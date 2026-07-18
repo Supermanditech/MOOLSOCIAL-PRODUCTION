@@ -15,13 +15,14 @@
 2. Deploy schema/connectors before clients only when backward-compatible.
 3. Use `COMPATIBLE` schema validation after production contains data.
 4. Run the clean-state journey replay on the emulator and staging.
-5. Upload Android artifact to App Distribution.
-6. Run Flutter integration tests on the Test Lab device matrix.
-7. Verify Crashlytics, Performance and business-intent events.
+5. Produce Android and iOS artifacts from the same source commit.
+6. Upload Android to App Distribution and iOS to TestFlight.
+7. Run Flutter integration tests on the Android and iOS device matrix.
+8. Verify Crashlytics, Performance and business-intent events by platform.
 
 ## Every production promotion
 
-1. Staging artifact and production artifact share the same source commit.
+1. Android and iOS staging/production artifacts share the same source commit.
 2. Feature is disabled by default and enabled through a reviewed flag.
 3. Backup and rollback route are verified.
 4. Payment/stock/payout mutations pass duplicate and retry tests.

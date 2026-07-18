@@ -54,3 +54,6 @@ firebase dataconnect:sdk:generate --project demo-moolsocial-local
 No command in this repository targets production by default. Staging and
 production deployment require explicit project aliases and protected GitHub
 environments.
+
+Cross-platform build, environment and store rules are defined in
+`docs/delivery/CROSS-PLATFORM-DELIVERY.md`.

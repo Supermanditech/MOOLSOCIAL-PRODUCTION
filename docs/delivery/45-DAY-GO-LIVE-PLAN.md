@@ -11,7 +11,8 @@ affected regression pass on staging.
 - Android/iOS application IDs and Firebase dev/staging projects.
 - Install/open, Remote Config boot, language/area setup, Auth and universal Mool
   shell.
-- Emulator tests, staging APK, connected-device replay and App Distribution.
+- Emulator tests, Android staging APK, iOS simulator build, connected-device
+  replay, App Distribution and TestFlight preparation.
 
 Exit: `PROD-JRN-001` works against real staging services.
 
@@ -61,7 +62,8 @@ Exit: content opens and its declared commerce/work action completes.
 
 ## Days 44-45: controlled release
 
-- Internal → closed → production Play tracks.
+- Internal → closed → production Google Play tracks and staged App Store
+  release from the same tagged source commit.
 - Staged percentage rollout controlled by crash-free and journey-success gates.
 - GO only when no release-blocking intent path is open.
 

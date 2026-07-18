@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  mobile:
+  mobile-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -27,6 +27,51 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --fatal-infos
       - run: flutter test --coverage
+
+  android-build:
+    needs: mobile-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.6"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moolsocial-android-debug
+          path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+  ios-build:
+    needs: mobile-quality
+    runs-on: macos-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.6"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --simulator --debug
+      - run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app build/ios/moolsocial-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moolsocial-ios-simulator
+          path: apps/mobile/build/ios/moolsocial-ios-simulator.zip
+          if-no-files-found: error
 
   sql-connect:
     runs-on: ubuntu-latest
