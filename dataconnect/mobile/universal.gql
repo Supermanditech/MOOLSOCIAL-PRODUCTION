@@ -1,0 +1,22 @@
+query GetMyAccount @auth(level: USER) {
+  appUser(key: {uid_expr: "auth.uid"}) {
+    uid
+    displayName
+    status
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpsertMyAccount($displayName: String)
+  @auth(level: USER)
+  @transaction {
+  appUser_upsert(
+    data: {
+      uid_expr: "auth.uid"
+      displayName: $displayName
+      status: ACTIVE
+      updatedAt_expr: "request.time"
+    }
+  )
+}

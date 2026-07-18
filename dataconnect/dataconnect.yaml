@@ -1,0 +1,13 @@
+specVersion: "v1beta"
+serviceId: "moolsocial-core"
+location: "asia-south1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "moolsocial"
+      cloudSql:
+        instanceId: "moolsocial-core-db"
+        schemaValidation: "COMPATIBLE"
+connectorDirs:
+  - "./mobile"

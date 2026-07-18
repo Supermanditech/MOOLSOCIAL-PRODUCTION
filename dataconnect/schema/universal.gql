@@ -1,0 +1,61 @@
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED
+  DELETED
+}
+
+enum AreaMode {
+  CURRENT
+  MANUAL
+  SKIPPED
+}
+
+enum RouteStatus {
+  PENDING
+  CONSUMED
+  EXPIRED
+}
+
+type AppUser @table(key: "uid") {
+  uid: String! @default(expr: "auth.uid")
+  displayName: String @col(dataType: "varchar(120)")
+  status: AccountStatus!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type UserPreference @table {
+  user: AppUser!
+  languageCode: String! @col(dataType: "varchar(12)")
+  areaMode: AreaMode!
+  areaLabel: String @col(dataType: "varchar(160)")
+  areaPlaceId: String @col(dataType: "varchar(180)")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type ConsentReceipt @table {
+  user: AppUser!
+  purpose: String! @col(dataType: "varchar(80)")
+  noticeVersion: String! @col(dataType: "varchar(40)")
+  languageCode: String! @col(dataType: "varchar(12)")
+  granted: Boolean!
+  recordedAt: Timestamp! @default(expr: "request.time")
+}
+
+type DeviceInstallation @table {
+  user: AppUser
+  installationId: String! @col(dataType: "varchar(180)")
+  platform: String! @col(dataType: "varchar(20)")
+  appVersion: String! @col(dataType: "varchar(40)")
+  pushTokenHash: String @col(dataType: "varchar(128)")
+  lastSeenAt: Timestamp! @default(expr: "request.time")
+}
+
+type PendingRoute @table {
+  user: AppUser!
+  route: String! @col(dataType: "varchar(320)")
+  status: RouteStatus!
+  expiresAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
+  consumedAt: Timestamp
+}
