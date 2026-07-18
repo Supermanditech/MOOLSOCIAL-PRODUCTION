@@ -43,3 +43,10 @@ artifacts/device/*
 !artifacts/device/moolsocial-production-food-basket-device.png
 !artifacts/device/moolsocial-production-table-replay-fixed.png
 !artifacts/device/moolsocial-production-tiffin-replay-fixed.png
+!artifacts/device/moolsocial-production-ride-booking-device.png
+!artifacts/device/moolsocial-production-ride-arriving-device.png
+!artifacts/device/moolsocial-production-ride-live-device.png
+!artifacts/device/moolsocial-production-ride-payment-device.png
+!artifacts/device/moolsocial-production-ride-receipt-device.png
+!artifacts/device/moolsocial-production-ride-support-device.png
+!artifacts/device/moolsocial-production-ride-support-selected-fixed.png

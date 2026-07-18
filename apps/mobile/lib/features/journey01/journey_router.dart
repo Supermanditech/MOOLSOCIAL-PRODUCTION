@@ -24,6 +24,11 @@ import '../eat/screens/eat_table_screen.dart';
 import '../eat/screens/eat_tiffin_confirmation_screen.dart';
 import '../eat/screens/eat_tiffin_screen.dart';
 import '../eat/screens/eat_tracking_screen.dart';
+import '../ride/ride_models.dart';
+import '../ride/ride_session.dart';
+import '../ride/screens/ride_booking_screen.dart';
+import '../ride/screens/ride_support_screen.dart';
+import '../ride/screens/ride_trip_screen.dart';
 import 'journey_session.dart';
 import 'screens/boot_screen.dart';
 import 'screens/setup_screen.dart';
@@ -35,7 +40,8 @@ GoRouter createJourneyRouter(
   JourneySession session,
   BuySession buySession,
   ChatSession chatSession,
-  EatSession eatSession, {
+  EatSession eatSession,
+  RideSession rideSession, {
   String initialLocation = '/boot',
 }) {
   return GoRouter(
@@ -200,6 +206,32 @@ GoRouter createJourneyRouter(
           session: chatSession,
           threadId: state.pathParameters['threadId'] ?? 'home-basket',
           returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+        ),
+      ),
+      GoRoute(
+        path: '/app/ride/book',
+        builder: (context, state) => RideBookingScreen(
+          session: rideSession,
+          initialType: switch (state.uri.queryParameters['type']) {
+            'bike' => RideType.bike,
+            'cab' => RideType.cab,
+            'auto' => RideType.auto,
+            _ => null,
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/app/ride/trip/:tripId',
+        builder: (context, state) => RideTripScreen(
+          session: rideSession,
+          tripId: state.pathParameters['tripId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/ride/trip/:tripId/support',
+        builder: (context, state) => RideSupportScreen(
+          session: rideSession,
+          tripId: state.pathParameters['tripId'] ?? '',
         ),
       ),
       GoRoute(

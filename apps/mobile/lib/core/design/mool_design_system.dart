@@ -141,7 +141,9 @@ class MoolSegment extends StatelessWidget {
               minHeight: MoolMetrics.minimumTapTarget,
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: MoolSpacing.sm),
+              padding: EdgeInsets.symmetric(
+                horizontal: icon == null ? MoolSpacing.sm : MoolSpacing.xs,
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -152,7 +154,7 @@ class MoolSegment extends StatelessWidget {
                       size: 17,
                       color: selected ? Colors.white : MoolColors.navy,
                     ),
-                    const SizedBox(width: MoolSpacing.xs),
+                    const SizedBox(width: MoolSpacing.xxs),
                   ],
                   Text(
                     label,

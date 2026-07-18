@@ -47,7 +47,7 @@ Last reconciled: 19 July 2026
 | 2 | At-shop payment and collection | `buy-counter` | 04, 09–12, 14–16 | Implemented in Flutter with explicit store choice, collection readiness, protected code, handoff and receipt; dedicated black-box suite passed |
 | 3 | Transactional and people chat | `chat` | 04, 23–25 | Implemented in Flutter; inbox, people/business/order/support threads, attachments, reply/reaction, failed-send replay, contextual actions and protected return routes passed dedicated and full-app regression |
 | 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Implemented in Flutter; order, basket, payment, tracking, table confirmation and tiffin controls passed dedicated black-box, two full regression cycles and physical-device replay |
-| 5 | Ride booking and completion | `ride` | 04, 30–35 | Pending |
+| 5 | Ride booking and completion | `ride` | 04, 30–35 | Implemented in Flutter; booking, captain arrival, live trip, explicit payment approval, receipt and support passed dedicated black-box, two full regression cycles and physical-device replay |
 | 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Pending |
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Pending |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Pending |
@@ -177,6 +177,26 @@ Last reconciled: 19 July 2026
   change entry, receipt, kitchen chat and stop-before-renewal.
 - Success or error banners are scoped to the journey where they occurred and
   are cleared when switching between Order, Table and Tiffin.
+
+## Ride implementation decisions now locked
+
+- Bike, Auto and Cab share one production booking route while retaining the
+  user's explicit vehicle choice.
+- Pickup, destination, schedule, available package, fare range, cancellation
+  rule and payment method remain visible before booking.
+- The customer is not charged at booking. Payment requires explicit approval
+  after the final trip fare and breakdown are visible.
+- Failed booking, payment and support submissions retain the user's context.
+  Exact retry creates one booking, receipt or case without duplication.
+- Captain identity, vehicle, rating and verified status remain visible before
+  the customer confirms pickup.
+- Live trip actions include call, chat, share, add stop and safety. Adding a
+  stop requires an explicit fare review before confirmation.
+- Receipt actions include download, share, rating, ride again and support.
+- Missing item, fare, route and safety cases attach the relevant trip, route,
+  captain and receipt evidence automatically.
+- Real maps, captain supply, telephony, emergency response and payment remain
+  replaceable external gateways and are not falsely represented as certified.
 
 ## Release boundary
 

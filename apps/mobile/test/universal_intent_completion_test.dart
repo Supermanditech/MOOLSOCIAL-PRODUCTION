@@ -67,7 +67,9 @@ void main() {
                   'order-food',
                   'book-table',
                   'tiffin',
-                }.contains(spec.id))) {
+                }.contains(spec.id)) ||
+            (section == 'ride' &&
+                const {'bike', 'auto', 'cab'}.contains(spec.id))) {
           continue;
         }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
@@ -134,6 +136,30 @@ void main() {
 
     await tapVisible(tester, const Key('eat-dock-tiffin'));
     expect(find.byKey(const Key('eat-tiffin-screen')), findsOneWidget);
+  });
+
+  testWidgets('Ride production entries open bike, auto and cab booking', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'ride');
+
+    await tapVisible(tester, const Key('sub-action-ride-bike'));
+    await tapVisible(tester, const Key('open-intent-bike'));
+    expect(find.byKey(const Key('ride-booking-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('ride-package-bike-saver'));
+
+    await tapVisible(tester, const Key('ride-back'));
+    await tapVisible(tester, const Key('sub-action-ride-auto'));
+    await tapVisible(tester, const Key('open-intent-auto'));
+    await tapVisible(tester, const Key('ride-package-auto'));
+
+    await tapVisible(tester, const Key('ride-back'));
+    await tapVisible(tester, const Key('sub-action-ride-cab'));
+    await tapVisible(tester, const Key('open-intent-cab'));
+    await tapVisible(tester, const Key('ride-package-cab-mini'));
   });
 
   testWidgets('Mool palette reaches every main action and returns safely', (

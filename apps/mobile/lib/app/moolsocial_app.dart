@@ -6,6 +6,7 @@ import '../features/chat/chat_session.dart';
 import '../features/eat/eat_session.dart';
 import '../features/journey01/journey_router.dart';
 import '../features/journey01/journey_session.dart';
+import '../features/ride/ride_session.dart';
 
 class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
@@ -14,22 +15,26 @@ class MoolSocialApp extends StatefulWidget {
     this.buySession,
     this.chatSession,
     this.eatSession,
+    this.rideSession,
     this.initialLocation = '/boot',
     this.disposeSession = false,
     this.disposeBuySession = false,
     this.disposeChatSession = false,
     this.disposeEatSession = false,
+    this.disposeRideSession = false,
   });
 
   final JourneySession? session;
   final BuySession? buySession;
   final ChatSession? chatSession;
   final EatSession? eatSession;
+  final RideSession? rideSession;
   final String initialLocation;
   final bool disposeSession;
   final bool disposeBuySession;
   final bool disposeChatSession;
   final bool disposeEatSession;
+  final bool disposeRideSession;
 
   @override
   State<MoolSocialApp> createState() => _MoolSocialAppState();
@@ -40,11 +45,13 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   late final BuySession _buySession = widget.buySession ?? BuySession();
   late final ChatSession _chatSession = widget.chatSession ?? ChatSession();
   late final EatSession _eatSession = widget.eatSession ?? EatSession();
+  late final RideSession _rideSession = widget.rideSession ?? RideSession();
   late final _router = createJourneyRouter(
     _session,
     _buySession,
     _chatSession,
     _eatSession,
+    _rideSession,
     initialLocation: widget.initialLocation,
   );
 
@@ -62,6 +69,9 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     }
     if (widget.eatSession == null || widget.disposeEatSession) {
       _eatSession.dispose();
+    }
+    if (widget.rideSession == null || widget.disposeRideSession) {
+      _rideSession.dispose();
     }
     super.dispose();
   }
