@@ -11,6 +11,9 @@ firestore-debug.log
 ui-debug.log
 dataconnect-debug.log
 pglite-debug.log
+OUTCOME/firebase-emulators-*.log
+OUTCOME/firebase-emulators-*.err.log
+OUTCOME/final-quality-gate*.log
 *.local
 .env
 .env.*
@@ -25,6 +28,7 @@ service-account*.json
 **/.packages
 **/build/
 **/doc/api/
+**/test/failures/
 **/android/local.properties
 **/ios/Flutter/ephemeral/
 **/ios/Pods/

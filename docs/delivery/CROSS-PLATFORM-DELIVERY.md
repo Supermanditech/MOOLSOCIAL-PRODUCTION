@@ -4,8 +4,11 @@
 
 - `apps/mobile/lib` contains the shared Flutter UI, navigation, validation,
   domain state and generated backend clients.
-- Android package: `com.supermanditech.moolsocial`.
-- iOS bundle: `com.supermanditech.moolsocial`.
+- Android package: `com.moolsocial.app`.
+- iOS bundle: `com.moolsocial.app`.
+- These production identifiers are fixed before the first store registration
+  and must not be renamed after an app is created in Play Console or App Store
+  Connect. See `docs/delivery/APP-IDENTITY.md`.
 - Android and iOS use the same environment-specific Firebase project, SQL
   Connect connector and Cloud SQL database.
 - Data, identity and business rules never fork by mobile platform.

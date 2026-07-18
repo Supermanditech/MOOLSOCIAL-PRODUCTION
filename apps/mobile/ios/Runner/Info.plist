@@ -26,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MoolSocial uses your area to show nearby products, services and work only after you choose current location.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MoolSocial uses the camera only when you choose to scan a supported payment or MoolSocial code.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MoolSocial uses the microphone only when you choose voice search.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>MoolSocial converts your short voice search into text so you can review it before searching.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

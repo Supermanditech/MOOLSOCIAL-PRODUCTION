@@ -1,0 +1,7 @@
+07-18 21:56:06.855 I/adbd    (10835): adbd service requested 'shell,v2,raw:uiautomator dump /sdcard/moolsocial-window.xml'
+07-18 21:56:07.017 D/AndroidRuntime(19641): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-18 21:56:07.023 I/AndroidRuntime(19641): Using default boot image
+07-18 21:56:07.023 I/AndroidRuntime(19641): Leaving lock profiling enabled
+07-18 21:56:07.175 D/AndroidRuntime(19641): Calling main entry com.android.commands.uiautomator.Launcher
+07-18 21:56:08.428 D/AndroidRuntime(19641): Shutting down VM
+07-18 21:56:09.427 I/adbd    (10835): adbd service requested 'shell,v2,raw:screencap -p /sdcard/moolsocial-otp-requested.png'

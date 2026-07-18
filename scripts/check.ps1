@@ -4,6 +4,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $mobile = Join-Path $root "apps\mobile"
 $flutterCommand = Get-Command flutter -ErrorAction SilentlyContinue
 
+& (Join-Path $PSScriptRoot "check-user-facing-copy.ps1")
+
 if ($flutterCommand) {
   $flutterExecutable = $flutterCommand.Source
 } else {
@@ -12,15 +14,6 @@ if ($flutterCommand) {
     throw "Flutter was not found."
   }
   $flutterExecutable = $flutterPath
-}
-
-Push-Location $mobile
-try {
-  & $flutterExecutable pub get
-  & $flutterExecutable analyze --fatal-infos
-  & $flutterExecutable test
-} finally {
-  Pop-Location
 }
 
 if (Get-Command firebase -ErrorAction SilentlyContinue) {
@@ -36,6 +29,15 @@ if (Get-Command firebase -ErrorAction SilentlyContinue) {
   } finally {
     Pop-Location
   }
+}
+
+Push-Location $mobile
+try {
+  & $flutterExecutable pub get
+  & $flutterExecutable analyze --fatal-infos
+  & $flutterExecutable test
+} finally {
+  Pop-Location
 }
 
 Write-Output "Local quality gate passed."

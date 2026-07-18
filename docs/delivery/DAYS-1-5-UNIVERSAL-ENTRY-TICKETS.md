@@ -1,5 +1,9 @@
 # Days 1-5: universal entry tickets
 
+> Superseded for user-facing UI/UX and intent-completion work by
+> `UNIVERSAL-INTENT-PRODUCTION-BACKLOG.md`. Platform and cloud tickets below
+> remain valid.
+
 ## Completed locally
 
 - `PLAT-001`: production monorepo and Flutter Android/iOS application scaffold.
@@ -19,7 +23,7 @@
 1. `CLOUD-001`: create separate `moolsocial-development`,
    `moolsocial-staging` and `moolsocial-production` Firebase/GCP projects;
    attach billing only to staging/production and set budget alerts.
-2. `AUTH-001`: register `com.supermanditech.moolsocial`, configure SHA
+2. `AUTH-001`: register `com.moolsocial.app`, configure SHA
    fingerprints and connect Firebase UI Auth to the Auth emulator.
 3. `AUTH-002`: implement real phone OTP plus invalid, expired, resend,
    provider-cancel and account-linking behavior.

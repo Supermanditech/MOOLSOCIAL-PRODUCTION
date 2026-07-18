@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.supermanditech.moolsocial"
+    namespace = "com.moolsocial.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +15,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.supermanditech.moolsocial"
+        // Store identity is permanent after the first Play release.
+        applicationId = "com.moolsocial.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

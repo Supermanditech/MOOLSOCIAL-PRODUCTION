@@ -1,0 +1,6 @@
+# Firebase Data Connect regenerates these files verbatim, including its
+# whitespace style. Keep diffs reproducible instead of rewriting generated SDKs.
+apps/mobile/lib/data/generated/** -whitespace
+
+# Preserve the upstream font license text exactly as distributed.
+apps/mobile/assets/fonts/OFL.txt -whitespace

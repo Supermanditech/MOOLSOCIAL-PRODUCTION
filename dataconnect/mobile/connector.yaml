@@ -1,7 +1,7 @@
 connectorId: "mobile"
 generate:
   dartSdk:
-    outputDir: "../../packages/generated/moolsocial_data"
+    outputDir: "../../apps/mobile/lib/data/generated"
     package: "moolsocial_data"
     clientCache:
       maxAge: "5m"

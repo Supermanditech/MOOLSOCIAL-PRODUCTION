@@ -1,5 +1,10 @@
 # MoolSocial Production
 
+## Product implementation contracts
+
+- [Apple-inspired full-app design memory](docs/design/APPLE-INSPIRED-PRODUCT-DESIGN-MEMORY.md)
+- [Universal intent-completion production backlog](docs/delivery/UNIVERSAL-INTENT-PRODUCTION-BACKLOG.md)
+
 This is the production codebase. The HTML screenbook remains a requirements and
 replay reference; production delivery happens here as end-to-end vertical
 journeys.
@@ -44,6 +49,18 @@ Run the mobile app:
 cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\apps\mobile"
 flutter run
 ```
+
+Install the clean review build on an authorized USB-connected Android phone:
+
+```powershell
+cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION"
+.\scripts\run-phone-review.ps1
+```
+
+This script refuses to continue unless both local backend emulators are
+listening. It reverses only ports 9099 and 9399, clears the demo Auth users and
+app state unless `-KeepAppState` is supplied, installs the APK and opens
+`com.moolsocial.app`.
 
 Generate SQL Connect SDKs after the emulator is configured:
 

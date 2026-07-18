@@ -7,9 +7,12 @@ import 'screens/sign_in_screen.dart';
 import 'screens/universal_shell.dart';
 import 'screens/verify_otp_screen.dart';
 
-GoRouter createJourneyRouter(JourneySession session) {
+GoRouter createJourneyRouter(
+  JourneySession session, {
+  String initialLocation = '/boot',
+}) {
   return GoRouter(
-    initialLocation: '/boot',
+    initialLocation: initialLocation,
     refreshListenable: session,
     redirect: (context, state) {
       final location = state.uri.path;
@@ -21,6 +24,7 @@ GoRouter createJourneyRouter(JourneySession session) {
 
       switch (session.stage) {
         case JourneyStage.booting:
+        case JourneyStage.bootFailure:
           return location == '/boot' ? null : '/boot';
         case JourneyStage.setup:
           return location == '/setup' ? null : '/setup';
@@ -29,7 +33,7 @@ GoRouter createJourneyRouter(JourneySession session) {
         case JourneyStage.verify:
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
-          if (!protected) return session.consumeReturnTo();
+          if (!protected) return session.readyRoute();
           return null;
       }
     },
@@ -53,7 +57,9 @@ GoRouter createJourneyRouter(JourneySession session) {
       GoRoute(
         path: '/app/:section',
         builder: (context, state) => UniversalShell(
+          session: session,
           section: state.pathParameters['section'] ?? 'social',
+          initialSubAction: state.uri.queryParameters['sub'],
         ),
       ),
     ],

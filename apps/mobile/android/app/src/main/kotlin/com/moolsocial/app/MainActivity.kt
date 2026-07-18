@@ -1,4 +1,4 @@
-package com.supermanditech.moolsocial
+package com.moolsocial.app
 
 import io.flutter.embedding.android.FlutterActivity
 

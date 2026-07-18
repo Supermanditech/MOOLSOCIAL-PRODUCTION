@@ -4,10 +4,13 @@
   },
   "emulators": {
     "auth": {
+      "host": "0.0.0.0",
       "port": 9099
     },
     "dataconnect": {
-      "port": 9399
+      "host": "0.0.0.0",
+      "port": 9399,
+      "dataDir": "dataconnect/.dataconnect/pgliteData"
     },
     "ui": {
       "enabled": true,

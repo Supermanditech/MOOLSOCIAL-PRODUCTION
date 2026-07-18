@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="132" viewBox="0 0 320 132" role="img" aria-label="MoolSocial — India Ka Socio Commerce App">
+  <rect width="320" height="132" rx="8" fill="#000080"/>
+  <text x="160" y="53" fill="#FFFFFF" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="42" font-weight="900" text-anchor="middle">MoolSocial</text>
+  <g transform="translate(61 65)">
+    <rect width="89" height="5" rx="2.5" fill="#FF9933"/>
+    <rect x="89" width="28" height="5" fill="#FFFFFF"/>
+    <rect x="117" width="81" height="5" rx="2.5" fill="#138808"/>
+  </g>
+  <rect x="54" y="81" width="212" height="32" rx="16" fill="#FFFFFF"/>
+  <text x="160" y="102" fill="#000080" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" text-anchor="middle">India Ka Socio Commerce App</text>
+</svg>
