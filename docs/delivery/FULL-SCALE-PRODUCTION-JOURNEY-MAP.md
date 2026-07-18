@@ -46,7 +46,7 @@ Last reconciled: 19 July 2026
 | 1 | Household buying, delivery, bill and issue resolution | `buy-delivery`, `buy-issue` | 04, 09–12, 14, 17–22 | Implemented in Flutter; dedicated black-box suite passed |
 | 2 | At-shop payment and collection | `buy-counter` | 04, 09–12, 14–16 | Implemented in Flutter with explicit store choice, collection readiness, protected code, handoff and receipt; dedicated black-box suite passed |
 | 3 | Transactional and people chat | `chat` | 04, 23–25 | Implemented in Flutter; inbox, people/business/order/support threads, attachments, reply/reaction, failed-send replay, contextual actions and protected return routes passed dedicated and full-app regression |
-| 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Pending |
+| 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Implemented in Flutter; order, basket, payment, tracking, table confirmation and tiffin controls passed dedicated black-box, two full regression cycles and physical-device replay |
 | 5 | Ride booking and completion | `ride` | 04, 30–35 | Pending |
 | 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Pending |
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Pending |
@@ -147,6 +147,36 @@ Last reconciled: 19 July 2026
   sequence replaces it with one delivered message; it does not duplicate it.
 - Calls, video calls and potentially sensitive conversation actions require an
   explicit confirmation or show their completed state.
+
+## Food implementation decisions now locked
+
+- Food is a production vertical slice with separate Order, Table and Tiffin
+  routes behind one shared Eat entry.
+- Restaurant and kitchen selection rejects a closed or paused provider without
+  replacing the user's current valid selection.
+- Order fulfilment supports home delivery, pickup, table QR and confirmed
+  scheduled delivery. Scheduled checkout cannot proceed without a valid date
+  and time.
+- Duplicate food adds increment one basket line. Customization remains attached
+  to that line and is visible before payment.
+- Food availability, preparation time, cancellation window, digital bill,
+  delivery fee and final total remain visible before payment.
+- Failed food payment creates no order, deducts no money and preserves the
+  basket for one exact retry.
+- Live order status covers confirmation, preparation, rider assignment,
+  nearby, delivered, early cancellation, support, bill and meal rating.
+- Table booking requires a restaurant, party size, time and table choice.
+  Booking cost, deposit adjustment, hold time, late-arrival rule and
+  cancellation window are visible before confirmation.
+- A confirmed table exposes a protected arrival QR, directions, masked call,
+  restaurant chat, menu preorder and safe cancellation.
+- Tiffin exposes kitchen trust, food style, day-wise menu, meal count, delivery
+  slot, trial/weekly/monthly price, address, pause/skip allowance and
+  cancellation timing before starting.
+- An active tiffin plan supports next-meal skip/restore, pause/resume, address
+  change entry, receipt, kitchen chat and stop-before-renewal.
+- Success or error banners are scoped to the journey where they occurred and
+  are cleared when switching between Order, Table and Tiffin.
 
 ## Release boundary
 

@@ -1268,6 +1268,9 @@ class _IntentEntryCard extends StatelessWidget {
                 ('buy', 'grocery') ||
                 ('buy', 'categories') => '/app/buy/grocery',
                 ('buy', 'basket') => '/app/buy/basket',
+                ('eat', 'order-food') => '/app/eat/order',
+                ('eat', 'book-table') => '/app/eat/table',
+                ('eat', 'tiffin') => '/app/eat/tiffin',
                 _ => null,
               };
               if (productionRoute != null) {

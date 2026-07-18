@@ -13,6 +13,17 @@ import '../buy/screens/buy_tracking_screen.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
+import '../eat/eat_session.dart';
+import '../eat/screens/eat_basket_screen.dart';
+import '../eat/screens/eat_completed_screen.dart';
+import '../eat/screens/eat_home_screen.dart';
+import '../eat/screens/eat_order_screen.dart';
+import '../eat/screens/eat_review_screen.dart';
+import '../eat/screens/eat_table_confirmation_screen.dart';
+import '../eat/screens/eat_table_screen.dart';
+import '../eat/screens/eat_tiffin_confirmation_screen.dart';
+import '../eat/screens/eat_tiffin_screen.dart';
+import '../eat/screens/eat_tracking_screen.dart';
 import 'journey_session.dart';
 import 'screens/boot_screen.dart';
 import 'screens/setup_screen.dart';
@@ -23,7 +34,8 @@ import 'screens/verify_otp_screen.dart';
 GoRouter createJourneyRouter(
   JourneySession session,
   BuySession buySession,
-  ChatSession chatSession, {
+  ChatSession chatSession,
+  EatSession eatSession, {
   String initialLocation = '/boot',
 }) {
   return GoRouter(
@@ -121,6 +133,58 @@ GoRouter createJourneyRouter(
         builder: (context, state) => BuyProblemScreen(
           session: buySession,
           orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/eat/home',
+        builder: (context, state) => EatHomeScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/order',
+        builder: (context, state) => EatOrderScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/basket',
+        builder: (context, state) => EatBasketScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/review',
+        builder: (context, state) => EatReviewScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/order/:orderId',
+        builder: (context, state) => EatTrackingScreen(
+          session: eatSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/eat/order/:orderId/completed',
+        builder: (context, state) => EatCompletedScreen(
+          session: eatSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/eat/table',
+        builder: (context, state) => EatTableScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/table/:bookingId',
+        builder: (context, state) => EatTableConfirmationScreen(
+          session: eatSession,
+          bookingId: state.pathParameters['bookingId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/eat/tiffin',
+        builder: (context, state) => EatTiffinScreen(session: eatSession),
+      ),
+      GoRoute(
+        path: '/app/eat/tiffin/:subscriptionId',
+        builder: (context, state) => EatTiffinConfirmationScreen(
+          session: eatSession,
+          subscriptionId: state.pathParameters['subscriptionId'] ?? '',
         ),
       ),
       GoRoute(

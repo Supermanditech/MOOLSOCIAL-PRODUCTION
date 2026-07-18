@@ -60,8 +60,14 @@ void main() {
       await openSection(tester, session, section);
 
       for (final spec in UniversalIntentCatalog.forSection(section)) {
-        if (section == 'buy' &&
-            const {'grocery', 'categories', 'basket'}.contains(spec.id)) {
+        if ((section == 'buy' &&
+                const {'grocery', 'categories', 'basket'}.contains(spec.id)) ||
+            (section == 'eat' &&
+                const {
+                  'order-food',
+                  'book-table',
+                  'tiffin',
+                }.contains(spec.id))) {
           continue;
         }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
@@ -107,6 +113,27 @@ void main() {
     await tapVisible(tester, const Key('sub-action-buy-basket'));
     await tapVisible(tester, const Key('open-intent-basket'));
     expect(find.byKey(const Key('buy-basket-screen')), findsOneWidget);
+  });
+
+  testWidgets('Eat production entries open order, table and tiffin routes', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'eat');
+
+    await tapVisible(tester, const Key('sub-action-eat-order-food'));
+    await tapVisible(tester, const Key('open-intent-order-food'));
+    expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
+
+    await tapVisible(tester, const Key('eat-back'));
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('eat-home-table'));
+    expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
+
+    await tapVisible(tester, const Key('eat-dock-tiffin'));
+    expect(find.byKey(const Key('eat-tiffin-screen')), findsOneWidget);
   });
 
   testWidgets('Mool palette reaches every main action and returns safely', (
