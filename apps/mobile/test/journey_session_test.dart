@@ -38,6 +38,21 @@ void main() {
     expect(session.stage, JourneyStage.setup);
   });
 
+  test('account bootstrap timeout reaches a retryable boot failure', () async {
+    final session = JourneySession(
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: _NeverCompletesAccountBootstrap(),
+      accountBootstrapTimeout: const Duration(milliseconds: 1),
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.bootFailure);
+    expect(session.busy, isFalse);
+    expect(session.errorMessage, contains('Nothing was changed'));
+  });
+
   test(
     'expired OTP fails, resend is cooled down, then retry succeeds',
     () async {
@@ -121,4 +136,10 @@ void main() {
       expect(session.manualArea, 'Sardarpura');
     },
   );
+}
+
+class _NeverCompletesAccountBootstrap implements AccountBootstrapGateway {
+  @override
+  Future<void> prepareAuthenticatedAccount() =>
+      Future<void>.delayed(const Duration(days: 1));
 }

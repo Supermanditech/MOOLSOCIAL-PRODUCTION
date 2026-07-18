@@ -60,6 +60,10 @@ void main() {
       await openSection(tester, session, section);
 
       for (final spec in UniversalIntentCatalog.forSection(section)) {
+        if (section == 'buy' &&
+            const {'grocery', 'categories', 'basket'}.contains(spec.id)) {
+          continue;
+        }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
         expect(find.text(spec.title), findsOneWidget);
 
@@ -79,6 +83,31 @@ void main() {
       }
     });
   }
+
+  testWidgets('Buy production entries open catalogue and basket routes', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'buy');
+
+    await tapVisible(tester, const Key('sub-action-buy-grocery'));
+    await tapVisible(tester, const Key('open-intent-grocery'));
+    expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
+
+    await tapVisible(tester, const Key('buy-back'));
+    expect(find.byKey(const Key('section-buy')), findsOneWidget);
+    final horizontalActions = find.byWidgetPredicate(
+      (widget) =>
+          widget is ListView && widget.scrollDirection == Axis.horizontal,
+    );
+    await tester.drag(horizontalActions.first, const Offset(-240, 0));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('sub-action-buy-basket'));
+    await tapVisible(tester, const Key('open-intent-basket'));
+    expect(find.byKey(const Key('buy-basket-screen')), findsOneWidget);
+  });
 
   testWidgets('Mool palette reaches every main action and returns safely', (
     tester,
@@ -303,8 +332,8 @@ void main() {
 
     await tapVisible(tester, const Key('close-profile'));
     await tapVisible(tester, const Key('nav-chat'));
-    expect(find.text('Back to Book'), findsOneWidget);
-    await tapVisible(tester, const Key('chat-return'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-back'));
     expect(find.byKey(const Key('section-book')), findsOneWidget);
   });
 

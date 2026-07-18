@@ -1263,7 +1263,19 @@ class _IntentEntryCard extends StatelessWidget {
           const SizedBox(height: MoolSpacing.md),
           FilledButton(
             key: Key('open-intent-${spec.id}'),
-            onPressed: () => showIntentCompletionSheet(context, spec),
+            onPressed: () {
+              final productionRoute = switch ((spec.section, spec.id)) {
+                ('buy', 'grocery') ||
+                ('buy', 'categories') => '/app/buy/grocery',
+                ('buy', 'basket') => '/app/buy/basket',
+                _ => null,
+              };
+              if (productionRoute != null) {
+                context.go(productionRoute);
+                return;
+              }
+              showIntentCompletionSheet(context, spec);
+            },
             style: FilledButton.styleFrom(backgroundColor: MoolColors.navy),
             child: Text(spec.primaryAction),
           ),
@@ -1321,7 +1333,13 @@ class _UniversalDock extends StatelessWidget {
               if (activeSection != 'chat') {
                 session.openMoolFrom(activeSection);
               }
-              context.go('/app/chat');
+              final current = GoRouterState.of(context).uri.toString();
+              context.go(
+                Uri(
+                  path: '/app/chat/inbox',
+                  queryParameters: {'return': current},
+                ).toString(),
+              );
             },
           ),
         ],

@@ -35,3 +35,7 @@ service-account*.json
 **/ios/.symlinks/
 packages/generated/
 dataconnect/.dataconnect/
+artifacts/device/*
+!artifacts/device/moolsocial-clean-install.png
+!artifacts/device/moolsocial-lan-verified.png
+!artifacts/device/moolsocial-production-chat-device.png

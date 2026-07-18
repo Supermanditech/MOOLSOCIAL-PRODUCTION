@@ -115,6 +115,7 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
       },
     );
 
+    unawaited(_completeFromEmulator(phoneNumber, completer));
     return completer.future.timeout(
       const Duration(seconds: 20),
       onTimeout: () => throw const JourneyServiceException(
@@ -152,6 +153,28 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
 
   @override
   Future<String?> reviewCodeFor(String phoneNumber) async {
+    final verification = await _latestEmulatorVerification(phoneNumber);
+    return verification?.code;
+  }
+
+  Future<void> _completeFromEmulator(
+    String phoneNumber,
+    Completer<OtpRequestResult> completer,
+  ) async {
+    for (var attempt = 0; attempt < 12 && !completer.isCompleted; attempt++) {
+      final verification = await _latestEmulatorVerification(phoneNumber);
+      if (verification != null) {
+        _verificationId = verification.sessionInfo;
+        completer.complete(const OtpRequestResult());
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+  }
+
+  Future<({String code, String sessionInfo})?> _latestEmulatorVerification(
+    String phoneNumber,
+  ) async {
     final client = HttpClient();
     try {
       final request = await client.getUrl(
@@ -168,7 +191,12 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
       for (final item in codes.reversed) {
         final code = item as Map<String, dynamic>;
         if (code['phoneNumber'] == phoneNumber) {
-          return (code['code'] ?? code['sessionCode']) as String?;
+          final value = (code['code'] ?? code['sessionCode']) as String?;
+          final sessionInfo =
+              (code['sessionInfo'] ?? code['sessionCode']) as String?;
+          if (value != null && sessionInfo != null) {
+            return (code: value, sessionInfo: sessionInfo);
+          }
         }
       }
       return null;

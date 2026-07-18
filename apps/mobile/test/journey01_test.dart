@@ -275,8 +275,9 @@ void main() {
     expect(find.text('Groceries delivered to your home'), findsOne);
 
     await tapVisible(tester, const Key('nav-chat'));
-    expect(find.text('Message people you know'), findsOne);
-    expect(find.text('Back to Buy'), findsOne);
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('section-buy')), findsOneWidget);
   });
 
   testWidgets('sign-out cancellation and confirmation are explicit', (

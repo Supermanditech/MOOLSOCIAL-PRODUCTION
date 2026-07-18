@@ -15,6 +15,7 @@ class JourneySession extends ChangeNotifier {
     DateTime Function()? now,
     this.otpValidity = const Duration(minutes: 2),
     this.resendCooldown = const Duration(seconds: 30),
+    this.accountBootstrapTimeout = const Duration(seconds: 8),
   }) : _store = store ?? MemoryJourneyStore(),
        _otpGateway = otpGateway ?? ReviewOtpGateway(),
        _accountBootstrapGateway =
@@ -29,6 +30,7 @@ class JourneySession extends ChangeNotifier {
   final DateTime Function() _now;
   final Duration otpValidity;
   final Duration resendCooldown;
+  final Duration accountBootstrapTimeout;
 
   JourneyStage stage = JourneyStage.booting;
   String languageCode = 'en';
@@ -81,7 +83,7 @@ class JourneySession extends ChangeNotifier {
 
       final signedIn = await _otpGateway.hasAuthenticatedUser();
       if (signedIn) {
-        await _accountBootstrapGateway.prepareAuthenticatedAccount();
+        await _prepareAuthenticatedAccount();
         stage = JourneyStage.ready;
       } else if (snapshot?.setupComplete ?? false) {
         stage = JourneyStage.signIn;
@@ -345,7 +347,7 @@ class JourneySession extends ChangeNotifier {
     }
     _authenticationCompletionInProgress = true;
     try {
-      await _accountBootstrapGateway.prepareAuthenticatedAccount();
+      await _prepareAuthenticatedAccount();
       await _persist(setupComplete: true);
       stage = JourneyStage.ready;
       errorMessage = null;
@@ -439,5 +441,14 @@ class JourneySession extends ChangeNotifier {
   void _setBusy(bool value) {
     busy = value;
     notifyListeners();
+  }
+
+  Future<void> _prepareAuthenticatedAccount() {
+    return _accountBootstrapGateway.prepareAuthenticatedAccount().timeout(
+      accountBootstrapTimeout,
+      onTimeout: () => throw const JourneyServiceException(
+        'Your account service did not respond. Check the connection and try again.',
+      ),
+    );
   }
 }
