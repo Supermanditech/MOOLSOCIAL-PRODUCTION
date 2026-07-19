@@ -6,6 +6,8 @@ import 'retailer_books_models.dart';
 import 'retailer_books_services.dart';
 import 'retailer_campaign_models.dart';
 import 'retailer_campaign_services.dart';
+import 'retailer_control_models.dart';
+import 'retailer_control_services.dart';
 import 'retailer_models.dart';
 import 'retailer_pos_models.dart';
 import 'retailer_pos_services.dart';
@@ -21,6 +23,7 @@ class RetailerSession extends ChangeNotifier {
     ReviewRetailerBooksGateway? booksGateway,
     ReviewRetailerBusinessServicesGateway? businessServicesGateway,
     ReviewRetailerCampaignGateway? campaignGateway,
+    ReviewRetailerControlGateway? controlGateway,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
        wholesaleGateway = wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
@@ -28,13 +31,16 @@ class RetailerSession extends ChangeNotifier {
        businessServicesGateway =
            businessServicesGateway ?? ReviewRetailerBusinessServicesGateway(),
        campaignGateway = campaignGateway ?? ReviewRetailerCampaignGateway(),
+       controlGateway = controlGateway ?? ReviewRetailerControlGateway(),
        orders = buildReviewRetailerOrders(),
        counters = buildReviewCounters(),
        sales = buildReviewSales(),
        purchases = buildReviewPurchaseRecords(),
        stockMovements = List.of(reviewStockMovements),
        moneyExceptions = buildReviewMoneyExceptions(),
-       campaigns = buildReviewRetailerCampaigns();
+       campaigns = buildReviewRetailerCampaigns(),
+       staff = buildReviewStaff(),
+       customerIssues = buildReviewCustomerIssues();
 
   final ReviewRetailerGateway gateway;
   final ReviewRetailerPosGateway posGateway;
@@ -42,6 +48,7 @@ class RetailerSession extends ChangeNotifier {
   final ReviewRetailerBooksGateway booksGateway;
   final ReviewRetailerBusinessServicesGateway businessServicesGateway;
   final ReviewRetailerCampaignGateway campaignGateway;
+  final ReviewRetailerControlGateway controlGateway;
   final List<RetailerOrder> orders;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
@@ -49,6 +56,8 @@ class RetailerSession extends ChangeNotifier {
   final List<RetailerStockMovement> stockMovements;
   final List<RetailerMoneyException> moneyExceptions;
   final List<RetailerCampaign> campaigns;
+  final List<RetailerStaffMember> staff;
+  final List<RetailerCustomerIssue> customerIssues;
 
   RetailerHomeView view = RetailerHomeView.home;
   bool ordersOnline = true;
@@ -167,6 +176,37 @@ class RetailerSession extends ChangeNotifier {
   int campaignSpendCap = 1500;
   String? campaignDraftId;
   String? publishedCampaignId;
+
+  bool controlsOnline = true;
+  bool controlsAuthorized = true;
+  String recoveryProductId = 'detergent';
+  RetailerRecoveryRoute recoveryRoute = RetailerRecoveryRoute.customerOffer;
+  int recoveryQuantity = 20;
+  int recoveryFloor = 116;
+  String recoveryDuration = 'In 48 hours';
+  bool recoveryReviewed = false;
+  String? recoveryId;
+  String aiPrompt = 'What needs action today?';
+  String? aiAnswer;
+  final Set<String> dismissedAiActions = {};
+  String? aiRequestId;
+  bool invitePanelOpen = false;
+  String inviteName = 'Rakesh Kumar';
+  String inviteMobile = '98765 11223';
+  RetailerStaffRole inviteRole = RetailerStaffRole.counterOperator;
+  String? staffInviteId;
+  String? selectedStaffId;
+  bool acceptAppOrders = true;
+  bool atShopCollection = true;
+  bool homeDelivery = true;
+  bool licenceAttention = false;
+  String? settingsVersion;
+  RetailerIssueFilter issueFilter = RetailerIssueFilter.all;
+  String selectedIssueId = 'MS-2848';
+  RetailerIssueResolution issueResolution = RetailerIssueResolution.replace;
+  String issueMessage =
+      'We reviewed your photo and can replace this item today.';
+  String? issueResolutionId;
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -2740,6 +2780,373 @@ class RetailerSession extends ChangeNotifier {
       () => campaignGateway.deleteDraft(id),
       success: '${campaign.title} draft deleted.',
       afterSuccess: () => campaigns.remove(campaign),
+    );
+  }
+
+  RetailerSlowStockItem get recoveryProduct => reviewSlowStock.firstWhere(
+    (item) => item.id == recoveryProductId,
+    orElse: () => reviewSlowStock.first,
+  );
+
+  RetailerCustomerIssue get selectedIssue => customerIssues.firstWhere(
+    (item) => item.id == selectedIssueId,
+    orElse: () => customerIssues.first,
+  );
+
+  List<RetailerCustomerIssue> get filteredIssues => customerIssues
+      .where(
+        (issue) =>
+            issueFilter == RetailerIssueFilter.all ||
+            issue.states.contains(issueFilter),
+      )
+      .toList(growable: false);
+
+  void setControlsOnline(bool value) {
+    controlsOnline = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectRecoveryProduct(String id) {
+    recoveryProductId = id;
+    final product = recoveryProduct;
+    recoveryQuantity = product.available < 20 ? product.available : 20;
+    recoveryFloor = product.floor;
+    recoveryReviewed = false;
+    recoveryId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setRecoveryRoute(RetailerRecoveryRoute value) {
+    recoveryRoute = value;
+    recoveryReviewed = false;
+    recoveryId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool setRecoveryQuantity(int value) {
+    if (value < 1 || value > recoveryProduct.available) {
+      _showError(
+        'Choose 1 to ${recoveryProduct.available} available units. Reserved, disputed and unsafe stock stays excluded.',
+      );
+      return false;
+    }
+    recoveryQuantity = value;
+    recoveryReviewed = false;
+    recoveryId = null;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  bool setRecoveryFloor(int value) {
+    if (value <= 0) {
+      _showError('Enter a protected minimum price greater than zero.');
+      return false;
+    }
+    recoveryFloor = value;
+    recoveryReviewed = false;
+    recoveryId = null;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  void setRecoveryDuration(String value) {
+    recoveryDuration = value;
+    recoveryReviewed = false;
+    recoveryId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> reviewOrPublishRecovery() async {
+    if (!recoveryReviewed) {
+      recoveryReviewed = true;
+      clearMessages();
+      noticeMessage =
+          'Review ready: ${recoveryRoute.label}, $recoveryQuantity units, minimum ₹${recoveryQuantity * recoveryFloor}, ${recoveryDuration.toLowerCase()}.';
+      notifyListeners();
+      return true;
+    }
+    if (recoveryId != null) {
+      noticeMessage =
+          'Recovery action $recoveryId is already published. No quantity was reserved twice.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!controlsAuthorized) {
+      _showError('Shop owner approval is required to publish recovery stock.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError(
+        'Stock recovery is offline. No quantity was reserved or published.',
+      );
+      return false;
+    }
+    return _runBool(
+      controlGateway.publishRecovery,
+      success:
+          'Recovery action REC-101-0715 published through ${recoveryRoute.label}. Quantity and floor are locked.',
+      afterSuccess: () => recoveryId = 'REC-101-0715',
+    );
+  }
+
+  void setAiPrompt(String value) {
+    aiPrompt = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> askRetailerAi() async {
+    if (aiPrompt.trim().length < 4) {
+      _showError('Ask a clear workspace question.');
+      return false;
+    }
+    if (!controlsAuthorized) {
+      _showError('Your current role cannot use protected workspace records.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError(
+        'Mool AI is offline. No answer or business action was created.',
+      );
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      aiRequestId = await controlGateway.askAi(aiPrompt.trim());
+      final prompt = aiPrompt.toLowerCase();
+      aiAnswer = prompt.contains('restock')
+          ? 'Seven products may run below seven-day demand. One purchase review is prepared using landed cost, MOQ and delivery terms.'
+          : prompt.contains('slow')
+          ? 'Eighteen products are slow. Twelve are safe for controlled offers; reserved, disputed and unsafe quantities are excluded.'
+          : 'Three actions need attention: confirm low stock, review customer credit due and approve a slow-stock offer.';
+      noticeMessage =
+          'Answer prepared from authorized workspace records. No purchase, price, message or filing was changed.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  void dismissAiAction(String id) {
+    dismissedAiActions.add(id);
+    clearMessages();
+    noticeMessage = 'Draft dismissed. No business action was taken.';
+    notifyListeners();
+  }
+
+  void setInvitePanel(bool value) {
+    invitePanelOpen = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setInviteName(String value) {
+    inviteName = value;
+    staffInviteId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setInviteMobile(String value) {
+    inviteMobile = value;
+    staffInviteId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setInviteRole(RetailerStaffRole value) {
+    inviteRole = value;
+    staffInviteId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> sendStaffInvite() async {
+    if (staffInviteId != null) {
+      noticeMessage =
+          'Invite $staffInviteId is already sent. No access or second invite was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (inviteName.trim().length < 3 ||
+        inviteMobile.replaceAll(RegExp(r'\D'), '').length != 10) {
+      _showError('Enter a staff name and valid 10-digit mobile number.');
+      return false;
+    }
+    if (!controlsAuthorized) {
+      _showError('Only the shop owner can invite or change staff access.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError('Staff access is offline. No invite or access was created.');
+      return false;
+    }
+    return _runBool(
+      controlGateway.inviteStaff,
+      success:
+          'Secure invite INV-103-0715 sent. It expires in 24 hours and grants no access until verification.',
+      afterSuccess: () => staffInviteId = 'INV-103-0715',
+    );
+  }
+
+  Future<bool> toggleStaffAccess(String id) async {
+    final member = staff.firstWhere((item) => item.id == id);
+    selectedStaffId = id;
+    if (member.owner) {
+      _showError('The protected owner role cannot be paused here.');
+      return false;
+    }
+    if (!controlsAuthorized) {
+      _showError('Only the owner can change staff access.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError('Staff access is offline. Existing access remains unchanged.');
+      return false;
+    }
+    return _runBool(
+      controlGateway.changeStaff,
+      success: member.paused
+          ? '${member.name} access resumed for the assigned branch.'
+          : '${member.name} access paused. Permission history was retained.',
+      afterSuccess: () => member.paused = !member.paused,
+    );
+  }
+
+  void toggleStoreSetting(String id) {
+    switch (id) {
+      case 'orders':
+        acceptAppOrders = !acceptAppOrders;
+      case 'collection':
+        atShopCollection = !atShopCollection;
+      case 'delivery':
+        homeDelivery = !homeDelivery;
+    }
+    settingsVersion = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void reviewLicenceReminder() {
+    licenceAttention = true;
+    clearMessages();
+    noticeMessage =
+        'Upload the renewed shop licence before the due date in 28 days.';
+    notifyListeners();
+  }
+
+  Future<bool> saveStoreSettings() async {
+    if (settingsVersion != null) {
+      noticeMessage =
+          'Settings version $settingsVersion is already saved. No duplicate version was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!controlsAuthorized) {
+      _showError('Owner approval is required to publish store settings.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError(
+        'Store settings are offline. Customer-visible settings remain unchanged.',
+      );
+      return false;
+    }
+    return _runBool(
+      controlGateway.saveSettings,
+      success:
+          'Store settings SET-104-0715 saved once with branch and operator audit.',
+      afterSuccess: () => settingsVersion = 'SET-104-0715',
+    );
+  }
+
+  void setIssueFilter(RetailerIssueFilter value) {
+    issueFilter = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectIssue(String id) {
+    selectedIssueId = id;
+    final issue = selectedIssue;
+    issueResolution = issue.states.contains(RetailerIssueFilter.refund)
+        ? RetailerIssueResolution.refund
+        : RetailerIssueResolution.replace;
+    issueMessage = issue.message;
+    issueResolutionId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setIssueResolution(RetailerIssueResolution value) {
+    issueResolution = value;
+    issueResolutionId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setIssueMessage(String value) {
+    issueMessage = value;
+    issueResolutionId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> resolveCustomerIssue() async {
+    final issue = selectedIssue;
+    if (issue.resolved) {
+      noticeMessage =
+          '${issue.id} is already resolved. No stock, refund or customer message was duplicated.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (issueResolutionId != null) {
+      noticeMessage =
+          'Resolution $issueResolutionId is already complete. No outcome was duplicated.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (issueMessage.trim().length < 12) {
+      _showError('Enter a clear customer outcome message.');
+      return false;
+    }
+    if (!controlsAuthorized) {
+      _showError('Your current role cannot authorize this issue outcome.');
+      return false;
+    }
+    if (!controlsOnline) {
+      _showError(
+        'Issue resolution is offline. Payment protection, stock and message remain unchanged.',
+      );
+      return false;
+    }
+    return _runBool(
+      controlGateway.resolveIssue,
+      success:
+          '${issue.id} resolution RES-105-0715 completed. The customer and linked evidence record were updated.',
+      afterSuccess: () {
+        issueResolutionId = 'RES-105-0715';
+        issue.resolved = true;
+      },
     );
   }
 

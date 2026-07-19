@@ -25,6 +25,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
   late final TextEditingController _search = TextEditingController(
     text: widget.session.searchQuery,
   );
+  final ScrollController _homeScroll = ScrollController();
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
   @override
   void dispose() {
     _search.dispose();
+    _homeScroll.dispose();
     super.dispose();
   }
 
@@ -106,6 +108,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
   Widget _buildHome(BuildContext context) {
     return ListView(
       key: const Key('retailer-home-screen'),
+      controller: _homeScroll,
       padding: const EdgeInsets.fromLTRB(
         MoolSpacing.md,
         MoolSpacing.xs,
@@ -189,6 +192,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
                     onPressed: () {
                       _search.clear();
                       widget.session.clearSearch();
+                      _returnHomeListToTop();
                     },
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -214,6 +218,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
             onAction: () {
               _search.clear();
               widget.session.clearSearch();
+              _returnHomeListToTop();
             },
           ),
         const SizedBox(height: MoolSpacing.md),
@@ -347,8 +352,69 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
             ),
           ],
         ),
+        const SizedBox(height: MoolSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: RetailerCard(
+                keyName: 'retailer-ai',
+                onTap: () => context.go('/app/retailer?panel=ai'),
+                color: const Color(0xFFF4F3FF),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.auto_awesome_rounded, color: MoolColors.navy),
+                    SizedBox(height: MoolSpacing.xs),
+                    Text(
+                      'Ask Mool AI',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'Explain and prepare for approval',
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: MoolSpacing.sm),
+            Expanded(
+              child: RetailerCard(
+                keyName: 'retailer-settings',
+                onTap: () => context.go('/app/retailer/settings'),
+                color: const Color(0xFFFFF4E5),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.tune_rounded, color: Color(0xFFB05C00)),
+                    SizedBox(height: MoolSpacing.xs),
+                    Text(
+                      'Store settings',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'Readiness, staff and customer rules',
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  void _returnHomeListToTop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_homeScroll.hasClients) return;
+      _homeScroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Widget _buildOrders(BuildContext context) {
@@ -451,6 +517,35 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
                 ),
                 child: const Text('Review'),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.sm),
+        RetailerCard(
+          keyName: 'retailer-slow-stock',
+          color: const Color(0xFFFFF4E5),
+          onTap: () =>
+              context.go('/app/retailer/home?view=stock&panel=recovery'),
+          child: const Row(
+            children: [
+              Icon(Icons.trending_down_rounded, color: Color(0xFFB05C00)),
+              SizedBox(width: MoolSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Move slow stock',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      '18 products · protected floor and quantity',
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),

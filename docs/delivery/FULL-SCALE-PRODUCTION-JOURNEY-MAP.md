@@ -52,7 +52,7 @@ Last reconciled: 19 July 2026
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
 | 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
-| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | POS flow 74 → 78 → 79 → 78 → 80 → 90, wholesale flow 74 → 81–89, Business Book family 91 → 92 → 106, operated Business Services 93–96 and customer/loyalty/campaign lifecycle 97–100 implemented; every completed slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay. Retailer controls 101–105 continue next |
+| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Complete in Flutter: POS 74 → 78 → 79 → 78 → 80 → 90; wholesale 74 → 81–89; Business Book 91 → 92 → 106; operated Business Services 93–96; customers/campaigns 97–100; recovery, AI, staff, settings and issues 101–105. Every slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
@@ -406,6 +406,24 @@ Last reconciled: 19 July 2026
 - Customers, consent, messaging, inventory, campaign budgets, attribution and
   refunds remain replaceable external gateways and are not falsely represented
   as server-certified production services.
+
+## Retailer operating-control decisions now locked
+
+- Slow-stock recovery uses only eligible sellable units and enforces quantity,
+  floor price, route, duration and owner review before publish.
+- Mool AI is grounded in role-authorized workspace records and prepares drafts;
+  it never autonomously purchases, publishes, refunds or changes shop data.
+- Staff access is least privilege, role based, auditable and inactive until an
+  invite is accepted.
+- Store settings commit as one idempotent version so the client cannot present
+  a partial save as a completed business outcome.
+- Customer issues retain evidence, message, selected resolution and protected
+  payment context through failure and exact retry.
+- Recovery, AI, invitation, access, settings and resolution commands reject
+  offline or unauthorized execution and never duplicate protected outcomes.
+- Inventory, AI, identity, authorization, compliance, payments, evidence and
+  messaging remain replaceable external gateways and are not falsely
+  represented as server-certified production services.
 
 ## Release boundary
 

@@ -47,6 +47,7 @@ import '../retailer/retailer_campaign_models.dart';
 import '../retailer/retailer_session.dart';
 import '../retailer/screens/retailer_business_services_screens.dart';
 import '../retailer/screens/retailer_campaign_screens.dart';
+import '../retailer/screens/retailer_control_screens.dart';
 import '../retailer/screens/retailer_delivery_screens.dart';
 import '../retailer/screens/retailer_books_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
@@ -422,8 +423,9 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/retailer',
-        builder: (context, state) =>
-            RetailerHomeScreen(session: retailerSession),
+        builder: (context, state) => state.uri.queryParameters['panel'] == 'ai'
+            ? RetailerAiAssistantScreen(session: retailerSession)
+            : RetailerHomeScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/mool',
@@ -434,15 +436,18 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/retailer/home',
-        builder: (context, state) => RetailerHomeScreen(
-          session: retailerSession,
-          initialView: switch (state.uri.queryParameters['view']) {
-            'orders' => RetailerHomeView.orders,
-            'stock' => RetailerHomeView.stock,
-            'wholesale' => RetailerHomeView.wholesale,
-            _ => RetailerHomeView.home,
-          },
-        ),
+        builder: (context, state) =>
+            state.uri.queryParameters['panel'] == 'recovery'
+            ? RetailerSlowStockScreen(session: retailerSession)
+            : RetailerHomeScreen(
+                session: retailerSession,
+                initialView: switch (state.uri.queryParameters['view']) {
+                  'orders' => RetailerHomeView.orders,
+                  'stock' => RetailerHomeView.stock,
+                  'wholesale' => RetailerHomeView.wholesale,
+                  _ => RetailerHomeView.home,
+                },
+              ),
       ),
       GoRoute(
         path: '/app/retailer/orders',
@@ -567,6 +572,21 @@ GoRouter createJourneyRouter(
         path: '/app/retailer/campaigns/new',
         builder: (context, state) =>
             RetailerCampaignBuilderScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/settings',
+        builder: (context, state) =>
+            RetailerStoreSettingsScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/settings/team',
+        builder: (context, state) =>
+            RetailerStaffScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders/issues',
+        builder: (context, state) =>
+            RetailerCustomerIssuesScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/wholesale',
