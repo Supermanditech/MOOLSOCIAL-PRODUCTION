@@ -47,7 +47,10 @@ import '../retailer/screens/retailer_delivery_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
 import '../retailer/screens/retailer_order_screen.dart';
 import '../retailer/screens/retailer_pos_screens.dart';
+import '../retailer/screens/retailer_purchase_book_screens.dart';
 import '../retailer/screens/retailer_sales_book_screen.dart';
+import '../retailer/screens/retailer_wholesale_catalog_screens.dart';
+import '../retailer/screens/retailer_wholesale_fulfilment_screens.dart';
 import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
@@ -469,6 +472,51 @@ GoRouter createJourneyRouter(
         path: '/app/retailer/books/sales',
         builder: (context, state) =>
             RetailerSalesBookScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale',
+        builder: (context, state) =>
+            RetailerWholesaleCatalogScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale/cart',
+        builder: (context, state) =>
+            RetailerWholesaleCartScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale/orders/confirmed',
+        builder: (context, state) =>
+            RetailerWholesaleOrderConfirmedScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale/orders/tracking',
+        builder: (context, state) =>
+            RetailerWholesaleTrackingScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale/goods-receipt',
+        builder: (context, state) =>
+            RetailerGoodsReceiptScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/wholesale/goods-receipt/result',
+        builder: (context, state) =>
+            RetailerGoodsReceiptResultScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/books/purchases',
+        builder: (context, state) =>
+            RetailerPurchaseBookScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/supplier-bills/:billId',
+        builder: (context, state) =>
+            RetailerSupplierBillScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/supplier-payments/:paymentId/status',
+        builder: (context, state) =>
+            RetailerSupplierPaymentStatusScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/orders/:orderId/tracking',

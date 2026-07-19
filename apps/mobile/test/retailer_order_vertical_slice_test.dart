@@ -410,7 +410,7 @@ void main() {
       expect(find.textContaining('Stock review is open'), findsOneWidget);
       await tapVisible(tester, const Key('retailer-dock-wholesale'));
       expect(
-        find.byKey(const Key('retailer-wholesale-preview-screen')),
+        find.byKey(const Key('wholesale-catalog-screen')),
         findsOneWidget,
       );
     },

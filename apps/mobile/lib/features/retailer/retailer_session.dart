@@ -4,22 +4,30 @@ import 'retailer_models.dart';
 import 'retailer_pos_models.dart';
 import 'retailer_pos_services.dart';
 import 'retailer_services.dart';
+import 'retailer_wholesale_models.dart';
+import 'retailer_wholesale_services.dart';
 
 class RetailerSession extends ChangeNotifier {
   RetailerSession({
     ReviewRetailerGateway? gateway,
     ReviewRetailerPosGateway? posGateway,
+    ReviewRetailerWholesaleGateway? wholesaleGateway,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
+       wholesaleGateway =
+           wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
        orders = buildReviewRetailerOrders(),
        counters = buildReviewCounters(),
-       sales = buildReviewSales();
+       sales = buildReviewSales(),
+       purchases = buildReviewPurchaseRecords();
 
   final ReviewRetailerGateway gateway;
   final ReviewRetailerPosGateway posGateway;
+  final ReviewRetailerWholesaleGateway wholesaleGateway;
   final List<RetailerOrder> orders;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
+  final List<RetailerPurchaseRecord> purchases;
 
   RetailerHomeView view = RetailerHomeView.home;
   bool ordersOnline = true;
@@ -54,6 +62,33 @@ class RetailerSession extends ChangeNotifier {
   bool salesDueOnly = false;
   String salesSearchQuery = '';
   String? selectedSaleId;
+
+  RetailerWholesaleCategory wholesaleCategory =
+      RetailerWholesaleCategory.all;
+  String wholesaleSearchQuery = '';
+  final Map<String, int> wholesaleCart = {};
+  bool wholesaleOnline = true;
+  bool cameraAllowed = true;
+  List<RetailerPurchaseOrder> purchaseOrders = [];
+  String? selectedPurchaseOrderId;
+  RetailerGoodsReceiptChoice receiptChoice =
+      RetailerGoodsReceiptChoice.pending;
+  RetailerGoodsIssue? goodsIssue;
+  bool goodsEvidenceAttached = false;
+  String? goodsReceiptId;
+  int acceptedStockPacks = 16;
+  RetailerPurchaseBookView purchaseBookView =
+      RetailerPurchaseBookView.purchases;
+  String purchaseSourceFilter = 'all';
+  String purchaseSearchQuery = '';
+  String? selectedPurchaseId;
+  bool purchaseBookAuthorized = true;
+  String? lastPurchaseExport;
+  RetailerSupplierPaymentMethod supplierPaymentMethod =
+      RetailerSupplierPaymentMethod.upi;
+  RetailerSupplierPaymentState supplierPaymentState =
+      RetailerSupplierPaymentState.notStarted;
+  String? supplierPaymentId;
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -170,6 +205,86 @@ class RetailerSession extends ChangeNotifier {
 
   int get openCounterCount =>
       counters.where((counter) => counter.isOpen).length;
+
+  List<RetailerWholesaleProduct> get visibleWholesaleProducts {
+    final query = wholesaleSearchQuery.trim().toLowerCase();
+    return reviewWholesaleProducts.where((product) {
+      final searchMatches =
+          query.isEmpty ||
+          '${product.brand} ${product.name} ${product.pack} ${product.id}'
+              .toLowerCase()
+              .contains(query);
+      final categoryMatches = switch (wholesaleCategory) {
+        RetailerWholesaleCategory.all => true,
+        RetailerWholesaleCategory.deals =>
+          product.offer.toLowerCase().contains('save') ||
+              product.offer.contains('%'),
+        RetailerWholesaleCategory.fastDelivery =>
+          product.delivery == 'Today' || product.delivery == 'Tomorrow',
+        RetailerWholesaleCategory.credit =>
+          product.payment.toLowerCase().contains('credit'),
+        RetailerWholesaleCategory.brands => true,
+      };
+      return searchMatches && categoryMatches;
+    }).toList(growable: false);
+  }
+
+  int wholesaleQuantity(String productId) => wholesaleCart[productId] ?? 0;
+
+  int get wholesaleCaseCount =>
+      wholesaleCart.values.fold(0, (sum, value) => sum + value);
+
+  int get wholesaleCartTotal => reviewWholesaleProducts.fold(
+    0,
+    (sum, product) =>
+        sum + product.casePrice * wholesaleQuantity(product.id),
+  );
+
+  List<RetailerPurchaseRecord> get visiblePurchases {
+    final query = purchaseSearchQuery.trim().toLowerCase();
+    return purchases.where((purchase) {
+      final viewMatches = switch (purchaseBookView) {
+        RetailerPurchaseBookView.purchases => true,
+        RetailerPurchaseBookView.payables =>
+          purchase.status.toLowerCase().contains('due') ||
+              purchase.status.toLowerCase().contains('processing'),
+        RetailerPurchaseBookView.returns =>
+          purchase.status.toLowerCase().contains('return'),
+      };
+      final sourceMatches =
+          purchaseSourceFilter == 'all' ||
+          (purchaseSourceFilter == 'platform' &&
+              purchase.source == 'MoolSocial PO') ||
+          (purchaseSourceFilter == 'direct' &&
+              purchase.source == 'Direct bill') ||
+          (purchaseSourceFilter == 'paid' &&
+              purchase.status.toLowerCase() == 'paid');
+      final searchMatches =
+          query.isEmpty ||
+          '${purchase.supplier} ${purchase.poId} ${purchase.invoiceId} ${purchase.summary}'
+              .toLowerCase()
+              .contains(query);
+      return viewMatches && sourceMatches && searchMatches;
+    }).toList(growable: false);
+  }
+
+  RetailerPurchaseRecord? get selectedPurchase {
+    final id = selectedPurchaseId;
+    if (id == null) return null;
+    for (final purchase in purchases) {
+      if (purchase.id == id) return purchase;
+    }
+    return null;
+  }
+
+  RetailerPurchaseOrder? get selectedPurchaseOrder {
+    final id = selectedPurchaseOrderId;
+    if (id == null) return null;
+    for (final order in purchaseOrders) {
+      if (order.id == id) return order;
+    }
+    return purchaseOrders.isEmpty ? null : purchaseOrders.first;
+  }
 
   void clearMessages() {
     errorMessage = null;
@@ -1045,6 +1160,420 @@ class RetailerSession extends ChangeNotifier {
       success: '$format is ready for the selected sales period.',
       afterSuccess: () => lastExportFormat = format,
     );
+  }
+
+  void setWholesaleOnline(bool value) {
+    wholesaleOnline = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void searchWholesale(String value) {
+    wholesaleSearchQuery = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setWholesaleCategory(RetailerWholesaleCategory value) {
+    wholesaleCategory = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void changeWholesaleQuantity(String productId, int change) {
+    final product = reviewWholesaleProducts.firstWhere(
+      (item) => item.id == productId,
+    );
+    final current = wholesaleQuantity(productId);
+    final next = change > 0
+        ? (current == 0 ? product.moq : current + 1)
+        : (current <= product.moq ? 0 : current - 1);
+    if (next > product.availableCases) {
+      _showError(
+        'Only ${product.availableCases} cases are currently available. Your existing cart is unchanged.',
+      );
+      return;
+    }
+    if (next == 0) {
+      wholesaleCart.remove(productId);
+    } else {
+      wholesaleCart[productId] = next;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void buildLowStockReorder() {
+    wholesaleCart['oil-case'] = 2;
+    wholesaleCart['atta-case'] = 3;
+    clearMessages();
+    noticeMessage =
+        'MOQ-ready reorder added. Review current price and delivery before placing it.';
+    notifyListeners();
+  }
+
+  Future<bool> placeWholesaleOrders() async {
+    if (purchaseOrders.isNotEmpty) {
+      noticeMessage =
+          'These purchase orders already exist. No duplicate order was created.';
+      notifyListeners();
+      return true;
+    }
+    if (wholesaleCart.isEmpty) {
+      _showError('Add at least one wholesale product before placing an order.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'Wholesale ordering is offline. Your cart remains saved for retry.',
+      );
+      return false;
+    }
+    final fingerprint = wholesaleCart.entries
+        .map((entry) => '${entry.key}:${entry.value}')
+        .join('|');
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      final ids = await wholesaleGateway.placeOrders(fingerprint);
+      final entries = wholesaleCart.entries.toList(growable: false);
+      purchaseOrders = [
+        for (var index = 0; index < entries.length; index += 1)
+          (() {
+            final entry = entries[index];
+            final product = reviewWholesaleProducts.firstWhere(
+              (item) => item.id == entry.key,
+            );
+            return RetailerPurchaseOrder(
+              id: ids[index < ids.length ? index : ids.length - 1],
+              supplier: product.id == 'atta-case'
+                  ? 'Jodhpur Authorised Distributor'
+                  : 'Supermandi Area Supply',
+              productId: product.id,
+              productName: '${product.brand} ${product.name}',
+              cases: entry.value,
+              value: entry.value * product.casePrice,
+              deliveryMode: product.id == 'atta-case'
+                  ? 'MoolSocial Transport'
+                  : 'Supplier fleet',
+              deliveryWindow: product.delivery == 'Today'
+                  ? 'Today · 4–7 PM'
+                  : 'Tomorrow · 2–6 PM',
+              paymentTerm: product.payment,
+            );
+          })(),
+      ];
+      selectedPurchaseOrderId = purchaseOrders.last.id;
+      noticeMessage =
+          '${purchaseOrders.length} supplier-wise purchase order${purchaseOrders.length == 1 ? '' : 's'} placed.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  void selectPurchaseOrder(String orderId) {
+    selectedPurchaseOrderId = orderId;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshWholesaleDelivery() async {
+    final order = selectedPurchaseOrder;
+    if (order == null) {
+      _showError('Choose a purchase order to refresh.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'Tracking is offline. The last verified delivery update remains visible.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => wholesaleGateway.refreshDelivery(order.id),
+      success: 'Delivery status is current.',
+    );
+  }
+
+  void advanceWholesaleDelivery() {
+    final order = selectedPurchaseOrder;
+    if (order == null) return;
+    order.stage = switch (order.stage) {
+      RetailerPurchaseOrderStage.confirmed =>
+        RetailerPurchaseOrderStage.dispatched,
+      RetailerPurchaseOrderStage.dispatched =>
+        RetailerPurchaseOrderStage.inTransit,
+      RetailerPurchaseOrderStage.inTransit =>
+        RetailerPurchaseOrderStage.delivered,
+      _ => order.stage,
+    };
+    clearMessages();
+    notifyListeners();
+  }
+
+  void chooseGoodsReceipt(RetailerGoodsReceiptChoice value) {
+    receiptChoice = value;
+    if (value != RetailerGoodsReceiptChoice.issue) {
+      goodsIssue = null;
+      goodsEvidenceAttached = false;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void chooseGoodsIssue(RetailerGoodsIssue value) {
+    receiptChoice = RetailerGoodsReceiptChoice.issue;
+    goodsIssue = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void attachGoodsEvidence({required bool permissionGranted}) {
+    cameraAllowed = permissionGranted;
+    if (!permissionGranted) {
+      _showError(
+        'Camera access was not allowed. Upload a saved photo or continue with written evidence.',
+      );
+      return;
+    }
+    goodsEvidenceAttached = true;
+    clearMessages();
+    noticeMessage = 'Delivery evidence attached.';
+    notifyListeners();
+  }
+
+  Future<bool> postGoodsReceipt() async {
+    if (goodsReceiptId != null) {
+      noticeMessage =
+          'Goods receipt $goodsReceiptId is already posted. Stock was not added again.';
+      notifyListeners();
+      return true;
+    }
+    if (receiptChoice == RetailerGoodsReceiptChoice.pending) {
+      _showError('Choose All received or Report issue before confirming.');
+      return false;
+    }
+    if (receiptChoice == RetailerGoodsReceiptChoice.issue &&
+        goodsIssue == null) {
+      _showError('Choose the goods issue before submitting the receipt.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'Goods receipt is offline. No stock or supplier payment was changed.',
+      );
+      return false;
+    }
+    final order = selectedPurchaseOrder;
+    if (order == null) {
+      _showError('The purchase order could not be found.');
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      final grn = await wholesaleGateway.postReceipt(
+        order.id,
+        receiptChoice,
+      );
+      goodsReceiptId = grn;
+      final issue = receiptChoice == RetailerGoodsReceiptChoice.issue;
+      acceptedStockPacks += issue ? 8 : 12;
+      order.stage = issue
+          ? RetailerPurchaseOrderStage.issueOpen
+          : RetailerPurchaseOrderStage.received;
+      purchases.removeWhere((purchase) => purchase.grnId == grn);
+      purchases.insert(
+        0,
+        RetailerPurchaseRecord(
+          id: 'PUR-85021',
+          supplier: order.supplier,
+          summary:
+              '${order.productName} · ${issue ? 2 : 3} cases · ${issue ? 8 : 12} packs',
+          amount: issue ? 1904 : 2856,
+          source: 'MoolSocial PO',
+          status: issue ? 'Issue open' : 'Processing',
+          invoiceId: 'INV-SM-2941',
+          poId: order.id,
+          grnId: grn,
+        ),
+      );
+      noticeMessage = issue
+          ? 'Accepted stock posted once. Disputed payment remains protected.'
+          : 'Goods receipt posted once. Stock and Purchase Book are updated.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  void setPurchaseBookView(RetailerPurchaseBookView value) {
+    purchaseBookView = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setPurchaseSourceFilter(String value) {
+    purchaseSourceFilter = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void searchPurchases(String value) {
+    purchaseSearchQuery = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectPurchase(String purchaseId) {
+    selectedPurchaseId = purchaseId;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshPurchaseBook() async {
+    if (!purchaseBookAuthorized) {
+      _showError('Your current shop role cannot open financial records.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'The Purchase Book is offline. Existing records remain available.',
+      );
+      return false;
+    }
+    return _runBool(
+      wholesaleGateway.refreshPurchases,
+      success: 'Purchase Book is current. No purchase was duplicated.',
+    );
+  }
+
+  Future<bool> exportPurchaseBook(String format) async {
+    if (!purchaseBookAuthorized) {
+      _showError('Owner or accountant permission is required for exports.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError('Reconnect before creating a purchase export.');
+      return false;
+    }
+    return _runBool(
+      () => wholesaleGateway.exportPurchases(format),
+      success: '$format purchase report is ready.',
+      afterSuccess: () => lastPurchaseExport = format,
+    );
+  }
+
+  void chooseSupplierPaymentMethod(RetailerSupplierPaymentMethod value) {
+    supplierPaymentMethod = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> authorizeSupplierPayment() async {
+    if (supplierPaymentId != null) {
+      noticeMessage =
+          'Payment $supplierPaymentId is already authorized. No duplicate payment was created.';
+      notifyListeners();
+      return true;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'Supplier payment is offline. The bill remains unpaid and unchanged.',
+      );
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      supplierPaymentId =
+          await wholesaleGateway.authorizeSupplierPayment(
+            'INV-RTD-665',
+            supplierPaymentMethod,
+          );
+      supplierPaymentState = RetailerSupplierPaymentState.processing;
+      noticeMessage =
+          'Payment authorization submitted. Settlement is not confirmed yet.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> refreshSupplierPayment() async {
+    final paymentId = supplierPaymentId;
+    if (paymentId == null) {
+      _showError('No supplier payment is available to refresh.');
+      return false;
+    }
+    if (!wholesaleOnline) {
+      _showError(
+        'Payment status is offline. Do not pay again while the last verified state is ${supplierPaymentState.label.toLowerCase()}.',
+      );
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      supplierPaymentState =
+          await wholesaleGateway.refreshSupplierPayment(paymentId);
+      RetailerPurchaseRecord? record;
+      for (final purchase in purchases) {
+        if (purchase.invoiceId == 'INV-RTD-665') {
+          record = purchase;
+          break;
+        }
+      }
+      if (record != null) {
+        record.status = switch (supplierPaymentState) {
+          RetailerSupplierPaymentState.settled => 'Paid',
+          RetailerSupplierPaymentState.failed => 'Due 25 Jul',
+          RetailerSupplierPaymentState.reversed => 'Due · reversed',
+          _ => 'Processing',
+        };
+      }
+      noticeMessage = switch (supplierPaymentState) {
+        RetailerSupplierPaymentState.settled =>
+          'Payment settled. The supplier balance and Purchase Book are updated.',
+        RetailerSupplierPaymentState.failed =>
+          'Payment failed. The supplier bill remains due and no settlement was recorded.',
+        RetailerSupplierPaymentState.reversed =>
+          'Payment was reversed. The supplier obligation is due again.',
+        _ => 'Payment remains processing. Do not pay again.',
+      };
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
   }
 
   Future<void> _run(

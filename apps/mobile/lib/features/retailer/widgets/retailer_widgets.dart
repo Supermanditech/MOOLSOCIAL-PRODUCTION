@@ -403,7 +403,7 @@ class RetailerBottomDock extends StatelessWidget {
         'wholesale',
         'Wholesale',
         Icons.local_shipping_outlined,
-        '/app/retailer/home?view=wholesale',
+        '/app/retailer/wholesale',
       ),
       (
         'chat',

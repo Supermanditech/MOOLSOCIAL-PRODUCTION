@@ -52,7 +52,7 @@ Last reconciled: 19 July 2026
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
 | 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
-| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | POS flow 74 → 78 → 79 → 78 → 80 → 90 implemented; dedicated black-box, two full regressions and physical-device replay passed. Wholesale, remaining books, services, growth and controls are pending |
+| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | POS flow 74 → 78 → 79 → 78 → 80 → 90 and wholesale flow 74 → 81–89 implemented; each slice passed dedicated black-box, two full regressions and physical-device replay. Stock Statement, Business Book home, services, growth and controls remain pending |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
@@ -332,6 +332,35 @@ Last reconciled: 19 July 2026
 - Orders, stock, payment, invoice, consent delivery, tax export and financial
   projection remain replaceable external gateways and are not falsely
   represented as certified production services.
+
+## Retailer wholesale and Purchase Book decisions now locked
+
+- Wholesale Buy is a shop procurement surface. MOQ cases, supplier payment,
+  delivery and landed value never appear in consumer Buy.
+- Canonical products stay separate from supplier offers. The authoritative
+  gateway chooses a serviceable offer; no screen renders millions of duplicate
+  supplier listings.
+- Adding a product starts at its exact MOQ. Current availability is enforced,
+  and the cart survives offline and gateway failure for an exact retry.
+- Commercial terms are revalidated immediately before placement. Any changed
+  term requires explicit retailer confirmation; there is no silent
+  substitution.
+- One placement command creates supplier-wise purchase orders once. A purchase
+  order is not a GST invoice and ordered quantity is not available stock.
+- Delivery tracking distinguishes committed time, verified dispatch and live
+  telemetry. It never displays a decorative map as live tracking.
+- Only accepted goods post to inventory and the Purchase Book. Short, damaged,
+  wrong or invoice-mismatched goods keep the affected settlement protected.
+- A goods-receipt command posts one GRN and one inventory event. Exact retry
+  cannot increase stock twice.
+- The Purchase Book normalizes MoolSocial purchase orders and direct supplier
+  bills without mislabelling their source. Financial views and exports remain
+  role controlled.
+- Supplier payment authorization is not settlement. Processing blocks a second
+  authorization; failed or reversed outcomes restore the payable obligation.
+- Catalogue matching, PO placement, transport events, GRN/stock posting,
+  invoice validation, exports and supplier payment remain replaceable external
+  gateways and are not falsely represented as certified production services.
 
 ## Release boundary
 

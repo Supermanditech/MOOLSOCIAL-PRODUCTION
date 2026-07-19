@@ -445,10 +445,8 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
               const SizedBox(height: MoolSpacing.sm),
               OutlinedButton(
                 key: const Key('retailer-wholesale-review'),
-                onPressed: () => widget.session.showNotice(
-                  'Wholesale catalogue is ready for the next procurement step. Consumer prices remain unchanged.',
-                ),
-                child: const Text('Review procurement'),
+                onPressed: () => context.go('/app/retailer/wholesale'),
+                child: const Text('Open Wholesale Buy'),
               ),
             ],
           ),
