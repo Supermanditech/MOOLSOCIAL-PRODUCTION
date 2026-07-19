@@ -228,139 +228,58 @@ class EatBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.sm,
-          MoolSpacing.xs,
-          MoolSpacing.sm,
-          MoolSpacing.sm,
-        ),
-        child: MoolGlassSurface(
-          semanticLabel: 'Eat navigation',
-          padding: const EdgeInsets.all(5),
-          child: Row(
-            children: [
-              _EatDockItem(
-                key: const Key('eat-dock-mool'),
-                label: 'Mool',
-                icon: Icons.blur_circular_rounded,
-                selected: active == 'mool',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/mool');
-                },
-              ),
-              _EatDockItem(
-                key: const Key('eat-dock-order'),
-                label: 'Order',
-                icon: Icons.restaurant_menu_rounded,
-                selected: active == 'order',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/eat/order');
-                },
-              ),
-              _EatDockItem(
-                key: const Key('eat-dock-table'),
-                label: 'Table',
-                icon: Icons.table_restaurant_outlined,
-                selected: active == 'table',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/eat/table');
-                },
-              ),
-              _EatDockItem(
-                key: const Key('eat-dock-tiffin'),
-                label: 'Tiffin',
-                icon: Icons.lunch_dining_outlined,
-                selected: active == 'tiffin',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/eat/tiffin');
-                },
-              ),
-              _EatDockItem(
-                key: const Key('eat-dock-chat'),
-                label: 'Chat',
-                icon: Icons.chat_bubble_outline_rounded,
-                selected: active == 'chat',
-                onTap: () {
-                  final current = GoRouterState.of(context).uri.toString();
-                  session.clearMessages();
-                  context.go(
-                    Uri(
-                      path: '/app/chat/inbox',
-                      queryParameters: {'return': current},
-                    ).toString(),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+    void open(String route) {
+      session.clearMessages();
+      context.go(route);
+    }
+
+    return MoolOutcomeDock(
+      semanticLabel: 'Eat navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'eat-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () => open('/app/mool'),
       ),
-    );
-  }
-}
-
-class _EatDockItem extends StatelessWidget {
-  const _EatDockItem({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Material(
-          color: selected ? MoolColors.navy : Colors.transparent,
-          borderRadius: BorderRadius.circular(MoolRadii.capsule),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(MoolRadii.capsule),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: MoolMetrics.minimumTapTarget,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    icon,
-                    size: 20,
-                    color: selected ? Colors.white : MoolColors.navy,
-                  ),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(
-                      color: selected ? Colors.white : MoolColors.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      actions: [
+        MoolDockAction(
+          keyName: 'eat-dock-order',
+          id: 'order',
+          label: 'Order',
+          icon: Icons.restaurant_menu_rounded,
+          onPressed: () => open('/app/eat/order'),
         ),
+        MoolDockAction(
+          keyName: 'eat-dock-table',
+          id: 'table',
+          label: 'Table',
+          icon: Icons.table_restaurant_outlined,
+          onPressed: () => open('/app/eat/table'),
+        ),
+        MoolDockAction(
+          keyName: 'eat-dock-tiffin',
+          id: 'tiffin',
+          label: 'Tiffin',
+          icon: Icons.lunch_dining_outlined,
+          onPressed: () => open('/app/eat/tiffin'),
+        ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'eat-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        onPressed: () {
+          final current = GoRouterState.of(context).uri.toString();
+          open(
+            Uri(
+              path: '/app/chat/inbox',
+              queryParameters: {'return': current},
+            ).toString(),
+          );
+        },
       ),
     );
   }
@@ -380,17 +299,7 @@ class EatSurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      elevation: 1,
-      shadowColor: const Color(0x24000036),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: Color(0x18000080)),
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-      ),
-      child: Padding(padding: padding, child: child),
-    );
+    return MoolCardSurface(color: color, padding: padding, child: child);
   }
 }
 

@@ -224,27 +224,12 @@ class RideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: semanticLabel,
-      button: onTap != null,
-      child: Material(
-        color: color,
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(MoolRadii.card),
-          child: Container(
-            width: double.infinity,
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(MoolRadii.card),
-              border: Border.all(color: MoolColors.line),
-              boxShadow: MoolShadows.card,
-            ),
-            child: child,
-          ),
-        ),
-      ),
+    return MoolCardSurface(
+      color: color,
+      padding: padding,
+      onTap: onTap,
+      semanticLabel: semanticLabel,
+      child: child,
     );
   }
 }
@@ -345,147 +330,75 @@ class RideBottomDock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tripId = session.trip?.id;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.sm,
-          MoolSpacing.xs,
-          MoolSpacing.sm,
-          MoolSpacing.sm,
-        ),
-        child: MoolGlassSurface(
-          semanticLabel: 'Ride navigation',
-          padding: const EdgeInsets.all(5),
-          child: Row(
-            children: [
-              _RideDockItem(
-                key: const Key('ride-dock-mool'),
-                label: 'Mool',
-                icon: Icons.blur_circular_rounded,
-                selected: active == 'mool',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/mool');
-                },
-              ),
-              _RideDockItem(
-                key: const Key('ride-dock-book'),
-                label: 'Book',
-                icon: Icons.local_taxi_outlined,
-                selected: active == 'ride',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/ride/book');
-                },
-              ),
-              _RideDockItem(
-                key: const Key('ride-dock-trip'),
-                label: 'Trip',
-                icon: Icons.route_outlined,
-                selected: active == 'trip',
-                onTap: () {
-                  session.clearMessages();
-                  context.go(
-                    tripId == null
-                        ? '/app/ride/book'
-                        : '/app/ride/trip/$tripId',
-                  );
-                },
-              ),
-              _RideDockItem(
-                key: const Key('ride-dock-help'),
-                label: 'Help',
-                icon: Icons.support_agent_rounded,
-                selected: active == 'help',
-                onTap: () {
-                  session.clearMessages();
-                  if (tripId == null) {
-                    session.showNotice(
-                      'Book a ride first so help can attach its route and receipt.',
-                    );
-                  } else {
-                    context.go('/app/ride/trip/$tripId/support');
-                  }
-                },
-              ),
-              _RideDockItem(
-                key: const Key('ride-dock-chat'),
-                label: 'Chat',
-                icon: Icons.chat_bubble_outline_rounded,
-                selected: active == 'chat',
-                onTap: () {
-                  final current = GoRouterState.of(context).uri.toString();
-                  session.clearMessages();
-                  context.go(
-                    Uri(
-                      path: '/app/chat/inbox',
-                      queryParameters: {'return': current},
-                    ).toString(),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+    void clear() => session.clearMessages();
+    return MoolOutcomeDock(
+      semanticLabel: 'Ride navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'ride-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () {
+          clear();
+          context.go('/app/mool');
+        },
       ),
-    );
-  }
-}
-
-class _RideDockItem extends StatelessWidget {
-  const _RideDockItem({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Material(
-          color: selected ? MoolColors.navy : Colors.transparent,
-          borderRadius: BorderRadius.circular(MoolRadii.capsule),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(MoolRadii.capsule),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: MoolMetrics.minimumTapTarget,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 19,
-                    color: selected ? Colors.white : MoolColors.navy,
-                  ),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : MoolColors.navy,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      actions: [
+        MoolDockAction(
+          keyName: 'ride-dock-book',
+          id: 'ride',
+          label: 'Book',
+          icon: Icons.local_taxi_outlined,
+          onPressed: () {
+            clear();
+            context.go('/app/ride/book');
+          },
         ),
+        MoolDockAction(
+          keyName: 'ride-dock-trip',
+          id: 'trip',
+          label: 'Trip',
+          icon: Icons.route_outlined,
+          onPressed: () {
+            clear();
+            context.go(
+              tripId == null ? '/app/ride/book' : '/app/ride/trip/$tripId',
+            );
+          },
+        ),
+        MoolDockAction(
+          keyName: 'ride-dock-help',
+          id: 'help',
+          label: 'Help',
+          icon: Icons.support_agent_rounded,
+          onPressed: () {
+            clear();
+            if (tripId == null) {
+              session.showNotice(
+                'Book a ride first so help can attach its route and receipt.',
+              );
+            } else {
+              context.go('/app/ride/trip/$tripId/support');
+            }
+          },
+        ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'ride-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        onPressed: () {
+          final current = GoRouterState.of(context).uri.toString();
+          clear();
+          context.go(
+            Uri(
+              path: '/app/chat/inbox',
+              queryParameters: {'return': current},
+            ).toString(),
+          );
+        },
       ),
     );
   }

@@ -35,4 +35,80 @@ void main() {
     );
     expect(animated.duration, Duration.zero);
   });
+
+  testWidgets('outcome dock separates stable and contextual actions', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    var tapped = '';
+    MoolDockAction action(String id) => MoolDockAction(
+      keyName: 'dock-$id',
+      id: id,
+      label: id,
+      icon: Icons.circle_outlined,
+      onPressed: () => tapped = id,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          bottomNavigationBar: MoolOutcomeDock(
+            semanticLabel: 'Outcome navigation',
+            activeId: 'second',
+            mool: action('mool'),
+            actions: [action('first'), action('second'), action('third')],
+            chat: action('chat'),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Outcome navigation'), findsOneWidget);
+    for (final id in const ['mool', 'first', 'second', 'third', 'chat']) {
+      final target = find.byKey(Key('dock-$id'));
+      expect(target, findsOneWidget);
+      expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+    }
+    await tester.tap(find.byKey(const Key('dock-third')));
+    expect(tapped, 'third');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'card surface gives direct pressed feedback without shrinking tap target',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 220,
+                child: MoolCardSurface(
+                  semanticLabel: 'Open result',
+                  onTap: () {},
+                  child: const SizedBox(height: 44),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final target = find.bySemanticsLabel('Open result');
+      expect(target, findsOneWidget);
+      expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+      final gesture = await tester.startGesture(tester.getCenter(target));
+      await tester.pump();
+      expect(
+        tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+        .985,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+    },
+  );
 }

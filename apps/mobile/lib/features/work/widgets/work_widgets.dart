@@ -222,24 +222,12 @@ class WorkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(MoolRadii.card),
-      side: const BorderSide(color: Color(0x1F000080)),
-    );
-    return Material(
+    return MoolCardSurface(
       key: keyName == null ? null : Key(keyName!),
       color: color,
-      elevation: 1,
-      shadowColor: const Color(0x22000036),
-      shape: shape,
-      clipBehavior: Clip.antiAlias,
-      child: onTap == null
-          ? Padding(padding: padding, child: child)
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(MoolRadii.card),
-              child: Padding(padding: padding, child: child),
-            ),
+      padding: padding,
+      onTap: onTap,
+      child: child,
     );
   }
 }
@@ -383,94 +371,43 @@ class WorkBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <(String, String, IconData, String)>[
-      ('mool', 'Mool', Icons.circle_rounded, '/app/work/mool'),
-      ('earn', 'Earn', Icons.currency_rupee_rounded, '/app/work/earn'),
-      ('my-work', 'My Work', Icons.work_outline_rounded, '/app/work/my-work'),
-      (
-        'chat',
-        'Chat',
-        Icons.chat_bubble_outline_rounded,
-        '/app/chat/inbox?return=/app/work/earn',
+    void open(String route) {
+      session.clearMessages();
+      context.go(route);
+    }
+
+    return MoolOutcomeDock(
+      semanticLabel: 'Work navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'work-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () => open('/app/work/mool'),
       ),
-    ];
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.md,
-          0,
-          MoolSpacing.md,
-          MoolSpacing.xs,
+      actions: [
+        MoolDockAction(
+          keyName: 'work-dock-earn',
+          id: 'earn',
+          label: 'Earn',
+          icon: Icons.currency_rupee_rounded,
+          onPressed: () => open('/app/work/earn'),
         ),
-        child: SizedBox(
-          height: 64,
-          child: MoolGlassSurface(
-            semanticLabel: 'Work navigation',
-            padding: const EdgeInsets.all(MoolSpacing.xxs),
-            child: Row(
-              children: [
-                for (final item in items)
-                  Expanded(
-                    child: Semantics(
-                      selected: active == item.$1,
-                      button: true,
-                      label: 'Open ${item.$2}',
-                      child: InkWell(
-                        key: Key('work-dock-${item.$1}'),
-                        onTap: () {
-                          session.clearMessages();
-                          context.go(item.$4);
-                        },
-                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                        child: AnimatedContainer(
-                          duration: MoolMotion.accessible(
-                            context,
-                            MoolMotion.quick,
-                          ),
-                          constraints: const BoxConstraints(minHeight: 52),
-                          decoration: BoxDecoration(
-                            color: active == item.$1
-                                ? MoolColors.navy
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                              MoolRadii.capsule,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                item.$3,
-                                size: 20,
-                                color: active == item.$1
-                                    ? Colors.white
-                                    : MoolColors.navy,
-                              ),
-                              const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  item.$2,
-                                  style: TextStyle(
-                                    color: active == item.$1
-                                        ? Colors.white
-                                        : MoolColors.navy,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        MoolDockAction(
+          keyName: 'work-dock-my-work',
+          id: 'my-work',
+          label: 'My Work',
+          icon: Icons.work_outline_rounded,
+          onPressed: () => open('/app/work/my-work'),
         ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'work-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        onPressed: () => open('/app/chat/inbox?return=/app/work/earn'),
       ),
     );
   }

@@ -230,24 +230,12 @@ class RetailerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(MoolRadii.card),
-      side: const BorderSide(color: Color(0x1F000080)),
-    );
-    return Material(
+    return MoolCardSurface(
       key: keyName == null ? null : Key(keyName!),
       color: color,
-      elevation: 1,
-      shadowColor: const Color(0x22000036),
-      shape: shape,
-      clipBehavior: Clip.antiAlias,
-      child: onTap == null
-          ? Padding(padding: padding, child: child)
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(MoolRadii.card),
-              child: Padding(padding: padding, child: child),
-            ),
+      padding: padding,
+      onTap: onTap,
+      child: child,
     );
   }
 }
@@ -390,107 +378,55 @@ class RetailerBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <(String, String, IconData, String)>[
-      ('mool', 'Mool', Icons.circle_rounded, '/app/retailer/mool'),
-      ('orders', 'Orders', Icons.receipt_long_outlined, '/app/retailer/orders'),
-      (
-        'stock',
-        'Stock',
-        Icons.inventory_2_outlined,
-        '/app/retailer/home?view=stock',
+    void open(String route) {
+      session.clearMessages();
+      context.go(route);
+    }
+
+    return MoolOutcomeDock(
+      semanticLabel: 'Retailer navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'retailer-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () => open('/app/retailer/mool'),
       ),
-      (
-        'wholesale',
-        'Wholesale',
-        Icons.local_shipping_outlined,
-        '/app/retailer/wholesale',
-      ),
-      (
-        'chat',
-        'Chat',
-        Icons.chat_bubble_outline_rounded,
-        Uri(
-          path: '/app/chat/inbox',
-          queryParameters: {'return': returnRoute},
-        ).toString(),
-      ),
-    ];
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.md,
-          0,
-          MoolSpacing.md,
-          MoolSpacing.xs,
+      actions: [
+        MoolDockAction(
+          keyName: 'retailer-dock-orders',
+          id: 'orders',
+          label: 'Orders',
+          icon: Icons.receipt_long_outlined,
+          onPressed: () => open('/app/retailer/orders'),
         ),
-        child: SizedBox(
-          height: 64,
-          child: MoolGlassSurface(
-            semanticLabel: 'Retailer navigation',
-            padding: const EdgeInsets.all(MoolSpacing.xxs),
-            child: Row(
-              children: [
-                for (final item in items)
-                  Expanded(
-                    child: Semantics(
-                      selected: active == item.$1,
-                      button: true,
-                      label: 'Open ${item.$2}',
-                      child: InkWell(
-                        key: Key('retailer-dock-${item.$1}'),
-                        onTap: () {
-                          session.clearMessages();
-                          context.go(item.$4);
-                        },
-                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                        child: AnimatedContainer(
-                          duration: MoolMotion.accessible(
-                            context,
-                            MoolMotion.quick,
-                          ),
-                          constraints: const BoxConstraints(minHeight: 52),
-                          decoration: BoxDecoration(
-                            color: active == item.$1
-                                ? MoolColors.navy
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                              MoolRadii.capsule,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                item.$3,
-                                size: 19,
-                                color: active == item.$1
-                                    ? Colors.white
-                                    : MoolColors.navy,
-                              ),
-                              const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  item.$2,
-                                  style: TextStyle(
-                                    color: active == item.$1
-                                        ? Colors.white
-                                        : MoolColors.navy,
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        MoolDockAction(
+          keyName: 'retailer-dock-stock',
+          id: 'stock',
+          label: 'Stock',
+          icon: Icons.inventory_2_outlined,
+          onPressed: () => open('/app/retailer/home?view=stock'),
+        ),
+        MoolDockAction(
+          keyName: 'retailer-dock-wholesale',
+          id: 'wholesale',
+          label: 'Wholesale',
+          icon: Icons.local_shipping_outlined,
+          onPressed: () => open('/app/retailer/wholesale'),
+        ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'retailer-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        badgeCount: session.openOrderCount,
+        onPressed: () => open(
+          Uri(
+            path: '/app/chat/inbox',
+            queryParameters: {'return': returnRoute},
+          ).toString(),
         ),
       ),
     );

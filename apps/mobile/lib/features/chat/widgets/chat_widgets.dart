@@ -193,16 +193,6 @@ class ChatSurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      elevation: 1,
-      shadowColor: const Color(0x24000036),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: Color(0x18000080)),
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-      ),
-      child: Padding(padding: padding, child: child),
-    );
+    return MoolCardSurface(color: color, padding: padding, child: child);
   }
 }

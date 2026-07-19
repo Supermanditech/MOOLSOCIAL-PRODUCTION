@@ -2,7 +2,7 @@
 
 Status: **mandatory for the complete application**
 
-Last confirmed by the product owner: 18 July 2026
+Last confirmed by the product owner: 19 July 2026
 
 ## Permanent product rule
 
@@ -75,6 +75,11 @@ applying, authentication or support.
 - Back returns one navigation level. Close dismisses only the current overlay.
   Cancel preserves the prior safe state.
 - The current main action and current sub-action are always visually apparent.
+- Product verticals use `MoolOutcomeDock`: Mool and Chat remain stable edge
+  actions while no more than three readable current-task actions occupy the
+  separate middle rail.
+- Standard product content uses `MoolCardSurface` so elevation, border,
+  pressed feedback and reduced-motion behavior remain consistent.
 
 ## Production language rules
 

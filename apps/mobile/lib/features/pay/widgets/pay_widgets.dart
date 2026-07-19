@@ -225,27 +225,12 @@ class PayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: semanticLabel,
-      button: onTap != null,
-      child: Material(
-        color: color,
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(MoolRadii.card),
-          child: Container(
-            width: double.infinity,
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(MoolRadii.card),
-              border: Border.all(color: MoolColors.line),
-              boxShadow: MoolShadows.card,
-            ),
-            child: child,
-          ),
-        ),
-      ),
+    return MoolCardSurface(
+      color: color,
+      padding: padding,
+      onTap: onTap,
+      semanticLabel: semanticLabel,
+      child: child,
     );
   }
 }
@@ -509,95 +494,50 @@ class PayBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <(String, String, IconData, String)>[
-      ('mool', 'Mool', Icons.circle_rounded, '/app/mool'),
-      ('pay', 'Pay', Icons.account_balance_wallet_rounded, '/app/pay/home'),
-      ('receipts', 'Receipts', Icons.receipt_long_rounded, '/app/pay/receipts'),
-      (
-        'requests',
-        'Requests',
-        Icons.mark_email_unread_outlined,
-        '/app/pay/requests',
+    void open(String route) {
+      session.clearMessages();
+      context.go(route);
+    }
+
+    return MoolOutcomeDock(
+      semanticLabel: 'Pay navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'pay-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () => open('/app/mool'),
       ),
-      (
-        'chat',
-        'Chat',
-        Icons.chat_bubble_outline_rounded,
-        '/app/chat/inbox?return=/app/pay/home',
-      ),
-    ];
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(
-          MoolSpacing.sm,
-          0,
-          MoolSpacing.sm,
-          MoolSpacing.xs,
+      actions: [
+        MoolDockAction(
+          keyName: 'pay-dock-pay',
+          id: 'pay',
+          label: 'Pay',
+          icon: Icons.account_balance_wallet_rounded,
+          onPressed: () => open('/app/pay/home'),
         ),
-        padding: const EdgeInsets.all(5),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .96),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: MoolColors.line),
-          boxShadow: MoolShadows.floating,
+        MoolDockAction(
+          keyName: 'pay-dock-receipts',
+          id: 'receipts',
+          label: 'Receipts',
+          icon: Icons.receipt_long_rounded,
+          onPressed: () => open('/app/pay/receipts'),
         ),
-        child: Row(
-          children: [
-            for (final item in items)
-              Expanded(
-                child: Semantics(
-                  selected: active == item.$1,
-                  button: true,
-                  label: 'Open ${item.$2}',
-                  child: InkWell(
-                    key: Key('pay-dock-${item.$1}'),
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: () {
-                      session.clearMessages();
-                      context.go(item.$4);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      constraints: const BoxConstraints(minHeight: 48),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: active == item.$1
-                            ? MoolColors.navy
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            item.$3,
-                            size: 19,
-                            color: active == item.$1
-                                ? Colors.white
-                                : MoolColors.navy,
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            child: Text(
-                              item.$2,
-                              style: TextStyle(
-                                color: active == item.$1
-                                    ? Colors.white
-                                    : MoolColors.navy,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        MoolDockAction(
+          keyName: 'pay-dock-requests',
+          id: 'requests',
+          label: 'Requests',
+          icon: Icons.mark_email_unread_outlined,
+          onPressed: () => open('/app/pay/requests'),
         ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'pay-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        onPressed: () => open('/app/chat/inbox?return=/app/pay/home'),
       ),
     );
   }

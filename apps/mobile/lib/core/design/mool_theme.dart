@@ -24,6 +24,13 @@ abstract final class MoolTheme {
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
+      appBarTheme: const AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: MoolColors.canvas,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: MoolColors.navy,
+      ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -54,22 +61,31 @@ abstract final class MoolTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: MoolColors.navy,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFE4E4EC),
+          disabledForegroundColor: const Color(0xFF8B8DA2),
           minimumSize: const Size.fromHeight(MoolMetrics.compactTapTarget),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(MoolRadii.control),
+            borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.1,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(MoolMetrics.compactTapTarget),
           foregroundColor: MoolColors.navy,
-          side: const BorderSide(color: MoolColors.navy),
+          backgroundColor: Colors.white.withValues(alpha: .72),
+          side: const BorderSide(color: Color(0x32000080)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(MoolRadii.control),
+            borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -80,9 +96,9 @@ abstract final class MoolTheme {
           ),
           foregroundColor: MoolColors.navy,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(MoolRadii.control),
+            borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -93,12 +109,24 @@ abstract final class MoolTheme {
           vertical: 17,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(MoolRadii.control),
-          borderSide: const BorderSide(color: MoolColors.navy),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: MoolColors.line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(MoolRadii.control),
-          borderSide: const BorderSide(color: MoolColors.navy),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: MoolColors.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: MoolColors.royal, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFB42318)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFB42318), width: 1.5),
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
@@ -133,7 +161,7 @@ abstract final class MoolTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFF0F1F8),
+        backgroundColor: const Color(0xFFF0F1F7),
         selectedColor: MoolColors.navy,
         labelStyle: const TextStyle(
           color: MoolColors.navy,
@@ -145,6 +173,37 @@ abstract final class MoolTheme {
         ),
         shape: const StadiumBorder(),
         side: BorderSide.none,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: MoolColors.line,
+        thickness: 1,
+        space: 24,
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size(44, MoolMetrics.minimumTapTarget),
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? Colors.white
+                : MoolColors.navy,
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? MoolColors.navy
+                : Colors.white,
+          ),
+          side: const WidgetStatePropertyAll(
+            BorderSide(color: MoolColors.line),
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          textStyle: const WidgetStatePropertyAll(
+            TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
       ),
     );
   }

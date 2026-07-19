@@ -236,144 +236,69 @@ class BuyBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.sm,
-          MoolSpacing.xs,
-          MoolSpacing.sm,
-          MoolSpacing.sm,
-        ),
-        child: MoolGlassSurface(
-          semanticLabel: 'Buy navigation',
-          padding: const EdgeInsets.all(5),
-          child: Row(
-            children: [
-              _DockItem(
-                key: const Key('buy-dock-mool'),
-                label: 'Mool',
-                icon: Icons.blur_circular_rounded,
-                selected: active == 'mool',
-                onTap: () => context.go('/app/mool'),
-              ),
-              _DockItem(
-                key: const Key('buy-dock-shop'),
-                label: 'Shop',
-                icon: Icons.storefront_outlined,
-                selected: active == 'shop',
-                onTap: () => context.go('/app/buy/grocery'),
-              ),
-              _DockItem(
-                key: const Key('buy-dock-basket'),
-                label: session.itemCount == 0
-                    ? 'Basket'
-                    : 'Basket ${session.itemCount}',
-                icon: Icons.shopping_bag_outlined,
-                selected: active == 'basket',
-                onTap: () => context.go('/app/buy/basket'),
-              ),
-              _DockItem(
-                key: const Key('buy-dock-orders'),
-                label: 'Order',
-                icon: Icons.receipt_long_outlined,
-                selected: active == 'orders',
-                onTap: () {
-                  final receipt = session.receipt;
-                  if (receipt == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Place an order to see its live status here.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  final route = receipt.fulfilment == BuyFulfilment.storePickup
-                      ? '/app/buy/order/${receipt.id}/collection'
-                      : '/app/buy/order/${receipt.id}';
-                  context.go(route);
-                },
-              ),
-              _DockItem(
-                key: const Key('buy-dock-chat'),
-                label: 'Chat',
-                icon: Icons.chat_bubble_outline_rounded,
-                selected: active == 'chat',
-                onTap: () {
-                  final current = GoRouterState.of(context).uri.toString();
-                  context.go(
-                    Uri(
-                      path: '/app/chat/inbox',
-                      queryParameters: {'return': current},
-                    ).toString(),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+    return MoolOutcomeDock(
+      semanticLabel: 'Buy navigation',
+      activeId: active,
+      mool: MoolDockAction(
+        keyName: 'buy-dock-mool',
+        id: 'mool',
+        label: 'Mool',
+        icon: Icons.blur_circular_rounded,
+        onPressed: () => context.go('/app/mool'),
       ),
-    );
-  }
-}
-
-class _DockItem extends StatelessWidget {
-  const _DockItem({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Material(
-          color: selected ? MoolColors.navy : Colors.transparent,
-          borderRadius: BorderRadius.circular(MoolRadii.capsule),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(MoolRadii.capsule),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: MoolMetrics.minimumTapTarget,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    icon,
-                    size: 20,
-                    color: selected ? Colors.white : MoolColors.navy,
-                  ),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(
-                      color: selected ? Colors.white : MoolColors.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      actions: [
+        MoolDockAction(
+          keyName: 'buy-dock-shop',
+          id: 'shop',
+          label: 'Shop',
+          icon: Icons.storefront_outlined,
+          onPressed: () => context.go('/app/buy/grocery'),
         ),
+        MoolDockAction(
+          keyName: 'buy-dock-basket',
+          id: 'basket',
+          label: session.itemCount == 0
+              ? 'Basket'
+              : 'Basket ${session.itemCount}',
+          icon: Icons.shopping_bag_outlined,
+          onPressed: () => context.go('/app/buy/basket'),
+        ),
+        MoolDockAction(
+          keyName: 'buy-dock-orders',
+          id: 'orders',
+          label: 'Order',
+          icon: Icons.receipt_long_outlined,
+          onPressed: () {
+            final receipt = session.receipt;
+            if (receipt == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Place an order to see its live status here.'),
+                ),
+              );
+              return;
+            }
+            final route = receipt.fulfilment == BuyFulfilment.storePickup
+                ? '/app/buy/order/${receipt.id}/collection'
+                : '/app/buy/order/${receipt.id}';
+            context.go(route);
+          },
+        ),
+      ],
+      chat: MoolDockAction(
+        keyName: 'buy-dock-chat',
+        id: 'chat',
+        label: 'Chat',
+        icon: Icons.chat_bubble_outline_rounded,
+        onPressed: () {
+          final current = GoRouterState.of(context).uri.toString();
+          context.go(
+            Uri(
+              path: '/app/chat/inbox',
+              queryParameters: {'return': current},
+            ).toString(),
+          );
+        },
       ),
     );
   }
@@ -393,17 +318,7 @@ class BuySurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      elevation: 1,
-      shadowColor: const Color(0x24000036),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: Color(0x18000080)),
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-      ),
-      child: Padding(padding: padding, child: child),
-    );
+    return MoolCardSurface(color: color, padding: padding, child: child);
   }
 }
 
