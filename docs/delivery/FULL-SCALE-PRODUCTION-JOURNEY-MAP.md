@@ -55,8 +55,8 @@ Last reconciled: 19 July 2026
 | 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Complete in Flutter: POS 74 → 78 → 79 → 78 → 80 → 90; wholesale 74 → 81–89; Business Book 91 → 92 → 106; operated Business Services 93–96; customers/campaigns 97–100; recovery, AI, staff, settings and issues 101–105. Every slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Complete in Flutter: home, Business Book, catalogue, sales-order review, input procurement, dispatch, demand/campaigns, claims/team/settings and operated services passed dedicated black-box, two regression cycles, nine-screen visual gates and two physical-device exact replays |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Complete in Flutter: availability, complete request economics, pickup/OTP, live trip safety, fare/payment, earnings/payout, compliance, support, opportunities and state-aware trip navigation passed dedicated black-box, two regression cycles, eight-screen visual gates and two physical-device exact replays |
-| 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Core Creator surface complete in Flutter for 124–132 and 166: Studio, business-funded 1–7 day Reels, YouTube Connect, library, performance, audience, campaigns, earnings, rights and memberships passed two regression cycles, 13 visual gates and three physical-device exact replays. Cross-workspace onboarding, commerce and admin dependencies continue in slices 14–15 |
-| 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
+| 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Core Creator surface complete in Flutter for 124–132 and 166: Studio, business-funded 1–7 day Reels, YouTube Connect, library, performance, audience, campaigns, earnings, rights and memberships passed two regression cycles, 13 visual gates and three physical-device exact replays. Earn operations dependency 133–137 is complete in slice 14; remaining commerce and admin dependencies continue in slice 15 |
+| 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Complete in Flutter: funded opportunities, applications, active work, proof, earnings, history, provider home, catalogue, availability, requests, fulfilment, business records, growth and controls passed two regression cycles, 14 visual gates and two physical-device exact replays |
 | 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
 | 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
 
@@ -497,6 +497,28 @@ Last reconciled: 19 July 2026
 - Identity, media, YouTube, moderation, rights, campaign funding, attribution,
   membership, ledger, tax and payout systems remain replaceable external
   gateways and are not falsely represented as certified production services.
+
+## Earn and provider operating decisions now locked
+
+- Workers never pay to apply for or start funded work. The verified business
+  or MoolSocial reserves payout for approved output.
+- Potential earnings are not salary or guaranteed income. Eligibility, open
+  capacity, proof and approved outcome control payment.
+- Protected actions are permission checked, failure safe and idempotent. An
+  offline, unauthorized or failed command cannot create a false result.
+- Pausing new provider demand preserves every already accepted customer
+  commitment.
+- Provider growth keeps both economic directions explicit: funded work pays
+  the provider; a business growth campaign uses the provider’s approved
+  maximum budget.
+- A growth-campaign request is not represented as charged before final
+  business and external-payment confirmation.
+- Fulfilment needs arrival and outcome confirmation. Completion can move money
+  only to settlement review, not directly to paid.
+- Identity, eligibility, funding, dispatch, location, proof, fraud,
+  communications, catalogue, availability, request, campaign, payment,
+  ledger, tax, payout and support systems remain replaceable external gateways
+  and are not falsely represented as certified production services.
 
 ## Release boundary
 

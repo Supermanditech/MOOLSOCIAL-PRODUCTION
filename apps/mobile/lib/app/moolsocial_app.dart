@@ -10,6 +10,7 @@ import '../features/eat/eat_session.dart';
 import '../features/journey01/journey_router.dart';
 import '../features/journey01/journey_session.dart';
 import '../features/manufacturer/manufacturer_session.dart';
+import '../features/operations/operations_session.dart';
 import '../features/pay/pay_session.dart';
 import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
@@ -26,6 +27,7 @@ class MoolSocialApp extends StatefulWidget {
     this.creatorSession,
     this.eatSession,
     this.manufacturerSession,
+    this.operationsSession,
     this.paySession,
     this.retailerSession,
     this.rideSession,
@@ -39,6 +41,7 @@ class MoolSocialApp extends StatefulWidget {
     this.disposeCreatorSession = false,
     this.disposeEatSession = false,
     this.disposeManufacturerSession = false,
+    this.disposeOperationsSession = false,
     this.disposePaySession = false,
     this.disposeRetailerSession = false,
     this.disposeRideSession = false,
@@ -53,6 +56,7 @@ class MoolSocialApp extends StatefulWidget {
   final CreatorSession? creatorSession;
   final EatSession? eatSession;
   final ManufacturerSession? manufacturerSession;
+  final OperationsSession? operationsSession;
   final PaySession? paySession;
   final RetailerSession? retailerSession;
   final RideSession? rideSession;
@@ -66,6 +70,7 @@ class MoolSocialApp extends StatefulWidget {
   final bool disposeCreatorSession;
   final bool disposeEatSession;
   final bool disposeManufacturerSession;
+  final bool disposeOperationsSession;
   final bool disposePaySession;
   final bool disposeRetailerSession;
   final bool disposeRideSession;
@@ -87,6 +92,8 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   late final EatSession _eatSession = widget.eatSession ?? EatSession();
   late final ManufacturerSession _manufacturerSession =
       widget.manufacturerSession ?? ManufacturerSession();
+  late final OperationsSession _operationsSession =
+      widget.operationsSession ?? OperationsSession();
   late final PaySession _paySession = widget.paySession ?? PaySession();
   late final RetailerSession _retailerSession =
       widget.retailerSession ?? RetailerSession();
@@ -101,6 +108,7 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     _creatorSession,
     _eatSession,
     _manufacturerSession,
+    _operationsSession,
     _paySession,
     _retailerSession,
     _rideSession,
@@ -135,6 +143,9 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     if (widget.manufacturerSession == null ||
         widget.disposeManufacturerSession) {
       _manufacturerSession.dispose();
+    }
+    if (widget.operationsSession == null || widget.disposeOperationsSession) {
+      _operationsSession.dispose();
     }
     if (widget.paySession == null || widget.disposePaySession) {
       _paySession.dispose();

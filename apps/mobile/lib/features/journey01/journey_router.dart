@@ -46,6 +46,9 @@ import '../manufacturer/manufacturer_session.dart';
 import '../manufacturer/screens/manufacturer_growth_control_screens.dart';
 import '../manufacturer/screens/manufacturer_home_book_screens.dart';
 import '../manufacturer/screens/manufacturer_sales_screens.dart';
+import '../operations/operations_session.dart';
+import '../operations/screens/earn_operations_screens.dart';
+import '../operations/screens/provider_operations_screens.dart';
 import '../pay/pay_session.dart';
 import '../pay/screens/pay_entry_screens.dart';
 import '../pay/screens/pay_home_screen.dart';
@@ -92,6 +95,7 @@ GoRouter createJourneyRouter(
   CreatorSession creatorSession,
   EatSession eatSession,
   ManufacturerSession manufacturerSession,
+  OperationsSession operationsSession,
   PaySession paySession,
   RetailerSession retailerSession,
   RideSession rideSession,
@@ -508,6 +512,76 @@ GoRouter createJourneyRouter(
         path: '/app/creator/control',
         builder: (context, state) =>
             CreatorControlScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/earn',
+        builder: (context, state) =>
+            EarnOpportunitiesScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/earn/applications',
+        builder: (context, state) =>
+            EarnApplicationsScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/earn/active',
+        builder: (context, state) =>
+            EarnActiveWorkScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/earn/proof',
+        builder: (context, state) =>
+            EarnProofScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/earn/earnings',
+        builder: (context, state) =>
+            EarnEarningsScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/earn/history',
+        builder: (context, state) =>
+            EarnHistoryScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider',
+        builder: (context, state) =>
+            ProviderHomeScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/catalogue',
+        builder: (context, state) =>
+            ProviderCatalogueScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/availability',
+        builder: (context, state) =>
+            ProviderAvailabilityScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/requests',
+        builder: (context, state) =>
+            ProviderRequestsScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/fulfilment',
+        builder: (context, state) =>
+            ProviderFulfilmentScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/business',
+        builder: (context, state) =>
+            ProviderBusinessScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/growth',
+        builder: (context, state) =>
+            ProviderGrowthScreen(session: operationsSession),
+      ),
+      GoRoute(
+        path: '/app/provider/control',
+        builder: (context, state) =>
+            ProviderControlScreen(session: operationsSession),
       ),
       GoRoute(
         path: '/app/captain',
