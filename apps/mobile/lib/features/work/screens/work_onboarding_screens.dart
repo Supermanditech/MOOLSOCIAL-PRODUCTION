@@ -104,6 +104,8 @@ class MyWorkScreen extends StatelessWidget {
                   onPressed: () => context.go(
                     session.reviewStage == WorkReviewStage.approved
                         ? '/app/work/ready'
+                        : session.reviewStage == WorkReviewStage.live
+                        ? '/app/retailer/home'
                         : '/app/work/retailer/setup',
                   ),
                 ),
@@ -2155,11 +2157,13 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
             keyName: complete
                 ? 'retailer-setup-open-my-work'
                 : 'retailer-finish-setup',
-            label: complete ? 'Open My Work' : 'Finish setup and go live',
+            label: complete
+                ? 'Open shop operations'
+                : 'Finish setup and go live',
             busy: widget.session.busy,
             onPressed: () async {
               if (complete) {
-                context.go('/app/work/my-work');
+                context.go('/app/retailer/home');
                 return;
               }
               _saveFields();

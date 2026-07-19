@@ -51,13 +51,14 @@ Last reconciled: 19 July 2026
 | 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Implemented in Flutter; consent-aware doctor care, complete salon visit and proof-protected local task paths passed dedicated black-box, two full regression cycles and physical-device replay |
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
-| 9 | Retailer orders, POS, procurement, books, services, growth and controls | all `retailer-*` operational flows | 13, 74–106 | Pending |
-| 10 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
-| 11 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
-| 12 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
-| 13 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
-| 14 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
-| 15 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
+| 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
+| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Pending |
+| 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
+| 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
+| 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
+| 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
+| 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
+| 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
 
 ## Operational flow register
 
@@ -278,6 +279,32 @@ Last reconciled: 19 July 2026
 - Employer funding, work eligibility, KYC/document review, GST validation,
   payouts, catalogue/inventory, delivery, payment and moderation remain
   replaceable external gateways and are not falsely represented as certified.
+
+## Retailer customer-order implementation decisions now locked
+
+- A paid order remains in Needs review until the retailer explicitly accepts
+  it. Payment protection, delivery promise and refund rule stay visible.
+- Home delivery is an operating fulfilment mode. Store collection is not
+  inserted into a home-delivery order.
+- Every product group must be checked before packing can complete. Failed
+  packing preserves every checked line.
+- Delivery assignment starts only after packing. A failed request cannot
+  create a second delivery reference or captain assignment.
+- Parcel ready, captain at shop, OTP verified and parcel handed over are
+  separate irreversible checkpoints.
+- An invalid OTP keeps the parcel with the retailer. OTP verification alone
+  does not record physical handover.
+- Delivery status refresh updates the existing delivery and cannot create a
+  new order, debit or delivery reference.
+- Delivered proof creates one customer-visible receipt and one Business Book
+  entry.
+- Cannot fulfil and delivery issue paths require explicit reasons, support
+  cancellation and preserve the order through exact failure retry.
+- Retailer Mool and Chat actions retain the originating operating screen.
+- Orders, inventory reservation, payment/refund, delivery matching, captain
+  identity, OTP, live location, customer proof and Business Book posting
+  remain replaceable external gateways and are not falsely represented as
+  certified production services.
 
 ## Release boundary
 

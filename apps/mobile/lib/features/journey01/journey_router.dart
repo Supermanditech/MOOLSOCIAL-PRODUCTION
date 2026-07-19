@@ -40,6 +40,11 @@ import '../ride/ride_session.dart';
 import '../ride/screens/ride_booking_screen.dart';
 import '../ride/screens/ride_support_screen.dart';
 import '../ride/screens/ride_trip_screen.dart';
+import '../retailer/retailer_models.dart';
+import '../retailer/retailer_session.dart';
+import '../retailer/screens/retailer_delivery_screens.dart';
+import '../retailer/screens/retailer_home_screen.dart';
+import '../retailer/screens/retailer_order_screen.dart';
 import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
@@ -57,6 +62,7 @@ GoRouter createJourneyRouter(
   ChatSession chatSession,
   EatSession eatSession,
   PaySession paySession,
+  RetailerSession retailerSession,
   RideSession rideSession,
   WorkSession workSession, {
   String initialLocation = '/boot',
@@ -401,6 +407,58 @@ GoRouter createJourneyRouter(
         builder: (context, state) => PayOutcomeScreen(
           session: paySession,
           paymentId: state.pathParameters['paymentId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer',
+        builder: (context, state) =>
+            RetailerHomeScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/mool',
+        builder: (context, state) {
+          session.openMoolFrom('retailer');
+          return UniversalShell(session: session, section: 'mool');
+        },
+      ),
+      GoRoute(
+        path: '/app/retailer/home',
+        builder: (context, state) => RetailerHomeScreen(
+          session: retailerSession,
+          initialView: switch (state.uri.queryParameters['view']) {
+            'orders' => RetailerHomeView.orders,
+            'stock' => RetailerHomeView.stock,
+            'wholesale' => RetailerHomeView.wholesale,
+            _ => RetailerHomeView.home,
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders',
+        builder: (context, state) => RetailerHomeScreen(
+          session: retailerSession,
+          initialView: RetailerHomeView.orders,
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders/:orderId/tracking',
+        builder: (context, state) => RetailerDeliveryTrackingScreen(
+          session: retailerSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders/:orderId/delivery',
+        builder: (context, state) => RetailerDeliveryAssignmentScreen(
+          session: retailerSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders/:orderId',
+        builder: (context, state) => RetailerOrderScreen(
+          session: retailerSession,
+          orderId: state.pathParameters['orderId'] ?? '',
         ),
       ),
       GoRoute(
