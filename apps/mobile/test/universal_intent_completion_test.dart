@@ -47,15 +47,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  for (final section in const [
-    'buy',
-    'eat',
-    'ride',
-    'book',
-    'pay',
-    'work',
-    'chat',
-  ]) {
+  for (final section in const ['buy', 'eat', 'ride', 'book', 'pay', 'work']) {
     testWidgets('$section completes every sub-action and option branch', (
       tester,
     ) async {
@@ -250,6 +242,34 @@ void main() {
     await tapVisible(tester, const Key('work-dock-earn'));
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
+
+  testWidgets(
+    'Chat entries open the production inbox with the intended filter',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = await readySession();
+      addTearDown(session.dispose);
+      await openSection(tester, session, 'social');
+
+      await tapVisible(tester, const Key('open-search'));
+      await tester.enterText(find.byKey(const Key('search-field')), 'business');
+      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('search-result-chat-business-chat'));
+
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(const Key('chat-filter-business')))
+            .selected,
+        isTrue,
+      );
+      expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-open-thread-home-basket')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('Mool palette reaches every main action and returns safely', (
     tester,

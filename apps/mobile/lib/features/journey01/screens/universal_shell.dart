@@ -2146,9 +2146,15 @@ String _routeForQuery(String value) {
   if (query.contains('onboard')) return '/app/work/earn';
   if (query.contains('verify')) return '/app/work/my-work';
   if (query.contains('workspace')) return '/app/work/my-work';
-  if (query.contains('business chat')) return '/app/chat?sub=business-chat';
-  if (query.contains('support')) return '/app/chat?sub=support';
-  if (query.contains('order chat')) return '/app/chat?sub=orders';
+  if (query.contains('business chat')) {
+    return '/app/chat/inbox?type=business&return=/app/social';
+  }
+  if (query.contains('support')) {
+    return '/app/chat/inbox?type=support&return=/app/social';
+  }
+  if (query.contains('order chat')) {
+    return '/app/chat/inbox?type=order&return=/app/social';
+  }
   if (query.contains('auto')) return '/app/ride?sub=auto';
   if (query.contains('cab')) return '/app/ride?sub=cab';
   if (query.contains('bike')) return '/app/ride?sub=bike';
@@ -2178,7 +2184,9 @@ String _routeForQuery(String value) {
       query.contains('job')) {
     return '/app/work/earn';
   }
-  if (query.contains('chat') || query.contains('message')) return '/app/chat';
+  if (query.contains('chat') || query.contains('message')) {
+    return '/app/chat/inbox?return=/app/social';
+  }
   if (query.contains('buy') ||
       query.contains('grocery') ||
       query.contains('medicine') ||
@@ -3030,6 +3038,15 @@ String _searchActionRoute(String section, String? subAction) {
   }
   if (section == 'work') {
     return subAction == 'workspace' ? '/app/work/my-work' : '/app/work/earn';
+  }
+  if (section == 'chat') {
+    return switch (subAction) {
+      'people' => '/app/chat/inbox?type=people&return=/app/social',
+      'business-chat' => '/app/chat/inbox?type=business&return=/app/social',
+      'orders' => '/app/chat/inbox?type=order&return=/app/social',
+      'support' => '/app/chat/inbox?type=support&return=/app/social',
+      _ => '/app/chat/inbox?return=/app/social',
+    };
   }
   return subAction == null ? '/app/$section' : '/app/$section?sub=$subAction';
 }

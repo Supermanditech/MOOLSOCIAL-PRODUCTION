@@ -158,6 +158,35 @@ void main() {
     },
   );
 
+  testWidgets('Universal Chat choices open the matching production inbox', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    for (final branch in const [
+      ('people', ChatThreadType.people, 'home-basket'),
+      ('business-chat', ChatThreadType.business, 'mahadev'),
+      ('orders', ChatThreadType.order, 'rasoi'),
+      ('support', ChatThreadType.support, 'order-support'),
+    ]) {
+      await mount(
+        tester,
+        route: '/app/chat?sub=${branch.$1}&return=/app/social',
+        journey: journey,
+        chat: chat,
+      );
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(chat.selectedFilter, branch.$2);
+      expect(find.byKey(Key('chat-open-thread-${branch.$3}')), findsOneWidget);
+    }
+  });
+
   testWidgets(
     'people chat completes reactions, reply, attachment and nested actions',
     (tester) async {
@@ -224,6 +253,8 @@ void main() {
       await tapVisible(tester, const Key('chat-mode-poll'));
       await tapVisible(tester, const Key('chat-poll-today-evening'));
       expect(find.textContaining('Vote recorded for Today'), findsOneWidget);
+      await tapVisible(tester, const Key('chat-thread-mool'));
+      expect(find.byKey(const Key('mool-command-palette')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -336,6 +367,7 @@ void main() {
       Key('chat-thread-call'),
       Key('chat-thread-video'),
       Key('chat-thread-more'),
+      Key('chat-thread-mool'),
       Key('chat-attach'),
       Key('chat-camera'),
       Key('chat-send'),

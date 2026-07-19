@@ -527,6 +527,19 @@ class _Composer extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  IconButton.filledTonal(
+                    key: const Key('chat-thread-mool'),
+                    tooltip: 'Open Mool',
+                    onPressed: () => context.go('/app/mool'),
+                    icon: const Text(
+                      'Mool',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
                   IconButton(
                     key: const Key('chat-attach'),
                     tooltip: 'Attach',

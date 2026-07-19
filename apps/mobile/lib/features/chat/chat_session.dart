@@ -146,6 +146,7 @@ class ChatSession extends ChangeNotifier {
   }
 
   void chooseAll() {
+    if (selectedFilter == null && !unreadOnly) return;
     selectedFilter = null;
     unreadOnly = false;
     notifyListeners();
@@ -158,6 +159,7 @@ class ChatSession extends ChangeNotifier {
   }
 
   void chooseFilter(ChatThreadType value) {
+    if (selectedFilter == value && !unreadOnly) return;
     selectedFilter = value;
     unreadOnly = false;
     notifyListeners();

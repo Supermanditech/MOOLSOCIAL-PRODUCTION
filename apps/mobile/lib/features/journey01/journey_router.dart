@@ -22,6 +22,7 @@ import '../captain/captain_session.dart';
 import '../captain/screens/captain_business_screens.dart';
 import '../captain/screens/captain_home_request_screens.dart';
 import '../captain/screens/captain_trip_screens.dart';
+import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
@@ -267,11 +268,31 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/chat',
+        builder: (context, state) {
+          final filter = _chatFilter(
+            state.uri.queryParameters['type'] ??
+                state.uri.queryParameters['sub'],
+          );
+          return ChatInboxScreen(
+            key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
+            session: chatSession,
+            initialFilter: filter,
+            returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          );
+        },
+      ),
+      GoRoute(
         path: '/app/chat/inbox',
-        builder: (context, state) => ChatInboxScreen(
-          session: chatSession,
-          returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
-        ),
+        builder: (context, state) {
+          final filter = _chatFilter(state.uri.queryParameters['type']);
+          return ChatInboxScreen(
+            key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
+            session: chatSession,
+            initialFilter: filter,
+            returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          );
+        },
       ),
       GoRoute(
         path: '/app/chat/thread/:threadId',
@@ -1090,3 +1111,11 @@ GoRouter createJourneyRouter(
   );
   return router;
 }
+
+ChatThreadType? _chatFilter(String? value) => switch (value) {
+  'people' => ChatThreadType.people,
+  'business' || 'business-chat' => ChatThreadType.business,
+  'order' || 'orders' => ChatThreadType.order,
+  'support' => ChatThreadType.support,
+  _ => null,
+};

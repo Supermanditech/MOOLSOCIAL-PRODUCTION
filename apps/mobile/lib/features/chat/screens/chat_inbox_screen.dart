@@ -11,11 +11,13 @@ class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({
     required this.session,
     required this.returnRoute,
+    this.initialFilter,
     super.key,
   });
 
   final ChatSession session;
   final String returnRoute;
+  final ChatThreadType? initialFilter;
 
   @override
   State<ChatInboxScreen> createState() => _ChatInboxScreenState();
@@ -23,6 +25,20 @@ class ChatInboxScreen extends StatefulWidget {
 
 class _ChatInboxScreenState extends State<ChatInboxScreen> {
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final filter = widget.initialFilter;
+      if (filter == null) {
+        widget.session.chooseAll();
+      } else {
+        widget.session.chooseFilter(filter);
+      }
+    });
+  }
 
   @override
   void dispose() {
