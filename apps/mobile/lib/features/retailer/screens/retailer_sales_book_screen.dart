@@ -37,7 +37,7 @@ class _RetailerSalesBookScreenState extends State<RetailerSalesBookScreen> {
         title: 'Sales Book',
         subtitle: 'Completed and open shop sales',
         activeDock: 'orders',
-        returnRoute: '/app/retailer/books/sales',
+        returnRoute: '/app/retailer/books',
         trailing: IconButton.outlined(
           key: const Key('sales-book-export'),
           tooltip: 'Export Sales Book',

@@ -44,6 +44,7 @@ import '../retailer/retailer_models.dart';
 import '../retailer/retailer_pos_models.dart';
 import '../retailer/retailer_session.dart';
 import '../retailer/screens/retailer_delivery_screens.dart';
+import '../retailer/screens/retailer_books_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
 import '../retailer/screens/retailer_order_screen.dart';
 import '../retailer/screens/retailer_pos_screens.dart';
@@ -469,9 +470,24 @@ GoRouter createJourneyRouter(
             RetailerCounterSaleScreen(session: retailerSession),
       ),
       GoRoute(
+        path: '/app/retailer/books',
+        builder: (context, state) =>
+            RetailerBusinessBookScreen(session: retailerSession),
+      ),
+      GoRoute(
         path: '/app/retailer/books/sales',
         builder: (context, state) =>
             RetailerSalesBookScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/books/stock',
+        builder: (context, state) =>
+            RetailerStockStatementScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/books/money',
+        builder: (context, state) =>
+            RetailerMoneyControlScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/wholesale',

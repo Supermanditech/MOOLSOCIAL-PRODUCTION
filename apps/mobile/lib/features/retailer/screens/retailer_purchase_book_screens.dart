@@ -41,13 +41,12 @@ class _RetailerPurchaseBookScreenState
             title: 'Purchase Book',
             subtitle: 'Owner or accountant access required',
             activeDock: 'wholesale',
-            returnRoute: '/app/retailer/home',
+            returnRoute: '/app/retailer/books',
             body: Center(
               child: RetailerEmptyState(
                 keyName: 'purchase-book-role-denied',
                 title: 'Financial records are protected',
-                detail:
-                    'Ask the shop owner to grant Purchase Book permission.',
+                detail: 'Ask the shop owner to grant Purchase Book permission.',
                 actionLabel: 'Return to shop',
                 onAction: () => context.go('/app/retailer/home'),
               ),
@@ -59,7 +58,7 @@ class _RetailerPurchaseBookScreenState
           title: 'Purchase Book',
           subtitle: 'Supplier bills, received stock and payments',
           activeDock: 'wholesale',
-          returnRoute: '/app/retailer/home',
+          returnRoute: '/app/retailer/books',
           trailing: IconButton.outlined(
             key: const Key('purchase-book-tools'),
             tooltip: 'Purchase Book tools',
@@ -164,9 +163,7 @@ class _RetailerPurchaseBookScreenState
                           suffixIcon: _search.text.isEmpty
                               ? null
                               : IconButton(
-                                  key: const Key(
-                                    'purchase-clear-search',
-                                  ),
+                                  key: const Key('purchase-clear-search'),
                                   onPressed: () {
                                     _search.clear();
                                     widget.session.searchPurchases('');
@@ -231,8 +228,7 @@ class _RetailerPurchaseBookScreenState
                     },
                   )
                 else
-                  for (final purchase
-                      in widget.session.visiblePurchases) ...[
+                  for (final purchase in widget.session.visiblePurchases) ...[
                     RetailerCard(
                       keyName: 'purchase-entry-${purchase.id}',
                       onTap: () => _showPurchase(context, purchase),
@@ -294,9 +290,10 @@ class _RetailerPurchaseBookScreenState
                               Text(
                                 purchase.status.toUpperCase(),
                                 style: TextStyle(
-                                  color: purchase.status
-                                          .toLowerCase()
-                                          .contains('paid')
+                                  color:
+                                      purchase.status.toLowerCase().contains(
+                                        'paid',
+                                      )
                                       ? MoolColors.success
                                       : MoolColors.orange,
                                   fontSize: 9,
@@ -411,9 +408,7 @@ class _RetailerPurchaseBookScreenState
         trailing: const Badge(label: Text('2')),
         onTap: () {
           Navigator.pop(context);
-          widget.session.setPurchaseBookView(
-            RetailerPurchaseBookView.payables,
-          );
+          widget.session.setPurchaseBookView(RetailerPurchaseBookView.payables);
         },
       ),
       for (final item in const [
@@ -555,9 +550,7 @@ class _RetailerPurchaseBookScreenState
               key: const Key('purchase-detail-pay'),
               onPressed: () {
                 Navigator.pop(context);
-                context.go(
-                  '/app/retailer/supplier-bills/INV-RTD-665',
-                );
+                context.go('/app/retailer/supplier-bills/INV-RTD-665');
               },
               child: const Text('Open bill'),
             ),
@@ -611,14 +604,8 @@ class RetailerSupplierBillScreen extends StatelessWidget {
                 title: 'Rajasthan Tea Distribution',
                 detail: 'Verified supplier relationship',
                 children: const [
-                  _PurchaseFact(
-                    title: '₹2,568',
-                    detail: 'Outstanding',
-                  ),
-                  _PurchaseFact(
-                    title: '15-day credit',
-                    detail: 'Payment term',
-                  ),
+                  _PurchaseFact(title: '₹2,568', detail: 'Outstanding'),
+                  _PurchaseFact(title: '15-day credit', detail: 'Payment term'),
                   _PurchaseFact(
                     title: '96% on time',
                     detail: 'Delivery performance',
@@ -645,14 +632,8 @@ class RetailerSupplierBillScreen extends StatelessWidget {
                 title: 'Tax invoice INV-RTD-665',
                 detail: 'Original image and reviewed extraction',
                 children: const [
-                  _PurchaseFact(
-                    title: '₹2,568',
-                    detail: 'Invoice total',
-                  ),
-                  _PurchaseFact(
-                    title: '12 Jul 2026',
-                    detail: 'Invoice date',
-                  ),
+                  _PurchaseFact(title: '₹2,568', detail: 'Invoice total'),
+                  _PurchaseFact(title: '12 Jul 2026', detail: 'Invoice date'),
                   _PurchaseFact(
                     title: 'Original retained',
                     detail: 'GST extraction matched',
@@ -682,9 +663,7 @@ class RetailerSupplierBillScreen extends StatelessWidget {
                 ])
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(
-                        right: MoolSpacing.xxs,
-                      ),
+                      padding: const EdgeInsets.only(right: MoolSpacing.xxs),
                       child: RetailerCard(
                         keyName: 'supplier-match-${item.$1}',
                         onTap: () => session.showNotice(
@@ -703,10 +682,7 @@ class RetailerSupplierBillScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            Text(
-                              item.$3,
-                              style: const TextStyle(fontSize: 10),
-                            ),
+                            Text(item.$3, style: const TextStyle(fontSize: 10)),
                           ],
                         ),
                       ),
@@ -738,10 +714,7 @@ class RetailerSupplierBillScreen extends StatelessWidget {
               color: const Color(0xFFEAF7E8),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.verified_rounded,
-                    color: MoolColors.success,
-                  ),
+                  const Icon(Icons.verified_rounded, color: MoolColors.success),
                   const SizedBox(width: MoolSpacing.xs),
                   const Expanded(
                     child: Text(
@@ -822,18 +795,12 @@ class RetailerSupplierBillScreen extends StatelessWidget {
     title: 'Review supplier payment',
     detail: 'Authorize only after checking beneficiary, amount and bill.',
     children: [
-      const _PurchaseFact(
-        title: '₹2,568',
-        detail: 'Full outstanding',
-      ),
+      const _PurchaseFact(title: '₹2,568', detail: 'Full outstanding'),
       const _PurchaseFact(
         title: 'Rajasthan Tea Distribution',
         detail: 'Verified beneficiary',
       ),
-      const _PurchaseFact(
-        title: 'PO & GRN matched',
-        detail: 'No open dispute',
-      ),
+      const _PurchaseFact(title: 'PO & GRN matched', detail: 'No open dispute'),
       const SizedBox(height: MoolSpacing.sm),
       SegmentedButton<RetailerSupplierPaymentMethod>(
         key: const Key('supplier-payment-method'),
@@ -878,10 +845,7 @@ class RetailerSupplierBillScreen extends StatelessWidget {
 }
 
 class RetailerSupplierPaymentStatusScreen extends StatelessWidget {
-  const RetailerSupplierPaymentStatusScreen({
-    required this.session,
-    super.key,
-  });
+  const RetailerSupplierPaymentStatusScreen({required this.session, super.key});
 
   final RetailerSession session;
 
@@ -924,8 +888,7 @@ class RetailerSupplierPaymentStatusScreen extends StatelessWidget {
           bottomAction: state == RetailerSupplierPaymentState.settled
               ? FilledButton(
                   key: const Key('supplier-open-purchase-book'),
-                  onPressed: () =>
-                      context.go('/app/retailer/books/purchases'),
+                  onPressed: () => context.go('/app/retailer/books/purchases'),
                   child: const Text('View Purchase Book'),
                 )
               : FilledButton(
@@ -1098,10 +1061,7 @@ class _PaymentStateCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   '₹2,568',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
                 ),
               ],
             ),
@@ -1164,10 +1124,7 @@ class _PurchaseFact extends StatelessWidget {
             child: Text(
               detail,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
             ),
           ),
         ],

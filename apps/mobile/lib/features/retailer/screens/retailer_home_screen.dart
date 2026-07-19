@@ -77,7 +77,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
               IconButton.outlined(
                 key: const Key('retailer-business-book'),
                 tooltip: 'Open Business Book',
-                onPressed: () => context.go('/app/retailer/books/sales'),
+                onPressed: () => context.go('/app/retailer/books'),
                 icon: const Icon(Icons.auto_stories_outlined),
               ),
               const SizedBox(width: MoolSpacing.xxs),

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'retailer_books_models.dart';
+import 'retailer_books_services.dart';
 import 'retailer_models.dart';
 import 'retailer_pos_models.dart';
 import 'retailer_pos_services.dart';
@@ -12,22 +14,28 @@ class RetailerSession extends ChangeNotifier {
     ReviewRetailerGateway? gateway,
     ReviewRetailerPosGateway? posGateway,
     ReviewRetailerWholesaleGateway? wholesaleGateway,
+    ReviewRetailerBooksGateway? booksGateway,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
-       wholesaleGateway =
-           wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
+       wholesaleGateway = wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
+       booksGateway = booksGateway ?? ReviewRetailerBooksGateway(),
        orders = buildReviewRetailerOrders(),
        counters = buildReviewCounters(),
        sales = buildReviewSales(),
-       purchases = buildReviewPurchaseRecords();
+       purchases = buildReviewPurchaseRecords(),
+       stockMovements = List.of(reviewStockMovements),
+       moneyExceptions = buildReviewMoneyExceptions();
 
   final ReviewRetailerGateway gateway;
   final ReviewRetailerPosGateway posGateway;
   final ReviewRetailerWholesaleGateway wholesaleGateway;
+  final ReviewRetailerBooksGateway booksGateway;
   final List<RetailerOrder> orders;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
   final List<RetailerPurchaseRecord> purchases;
+  final List<RetailerStockMovement> stockMovements;
+  final List<RetailerMoneyException> moneyExceptions;
 
   RetailerHomeView view = RetailerHomeView.home;
   bool ordersOnline = true;
@@ -63,16 +71,14 @@ class RetailerSession extends ChangeNotifier {
   String salesSearchQuery = '';
   String? selectedSaleId;
 
-  RetailerWholesaleCategory wholesaleCategory =
-      RetailerWholesaleCategory.all;
+  RetailerWholesaleCategory wholesaleCategory = RetailerWholesaleCategory.all;
   String wholesaleSearchQuery = '';
   final Map<String, int> wholesaleCart = {};
   bool wholesaleOnline = true;
   bool cameraAllowed = true;
   List<RetailerPurchaseOrder> purchaseOrders = [];
   String? selectedPurchaseOrderId;
-  RetailerGoodsReceiptChoice receiptChoice =
-      RetailerGoodsReceiptChoice.pending;
+  RetailerGoodsReceiptChoice receiptChoice = RetailerGoodsReceiptChoice.pending;
   RetailerGoodsIssue? goodsIssue;
   bool goodsEvidenceAttached = false;
   String? goodsReceiptId;
@@ -89,6 +95,24 @@ class RetailerSession extends ChangeNotifier {
   RetailerSupplierPaymentState supplierPaymentState =
       RetailerSupplierPaymentState.notStarted;
   String? supplierPaymentId;
+
+  RetailerStockStatementView stockStatementView =
+      RetailerStockStatementView.movements;
+  RetailerStockMovementType? stockMovementFilter;
+  String stockSearchQuery = '';
+  String? selectedStockMovementId;
+  String? selectedStockCheckId;
+  RetailerStockAdjustmentKind stockAdjustmentKind =
+      RetailerStockAdjustmentKind.physicalCount;
+  String? stockAdjustmentId;
+  String? lastStockExport;
+  RetailerBusinessPeriod businessPeriod = RetailerBusinessPeriod.month;
+  bool businessBookOnline = true;
+  String? lastBusinessExport;
+  String? matchedCustomerPaymentId;
+  final List<RetailerExpense> expenses = [];
+  String? expenseId;
+  String? selectedMoneyExceptionId;
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -208,25 +232,27 @@ class RetailerSession extends ChangeNotifier {
 
   List<RetailerWholesaleProduct> get visibleWholesaleProducts {
     final query = wholesaleSearchQuery.trim().toLowerCase();
-    return reviewWholesaleProducts.where((product) {
-      final searchMatches =
-          query.isEmpty ||
-          '${product.brand} ${product.name} ${product.pack} ${product.id}'
-              .toLowerCase()
-              .contains(query);
-      final categoryMatches = switch (wholesaleCategory) {
-        RetailerWholesaleCategory.all => true,
-        RetailerWholesaleCategory.deals =>
-          product.offer.toLowerCase().contains('save') ||
-              product.offer.contains('%'),
-        RetailerWholesaleCategory.fastDelivery =>
-          product.delivery == 'Today' || product.delivery == 'Tomorrow',
-        RetailerWholesaleCategory.credit =>
-          product.payment.toLowerCase().contains('credit'),
-        RetailerWholesaleCategory.brands => true,
-      };
-      return searchMatches && categoryMatches;
-    }).toList(growable: false);
+    return reviewWholesaleProducts
+        .where((product) {
+          final searchMatches =
+              query.isEmpty ||
+              '${product.brand} ${product.name} ${product.pack} ${product.id}'
+                  .toLowerCase()
+                  .contains(query);
+          final categoryMatches = switch (wholesaleCategory) {
+            RetailerWholesaleCategory.all => true,
+            RetailerWholesaleCategory.deals =>
+              product.offer.toLowerCase().contains('save') ||
+                  product.offer.contains('%'),
+            RetailerWholesaleCategory.fastDelivery =>
+              product.delivery == 'Today' || product.delivery == 'Tomorrow',
+            RetailerWholesaleCategory.credit =>
+              product.payment.toLowerCase().contains('credit'),
+            RetailerWholesaleCategory.brands => true,
+          };
+          return searchMatches && categoryMatches;
+        })
+        .toList(growable: false);
   }
 
   int wholesaleQuantity(String productId) => wholesaleCart[productId] ?? 0;
@@ -236,36 +262,37 @@ class RetailerSession extends ChangeNotifier {
 
   int get wholesaleCartTotal => reviewWholesaleProducts.fold(
     0,
-    (sum, product) =>
-        sum + product.casePrice * wholesaleQuantity(product.id),
+    (sum, product) => sum + product.casePrice * wholesaleQuantity(product.id),
   );
 
   List<RetailerPurchaseRecord> get visiblePurchases {
     final query = purchaseSearchQuery.trim().toLowerCase();
-    return purchases.where((purchase) {
-      final viewMatches = switch (purchaseBookView) {
-        RetailerPurchaseBookView.purchases => true,
-        RetailerPurchaseBookView.payables =>
-          purchase.status.toLowerCase().contains('due') ||
-              purchase.status.toLowerCase().contains('processing'),
-        RetailerPurchaseBookView.returns =>
-          purchase.status.toLowerCase().contains('return'),
-      };
-      final sourceMatches =
-          purchaseSourceFilter == 'all' ||
-          (purchaseSourceFilter == 'platform' &&
-              purchase.source == 'MoolSocial PO') ||
-          (purchaseSourceFilter == 'direct' &&
-              purchase.source == 'Direct bill') ||
-          (purchaseSourceFilter == 'paid' &&
-              purchase.status.toLowerCase() == 'paid');
-      final searchMatches =
-          query.isEmpty ||
-          '${purchase.supplier} ${purchase.poId} ${purchase.invoiceId} ${purchase.summary}'
-              .toLowerCase()
-              .contains(query);
-      return viewMatches && sourceMatches && searchMatches;
-    }).toList(growable: false);
+    return purchases
+        .where((purchase) {
+          final viewMatches = switch (purchaseBookView) {
+            RetailerPurchaseBookView.purchases => true,
+            RetailerPurchaseBookView.payables =>
+              purchase.status.toLowerCase().contains('due') ||
+                  purchase.status.toLowerCase().contains('processing'),
+            RetailerPurchaseBookView.returns =>
+              purchase.status.toLowerCase().contains('return'),
+          };
+          final sourceMatches =
+              purchaseSourceFilter == 'all' ||
+              (purchaseSourceFilter == 'platform' &&
+                  purchase.source == 'MoolSocial PO') ||
+              (purchaseSourceFilter == 'direct' &&
+                  purchase.source == 'Direct bill') ||
+              (purchaseSourceFilter == 'paid' &&
+                  purchase.status.toLowerCase() == 'paid');
+          final searchMatches =
+              query.isEmpty ||
+              '${purchase.supplier} ${purchase.poId} ${purchase.invoiceId} ${purchase.summary}'
+                  .toLowerCase()
+                  .contains(query);
+          return viewMatches && sourceMatches && searchMatches;
+        })
+        .toList(growable: false);
   }
 
   RetailerPurchaseRecord? get selectedPurchase {
@@ -276,6 +303,49 @@ class RetailerSession extends ChangeNotifier {
     }
     return null;
   }
+
+  List<RetailerStockMovement> get visibleStockMovements {
+    final query = stockSearchQuery.trim().toLowerCase();
+    return stockMovements
+        .where((movement) {
+          final typeMatches =
+              stockMovementFilter == null ||
+              movement.type == stockMovementFilter;
+          final searchMatches =
+              query.isEmpty ||
+              '${movement.product} ${movement.sku} ${movement.source} ${movement.reference}'
+                  .toLowerCase()
+                  .contains(query);
+          return typeMatches && searchMatches;
+        })
+        .toList(growable: false);
+  }
+
+  List<RetailerStockCheck> get visibleStockChecks {
+    final query = stockSearchQuery.trim().toLowerCase();
+    return reviewStockChecks
+        .where(
+          (check) =>
+              query.isEmpty ||
+              '${check.product} ${check.reason} ${check.action}'
+                  .toLowerCase()
+                  .contains(query),
+        )
+        .toList(growable: false);
+  }
+
+  RetailerStockMovement? get selectedStockMovement {
+    final id = selectedStockMovementId;
+    if (id == null) return null;
+    for (final movement in stockMovements) {
+      if (movement.id == id) return movement;
+    }
+    return null;
+  }
+
+  List<RetailerMoneyException> get openMoneyExceptions => moneyExceptions
+      .where((exception) => !exception.resolved)
+      .toList(growable: false);
 
   RetailerPurchaseOrder? get selectedPurchaseOrder {
     final id = selectedPurchaseOrderId;
@@ -1383,10 +1453,7 @@ class RetailerSession extends ChangeNotifier {
     notifyListeners();
     var completed = false;
     try {
-      final grn = await wholesaleGateway.postReceipt(
-        order.id,
-        receiptChoice,
-      );
+      final grn = await wholesaleGateway.postReceipt(order.id, receiptChoice);
       goodsReceiptId = grn;
       final issue = receiptChoice == RetailerGoodsReceiptChoice.issue;
       acceptedStockPacks += issue ? 8 : 12;
@@ -1504,11 +1571,10 @@ class RetailerSession extends ChangeNotifier {
     notifyListeners();
     var completed = false;
     try {
-      supplierPaymentId =
-          await wholesaleGateway.authorizeSupplierPayment(
-            'INV-RTD-665',
-            supplierPaymentMethod,
-          );
+      supplierPaymentId = await wholesaleGateway.authorizeSupplierPayment(
+        'INV-RTD-665',
+        supplierPaymentMethod,
+      );
       supplierPaymentState = RetailerSupplierPaymentState.processing;
       noticeMessage =
           'Payment authorization submitted. Settlement is not confirmed yet.';
@@ -1540,8 +1606,9 @@ class RetailerSession extends ChangeNotifier {
     notifyListeners();
     var completed = false;
     try {
-      supplierPaymentState =
-          await wholesaleGateway.refreshSupplierPayment(paymentId);
+      supplierPaymentState = await wholesaleGateway.refreshSupplierPayment(
+        paymentId,
+      );
       RetailerPurchaseRecord? record;
       for (final purchase in purchases) {
         if (purchase.invoiceId == 'INV-RTD-665') {
@@ -1574,6 +1641,289 @@ class RetailerSession extends ChangeNotifier {
       notifyListeners();
     }
     return completed;
+  }
+
+  void setBusinessBookOnline(bool value) {
+    businessBookOnline = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setStockStatementView(RetailerStockStatementView value) {
+    stockStatementView = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setStockMovementFilter(RetailerStockMovementType? value) {
+    stockStatementView = RetailerStockStatementView.movements;
+    stockMovementFilter = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void searchStockStatement(String value) {
+    stockSearchQuery = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectStockMovement(String movementId) {
+    selectedStockMovementId = movementId;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectStockCheck(String checkId) {
+    selectedStockCheckId = checkId;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshStockStatement() async {
+    if (!businessBookAuthorized) {
+      _showError('Your current shop role cannot open stock financial value.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError(
+        'The Stock Statement is offline. Existing movements remain available.',
+      );
+      return false;
+    }
+    return _runBool(
+      booksGateway.refreshStock,
+      success: 'Stock Statement is current. No movement was duplicated.',
+    );
+  }
+
+  Future<bool> recordStockAdjustment({
+    required RetailerStockAdjustmentKind kind,
+    required int quantity,
+    required String reason,
+  }) async {
+    if (stockAdjustmentId != null) {
+      noticeMessage =
+          'Stock change $stockAdjustmentId is already recorded. Quantity was not changed again.';
+      notifyListeners();
+      return true;
+    }
+    if (quantity <= 0) {
+      _showError('Enter a quantity greater than zero.');
+      return false;
+    }
+    if (reason.trim().length < 4) {
+      _showError('Enter a clear reason for this stock change.');
+      return false;
+    }
+    if (!businessBookAuthorized) {
+      _showError('Shop owner approval is required for stock changes.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError(
+        'Stock changes are offline. No available quantity was changed.',
+      );
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      stockAdjustmentId = await booksGateway.adjustStock(
+        kind,
+        quantity,
+        reason.trim(),
+      );
+      stockAdjustmentKind = kind;
+      final negative = kind != RetailerStockAdjustmentKind.physicalCount;
+      stockMovements.insert(
+        0,
+        RetailerStockMovement(
+          id: 'MOV-$stockAdjustmentId',
+          product: 'Fortune Sunflower Oil 1 L',
+          sku: 'FRT-1L',
+          source: kind.label,
+          reference:
+              '$stockAdjustmentId · ${reason.trim()} · shop owner approved',
+          change: negative ? -quantity : quantity,
+          balance: negative ? 7 - quantity : 7 + quantity,
+          type: kind == RetailerStockAdjustmentKind.damageOrExpiry
+              ? RetailerStockMovementType.damage
+              : RetailerStockMovementType.adjusted,
+        ),
+      );
+      noticeMessage =
+          '${kind.label} recorded once with owner approval and audit history.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> exportStockStatement(String format) async {
+    if (!businessBookAuthorized) {
+      _showError('Owner or accountant permission is required for exports.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError('Reconnect before creating a stock statement export.');
+      return false;
+    }
+    return _runBool(
+      () => booksGateway.exportStock(format),
+      success: '$format stock statement is ready.',
+      afterSuccess: () => lastStockExport = format,
+    );
+  }
+
+  void setBusinessPeriod(RetailerBusinessPeriod value) {
+    businessPeriod = value;
+    clearMessages();
+    noticeMessage = '${value.label} Business Book selected.';
+    notifyListeners();
+  }
+
+  Future<bool> refreshBusinessBook() async {
+    if (!businessBookAuthorized) {
+      _showError('Your current shop role cannot open financial records.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError(
+        'The Business Book is offline. Existing approved records remain available.',
+      );
+      return false;
+    }
+    return _runBool(
+      booksGateway.refreshBusinessBook,
+      success: 'Business Book is current. No record was posted twice.',
+    );
+  }
+
+  Future<bool> exportBusinessBook(String format) async {
+    if (!businessBookAuthorized) {
+      _showError('Owner or accountant permission is required for reports.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError('Reconnect before creating a business report.');
+      return false;
+    }
+    return _runBool(
+      () => booksGateway.exportBusinessBook(format),
+      success: '$format Business Book report is ready.',
+      afterSuccess: () => lastBusinessExport = format,
+    );
+  }
+
+  void matchCustomerPayment() {
+    if (matchedCustomerPaymentId != null) {
+      noticeMessage =
+          'Customer payment $matchedCustomerPaymentId is already matched.';
+      notifyListeners();
+      return;
+    }
+    matchedCustomerPaymentId = 'PH-1182';
+    clearMessages();
+    noticeMessage =
+        '₹1,240 bank transfer PH-1182 matched to the customer due once.';
+    notifyListeners();
+  }
+
+  Future<bool> saveBusinessExpense({
+    required int amount,
+    required String category,
+    required String note,
+    required String method,
+    required bool evidenceAttached,
+  }) async {
+    if (expenseId != null) {
+      noticeMessage =
+          'Expense $expenseId is already saved. No duplicate expense was created.';
+      notifyListeners();
+      return true;
+    }
+    if (amount <= 0) {
+      _showError('Enter an expense amount greater than zero.');
+      return false;
+    }
+    if (category.trim().isEmpty || note.trim().length < 3) {
+      _showError('Choose a category and enter a clear bill or note.');
+      return false;
+    }
+    if (!evidenceAttached) {
+      _showError('Attach the bill or payment evidence before saving.');
+      return false;
+    }
+    if (!businessBookAuthorized) {
+      _showError('Your current shop role cannot add business expenses.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError('Expenses are offline. No financial record was created.');
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      final expense = RetailerExpense(
+        id: 'EXP-10601',
+        amount: amount,
+        category: category.trim(),
+        note: note.trim(),
+        method: method,
+        evidenceAttached: evidenceAttached,
+      );
+      expenseId = await booksGateway.saveExpense(expense);
+      expenses.add(expense);
+      noticeMessage =
+          'Expense $expenseId saved once with source evidence and operator.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> resolveMoneyException(String exceptionId) async {
+    final exception = moneyExceptions.firstWhere(
+      (item) => item.id == exceptionId,
+    );
+    selectedMoneyExceptionId = exceptionId;
+    if (exception.resolved) {
+      noticeMessage =
+          'This money exception is already resolved. No duplicate record was created.';
+      notifyListeners();
+      return true;
+    }
+    if (!businessBookAuthorized) {
+      _showError('Owner approval is required for money reconciliation.');
+      return false;
+    }
+    if (!businessBookOnline) {
+      _showError(
+        'Money reconciliation is offline. The exception remains open.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => booksGateway.resolveMoney(exceptionId),
+      success: '${exception.title} resolved with audit history.',
+      afterSuccess: () => exception.resolved = true,
+    );
   }
 
   Future<void> _run(
