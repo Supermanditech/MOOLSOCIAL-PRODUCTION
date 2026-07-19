@@ -34,14 +34,35 @@ void main() {
     );
   });
 
-  test('iOS declares camera, microphone and speech permissions', () {
+  test('iOS identity, deployment target and permissions are aligned', () {
     final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+    final frameworkInfo = File(
+      'ios/Flutter/AppFrameworkInfo.plist',
+    ).readAsStringSync();
 
     expect(infoPlist, contains('<key>NSCameraUsageDescription</key>'));
     expect(infoPlist, contains('<key>NSMicrophoneUsageDescription</key>'));
     expect(
       infoPlist,
       contains('<key>NSSpeechRecognitionUsageDescription</key>'),
+    );
+    expect(
+      'PRODUCT_BUNDLE_IDENTIFIER = com.moolsocial.app;'
+          .allMatches(project)
+          .length,
+      3,
+    );
+    expect(
+      'IPHONEOS_DEPLOYMENT_TARGET = 15.0;'.allMatches(project).length,
+      3,
+      reason: 'Current Firebase Apple packages require iOS 15 or newer.',
+    );
+    expect(
+      frameworkInfo,
+      contains('<key>MinimumOSVersion</key>\n  <string>15.0</string>'),
     );
   });
 

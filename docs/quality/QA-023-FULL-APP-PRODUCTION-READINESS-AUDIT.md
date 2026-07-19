@@ -220,6 +220,19 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: no golden is skipped or given a wider tolerance; CI must compare
   against the same rendering platform used to approve the evidence.
 
+### QA23-013 — hosted iOS build target was below Firebase minimum
+
+- Discovery: the hosted macOS simulator build rejected the Firebase Analytics,
+  App Check, Auth, Core, Crashlytics, Messaging, Performance and Remote Config
+  packages.
+- Root cause: the Runner still declared iOS 13 while the resolved Firebase
+  Apple packages require iOS 15 or newer.
+- Fix: every Runner build configuration and the embedded Flutter framework now
+  declare iOS 15. A platform configuration test locks the application identity
+  and all three deployment-target entries.
+- Acceptance: the exact simulator build must pass on hosted macOS before this
+  ticket is closed.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -251,6 +264,7 @@ evidence.
 | Reinstall reopened a prior completed journey | Debug package-private data is removed and verified before launch | Exact clean setup-to-Universal replay passed |
 | Universal search prompt ended in an ellipsis on OPPO | Complete contextual prompt fits; the result screen carries the detailed content scope | Universal responsive intent and golden suites passed |
 | Ubuntu reported all 74 Flutter pixel baselines as different | Run approved baselines on Windows while retaining Linux Android and macOS iOS builds | Replacement GitHub workflow pending exact replay |
+| Hosted iOS build rejected Firebase Apple packages because the Runner targeted iOS 13 | Runner and embedded Flutter framework now declare iOS 15; a configuration test fixes the boundary | Hosted macOS build pending exact replay |
 
 ## Current verification
 
@@ -300,6 +314,8 @@ The first live path is:
 - Android signing/store approval and Apple Developer/App Store Connect
   agreements remain owner-controlled actions.
 - iOS compilation and signing require hosted macOS.
+- The current Firebase Apple packages require iOS 15 or newer; older iPhones
+  are outside the supported production boundary.
 - The current Android build succeeds but emits a future Flutter compatibility
   warning for seven plugins that still apply the Kotlin Gradle Plugin. This is
   ticketed as `PROD-FDN-005`; it is not a current build failure.

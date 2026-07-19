@@ -6,6 +6,8 @@
   domain state and generated backend clients.
 - Android package: `com.moolsocial.app`.
 - iOS bundle: `com.moolsocial.app`.
+- Minimum supported iOS version: 15.0, aligned with the current Firebase
+  Apple SDK packages.
 - These production identifiers are fixed before the first store registration
   and must not be renamed after an app is created in Play Console or App Store
   Connect. See `docs/delivery/APP-IDENTITY.md`.
