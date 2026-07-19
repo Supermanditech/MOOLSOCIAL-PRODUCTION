@@ -75,7 +75,14 @@ void main() {
             (section == 'ride' &&
                 const {'bike', 'auto', 'cab'}.contains(spec.id)) ||
             (section == 'book' &&
-                const {'get-done', 'doctor', 'salon'}.contains(spec.id))) {
+                const {'get-done', 'doctor', 'salon'}.contains(spec.id)) ||
+            (section == 'pay' &&
+                const {
+                  'recharge',
+                  'bills',
+                  'scan-pay',
+                  'receipts',
+                }.contains(spec.id))) {
           continue;
         }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
@@ -190,6 +197,31 @@ void main() {
     expect(find.text('1. Select service'), findsOneWidget);
   });
 
+  testWidgets(
+    'Pay production entries open recharge, bills, scan and receipts routes',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = await readySession();
+      addTearDown(session.dispose);
+      await openSection(tester, session, 'pay');
+
+      await tapVisible(tester, const Key('sub-action-pay-recharge'));
+      await tapVisible(tester, const Key('open-intent-recharge'));
+      expect(find.byKey(const Key('pay-recharge-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('pay-back'));
+      await tapVisible(tester, const Key('pay-home-bills'));
+      expect(find.byKey(const Key('pay-bills-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('pay-back'));
+      await tapVisible(tester, const Key('pay-home-scan'));
+      expect(find.byKey(const Key('pay-scan-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('pay-dock-receipts'));
+      expect(find.byKey(const Key('pay-receipts-screen')), findsOneWidget);
+    },
+  );
+
   testWidgets('Mool palette reaches every main action and returns safely', (
     tester,
   ) async {
@@ -213,6 +245,9 @@ void main() {
       if (section == 'book') {
         expect(find.byKey(const Key('book-search')), findsOneWidget);
         await tapVisible(tester, const Key('book-dock-mool'));
+      } else if (section == 'pay') {
+        expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
+        await tapVisible(tester, const Key('pay-dock-mool'));
       } else {
         expect(find.byKey(Key('section-$section')), findsOneWidget);
         await tapVisible(tester, const Key('nav-mool'));
@@ -383,7 +418,9 @@ void main() {
       'moolsocial-pay-123',
     );
     await tapVisible(tester, const Key('continue-scan'));
-    expect(find.byKey(const Key('section-pay')), findsOneWidget);
+    expect(find.byKey(const Key('pay-scan-screen')), findsOneWidget);
+
+    await openSection(tester, session, 'social');
 
     await tapVisible(tester, const Key('open-voice'));
     await tapVisible(tester, const Key('continue-voice-search'));

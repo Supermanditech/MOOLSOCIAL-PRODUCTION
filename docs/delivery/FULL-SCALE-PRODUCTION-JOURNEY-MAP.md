@@ -49,7 +49,7 @@ Last reconciled: 19 July 2026
 | 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Implemented in Flutter; order, basket, payment, tracking, table confirmation and tiffin controls passed dedicated black-box, two full regression cycles and physical-device replay |
 | 5 | Ride booking and completion | `ride` | 04, 30–35 | Implemented in Flutter; booking, captain arrival, live trip, explicit payment approval, receipt and support passed dedicated black-box, two full regression cycles and physical-device replay |
 | 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Implemented in Flutter; consent-aware doctor care, complete salon visit and proof-protected local task paths passed dedicated black-box, two full regression cycles and physical-device replay |
-| 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Pending |
+| 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Pending |
 | 9 | Retailer orders, POS, procurement, books, services, growth and controls | all `retailer-*` operational flows | 13, 74–106 | Pending |
 | 10 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
@@ -224,6 +224,31 @@ Last reconciled: 19 July 2026
 - Medical storage, provider licensing, live availability, maps, telephony,
   payment/hold/refund and safety operations remain replaceable external
   gateways and are not falsely represented as certified.
+
+## Pay implementation decisions now locked
+
+- Pay home contains personal recharge, bill, QR/UPI and payment-request
+  actions. Business disbursements remain inside the relevant business
+  workspace.
+- A scan, request or fetched bill cannot debit by itself. Payee, purpose,
+  linked reference, amount and payment method remain visible before explicit
+  approval.
+- Unknown requesters and invalid payment identifiers cannot reach debit
+  confirmation.
+- Camera permission denial keeps typed UPI entry available and provides a
+  recoverable permission path.
+- Provider and payment failure preserve the original intent and state that no
+  money was deducted. Exact retry cannot create a duplicate debit or receipt.
+- Pending payment locks repeat payment. Status refresh checks the existing
+  bank reference and cannot create a second debit.
+- Failed-no-debit can be retried with the same payee, purpose and amount.
+  Reversal cannot be retried and its return stays linked to the original
+  reference and payment method.
+- Successful, pending and returned records remain searchable, shareable and
+  connected to support.
+- RBI/UPI, BBPS, bank reconciliation, KYC/risk, refund/reversal,
+  tokenization, QR validation and production support remain replaceable
+  external gateways and are not falsely represented as certified.
 
 ## Release boundary
 

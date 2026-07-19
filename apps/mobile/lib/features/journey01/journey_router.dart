@@ -29,6 +29,11 @@ import '../eat/screens/eat_table_screen.dart';
 import '../eat/screens/eat_tiffin_confirmation_screen.dart';
 import '../eat/screens/eat_tiffin_screen.dart';
 import '../eat/screens/eat_tracking_screen.dart';
+import '../pay/pay_session.dart';
+import '../pay/screens/pay_entry_screens.dart';
+import '../pay/screens/pay_home_screen.dart';
+import '../pay/screens/pay_record_screens.dart';
+import '../pay/screens/pay_request_screens.dart';
 import '../ride/ride_models.dart';
 import '../ride/ride_session.dart';
 import '../ride/screens/ride_booking_screen.dart';
@@ -47,6 +52,7 @@ GoRouter createJourneyRouter(
   BuySession buySession,
   ChatSession chatSession,
   EatSession eatSession,
+  PaySession paySession,
   RideSession rideSession, {
   String initialLocation = '/boot',
 }) {
@@ -329,6 +335,61 @@ GoRouter createJourneyRouter(
         path: '/app/book/task/resolution-complete',
         builder: (context, state) =>
             TaskResolutionCompleteScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/pay/home',
+        builder: (context, state) => PayHomeScreen(
+          session: paySession,
+          initialIntent: state.uri.queryParameters['intent'],
+        ),
+      ),
+      GoRoute(
+        path: '/app/pay/recharge',
+        builder: (context, state) => PayRechargeScreen(session: paySession),
+      ),
+      GoRoute(
+        path: '/app/pay/bills',
+        builder: (context, state) => PayBillsScreen(session: paySession),
+      ),
+      GoRoute(
+        path: '/app/pay/scan',
+        builder: (context, state) => PayScanScreen(session: paySession),
+      ),
+      GoRoute(
+        path: '/app/pay/requests',
+        builder: (context, state) => PayRequestsScreen(session: paySession),
+      ),
+      GoRoute(
+        path: '/app/pay/request/:requestId/confirm',
+        builder: (context, state) => PayRequestConfirmationScreen(
+          session: paySession,
+          requestId: state.pathParameters['requestId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/pay/payment/:paymentId/receipt',
+        builder: (context, state) => PayReceiptScreen(
+          session: paySession,
+          paymentId: state.pathParameters['paymentId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/pay/receipts',
+        builder: (context, state) => PayReceiptsScreen(session: paySession),
+      ),
+      GoRoute(
+        path: '/app/pay/payment/:paymentId/status',
+        builder: (context, state) => PayStatusScreen(
+          session: paySession,
+          paymentId: state.pathParameters['paymentId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/pay/payment/:paymentId/outcome',
+        builder: (context, state) => PayOutcomeScreen(
+          session: paySession,
+          paymentId: state.pathParameters['paymentId'] ?? '',
+        ),
       ),
       GoRoute(
         path: '/app/:section',

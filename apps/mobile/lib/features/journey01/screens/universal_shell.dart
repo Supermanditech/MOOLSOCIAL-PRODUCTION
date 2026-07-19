@@ -1277,6 +1277,10 @@ class _IntentEntryCard extends StatelessWidget {
                 ('book', 'get-done') => '/app/book/task',
                 ('book', 'doctor') => '/app/book/doctor',
                 ('book', 'salon') => '/app/book/salon',
+                ('pay', 'recharge') => '/app/pay/recharge',
+                ('pay', 'bills') => '/app/pay/bills',
+                ('pay', 'scan-pay') => '/app/pay/scan',
+                ('pay', 'receipts') => '/app/pay/receipts',
                 _ => null,
               };
               if (productionRoute != null) {
@@ -1624,7 +1628,11 @@ class _MoolCommandPalette extends StatelessWidget {
                     action: action,
                     selected: action == activeSection,
                     onTap: () => context.go(
-                      action == 'book' ? '/app/book/home' : '/app/$action',
+                      action == 'book'
+                          ? '/app/book/home'
+                          : action == 'pay'
+                          ? '/app/pay/home'
+                          : '/app/$action',
                     ),
                   ),
                 )
@@ -1726,9 +1734,7 @@ Future<void> _showQuickInputSheet(
   );
   if (value == null || !context.mounted) return;
   context.go(
-    type == _QuickInputType.scan
-        ? '/app/pay?sub=scan-pay'
-        : _routeForQuery(value),
+    type == _QuickInputType.scan ? '/app/pay/scan' : _routeForQuery(value),
   );
 }
 
@@ -2138,9 +2144,9 @@ String _routeForQuery(String value) {
       query.contains('document')) {
     return '/app/book/task';
   }
-  if (query.contains('recharge')) return '/app/pay?sub=recharge';
-  if (query.contains('bill')) return '/app/pay?sub=bills';
-  if (query.contains('receipt')) return '/app/pay?sub=receipts';
+  if (query.contains('recharge')) return '/app/pay/recharge';
+  if (query.contains('bill')) return '/app/pay/bills';
+  if (query.contains('receipt')) return '/app/pay/receipts';
   if (query.contains('delivery work')) return '/app/work?sub=delivery';
   if (query.contains('onboard')) return '/app/work?sub=onboard';
   if (query.contains('verify')) return '/app/work?sub=verify';
@@ -2170,7 +2176,7 @@ String _routeForQuery(String value) {
   if (query.contains('pay') ||
       query.contains('bill') ||
       query.contains('recharge')) {
-    return '/app/pay';
+    return '/app/pay/home';
   }
   if (query.contains('work') ||
       query.contains('earn') ||
@@ -2950,9 +2956,7 @@ Future<void> _showSearch(BuildContext context) {
                                 Navigator.pop(sheetContext);
                                 final subAction = action.$5;
                                 context.go(
-                                  subAction == null
-                                      ? '/app/${action.$4}'
-                                      : '/app/${action.$4}?sub=$subAction',
+                                  _searchActionRoute(action.$4, subAction),
                                 );
                               },
                             );
@@ -2971,4 +2975,25 @@ Future<void> _showSearch(BuildContext context) {
       },
     ),
   );
+}
+
+String _searchActionRoute(String section, String? subAction) {
+  if (section == 'book') {
+    return switch (subAction) {
+      'get-done' => '/app/book/task',
+      'doctor' => '/app/book/doctor',
+      'salon' => '/app/book/salon',
+      _ => '/app/book/home',
+    };
+  }
+  if (section == 'pay') {
+    return switch (subAction) {
+      'recharge' => '/app/pay/recharge',
+      'bills' => '/app/pay/bills',
+      'scan-pay' => '/app/pay/scan',
+      'receipts' => '/app/pay/receipts',
+      _ => '/app/pay/home',
+    };
+  }
+  return subAction == null ? '/app/$section' : '/app/$section?sub=$subAction';
 }

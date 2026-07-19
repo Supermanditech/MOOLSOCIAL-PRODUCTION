@@ -54,3 +54,12 @@ artifacts/device/*
 !artifacts/device/moolsocial-production-doctor-device.png
 !artifacts/device/moolsocial-production-salon-device.png
 !artifacts/device/moolsocial-production-task-device.png
+!artifacts/device/moolsocial-production-pay-home-device.png
+!artifacts/device/moolsocial-production-pay-recharge-device.png
+!artifacts/device/moolsocial-production-pay-bills-device.png
+!artifacts/device/moolsocial-production-pay-scan-device.png
+!artifacts/device/moolsocial-production-pay-requests-device.png
+!artifacts/device/moolsocial-production-pay-receipts-device.png
+!artifacts/device/moolsocial-production-pay-status-device.png
+!artifacts/device/moolsocial-production-pay-status-fixed-device.png
+!artifacts/device/moolsocial-production-pay-status-completed-device.png
