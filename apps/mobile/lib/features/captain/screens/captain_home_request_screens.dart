@@ -177,7 +177,7 @@ class CaptainHomeScreen extends StatelessWidget {
             const SizedBox(height: MoolSpacing.md),
             const CaptainSectionTitle(
               title: 'Priority',
-              detail: 'One tap to act',
+              detail: 'Review and respond',
             ),
             const SizedBox(height: MoolSpacing.sm),
             CaptainActionRow(

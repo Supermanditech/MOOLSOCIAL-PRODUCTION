@@ -51,14 +51,41 @@ if (-not $KeepAppState) {
 
 if (-not $KeepAppState) {
   $uninstallOutput = (& $adb -s $serial uninstall $packageName) -join "`n"
-  if ($LASTEXITCODE -ne 0 -or $uninstallOutput -notmatch "Success") {
+  $uninstallExitCode = $LASTEXITCODE
+  $remainingPackagePath = (
+    (& $adb -s $serial shell pm path $packageName 2>$null) -join ""
+  ).Trim()
+  if ($remainingPackagePath) {
     throw "Existing review app could not be removed cleanly: $uninstallOutput"
+  }
+  if ($uninstallExitCode -ne 0 -or $uninstallOutput -notmatch "Success") {
+    Write-Warning (
+      "Android did not return a successful uninstall response, but package " +
+      "$packageName is absent. Continuing from the verified clean state."
+    )
   }
 }
 
 & $adb -s $serial install -r $apk
 if ($LASTEXITCODE -ne 0) {
   throw "APK installation failed."
+}
+
+if (-not $KeepAppState) {
+  # Some OPPO builds deny `pm clear` to the shell user. The review artifact is
+  # debuggable, so clear only this package's private review data through
+  # `run-as` and verify that no state-bearing directory remains.
+  & $adb -s $serial shell run-as $packageName rm -rf `
+    shared_prefs databases files no_backup app_flutter cache code_cache
+  if ($LASTEXITCODE -ne 0) {
+    throw "Installed review app data could not be cleared through run-as."
+  }
+  $remainingState = (
+    (& $adb -s $serial shell run-as $packageName ls 2>$null) -join " "
+  )
+  if ($remainingState -match "\b(shared_prefs|databases|files|no_backup|app_flutter)\b") {
+    throw "Installed review app retained state after cleanup: $remainingState"
+  }
 }
 
 & $adb -s $serial shell am start -n "$packageName/.MainActivity" | Out-Null
@@ -70,5 +97,16 @@ $version = (& $adb -s $serial shell getprop ro.build.version.release).Trim()
 Write-Output "MoolSocial review build opened successfully."
 Write-Output "Device: $manufacturer $model / Android $version / $serial"
 Write-Output "Package: $packageName"
-Write-Output "Authentication: local emulator at ${EmulatorHost}:9099"
-Write-Output "SQL Connect: local emulator at ${EmulatorHost}:9399"
+Write-Output (
+  $(if ($KeepAppState) {
+      "Review preferences: preserved by request"
+    } else {
+      "Review preferences: package-private data cleared after install"
+    })
+)
+Write-Output "Local Auth emulator: ${EmulatorHost}:9099"
+Write-Output "Local Data Connect emulator: ${EmulatorHost}:9399"
+Write-Output (
+  "Account bootstrap mode is fixed when the APK is built; use " +
+  "MOOLSOCIAL_DEVICE_REVIEW=true only for isolated physical-device review."
+)

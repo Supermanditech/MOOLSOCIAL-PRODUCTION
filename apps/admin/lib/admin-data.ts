@@ -1000,7 +1000,7 @@ export const adminScreens: AdminScreen[] = [
     ],
     filters: ["Offerings", "Drafts", "Approval", "Canary", "Live", "Stopped"],
     queueTitle: "Products, services and launch control",
-    queueNote: "Configure, approve, test, then expand",
+    queueNote: "Configure, approve, validate, then expand",
     note: "Eligible recipients are resolved when used. Administrators cannot export raw audience lists.",
     composer: true,
     items: [
@@ -1065,7 +1065,7 @@ export const adminScreens: AdminScreen[] = [
         primary: "Approve canary launch",
         secondary: "Return to owner",
         primaryOutcome:
-          "Test-audience delivery approved; full release stays held for health checks.",
+          "Pilot-audience delivery approved; full release stays held for health checks.",
         secondaryOutcome:
           "Launch returned to its owner with the required correction.",
         tags: ["Approval", "Canary"],
@@ -1170,7 +1170,7 @@ export const adminScreens: AdminScreen[] = [
     navLabel: "Product Health",
     path: "/admin?view=activity-health",
     title: "User Activity and Product Health",
-    subtitle: "Trace meaningful actions from screen to outcome without collecting private content",
+    subtitle: "Trace meaningful actions from product area to outcome without collecting private content",
     role: "Product Reliability Lead",
     stats: [
       { label: "JOURNEY SUCCESS", value: "99.18%", note: "Last 60 minutes" },
@@ -1187,7 +1187,7 @@ export const adminScreens: AdminScreen[] = [
         id: "upi-return",
         kicker: "BUY JOURNEY · ANDROID 6.4.1",
         title: "Checkout confirmation failing after UPI return",
-        meta: "184 users · Screen 14 · payment confirmation · started 09:18",
+        meta: "184 users · payment confirmation · started 09:18",
         status: "Investigating",
         tone: "critical",
         time: "08:14 left",
@@ -1225,14 +1225,14 @@ export const adminScreens: AdminScreen[] = [
         facts: [
           fact("USER", "U-83A…"),
           fact("WORKSPACE", "Retailer"),
-          fact("LAST SCREEN", "74"),
+          fact("LAST AREA", "Stock import"),
           fact("ERROR", "CSV_ROW_42"),
         ],
         detail:
-          "The timeline includes screen, action, outcome, latency and trace IDs. It excludes file contents, chats, passwords, OTPs and payment data.",
+          "The timeline includes product area, action, outcome, latency and trace IDs. It excludes file contents, chats, passwords, OTPs and payment data.",
         steps: [
-          step("Open", "Screen 74 stock catalogue"),
-          step("Tap", "Import stock file"),
+          step("Open", "Stock catalogue"),
+          step("Action", "Import stock file"),
           step("Validate", "41 rows passed; row 42 failed"),
           step("Resolve", "Show exact correction and safe retry"),
         ],
@@ -1251,7 +1251,7 @@ export const adminScreens: AdminScreen[] = [
         id: "proof-upload",
         kicker: "MANUFACTURER ONBOARDING",
         title: "Proof upload completion fell in Rajasthan",
-        meta: "86 sessions · Screen 71 · Android low-memory devices",
+        meta: "86 sessions · onboarding proof · Android low-memory devices",
         status: "At risk",
         tone: "warning",
         time: "Today",
@@ -1310,7 +1310,7 @@ export const adminScreens: AdminScreen[] = [
         id: "action-coverage",
         kicker: "ACTION COVERAGE",
         title: "All launch controls have stable action IDs",
-        meta: "1,842 controls · 163 states · contract tests passed",
+        meta: "1,842 controls · 149 routes · contract tests passed",
         status: "Complete",
         tone: "success",
         time: "Build 1554330",
@@ -1318,13 +1318,13 @@ export const adminScreens: AdminScreen[] = [
           fact("CONTROLS", "1,842"),
           fact("REGISTERED", "100%"),
           fact("FORBIDDEN FIELDS", "0"),
-          fact("ROUTES", "113"),
+          fact("ROUTES", "149"),
         ],
         detail:
-          "Android, iOS and web map controls to one semantic action registry. Missing IDs or forbidden fields fail the build.",
+          "Android, iOS and web map controls to one governed action catalogue. Missing IDs or forbidden fields fail the build.",
         steps: [
           step("Declare", "Owner and purpose"),
-          step("Validate", "Schema and forbidden fields"),
+          step("Validate", "Required and forbidden fields"),
           step("Trace", "User action to responsible service"),
           step("Release", "Synthetic journey gate"),
         ],
@@ -1344,7 +1344,7 @@ export const adminScreens: AdminScreen[] = [
     subtitle: "Explainable intent, user controls and governed targeting",
     role: "Data Governance Controller",
     stats: [
-      { label: "EVENT SCHEMAS", value: "42", note: "Approved for MVP" },
+      { label: "GOVERNED ACTION TYPES", value: "42", note: "Approved for launch" },
       { label: "CONSENT ELIGIBLE", value: "78.6%", note: "Personalization purpose" },
       { label: "SUPPRESSED", value: "14.2K", note: "Withdrawal, frequency or risk" },
       { label: "KILL SWITCHES", value: "0", note: "All classes healthy" },
@@ -1444,9 +1444,9 @@ export const adminScreens: AdminScreen[] = [
       }),
       adminCase({
         id: "action-event",
-        kicker: "EVENT SCHEMA · action_tapped v1",
-        title: "Safe action telemetry",
-        meta: "All routes · sampled playback · full transaction controls",
+        kicker: "ACTION DATA POLICY",
+        title: "Privacy-safe action monitoring",
+        meta: "All supported actions · controlled validation · transaction safeguards",
         status: "Approved",
         tone: "success",
         time: "Updated 2 h",
@@ -1457,7 +1457,7 @@ export const adminScreens: AdminScreen[] = [
           fact("FREE TEXT", "Blocked"),
         ],
         detail:
-          "Allows action ID, screen, result, time and trace. Form values, messages, files and touch coordinates are rejected.",
+          "Records the action, product area, result, time and audit reference. Form values, messages, files and touch coordinates are rejected.",
         steps: [
           step("Declare", "Purpose and owner"),
           step("Scan", "Forbidden fields"),
@@ -1468,7 +1468,7 @@ export const adminScreens: AdminScreen[] = [
         primary: "Open event policy",
         secondary: "Pause event class",
         primaryOutcome:
-          "Approved schema and forbidden-field controls opened.",
+          "Approved action-data policy and forbidden-field controls opened.",
         secondaryOutcome:
           "New action-event collection paused without blocking product journeys.",
         tags: ["Event rules", "Retention"],
@@ -1485,7 +1485,7 @@ export const adminScreens: AdminScreen[] = [
           fact("PERSONALIZATION", "On"),
           fact("PRODUCT HEALTH", "On"),
           fact("SESSION REPLAY", "Off"),
-          fact("LAST TEST", "12 Jul"),
+          fact("LAST VALIDATION", "12 Jul"),
         ],
         detail:
           "Stop one event or targeting class without blocking orders, payments, rides, social or workspace operations.",
@@ -1494,15 +1494,15 @@ export const adminScreens: AdminScreen[] = [
           step("Preview", "Affected health and audiences"),
           step("Approve", "Authorized controller"),
           step("Stop", "Immediate configuration"),
-          step("Recover", "Versioned re-enable after test"),
+          step("Recover", "Versioned re-enable after validation"),
         ],
         currentStep: 0,
         primary: "Open kill switches",
-        secondary: "Run safe test",
+        secondary: "Run controlled validation",
         primaryOutcome:
           "Scoped kill-switch controls opened; no class was stopped yet.",
         secondaryOutcome:
-          "Safe test completed without sending data or blocking journeys.",
+          "Validation completed without sending data or blocking user actions.",
         tags: ["Kill switches", "Event rules"],
         confirmation:
           "I reviewed the exact class and scope and confirmed core journeys remain available.",

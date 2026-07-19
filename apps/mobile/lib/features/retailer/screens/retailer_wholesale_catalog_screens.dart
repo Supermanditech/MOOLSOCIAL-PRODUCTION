@@ -99,10 +99,7 @@ class _RetailerWholesaleCatalogScreenState
                 title: '2 supplier deliveries',
                 detail: 'One dispatch due today',
               ),
-              _SheetFact(
-                title: '₹2,568 supplier bill',
-                detail: 'Due 25 July',
-              ),
+              _SheetFact(title: '₹2,568 supplier bill', detail: 'Due 25 July'),
             ],
           ),
           icon: const Badge(
@@ -216,8 +213,7 @@ class _RetailerWholesaleCatalogScreenState
                       child: ChoiceChip(
                         key: Key('wholesale-category-${category.name}'),
                         label: Text(category.label),
-                        selected:
-                            widget.session.wholesaleCategory == category,
+                        selected: widget.session.wholesaleCategory == category,
                         onSelected: (_) =>
                             widget.session.setWholesaleCategory(category),
                       ),
@@ -247,7 +243,8 @@ class _RetailerWholesaleCatalogScreenState
                 },
               )
             else
-              for (final product in widget.session.visibleWholesaleProducts) ...[
+              for (final product
+                  in widget.session.visibleWholesaleProducts) ...[
                 _WholesaleProductCard(
                   product: product,
                   session: widget.session,
@@ -287,17 +284,14 @@ class _RetailerWholesaleCatalogScreenState
           _search.text = 'Tata Premium Tea';
         },
         icon: const Icon(Icons.qr_code_scanner_rounded),
-        label: const Text('Scan test barcode'),
+        label: const Text('Scan product barcode'),
       ),
     ],
   );
 }
 
 class _WholesaleProductCard extends StatelessWidget {
-  const _WholesaleProductCard({
-    required this.product,
-    required this.session,
-  });
+  const _WholesaleProductCard({required this.product, required this.session});
 
   final RetailerWholesaleProduct product;
   final RetailerSession session;
@@ -500,9 +494,7 @@ class RetailerWholesaleCartScreen extends StatelessWidget {
               ? null
               : FilledButton(
                   key: const Key('wholesale-review-order'),
-                  onPressed: session.busy
-                      ? null
-                      : () => _reviewOrder(context),
+                  onPressed: session.busy ? null : () => _reviewOrder(context),
                   child: Text(
                     'Review order · ${wholesaleMoney(session.wholesaleCartTotal)}',
                   ),
@@ -515,8 +507,7 @@ class RetailerWholesaleCartScreen extends StatelessWidget {
                     detail:
                         'Add cases from the area-matched wholesale catalogue.',
                     actionLabel: 'Browse wholesale products',
-                    onAction: () =>
-                        context.go('/app/retailer/wholesale'),
+                    onAction: () => context.go('/app/retailer/wholesale'),
                   ),
                 )
               : ListView(
@@ -633,11 +624,8 @@ class RetailerWholesaleCartScreen extends StatelessWidget {
                                   key: Key(
                                     'wholesale-cart-reduce-${product.id}',
                                   ),
-                                  onPressed: () =>
-                                      session.changeWholesaleQuantity(
-                                        product.id,
-                                        -1,
-                                      ),
+                                  onPressed: () => session
+                                      .changeWholesaleQuantity(product.id, -1),
                                   icon: const Icon(Icons.remove_rounded),
                                 ),
                                 SizedBox(
@@ -654,11 +642,8 @@ class RetailerWholesaleCartScreen extends StatelessWidget {
                                   key: Key(
                                     'wholesale-cart-increase-${product.id}',
                                   ),
-                                  onPressed: () =>
-                                      session.changeWholesaleQuantity(
-                                        product.id,
-                                        1,
-                                      ),
+                                  onPressed: () => session
+                                      .changeWholesaleQuantity(product.id, 1),
                                   icon: const Icon(Icons.add_rounded),
                                 ),
                               ],

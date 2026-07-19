@@ -1,10 +1,4 @@
-enum RetailerWholesaleCategory {
-  all,
-  deals,
-  fastDelivery,
-  credit,
-  brands,
-}
+enum RetailerWholesaleCategory { all, deals, fastDelivery, credit, brands }
 
 extension RetailerWholesaleCategoryLabel on RetailerWholesaleCategory {
   String get label => switch (this) {
@@ -123,8 +117,7 @@ enum RetailerPurchaseBookView { purchases, payables, returns }
 
 enum RetailerSupplierPaymentMethod { upi, bankTransfer }
 
-extension RetailerSupplierPaymentMethodLabel
-    on RetailerSupplierPaymentMethod {
+extension RetailerSupplierPaymentMethodLabel on RetailerSupplierPaymentMethod {
   String get label => switch (this) {
     RetailerSupplierPaymentMethod.upi => 'UPI',
     RetailerSupplierPaymentMethod.bankTransfer => 'Bank transfer',
@@ -139,8 +132,7 @@ enum RetailerSupplierPaymentState {
   reversed,
 }
 
-extension RetailerSupplierPaymentStateLabel
-    on RetailerSupplierPaymentState {
+extension RetailerSupplierPaymentStateLabel on RetailerSupplierPaymentState {
   String get label => switch (this) {
     RetailerSupplierPaymentState.notStarted => 'Ready',
     RetailerSupplierPaymentState.processing => 'Processing',

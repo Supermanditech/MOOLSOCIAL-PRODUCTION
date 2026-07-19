@@ -215,7 +215,7 @@ extension EatPaymentMethodCopy on EatPaymentMethod {
     EatPaymentMethod.upi => 'UPI',
     EatPaymentMethod.wallet => 'Mool wallet',
     EatPaymentMethod.card => 'Debit or credit card',
-    EatPaymentMethod.payAtHandoff => 'Pay at handoff',
+    EatPaymentMethod.payAtHandoff => 'Pay on delivery',
   };
 }
 
@@ -232,8 +232,9 @@ extension EatOrderStageCopy on EatOrderStage {
     EatOrderStage.confirmed => 'The restaurant accepted your paid order.',
     EatOrderStage.preparing => 'Fresh preparation is in progress.',
     EatOrderStage.riderAssigned => 'The packed meal will be checked at pickup.',
-    EatOrderStage.nearby => 'Keep your phone nearby for a smooth handoff.',
-    EatOrderStage.delivered => 'Check the meal and confirm the handoff.',
+    EatOrderStage.nearby =>
+      'Keep your phone nearby so the rider can complete delivery.',
+    EatOrderStage.delivered => 'Check the meal and confirm delivery.',
   };
 }
 

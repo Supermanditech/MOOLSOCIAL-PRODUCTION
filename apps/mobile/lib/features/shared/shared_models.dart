@@ -110,7 +110,7 @@ class SharedScreenSpec {
     required this.filters,
     required this.listTitle,
     required this.items,
-    this.listNote = 'tap to review',
+    this.listNote = 'choose an item to continue',
     this.topAction,
   });
 
@@ -444,7 +444,7 @@ const sharedScreenSpecs = <int, SharedScreenSpec>{
         why:
             'Your request includes the product, maximum price, fulfilment and area.',
         facts: [
-          SharedFact('INTENT', 'Buy product'),
+          SharedFact('GOAL', 'Buy product'),
           SharedFact('BUDGET', 'Under ₹300'),
           SharedFact('TIME', 'Today'),
           SharedFact('AREA', 'Jodhpur'),
@@ -794,7 +794,7 @@ const sharedScreenSpecs = <int, SharedScreenSpec>{
     ],
     filters: ['All', 'Personal', 'Business', 'Creator', 'Settings'],
     listTitle: 'Your spaces',
-    listNote: 'tap to open',
+    listNote: 'choose a workspace',
     topAction: 'Add',
     items: [
       SharedItem(
@@ -1022,7 +1022,7 @@ const sharedScreenSpecs = <int, SharedScreenSpec>{
       'Privacy',
     ],
     listTitle: 'Your controls',
-    listNote: 'tap one area',
+    listNote: 'choose a control area',
     items: [
       SharedItem(
         id: 'personal',

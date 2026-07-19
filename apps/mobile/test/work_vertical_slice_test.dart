@@ -301,6 +301,26 @@ void main() {
   );
 
   testWidgets(
+    'selected work profile is informative and does not advertise a no-op tap',
+    (tester) async {
+      await mount(tester, route: '/app/work/choose');
+
+      await tapVisible(tester, const Key('work-family-products-trade'));
+      await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+
+      final selectedCard = find.byKey(
+        const Key('work-profile-retailer-grocery'),
+      );
+      expect(selectedCard, findsOneWidget);
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(of: selectedCard, matching: find.byType(InkWell)).first,
+      );
+      expect(inkWell.onTap, isNull);
+      expect(find.text('Selected workspace'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'proof and submission failures preserve fields then submit exactly once',
     (tester) async {
       final gateway = ReviewWorkGateway()..failProof = true;

@@ -106,7 +106,7 @@ class RideSession extends ChangeNotifier {
       name: 'Rental 2 hr',
       fare: 599,
       arrivalMinutes: 10,
-      capacity: 'local package',
+      capacity: '2-hour rental',
       note: 'wait included',
       nearbyCaptains: 2,
     ),

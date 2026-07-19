@@ -214,7 +214,6 @@ export function AdminConsole({
               key={screen.screen}
               onClick={() => setMobileNavOpen(false)}
             >
-              <span className="nav-index">{screen.screen}</span>
               <span>{screen.navLabel}</span>
             </Link>
           ))}
@@ -222,8 +221,14 @@ export function AdminConsole({
         <div className="nav-privacy">
           <span className="status-dot" aria-hidden="true" />
           <div>
-            <strong>Protected review</strong>
-            <span>No public deployment</span>
+            <strong>
+              {access.reviewMode ? "Review environment" : "Protected access"}
+            </strong>
+            <span>
+              {access.reviewMode
+                ? "Isolated training data"
+                : "Role verification active"}
+            </span>
           </div>
         </div>
       </aside>
@@ -239,7 +244,6 @@ export function AdminConsole({
             ☰
           </button>
           <div className="topbar-title">
-            <span className="screen-number">SCREEN {initialScreen.screen}</span>
             <span>{initialScreen.role}</span>
           </div>
           <div className="admin-identity">
@@ -255,7 +259,7 @@ export function AdminConsole({
 
         {access.reviewMode && (
           <div className="review-banner" role="status">
-            Isolated review data · actions cannot reach production
+            Review environment · actions use isolated training data
           </div>
         )}
 
@@ -730,7 +734,7 @@ function OfferingComposer({
                   data-testid="offering-name"
                   value={draft.title}
                   onChange={(event) => update("title", event.target.value)}
-                  placeholder="Example: 100 monthly basket customers"
+                  placeholder="100 monthly basket customers"
                 />
               </label>
               <label className="form-wide">
@@ -882,7 +886,7 @@ function OfferingComposer({
                 <span>1 · Product owner</span>
                 <span>2 · Finance and policy</span>
                 <span>3 · Operations readiness</span>
-                <span>4 · Small test group</span>
+                <span>4 · Controlled pilot group</span>
                 <span>5 · Health-gated expansion</span>
               </div>
               <label className="confirmation">

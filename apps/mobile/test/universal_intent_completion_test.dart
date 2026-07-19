@@ -304,6 +304,15 @@ void main() {
       await completeSheet(actionKey);
     }
 
+    Future<void> returnToSocialTabs() async {
+      await tester.fling(
+        find.byKey(const Key('section-social')),
+        const Offset(0, 2400),
+        5000,
+      );
+      await tester.pumpAndSettle();
+    }
+
     await tapVisible(tester, const Key('social-open-video'));
     await completeSheet('open-connected-video');
     await tapVisible(tester, const Key('social-how-it-works'));
@@ -332,6 +341,7 @@ void main() {
     await tapVisible(tester, const Key('social-action-more'));
     await completeSheet('choose-action');
 
+    await returnToSocialTabs();
     await tapVisible(tester, const Key('social-tab-videos'));
     await tapVisible(tester, const Key('social-open-short'));
     await completeSheet('play-video');
@@ -350,6 +360,7 @@ void main() {
     await tapVisible(tester, const Key('social-action-more'));
     await completeSheet('choose-action');
 
+    await returnToSocialTabs();
     await tapVisible(tester, const Key('social-tab-feed'));
     for (final action in const ['like', 'comment', 'share']) {
       await completeCardAction('local-feed-post', action);
@@ -369,6 +380,7 @@ void main() {
     await tapVisible(tester, const Key('social-action-profile'));
     await completeSheet('open-profile');
 
+    await returnToSocialTabs();
     await tapVisible(tester, const Key('social-tab-create'));
     for (final action in const ['text', 'photo', 'video', 'proof']) {
       await completeCardAction('create-social-post', action);
@@ -512,6 +524,29 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+
+    final actionRailLeft = tester
+        .getRect(find.byKey(const Key('social-action-follow')))
+        .left;
+    final connectCopy = tester.getRect(
+      find.text(
+        'Discover connected YouTube videos and time-bound Campaign '
+        'Reels. Text and photo posts stay native.',
+      ),
+    );
+    final createTab = tester.getRect(
+      find.byKey(const Key('social-tab-create')),
+    );
+    expect(
+      connectCopy.right,
+      lessThanOrEqualTo(actionRailLeft - 4),
+      reason: 'The action rail must not obscure the connected-video copy.',
+    );
+    expect(
+      createTab.right,
+      lessThanOrEqualTo(actionRailLeft - 4),
+      reason: 'The action rail must not cover the Create tab.',
+    );
 
     await tapVisible(tester, const Key('nav-mool'));
     expect(find.byKey(const Key('mool-action-work')), findsOneWidget);

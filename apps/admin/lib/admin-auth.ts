@@ -10,8 +10,8 @@ export function requireAdminAccess(): AdminAccess {
   if (process.env.MOOLSOCIAL_ADMIN_REVIEW_MODE === "true") {
     return {
       allowed: true,
-      email: "reviewer@moolsocial.local",
-      role: "Superadmin Review",
+      email: "founder-review@moolsocial.com",
+      role: "Superadmin",
       reviewMode: true,
     };
   }

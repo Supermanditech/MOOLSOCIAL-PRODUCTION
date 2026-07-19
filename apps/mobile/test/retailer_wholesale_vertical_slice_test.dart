@@ -69,9 +69,10 @@ void main() {
       final scrollables = find.byWidgetPredicate(
         (widget) =>
             widget is Scrollable &&
-            {AxisDirection.down, AxisDirection.up}.contains(
-              widget.axisDirection,
-            ),
+            {
+              AxisDirection.down,
+              AxisDirection.up,
+            }.contains(widget.axisDirection),
       );
       expect(scrollables, findsWidgets, reason: 'No scrollable for $key');
       final scrollable = tester.state<ScrollableState>(scrollables.last);
@@ -103,11 +104,7 @@ void main() {
     await settle(tester);
   }
 
-  Future<void> enter(
-    WidgetTester tester,
-    Key key,
-    String value,
-  ) async {
+  Future<void> enter(WidgetTester tester, Key key, String value) async {
     final finder = await reveal(tester, key);
     await tester.enterText(finder, value);
     await settle(tester);
@@ -137,25 +134,15 @@ void main() {
       await tapVisible(tester, const Key('retailer-wholesale-review'));
       expect(find.byKey(const Key('wholesale-catalog-screen')), findsOneWidget);
 
-      await enter(
-        tester,
-        const Key('wholesale-search'),
-        'not available',
-      );
+      await enter(tester, const Key('wholesale-search'), 'not available');
       expect(find.byKey(const Key('wholesale-empty')), findsOneWidget);
       await tapVisible(tester, const Key('wholesale-clear-search'));
-      await tapVisible(
-        tester,
-        const Key('wholesale-category-credit'),
-      );
+      await tapVisible(tester, const Key('wholesale-category-credit'));
       expect(
         find.byKey(const Key('wholesale-product-tea-case')),
         findsOneWidget,
       );
-      await tapVisible(
-        tester,
-        const Key('wholesale-category-all'),
-      );
+      await tapVisible(tester, const Key('wholesale-category-all'));
 
       await tapVisible(tester, const Key('wholesale-scan'));
       await tapVisible(tester, const Key('wholesale-scan-denied'));
@@ -165,10 +152,7 @@ void main() {
       expect(retailer.wholesaleSearchQuery, 'Tata Premium Tea');
       await tapVisible(tester, const Key('wholesale-clear-search'));
 
-      await tapVisible(
-        tester,
-        const Key('wholesale-product-details-oil-case'),
-      );
+      await tapVisible(tester, const Key('wholesale-product-details-oil-case'));
       expect(find.textContaining('Complete buying'), findsOneWidget);
       await dismissSheet(tester);
       await tapVisible(tester, const Key('wholesale-reorder'));
@@ -176,10 +160,7 @@ void main() {
       await tapVisible(tester, const Key('wholesale-open-cart'));
       expect(find.byKey(const Key('wholesale-cart-screen')), findsOneWidget);
 
-      await tapVisible(
-        tester,
-        const Key('wholesale-cart-terms-oil-case'),
-      );
+      await tapVisible(tester, const Key('wholesale-cart-terms-oil-case'));
       await dismissSheet(tester);
       await tapVisible(tester, const Key('wholesale-address'));
       await dismissSheet(tester);
@@ -222,22 +203,13 @@ void main() {
       await tapVisible(tester, const Key('delivery-open-chat'));
       expect(find.textContaining('chat opened'), findsOneWidget);
       await tapVisible(tester, const Key('delivery-report-delay'));
-      await tapVisible(
-        tester,
-        const Key('delivery-problem-not-dispatched'),
-      );
+      await tapVisible(tester, const Key('delivery-problem-not-dispatched'));
       expect(find.textContaining('settlement remains protected'), findsOne);
 
-      await tapVisible(
-        tester,
-        const Key('wholesale-refresh-delivery'),
-      );
+      await tapVisible(tester, const Key('wholesale-refresh-delivery'));
       expect(find.textContaining('could not refresh'), findsOneWidget);
       for (var index = 0; index < 3; index += 1) {
-        await tapVisible(
-          tester,
-          const Key('wholesale-refresh-delivery'),
-        );
+        await tapVisible(tester, const Key('wholesale-refresh-delivery'));
       }
       expect(
         retailer.selectedPurchaseOrder!.stage,
@@ -247,10 +219,7 @@ void main() {
       expect(find.byKey(const Key('goods-receipt-screen')), findsOneWidget);
 
       await tapVisible(tester, const Key('goods-report-issue'));
-      await tapVisible(
-        tester,
-        const Key('goods-issue-shortQuantity'),
-      );
+      await tapVisible(tester, const Key('goods-issue-shortQuantity'));
       await tapVisible(tester, const Key('goods-evidence-denied'));
       expect(find.textContaining('Camera access was not allowed'), findsOne);
       await tapVisible(tester, const Key('goods-attach-evidence'));
@@ -299,10 +268,7 @@ void main() {
 
       await tapVisible(tester, const Key('purchase-actions'));
       await tapVisible(tester, const Key('purchase-attention-due'));
-      expect(
-        retailer.purchaseBookView,
-        RetailerPurchaseBookView.payables,
-      );
+      expect(retailer.purchaseBookView, RetailerPurchaseBookView.payables);
       retailer.setPurchaseBookView(RetailerPurchaseBookView.purchases);
       await settle(tester);
 
@@ -362,10 +328,7 @@ void main() {
         findsOneWidget,
       );
       await tapVisible(tester, const Key('supplier-report-issue'));
-      await tapVisible(
-        tester,
-        const Key('supplier-issue-wrong-amount'),
-      );
+      await tapVisible(tester, const Key('supplier-issue-wrong-amount'));
       expect(find.textContaining('on hold'), findsOneWidget);
       await tapVisible(tester, const Key('supplier-bill-tools'));
       await tapVisible(tester, const Key('supplier-tool-external'));
@@ -377,16 +340,10 @@ void main() {
       await tapVisible(tester, const Key('supplier-review-payment'));
       await tester.tap(find.text('Bank transfer').last);
       await settle(tester);
-      await tapVisible(
-        tester,
-        const Key('supplier-authorize-payment'),
-      );
+      await tapVisible(tester, const Key('supplier-authorize-payment'));
       expect(find.textContaining('not authorized'), findsOneWidget);
       await tapVisible(tester, const Key('supplier-review-payment'));
-      await tapVisible(
-        tester,
-        const Key('supplier-authorize-payment'),
-      );
+      await tapVisible(tester, const Key('supplier-authorize-payment'));
       expect(
         find.byKey(const Key('supplier-payment-status-screen')),
         findsOneWidget,
@@ -399,20 +356,11 @@ void main() {
       expect(await retailer.authorizeSupplierPayment(), isTrue);
       expect(gateway.authorizePaymentCalls, 2);
 
-      await tapVisible(
-        tester,
-        const Key('supplier-status-receipt'),
-      );
+      await tapVisible(tester, const Key('supplier-status-receipt'));
       expect(find.textContaining('acknowledgement'), findsOneWidget);
-      await tapVisible(
-        tester,
-        const Key('supplier-refresh-payment'),
-      );
+      await tapVisible(tester, const Key('supplier-refresh-payment'));
       expect(find.textContaining('could not refresh'), findsOneWidget);
-      await tapVisible(
-        tester,
-        const Key('supplier-refresh-payment'),
-      );
+      await tapVisible(tester, const Key('supplier-refresh-payment'));
       expect(
         retailer.supplierPaymentState,
         RetailerSupplierPaymentState.settled,
@@ -420,15 +368,9 @@ void main() {
       await reveal(tester, const Key('supplier-payment-state'));
       expect(find.text('Payment settled'), findsOneWidget);
       expect(gateway.refreshPaymentCalls, 2);
-      await tapVisible(
-        tester,
-        const Key('supplier-status-receipt'),
-      );
+      await tapVisible(tester, const Key('supplier-status-receipt'));
       expect(find.textContaining('Final payment receipt'), findsOneWidget);
-      await tapVisible(
-        tester,
-        const Key('supplier-open-purchase-book'),
-      );
+      await tapVisible(tester, const Key('supplier-open-purchase-book'));
       expect(find.byKey(const Key('purchase-book-screen')), findsOneWidget);
       expect(find.text('PAID'), findsWidgets);
     },
@@ -479,10 +421,7 @@ void main() {
       route: '/app/retailer/books/purchases',
       retailerSession: retailer,
     );
-    expect(
-      find.byKey(const Key('purchase-book-role-denied')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('purchase-book-role-denied')), findsOneWidget);
     await tapVisible(tester, const Key('purchase-book-role-denied-action'));
     expect(find.byKey(const Key('retailer-home-screen')), findsOneWidget);
   });
@@ -499,18 +438,14 @@ void main() {
         final retailer = RetailerSession(wholesaleGateway: gateway);
         await mount(
           tester,
-          route:
-              '/app/retailer/supplier-payments/PAY-RTD-2568/status',
+          route: '/app/retailer/supplier-payments/PAY-RTD-2568/status',
           retailerSession: retailer,
         );
         final authorization = retailer.authorizeSupplierPayment();
         await tester.pump(const Duration(milliseconds: 30));
         expect(await authorization, isTrue);
         await tester.pump();
-        await tapVisible(
-          tester,
-          const Key('supplier-refresh-payment'),
-        );
+        await tapVisible(tester, const Key('supplier-refresh-payment'));
         expect(retailer.supplierPaymentState, paymentState);
         expect(
           find.text(
@@ -522,9 +457,7 @@ void main() {
         );
         expect(
           retailer.purchases
-              .firstWhere(
-                (purchase) => purchase.invoiceId == 'INV-RTD-665',
-              )
+              .firstWhere((purchase) => purchase.invoiceId == 'INV-RTD-665')
               .status,
           contains('Due'),
         );

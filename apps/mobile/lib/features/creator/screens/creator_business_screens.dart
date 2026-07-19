@@ -1195,7 +1195,7 @@ class CreatorMembershipsScreen extends StatelessWidget {
             const CreatorCard(
               color: Color(0xFFFFF6E8),
               child: Text(
-                '* Final take-home appears before activation. Applicable tax, refunds and payment-method costs can change the example. Members control renewal and cancellation.',
+                '* Final take-home appears before activation. Applicable tax, refunds and payment-method costs can change the estimated amount. Members control renewal and cancellation.',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               ),
             ),
@@ -1291,7 +1291,7 @@ class CreatorMembershipsScreen extends StatelessWidget {
                           value: '₹${plan.yearlyPrice}',
                         ),
                         CreatorFact(
-                          label: 'Example net',
+                          label: 'Estimated take-home',
                           value: '₹${plan.monthlyNet}/month',
                         ),
                         const CreatorFact(label: 'Payout', value: 'Monthly'),

@@ -111,7 +111,8 @@ extension BuyOrderStageCopy on BuyOrderStage {
     BuyOrderStage.confirmed => 'The shop received your paid order.',
     BuyOrderStage.packing => 'Items are being checked and packed.',
     BuyOrderStage.riderAssigned => 'Rakesh is on the way to the shop.',
-    BuyOrderStage.nearby => 'Keep your phone nearby for a smooth handoff.',
+    BuyOrderStage.nearby =>
+      'Keep your phone nearby so the rider can complete delivery.',
     BuyOrderStage.delivered =>
       'Check the basket and confirm everything arrived.',
   };

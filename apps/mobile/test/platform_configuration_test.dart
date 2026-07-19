@@ -44,4 +44,40 @@ void main() {
       contains('<key>NSSpeechRecognitionUsageDescription</key>'),
     );
   });
+
+  test('release builds require live Firebase configuration', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+
+    expect(mainSource, contains("const _useEmulators = bool.fromEnvironment("));
+    expect(mainSource, contains('defaultValue: kDebugMode'));
+    expect(mainSource, contains('if (_useEmulators)'));
+    expect(mainSource, contains('MOOLSOCIAL_DEVICE_REVIEW'));
+    expect(
+      mainSource,
+      contains('Device review mode requires the isolated local emulator'),
+    );
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
+    expect(
+      mainSource,
+      contains('Release configuration is incomplete. Missing:'),
+      reason:
+          'A release must fail closed instead of silently using demo services.',
+    );
+  });
+
+  test('OTP and Data Connect emulators are optional production boundaries', () {
+    final servicesSource = File(
+      'lib/features/journey01/review_journey_services.dart',
+    ).readAsStringSync();
+
+    expect(servicesSource, contains('class FirebaseOtpGateway'));
+    expect(servicesSource, contains('String? emulatorHost'));
+    expect(servicesSource, contains('_requestEmulatorCode'));
+    expect(servicesSource, contains('_verifyEmulatorCode'));
+    expect(servicesSource, contains('if (!_usesEmulatorReview) return null'));
+    expect(servicesSource, contains('if (emulatorHost != null)'));
+  });
 }

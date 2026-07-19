@@ -674,7 +674,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                     const SizedBox(height: MoolSpacing.xs),
                   ]
                 else ...[
-                  _ProfileCard(option: profile, selected: true, onTap: () {}),
+                  _ProfileCard(option: profile, selected: true),
                   const SizedBox(height: MoolSpacing.md),
                   const WorkSectionTitle(
                     title: 'Workspace contact',
@@ -918,12 +918,12 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.option,
     required this.selected,
-    required this.onTap,
+    this.onTap,
   });
 
   final WorkProfileOption option;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -2388,7 +2388,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                       child: Text(
                         complete
                             ? 'This product is visible with current stock and fulfilment.'
-                            : 'Nothing is public until setup passes and you tap Finish setup and go live.',
+                            : 'Nothing is public until setup passes and you choose Finish setup and go live.',
                         style: const TextStyle(
                           color: MoolColors.ink,
                           fontWeight: FontWeight.w700,

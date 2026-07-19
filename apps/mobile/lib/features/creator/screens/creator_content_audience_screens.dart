@@ -639,7 +639,7 @@ class CreatorAudienceScreen extends StatelessWidget {
               SizedBox(width: MoolSpacing.xs),
               Expanded(
                 child: CreatorMetric(
-                  label: 'BUY INTENT',
+                  label: 'PURCHASE INTEREST',
                   value: '6.2K',
                   detail: 'verified',
                 ),

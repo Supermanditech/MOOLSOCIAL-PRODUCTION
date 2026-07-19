@@ -27,6 +27,31 @@ deep links, notifications, payment handoff, signing and store metadata.
 Each row is isolated. Android and iOS inside one row share users and business
 data. No client can select a different environment at runtime.
 
+## Compile-time environment boundary
+
+`apps/mobile/lib/main.dart` selects the environment at compile time:
+
+- debug defaults to `MOOLSOCIAL_USE_EMULATORS=true`;
+- staging and release set `MOOLSOCIAL_USE_EMULATORS=false`;
+- a non-emulator build must receive
+  `MOOLSOCIAL_FIREBASE_API_KEY`, `MOOLSOCIAL_FIREBASE_APP_ID`,
+  `MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID` and
+  `MOOLSOCIAL_FIREBASE_PROJECT_ID`;
+- missing live values stop application startup instead of silently connecting
+  to the demo project;
+- Auth and Data Connect emulator routing is enabled only inside the emulator
+  branch;
+- the optional `MOOLSOCIAL_DEVICE_REVIEW` build flag is accepted only with
+  emulators enabled. It works around physical-device-to-laptop networking by
+  using Auth emulator REST and a non-authoritative account bootstrap; it is
+  never a staging or production identity path;
+- the Android and iOS pipelines supply their own Firebase app ID while sharing
+  the same environment project and authoritative data.
+
+The environment is immutable inside a built artifact. Firebase identifiers are
+held in protected CI environment values; provider secrets, signing keys and
+payment credentials remain server-side.
+
 ## Automated gates
 
 Every accepted source change must:

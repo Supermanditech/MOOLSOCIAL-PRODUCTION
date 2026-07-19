@@ -132,7 +132,7 @@ class RetailerSlowStockScreen extends StatelessWidget {
             ],
             const SizedBox(height: MoolSpacing.md),
             const RetailerSectionTitle(
-              title: 'Choose recovery route',
+              title: 'Choose how to recover value',
               detail: 'One controlled outcome',
             ),
             const SizedBox(height: MoolSpacing.sm),

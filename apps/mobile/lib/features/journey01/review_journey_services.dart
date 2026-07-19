@@ -54,27 +54,40 @@ class SharedPreferencesJourneyStore implements JourneyStore {
   }
 }
 
-class FirebaseEmulatorOtpGateway implements OtpGateway {
-  FirebaseEmulatorOtpGateway(
+class FirebaseOtpGateway implements OtpGateway {
+  FirebaseOtpGateway(
     this._auth, {
-    required this.host,
-    required this.projectId,
-    this.port = 9099,
+    this.emulatorHost,
+    this.emulatorProjectId,
+    this.emulatorApiKey = 'demo-moolsocial-local-key',
+    this.emulatorPort = 9099,
+    this.directEmulatorAuth = false,
   });
 
   final FirebaseAuth _auth;
-  final String host;
-  final int port;
-  final String projectId;
+  final String? emulatorHost;
+  final String emulatorApiKey;
+  final int emulatorPort;
+  final String? emulatorProjectId;
+  final bool directEmulatorAuth;
 
   String? _verificationId;
   int? _resendToken;
+  String? _directEmulatorUserId;
 
   @override
-  Future<bool> hasAuthenticatedUser() async => _auth.currentUser != null;
+  Future<bool> hasAuthenticatedUser() async =>
+      _directEmulatorUserId != null || _auth.currentUser != null;
 
   @override
   Future<OtpRequestResult> requestCode(String phoneNumber) async {
+    if (_usesDirectEmulatorAuth) {
+      return _requestEmulatorCode(phoneNumber);
+    }
+
+    final previousEmulatorSession = _usesEmulatorReview
+        ? (await _latestEmulatorVerification(phoneNumber))?.sessionInfo
+        : null;
     final completer = Completer<OtpRequestResult>();
 
     await _auth.verifyPhoneNumber(
@@ -115,7 +128,11 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
       },
     );
 
-    unawaited(_completeFromEmulator(phoneNumber, completer));
+    if (_usesEmulatorReview) {
+      unawaited(
+        _completeFromEmulator(phoneNumber, completer, previousEmulatorSession),
+      );
+    }
     return completer.future.timeout(
       const Duration(seconds: 20),
       onTimeout: () => throw const JourneyServiceException(
@@ -126,6 +143,10 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
 
   @override
   Future<String> verifyCode(String code) async {
+    if (_usesDirectEmulatorAuth) {
+      return _verifyEmulatorCode(code);
+    }
+
     final verificationId = _verificationId;
     if (verificationId == null) {
       throw const JourneyServiceException(
@@ -153,17 +174,24 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
 
   @override
   Future<String?> reviewCodeFor(String phoneNumber) async {
+    if (!_usesEmulatorReview) return null;
     final verification = await _latestEmulatorVerification(phoneNumber);
     return verification?.code;
   }
 
+  bool get _usesEmulatorReview =>
+      emulatorHost != null && emulatorProjectId != null;
+  bool get _usesDirectEmulatorAuth => _usesEmulatorReview && directEmulatorAuth;
+
   Future<void> _completeFromEmulator(
     String phoneNumber,
     Completer<OtpRequestResult> completer,
+    String? previousSessionInfo,
   ) async {
     for (var attempt = 0; attempt < 12 && !completer.isCompleted; attempt++) {
       final verification = await _latestEmulatorVerification(phoneNumber);
-      if (verification != null) {
+      if (verification != null &&
+          verification.sessionInfo != previousSessionInfo) {
         _verificationId = verification.sessionInfo;
         completer.complete(const OtpRequestResult());
         return;
@@ -172,14 +200,126 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
     }
   }
 
+  Future<OtpRequestResult> _requestEmulatorCode(String phoneNumber) async {
+    final host = emulatorHost;
+    if (host == null) {
+      throw const JourneyServiceException(
+        'The verification service is unavailable. Please retry.',
+      );
+    }
+
+    final client = HttpClient();
+    try {
+      final uri = Uri.http(
+        '$host:$emulatorPort',
+        '/identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode',
+        {'key': emulatorApiKey},
+      );
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'phoneNumber': phoneNumber}));
+      final response = await request.close();
+      final body = await utf8.decoder.bind(response).join();
+      if (response.statusCode != HttpStatus.ok) {
+        throw const JourneyServiceException(
+          'The verification service could not send a code. Please retry.',
+        );
+      }
+      final payload = jsonDecode(body) as Map<String, dynamic>;
+      final sessionInfo = payload['sessionInfo'] as String?;
+      if (sessionInfo == null || sessionInfo.isEmpty) {
+        throw const JourneyServiceException(
+          'The verification service did not return a valid code. Please retry.',
+        );
+      }
+      _verificationId = sessionInfo;
+      return const OtpRequestResult();
+    } on JourneyServiceException {
+      rethrow;
+    } on SocketException {
+      throw const JourneyServiceException(
+        'You appear to be offline. Reconnect and retry.',
+      );
+    } on Object {
+      throw const JourneyServiceException(
+        'The verification service did not respond. Please retry.',
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<String> _verifyEmulatorCode(String code) async {
+    final host = emulatorHost;
+    final sessionInfo = _verificationId;
+    if (host == null || sessionInfo == null) {
+      throw const JourneyServiceException(
+        'Request a new verification code and try again.',
+      );
+    }
+
+    final client = HttpClient();
+    try {
+      final uri = Uri.http(
+        '$host:$emulatorPort',
+        '/identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber',
+        {'key': emulatorApiKey},
+      );
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'sessionInfo': sessionInfo, 'code': code}));
+      final response = await request.close();
+      final body = await utf8.decoder.bind(response).join();
+      if (response.statusCode != HttpStatus.ok) {
+        final payload = jsonDecode(body) as Map<String, dynamic>;
+        final message =
+            ((payload['error'] as Map<String, dynamic>?)?['message'] as String?)
+                ?.toUpperCase();
+        if (message?.contains('INVALID_CODE') ?? false) {
+          throw const JourneyServiceException(
+            'That code is not valid. Check it and try again.',
+          );
+        }
+        throw const JourneyServiceException(
+          'We could not finish verification. Please retry.',
+        );
+      }
+      final payload = jsonDecode(body) as Map<String, dynamic>;
+      final userId = payload['localId'] as String?;
+      if (userId == null || userId.isEmpty) {
+        throw const JourneyServiceException(
+          'We could not finish verification. Please retry.',
+        );
+      }
+      _directEmulatorUserId = userId;
+      return userId;
+    } on JourneyServiceException {
+      rethrow;
+    } on SocketException {
+      throw const JourneyServiceException(
+        'You appear to be offline. Reconnect and retry.',
+      );
+    } on Object {
+      throw const JourneyServiceException(
+        'Verification could not be completed. Please retry.',
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<({String code, String sessionInfo})?> _latestEmulatorVerification(
     String phoneNumber,
   ) async {
+    final host = emulatorHost;
+    final projectId = emulatorProjectId;
+    if (host == null || projectId == null) return null;
+
     final client = HttpClient();
     try {
       final request = await client.getUrl(
         Uri.parse(
-          'http://$host:$port/emulator/v1/projects/$projectId/'
+          'http://$host:$emulatorPort/emulator/v1/projects/$projectId/'
           'verificationCodes',
         ),
       );
@@ -208,7 +348,10 @@ class FirebaseEmulatorOtpGateway implements OtpGateway {
   }
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    _directEmulatorUserId = null;
+    await _auth.signOut();
+  }
 
   JourneyServiceException _friendlyAuthError(FirebaseAuthException error) {
     return switch (error.code) {
@@ -249,8 +392,13 @@ class DeviceLocationPermissionGateway implements LocationPermissionGateway {
 }
 
 class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
-  DataConnectAccountBootstrapGateway({required String host, this.port = 9399}) {
-    MobileConnector.instance.dataConnect.useDataConnectEmulator(host, port);
+  DataConnectAccountBootstrapGateway({String? emulatorHost, this.port = 9399}) {
+    if (emulatorHost != null) {
+      MobileConnector.instance.dataConnect.useDataConnectEmulator(
+        emulatorHost,
+        port,
+      );
+    }
   }
 
   final int port;

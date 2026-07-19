@@ -1019,7 +1019,7 @@ class ProviderRequestsScreen extends StatelessWidget {
                     onChanged: (value) => session.declineReason = value,
                     decoration: const InputDecoration(
                       labelText: 'Reason',
-                      hintText: 'For example: no capacity at this time',
+                      hintText: 'No capacity at this time',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.md),
@@ -1314,7 +1314,7 @@ class ProviderBusinessScreen extends StatelessWidget {
     builder: (context, _) => OperationsPageScaffold(
       session: session,
       title: 'Money and Records',
-      subtitle: 'Ravi Home Services · trace every amount',
+      subtitle: 'Ravi Home Services · see every earning, fee and payout',
       activeDock: 'money',
       returnRoute: '/app/provider',
       provider: true,
@@ -2140,8 +2140,8 @@ class ProviderControlScreen extends StatelessWidget {
                         : session.openProviderSupport,
                     child: Text(
                       session.providerSupportId == null
-                          ? 'Open Support Case'
-                          : 'Case SUP-146-2048 Opened',
+                          ? 'Open support case'
+                          : 'Case SUP-146-2048 opened',
                     ),
                   ),
                 ),
@@ -2377,7 +2377,7 @@ class _RequestCard extends StatelessWidget {
               child: OutlinedButton(
                 key: Key('$keyName-decline'),
                 onPressed: onDecline,
-                child: const Text('Cannot Take'),
+                child: const Text('Decline request'),
               ),
             ),
             const SizedBox(width: MoolSpacing.xs),
@@ -2385,7 +2385,7 @@ class _RequestCard extends StatelessWidget {
               child: FilledButton(
                 key: Key('$keyName-accept'),
                 onPressed: onAccept,
-                child: const Text('Review & Accept'),
+                child: const Text('Review request'),
               ),
             ),
           ],

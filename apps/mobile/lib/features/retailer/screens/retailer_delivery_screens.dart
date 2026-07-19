@@ -245,7 +245,7 @@ class _RetailerDeliveryAssignmentScreenState
                         ),
                       ),
                       const Text(
-                        'For this reviewed journey use 2841.',
+                        'Ask the assigned captain for the 4-digit code shown in their MoolSocial app.',
                         style: TextStyle(color: MoolColors.muted, fontSize: 11),
                       ),
                       const SizedBox(height: MoolSpacing.sm),
@@ -368,7 +368,7 @@ class _RetailerDeliveryAssignmentScreenState
     );
     if (confirmed == true) {
       widget.session.showNotice(
-        'Masked captain call is ready. The order remains on this screen.',
+        'Masked call started. Return here to continue delivery.',
       );
     }
   }

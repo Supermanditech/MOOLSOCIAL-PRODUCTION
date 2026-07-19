@@ -10,7 +10,20 @@ permissions:
   contents: read
 
 jobs:
+  product-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check production-facing language
+        shell: pwsh
+        run: ./scripts/check-user-facing-copy.ps1
+      - name: Check controls and route contracts
+        shell: pwsh
+        run: ./scripts/check-interaction-contracts.ps1
+
   mobile-quality:
+    needs: product-contracts
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -27,6 +40,24 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --fatal-infos
       - run: flutter test --coverage
+
+  superadmin-quality:
+    needs: product-contracts
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm test
 
   android-build:
     needs: mobile-quality

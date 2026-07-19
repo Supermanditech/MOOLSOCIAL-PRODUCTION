@@ -555,7 +555,7 @@ class EarnActiveWorkScreen extends StatelessWidget {
           const SizedBox(height: MoolSpacing.md),
           const OpsSectionTitle(
             title: 'Complete the assigned output',
-            detail: 'Nothing unrelated',
+            detail: 'Only the required steps',
           ),
           const SizedBox(height: MoolSpacing.sm),
           const _WorkStep(
@@ -575,7 +575,7 @@ class EarnActiveWorkScreen extends StatelessWidget {
           const _WorkStep(
             index: '3',
             title: 'Place and verify QR',
-            detail: 'Location, shop photo and scan test',
+            detail: 'Location, shop photo and successful QR scan',
             status: 'Next',
           ),
           const _WorkStep(
@@ -675,8 +675,8 @@ class EarnActiveWorkScreen extends StatelessWidget {
                     onPressed: session.busy ? null : session.openEarnSupport,
                     child: Text(
                       session.earnSupportId == null
-                          ? 'Open Support Case'
-                          : 'Case Opened',
+                          ? 'Open support case'
+                          : 'Case opened',
                     ),
                   ),
                 ),
@@ -705,7 +705,7 @@ class EarnProofScreen extends StatelessWidget {
   static const proofItems = <(String, String, String)>[
     ('owner-otp', 'Owner OTP', 'Matched 10:06'),
     ('shop-photo', 'Shop photo', 'Location + time saved'),
-    ('qr-test', 'QR scan test', 'Activation confirmed'),
+    ('qr-test', 'QR scan confirmation', 'Activation confirmed'),
     ('owner-confirmed', 'Owner confirmed', 'App access active'),
   ];
 
@@ -714,7 +714,7 @@ class EarnProofScreen extends StatelessWidget {
     animation: session,
     builder: (context, _) => OperationsPageScaffold(
       session: session,
-      title: 'Submit Outcome',
+      title: 'Submit work proof',
       subtitle: 'WRK-4821 · retailer activation',
       activeDock: 'work',
       returnRoute: '/app/earn/active',
@@ -730,8 +730,8 @@ class EarnProofScreen extends StatelessWidget {
         onPressed: session.busy ? null : () => _submit(context),
         child: Text(
           session.outcomeId == null
-              ? 'Submit for Verification'
-              : 'Outcome Submitted',
+              ? 'Submit for verification'
+              : 'Proof submitted',
         ),
       ),
       body: ListView(
@@ -1399,7 +1399,7 @@ class EarnHistoryScreen extends StatelessWidget {
                   Navigator.pop(sheetContext);
                   _supportSheet(context);
                 },
-                child: const Text('Open Support Case'),
+                child: const Text('Open support case'),
               ),
             ),
             SizedBox(
@@ -1461,8 +1461,8 @@ class EarnHistoryScreen extends StatelessWidget {
                     onPressed: session.busy ? null : session.openEarnSupport,
                     child: Text(
                       session.earnSupportId == null
-                          ? 'Open Support Case'
-                          : 'Case Opened',
+                          ? 'Open support case'
+                          : 'Case opened',
                     ),
                   ),
                 ),

@@ -202,7 +202,7 @@ class _RetailerOrderScreenState extends State<RetailerOrderScreen> {
               RetailerSectionTitle(
                 title: '${order.lines.length} checked groups',
                 detail:
-                    '${order.lines.fold<int>(0, (sum, line) => sum + line.quantity)} product units · tap each group while packing',
+                    '${order.lines.fold<int>(0, (sum, line) => sum + line.quantity)} product units · mark each group packed',
                 trailing: TextButton(
                   key: const Key('retailer-toggle-order-lines'),
                   onPressed: widget.session.toggleOrderLines,

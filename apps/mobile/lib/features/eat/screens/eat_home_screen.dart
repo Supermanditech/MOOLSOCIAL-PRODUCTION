@@ -615,7 +615,7 @@ Future<void> _showQr(BuildContext context, EatSession session) async {
               ),
               const SizedBox(height: MoolSpacing.sm),
               const Text(
-                'Camera scanning opens on a real device. Enter the printed code to test this path.',
+                'Camera access is unavailable. Enter the printed code instead.',
               ),
               const SizedBox(height: MoolSpacing.sm),
               TextField(

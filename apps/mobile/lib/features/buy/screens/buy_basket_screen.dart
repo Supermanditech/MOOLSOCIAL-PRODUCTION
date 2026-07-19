@@ -427,7 +427,7 @@ Future<void> _showCouponSheet(BuildContext context, BuySession session) async {
             textCapitalization: TextCapitalization.characters,
             decoration: const InputDecoration(
               labelText: 'Coupon code',
-              hintText: 'For example MOOL50',
+              hintText: 'MOOL50',
             ),
           ),
           const SizedBox(height: MoolSpacing.md),

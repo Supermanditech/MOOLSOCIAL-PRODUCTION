@@ -31,10 +31,11 @@ Firebase SDK calls stay behind adapters.
 `PROD-JRN-001`: install/open → setup language/area → authenticate → restore the
 requested destination → open the universal Mool shell.
 
-The initial Flutter shell is intentionally backed by a development session
-adapter. It enables deterministic UI and clean-state regression testing before
-live Firebase project identifiers are provisioned. Development OTP is `123456`
-and is never a release authentication provider.
+The Flutter shell uses Firebase Authentication and generated Data Connect
+clients behind explicit environment boundaries. Debug builds use the local
+Firebase emulators by default. Profile, staging and release builds fail closed
+unless all required live Firebase identifiers are supplied; they never fall
+back to the local demo project or expose an emulator verification code.
 
 ## Local commands
 
@@ -50,9 +51,37 @@ cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\apps\mobile"
 flutter run
 ```
 
+Run explicitly against the local backend:
+
+```powershell
+flutter run `
+  --dart-define=MOOLSOCIAL_USE_EMULATORS=true `
+  --dart-define=MOOLSOCIAL_EMULATOR_HOST=127.0.0.1
+```
+
+Build a staging or release artifact only with environment-specific values:
+
+```powershell
+flutter build appbundle --release `
+  --dart-define=MOOLSOCIAL_USE_EMULATORS=false `
+  --dart-define=MOOLSOCIAL_FIREBASE_API_KEY=<protected-ci-value> `
+  --dart-define=MOOLSOCIAL_FIREBASE_APP_ID=<android-app-id> `
+  --dart-define=MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID=<sender-id> `
+  --dart-define=MOOLSOCIAL_FIREBASE_PROJECT_ID=<environment-project-id>
+```
+
+The equivalent iOS archive uses the iOS Firebase app ID. Protected CI
+environments provide these values; they are not committed to source control.
+
 Install the clean review build on an authorized USB-connected Android phone:
 
 ```powershell
+cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\apps\mobile"
+flutter build apk --debug `
+  --dart-define=MOOLSOCIAL_USE_EMULATORS=true `
+  --dart-define=MOOLSOCIAL_DEVICE_REVIEW=true `
+  --dart-define=MOOLSOCIAL_EMULATOR_HOST=127.0.0.1
+
 cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION"
 .\scripts\run-phone-review.ps1
 ```
@@ -60,7 +89,11 @@ cd "C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION"
 This script refuses to continue unless both local backend emulators are
 listening. It reverses only ports 9099 and 9399, clears the demo Auth users and
 app state unless `-KeepAppState` is supplied, installs the APK and opens
-`com.moolsocial.app`.
+`com.moolsocial.app`. `MOOLSOCIAL_DEVICE_REVIEW` exists only for a
+USB-connected physical review device whose native Firebase networking cannot
+reach the laptop emulator. It verifies against the local Auth emulator and uses
+an isolated, non-authoritative account bootstrap. Application startup rejects
+this mode when emulators are disabled; staging and production cannot use it.
 
 Generate SQL Connect SDKs after the emulator is configured:
 

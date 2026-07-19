@@ -9,10 +9,7 @@ import '../widgets/retailer_widgets.dart';
 import 'retailer_wholesale_catalog_screens.dart';
 
 class RetailerWholesaleTrackingScreen extends StatelessWidget {
-  const RetailerWholesaleTrackingScreen({
-    required this.session,
-    super.key,
-  });
+  const RetailerWholesaleTrackingScreen({required this.session, super.key});
 
   final RetailerSession session;
 
@@ -80,8 +77,7 @@ class RetailerWholesaleTrackingScreen extends StatelessWidget {
                     detail:
                         'Place a wholesale order before opening delivery tracking.',
                     actionLabel: 'Open wholesale catalogue',
-                    onAction: () =>
-                        context.go('/app/retailer/wholesale'),
+                    onAction: () => context.go('/app/retailer/wholesale'),
                   ),
                 )
               : ListView(
@@ -124,8 +120,7 @@ class RetailerWholesaleTrackingScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       '${order.id} · ${order.productName}',
@@ -140,9 +135,7 @@ class RetailerWholesaleTrackingScreen extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              RetailerPill(
-                                label: _stageLabel(order.stage),
-                              ),
+                              RetailerPill(label: _stageLabel(order.stage)),
                             ],
                           ),
                           const SizedBox(height: MoolSpacing.sm),
@@ -170,11 +163,8 @@ class RetailerWholesaleTrackingScreen extends StatelessWidget {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   key: const Key('delivery-call'),
-                                  onPressed: () => _contactSheet(
-                                    context,
-                                    order,
-                                    call: true,
-                                  ),
+                                  onPressed: () =>
+                                      _contactSheet(context, order, call: true),
                                   icon: const Icon(Icons.call_outlined),
                                   label: const Text('Call'),
                                 ),
@@ -262,10 +252,7 @@ class RetailerWholesaleTrackingScreen extends StatelessWidget {
             : order.supplier,
         detail: call ? 'Verified delivery contact' : 'PO-linked thread',
       ),
-      _TrackingFact(
-        title: order.deliveryWindow,
-        detail: 'Committed delivery',
-      ),
+      _TrackingFact(title: order.deliveryWindow, detail: 'Committed delivery'),
       const SizedBox(height: MoolSpacing.sm),
       FilledButton(
         key: Key(call ? 'delivery-start-call' : 'delivery-open-chat'),
@@ -374,8 +361,7 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
-        final issue =
-            session.receiptChoice == RetailerGoodsReceiptChoice.issue;
+        final issue = session.receiptChoice == RetailerGoodsReceiptChoice.issue;
         return RetailerPageScaffold(
           session: session,
           title: 'Receive goods',
@@ -414,8 +400,7 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
             key: const Key('goods-confirm-receipt'),
             onPressed:
                 session.busy ||
-                    session.receiptChoice ==
-                        RetailerGoodsReceiptChoice.pending
+                    session.receiptChoice == RetailerGoodsReceiptChoice.pending
                 ? null
                 : () => _confirm(context),
             child: Text(issue ? 'Submit issue' : 'Confirm receipt'),
@@ -459,7 +444,8 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
                         Expanded(
                           child: _TrackingFact(
                             title: issue ? '2 cases' : '3 cases',
-                            detail: session.receiptChoice ==
+                            detail:
+                                session.receiptChoice ==
                                     RetailerGoodsReceiptChoice.pending
                                 ? 'To verify'
                                 : 'Accepted',
@@ -574,10 +560,7 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
                   title: 'GST tax invoice',
                   detail: 'INV-SM-2941 · Supermandi Tech Pvt Ltd',
                   children: const [
-                    _TrackingFact(
-                      title: '₹2,856',
-                      detail: 'Invoice value',
-                    ),
+                    _TrackingFact(title: '₹2,856', detail: 'Invoice value'),
                     _TrackingFact(
                       title: '3 cases · 12 packs',
                       detail: 'Invoice quantity',
@@ -653,15 +636,13 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
         'This action updates accepted stock and the linked supplier obligation once.',
     children: [
       _TrackingFact(
-        title:
-            session.receiptChoice == RetailerGoodsReceiptChoice.issue
+        title: session.receiptChoice == RetailerGoodsReceiptChoice.issue
             ? '8 packs'
             : '12 packs',
         detail: 'Accepted stock',
       ),
       _TrackingFact(
-        title:
-            session.receiptChoice == RetailerGoodsReceiptChoice.issue
+        title: session.receiptChoice == RetailerGoodsReceiptChoice.issue
             ? 'Disputed amount held'
             : 'Payment release begins',
         detail: 'Supplier settlement',
@@ -674,9 +655,7 @@ class RetailerGoodsReceiptScreen extends StatelessWidget {
             : () async {
                 Navigator.pop(context);
                 if (await session.postGoodsReceipt() && context.mounted) {
-                  context.go(
-                    '/app/retailer/wholesale/goods-receipt/result',
-                  );
+                  context.go('/app/retailer/wholesale/goods-receipt/result');
                 }
               },
         child: const Text('Post receipt'),
@@ -731,17 +710,13 @@ class _ReceiptChoiceCard extends StatelessWidget {
 }
 
 class RetailerGoodsReceiptResultScreen extends StatelessWidget {
-  const RetailerGoodsReceiptResultScreen({
-    required this.session,
-    super.key,
-  });
+  const RetailerGoodsReceiptResultScreen({required this.session, super.key});
 
   final RetailerSession session;
 
   @override
   Widget build(BuildContext context) {
-    final issue =
-        session.receiptChoice == RetailerGoodsReceiptChoice.issue;
+    final issue = session.receiptChoice == RetailerGoodsReceiptChoice.issue;
     return RetailerPageScaffold(
       session: session,
       title: issue ? 'Receipt posted with issue' : 'Receipt posted',
@@ -752,7 +727,7 @@ class RetailerGoodsReceiptResultScreen extends StatelessWidget {
         key: const Key('receipt-result-help'),
         tooltip: 'Receipt result help',
         onPressed: () => session.showNotice(
-          'This screen shows posted business records, not estimates.',
+          'Posted business records appear here; estimates do not.',
         ),
         icon: const Icon(Icons.help_outline_rounded),
       ),
@@ -766,9 +741,7 @@ class RetailerGoodsReceiptResultScreen extends StatelessWidget {
         padding: const EdgeInsets.all(MoolSpacing.md),
         children: [
           RetailerCard(
-            color: issue
-                ? const Color(0xFFFFF4E6)
-                : const Color(0xFFEAF7E8),
+            color: issue ? const Color(0xFFFFF4E6) : const Color(0xFFEAF7E8),
             child: Row(
               children: [
                 Icon(
@@ -874,8 +847,7 @@ class RetailerGoodsReceiptResultScreen extends StatelessWidget {
           ],
           OutlinedButton.icon(
             key: const Key('receipt-view-stock'),
-            onPressed: () =>
-                context.go('/app/retailer/home?view=stock'),
+            onPressed: () => context.go('/app/retailer/home?view=stock'),
             icon: const Icon(Icons.inventory_2_outlined),
             label: const Text('View updated stock'),
           ),

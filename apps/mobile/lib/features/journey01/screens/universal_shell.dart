@@ -372,7 +372,7 @@ class _SocialSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       key: const Key('section-social'),
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 104),
+      padding: const EdgeInsets.fromLTRB(14, 8, 72, 104),
       children: [
         const _YouTubeConnectCard(),
         const SizedBox(height: 8),
@@ -534,9 +534,9 @@ class _YouTubeConnectCard extends StatelessWidget {
                     context,
                     title: 'YouTube video with a Mool action',
                     description:
-                        'The video remains hosted by YouTube. Choose the '
-                        'MoolSocial action below the player when you want to '
-                        'buy, book, order, apply, visit or chat.',
+                        'The video remains hosted by YouTube. Open its '
+                        'connected MoolSocial action when you want to buy, '
+                        'book, order, apply, visit or chat.',
                     primaryLabel: 'Open connected video',
                   ),
                   style: FilledButton.styleFrom(
@@ -700,7 +700,7 @@ class _VideoCard extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        height: 330 + addedHeight,
+        height: 382 + addedHeight,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           border: Border.all(color: MoolColors.navy),
@@ -1430,7 +1430,7 @@ class _FocusedDockButton extends StatelessWidget {
     return Semantics(
       selected: !moolOpen,
       label: moolOpen
-          ? 'Choose a Mool action above'
+          ? 'Mool action menu is open'
           : '${_titleCase(activeSection)} is open',
       child: Container(
         height: 50,
@@ -2752,7 +2752,7 @@ Future<void> _showAreaPicker(BuildContext context, JourneySession session) {
                   onChanged: (value) => input = value,
                   decoration: const InputDecoration(
                     labelText: 'Area or PIN code',
-                    hintText: 'For example, Sardarpura',
+                    hintText: 'Sardarpura',
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -137,7 +137,7 @@ const workOpportunities = <WorkOpportunity>[
     id: 'shakti-shorts',
     publisher: 'Shakti Foods',
     publisherType: 'Verified manufacturer',
-    title: 'Make two product-demo shorts',
+    title: 'Create two product showcase Shorts',
     summary:
         'Show the supplied product pack, preparation and final serving in two original shorts.',
     kind: 'Create',
@@ -266,7 +266,7 @@ const workTerms = <WorkTerm>[
     id: 'publisher',
     title: 'What the publisher provides',
     detail:
-        'Campaign brief, approved facts, brand assets and the submission route are provided after selection.',
+        'Campaign brief, approved facts, brand assets and submission instructions are provided after selection.',
   ),
   WorkTerm(
     id: 'review',
@@ -409,7 +409,7 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Create & Work',
     label: 'Creator',
     sellSide: 'Complete funded creator campaigns',
-    buySide: 'Access production services',
+    buySide: 'Hire creator support services',
     tools: 'YouTube Connect, campaigns and earnings',
     icon: Icons.video_camera_front_outlined,
   ),

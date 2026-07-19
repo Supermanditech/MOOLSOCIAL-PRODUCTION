@@ -291,7 +291,7 @@ class _RetailerCreateOrderScreenState extends State<RetailerCreateOrderScreen> {
         RetailerSectionTitle(
           title: 'Available in My Stock',
           detail: widget.session.posItemCount == 0
-              ? 'Tap Add to begin'
+              ? 'Choose Add to begin'
               : '${widget.session.posItemCount} products in this order',
         ),
         const SizedBox(height: MoolSpacing.xs),
@@ -702,7 +702,7 @@ class _RetailerCreateOrderScreenState extends State<RetailerCreateOrderScreen> {
               Navigator.pop(context);
               widget.session.useBarcodeResult(permissionDenied: true);
             },
-            child: const Text('Test without camera permission'),
+            child: const Text('Continue without camera'),
           ),
         ),
       ],
@@ -716,7 +716,7 @@ class _RetailerCreateOrderScreenState extends State<RetailerCreateOrderScreen> {
     detail: 'Say product, pack and quantity, then review the match.',
     child: Column(
       children: [
-        const _SheetFact(label: 'Example', value: 'One atta 1 kg'),
+        const _SheetFact(label: 'Say', value: 'One atta 1 kg'),
         const SizedBox(height: MoolSpacing.md),
         SizedBox(
           width: double.infinity,
@@ -738,7 +738,7 @@ class _RetailerCreateOrderScreenState extends State<RetailerCreateOrderScreen> {
               Navigator.pop(context);
               widget.session.useVoiceResult(permissionDenied: true);
             },
-            child: const Text('Test without microphone permission'),
+            child: const Text('Continue without microphone'),
           ),
         ),
       ],

@@ -286,7 +286,7 @@ const reviewCaptainVehicleHelp = <CaptainSupportOption>[
     id: 'vehicle-bills',
     title: 'FASTag, insurance and vehicle bills',
     detail: 'Open the matching Pay action',
-    outcome: 'One-tap payment routes',
+    outcome: 'Pay from the matching bill',
     iconLabel: 'BILL',
   ),
 ];
