@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'retailer_business_services_models.dart';
+import 'retailer_business_services_services.dart';
 import 'retailer_books_models.dart';
 import 'retailer_books_services.dart';
 import 'retailer_models.dart';
@@ -15,10 +17,13 @@ class RetailerSession extends ChangeNotifier {
     ReviewRetailerPosGateway? posGateway,
     ReviewRetailerWholesaleGateway? wholesaleGateway,
     ReviewRetailerBooksGateway? booksGateway,
+    ReviewRetailerBusinessServicesGateway? businessServicesGateway,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
        wholesaleGateway = wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
        booksGateway = booksGateway ?? ReviewRetailerBooksGateway(),
+       businessServicesGateway =
+           businessServicesGateway ?? ReviewRetailerBusinessServicesGateway(),
        orders = buildReviewRetailerOrders(),
        counters = buildReviewCounters(),
        sales = buildReviewSales(),
@@ -30,6 +35,7 @@ class RetailerSession extends ChangeNotifier {
   final ReviewRetailerPosGateway posGateway;
   final ReviewRetailerWholesaleGateway wholesaleGateway;
   final ReviewRetailerBooksGateway booksGateway;
+  final ReviewRetailerBusinessServicesGateway businessServicesGateway;
   final List<RetailerOrder> orders;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
@@ -113,6 +119,20 @@ class RetailerSession extends ChangeNotifier {
   final List<RetailerExpense> expenses = [];
   String? expenseId;
   String? selectedMoneyExceptionId;
+
+  bool businessServicesOnline = true;
+  bool businessServicesAuthorized = true;
+  bool businessServicesCatalogueAvailable = true;
+  RetailerBusinessServiceOffering? selectedBusinessService;
+  RetailerBusinessPlan? selectedBusinessPlan;
+  int businessServiceMonthlyLimit = 3000;
+  bool businessServiceCustomLimit = false;
+  RetailerBusinessPayment businessServicePayment = RetailerBusinessPayment.upi;
+  bool businessServiceCommercialConsent = false;
+  bool businessServiceDataConsent = false;
+  bool businessServiceTermsReviewed = false;
+  final Map<RetailerBusinessServiceType, RetailerActiveBusinessService>
+  activeBusinessServices = {};
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -346,6 +366,22 @@ class RetailerSession extends ChangeNotifier {
   List<RetailerMoneyException> get openMoneyExceptions => moneyExceptions
       .where((exception) => !exception.resolved)
       .toList(growable: false);
+
+  int get activeBusinessServiceCount => activeBusinessServices.length;
+
+  RetailerActiveBusinessService? activeBusinessService(
+    RetailerBusinessServiceType type,
+  ) => activeBusinessServices[type];
+
+  bool get businessServiceCanActivate {
+    final service = selectedBusinessService;
+    return selectedBusinessPlan != null &&
+        businessServiceMonthlyLimit >= 1000 &&
+        businessServiceCommercialConsent &&
+        (service == null ||
+            !service.requiresDataConsent ||
+            businessServiceDataConsent);
+  }
 
   RetailerPurchaseOrder? get selectedPurchaseOrder {
     final id = selectedPurchaseOrderId;
@@ -1923,6 +1959,267 @@ class RetailerSession extends ChangeNotifier {
       () => booksGateway.resolveMoney(exceptionId),
       success: '${exception.title} resolved with audit history.',
       afterSuccess: () => exception.resolved = true,
+    );
+  }
+
+  void setBusinessServicesOnline(bool value) {
+    businessServicesOnline = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectBusinessService(RetailerBusinessServiceOffering service) {
+    final changed = selectedBusinessService?.type != service.type;
+    selectedBusinessService = service;
+    final active = activeBusinessServices[service.type];
+    if (active != null) {
+      selectedBusinessPlan = active.plan;
+      businessServiceMonthlyLimit = active.monthlyLimit;
+      businessServicePayment = active.payment;
+    } else if (changed || selectedBusinessPlan == null) {
+      selectedBusinessPlan = service.plans.first;
+      businessServiceMonthlyLimit = 3000;
+      businessServicePayment = RetailerBusinessPayment.upi;
+    }
+    if (changed) {
+      businessServiceCustomLimit = false;
+      businessServiceCommercialConsent = false;
+      businessServiceDataConsent = false;
+      businessServiceTermsReviewed = false;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectBusinessServicePlan(RetailerBusinessPlan plan) {
+    selectedBusinessPlan = plan;
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool setBusinessServiceLimit(int value, {bool custom = false}) {
+    if (value < 1000) {
+      _showError('Set a monthly spending limit of at least ₹1,000.');
+      return false;
+    }
+    if (value > 100000) {
+      _showError('For your protection, choose a limit up to ₹1,00,000.');
+      return false;
+    }
+    final monthly = selectedBusinessPlan?.monthly ?? 0;
+    if (value < monthly) {
+      _showError('The monthly limit must cover the selected plan price.');
+      return false;
+    }
+    businessServiceMonthlyLimit = value;
+    businessServiceCustomLimit = custom;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  void selectBusinessServicePayment(RetailerBusinessPayment payment) {
+    businessServicePayment = payment;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setBusinessServiceCommercialConsent(bool value) {
+    businessServiceCommercialConsent = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setBusinessServiceDataConsent(bool value) {
+    businessServiceDataConsent = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void reviewBusinessServiceTerms() {
+    businessServiceTermsReviewed = true;
+    clearMessages();
+    noticeMessage =
+        'Service terms reviewed. Charges, limit and renewal remain visible.';
+    notifyListeners();
+  }
+
+  Future<bool> refreshBusinessServices() async {
+    if (!businessServicesAuthorized) {
+      _showError(
+        'Your current shop role cannot manage paid business services.',
+      );
+      return false;
+    }
+    if (!businessServicesOnline) {
+      _showError(
+        'Business Services is offline. No plan or entitlement was changed.',
+      );
+      return false;
+    }
+    return _runBool(
+      businessServicesGateway.refreshCatalogue,
+      success: 'Business Services plans and prices are current.',
+      afterSuccess: () => businessServicesCatalogueAvailable = true,
+    );
+  }
+
+  Future<bool> loadBusinessServicePlans(
+    RetailerBusinessServiceOffering service,
+  ) async {
+    selectBusinessService(service);
+    if (!businessServicesAuthorized) {
+      _showError('Your current shop role cannot review paid service plans.');
+      return false;
+    }
+    if (!businessServicesOnline) {
+      _showError(
+        'Service plans are offline. Your existing selection remains unchanged.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => businessServicesGateway.loadPlans(service.type),
+      success: '${service.title} plans are ready to compare.',
+    );
+  }
+
+  Future<bool> activateBusinessService() async {
+    final service = selectedBusinessService;
+    final plan = selectedBusinessPlan;
+    if (service == null || plan == null) {
+      _showError('Choose a service and plan before activation.');
+      return false;
+    }
+    final existing = activeBusinessServices[service.type];
+    if (existing != null) {
+      noticeMessage =
+          '${service.title} is already active as ${existing.id}. No duplicate payment or entitlement was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!businessServiceCommercialConsent) {
+      _showError('Approve the displayed commercial terms before activation.');
+      return false;
+    }
+    if (service.requiresDataConsent && !businessServiceDataConsent) {
+      _showError(
+        'Approve purpose-limited business-record access before activating this service.',
+      );
+      return false;
+    }
+    if (!businessServicesAuthorized) {
+      _showError('Shop owner approval is required to activate a paid service.');
+      return false;
+    }
+    if (!businessServicesOnline) {
+      _showError(
+        'Activation is offline. No payment was collected and no service was started.',
+      );
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      final id = await businessServicesGateway.activate(
+        service: service.type,
+        planId: plan.id,
+        monthlyLimit: businessServiceMonthlyLimit,
+        payment: businessServicePayment,
+        idempotencyKey:
+            '${service.type.name}-${plan.id}-$businessServiceMonthlyLimit',
+      );
+      activeBusinessServices[service.type] = RetailerActiveBusinessService(
+        id: id,
+        offering: service,
+        plan: plan,
+        monthlyLimit: businessServiceMonthlyLimit,
+        payment: businessServicePayment,
+        readySetup: {
+          for (final setup in service.quickSetup)
+            if (setup.$3) setup.$1,
+        },
+      );
+      noticeMessage =
+          '${service.title} activated once. Plan, spend limit and payment proof are recorded.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> completeBusinessServiceSetup(
+    RetailerBusinessServiceType type,
+    String setupId,
+  ) async {
+    final active = activeBusinessServices[type];
+    if (active == null) {
+      _showError('Activate this service before completing its setup.');
+      return false;
+    }
+    if (active.readySetup.contains(setupId)) {
+      noticeMessage = '$setupId is already ready. No duplicate was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!businessServicesOnline) {
+      _showError('Service setup is offline. Its current status is unchanged.');
+      return false;
+    }
+    return _runBool(
+      () => businessServicesGateway.saveSetup(type, setupId),
+      success: '$setupId is ready to use.',
+      afterSuccess: () => active.readySetup.add(setupId),
+    );
+  }
+
+  Future<bool> openBusinessServiceSupport(
+    RetailerBusinessServiceType type,
+  ) async {
+    if (!activeBusinessServices.containsKey(type)) {
+      _showError('Activate this service before opening service support.');
+      return false;
+    }
+    if (!businessServicesOnline) {
+      _showError(
+        'Service support is offline. Your active service remains unchanged.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => businessServicesGateway.openSupport(type),
+      success: 'A service support case is ready in Chat.',
+    );
+  }
+
+  Future<bool> cancelBusinessService(RetailerBusinessServiceType type) async {
+    final active = activeBusinessServices[type];
+    if (active == null) {
+      noticeMessage = 'This service is already inactive.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!businessServicesOnline) {
+      _showError(
+        'Cancellation is offline. The service remains active until a confirmed request is recorded.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => businessServicesGateway.cancel(type),
+      success:
+          '${active.offering.title} will not renew. Current paid access remains available until renewal.',
+      afterSuccess: () => activeBusinessServices.remove(type),
     );
   }
 

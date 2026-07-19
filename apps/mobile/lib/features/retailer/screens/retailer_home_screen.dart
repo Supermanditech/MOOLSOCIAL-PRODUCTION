@@ -264,9 +264,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
         ),
         const SizedBox(height: MoolSpacing.md),
         RetailerCard(
-          onTap: () => widget.session.showNotice(
-            'Professional delivery, sales, tax and growth plans are ready for review. No plan starts without your approval.',
-          ),
+          onTap: () => context.go('/app/retailer/services'),
           keyName: 'retailer-business-services',
           color: const Color(0xFFFFF4E5),
           child: const Row(

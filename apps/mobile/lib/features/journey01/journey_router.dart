@@ -42,7 +42,9 @@ import '../ride/screens/ride_support_screen.dart';
 import '../ride/screens/ride_trip_screen.dart';
 import '../retailer/retailer_models.dart';
 import '../retailer/retailer_pos_models.dart';
+import '../retailer/retailer_business_services_models.dart';
 import '../retailer/retailer_session.dart';
+import '../retailer/screens/retailer_business_services_screens.dart';
 import '../retailer/screens/retailer_delivery_screens.dart';
 import '../retailer/screens/retailer_books_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
@@ -488,6 +490,33 @@ GoRouter createJourneyRouter(
         path: '/app/retailer/books/money',
         builder: (context, state) =>
             RetailerMoneyControlScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/services',
+        builder: (context, state) =>
+            RetailerBusinessServicesScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/services/:serviceId',
+        builder: (context, state) {
+          final service = retailerBusinessServiceByName(
+            state.pathParameters['serviceId'] ?? 'delivery',
+          );
+          return switch (state.uri.queryParameters['stage']) {
+            'review' => RetailerBusinessServiceReviewScreen(
+              session: retailerSession,
+              service: service,
+            ),
+            'active' => RetailerBusinessServiceActiveScreen(
+              session: retailerSession,
+              service: service,
+            ),
+            _ => RetailerBusinessServicePlanScreen(
+              session: retailerSession,
+              service: service,
+            ),
+          };
+        },
       ),
       GoRoute(
         path: '/app/retailer/wholesale',
