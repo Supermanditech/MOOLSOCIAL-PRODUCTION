@@ -22,7 +22,7 @@ evidence, regression state and live-backend state independently.
 | --- | ---: | --- | --- |
 | Install, setup, sign-in, Universal | 5 | Flutter | Journey, session and Universal tests |
 | Social | 4 | Flutter | Universal nested-intent tests |
-| Buy | 14 | Flutter | Home-delivery vertical-slice tests |
+| Buy | 15 | Flutter | Home-delivery and Medicine vertical-slice tests |
 | Chat | 3 | Flutter | Chat flow tests |
 | Eat | 4 | Flutter | Eat vertical-slice tests |
 | Ride | 6 | Flutter | Ride vertical-slice tests |
@@ -43,12 +43,17 @@ evidence, regression state and live-backend state independently.
 | Service provider | 8 | Flutter | Operations tests and goldens |
 | Superadmin | 12 | Next.js | Contract, desktop/mobile intent and visual tests |
 | Shared capabilities | 7 | Flutter | Shared nested-intent tests and goldens |
-| **Total** | **167** | **155 Flutter + 12 Next.js** | **149 registered Flutter routes** |
+| **Total implemented** | **168** | **156 Flutter + 12 Next.js** | **150 registered Flutter routes** |
 
 The complete screen-by-screen record is
 [`SCREEN-BY-SCREEN-READINESS.csv`](SCREEN-BY-SCREEN-READINESS.csv). It is
 generated from the approved reference directory, refuses missing or duplicate
-sequence numbers and contains one row for every screen.
+sequence numbers and contains one row for every approved screen. The audit
+added one production-only Medicine and pharmacy screen beyond approved
+references `000`–`166`; it is tracked in
+[`PRODUCTION-ONLY-SCREEN-READINESS.csv`](PRODUCTION-ONLY-SCREEN-READINESS.csv),
+by `PROD-COM-005`, dedicated functional/device tests and three visual
+baselines.
 
 The paired
 [`APPROVED-TAP-INVENTORY.csv`](APPROVED-TAP-INVENTORY.csv) extracts the
@@ -122,7 +127,7 @@ columns so a prototype control cannot create a false production pass.
 - Fix: `scripts/check-interaction-contracts.ps1` now rejects empty Flutter and
   Superadmin callbacks, `href="#"`, permanently disabled controls and any
   literal `/app…` target absent from the registered route set.
-- Result: 149 unique registered routes; all 835 literal application targets
+- Result: 150 unique registered routes; all 835 literal application targets
   resolve; no static no-op control remains.
 
 ### QA23-006 — release builds could silently use demo Firebase services
@@ -310,7 +315,38 @@ columns so a prototype control cannot create a false production pass.
   “Order, product or customer” beside the search icon, preserving all three
   searchable entities without clipping.
 - Acceptance: exact wording assertions, 29 affected journey tests, the
-  production-copy gate and the 149-route/no-op interaction gate all pass.
+  production-copy gate and the 150-route/no-op interaction gate all pass.
+
+### QA23-020 — Buy Medicine ended in a false generic completion
+
+- Discovery: Universal → Buy → Medicine ended with “Your pharmacy request is
+  ready” instead of opening a pharmacy journey. Search had the same extra
+  generic stop.
+- Root cause: Medicine was the only reachable consumer Buy sub-action without
+  a production route owner.
+- Fix: a dedicated Apple-inspired Medicine and pharmacy screen now owns search,
+  no-result recovery, eligible basket addition, prescription selection and
+  submission, and a licensed-pharmacist question path. Prescription-required
+  medicine cannot be charged or confirmed before pharmacy acceptance.
+- Failure replay: missing medicine, missing prescription, short question,
+  prescription send failure and pharmacist send failure preserve input and
+  state; one retry creates one request; duplicate submission creates none.
+- Acceptance: 22/22 targeted tests pass, including direct Universal and search
+  routes plus 360×800 at 140% text. Three readable golden states pass. The
+  exact invalid, failure, retry and duplicate-safe sequence also passed on the
+  connected OPPO.
+
+### QA23-021 — visual baselines still replaced icons with squares
+
+- Discovery: after application text became readable, every Material or
+  Cupertino icon in Flutter goldens still appeared as a square placeholder.
+  Physical-device icons were correct.
+- Root cause: the shared golden harness loaded Inter but not the two icon
+  fonts packaged with the application.
+- Fix: the harness now loads Inter, Material Icons and Cupertino Icons before
+  every test. A design-system source assertion locks all three font loaders.
+- Acceptance: all 77 mobile baselines were regenerated with real icons and the
+  independent no-update full regression passed 322/322.
 
 ## Visual review method
 
@@ -323,7 +359,7 @@ node scripts/create-visual-audit-board.mjs `
   artifacts/quality/mobile-golden-board.png
 ```
 
-Boards cover Universal, Creator, Earn, Provider, Shared, Retailer,
+Boards cover Universal, Medicine, Creator, Earn, Provider, Shared, Retailer,
 Manufacturer, Captain and Superadmin at phone and desktop widths. The audit
 looked for clipped primary actions, inaccessible nested controls, inconsistent
 navigation, internal labels, unsafe fixed values and screen-height failures.
@@ -332,7 +368,10 @@ evidence.
 
 Founder-readable boards are versioned with the audit:
 
+- [All current mobile baselines](../../artifacts/quality/mobile-golden-board.png)
 - [Universal](../../artifacts/quality/readable-universal.png)
+- [Latest clean OPPO Universal](../../artifacts/quality/phone-universal-latest.png)
+- [Medicine and pharmacy](../../artifacts/quality/readable-buy-medicine.png)
 - [Creator](../../artifacts/quality/readable-creator.png)
 - [Earn](../../artifacts/quality/readable-earn.png)
 - [Provider](../../artifacts/quality/readable-provider.png)
@@ -364,11 +403,13 @@ Founder-readable boards are versioned with the audit:
 | Universal search prompt ended in an ellipsis on OPPO | Complete contextual prompt fits; the result screen carries the detailed content scope | Universal responsive intent and golden suites passed |
 | Ubuntu reported all 74 Flutter pixel baselines as different | Run approved baselines on Windows while retaining Linux Android and macOS iOS builds | Replacement GitHub workflow pending exact replay |
 | Hosted iOS build rejected Firebase Apple packages because the Runner targeted iOS 13 | Runner and embedded Flutter framework now declare iOS 15; a configuration test fixes the boundary | Hosted macOS build pending exact replay |
-| Flutter golden boards replaced application copy and button labels with block glyphs | Shared test setup loads packaged Inter and component themes preserve it | Readable 74-screen regeneration and nine-board review passed locally |
+| Flutter golden boards replaced application copy and button labels with block glyphs | Shared test setup loads packaged Inter and component themes preserve it | Readable 77-screen regeneration and ten-board review passed locally |
 | Paid Reel showed only days 1–5 without signalling hidden choices | Wrapping selector shows all 1–7 day funded durations | Exact selection replay and compact 140% text regression passed |
 | Physical Creator replay proved only day 7 | Every 1–7-day Reel and YouTube choice now changes state on the OPPO | Full eight-lifecycle Creator failure/retry replay passed |
 | Early device captures were difficult to review screenwise | Six filtered, labelled boards group 50 OPPO outcomes by journey | Full-resolution board review passed |
 | Book and retailer search wording was verbose for compact screens | Short, action-led labels preserve complete meaning | Exact copy assertions and 29 affected journey tests passed |
+| Medicine displayed a generic “request is ready” result | Dedicated search, basket, prescription and pharmacist owners replace the false completion | Targeted 22/22, three visual states and the physical-device exact replay passed |
+| Flutter goldens still drew icon squares | Golden harness loads both production icon fonts | All 77 baselines regenerated; independent 322/322 passed |
 
 ## Current verification
 
@@ -386,17 +427,20 @@ Founder-readable boards are versioned with the audit:
 | Full Flutter pre-device baseline | Passed, 312/312 twice |
 | Final post-device full-regression cycle 1 | Passed, 312/312 |
 | Final post-device full-regression cycle 2 | Passed, 312/312 |
-| Readable golden regeneration | Passed, 313/313 before the compact duration assertion was added |
-| Current full regression cycle 1 | Passed, 314/314 |
-| Current full regression cycle 2 | Passed, 314/314 |
+| Earlier readable golden regeneration | Passed, 313/313 before later coverage was added |
+| Earlier full regression cycles | Passed, 314/314 twice |
 | OPPO Creator paid-duration and failure/retry replay | Passed; every Reel and YouTube duration 1–7 changed state |
 | Book/retailer copy-refinement journey replay | Passed, 29/29 |
+| Medicine intent and failure replay | Passed, 22/22 |
+| OPPO Medicine invalid/failure/retry/duplicate replay | Passed; search recovery, OTC basket, prescription and pharmacist end intents completed |
+| Production-icon golden regeneration | Passed, 322/322 across 77 baselines |
+| Independent current full regression | Passed, 322/322 without baseline updates |
 | Corrected debug APK build | Passed |
 | Clean OPPO install and OTP-to-Universal replay | Passed after exact failure fixes; latest build remains open at Universal |
 
 ## Cascading production backlog
 
-The audit produced 46 ordered production tickets in
+The audit produced 47 ordered production tickets in
 [`PRODUCTION-CASCADE-2026-07-20.md`](../delivery/PRODUCTION-CASCADE-2026-07-20.md).
 They deliberately keep one journey vertical:
 

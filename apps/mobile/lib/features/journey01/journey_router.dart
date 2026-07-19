@@ -12,6 +12,7 @@ import '../buy/screens/buy_catalog_screen.dart';
 import '../buy/screens/buy_collection_completed_screen.dart';
 import '../buy/screens/buy_collection_screen.dart';
 import '../buy/screens/buy_completed_screen.dart';
+import '../buy/screens/buy_medicine_screen.dart';
 import '../buy/screens/buy_problem_screen.dart';
 import '../buy/screens/buy_product_screen.dart';
 import '../buy/screens/buy_review_screen.dart';
@@ -158,6 +159,10 @@ GoRouter createJourneyRouter(
       GoRoute(
         path: '/app/buy/grocery',
         builder: (context, state) => BuyCatalogScreen(session: buySession),
+      ),
+      GoRoute(
+        path: '/app/buy/medicine',
+        builder: (context, state) => BuyMedicineScreen(session: buySession),
       ),
       GoRoute(
         path: '/app/buy/product/:productId',

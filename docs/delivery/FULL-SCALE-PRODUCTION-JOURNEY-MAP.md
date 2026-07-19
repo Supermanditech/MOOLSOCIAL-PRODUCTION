@@ -6,6 +6,8 @@ Last reconciled: 19 July 2026
 
 - Approved reference: `supermandi-uiux-screenbook/approved-final`
 - Approved screen files: 167 (`00` through `166`)
+- Production review surfaces: 168; the audit added one dedicated Medicine and
+  pharmacy screen beyond the approved reference set
 - Flow definitions: 48 total
   - 1 aggregate screenbook sequence
   - 47 operational user-flow definitions
@@ -44,6 +46,7 @@ Last reconciled: 19 July 2026
 |---:|---|---|---|---|
 | 0 | Install, setup, OTP and Universal entry | `onboarding` | 00–04 | Implemented; two clean regression cycles passed |
 | 1 | Household buying, delivery, bill and issue resolution | `buy-delivery`, `buy-issue` | 04, 09–12, 14, 17–22 | Implemented in Flutter; dedicated black-box suite passed |
+| 1A | Medicine search, prescription and pharmacist request | `buy-medicine` | production-only Medicine surface plus 04 and 12 | Implemented in Flutter; direct Universal/search routes, OTC basket, prescription, pharmacist, invalid, retry, duplicate-safe, compact and three-state visual gates passed |
 | 2 | At-shop payment and collection | `buy-counter` | 04, 09–12, 14–16 | Implemented in Flutter with explicit store choice, collection readiness, protected code, handoff and receipt; dedicated black-box suite passed |
 | 3 | Transactional and people chat | `chat` | 04, 23–25 | Implemented in Flutter; inbox, people/business/order/support threads, attachments, reply/reaction, failed-send replay, contextual actions and protected return routes passed dedicated and full-app regression |
 | 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Implemented in Flutter; order, basket, payment, tracking, table confirmation and tiffin controls passed dedicated black-box, two full regression cycles and physical-device replay |
@@ -68,6 +71,8 @@ Last reconciled: 19 July 2026
 - `social`: 04 → 05 → 06 → 07 → 08
 - `buy-counter`: 04 → 09 → 10 → 11 → 12 → 14 → 15 → 16
 - `buy-delivery`: 04 → 09 → 10 → 11 → 12 → 14 → 17 → 18
+- `buy-medicine`: 04 → Medicine search → eligible Basket or protected
+  prescription/pharmacist request
 - `buy-issue`: 18 → 19 → 20 → 21 → 22
 - `chat`: 04 → 23 → 24 → 23 → 25
 - `eat-order`: 04 → 26 → 27

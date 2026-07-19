@@ -4,10 +4,14 @@ import 'buy_models.dart';
 import 'buy_services.dart';
 
 class BuySession extends ChangeNotifier {
-  BuySession({BuyOrderGateway? orderGateway})
-    : _orderGateway = orderGateway ?? ReviewBuyOrderGateway();
+  BuySession({
+    BuyOrderGateway? orderGateway,
+    BuyMedicineGateway? medicineGateway,
+  }) : _orderGateway = orderGateway ?? ReviewBuyOrderGateway(),
+       _medicineGateway = medicineGateway ?? ReviewBuyMedicineGateway();
 
   final BuyOrderGateway _orderGateway;
+  final BuyMedicineGateway _medicineGateway;
 
   static const products = <BuyProduct>[
     BuyProduct(
@@ -77,6 +81,29 @@ class BuySession extends ChangeNotifier {
       refundRule: 'No charge until available',
       available: false,
     ),
+    BuyProduct(
+      id: 'ors',
+      name: 'ORS electrolyte sachets',
+      detail: 'Pack of 5 sachets',
+      unitLabel: '5 sachets',
+      price: 110,
+      category: BuyCategory.medicine,
+      seller: 'Sardarpura Licensed Pharmacy',
+      deliveryPromise: 'Home delivery in 35–50 min',
+      refundRule: 'Return only if the sealed pack is damaged',
+    ),
+    BuyProduct(
+      id: 'metformin-500',
+      name: 'Metformin 500 mg',
+      detail: '10-tablet strip · prescription medicine',
+      unitLabel: '10 tablets',
+      price: 32,
+      category: BuyCategory.medicine,
+      seller: 'Sardarpura Licensed Pharmacy',
+      deliveryPromise: 'Delivery after prescription acceptance',
+      refundRule: 'No charge before pharmacy acceptance',
+      requiresPrescription: true,
+    ),
   ];
 
   final Map<String, BuyCartLine> _cart = {};
@@ -98,6 +125,17 @@ class BuySession extends ChangeNotifier {
   int shopRating = 0;
   int riderRating = 0;
   bool ratingSubmitted = false;
+  BuyMedicinePath medicinePath = BuyMedicinePath.search;
+  String medicineQuery = '';
+  String? selectedMedicineId;
+  bool prescriptionAttached = false;
+  String? medicineRequestId;
+  String? pharmacistRequestId;
+  bool medicineBusy = false;
+
+  List<BuyProduct> get medicineProducts => List.unmodifiable(
+    products.where((product) => product.category == BuyCategory.medicine),
+  );
 
   List<BuyCartLine> get cartLines => List.unmodifiable(_cart.values);
 
@@ -116,9 +154,9 @@ class BuySession extends ChangeNotifier {
   List<BuyProduct> visibleProducts([String query = '']) {
     final normalized = query.trim().toLowerCase();
     return products.where((product) {
-      final categoryMatches =
-          selectedCategory == BuyCategory.all ||
-          product.category == selectedCategory;
+      final categoryMatches = selectedCategory == BuyCategory.all
+          ? product.category != BuyCategory.medicine
+          : product.category == selectedCategory;
       final queryMatches =
           normalized.isEmpty ||
           product.name.toLowerCase().contains(normalized) ||
@@ -133,6 +171,161 @@ class BuySession extends ChangeNotifier {
       (product) => product.id == id,
       orElse: () => products.first,
     );
+  }
+
+  List<BuyProduct> visibleMedicines([String query = '']) {
+    final normalized = query.trim().toLowerCase();
+    return medicineProducts.where((product) {
+      return normalized.isEmpty ||
+          product.name.toLowerCase().contains(normalized) ||
+          product.detail.toLowerCase().contains(normalized) ||
+          product.seller.toLowerCase().contains(normalized);
+    }).toList();
+  }
+
+  BuyProduct? get selectedMedicine {
+    final id = selectedMedicineId;
+    if (id == null) return null;
+    for (final product in medicineProducts) {
+      if (product.id == id) return product;
+    }
+    return null;
+  }
+
+  void chooseMedicinePath(BuyMedicinePath value) {
+    medicinePath = value;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  void updateMedicineQuery(String value) {
+    medicineQuery = value;
+    notifyListeners();
+  }
+
+  void selectMedicine(String productId) {
+    final medicine = medicineProducts.firstWhere(
+      (product) => product.id == productId,
+    );
+    selectedMedicineId = medicine.id;
+    prescriptionAttached = false;
+    medicineRequestId = null;
+    medicinePath = medicine.requiresPrescription
+        ? BuyMedicinePath.prescription
+        : BuyMedicinePath.search;
+    errorMessage = null;
+    noticeMessage = medicine.requiresPrescription
+        ? 'Add a valid prescription before sending this request.'
+        : '${medicine.name} selected.';
+    notifyListeners();
+  }
+
+  void attachPrescription() {
+    prescriptionAttached = true;
+    errorMessage = null;
+    noticeMessage =
+        'Prescription added. Check the medicine and seller before sending.';
+    notifyListeners();
+  }
+
+  bool addMedicine(String productId) {
+    final medicine = product(productId);
+    if (medicine.requiresPrescription) {
+      selectMedicine(productId);
+      errorMessage =
+          'This medicine requires a prescription and pharmacy acceptance.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    return addProduct(productId);
+  }
+
+  Future<bool> submitPrescription() async {
+    if (medicineBusy) return false;
+    final medicine = selectedMedicine;
+    if (medicine == null || !medicine.requiresPrescription) {
+      errorMessage = 'Choose a prescription medicine first.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (!prescriptionAttached) {
+      errorMessage = 'Add the prescription before sending this request.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (medicineRequestId != null) {
+      noticeMessage =
+          'Prescription request $medicineRequestId is already sent.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    medicineBusy = true;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+    try {
+      medicineRequestId = await _medicineGateway.submitPrescription(
+        productId: medicine.id,
+      );
+      noticeMessage =
+          'Prescription request $medicineRequestId was sent. No payment was taken.';
+      return true;
+    } on BuyServiceException catch (error) {
+      errorMessage = error.userMessage;
+      return false;
+    } on Object {
+      errorMessage =
+          'The prescription was not sent. Check your connection and try again.';
+      return false;
+    } finally {
+      medicineBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> requestPharmacist(String question) async {
+    if (medicineBusy) return false;
+    final trimmed = question.trim();
+    if (trimmed.length < 8) {
+      errorMessage = 'Describe what you need help with.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (pharmacistRequestId != null) {
+      noticeMessage =
+          'Pharmacist request $pharmacistRequestId is already open.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    medicineBusy = true;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+    try {
+      pharmacistRequestId = await _medicineGateway.requestPharmacist(
+        question: trimmed,
+      );
+      noticeMessage =
+          'Pharmacist request $pharmacistRequestId was sent. No payment was taken.';
+      return true;
+    } on BuyServiceException catch (error) {
+      errorMessage = error.userMessage;
+      return false;
+    } on Object {
+      errorMessage =
+          'Your question was not sent. Check your connection and try again.';
+      return false;
+    } finally {
+      medicineBusy = false;
+      notifyListeners();
+    }
   }
 
   int quantityFor(String productId) => _cart[productId]?.quantity ?? 0;

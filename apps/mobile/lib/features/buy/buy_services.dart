@@ -17,6 +17,52 @@ abstract interface class BuyOrderGateway {
   });
 }
 
+abstract interface class BuyMedicineGateway {
+  Future<String> submitPrescription({required String productId});
+
+  Future<String> requestPharmacist({required String question});
+}
+
+class ReviewBuyMedicineGateway implements BuyMedicineGateway {
+  ReviewBuyMedicineGateway({
+    this.failPrescription = false,
+    this.failPharmacist = false,
+    this.latency = const Duration(milliseconds: 120),
+  });
+
+  bool failPrescription;
+  bool failPharmacist;
+  final Duration latency;
+  int prescriptionCalls = 0;
+  int pharmacistCalls = 0;
+
+  @override
+  Future<String> submitPrescription({required String productId}) async {
+    prescriptionCalls += 1;
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+    if (failPrescription) {
+      failPrescription = false;
+      throw const BuyServiceException(
+        'The prescription was not sent. No payment was taken. Try again.',
+      );
+    }
+    return 'RX-${4100 + prescriptionCalls}';
+  }
+
+  @override
+  Future<String> requestPharmacist({required String question}) async {
+    pharmacistCalls += 1;
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+    if (failPharmacist) {
+      failPharmacist = false;
+      throw const BuyServiceException(
+        'Your question was not sent. Try again without losing the message.',
+      );
+    }
+    return 'PH-${7300 + pharmacistCalls}';
+  }
+}
+
 class ReviewBuyOrderGateway implements BuyOrderGateway {
   ReviewBuyOrderGateway({
     this.failNextRequest = false,

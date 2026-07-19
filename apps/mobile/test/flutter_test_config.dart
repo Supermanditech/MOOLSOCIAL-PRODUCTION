@@ -8,7 +8,17 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 
   final inter = FontLoader('Inter')
     ..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
-  await inter.load();
+  final materialIcons = FontLoader('MaterialIcons')
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+  final cupertinoIcons = FontLoader('packages/cupertino_icons/CupertinoIcons')
+    ..addFont(
+      rootBundle.load('packages/cupertino_icons/assets/CupertinoIcons.ttf'),
+    );
+  await Future.wait([
+    inter.load(),
+    materialIcons.load(),
+    cupertinoIcons.load(),
+  ]);
 
   await testMain();
 }

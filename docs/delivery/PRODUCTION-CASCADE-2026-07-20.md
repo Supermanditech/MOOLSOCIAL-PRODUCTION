@@ -241,6 +241,27 @@ returns success. Completion requires:
   the order and no refund is claimed before ledger confirmation.
 - Depends on: `PROD-COM-002`, `PROD-PLT-002`, `PROD-MNY-002`.
 
+### PROD-COM-005 — regulated Medicine and pharmacy requests
+
+- Source progress: dedicated Medicine UI, direct Universal/search routes,
+  prescription and pharmacist failure/retry contracts, idempotent review
+  gateways, compact accessibility checks and three golden states are complete.
+- Implement jurisdiction-aware medicine catalogue and licensed-seller
+  eligibility; never mix regulated Medicine inventory into the general
+  household catalogue.
+- Store prescriptions through private-file controls, expose purpose-bound
+  access, retention and audit, and prevent raw prescription content from logs.
+- The server must own prescription acceptance, medicine availability, final
+  price and the transition to payment. A client tap cannot claim acceptance or
+  debit.
+- Link pharmacist requests to Chat with one request reference and explicit
+  response/status ownership.
+- Accept: eligible non-prescription item reaches Basket; prescription and
+  pharmacist invalid/failure/retry/duplicate flows preserve one authoritative
+  result; no charge occurs before licensed acceptance.
+- Depends on: `PROD-COM-001`, `PROD-COM-002`, `PROD-PLT-002`,
+  `PROD-PLT-003`, `PROD-MNY-001`.
+
 ### PROD-OPS-001 — retailer fulfilment and delivery handover
 
 - Implement accept/cannot-fulfil, pick/pack, delivery request, captain match,
@@ -487,7 +508,9 @@ The first implementation sequence remains:
 3. screens 00–04 on real staging;
 4. `PROD-COM-001`, `PROD-COM-002`, `PROD-MNY-001`;
 5. screens 09–18 plus retailer screens 74–77;
-6. only then add the next end-to-end launch journey.
+6. `PROD-COM-005` when the jurisdiction, licensed-pharmacy and private-file
+   controls are approved;
+7. only then add the next end-to-end launch journey.
 
 This sequence gives visible production outcomes early and prevents a large
 unintegrated frontend/backend merge at the end of the schedule.

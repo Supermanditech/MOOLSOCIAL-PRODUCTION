@@ -66,7 +66,12 @@ void main() {
 
       for (final spec in UniversalIntentCatalog.forSection(section)) {
         if ((section == 'buy' &&
-                const {'grocery', 'categories', 'basket'}.contains(spec.id)) ||
+                const {
+                  'grocery',
+                  'categories',
+                  'medicine',
+                  'basket',
+                }.contains(spec.id)) ||
             (section == 'eat' &&
                 const {
                   'order-food',
@@ -118,6 +123,12 @@ void main() {
     await tapVisible(tester, const Key('sub-action-buy-grocery'));
     await tapVisible(tester, const Key('open-intent-grocery'));
     expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
+
+    await tapVisible(tester, const Key('buy-back'));
+    expect(find.byKey(const Key('section-buy')), findsOneWidget);
+    await tapVisible(tester, const Key('sub-action-buy-medicine'));
+    await tapVisible(tester, const Key('open-intent-medicine'));
+    expect(find.byKey(const Key('buy-medicine-screen')), findsOneWidget);
 
     await tapVisible(tester, const Key('buy-back'));
     expect(find.byKey(const Key('section-buy')), findsOneWidget);
@@ -441,8 +452,9 @@ void main() {
     await tester.enterText(find.byKey(const Key('search-field')), 'medicine');
     await tester.pumpAndSettle();
     await tapVisible(tester, const Key('search-result-buy-medicine'));
-    expect(find.text('Find medicine safely'), findsOneWidget);
+    expect(find.byKey(const Key('buy-medicine-screen')), findsOneWidget);
 
+    await openSection(tester, session, 'social');
     await tapVisible(tester, const Key('open-scan'));
     await tapVisible(tester, const Key('continue-scan'));
     expect(find.text('Enter or scan a code to continue.'), findsOneWidget);

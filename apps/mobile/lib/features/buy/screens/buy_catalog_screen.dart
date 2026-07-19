@@ -31,6 +31,9 @@ class _BuyCatalogScreenState extends State<BuyCatalogScreen> {
       animation: widget.session,
       builder: (context, _) {
         final products = widget.session.visibleProducts(_searchController.text);
+        final categories = BuyCategory.values
+            .where((category) => category != BuyCategory.medicine)
+            .toList();
         return BuyPageScaffold(
           key: const Key('buy-catalog-screen'),
           session: widget.session,
@@ -79,11 +82,11 @@ class _BuyCatalogScreenState extends State<BuyCatalogScreen> {
                       height: MoolMetrics.minimumTapTarget,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: BuyCategory.values.length,
+                        itemCount: categories.length,
                         separatorBuilder: (_, _) =>
                             const SizedBox(width: MoolSpacing.xs),
                         itemBuilder: (context, index) {
-                          final category = BuyCategory.values[index];
+                          final category = categories[index];
                           return ChoiceChip(
                             key: Key('buy-category-${category.name}'),
                             label: Text(category.label),
@@ -574,6 +577,7 @@ Color _productColor(BuyCategory category) => switch (category) {
   BuyCategory.dairy => const Color(0xFFE3F1FF),
   BuyCategory.homeCare => const Color(0xFFEDE8FF),
   BuyCategory.personalCare => const Color(0xFFFFE8F2),
+  BuyCategory.medicine => const Color(0xFFEAF7E8),
   BuyCategory.all => const Color(0xFFF0F1F8),
 };
 
@@ -583,5 +587,6 @@ IconData _productIcon(BuyCategory category) => switch (category) {
   BuyCategory.dairy => Icons.water_drop_outlined,
   BuyCategory.homeCare => Icons.cleaning_services_outlined,
   BuyCategory.personalCare => Icons.spa_outlined,
+  BuyCategory.medicine => Icons.medication_outlined,
   BuyCategory.all => Icons.shopping_basket_outlined,
 };

@@ -1,4 +1,14 @@
-enum BuyCategory { all, fresh, staples, dairy, homeCare, personalCare }
+enum BuyCategory {
+  all,
+  fresh,
+  staples,
+  dairy,
+  homeCare,
+  personalCare,
+  medicine,
+}
+
+enum BuyMedicinePath { search, prescription, pharmacist }
 
 enum BuyFulfilment { homeDelivery, storePickup }
 
@@ -22,6 +32,7 @@ class BuyProduct {
     required this.deliveryPromise,
     required this.refundRule,
     this.available = true,
+    this.requiresPrescription = false,
   });
 
   final String id;
@@ -34,6 +45,7 @@ class BuyProduct {
   final String deliveryPromise;
   final String refundRule;
   final bool available;
+  final bool requiresPrescription;
 }
 
 class BuyCartLine {
@@ -79,6 +91,15 @@ extension BuyCategoryCopy on BuyCategory {
     BuyCategory.dairy => 'Dairy',
     BuyCategory.homeCare => 'Home care',
     BuyCategory.personalCare => 'Personal care',
+    BuyCategory.medicine => 'Medicine',
+  };
+}
+
+extension BuyMedicinePathCopy on BuyMedicinePath {
+  String get label => switch (this) {
+    BuyMedicinePath.search => 'Search',
+    BuyMedicinePath.prescription => 'Prescription',
+    BuyMedicinePath.pharmacist => 'Ask pharmacist',
   };
 }
 

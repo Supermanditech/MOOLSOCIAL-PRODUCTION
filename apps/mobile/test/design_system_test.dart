@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
@@ -34,6 +36,16 @@ void main() {
     expect(
       theme.segmentedButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
       'Inter',
+    );
+  });
+
+  test('golden harness loads production text and icon fonts', () {
+    final source = File('test/flutter_test_config.dart').readAsStringSync();
+    expect(source, contains("FontLoader('Inter')"));
+    expect(source, contains("FontLoader('MaterialIcons')"));
+    expect(
+      source,
+      contains("FontLoader('packages/cupertino_icons/CupertinoIcons')"),
     );
   });
 
