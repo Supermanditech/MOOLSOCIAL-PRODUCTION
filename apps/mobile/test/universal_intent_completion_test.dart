@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -524,6 +525,15 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+
+    final searchPrompt = tester.renderObject<RenderParagraph>(
+      find.byKey(const Key('universal-search-prompt')),
+    );
+    expect(
+      searchPrompt.didExceedMaxLines,
+      isFalse,
+      reason: 'The Universal search action must remain fully readable.',
+    );
 
     final actionRailLeft = tester
         .getRect(find.byKey(const Key('social-action-follow')))

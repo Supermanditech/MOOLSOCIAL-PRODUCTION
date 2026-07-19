@@ -192,16 +192,7 @@ class _UniversalHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final command = switch (section) {
-      'buy' => 'Search grocery, categories, medicine or household basket',
-      'eat' => 'Search restaurants, tiffin, cafes or tables',
-      'ride' => 'Search bike, auto or cab',
-      'book' => 'Search get it done, doctor or salon',
-      'pay' => 'Search recharge, bills, scan pay or receipts',
-      'work' => 'Search earn today, delivery, onboarding or verification',
-      'chat' => 'Search people, business, orders or support',
-      _ => 'Search YouTube videos, people or native posts',
-    };
+    const command = 'Search';
     return Container(
       color: MoolColors.navy,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
@@ -276,6 +267,7 @@ class _UniversalHeader extends StatelessWidget {
                 Expanded(
                   child: Text(
                     command,
+                    key: const Key('universal-search-prompt'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

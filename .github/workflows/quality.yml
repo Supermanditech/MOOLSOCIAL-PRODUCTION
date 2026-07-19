@@ -24,7 +24,11 @@ jobs:
 
   mobile-quality:
     needs: product-contracts
-    runs-on: ubuntu-latest
+    # Flutter pixel goldens are authored and reviewed on Windows. Keeping this
+    # job on the same rendering platform avoids accepting Linux font-raster
+    # drift as a product change. Android still builds independently on Linux
+    # and iOS independently on hosted macOS below.
+    runs-on: windows-latest
     timeout-minutes: 20
     defaults:
       run:
@@ -40,6 +44,13 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --fatal-infos
       - run: flutter test --coverage
+      - name: Preserve Flutter visual failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-visual-failures
+          path: apps/mobile/test/failures
+          if-no-files-found: ignore
 
   superadmin-quality:
     needs: product-contracts
@@ -58,6 +69,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium
       - run: npm test
+      - name: Preserve Superadmin failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: superadmin-browser-failures
+          path: apps/admin/test-results
+          if-no-files-found: ignore
 
   android-build:
     needs: mobile-quality

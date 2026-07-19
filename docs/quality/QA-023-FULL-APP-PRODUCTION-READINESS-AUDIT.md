@@ -193,6 +193,33 @@ columns so a prototype control cannot create a false production pass.
 - Exact replay: reinstall → verified private-state cleanup → first setup screen
   → Skip now → Mobile OTP → new verification code → Verify → Universal Social.
 
+### QA23-011 — Universal search prompt was truncated on the OPPO
+
+- Discovery: the corrected Universal capture still rendered the Social search
+  prompt with an ellipsis before the user could read all searchable content
+  types.
+- Root cause: the prompt repeated hosting detail already explained by the
+  YouTube Connect card and exceeded the compact search field.
+- Fix: the persistent field now uses the complete action “Search”; the
+  selected product and the search result screen supply the detailed context.
+- Evidence: the compact 360×800 test inspects the rendered paragraph and fails
+  if it exceeds one line. The Universal intent suite and compact visual
+  baselines pass with the complete prompt.
+
+### QA23-012 — Linux CI treated font rasterization as 74 visual regressions
+
+- Discovery: the first expanded GitHub workflow passed the production
+  contracts and Superadmin job, then reported 238 Flutter tests passed and all
+  74 pixel-golden tests failed on Ubuntu.
+- Root cause: the committed Flutter baselines are authored and approved on
+  Windows; Linux rasterizes the same fonts differently by thousands of edge
+  pixels.
+- Fix: the full Flutter quality job, including approved pixel baselines, now
+  runs on Windows. The Android artifact still builds independently on Linux and
+  the iOS simulator artifact still builds independently on hosted macOS.
+- Acceptance: no golden is skipped or given a wider tolerance; CI must compare
+  against the same rendering platform used to approve the evidence.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -222,6 +249,8 @@ evidence.
 | Native Auth emulator verification timed out on OPPO | Compile-time device-review mode uses the authorized local-emulator path and is rejected outside emulator builds | Clean OTP-to-Universal replay passed |
 | Social action rail covered connected-video copy and Create | A reserved content gutter keeps copy and tabs clear of the rail at compact width and 140% text | Targeted Social journey and updated golden suite passed |
 | Reinstall reopened a prior completed journey | Debug package-private data is removed and verified before launch | Exact clean setup-to-Universal replay passed |
+| Universal search prompt ended in an ellipsis on OPPO | Complete contextual prompt fits; the result screen carries the detailed content scope | Universal responsive intent and golden suites passed |
+| Ubuntu reported all 74 Flutter pixel baselines as different | Run approved baselines on Windows while retaining Linux Android and macOS iOS builds | Replacement GitHub workflow pending exact replay |
 
 ## Current verification
 
