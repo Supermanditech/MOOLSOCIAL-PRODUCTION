@@ -199,7 +199,7 @@ void main() {
       addTearDown(chat.dispose);
       await mount(
         tester,
-        route: '/app/chat/thread/home-basket?return=/app/social',
+        route: '/app/chat/thread/home-basket?return=/app/social&stage=basket',
         journey: journey,
         chat: chat,
       );
@@ -244,17 +244,70 @@ void main() {
         findsOneWidget,
       );
 
-      for (final mode in const ['media', 'basket', 'poll', 'invite']) {
-        await tapVisible(tester, Key('chat-mode-$mode'));
-        expect(find.byKey(Key('chat-context-$mode')), findsOneWidget);
-        await tapVisible(tester, Key('chat-context-primary-$mode'));
-        expect(find.byKey(const Key('chat-notice')), findsOneWidget);
-      }
+      await tapVisible(tester, const Key('chat-mode-media'));
+      await tapVisible(tester, const Key('chat-context-primary-media'));
+      expect(find.byKey(const Key('chat-media-sheet')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-media-open-staples-file'));
+      expect(find.text('Monthly Staples.pdf opened.'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-mode-poll'));
+      await tapVisible(tester, const Key('chat-context-primary-poll'));
+      await tapVisible(tester, const Key('chat-poll-option-add'));
+      expect(chat.errorMessage, 'Enter a clear poll option.');
+      await tester.enterText(
+        find.byKey(const Key('chat-poll-option-field')),
+        'Later this week',
+      );
+      await tapVisible(tester, const Key('chat-poll-option-add'));
+      expect(chat.pollOptions, contains('Later this week'));
+      await tapVisible(tester, const Key('chat-poll-later-this-week'));
+      expect(find.textContaining('Vote recorded for Later'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-context-primary-poll'));
+      await tester.enterText(
+        find.byKey(const Key('chat-poll-option-field')),
+        'Later this week',
+      );
+      await tapVisible(tester, const Key('chat-poll-option-add'));
+      expect(chat.errorMessage, 'This poll option is already included.');
+      await tapVisible(tester, const Key('chat-poll-option-cancel'));
+
+      await tapVisible(tester, const Key('chat-mode-invite'));
+      await tapVisible(tester, const Key('chat-context-primary-invite'));
+      await tapVisible(tester, const Key('chat-invite-prepare'));
+      expect(chat.errorMessage, 'Enter a name or mobile number.');
+      await tester.enterText(
+        find.byKey(const Key('chat-invite-field')),
+        'Riya Sharma',
+      );
+      await tapVisible(tester, const Key('chat-invite-prepare'));
+      expect(chat.invitedMembers, ['Riya Sharma']);
+      expect(find.byKey(const Key('chat-invited-members')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-context-primary-invite'));
+      await tester.enterText(
+        find.byKey(const Key('chat-invite-field')),
+        'Riya Sharma',
+      );
+      await tapVisible(tester, const Key('chat-invite-prepare'));
+      expect(chat.errorMessage, 'This person is already invited.');
+      await tapVisible(tester, const Key('chat-invite-cancel'));
+
       await tapVisible(tester, const Key('chat-mode-poll'));
       await tapVisible(tester, const Key('chat-poll-today-evening'));
       expect(find.textContaining('Vote recorded for Today'), findsOneWidget);
       await tapVisible(tester, const Key('chat-thread-mool'));
       expect(find.byKey(const Key('mool-command-palette')), findsOneWidget);
+
+      await mount(
+        tester,
+        route: '/app/chat/thread/home-basket?return=/app/social',
+        journey: journey,
+        chat: chat,
+      );
+      await tapVisible(tester, const Key('chat-mode-basket'));
+      await tapVisible(tester, const Key('chat-context-primary-basket'));
+      expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -301,6 +354,17 @@ void main() {
     expect(replayed, hasLength(1), reason: 'Retry must not duplicate messages');
     expect(replayed.single.deliveryState, ChatDeliveryState.delivered);
     expect(find.text('Message delivered.'), findsOneWidget);
+
+    await tapVisible(tester, const Key('chat-mode-details'));
+    await tapVisible(tester, const Key('chat-context-primary-details'));
+    expect(find.byKey(const Key('chat-linked-details-sheet')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-linked-details-done'));
+    await tapVisible(tester, const Key('chat-mode-updates'));
+    await tapVisible(tester, const Key('chat-context-primary-updates'));
+    expect(
+      find.text('Conversation updates refreshed just now.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -323,8 +387,11 @@ void main() {
 
     await tapVisible(tester, const Key('chat-mode-orders'));
     await tapVisible(tester, const Key('chat-context-primary-orders'));
-    expect(find.textContaining('Open linked order is ready'), findsOneWidget);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Order Support'), findsOneWidget);
 
+    await tapVisible(tester, const Key('chat-back'));
+    expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
     await tapVisible(tester, const Key('chat-mode-quote'));
     expect(find.text('Mahadev Fresh Mart quote'), findsOneWidget);
     await tapVisible(tester, const Key('chat-quote-buy'));
@@ -338,7 +405,7 @@ void main() {
     );
     await tapVisible(tester, const Key('chat-mode-pay'));
     await tapVisible(tester, const Key('chat-context-primary-pay'));
-    expect(find.byKey(const Key('section-pay')), findsOneWidget);
+    expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

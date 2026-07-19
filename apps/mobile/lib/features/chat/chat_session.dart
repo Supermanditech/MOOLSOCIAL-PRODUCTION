@@ -116,6 +116,12 @@ class ChatSession extends ChangeNotifier {
   String? pendingAttachment;
   String? replyingTo;
   bool busy = false;
+  final List<String> pollOptions = [
+    'Today evening',
+    'Tomorrow morning',
+    'Tomorrow evening',
+  ];
+  final List<String> invitedMembers = [];
 
   List<ChatThread> visibleThreads([String query = '']) {
     final normalized = query.trim().toLowerCase();
@@ -280,6 +286,52 @@ class ChatSession extends ChangeNotifier {
       reactionCount: current.reactionCount == 0 ? 1 : current.reactionCount - 1,
     );
     notifyListeners();
+  }
+
+  bool addPollOption(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length < 3) {
+      errorMessage = 'Enter a clear poll option.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (pollOptions.any(
+      (option) => option.toLowerCase() == trimmed.toLowerCase(),
+    )) {
+      errorMessage = 'This poll option is already included.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    pollOptions.add(trimmed);
+    errorMessage = null;
+    noticeMessage = '$trimmed added to the poll.';
+    notifyListeners();
+    return true;
+  }
+
+  bool inviteMember(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length < 3) {
+      errorMessage = 'Enter a name or mobile number.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (invitedMembers.any(
+      (member) => member.toLowerCase() == trimmed.toLowerCase(),
+    )) {
+      errorMessage = 'This person is already invited.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    invitedMembers.add(trimmed);
+    errorMessage = null;
+    noticeMessage = 'Invite prepared for $trimmed.';
+    notifyListeners();
+    return true;
   }
 
   void showNotice(String message) {

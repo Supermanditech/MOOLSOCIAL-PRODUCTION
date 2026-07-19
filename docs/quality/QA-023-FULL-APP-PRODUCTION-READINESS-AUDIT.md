@@ -377,6 +377,26 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: the action remains at least 44×44 at 360×800, appears in all
   four Chat baselines and passed the exact OPPO thread-to-Mool replay.
 
+### QA23-024 — Chat context actions claimed completion without an owner
+
+- Discovery: Open linked order, Pay, Media, Poll, Invite, Details and Updates
+  returned a generic notice or added an unnecessary Universal step instead of
+  completing the selected sub-intent.
+- Root cause: the context panel test treated acknowledgement copy as an end
+  state and did not continue through each newly revealed nested action.
+- Fix: catalogue, quote and basket actions now open Buy directly; Pay opens its
+  owned home; Orders opens the order-support conversation with a protected
+  return to the originating thread; Media and Details open their owned sheets;
+  Poll and Invite provide validated, duplicate-safe creation; Updates refreshes
+  visibly in place.
+- Exact replay: empty and duplicate poll/invite submissions were rejected,
+  valid entries appeared once, a deliberately failed message retried to one
+  delivered copy, and the linked order returned to the original conversation.
+- Acceptance: all six Chat journey tests and the expanded connected-OPPO
+  nested-action replay pass. Both independent 327/327 full application
+  regressions were then rerun from the current source without updating
+  baselines.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -442,6 +462,7 @@ Founder-readable boards are versioned with the audit:
 | Flutter goldens still drew icon squares | Golden harness loads both production icon fonts | All 81 current baselines use real icons; independent 327/327 passed twice |
 | Universal Chat choices stopped at explanatory content | Every entry owns a filtered production inbox route | 24/24 affected tests and physical four-filter replay passed |
 | Chat threads exposed only Back as an exit | Labelled Mool action is persistent in the composer | Compact, visual and OPPO thread-to-Mool replays passed |
+| Chat context actions stopped at a notice or extra Universal step | Each nested action now owns its direct route, sheet or validated in-place completion | Six affected tests, exact invalid/duplicate/retry replay and expanded OPPO replay passed |
 
 ## Current verification
 
@@ -466,7 +487,7 @@ Founder-readable boards are versioned with the audit:
 | Medicine intent and failure replay | Passed, 22/22 |
 | OPPO Medicine invalid/failure/retry/duplicate replay | Passed; search recovery, OTC basket, prescription and pharmacist end intents completed |
 | Chat and Universal affected regression | Passed, 24/24 |
-| OPPO Chat filter/Mool/failure replay | Passed; four filters, direct Mool and one-message retry completed |
+| OPPO Chat filter/Mool/nested-action/failure replay | Passed; four filters, direct Mool, media, poll, invite, details, updates and one-message retry completed |
 | Production visual baseline set | Passed across 81 current mobile states |
 | Independent current full regression cycle 1 | Passed, 327/327 without baseline updates |
 | Independent current full regression cycle 2 | Passed, 327/327 without baseline updates |

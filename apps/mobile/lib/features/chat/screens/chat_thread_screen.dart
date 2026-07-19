@@ -47,16 +47,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       animation: widget.session,
       builder: (context, _) {
         final thread = widget.session.thread(widget.threadId);
-        final inboxRoute = chatRoute(
-          '/app/chat/inbox',
-          returnRoute: widget.returnRoute,
-        );
+        final returnUri = Uri.tryParse(widget.returnRoute);
+        final returnsToChatThread =
+            returnUri?.pathSegments.length == 4 &&
+            returnUri?.pathSegments[0] == 'app' &&
+            returnUri?.pathSegments[1] == 'chat' &&
+            returnUri?.pathSegments[2] == 'thread';
+        final backRoute = returnsToChatThread
+            ? widget.returnRoute
+            : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
           session: widget.session,
           title: thread.title,
           subtitle: thread.subtitle,
-          returnRoute: inboxRoute,
+          returnRoute: backRoute,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -409,6 +414,34 @@ class _ContextPanel extends StatelessWidget {
           const SizedBox(height: MoolSpacing.sm),
           _PollCard(session: session),
         ],
+        if (mode == 'Invite' && session.invitedMembers.isNotEmpty) ...[
+          const SizedBox(height: MoolSpacing.sm),
+          ChatSurfaceCard(
+            key: const Key('chat-invited-members'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Prepared invitations',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                for (final member in session.invitedMembers)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.person_add_alt_rounded),
+                    title: Text(member),
+                    subtitle: const Text(
+                      'Confirm recipient permission before sending',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         if (mode == 'Basket' || mode == 'Quote') ...[
           const SizedBox(height: MoolSpacing.sm),
           ChatSurfaceCard(
@@ -463,11 +496,7 @@ class _PollCard extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          for (final option in const [
-            'Today evening',
-            'Tomorrow morning',
-            'Tomorrow evening',
-          ])
+          for (final option in session.pollOptions)
             ListTile(
               key: Key(
                 'chat-poll-${option.toLowerCase().replaceAll(' ', '-')}',
@@ -833,13 +862,13 @@ String _contextDetail(String mode, ChatThreadType type) => switch (mode) {
 String _contextAction(String mode) => switch (mode) {
   'Catalog' => 'Open products',
   'Quote' => 'Review quote',
-  'Orders' => 'Open linked order',
+  'Orders' => 'Open order conversation',
   'Pay' => 'Review payment',
-  'Media' => 'Open shared files',
-  'Basket' => 'Edit shared list',
+  'Media' => 'View shared files',
+  'Basket' => 'Find current prices',
   'Poll' => 'Add poll option',
   'Invite' => 'Invite a member',
-  'Details' => 'View details',
+  'Details' => 'View linked details',
   'Updates' => 'Refresh updates',
   _ => 'Continue',
 };
@@ -864,13 +893,259 @@ void _completeContextAction(
   ChatThread thread,
   String mode,
 ) {
-  if (const {'Catalog', 'Quote'}.contains(mode)) {
+  if (const {'Catalog', 'Quote', 'Basket'}.contains(mode)) {
     context.go('/app/buy/grocery');
     return;
   }
   if (mode == 'Pay') {
-    context.go('/app/pay');
+    context.go('/app/pay/home');
     return;
   }
-  session.showNotice('${_contextAction(mode)} is ready in ${thread.title}.');
+  if (mode == 'Orders') {
+    context.go(
+      chatRoute(
+        '/app/chat/thread/order-support',
+        returnRoute: '/app/chat/thread/${thread.id}',
+      ),
+    );
+    return;
+  }
+  if (mode == 'Media') {
+    _showSharedMedia(context, session);
+    return;
+  }
+  if (mode == 'Poll') {
+    _showPollOption(context, session);
+    return;
+  }
+  if (mode == 'Invite') {
+    _showInviteMember(context, session);
+    return;
+  }
+  if (mode == 'Details') {
+    _showLinkedDetails(context, thread);
+    return;
+  }
+  if (mode == 'Updates') {
+    session.showNotice('Conversation updates refreshed just now.');
+    return;
+  }
+}
+
+Future<void> _showSharedMedia(BuildContext context, ChatSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('chat-media-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Shared files',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          for (final item in const [
+            ('kitchen-list', Icons.image_outlined, 'Kitchen list.jpg'),
+            ('staples-file', Icons.description_outlined, 'Monthly Staples.pdf'),
+          ])
+            ListTile(
+              key: Key('chat-media-open-${item.$1}'),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(item.$2, color: MoolColors.navy),
+              title: Text(item.$3),
+              trailing: const Icon(Icons.arrow_forward_rounded),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                session.showNotice('${item.$3} opened.');
+              },
+            ),
+          TextButton(
+            key: const Key('chat-media-close'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showPollOption(BuildContext context, ChatSession session) {
+  final controller = TextEditingController();
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('chat-poll-option-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Add a poll option',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          TextField(
+            key: const Key('chat-poll-option-field'),
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Enter one clear choice',
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          FilledButton(
+            key: const Key('chat-poll-option-add'),
+            onPressed: () {
+              if (session.addPollOption(controller.text)) {
+                Navigator.of(sheetContext).pop();
+              }
+            },
+            child: const Text('Add option'),
+          ),
+          TextButton(
+            key: const Key('chat-poll-option-cancel'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showInviteMember(BuildContext context, ChatSession session) {
+  final controller = TextEditingController();
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('chat-invite-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Invite a member',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'Enter a name or mobile number. Nothing is sent until the '
+            'recipient and access are confirmed.',
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          TextField(
+            key: const Key('chat-invite-field'),
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Name or mobile number',
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          FilledButton(
+            key: const Key('chat-invite-prepare'),
+            onPressed: () {
+              if (session.inviteMember(controller.text)) {
+                Navigator.of(sheetContext).pop();
+              }
+            },
+            child: const Text('Prepare invite'),
+          ),
+          TextButton(
+            key: const Key('chat-invite-cancel'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showLinkedDetails(BuildContext context, ChatThread thread) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('chat-linked-details-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            thread.title,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          Text(thread.subtitle),
+          const SizedBox(height: MoolSpacing.md),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.verified_user_outlined),
+            title: Text('Linked context verified'),
+            subtitle: Text(
+              'Messages, status and support remain attached to this reference.',
+            ),
+          ),
+          FilledButton(
+            key: const Key('chat-linked-details-done'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

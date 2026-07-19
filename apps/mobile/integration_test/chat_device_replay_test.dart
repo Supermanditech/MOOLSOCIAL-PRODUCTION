@@ -16,12 +16,7 @@ void main() {
     final finder = find.byKey(key);
     if (finder.evaluate().isEmpty) {
       final scrollables = find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable &&
-            {
-              AxisDirection.down,
-              AxisDirection.up,
-            }.contains(widget.axisDirection),
+        (widget) => widget is Scrollable,
       );
       for (final state
           in scrollables
@@ -32,6 +27,8 @@ void main() {
         if (state.position.maxScrollExtent <= state.position.minScrollExtent) {
           continue;
         }
+        state.position.jumpTo(state.position.minScrollExtent);
+        await tester.pump();
         for (
           var attempt = 0;
           attempt < 40 && finder.evaluate().isEmpty;
@@ -132,6 +129,34 @@ void main() {
         tester,
         '/app/chat/thread/home-basket?return=/app/social',
       );
+      await tapVisible(tester, const Key('chat-mode-media'));
+      await tapVisible(tester, const Key('chat-context-primary-media'));
+      await tapVisible(tester, const Key('chat-media-open-staples-file'));
+      expect(find.text('Monthly Staples.pdf opened.'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-mode-poll'));
+      await tapVisible(tester, const Key('chat-context-primary-poll'));
+      await tapVisible(tester, const Key('chat-poll-option-add'));
+      expect(chat.errorMessage, 'Enter a clear poll option.');
+      await tester.enterText(
+        await reveal(tester, const Key('chat-poll-option-field')),
+        'Later this week',
+      );
+      await tapVisible(tester, const Key('chat-poll-option-add'));
+      expect(chat.pollOptions, contains('Later this week'));
+
+      await tapVisible(tester, const Key('chat-mode-invite'));
+      await tapVisible(tester, const Key('chat-context-primary-invite'));
+      await tapVisible(tester, const Key('chat-invite-prepare'));
+      expect(chat.errorMessage, 'Enter a name or mobile number.');
+      await tester.enterText(
+        await reveal(tester, const Key('chat-invite-field')),
+        'Riya Sharma',
+      );
+      await tapVisible(tester, const Key('chat-invite-prepare'));
+      expect(chat.invitedMembers, ['Riya Sharma']);
+
+      await tapVisible(tester, const Key('chat-mode-chat'));
       await tester.enterText(
         await reveal(tester, const Key('chat-message-field')),
         'Please add milk to the basket.',
@@ -153,6 +178,24 @@ void main() {
           .toList();
       expect(replays, hasLength(1));
       expect(replays.single.deliveryState, ChatDeliveryState.delivered);
+
+      await openRoute(
+        tester,
+        '/app/chat/thread/order-support?return=/app/social',
+      );
+      await tapVisible(tester, const Key('chat-mode-details'));
+      await tapVisible(tester, const Key('chat-context-primary-details'));
+      expect(
+        find.byKey(const Key('chat-linked-details-sheet')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('chat-linked-details-done'));
+      await tapVisible(tester, const Key('chat-mode-updates'));
+      await tapVisible(tester, const Key('chat-context-primary-updates'));
+      expect(
+        find.text('Conversation updates refreshed just now.'),
+        findsOneWidget,
+      );
       await binding.takeScreenshot('chat-025-failed-message-retried');
     },
   );

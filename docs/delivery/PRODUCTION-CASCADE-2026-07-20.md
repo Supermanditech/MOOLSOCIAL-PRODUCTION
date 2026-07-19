@@ -161,8 +161,10 @@ returns success. Completion requires:
 
 - Source progress: Universal People, Business, Orders and Support now route
   directly to filtered production inbox states; every thread has persistent
-  Mool access; invalid, failure, retry, protected return, compact and four
-  approved visual states pass locally and on the connected OPPO.
+  Mool access. Linked catalogue, quote, basket, payment, order-support, media,
+  poll, invite, detail and update intents now have direct owners; empty and
+  duplicate drafts, failure, retry, protected return, compact and four approved
+  visual states pass locally and on the connected OPPO.
 - Use Firestore realtime conversation state, Cloud Storage attachments and FCM
   fan-out behind a versioned messaging API.
 - Separate people, business, order and support permissions.
