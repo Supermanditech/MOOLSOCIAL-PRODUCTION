@@ -30,6 +30,11 @@ import '../eat/screens/eat_table_screen.dart';
 import '../eat/screens/eat_tiffin_confirmation_screen.dart';
 import '../eat/screens/eat_tiffin_screen.dart';
 import '../eat/screens/eat_tracking_screen.dart';
+import '../manufacturer/manufacturer_models.dart';
+import '../manufacturer/manufacturer_session.dart';
+import '../manufacturer/screens/manufacturer_growth_control_screens.dart';
+import '../manufacturer/screens/manufacturer_home_book_screens.dart';
+import '../manufacturer/screens/manufacturer_sales_screens.dart';
 import '../pay/pay_session.dart';
 import '../pay/screens/pay_entry_screens.dart';
 import '../pay/screens/pay_home_screen.dart';
@@ -73,6 +78,7 @@ GoRouter createJourneyRouter(
   BuySession buySession,
   ChatSession chatSession,
   EatSession eatSession,
+  ManufacturerSession manufacturerSession,
   PaySession paySession,
   RetailerSession retailerSession,
   RideSession rideSession,
@@ -426,6 +432,119 @@ GoRouter createJourneyRouter(
         builder: (context, state) => state.uri.queryParameters['panel'] == 'ai'
             ? RetailerAiAssistantScreen(session: retailerSession)
             : RetailerHomeScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/manufacturer',
+        builder: (context, state) {
+          final view = state.uri.queryParameters['view'] == 'orders'
+              ? ManufacturerHomeView.orders
+              : ManufacturerHomeView.home;
+          manufacturerSession.homeView = view;
+          return ManufacturerHomeScreen(
+            session: manufacturerSession,
+            initialView: view,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/books',
+        builder: (context, state) =>
+            ManufacturerBusinessBookScreen(session: manufacturerSession),
+      ),
+      GoRoute(
+        path: '/app/manufacturer/catalogue',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'] == 'master'
+              ? ManufacturerCatalogueMode.master
+              : ManufacturerCatalogueMode.stock;
+          manufacturerSession.catalogueMode = mode;
+          return ManufacturerCatalogueScreen(
+            session: manufacturerSession,
+            initialMode: mode,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/orders/review',
+        builder: (context, state) =>
+            ManufacturerOrderReviewScreen(session: manufacturerSession),
+      ),
+      GoRoute(
+        path: '/app/manufacturer/purchases',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'cart' => ManufacturerPurchaseTab.cart,
+            'orders' => ManufacturerPurchaseTab.orders,
+            _ => ManufacturerPurchaseTab.matched,
+          };
+          manufacturerSession.purchaseTab = tab;
+          return ManufacturerProcurementScreen(
+            session: manufacturerSession,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/dispatch',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'transit' => ManufacturerDispatchTab.transit,
+            'delivered' => ManufacturerDispatchTab.delivered,
+            _ => ManufacturerDispatchTab.ready,
+          };
+          manufacturerSession.dispatchTab = tab;
+          return ManufacturerDispatchScreen(
+            session: manufacturerSession,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/growth',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'demand' => ManufacturerGrowthTab.demand,
+            'campaigns' => ManufacturerGrowthTab.campaigns,
+            'analytics' => ManufacturerGrowthTab.analytics,
+            _ => ManufacturerGrowthTab.buyers,
+          };
+          manufacturerSession.growthTab = tab;
+          return ManufacturerGrowthScreen(
+            session: manufacturerSession,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/control',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'team' => ManufacturerControlTab.team,
+            'settings' => ManufacturerControlTab.settings,
+            'support' => ManufacturerControlTab.support,
+            _ => ManufacturerControlTab.claims,
+          };
+          manufacturerSession.controlTab = tab;
+          return ManufacturerControlScreen(
+            session: manufacturerSession,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/manufacturer/services',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'active' => ManufacturerServiceTab.active,
+            'requests' => ManufacturerServiceTab.requests,
+            _ => ManufacturerServiceTab.services,
+          };
+          manufacturerSession.serviceTab = tab;
+          return ManufacturerServicesScreen(
+            session: manufacturerSession,
+            initialTab: tab,
+          );
+        },
       ),
       GoRoute(
         path: '/app/retailer/mool',

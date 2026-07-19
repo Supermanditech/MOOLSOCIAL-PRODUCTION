@@ -53,7 +53,7 @@ Last reconciled: 19 July 2026
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
 | 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
 | 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Complete in Flutter: POS 74 → 78 → 79 → 78 → 80 → 90; wholesale 74 → 81–89; Business Book 91 → 92 → 106; operated Business Services 93–96; customers/campaigns 97–100; recovery, AI, staff, settings and issues 101–105. Every slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay |
-| 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
+| 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Complete in Flutter: home, Business Book, catalogue, sales-order review, input procurement, dispatch, demand/campaigns, claims/team/settings and operated services passed dedicated black-box, two regression cycles, nine-screen visual gates and two physical-device exact replays |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
 | 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
@@ -424,6 +424,29 @@ Last reconciled: 19 July 2026
 - Inventory, AI, identity, authorization, compliance, payments, evidence and
   messaging remain replaceable external gateways and are not falsely
   represented as server-certified production services.
+
+## Manufacturer operating decisions now locked
+
+- Pausing supply affects new availability only; existing confirmed orders
+  remain visible and actionable.
+- Buyer-visible products require valid stock, price, MOQ, terms and confirmed
+  manufacturing-input mapping.
+- Full, partial and cannot-fulfil are explicit order decisions. Partial
+  quantity is bounded and cannot-fulfil requires a buyer-readable reason.
+- Purchase carts survive failure. A purchase order uses verified input MOQs
+  and commits once; receipt records grade, quantity and condition once.
+- Dispatch requires GST invoice, LR, e-way bill and the chosen fleet identity.
+  Delivery proof precedes ledger-controlled payment release.
+- Manufacturer campaigns have a hard funding maximum. Only approved
+  activations or paid, non-refunded attributed orders count; views do not.
+- Claims, team invitations, settings versions and service requests are
+  permission checked, failure safe and idempotent.
+- Business Services disclose coverage, base price, success charge, minimum
+  term, proof and cancellation before a request; no charge is taken at request.
+- Product, stock, order, ledger, payment, procurement, compliance, logistics,
+  attribution, identity and service-entitlement systems remain replaceable
+  external gateways and are not falsely represented as certified production
+  services.
 
 ## Release boundary
 
