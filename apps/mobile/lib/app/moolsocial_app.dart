@@ -14,6 +14,7 @@ import '../features/operations/operations_session.dart';
 import '../features/pay/pay_session.dart';
 import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
+import '../features/shared/shared_session.dart';
 import '../features/work/work_session.dart';
 
 class MoolSocialApp extends StatefulWidget {
@@ -31,6 +32,7 @@ class MoolSocialApp extends StatefulWidget {
     this.paySession,
     this.retailerSession,
     this.rideSession,
+    this.sharedSession,
     this.workSession,
     this.initialLocation = '/boot',
     this.disposeSession = false,
@@ -45,6 +47,7 @@ class MoolSocialApp extends StatefulWidget {
     this.disposePaySession = false,
     this.disposeRetailerSession = false,
     this.disposeRideSession = false,
+    this.disposeSharedSession = false,
     this.disposeWorkSession = false,
   });
 
@@ -60,6 +63,7 @@ class MoolSocialApp extends StatefulWidget {
   final PaySession? paySession;
   final RetailerSession? retailerSession;
   final RideSession? rideSession;
+  final SharedSession? sharedSession;
   final WorkSession? workSession;
   final String initialLocation;
   final bool disposeSession;
@@ -74,6 +78,7 @@ class MoolSocialApp extends StatefulWidget {
   final bool disposePaySession;
   final bool disposeRetailerSession;
   final bool disposeRideSession;
+  final bool disposeSharedSession;
   final bool disposeWorkSession;
 
   @override
@@ -98,6 +103,8 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   late final RetailerSession _retailerSession =
       widget.retailerSession ?? RetailerSession();
   late final RideSession _rideSession = widget.rideSession ?? RideSession();
+  late final SharedSession _sharedSession =
+      widget.sharedSession ?? SharedSession();
   late final WorkSession _workSession = widget.workSession ?? WorkSession();
   late final _router = createJourneyRouter(
     _session,
@@ -112,6 +119,7 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     _paySession,
     _retailerSession,
     _rideSession,
+    _sharedSession,
     _workSession,
     initialLocation: widget.initialLocation,
   );
@@ -155,6 +163,9 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     }
     if (widget.rideSession == null || widget.disposeRideSession) {
       _rideSession.dispose();
+    }
+    if (widget.sharedSession == null || widget.disposeSharedSession) {
+      _sharedSession.dispose();
     }
     if (widget.workSession == null || widget.disposeWorkSession) {
       _workSession.dispose();

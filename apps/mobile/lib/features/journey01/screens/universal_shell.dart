@@ -2571,11 +2571,41 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.storefront_rounded),
                   title: const Text('Business and workspaces'),
-                  subtitle: const Text('Start or manage verified work'),
+                  subtitle: const Text(
+                    'Open personal, business and creator spaces',
+                  ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    context.go('/app/work/my-work');
+                    context.go('/app/account/workspaces');
+                  },
+                ),
+                ListTile(
+                  key: const Key('profile-activity'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.notifications_none_rounded),
+                  title: const Text('Activity'),
+                  subtitle: const Text(
+                    'Required actions, orders, work and offers',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.go('/app/activity');
+                  },
+                ),
+                ListTile(
+                  key: const Key('profile-security'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.shield_outlined),
+                  title: const Text('Security and support'),
+                  subtitle: const Text(
+                    'Devices, recovery and urgent account help',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.go('/app/account/security');
                   },
                 ),
                 if (session.errorMessage case final message?)

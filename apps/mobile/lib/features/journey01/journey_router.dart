@@ -59,6 +59,8 @@ import '../ride/ride_session.dart';
 import '../ride/screens/ride_booking_screen.dart';
 import '../ride/screens/ride_support_screen.dart';
 import '../ride/screens/ride_trip_screen.dart';
+import '../shared/screens/shared_screens.dart';
+import '../shared/shared_session.dart';
 import '../retailer/retailer_models.dart';
 import '../retailer/retailer_pos_models.dart';
 import '../retailer/retailer_business_services_models.dart';
@@ -99,6 +101,7 @@ GoRouter createJourneyRouter(
   PaySession paySession,
   RetailerSession retailerSession,
   RideSession rideSession,
+  SharedSession sharedSession,
   WorkSession workSession, {
   String initialLocation = '/boot',
 }) {
@@ -980,6 +983,44 @@ GoRouter createJourneyRouter(
         builder: (context, state) => RetailerOrderScreen(
           session: retailerSession,
           orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/activity',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 157),
+      ),
+      GoRoute(
+        path: '/app/account/identity',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 158),
+      ),
+      GoRoute(
+        path: '/app/ask',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 159),
+      ),
+      GoRoute(
+        path: '/app/files',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 160),
+      ),
+      GoRoute(
+        path: '/app/account/security',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 161),
+      ),
+      GoRoute(
+        path: '/app/account/workspaces',
+        builder: (context, state) =>
+            SharedHubScreen(session: sharedSession, screen: 162),
+      ),
+      GoRoute(
+        path: '/app/account/workspaces/preferences',
+        builder: (context, state) => SharedHubScreen(
+          session: sharedSession,
+          screen: 165,
+          initialItemId: state.uri.queryParameters['item'],
         ),
       ),
       GoRoute(

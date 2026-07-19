@@ -58,7 +58,7 @@ Last reconciled: 19 July 2026
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Core Creator surface complete in Flutter for 124–132 and 166: Studio, business-funded 1–7 day Reels, YouTube Connect, library, performance, audience, campaigns, earnings, rights and memberships passed two regression cycles, 13 visual gates and three physical-device exact replays. Earn operations dependency 133–137 is complete in slice 14; remaining commerce and admin dependencies continue in slice 15 |
 | 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Complete in Flutter: funded opportunities, applications, active work, proof, earnings, history, provider home, catalogue, availability, requests, fulfilment, business records, growth and controls passed two regression cycles, 14 visual gates and two physical-device exact replays |
 | 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Complete in a separately deployed, role-gated Next.js console: 12 owner screens, 42 governed cases, all 29 approved profile targets, business-funded 1–7 day Reel provisioning, failure/retry/duplicate protections, two responsive regression cycles and two physical OPPO Chrome exact replays |
-| 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
+| 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Complete in Flutter: Activity, identity/consent, universal Ask, files/evidence, security, workspace ownership and 56 profile-specific controls passed exhaustive failure/retry/duplicate checks, 10 visual gates and three physical OPPO exact replays; the first device run found a file-picker overflow, and the corrected original sequence plus two clean screenshot-backed cycles passed |
 
 ## Operational flow register
 
@@ -542,6 +542,27 @@ Last reconciled: 19 July 2026
   proof, moderation, appeals, campaigns, messaging and analytics remain
   replaceable external gateways and are not falsely represented as certified
   production services.
+
+## Shared account and control decisions now locked
+
+- Activity explains why each item appears and opens its accountable owner. A
+  reminder cannot itself complete a regulated, money or work action.
+- Identity, document and consent views expose source, purpose, recipient,
+  expiry and revocation. Regulated access is time-limited.
+- Universal Ask resolves one explicit action. Scan and Voice never pay,
+  publish or submit automatically.
+- Pausing new demand preserves accepted orders, active assignments, payout
+  tracking and existing obligations.
+- Required security alerts, sensitive-action approval and privacy purpose
+  boundaries cannot be disabled from ordinary preferences.
+- Mool Agent remains inactive without an entitlement. Money, public, legal and
+  other sensitive final actions always require fresh scoped owner approval.
+- All 56 protected primary/alternative actions are permission checked,
+  failure safe and idempotent; all 56 controls retain locked and subscription
+  boundaries.
+- Identity, consent, files, devices, passkeys, notifications, search,
+  entitlements and agent execution remain replaceable external gateways and
+  are not falsely represented as certified production services.
 
 ## Release boundary
 
