@@ -57,7 +57,7 @@ Last reconciled: 19 July 2026
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Complete in Flutter: availability, complete request economics, pickup/OTP, live trip safety, fare/payment, earnings/payout, compliance, support, opportunities and state-aware trip navigation passed dedicated black-box, two regression cycles, eight-screen visual gates and two physical-device exact replays |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Core Creator surface complete in Flutter for 124–132 and 166: Studio, business-funded 1–7 day Reels, YouTube Connect, library, performance, audience, campaigns, earnings, rights and memberships passed two regression cycles, 13 visual gates and three physical-device exact replays. Earn operations dependency 133–137 is complete in slice 14; remaining commerce and admin dependencies continue in slice 15 |
 | 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Complete in Flutter: funded opportunities, applications, active work, proof, earnings, history, provider home, catalogue, availability, requests, fulfilment, business records, growth and controls passed two regression cycles, 14 visual gates and two physical-device exact replays |
-| 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
+| 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Complete in a separately deployed, role-gated Next.js console: 12 owner screens, 42 governed cases, all 29 approved profile targets, business-funded 1–7 day Reel provisioning, failure/retry/duplicate protections, two responsive regression cycles and two physical OPPO Chrome exact replays |
 | 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
 
 ## Operational flow register
@@ -519,6 +519,29 @@ Last reconciled: 19 July 2026
   communications, catalogue, availability, request, campaign, payment,
   ledger, tax, payout and support systems remain replaceable external gateways
   and are not falsely represented as certified production services.
+
+## Superadmin and provisioning decisions now locked
+
+- Superadmin is a separately deployed responsive web console. It is not
+  embedded in the consumer/business app or public marketing site.
+- Production access denies by default and requires a verified server session,
+  least-privilege role, permitted scope, reason and immutable audit history.
+- Dynamic provisioning targets the permanent personal profile and every one of
+  the 28 approved workspace profiles without hard-coding broad substitutes.
+- An offering draft cannot reach users or charge budget. Product, Finance,
+  policy and Operations approval precede a small test group and health-gated
+  expansion.
+- Business-funded creator Reels use a controlled 1, 2, 3, 4, 5, 6 or 7 day
+  run, with explicit 24/48-hour clarification, sponsor disclosure, reserved pay
+  and automatic expiry.
+- Every privileged command is confirmation-gated, failure safe, idempotent and
+  blocked offline or without permission.
+- Signals resolve eligible recipients only at permitted use time. Raw audience
+  lists and private viewer/customer identities are not exportable.
+- Identity, roles, audit, payments, verification, catalogue, ride safety,
+  proof, moderation, appeals, campaigns, messaging and analytics remain
+  replaceable external gateways and are not falsely represented as certified
+  production services.
 
 ## Release boundary
 
