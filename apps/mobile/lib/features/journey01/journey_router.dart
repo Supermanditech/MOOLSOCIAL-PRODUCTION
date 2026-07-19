@@ -1,5 +1,10 @@
 import 'package:go_router/go_router.dart';
 
+import '../book/book_session.dart';
+import '../book/screens/book_home_screen.dart';
+import '../book/screens/doctor_screens.dart';
+import '../book/screens/salon_screens.dart';
+import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
 import '../buy/screens/buy_basket_screen.dart';
 import '../buy/screens/buy_catalog_screen.dart';
@@ -38,6 +43,7 @@ import 'screens/verify_otp_screen.dart';
 
 GoRouter createJourneyRouter(
   JourneySession session,
+  BookSession bookSession,
   BuySession buySession,
   ChatSession chatSession,
   EatSession eatSession,
@@ -233,6 +239,96 @@ GoRouter createJourneyRouter(
           session: rideSession,
           tripId: state.pathParameters['tripId'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/app/book/home',
+        builder: (context, state) => BookHomeScreen(
+          session: bookSession,
+          initialIntent: state.uri.queryParameters['intent'],
+        ),
+      ),
+      GoRoute(
+        path: '/app/book/doctor',
+        builder: (context, state) => DoctorBookingScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/doctor/details',
+        builder: (context, state) => DoctorDetailsScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/doctor/invite',
+        builder: (context, state) => DoctorInviteScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/doctor/join',
+        builder: (context, state) =>
+            PatientInviteJoinScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/doctor/followup',
+        builder: (context, state) =>
+            PatientFollowUpScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon',
+        builder: (context, state) => SalonBookingScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon/confirm',
+        builder: (context, state) => SalonConfirmScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon/confirmed',
+        builder: (context, state) => SalonConfirmedScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon/visit',
+        builder: (context, state) => SalonVisitScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon/complete',
+        builder: (context, state) => SalonCompleteScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/salon/support',
+        builder: (context, state) => SalonSupportScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task',
+        builder: (context, state) => TaskCreateScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/review',
+        builder: (context, state) => TaskReviewScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/live',
+        builder: (context, state) => TaskLiveScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/proof',
+        builder: (context, state) => TaskProofScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/completed',
+        builder: (context, state) => TaskCompletedScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/support',
+        builder: (context, state) => TaskSupportScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/case',
+        builder: (context, state) => TaskCaseScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/resolution',
+        builder: (context, state) => TaskResolutionScreen(session: bookSession),
+      ),
+      GoRoute(
+        path: '/app/book/task/resolution-complete',
+        builder: (context, state) =>
+            TaskResolutionCompleteScreen(session: bookSession),
       ),
       GoRoute(
         path: '/app/:section',

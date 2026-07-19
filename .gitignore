@@ -50,3 +50,7 @@ artifacts/device/*
 !artifacts/device/moolsocial-production-ride-receipt-device.png
 !artifacts/device/moolsocial-production-ride-support-device.png
 !artifacts/device/moolsocial-production-ride-support-selected-fixed.png
+!artifacts/device/moolsocial-production-book-home-device.png
+!artifacts/device/moolsocial-production-doctor-device.png
+!artifacts/device/moolsocial-production-salon-device.png
+!artifacts/device/moolsocial-production-task-device.png

@@ -48,7 +48,7 @@ Last reconciled: 19 July 2026
 | 3 | Transactional and people chat | `chat` | 04, 23–25 | Implemented in Flutter; inbox, people/business/order/support threads, attachments, reply/reaction, failed-send replay, contextual actions and protected return routes passed dedicated and full-app regression |
 | 4 | Food delivery, table booking and tiffin | `eat-order`, `eat-table`, `eat-tiffin` | 04, 26–29 | Implemented in Flutter; order, basket, payment, tracking, table confirmation and tiffin controls passed dedicated black-box, two full regression cycles and physical-device replay |
 | 5 | Ride booking and completion | `ride` | 04, 30–35 | Implemented in Flutter; booking, captain arrival, live trip, explicit payment approval, receipt and support passed dedicated black-box, two full regression cycles and physical-device replay |
-| 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Pending |
+| 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Implemented in Flutter; consent-aware doctor care, complete salon visit and proof-protected local task paths passed dedicated black-box, two full regression cycles and physical-device replay |
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Pending |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Pending |
 | 9 | Retailer orders, POS, procurement, books, services, growth and controls | all `retailer-*` operational flows | 13, 74–106 | Pending |
@@ -197,6 +197,33 @@ Last reconciled: 19 July 2026
   captain and receipt evidence automatically.
 - Real maps, captain supply, telephony, emergency response and payment remain
   replaceable external gateways and are not falsely represented as certified.
+
+## Book implementation decisions now locked
+
+- The main Mool Book action opens the production Book master directly. It does
+  not add a generic intent-confirmation screen before Doctor, Salon or Get It
+  Done.
+- Doctor care separates clinic, hospital OPD, video and follow-up. Fee, wait,
+  registration, clinic proof and follow-up policy remain visible.
+- Medical information is linked only after the patient selects a profile,
+  supplies required age/reason information and explicitly allows the verified
+  clinic. The patient can pause sharing without deleting private records.
+- Salon visit and home visit remain distinct. Service, mode, slot, provider
+  proof, add-ons, final amount and cancellation window remain visible before
+  confirmation.
+- A salon payment failure never marks the bill paid. Check-in, queue, issue
+  before pay, final bill, rating, repeat booking and saved-record support stay
+  connected to one booking.
+- Get It Done requires an exact instruction before review. The user sees the
+  helper fee, spend cap and total protected hold before confirming.
+- Task payment cannot release before required proof. The user sees actual
+  spend and the unused return, then explicitly releases, asks for clearer
+  proof or opens a case.
+- Failed booking, payment, helper matching, release, support and resolution
+  submissions keep their context and exact retry cannot create a duplicate.
+- Medical storage, provider licensing, live availability, maps, telephony,
+  payment/hold/refund and safety operations remain replaceable external
+  gateways and are not falsely represented as certified.
 
 ## Release boundary
 

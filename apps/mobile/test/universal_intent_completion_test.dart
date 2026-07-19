@@ -28,7 +28,11 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(412, 915));
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/$section'),
+      MoolSocialApp(
+        key: UniqueKey(),
+        session: session,
+        initialLocation: '/app/$section',
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -69,7 +73,9 @@ void main() {
                   'tiffin',
                 }.contains(spec.id)) ||
             (section == 'ride' &&
-                const {'bike', 'auto', 'cab'}.contains(spec.id))) {
+                const {'bike', 'auto', 'cab'}.contains(spec.id)) ||
+            (section == 'book' &&
+                const {'get-done', 'doctor', 'salon'}.contains(spec.id))) {
           continue;
         }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
@@ -162,6 +168,28 @@ void main() {
     await tapVisible(tester, const Key('ride-package-cab-mini'));
   });
 
+  testWidgets('Book production entries open task, doctor and salon routes', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'book');
+
+    await tapVisible(tester, const Key('sub-action-book-get-done'));
+    await tapVisible(tester, const Key('open-intent-get-done'));
+    expect(find.text('Get It Done'), findsWidgets);
+    expect(find.byKey(const Key('task-detail')), findsOneWidget);
+
+    await tapVisible(tester, const Key('book-back'));
+    await tapVisible(tester, const Key('book-home-doctor'));
+    expect(find.text('Choose care'), findsOneWidget);
+
+    await tapVisible(tester, const Key('book-back'));
+    await tapVisible(tester, const Key('book-home-salon'));
+    expect(find.text('1. Select service'), findsOneWidget);
+  });
+
   testWidgets('Mool palette reaches every main action and returns safely', (
     tester,
   ) async {
@@ -170,6 +198,7 @@ void main() {
     addTearDown(session.dispose);
     await openSection(tester, session, 'social');
 
+    await tapVisible(tester, const Key('nav-mool'));
     for (final section in const [
       'buy',
       'eat',
@@ -179,13 +208,17 @@ void main() {
       'work',
       'social',
     ]) {
-      await tapVisible(tester, const Key('nav-mool'));
       expect(find.byKey(Key('mool-action-$section')), findsOneWidget);
       await tapVisible(tester, Key('mool-action-$section'));
-      expect(find.byKey(Key('section-$section')), findsOneWidget);
+      if (section == 'book') {
+        expect(find.byKey(const Key('book-search')), findsOneWidget);
+        await tapVisible(tester, const Key('book-dock-mool'));
+      } else {
+        expect(find.byKey(Key('section-$section')), findsOneWidget);
+        await tapVisible(tester, const Key('nav-mool'));
+      }
     }
 
-    await tapVisible(tester, const Key('nav-mool'));
     await tapVisible(tester, const Key('close-mool'));
     expect(find.byKey(const Key('section-social')), findsOneWidget);
   });
@@ -360,8 +393,9 @@ void main() {
       'book a doctor',
     );
     await tapVisible(tester, const Key('continue-voice-search'));
-    expect(find.byKey(const Key('section-book')), findsOneWidget);
-    expect(find.text('Book a doctor appointment'), findsOneWidget);
+    expect(find.text('Choose care'), findsOneWidget);
+
+    await openSection(tester, session, 'social');
 
     await tapVisible(tester, const Key('open-profile'));
     await tapVisible(tester, const Key('profile-language'));
@@ -387,7 +421,7 @@ void main() {
     await tapVisible(tester, const Key('nav-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     await tapVisible(tester, const Key('chat-back'));
-    expect(find.byKey(const Key('section-book')), findsOneWidget);
+    expect(find.byKey(const Key('section-social')), findsOneWidget);
   });
 
   testWidgets('compact screen, larger text and reduce motion remain usable', (

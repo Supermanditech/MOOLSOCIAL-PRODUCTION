@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/design/mool_theme.dart';
+import '../features/book/book_session.dart';
 import '../features/buy/buy_session.dart';
 import '../features/chat/chat_session.dart';
 import '../features/eat/eat_session.dart';
@@ -12,12 +13,14 @@ class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
     super.key,
     this.session,
+    this.bookSession,
     this.buySession,
     this.chatSession,
     this.eatSession,
     this.rideSession,
     this.initialLocation = '/boot',
     this.disposeSession = false,
+    this.disposeBookSession = false,
     this.disposeBuySession = false,
     this.disposeChatSession = false,
     this.disposeEatSession = false,
@@ -25,12 +28,14 @@ class MoolSocialApp extends StatefulWidget {
   });
 
   final JourneySession? session;
+  final BookSession? bookSession;
   final BuySession? buySession;
   final ChatSession? chatSession;
   final EatSession? eatSession;
   final RideSession? rideSession;
   final String initialLocation;
   final bool disposeSession;
+  final bool disposeBookSession;
   final bool disposeBuySession;
   final bool disposeChatSession;
   final bool disposeEatSession;
@@ -42,12 +47,14 @@ class MoolSocialApp extends StatefulWidget {
 
 class _MoolSocialAppState extends State<MoolSocialApp> {
   late final JourneySession _session = widget.session ?? JourneySession();
+  late final BookSession _bookSession = widget.bookSession ?? BookSession();
   late final BuySession _buySession = widget.buySession ?? BuySession();
   late final ChatSession _chatSession = widget.chatSession ?? ChatSession();
   late final EatSession _eatSession = widget.eatSession ?? EatSession();
   late final RideSession _rideSession = widget.rideSession ?? RideSession();
   late final _router = createJourneyRouter(
     _session,
+    _bookSession,
     _buySession,
     _chatSession,
     _eatSession,
@@ -60,6 +67,9 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     _router.dispose();
     if (widget.session == null || widget.disposeSession) {
       _session.dispose();
+    }
+    if (widget.bookSession == null || widget.disposeBookSession) {
+      _bookSession.dispose();
     }
     if (widget.buySession == null || widget.disposeBuySession) {
       _buySession.dispose();

@@ -1274,6 +1274,9 @@ class _IntentEntryCard extends StatelessWidget {
                 ('ride', 'bike') => '/app/ride/book?type=bike',
                 ('ride', 'auto') => '/app/ride/book?type=auto',
                 ('ride', 'cab') => '/app/ride/book?type=cab',
+                ('book', 'get-done') => '/app/book/task',
+                ('book', 'doctor') => '/app/book/doctor',
+                ('book', 'salon') => '/app/book/salon',
                 _ => null,
               };
               if (productionRoute != null) {
@@ -1620,7 +1623,9 @@ class _MoolCommandPalette extends StatelessWidget {
                   (action) => _MoolActionTile(
                     action: action,
                     selected: action == activeSection,
-                    onTap: () => context.go('/app/$action'),
+                    onTap: () => context.go(
+                      action == 'book' ? '/app/book/home' : '/app/$action',
+                    ),
                   ),
                 )
                 .toList(),
@@ -2126,8 +2131,13 @@ String _routeForQuery(String value) {
   if (query.contains('grocery')) return '/app/buy?sub=grocery';
   if (query.contains('tiffin')) return '/app/eat?sub=tiffin';
   if (query.contains('table')) return '/app/eat?sub=book-table';
-  if (query.contains('doctor')) return '/app/book?sub=doctor';
-  if (query.contains('salon')) return '/app/book?sub=salon';
+  if (query.contains('doctor')) return '/app/book/doctor';
+  if (query.contains('salon')) return '/app/book/salon';
+  if (query.contains('task') ||
+      query.contains('pickup') ||
+      query.contains('document')) {
+    return '/app/book/task';
+  }
   if (query.contains('recharge')) return '/app/pay?sub=recharge';
   if (query.contains('bill')) return '/app/pay?sub=bills';
   if (query.contains('receipt')) return '/app/pay?sub=receipts';
@@ -2155,7 +2165,7 @@ String _routeForQuery(String value) {
   if (query.contains('doctor') ||
       query.contains('salon') ||
       query.contains('book')) {
-    return '/app/book';
+    return '/app/book/home';
   }
   if (query.contains('pay') ||
       query.contains('bill') ||
