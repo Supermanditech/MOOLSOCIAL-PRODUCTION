@@ -4,6 +4,8 @@ import 'retailer_business_services_models.dart';
 import 'retailer_business_services_services.dart';
 import 'retailer_books_models.dart';
 import 'retailer_books_services.dart';
+import 'retailer_campaign_models.dart';
+import 'retailer_campaign_services.dart';
 import 'retailer_models.dart';
 import 'retailer_pos_models.dart';
 import 'retailer_pos_services.dart';
@@ -18,30 +20,35 @@ class RetailerSession extends ChangeNotifier {
     ReviewRetailerWholesaleGateway? wholesaleGateway,
     ReviewRetailerBooksGateway? booksGateway,
     ReviewRetailerBusinessServicesGateway? businessServicesGateway,
+    ReviewRetailerCampaignGateway? campaignGateway,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
        wholesaleGateway = wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
        booksGateway = booksGateway ?? ReviewRetailerBooksGateway(),
        businessServicesGateway =
            businessServicesGateway ?? ReviewRetailerBusinessServicesGateway(),
+       campaignGateway = campaignGateway ?? ReviewRetailerCampaignGateway(),
        orders = buildReviewRetailerOrders(),
        counters = buildReviewCounters(),
        sales = buildReviewSales(),
        purchases = buildReviewPurchaseRecords(),
        stockMovements = List.of(reviewStockMovements),
-       moneyExceptions = buildReviewMoneyExceptions();
+       moneyExceptions = buildReviewMoneyExceptions(),
+       campaigns = buildReviewRetailerCampaigns();
 
   final ReviewRetailerGateway gateway;
   final ReviewRetailerPosGateway posGateway;
   final ReviewRetailerWholesaleGateway wholesaleGateway;
   final ReviewRetailerBooksGateway booksGateway;
   final ReviewRetailerBusinessServicesGateway businessServicesGateway;
+  final ReviewRetailerCampaignGateway campaignGateway;
   final List<RetailerOrder> orders;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
   final List<RetailerPurchaseRecord> purchases;
   final List<RetailerStockMovement> stockMovements;
   final List<RetailerMoneyException> moneyExceptions;
+  final List<RetailerCampaign> campaigns;
 
   RetailerHomeView view = RetailerHomeView.home;
   bool ordersOnline = true;
@@ -133,6 +140,33 @@ class RetailerSession extends ChangeNotifier {
   bool businessServiceTermsReviewed = false;
   final Map<RetailerBusinessServiceType, RetailerActiveBusinessService>
   activeBusinessServices = {};
+
+  bool customerCampaignOnline = true;
+  bool customerCampaignAuthorized = true;
+  RetailerCustomerFilter customerFilter = RetailerCustomerFilter.all;
+  String customerSearchQuery = '';
+  String selectedCustomerId = 'sharma';
+  RetailerMessageChannel reminderChannel = RetailerMessageChannel.moolChat;
+  String reminderMessage =
+      'Your usual atta, rice and oil basket is available. Review current prices before ordering.';
+  String? reminderMessageId;
+  RetailerCampaignFilter campaignFilter = RetailerCampaignFilter.all;
+  int campaignBuilderStep = 0;
+  RetailerCampaignObjective campaignObjective =
+      RetailerCampaignObjective.increaseSales;
+  String campaignName = 'Monthly staples offer';
+  final Set<String> campaignProductIds = {'atta', 'oil'};
+  RetailerCampaignBenefit campaignBenefit =
+      RetailerCampaignBenefit.basketSaving;
+  int campaignMaximumOrders = 30;
+  RetailerCampaignAudience campaignAudience =
+      RetailerCampaignAudience.repeatCustomers;
+  int campaignRadiusKm = 5;
+  int campaignDurationDays = 7;
+  RetailerCampaignChannel campaignChannel = RetailerCampaignChannel.moolSocial;
+  int campaignSpendCap = 1500;
+  String? campaignDraftId;
+  String? publishedCampaignId;
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -2220,6 +2254,492 @@ class RetailerSession extends ChangeNotifier {
       success:
           '${active.offering.title} will not renew. Current paid access remains available until renewal.',
       afterSuccess: () => activeBusinessServices.remove(type),
+    );
+  }
+
+  List<RetailerCustomer> get filteredCustomers {
+    final query = customerSearchQuery.trim().toLowerCase();
+    return reviewRetailerCustomers
+        .where(
+          (customer) =>
+              customer.matches(customerFilter) &&
+              (query.isEmpty ||
+                  customer.name.toLowerCase().contains(query) ||
+                  customer.summary.toLowerCase().contains(query) ||
+                  customer.detail.toLowerCase().contains(query)),
+        )
+        .toList(growable: false);
+  }
+
+  RetailerCustomer get selectedCustomer => reviewRetailerCustomers.firstWhere(
+    (customer) => customer.id == selectedCustomerId,
+    orElse: () => reviewRetailerCustomers.first,
+  );
+
+  List<RetailerCampaign> get filteredCampaigns => campaigns
+      .where(
+        (campaign) => switch (campaignFilter) {
+          RetailerCampaignFilter.all => true,
+          RetailerCampaignFilter.active =>
+            campaign.state == RetailerCampaignState.active ||
+                campaign.state == RetailerCampaignState.paused,
+          RetailerCampaignFilter.draft =>
+            campaign.state == RetailerCampaignState.draft,
+          RetailerCampaignFilter.completed =>
+            campaign.state == RetailerCampaignState.completed,
+          RetailerCampaignFilter.loyalty => campaign.loyalty,
+        },
+      )
+      .toList(growable: false);
+
+  List<RetailerCampaignProduct> get selectedCampaignProducts =>
+      reviewCampaignProducts
+          .where((product) => campaignProductIds.contains(product.id))
+          .toList(growable: false);
+
+  void setCustomerCampaignOnline(bool value) {
+    customerCampaignOnline = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCustomerSearch(String value) {
+    customerSearchQuery = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCustomerFilter(RetailerCustomerFilter value) {
+    customerFilter = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectCustomer(String id) {
+    selectedCustomerId =
+        reviewRetailerCustomers.any((customer) => customer.id == id)
+        ? id
+        : reviewRetailerCustomers.first.id;
+    reminderMessageId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setReminderChannel(RetailerMessageChannel value) {
+    if (value == RetailerMessageChannel.sms) {
+      _showError(
+        'SMS is off for this customer. Choose a currently permitted channel.',
+      );
+      return;
+    }
+    reminderChannel = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setReminderMessage(String value) {
+    reminderMessage = value;
+    reminderMessageId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshCustomers() async {
+    if (!customerCampaignAuthorized) {
+      _showError('Your current shop role cannot access customer records.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError(
+        'Customers are offline. Existing permissions and order records remain available.',
+      );
+      return false;
+    }
+    return _runBool(
+      campaignGateway.refreshCustomers,
+      success: 'Customer orders, dues, issues and permissions are current.',
+    );
+  }
+
+  Future<bool> sendCustomerReminder() async {
+    final customer = selectedCustomer;
+    if (reminderMessageId != null) {
+      noticeMessage =
+          'Reminder $reminderMessageId was already sent once. No duplicate message or order was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!customer.allowed) {
+      _showError(
+        'Promotional reminders are not allowed for this customer. Invoices remain available independently.',
+      );
+      return false;
+    }
+    if (customer.issue) {
+      _showError(
+        'Resolve the open customer issue before sending a promotional reminder.',
+      );
+      return false;
+    }
+    if (reminderChannel == RetailerMessageChannel.sms) {
+      _showError('SMS is off. Choose Mool Chat or permitted WhatsApp.');
+      return false;
+    }
+    if (reminderMessage.trim().length < 12) {
+      _showError('Enter a clear customer reminder before sending.');
+      return false;
+    }
+    if (!customerCampaignAuthorized) {
+      _showError('Your current shop role cannot send customer reminders.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError('Messaging is offline. No reminder or order was created.');
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      reminderMessageId = await campaignGateway.sendReminder(
+        customerId: customer.id,
+        channel: reminderChannel.name,
+        message: reminderMessage.trim(),
+        idempotencyKey:
+            '${customer.id}-${reminderChannel.name}-${reminderMessage.trim().hashCode}',
+      );
+      noticeMessage =
+          'Reminder $reminderMessageId sent once by ${reminderChannel.label}. Permission, purpose, operator and opt-out were recorded. No order was created.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  void setCampaignFilter(RetailerCampaignFilter value) {
+    campaignFilter = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshCampaigns() async {
+    if (!customerCampaignAuthorized) {
+      _showError('Your current shop role cannot manage campaigns.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError(
+        'Campaigns are offline. Existing budgets and campaign states remain unchanged.',
+      );
+      return false;
+    }
+    return _runBool(
+      campaignGateway.refreshCampaigns,
+      success: 'Paid sales, refunds, spend and campaign states are current.',
+    );
+  }
+
+  void resetCampaignBuilder({String? cloneId}) {
+    campaignBuilderStep = 0;
+    campaignObjective = RetailerCampaignObjective.increaseSales;
+    campaignName = cloneId == null
+        ? 'Monthly staples offer'
+        : 'Monthly staples offer copy';
+    campaignProductIds
+      ..clear()
+      ..addAll({'atta', 'oil'});
+    campaignBenefit = RetailerCampaignBenefit.basketSaving;
+    campaignMaximumOrders = 30;
+    campaignAudience = RetailerCampaignAudience.repeatCustomers;
+    campaignRadiusKm = 5;
+    campaignDurationDays = 7;
+    campaignChannel = RetailerCampaignChannel.moolSocial;
+    campaignSpendCap = 1500;
+    campaignDraftId = null;
+    publishedCampaignId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignObjective(RetailerCampaignObjective value) {
+    campaignObjective = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignName(String value) {
+    campaignName = value;
+    campaignDraftId = null;
+    publishedCampaignId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void toggleCampaignProduct(String productId) {
+    if (campaignProductIds.contains(productId)) {
+      if (campaignProductIds.length == 1) {
+        _showError('Keep at least one stock-backed product in the campaign.');
+        return;
+      }
+      campaignProductIds.remove(productId);
+    } else {
+      campaignProductIds.add(productId);
+    }
+    campaignDraftId = null;
+    publishedCampaignId = null;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignBenefit(RetailerCampaignBenefit value) {
+    campaignBenefit = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool setCampaignMaximumOrders(int value) {
+    if (value < 1) {
+      _showError('Maximum orders must be at least 1.');
+      return false;
+    }
+    final available = selectedCampaignProducts
+        .map((product) => product.available)
+        .reduce((a, b) => a < b ? a : b);
+    if (value > available) {
+      _showError(
+        'Maximum orders cannot exceed the lowest selected sellable stock of $available.',
+      );
+      return false;
+    }
+    campaignMaximumOrders = value;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  void setCampaignAudience(RetailerCampaignAudience value) {
+    campaignAudience = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignRadius(int value) {
+    campaignRadiusKm = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignDuration(int value) {
+    campaignDurationDays = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCampaignChannel(RetailerCampaignChannel value) {
+    campaignChannel = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool setCampaignSpendCap(int value) {
+    if (value < 100) {
+      _showError('Set a maximum campaign spend of at least ₹100.');
+      return false;
+    }
+    if (value > 100000) {
+      _showError('Choose a campaign spend cap up to ₹1,00,000.');
+      return false;
+    }
+    campaignSpendCap = value;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  bool goToCampaignStep(int value) {
+    if (value > campaignBuilderStep &&
+        !_campaignStepValid(campaignBuilderStep)) {
+      return false;
+    }
+    campaignBuilderStep = value.clamp(0, 3);
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  bool continueCampaignBuilder() {
+    if (!_campaignStepValid(campaignBuilderStep)) return false;
+    if (campaignBuilderStep < 3) {
+      campaignBuilderStep += 1;
+      clearMessages();
+      notifyListeners();
+    }
+    return true;
+  }
+
+  bool _campaignStepValid(int step) {
+    if (step == 0 && campaignName.trim().length < 4) {
+      _showError('Enter a clear campaign name before continuing.');
+      return false;
+    }
+    if (step == 1 && campaignProductIds.isEmpty) {
+      _showError('Choose at least one stock-backed product.');
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> saveCampaignDraft() async {
+    if (campaignDraftId != null) {
+      noticeMessage =
+          'Draft $campaignDraftId is already saved. No duplicate campaign was created.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (campaignName.trim().length < 4) {
+      _showError('Enter a clear campaign name before saving.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError('Campaigns are offline. No draft was created.');
+      return false;
+    }
+    if (!customerCampaignAuthorized) {
+      _showError('Your current shop role cannot save campaigns.');
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      campaignDraftId = await campaignGateway.saveDraft(
+        name: campaignName.trim(),
+        idempotencyKey:
+            '${campaignName.trim()}-${campaignProductIds.join('-')}',
+      );
+      noticeMessage = 'Draft $campaignDraftId saved once.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> publishCampaign() async {
+    if (publishedCampaignId != null) {
+      noticeMessage =
+          'Campaign $publishedCampaignId is already published. No stock, budget or campaign was duplicated.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (!_campaignStepValid(0) || !_campaignStepValid(1)) return false;
+    final available = selectedCampaignProducts
+        .map((product) => product.available)
+        .reduce((a, b) => a < b ? a : b);
+    if (campaignMaximumOrders > available) {
+      _showError(
+        'Reduce maximum orders to $available or less before publishing.',
+      );
+      return false;
+    }
+    if (!customerCampaignAuthorized) {
+      _showError('Shop owner approval is required to publish a campaign.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError('Publishing is offline. No stock or budget was committed.');
+      return false;
+    }
+    if (busy) return false;
+    clearMessages();
+    busy = true;
+    notifyListeners();
+    var completed = false;
+    try {
+      publishedCampaignId = await campaignGateway.publish(
+        name: campaignName.trim(),
+        maximumOrders: campaignMaximumOrders,
+        spendCap: campaignSpendCap,
+        idempotencyKey:
+            '${campaignName.trim()}-$campaignMaximumOrders-$campaignSpendCap',
+      );
+      campaigns.insert(
+        0,
+        RetailerCampaign(
+          id: publishedCampaignId!,
+          title: campaignName.trim(),
+          detail:
+              '${campaignAudience.label} · ${campaignChannel.label} · $campaignDurationDays days',
+          state: RetailerCampaignState.active,
+          paidSales: 0,
+          spend: 0,
+          result: '₹$campaignSpendCap maximum spend',
+        ),
+      );
+      noticeMessage =
+          'Campaign $publishedCampaignId published once. Stock is committed only on accepted orders and spend cannot exceed ₹$campaignSpendCap.';
+      completed = true;
+    } on RetailerGatewayException catch (error) {
+      errorMessage = error.message;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    return completed;
+  }
+
+  Future<bool> pauseCampaign(String id) async {
+    final campaign = campaigns.firstWhere((item) => item.id == id);
+    if (campaign.state == RetailerCampaignState.paused) {
+      noticeMessage = '${campaign.title} is already paused.';
+      errorMessage = null;
+      notifyListeners();
+      return true;
+    }
+    if (campaign.state != RetailerCampaignState.active) {
+      _showError('Only an active campaign can be paused.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError('Campaigns are offline. The campaign remains active.');
+      return false;
+    }
+    return _runBool(
+      () => campaignGateway.pause(id),
+      success:
+          '${campaign.title} paused. No new eligible campaign spend will be accepted.',
+      afterSuccess: () => campaign.state = RetailerCampaignState.paused,
+    );
+  }
+
+  Future<bool> deleteCampaignDraft(String id) async {
+    final campaign = campaigns.firstWhere((item) => item.id == id);
+    if (campaign.state != RetailerCampaignState.draft) {
+      _showError('Only a draft campaign can be deleted.');
+      return false;
+    }
+    if (!customerCampaignOnline) {
+      _showError('Campaigns are offline. The draft remains available.');
+      return false;
+    }
+    return _runBool(
+      () => campaignGateway.deleteDraft(id),
+      success: '${campaign.title} draft deleted.',
+      afterSuccess: () => campaigns.remove(campaign),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -383,18 +384,11 @@ void main() {
       expect(gateway.setupCalls, 2);
 
       await tapVisible(tester, const Key('business-primary-work'));
-      expect(
-        find.byKey(const Key('business-primary-work-sheet')),
-        findsOneWidget,
-      );
-      await tapVisible(tester, const Key('business-primary-work-complete'));
-      expect(
-        retailer
-            .activeBusinessService(RetailerBusinessServiceType.growth)
-            ?.readySetup
-            .contains('Team'),
-        isTrue,
-      );
+      expect(find.byKey(const Key('campaign-builder-screen')), findsOneWidget);
+      GoRouter.of(
+        tester.element(find.byKey(const Key('campaign-builder-screen'))),
+      ).go('/app/retailer/services/growth?stage=active');
+      await settle(tester);
 
       await tapVisible(tester, const Key('business-service-support'));
       expect(find.textContaining('could not open'), findsOneWidget);

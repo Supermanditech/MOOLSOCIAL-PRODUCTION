@@ -43,8 +43,10 @@ import '../ride/screens/ride_trip_screen.dart';
 import '../retailer/retailer_models.dart';
 import '../retailer/retailer_pos_models.dart';
 import '../retailer/retailer_business_services_models.dart';
+import '../retailer/retailer_campaign_models.dart';
 import '../retailer/retailer_session.dart';
 import '../retailer/screens/retailer_business_services_screens.dart';
+import '../retailer/screens/retailer_campaign_screens.dart';
 import '../retailer/screens/retailer_delivery_screens.dart';
 import '../retailer/screens/retailer_books_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
@@ -517,6 +519,54 @@ GoRouter createJourneyRouter(
             ),
           };
         },
+      ),
+      GoRoute(
+        path: '/app/retailer/customers',
+        builder: (context, state) {
+          final filter = state.uri.queryParameters['filter'];
+          if (filter != null) {
+            final requested = RetailerCustomerFilter.values.firstWhere(
+              (value) => value.name == filter,
+              orElse: () => RetailerCustomerFilter.all,
+            );
+            if (retailerSession.customerFilter != requested) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                retailerSession.setCustomerFilter(requested);
+              });
+            }
+          }
+          return RetailerCustomersScreen(session: retailerSession);
+        },
+      ),
+      GoRoute(
+        path: '/app/retailer/customers/:customerId',
+        builder: (context, state) => RetailerCustomerDetailScreen(
+          session: retailerSession,
+          customerId: state.pathParameters['customerId'] ?? 'sharma',
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/campaigns',
+        builder: (context, state) {
+          final filter = state.uri.queryParameters['filter'];
+          if (filter != null) {
+            final requested = RetailerCampaignFilter.values.firstWhere(
+              (value) => value.name == filter,
+              orElse: () => RetailerCampaignFilter.all,
+            );
+            if (retailerSession.campaignFilter != requested) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                retailerSession.setCampaignFilter(requested);
+              });
+            }
+          }
+          return RetailerCampaignsScreen(session: retailerSession);
+        },
+      ),
+      GoRoute(
+        path: '/app/retailer/campaigns/new',
+        builder: (context, state) =>
+            RetailerCampaignBuilderScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/wholesale',

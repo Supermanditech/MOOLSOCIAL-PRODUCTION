@@ -1587,59 +1587,7 @@ class RetailerBusinessServiceActiveScreen extends StatelessWidget {
         context.go('/app/retailer/books');
       case RetailerBusinessServiceType.growth:
       case RetailerBusinessServiceType.ads:
-        await showModalBottomSheet<void>(
-          context: context,
-          showDragHandle: true,
-          builder: (sheetContext) => SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(MoolSpacing.md),
-              child: Column(
-                key: const Key('business-primary-work-sheet'),
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    _serviceIcon(service.type),
-                    size: 42,
-                    color: _serviceColor(service.type),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  Text(
-                    service.workTitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    service.workDetail,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: MoolColors.muted),
-                  ),
-                  const SizedBox(height: MoolSpacing.md),
-                  FilledButton(
-                    key: const Key('business-primary-work-complete'),
-                    onPressed: () async {
-                      final pending = service.quickSetup.firstWhere(
-                        (item) => !active.readySetup.contains(item.$1),
-                        orElse: () => service.quickSetup.first,
-                      );
-                      final completed = await session
-                          .completeBusinessServiceSetup(
-                            service.type,
-                            pending.$1,
-                          );
-                      if (!sheetContext.mounted || !completed) return;
-                      Navigator.pop(sheetContext);
-                    },
-                    child: Text('${service.workAction} setup'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        context.go('/app/retailer/campaigns/new');
     }
   }
 

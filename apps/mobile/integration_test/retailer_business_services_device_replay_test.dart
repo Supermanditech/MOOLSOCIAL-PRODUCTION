@@ -140,13 +140,8 @@ void main() {
       await tapVisible(tester, const Key('business-setup-offer'));
       expect(active?.readySetup.contains('Offer'), isTrue);
       await tapVisible(tester, const Key('business-primary-work'));
-      expect(
-        find.byKey(const Key('business-primary-work-sheet')),
-        findsOneWidget,
-      );
-      await tapVisible(tester, const Key('business-primary-work-complete'));
-      expect(active?.readySetup.length, greaterThanOrEqualTo(3));
-      await binding.takeScreenshot('retailer-96-first-campaign-ready');
+      expect(find.byKey(const Key('campaign-builder-screen')), findsOneWidget);
+      await binding.takeScreenshot('retailer-100-first-campaign-ready');
     },
   );
 }

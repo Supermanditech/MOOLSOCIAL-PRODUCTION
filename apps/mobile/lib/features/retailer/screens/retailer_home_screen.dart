@@ -297,6 +297,56 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: MoolSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: RetailerCard(
+                keyName: 'retailer-customers',
+                onTap: () => context.go('/app/retailer/customers'),
+                color: const Color(0xFFF4F3FF),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.people_alt_outlined, color: MoolColors.navy),
+                    SizedBox(height: MoolSpacing.xs),
+                    Text(
+                      'Customers',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'Baskets, dues and permission',
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: MoolSpacing.sm),
+            Expanded(
+              child: RetailerCard(
+                keyName: 'retailer-campaigns',
+                onTap: () => context.go('/app/retailer/campaigns'),
+                color: const Color(0xFFEAF7E8),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.campaign_outlined, color: MoolColors.success),
+                    SizedBox(height: MoolSpacing.xs),
+                    Text(
+                      'Campaigns',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'Stock-backed measured sales',
+                      style: TextStyle(color: MoolColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
