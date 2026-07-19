@@ -27,6 +27,9 @@ class BookSession extends ChangeNotifier {
   bool clinicSharing = true;
   bool followUpReportUploaded = false;
   bool medicineReminder = false;
+  bool prescriptionInviteQrAdded = false;
+  String? receptionInviteCode;
+  String? followUpSlot;
 
   String salonService = 'Haircut';
   SalonMode salonMode = SalonMode.salon;
@@ -87,6 +90,39 @@ class BookSession extends ChangeNotifier {
     noticeMessage = null;
     errorMessage = null;
     notifyListeners();
+  }
+
+  String get secureClinicInviteLink {
+    final reference = appointment?.id ?? 'clinic-care';
+    return 'https://moolsocial.com/i/$reference';
+  }
+
+  void addInviteQrToPrescription() {
+    if (prescriptionInviteQrAdded) {
+      showNotice('The patient invite QR is already on the prescription.');
+      return;
+    }
+    prescriptionInviteQrAdded = true;
+    showNotice('Patient invite QR added to the prescription.');
+  }
+
+  void createReceptionInviteCode() {
+    if (receptionInviteCode != null) {
+      showNotice('The active reception code remains unchanged.');
+      return;
+    }
+    final reference = appointment?.id ?? 'clinic-care';
+    final value = reference.codeUnits.fold<int>(
+      0,
+      (total, unit) => (total * 31 + unit) % 900000,
+    );
+    receptionInviteCode = (value + 100000).toString();
+    showNotice('One-time reception code created.');
+  }
+
+  void chooseFollowUpSlot(String value) {
+    followUpSlot = value;
+    showNotice('$value follow-up booked.');
   }
 
   void prepareDoctor() {

@@ -397,6 +397,24 @@ columns so a prototype control cannot create a false production pass.
   regressions were then rerun from the current source without updating
   baselines.
 
+### QA23-025 — Doctor invite and follow-up taps stopped at “ready”
+
+- Discovery: Ask clinic, Show patient QR, Send secure link, Use reception code,
+  Add QR to prescription and Book review slot acknowledged the tap but did not
+  expose or complete the selected healthcare intent.
+- Root cause: the first Doctor implementation counted a notice banner as the
+  terminal outcome and did not continue through the nested patient-consent,
+  clinic-contact and slot-selection actions.
+- Fix: the clinic action now opens a verified appointment-linked conversation;
+  invite actions expose a visible expiring QR, copyable consent-bound link,
+  generated one-time reception code and persistent prescription QR state; the
+  follow-up action exposes and saves an exact clinic or video slot.
+- Exact replay: the reception action was repeated without replacing the active
+  code, the prescription action was repeated without adding a second QR, and
+  the selected follow-up slot remained visible after the sheet closed.
+- Acceptance: the 17/17 affected Book/Chat tests, zero-issue analyzer and the
+  full nested sequence on the connected OPPO pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -463,6 +481,7 @@ Founder-readable boards are versioned with the audit:
 | Universal Chat choices stopped at explanatory content | Every entry owns a filtered production inbox route | 24/24 affected tests and physical four-filter replay passed |
 | Chat threads exposed only Back as an exit | Labelled Mool action is persistent in the composer | Compact, visual and OPPO thread-to-Mool replays passed |
 | Chat context actions stopped at a notice or extra Universal step | Each nested action now owns its direct route, sheet or validated in-place completion | Six affected tests, exact invalid/duplicate/retry replay and expanded OPPO replay passed |
+| Doctor invite and follow-up actions stopped at “ready” notices | Clinic chat, QR, secure link, one-time code, prescription state and slot selection each expose their owned outcome | 17/17 affected tests and the complete OPPO nested replay passed |
 
 ## Current verification
 
@@ -488,6 +507,8 @@ Founder-readable boards are versioned with the audit:
 | OPPO Medicine invalid/failure/retry/duplicate replay | Passed; search recovery, OTC basket, prescription and pharmacist end intents completed |
 | Chat and Universal affected regression | Passed, 24/24 |
 | OPPO Chat filter/Mool/nested-action/failure replay | Passed; four filters, direct Mool, media, poll, invite, details, updates and one-message retry completed |
+| Doctor and clinic affected regression | Passed, 17/17 |
+| OPPO Doctor invite and follow-up replay | Passed; clinic conversation, QR, secure link, duplicate-safe code and prescription QR, and exact slot completed |
 | Production visual baseline set | Passed across 81 current mobile states |
 | Independent current full regression cycle 1 | Passed, 327/327 without baseline updates |
 | Independent current full regression cycle 2 | Passed, 327/327 without baseline updates |

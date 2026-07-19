@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
@@ -93,8 +94,12 @@ class DoctorBookingScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.sm),
             OutlinedButton.icon(
-              onPressed: () => session.showNotice(
-                'Clinic chat opened with this appointment selection attached.',
+              key: const Key('doctor-ask-clinic'),
+              onPressed: () => context.go(
+                Uri(
+                  path: '/app/chat/thread/clinic-care',
+                  queryParameters: {'return': '/app/book/doctor'},
+                ).toString(),
               ),
               icon: const Icon(Icons.chat_bubble_outline_rounded),
               label: const Text('Ask clinic'),
@@ -300,21 +305,44 @@ class DoctorInviteScreen extends StatelessWidget {
             const SizedBox(height: MoolSpacing.lg),
             const BookSectionTitle('Invite options'),
             const SizedBox(height: MoolSpacing.sm),
-            for (final item in const [
-              ('Show patient QR', Icons.qr_code_2_rounded),
-              ('Send secure link', Icons.link_rounded),
-              ('Use reception code', Icons.pin_outlined),
-              ('Add QR to prescription', Icons.receipt_long_outlined),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(bottom: MoolSpacing.xs),
-                child: OutlinedButton.icon(
-                  key: Key(
-                    'doctor-invite-${item.$1.toLowerCase().replaceAll(' ', '-')}',
-                  ),
-                  onPressed: () => session.showNotice('${item.$1} is ready.'),
-                  icon: Icon(item.$2),
-                  label: Text(item.$1),
+            _DoctorInviteAction(
+              actionKey: const Key('doctor-invite-show-patient-qr'),
+              icon: Icons.qr_code_2_rounded,
+              label: 'Show patient QR',
+              onPressed: () => _showPatientInviteQr(context, session),
+            ),
+            _DoctorInviteAction(
+              actionKey: const Key('doctor-invite-send-secure-link'),
+              icon: Icons.link_rounded,
+              label: 'Send secure link',
+              onPressed: () => _showSecureInviteLink(context, session),
+            ),
+            _DoctorInviteAction(
+              actionKey: const Key('doctor-invite-use-reception-code'),
+              icon: Icons.pin_outlined,
+              label: 'Use reception code',
+              onPressed: () {
+                session.createReceptionInviteCode();
+                _showReceptionCode(context, session);
+              },
+            ),
+            _DoctorInviteAction(
+              actionKey: const Key('doctor-invite-add-qr-to-prescription'),
+              icon: Icons.receipt_long_outlined,
+              label: session.prescriptionInviteQrAdded
+                  ? 'QR added to prescription'
+                  : 'Add QR to prescription',
+              onPressed: session.addInviteQrToPrescription,
+            ),
+            if (session.prescriptionInviteQrAdded)
+              const BookCard(
+                key: Key('doctor-prescription-qr-status'),
+                color: Color(0xFFF0FAF3),
+                child: BookFact(
+                  icon: Icons.task_alt_rounded,
+                  title: 'Prescription includes patient invite',
+                  detail:
+                      'The QR opens only this verified follow-up request and still requires patient approval.',
                 ),
               ),
             const SizedBox(height: MoolSpacing.sm),
@@ -468,11 +496,10 @@ class PatientFollowUpScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.xs),
             OutlinedButton.icon(
-              onPressed: () => session.showNotice(
-                'Clinic and video review slots are ready to choose.',
-              ),
+              key: const Key('followup-book-slot'),
+              onPressed: () => _showFollowUpSlots(context, session),
               icon: const Icon(Icons.video_call_outlined),
-              label: const Text('Book review slot'),
+              label: Text(session.followUpSlot ?? 'Book review slot'),
             ),
             const SizedBox(height: MoolSpacing.lg),
             const BookSectionTitle('Sharing control'),
@@ -500,4 +527,232 @@ class PatientFollowUpScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DoctorInviteAction extends StatelessWidget {
+  const _DoctorInviteAction({
+    required this.actionKey,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final Key actionKey;
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: MoolSpacing.xs),
+      child: OutlinedButton.icon(
+        key: actionKey,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
+    );
+  }
+}
+
+Future<void> _showPatientInviteQr(BuildContext context, BookSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('doctor-patient-qr-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Patient follow-up QR',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          Semantics(
+            label: 'Scannable patient follow-up QR',
+            child: Icon(Icons.qr_code_2_rounded, size: 176),
+          ),
+          const Text(
+            'Expires in 10 minutes · Patient approval required',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const Key('doctor-patient-qr-done'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Done'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showSecureInviteLink(BuildContext context, BookSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('doctor-secure-link-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Secure patient invite',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'The link opens this follow-up request. The patient must sign in '
+            'and approve clinic access.',
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          SelectableText(
+            session.secureClinicInviteLink,
+            key: const Key('doctor-secure-link-value'),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton.icon(
+            key: const Key('doctor-secure-link-copy'),
+            onPressed: () {
+              Clipboard.setData(
+                ClipboardData(text: session.secureClinicInviteLink),
+              );
+              Navigator.of(sheetContext).pop();
+              session.showNotice('Secure patient invite link copied.');
+            },
+            icon: const Icon(Icons.copy_rounded),
+            label: const Text('Copy secure link'),
+          ),
+          TextButton(
+            key: const Key('doctor-secure-link-cancel'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showReceptionCode(BuildContext context, BookSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('doctor-reception-code-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Reception invite code',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          SelectableText(
+            session.receptionInviteCode ?? '',
+            key: const Key('doctor-reception-code-value'),
+            style: const TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 8,
+            ),
+          ),
+          const Text(
+            'One use · Expires in 10 minutes · No medical record is shared',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const Key('doctor-reception-code-done'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Done'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showFollowUpSlots(BuildContext context, BookSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('followup-slot-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Choose review slot',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          for (final slot in const [
+            ('video-today', 'Video · Today 6:20 PM'),
+            ('clinic-tomorrow', 'Clinic · Tomorrow 10:30 AM'),
+            ('video-tomorrow', 'Video · Tomorrow 5:40 PM'),
+          ])
+            ListTile(
+              key: Key('followup-slot-${slot.$1}'),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                slot.$2.startsWith('Video')
+                    ? Icons.video_call_outlined
+                    : Icons.local_hospital_outlined,
+              ),
+              title: Text(slot.$2),
+              trailing: const Icon(Icons.arrow_forward_rounded),
+              onTap: () {
+                session.chooseFollowUpSlot(slot.$2);
+                Navigator.of(sheetContext).pop();
+              },
+            ),
+          TextButton(
+            key: const Key('followup-slot-cancel'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

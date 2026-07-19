@@ -60,6 +60,15 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'clinic-care': [
+        const ChatMessage(
+          id: 'm7',
+          sender: 'Sardarpura Clinic',
+          text: 'Your appointment details are linked. How can the clinic help?',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
     });
   }
 
@@ -105,6 +114,15 @@ class ChatSession extends ChangeNotifier {
       timeLabel: '10:21',
       type: ChatThreadType.order,
       unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'clinic-care',
+      title: 'Sardarpura Clinic',
+      subtitle: 'Verified clinic · Appointment support',
+      preview: 'Your appointment details are linked.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
       verified: true,
     ),
   ];

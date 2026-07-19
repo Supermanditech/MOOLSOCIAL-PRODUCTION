@@ -33,7 +33,7 @@ void main() {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
       MoolSocialApp(
-        key: ValueKey(route),
+        key: UniqueKey(),
         session: journey,
         bookSession: book,
         initialLocation: route,
@@ -87,6 +87,20 @@ void main() {
         book: book,
       );
 
+      await tapVisible(tester, const Key('doctor-ask-clinic'));
+      expect(find.text('Sardarpura Clinic'), findsWidgets);
+      expect(
+        find.text(
+          'Your appointment details are linked. How can the clinic help?',
+        ),
+        findsOneWidget,
+      );
+      await mount(
+        tester,
+        route: '/app/book/doctor',
+        journey: journey,
+        book: book,
+      );
       await tapVisible(tester, const Key('doctor-care-video'));
       await tapVisible(tester, const Key('doctor-need-skin'));
       await tapVisible(tester, const Key('book-doctor'));
@@ -100,7 +114,43 @@ void main() {
 
       await tapVisible(tester, const Key('open-doctor-invite'));
       await tapVisible(tester, const Key('doctor-invite-show-patient-qr'));
-      expect(find.textContaining('Show patient QR is ready'), findsOneWidget);
+      expect(find.byKey(const Key('doctor-patient-qr-sheet')), findsOneWidget);
+      await tapVisible(tester, const Key('doctor-patient-qr-done'));
+
+      await tapVisible(tester, const Key('doctor-invite-send-secure-link'));
+      expect(find.byKey(const Key('doctor-secure-link-sheet')), findsOneWidget);
+      await tapVisible(tester, const Key('doctor-secure-link-copy'));
+      expect(book.noticeMessage, 'Secure patient invite link copied.');
+
+      await tapVisible(tester, const Key('doctor-invite-use-reception-code'));
+      expect(book.receptionInviteCode, hasLength(6));
+      expect(
+        find.byKey(const Key('doctor-reception-code-sheet')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('doctor-reception-code-done'));
+      final receptionCode = book.receptionInviteCode;
+      await tapVisible(tester, const Key('doctor-invite-use-reception-code'));
+      expect(book.receptionInviteCode, receptionCode);
+      await tapVisible(tester, const Key('doctor-reception-code-done'));
+
+      await tapVisible(
+        tester,
+        const Key('doctor-invite-add-qr-to-prescription'),
+      );
+      expect(book.prescriptionInviteQrAdded, isTrue);
+      expect(
+        find.byKey(const Key('doctor-prescription-qr-status')),
+        findsOneWidget,
+      );
+      await tapVisible(
+        tester,
+        const Key('doctor-invite-add-qr-to-prescription'),
+      );
+      expect(
+        book.noticeMessage,
+        'The patient invite QR is already on the prescription.',
+      );
       await tapVisible(tester, const Key('preview-patient-invite'));
       await tapVisible(tester, const Key('clinic-invite-consent'));
       await tapVisible(tester, const Key('join-clinic-followup'));
@@ -108,6 +158,10 @@ void main() {
       await tapVisible(tester, const Key('followup-reminder'));
       expect(book.followUpReportUploaded, isTrue);
       expect(book.medicineReminder, isTrue);
+      await tapVisible(tester, const Key('followup-book-slot'));
+      expect(find.byKey(const Key('followup-slot-sheet')), findsOneWidget);
+      await tapVisible(tester, const Key('followup-slot-video-today'));
+      expect(book.followUpSlot, 'Video · Today 6:20 PM');
       await tapVisible(tester, const Key('followup-sharing'));
       expect(book.clinicSharing, isFalse);
     },
