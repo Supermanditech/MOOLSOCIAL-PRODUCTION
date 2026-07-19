@@ -183,6 +183,17 @@ void main() {
         const Key('creator-post-caption'),
         'See how a verified shop packs the morning basket.',
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('creator-reel-duration-options')),
+      );
+      await settle(tester);
+      for (final days in creatorPlacementDays) {
+        expect(
+          find.byKey(Key('creator-reel-days-$days')).hitTestable(),
+          findsOneWidget,
+          reason: 'Paid Reel duration $days must be visible without guessing.',
+        );
+      }
       await tap(tester, const Key('creator-reel-days-7'));
       expect(session.reelDurationDays, 7);
 
@@ -237,6 +248,32 @@ void main() {
   );
 
   testWidgets(
+    'paid Reel exposes every 1 to 7 day choice on compact large text',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await mount(
+        tester,
+        route: '/app/creator/publish?campaign=CR-2048',
+        size: const Size(360, 800),
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('creator-reel-duration-options')),
+      );
+      await settle(tester);
+      for (final days in creatorPlacementDays) {
+        expect(
+          find.byKey(Key('creator-reel-days-$days')).hitTestable(),
+          findsOneWidget,
+          reason:
+              'Paid Reel duration $days must be visible at 360px and 140% text.',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'screen 166 validates YouTube source and exactly retries one connected post',
     (tester) async {
       final gateway = ReviewCreatorGateway()
@@ -277,6 +314,18 @@ void main() {
         key: const Key('youtube-campaign'),
         label: 'Funded Campaign Reel · CR-2048',
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('youtube-duration-options')),
+      );
+      await settle(tester);
+      for (final days in creatorPlacementDays) {
+        expect(
+          find.byKey(Key('youtube-days-$days')).hitTestable(),
+          findsOneWidget,
+          reason:
+              'Funded YouTube discovery duration $days must remain visible.',
+        );
+      }
       await tap(tester, const Key('youtube-days-7'));
       await tap(tester, const Key('youtube-rights'));
       await tap(tester, const Key('youtube-action-truth'));

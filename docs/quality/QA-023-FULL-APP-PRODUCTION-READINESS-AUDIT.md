@@ -233,13 +233,53 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: the exact simulator build must pass on hosted macOS before this
   ticket is closed.
 
+### QA23-014 — Flutter visual evidence used unreadable block glyphs
+
+- Discovery: the visual audit boards preserved layout and colour accurately,
+  but Flutter’s test-only block font replaced all application wording with
+  rectangular glyphs.
+- Root cause: the golden harness did not load the Inter font declared by the
+  production theme.
+- Fix: the shared Flutter test configuration loads the packaged Inter font
+  before every test. Every mobile golden is regenerated on the approved
+  Windows rendering platform.
+- Acceptance: board text must be human-readable, the full golden suite must
+  pass without tolerance or skipped comparisons, and each board must be
+  reviewed again for copy and clipping.
+
+### QA23-015 — iOS configuration assertion depended on local newlines
+
+- Discovery: the iOS 15 configuration passed on the developer laptop but the
+  Windows CI clone used CRLF and rejected the same property-list content.
+- Root cause: the test asserted one literal LF-formatted snippet.
+- Fix: the assertion now parses the key/value boundary with whitespace-neutral
+  matching while still requiring the exact iOS 15 value.
+- Acceptance: the configuration test must pass from a fresh Windows checkout
+  before Android and iOS build jobs are allowed to start.
+
+### QA23-016 — paid duration choices 6 and 7 were hidden
+
+- Discovery: the readable Creator board showed only days 1–5 for a
+  business-funded Reel. Days 6 and 7 existed beyond an unlabelled horizontal
+  scroll, so a creator could reasonably conclude they were unavailable.
+- Root cause: both funded Reel and funded YouTube discovery used a horizontally
+  scrolling duration row without a continuation affordance.
+- Fix: both selectors use a wrapping 1–7 day group. No choice is hidden and the
+  commercial copy still states automatic expiry.
+- Exact replay: open business-funded Reel → reveal paid run → verify days 1,
+  2, 3, 4, 5, 6 and 7 are all tappable → select 7 → review and publish.
+- Acceptance: all seven targets remain visible and tappable at 360×800 with
+  140% text scaling.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
 source screenshots:
 
 ```powershell
-node scripts/create-visual-audit-board.mjs
+node scripts/create-visual-audit-board.mjs `
+  apps/mobile/test/goldens `
+  artifacts/quality/mobile-golden-board.png
 ```
 
 Boards cover Universal, Creator, Earn, Provider, Shared, Retailer,
@@ -248,6 +288,18 @@ looked for clipped primary actions, inaccessible nested controls, inconsistent
 navigation, internal labels, unsafe fixed values and screen-height failures.
 No new clipping or unreachable primary action was found in the accepted
 evidence.
+
+Founder-readable boards are versioned with the audit:
+
+- [Universal](../../artifacts/quality/readable-universal.png)
+- [Creator](../../artifacts/quality/readable-creator.png)
+- [Earn](../../artifacts/quality/readable-earn.png)
+- [Provider](../../artifacts/quality/readable-provider.png)
+- [Retailer](../../artifacts/quality/readable-retailer.png)
+- [Manufacturer](../../artifacts/quality/readable-manufacturer.png)
+- [Captain](../../artifacts/quality/readable-captain.png)
+- [Shared account and controls](../../artifacts/quality/readable-shared.png)
+- [Superadmin desktop and mobile](../../artifacts/quality/readable-superadmin.png)
 
 ## Exact failure replay summary
 
@@ -265,6 +317,8 @@ evidence.
 | Universal search prompt ended in an ellipsis on OPPO | Complete contextual prompt fits; the result screen carries the detailed content scope | Universal responsive intent and golden suites passed |
 | Ubuntu reported all 74 Flutter pixel baselines as different | Run approved baselines on Windows while retaining Linux Android and macOS iOS builds | Replacement GitHub workflow pending exact replay |
 | Hosted iOS build rejected Firebase Apple packages because the Runner targeted iOS 13 | Runner and embedded Flutter framework now declare iOS 15; a configuration test fixes the boundary | Hosted macOS build pending exact replay |
+| Flutter golden boards replaced application copy and button labels with block glyphs | Shared test setup loads packaged Inter and component themes preserve it | Readable 74-screen regeneration and nine-board review passed locally |
+| Paid Reel showed only days 1–5 without signalling hidden choices | Wrapping selector shows all 1–7 day funded durations | Exact selection replay and compact 140% text regression passed |
 
 ## Current verification
 
@@ -282,6 +336,9 @@ evidence.
 | Full Flutter pre-device baseline | Passed, 312/312 twice |
 | Final post-device full-regression cycle 1 | Passed, 312/312 |
 | Final post-device full-regression cycle 2 | Passed, 312/312 |
+| Readable golden regeneration | Passed, 313/313 before the compact duration assertion was added |
+| Current full regression cycle 1 | Passed, 314/314 |
+| Current full regression cycle 2 | Passed, 314/314 |
 | Corrected debug APK build | Passed |
 | Clean OPPO install and OTP-to-Universal replay | Passed after exact failure fixes; latest build remains open at Universal |
 

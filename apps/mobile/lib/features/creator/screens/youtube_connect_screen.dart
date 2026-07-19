@@ -555,24 +555,20 @@ class _ActionStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: MoolSpacing.xs),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: creatorPlacementDays
-                      .map(
-                        (days) => Padding(
-                          padding: const EdgeInsets.only(right: MoolSpacing.xs),
-                          child: MoolSegment(
-                            key: Key('youtube-days-$days'),
-                            label: '$days day${days == 1 ? '' : 's'}',
-                            selected: session.youtubePlacementDays == days,
-                            onPressed: () =>
-                                session.setYouTubePlacementDays(days),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
+              Wrap(
+                key: const Key('youtube-duration-options'),
+                spacing: MoolSpacing.xs,
+                runSpacing: MoolSpacing.xs,
+                children: creatorPlacementDays
+                    .map(
+                      (days) => MoolSegment(
+                        key: Key('youtube-days-$days'),
+                        label: '$days day${days == 1 ? '' : 's'}',
+                        selected: session.youtubePlacementDays == days,
+                        onPressed: () => session.setYouTubePlacementDays(days),
+                      ),
+                    )
+                    .toList(),
               ),
               const Padding(
                 padding: EdgeInsets.only(top: MoolSpacing.xs),

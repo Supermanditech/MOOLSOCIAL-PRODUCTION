@@ -11,6 +11,32 @@ void main() {
     expect(MoolRadii.card, lessThan(MoolRadii.sheet));
   });
 
+  test('component typography keeps the production Inter family', () {
+    final theme = MoolTheme.light();
+    const states = <WidgetState>{};
+
+    expect(theme.textTheme.bodyMedium?.fontFamily, 'Inter');
+    expect(
+      theme.filledButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
+      'Inter',
+    );
+    expect(
+      theme.outlinedButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
+      'Inter',
+    );
+    expect(
+      theme.textButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
+      'Inter',
+    );
+    expect(theme.snackBarTheme.contentTextStyle?.fontFamily, 'Inter');
+    expect(theme.chipTheme.labelStyle?.fontFamily, 'Inter');
+    expect(theme.chipTheme.secondaryLabelStyle?.fontFamily, 'Inter');
+    expect(
+      theme.segmentedButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
+      'Inter',
+    );
+  });
+
   testWidgets('glass navigation honours reduce-motion and semantics', (
     tester,
   ) async {

@@ -70,6 +70,7 @@ abstract final class MoolTheme {
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 15,
             fontWeight: FontWeight.w800,
             letterSpacing: -.1,
@@ -85,7 +86,10 @@ abstract final class MoolTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -98,7 +102,10 @@ abstract final class MoolTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -153,6 +160,7 @@ abstract final class MoolTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xF21B1B2F),
         contentTextStyle: const TextStyle(
+          fontFamily: 'Inter',
           color: Colors.white,
           fontWeight: FontWeight.w600,
         ),
@@ -164,10 +172,12 @@ abstract final class MoolTheme {
         backgroundColor: const Color(0xFFF0F1F7),
         selectedColor: MoolColors.navy,
         labelStyle: const TextStyle(
+          fontFamily: 'Inter',
           color: MoolColors.navy,
           fontWeight: FontWeight.w700,
         ),
         secondaryLabelStyle: const TextStyle(
+          fontFamily: 'Inter',
           color: Colors.white,
           fontWeight: FontWeight.w700,
         ),
@@ -201,7 +211,7 @@ abstract final class MoolTheme {
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontWeight: FontWeight.w800),
+            TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800),
           ),
         ),
       ),

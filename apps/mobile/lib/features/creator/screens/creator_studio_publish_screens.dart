@@ -702,23 +702,20 @@ class _FundedReelTerms extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: MoolSpacing.xs),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: creatorPlacementDays
-                .map(
-                  (days) => Padding(
-                    padding: const EdgeInsets.only(right: MoolSpacing.xs),
-                    child: MoolSegment(
-                      key: Key('creator-reel-days-$days'),
-                      label: '$days day${days == 1 ? '' : 's'}',
-                      selected: session.reelDurationDays == days,
-                      onPressed: () => session.setReelDuration(days),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
+        Wrap(
+          key: const Key('creator-reel-duration-options'),
+          spacing: MoolSpacing.xs,
+          runSpacing: MoolSpacing.xs,
+          children: creatorPlacementDays
+              .map(
+                (days) => MoolSegment(
+                  key: Key('creator-reel-days-$days'),
+                  label: '$days day${days == 1 ? '' : 's'}',
+                  selected: session.reelDurationDays == days,
+                  onPressed: () => session.setReelDuration(days),
+                ),
+              )
+              .toList(),
         ),
         const SizedBox(height: MoolSpacing.xs),
         Text(

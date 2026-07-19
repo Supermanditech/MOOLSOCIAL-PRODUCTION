@@ -61,8 +61,11 @@ void main() {
       reason: 'Current Firebase Apple packages require iOS 15 or newer.',
     );
     expect(
-      frameworkInfo,
-      contains('<key>MinimumOSVersion</key>\n  <string>15.0</string>'),
+      RegExp(
+        r'<key>MinimumOSVersion</key>\s*<string>15\.0</string>',
+      ).hasMatch(frameworkInfo),
+      isTrue,
+      reason: 'The framework minimum must be iOS 15 on every host newline.',
     );
   });
 

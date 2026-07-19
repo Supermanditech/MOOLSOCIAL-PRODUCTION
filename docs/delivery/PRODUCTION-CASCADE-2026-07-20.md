@@ -292,6 +292,10 @@ returns success. Completion requires:
 
 ### PROD-SOC-002 — business-funded 1–7 day Reels
 
+- Source progress: the Creator review experience now exposes every funded
+  duration from 1 through 7 days without hidden horizontal choices, states
+  automatic expiry, and passes compact 140% text regression. Live campaign,
+  media, moderation and ledger services remain pending.
 - Allow only funded campaigns with explicit 1, 2, 3, 4, 5, 6 or 7-day duration
   (24–168 hours), maximum exposure, rights declaration and stop condition.
 - Use a managed media provider behind `MediaGateway`; retain only for the
