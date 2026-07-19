@@ -55,7 +55,7 @@ Last reconciled: 19 July 2026
 | 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Complete in Flutter: POS 74 → 78 → 79 → 78 → 80 → 90; wholesale 74 → 81–89; Business Book 91 → 92 → 106; operated Business Services 93–96; customers/campaigns 97–100; recovery, AI, staff, settings and issues 101–105. Every slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Complete in Flutter: home, Business Book, catalogue, sales-order review, input procurement, dispatch, demand/campaigns, claims/team/settings and operated services passed dedicated black-box, two regression cycles, nine-screen visual gates and two physical-device exact replays |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Complete in Flutter: availability, complete request economics, pickup/OTP, live trip safety, fare/payment, earnings/payout, compliance, support, opportunities and state-aware trip navigation passed dedicated black-box, two regression cycles, eight-screen visual gates and two physical-device exact replays |
-| 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
+| 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Core Creator surface complete in Flutter for 124–132 and 166: Studio, business-funded 1–7 day Reels, YouTube Connect, library, performance, audience, campaigns, earnings, rights and memberships passed two regression cycles, 13 visual gates and three physical-device exact replays. Cross-workspace onboarding, commerce and admin dependencies continue in slices 14–15 |
 | 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
 | 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
 | 16 | Shared account, security, workspace and notification controls | `shared-controls` | 157–162, 165 | Pending |
@@ -472,6 +472,30 @@ Last reconciled: 19 July 2026
 - Delivery tasks remain in the separate Delivery Partner workspace.
 - Identity, request dispatch, maps/location, communications, safety, payment,
   ledger, payout, document and opportunity systems remain replaceable external
+  gateways and are not falsely represented as certified production services.
+
+## Creator operating decisions now locked
+
+- A native promotional Reel is funded by a verified business; the creator does
+  not pay to publish the sponsored campaign deliverable.
+- Native Reels are limited to 60 seconds and use a precise 1, 2, 3, 4, 5, 6 or
+  7 day paid run. They automatically leave the live campaign at expiry.
+- The selected sponsor, reserved creator earning, material connection, paid
+  disclosure, rights and expiry remain visible before publish.
+- Persistent Shorts and long-form video stay on YouTube. YouTube Connect adds
+  one Mool action and may add a time-bound discovery placement without
+  rehosting or claiming ownership of the video.
+- Text and image posts are native formats and do not inherit paid Reel
+  duration.
+- Views, likes and attention do not become guaranteed sales or payable
+  outcomes. Only approved campaign work or paid, non-refunded attributed
+  commerce can move to the creator ledger.
+- Drafts, publication, campaign acceptance, statement preparation, appeals and
+  membership changes are permission checked, failure safe and idempotent.
+- Audience reporting stays aggregated. Private viewer identities, contact
+  books and purchase histories are not exposed to creators.
+- Identity, media, YouTube, moderation, rights, campaign funding, attribution,
+  membership, ledger, tax and payout systems remain replaceable external
   gateways and are not falsely represented as certified production services.
 
 ## Release boundary

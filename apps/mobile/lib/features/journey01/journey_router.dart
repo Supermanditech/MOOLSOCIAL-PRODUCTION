@@ -24,6 +24,12 @@ import '../captain/screens/captain_trip_screens.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
+import '../creator/creator_models.dart';
+import '../creator/creator_session.dart';
+import '../creator/screens/creator_business_screens.dart';
+import '../creator/screens/creator_content_audience_screens.dart';
+import '../creator/screens/creator_studio_publish_screens.dart';
+import '../creator/screens/youtube_connect_screen.dart';
 import '../eat/eat_session.dart';
 import '../eat/screens/eat_basket_screen.dart';
 import '../eat/screens/eat_completed_screen.dart';
@@ -83,6 +89,7 @@ GoRouter createJourneyRouter(
   BuySession buySession,
   CaptainSession captainSession,
   ChatSession chatSession,
+  CreatorSession creatorSession,
   EatSession eatSession,
   ManufacturerSession manufacturerSession,
   PaySession paySession,
@@ -438,6 +445,69 @@ GoRouter createJourneyRouter(
         builder: (context, state) => state.uri.queryParameters['panel'] == 'ai'
             ? RetailerAiAssistantScreen(session: retailerSession)
             : RetailerHomeScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/creator',
+        builder: (context, state) =>
+            CreatorStudioHomeScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/publish',
+        builder: (context, state) {
+          final campaign = state.uri.queryParameters['campaign'];
+          if (campaign != null) {
+            creatorSession
+              ..publishFormat = CreatorPublishFormat.reel
+              ..reelFundingCampaignId = campaign
+              ..sponsored = true;
+          }
+          return CreatorPublishScreen(session: creatorSession);
+        },
+      ),
+      GoRoute(
+        path: '/app/creator/youtube-connect',
+        builder: (context, state) =>
+            CreatorYouTubeConnectScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/content',
+        builder: (context, state) {
+          creatorSession.contentTab =
+              switch (state.uri.queryParameters['tab']) {
+                'drafts' => CreatorContentTab.drafts,
+                'scheduled' => CreatorContentTab.scheduled,
+                'unavailable' => CreatorContentTab.unavailable,
+                _ => CreatorContentTab.published,
+              };
+          return CreatorContentLibraryScreen(session: creatorSession);
+        },
+      ),
+      GoRoute(
+        path: '/app/creator/performance',
+        builder: (context, state) =>
+            CreatorPerformanceScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/audience',
+        builder: (context, state) =>
+            state.uri.queryParameters['tab'] == 'memberships'
+            ? CreatorMembershipsScreen(session: creatorSession)
+            : CreatorAudienceScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/campaigns',
+        builder: (context, state) =>
+            CreatorCampaignsScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/earnings',
+        builder: (context, state) =>
+            CreatorEarningsScreen(session: creatorSession),
+      ),
+      GoRoute(
+        path: '/app/creator/control',
+        builder: (context, state) =>
+            CreatorControlScreen(session: creatorSession),
       ),
       GoRoute(
         path: '/app/captain',
