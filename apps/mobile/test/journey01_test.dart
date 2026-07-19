@@ -217,7 +217,7 @@ void main() {
     addTearDown(session.dispose);
 
     await authenticate(tester, session, initialLocation: '/app/work');
-    expect(find.byKey(const Key('section-work')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(session.returnTo, isNull);
   });
 
@@ -230,12 +230,12 @@ void main() {
     await authenticate(tester, session);
     await tapVisible(tester, const Key('nav-mool'));
     await tapVisible(tester, const Key('mool-action-work'));
-    expect(find.text('Work'), findsWidgets);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
 
-    await tapVisible(tester, const Key('nav-mool'));
+    await tapVisible(tester, const Key('work-dock-mool'));
     expect(find.byKey(const Key('mool-action-buy')), findsOneWidget);
     await tapVisible(tester, const Key('close-mool'));
-    expect(find.byKey(const Key('section-work')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
 
   testWidgets('universal screen visible controls complete their tap intents', (

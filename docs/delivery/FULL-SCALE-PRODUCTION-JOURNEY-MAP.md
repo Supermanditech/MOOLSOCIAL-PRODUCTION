@@ -50,7 +50,7 @@ Last reconciled: 19 July 2026
 | 5 | Ride booking and completion | `ride` | 04, 30–35 | Implemented in Flutter; booking, captain arrival, live trip, explicit payment approval, receipt and support passed dedicated black-box, two full regression cycles and physical-device replay |
 | 6 | Doctor, salon and local task booking | `doctor-booking`, `doctor-invite`, `salon`, `get-it-done` | 03–04, 36–56 | Implemented in Flutter; consent-aware doctor care, complete salon visit and proof-protected local task paths passed dedicated black-box, two full regression cycles and physical-device replay |
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
-| 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Pending |
+| 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
 | 9 | Retailer orders, POS, procurement, books, services, growth and controls | all `retailer-*` operational flows | 13, 74–106 | Pending |
 | 10 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
 | 11 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
@@ -249,6 +249,35 @@ Last reconciled: 19 July 2026
 - RBI/UPI, BBPS, bank reconciliation, KYC/risk, refund/reversal,
   tokenization, QR validation and production support remain replaceable
   external gateways and are not falsely represented as certified.
+
+## Work implementation decisions now locked
+
+- Earn and My Work are separate intents: Earn discovers verified
+  opportunities; My Work creates, reviews and operates the user's own work
+  identities.
+- Applying without a verified workspace saves the exact opportunity and sends
+  the user to My Work. It does not create a false application.
+- One personal MoolSocial account may hold multiple verified workspaces.
+  Starting another work identity does not replace or hide existing work.
+- Business activity, exact profile, contact, business details, proof and
+  declaration remain visible and editable before review submission.
+- An unsupported activity creates a trackable request, not a fake workspace.
+- Optional GST proof can be added now or later. Missing optional GST does not
+  erase the submitted work profile.
+- Proof, submission, GST and status failures keep the user's existing fields
+  and one review reference. Exact retry cannot duplicate a workspace or case.
+- Approval is not the end intent for a retailer. The workspace becomes usable
+  only after one valid product, quantity, household selling price and
+  fulfilment method are confirmed.
+- Home delivery and store collection are explicit retailer capabilities.
+  Store collection is not presented to consumers unless the retailer enables
+  it and the customer chooses that store.
+- Firebase production collection stays disabled in local debug builds that use
+  emulator credentials. Production configuration is a release gate, not a
+  simulated success.
+- Employer funding, work eligibility, KYC/document review, GST validation,
+  payouts, catalogue/inventory, delivery, payment and moderation remain
+  replaceable external gateways and are not falsely represented as certified.
 
 ## Release boundary
 

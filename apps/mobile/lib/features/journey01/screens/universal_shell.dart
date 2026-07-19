@@ -1632,6 +1632,8 @@ class _MoolCommandPalette extends StatelessWidget {
                           ? '/app/book/home'
                           : action == 'pay'
                           ? '/app/pay/home'
+                          : action == 'work'
+                          ? '/app/work/earn'
                           : '/app/$action',
                     ),
                   ),
@@ -2147,10 +2149,10 @@ String _routeForQuery(String value) {
   if (query.contains('recharge')) return '/app/pay/recharge';
   if (query.contains('bill')) return '/app/pay/bills';
   if (query.contains('receipt')) return '/app/pay/receipts';
-  if (query.contains('delivery work')) return '/app/work?sub=delivery';
-  if (query.contains('onboard')) return '/app/work?sub=onboard';
-  if (query.contains('verify')) return '/app/work?sub=verify';
-  if (query.contains('workspace')) return '/app/work?sub=workspace';
+  if (query.contains('delivery work')) return '/app/work/earn';
+  if (query.contains('onboard')) return '/app/work/earn';
+  if (query.contains('verify')) return '/app/work/my-work';
+  if (query.contains('workspace')) return '/app/work/my-work';
   if (query.contains('business chat')) return '/app/chat?sub=business-chat';
   if (query.contains('support')) return '/app/chat?sub=support';
   if (query.contains('order chat')) return '/app/chat?sub=orders';
@@ -2181,7 +2183,7 @@ String _routeForQuery(String value) {
   if (query.contains('work') ||
       query.contains('earn') ||
       query.contains('job')) {
-    return '/app/work';
+    return '/app/work/earn';
   }
   if (query.contains('chat') || query.contains('message')) return '/app/chat';
   if (query.contains('buy') ||
@@ -2573,7 +2575,7 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    context.go('/app/work');
+                    context.go('/app/work/my-work');
                   },
                 ),
                 if (session.errorMessage case final message?)
@@ -2994,6 +2996,9 @@ String _searchActionRoute(String section, String? subAction) {
       'receipts' => '/app/pay/receipts',
       _ => '/app/pay/home',
     };
+  }
+  if (section == 'work') {
+    return subAction == 'workspace' ? '/app/work/my-work' : '/app/work/earn';
   }
   return subAction == null ? '/app/$section' : '/app/$section?sub=$subAction';
 }

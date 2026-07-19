@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../book/book_session.dart';
@@ -39,6 +40,9 @@ import '../ride/ride_session.dart';
 import '../ride/screens/ride_booking_screen.dart';
 import '../ride/screens/ride_support_screen.dart';
 import '../ride/screens/ride_trip_screen.dart';
+import '../work/screens/work_earn_screens.dart';
+import '../work/screens/work_onboarding_screens.dart';
+import '../work/work_session.dart';
 import 'journey_session.dart';
 import 'screens/boot_screen.dart';
 import 'screens/setup_screen.dart';
@@ -53,10 +57,12 @@ GoRouter createJourneyRouter(
   ChatSession chatSession,
   EatSession eatSession,
   PaySession paySession,
-  RideSession rideSession, {
+  RideSession rideSession,
+  WorkSession workSession, {
   String initialLocation = '/boot',
 }) {
-  return GoRouter(
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: initialLocation,
     refreshListenable: session,
     redirect: (context, state) {
@@ -79,6 +85,12 @@ GoRouter createJourneyRouter(
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
           if (!protected) return session.readyRoute();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (session.isReady &&
+                router.routeInformationProvider.value.uri.path == location) {
+              session.confirmReadyRoute(location);
+            }
+          });
           return null;
       }
     },
@@ -392,6 +404,56 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/work',
+        builder: (context, state) => WorkEarnScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/mool',
+        builder: (context, state) {
+          session.openMoolFrom('work');
+          return UniversalShell(session: session, section: 'mool');
+        },
+      ),
+      GoRoute(
+        path: '/app/work/earn',
+        builder: (context, state) => WorkEarnScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/opportunity/:opportunityId',
+        builder: (context, state) => WorkOpportunityScreen(
+          session: workSession,
+          opportunityId:
+              state.pathParameters['opportunityId'] ?? 'mool-explainer',
+        ),
+      ),
+      GoRoute(
+        path: '/app/work/my-work',
+        builder: (context, state) => MyWorkScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/choose',
+        builder: (context, state) =>
+            WorkChooseActivityScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/proof',
+        builder: (context, state) =>
+            WorkProfileProofScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/status',
+        builder: (context, state) =>
+            WorkVerificationStatusScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/ready',
+        builder: (context, state) => WorkspaceReadyScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/retailer/setup',
+        builder: (context, state) => RetailerSetupScreen(session: workSession),
+      ),
+      GoRoute(
         path: '/app/:section',
         builder: (context, state) => UniversalShell(
           session: session,
@@ -401,4 +463,5 @@ GoRouter createJourneyRouter(
       ),
     ],
   );
+  return router;
 }

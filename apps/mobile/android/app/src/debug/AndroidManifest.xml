@@ -4,5 +4,24 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <application android:usesCleartextTraffic="true"/>
+    <application android:usesCleartextTraffic="true">
+        <!--
+          Local builds use the Firebase Emulator Suite with deliberately
+          non-production credentials. Disable SDKs that contact Google-hosted
+          Firebase services so a placeholder API key can never terminate the
+          app while the real Firebase project is being provisioned.
+        -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_performance_collection_enabled"
+            android:value="false" />
+    </application>
 </manifest>

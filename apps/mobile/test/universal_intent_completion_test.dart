@@ -82,7 +82,8 @@ void main() {
                   'bills',
                   'scan-pay',
                   'receipts',
-                }.contains(spec.id))) {
+                }.contains(spec.id)) ||
+            section == 'work') {
           continue;
         }
         await tapVisible(tester, Key('sub-action-$section-${spec.id}'));
@@ -222,6 +223,21 @@ void main() {
     },
   );
 
+  testWidgets('Work production entries open Earn and My Work routes', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'work');
+
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('work-dock-my-work'));
+    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('work-dock-earn'));
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+  });
+
   testWidgets('Mool palette reaches every main action and returns safely', (
     tester,
   ) async {
@@ -248,6 +264,9 @@ void main() {
       } else if (section == 'pay') {
         expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
         await tapVisible(tester, const Key('pay-dock-mool'));
+      } else if (section == 'work') {
+        expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+        await tapVisible(tester, const Key('work-dock-mool'));
       } else {
         expect(find.byKey(Key('section-$section')), findsOneWidget);
         await tapVisible(tester, const Key('nav-mool'));
@@ -497,7 +516,7 @@ void main() {
     await tapVisible(tester, const Key('nav-mool'));
     expect(find.byKey(const Key('mool-action-work')), findsOneWidget);
     await tapVisible(tester, const Key('mool-action-work'));
-    expect(find.byKey(const Key('section-work')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

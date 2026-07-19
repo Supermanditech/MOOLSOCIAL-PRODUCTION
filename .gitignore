@@ -63,3 +63,11 @@ artifacts/device/*
 !artifacts/device/moolsocial-production-pay-status-device.png
 !artifacts/device/moolsocial-production-pay-status-fixed-device.png
 !artifacts/device/moolsocial-production-pay-status-completed-device.png
+!artifacts/device/moolsocial-production-work-earn-device.png
+!artifacts/device/moolsocial-production-work-opportunity-device.png
+!artifacts/device/moolsocial-production-work-choose-device.png
+!artifacts/device/moolsocial-production-work-proof-device.png
+!artifacts/device/moolsocial-production-work-status-device.png
+!artifacts/device/moolsocial-production-workspace-ready-device.png
+!artifacts/device/moolsocial-production-retailer-setup-device.png
+!artifacts/device/moolsocial-production-retailer-live-device.png
