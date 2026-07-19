@@ -54,7 +54,7 @@ Last reconciled: 19 July 2026
 | 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
 | 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Complete in Flutter: POS 74 → 78 → 79 → 78 → 80 → 90; wholesale 74 → 81–89; Business Book 91 → 92 → 106; operated Business Services 93–96; customers/campaigns 97–100; recovery, AI, staff, settings and issues 101–105. Every slice passed dedicated black-box, two regression cycles, visual gates and physical-device replay |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Complete in Flutter: home, Business Book, catalogue, sales-order review, input procurement, dispatch, demand/campaigns, claims/team/settings and operated services passed dedicated black-box, two regression cycles, nine-screen visual gates and two physical-device exact replays |
-| 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
+| 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Complete in Flutter: availability, complete request economics, pickup/OTP, live trip safety, fare/payment, earnings/payout, compliance, support, opportunities and state-aware trip navigation passed dedicated black-box, two regression cycles, eight-screen visual gates and two physical-device exact replays |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
 | 14 | Freelancer operations and service-provider workspace | `earn-operations`, `provider-workspace` | 133–146 | Pending |
 | 15 | Superadmin operations and dynamic user-type offerings | `admin-operations` | 147–156, 163–164 | Pending |
@@ -447,6 +447,32 @@ Last reconciled: 19 July 2026
   attribution, identity and service-entitlement systems remain replaceable
   external gateways and are not falsely represented as certified production
   services.
+
+## Captain operating decisions now locked
+
+- Location sharing for new rides begins only after the Captain explicitly goes
+  Online and stops after the Captain goes Offline.
+- A ride decision exposes pickup, destination, distance, duration, fare,
+  platform charge, estimated fuel and expected net earning before acceptance.
+- Accept, decline, trip start, destination arrival, payment confirmation,
+  verification, support and opportunity application are permission checked,
+  failure safe and idempotent.
+- Pickup confirmation requires current pickup location and the matching rider
+  OTP; destination completion requires a started trip and current destination
+  location.
+- The persistent Trip action follows pickup, live and fare-completion state;
+  it never sends an active Captain back to the beginning.
+- A failed payment check cannot close a trip or credit earnings. One confirmed
+  receipt credits one trip earning and exposes its charge breakdown.
+- Vehicle requirements are derived from vehicle and service use. Verification
+  requires explicit consent and never changes eligibility before confirmation.
+- Safety, support and found-item paths retain the relevant trip and vehicle
+  context. Paid opportunities disclose geography, payment, approval rule,
+  proof and capacity before application.
+- Delivery tasks remain in the separate Delivery Partner workspace.
+- Identity, request dispatch, maps/location, communications, safety, payment,
+  ledger, payout, document and opportunity systems remain replaceable external
+  gateways and are not falsely represented as certified production services.
 
 ## Release boundary
 

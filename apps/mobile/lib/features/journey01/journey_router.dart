@@ -16,6 +16,11 @@ import '../buy/screens/buy_problem_screen.dart';
 import '../buy/screens/buy_product_screen.dart';
 import '../buy/screens/buy_review_screen.dart';
 import '../buy/screens/buy_tracking_screen.dart';
+import '../captain/captain_models.dart';
+import '../captain/captain_session.dart';
+import '../captain/screens/captain_business_screens.dart';
+import '../captain/screens/captain_home_request_screens.dart';
+import '../captain/screens/captain_trip_screens.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
@@ -76,6 +81,7 @@ GoRouter createJourneyRouter(
   JourneySession session,
   BookSession bookSession,
   BuySession buySession,
+  CaptainSession captainSession,
   ChatSession chatSession,
   EatSession eatSession,
   ManufacturerSession manufacturerSession,
@@ -432,6 +438,65 @@ GoRouter createJourneyRouter(
         builder: (context, state) => state.uri.queryParameters['panel'] == 'ai'
             ? RetailerAiAssistantScreen(session: retailerSession)
             : RetailerHomeScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/captain',
+        builder: (context, state) => CaptainHomeScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/requests',
+        builder: (context, state) =>
+            CaptainRideRequestScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/trips/:tripId/pickup',
+        builder: (context, state) =>
+            CaptainPickupScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/trips/:tripId/complete',
+        builder: (context, state) =>
+            CaptainFareCompletionScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/trips/:tripId',
+        builder: (context, state) =>
+            CaptainLiveTripScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/earnings',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'week' => CaptainEarningsTab.week,
+            'payouts' => CaptainEarningsTab.payouts,
+            _ => CaptainEarningsTab.today,
+          };
+          captainSession.earningsTab = tab;
+          return CaptainEarningsScreen(
+            session: captainSession,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/captain/compliance',
+        builder: (context, state) =>
+            CaptainComplianceScreen(session: captainSession),
+      ),
+      GoRoute(
+        path: '/app/captain/support-work',
+        builder: (context, state) {
+          final tab = switch (state.uri.queryParameters['tab']) {
+            'work' => CaptainSupportTab.paidWork,
+            'vehicle' => CaptainSupportTab.vehicle,
+            _ => CaptainSupportTab.support,
+          };
+          captainSession.supportTab = tab;
+          return CaptainSupportWorkScreen(
+            session: captainSession,
+            initialTab: tab,
+          );
+        },
       ),
       GoRoute(
         path: '/app/manufacturer',
