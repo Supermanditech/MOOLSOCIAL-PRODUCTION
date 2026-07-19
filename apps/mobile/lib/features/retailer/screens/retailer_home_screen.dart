@@ -77,7 +77,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
               IconButton.outlined(
                 key: const Key('retailer-business-book'),
                 tooltip: 'Open Business Book',
-                onPressed: widget.session.openBusinessBook,
+                onPressed: () => context.go('/app/retailer/books/sales'),
                 icon: const Icon(Icons.auto_stories_outlined),
               ),
               const SizedBox(width: MoolSpacing.xxs),
@@ -243,9 +243,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
               keyName: 'retailer-new-order',
               label: 'Create order',
               icon: Icons.add_shopping_cart_rounded,
-              onTap: () => widget.session.showNotice(
-                'Create Order will open counter, phone and assisted-order choices. Current customer orders remain saved.',
-              ),
+              onTap: () => context.go('/app/retailer/orders/new'),
             ),
             _QuickAction(
               keyName: 'retailer-open-stock',
@@ -260,9 +258,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
               keyName: 'retailer-send-invoice',
               label: 'Send invoice',
               icon: Icons.send_to_mobile_outlined,
-              onTap: () => widget.session.showNotice(
-                'Choose a completed sale before sending its tax invoice.',
-              ),
+              onTap: () => context.go('/app/retailer/books/sales'),
             ),
           ],
         ),

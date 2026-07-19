@@ -1,15 +1,25 @@
 import 'package:flutter/foundation.dart';
 
 import 'retailer_models.dart';
+import 'retailer_pos_models.dart';
+import 'retailer_pos_services.dart';
 import 'retailer_services.dart';
 
 class RetailerSession extends ChangeNotifier {
-  RetailerSession({ReviewRetailerGateway? gateway})
-    : gateway = gateway ?? ReviewRetailerGateway(),
-      orders = buildReviewRetailerOrders();
+  RetailerSession({
+    ReviewRetailerGateway? gateway,
+    ReviewRetailerPosGateway? posGateway,
+  }) : gateway = gateway ?? ReviewRetailerGateway(),
+       posGateway = posGateway ?? ReviewRetailerPosGateway(),
+       orders = buildReviewRetailerOrders(),
+       counters = buildReviewCounters(),
+       sales = buildReviewSales();
 
   final ReviewRetailerGateway gateway;
+  final ReviewRetailerPosGateway posGateway;
   final List<RetailerOrder> orders;
+  final List<RetailerCounter> counters;
+  final List<RetailerSaleRecord> sales;
 
   RetailerHomeView view = RetailerHomeView.home;
   bool ordersOnline = true;
@@ -23,6 +33,27 @@ class RetailerSession extends ChangeNotifier {
   String? selectedIssueReason;
   bool handoverOtpVisible = false;
   bool businessBookRecorded = false;
+
+  RetailerOrderSource posSource = RetailerOrderSource.phone;
+  RetailerFulfilment posFulfilment = RetailerFulfilment.moolDelivery;
+  RetailerPosPayment posPayment = RetailerPosPayment.paymentRequest;
+  final Map<String, int> posCart = {'oil': 1, 'atta': 1, 'salt': 0};
+  String activeCounterId = 'CTR-01';
+  String customerMobile = '';
+  bool customerKnown = true;
+  bool posOnline = true;
+  bool cashConfirmed = false;
+  bool customerMessagingConsent = true;
+  bool businessBookAuthorized = true;
+  String? posOrderId;
+  String? posInvoiceId;
+  String? lastSharedChannel;
+  String? lastExportFormat;
+  RetailerSalesBookView salesBookView = RetailerSalesBookView.sales;
+  RetailerSaleSource? salesSourceFilter;
+  bool salesDueOnly = false;
+  String salesSearchQuery = '';
+  String? selectedSaleId;
 
   List<RetailerOrder> get filteredOrders {
     final query = searchQuery.trim().toLowerCase();
@@ -56,6 +87,89 @@ class RetailerSession extends ChangeNotifier {
             order.stage != RetailerOrderStage.cannotFulfil,
       )
       .length;
+
+  RetailerCounter get activeCounter => counters.firstWhere(
+    (counter) => counter.id == activeCounterId,
+    orElse: () => counters.first,
+  );
+
+  List<RetailerPosProduct> get posProducts => reviewPosProducts;
+
+  int posQuantity(String productId) => posCart[productId] ?? 0;
+
+  int get posItemCount => reviewPosProducts.fold(
+    0,
+    (sum, product) => sum + posQuantity(product.id),
+  );
+
+  int get posSubtotal => reviewPosProducts.fold(
+    0,
+    (sum, product) => sum + (posQuantity(product.id) * product.price),
+  );
+
+  int get posDeliveryFee =>
+      posFulfilment == RetailerFulfilment.moolDelivery ? 48 : 0;
+
+  int get posTotal => posSubtotal + posDeliveryFee;
+
+  bool get posSaleCompleted => posInvoiceId != null;
+
+  List<RetailerPosPayment> get availablePosPayments =>
+      posSource == RetailerOrderSource.counter
+      ? const [
+          RetailerPosPayment.cash,
+          RetailerPosPayment.upi,
+          RetailerPosPayment.card,
+        ]
+      : const [
+          RetailerPosPayment.paymentRequest,
+          RetailerPosPayment.onDelivery,
+          RetailerPosPayment.due,
+        ];
+
+  List<RetailerSaleRecord> get visibleSales {
+    final query = salesSearchQuery.trim().toLowerCase();
+    return sales
+        .where((sale) {
+          final viewMatches = switch (salesBookView) {
+            RetailerSalesBookView.sales =>
+              sale.status != RetailerSaleStatus.returned,
+            RetailerSalesBookView.payments =>
+              sale.status == RetailerSaleStatus.due,
+            RetailerSalesBookView.returns =>
+              sale.status == RetailerSaleStatus.returned,
+          };
+          final sourceMatches =
+              salesSourceFilter == null || sale.source == salesSourceFilter;
+          final dueMatches =
+              !salesDueOnly || sale.status == RetailerSaleStatus.due;
+          final searchMatches =
+              query.isEmpty ||
+              '${sale.invoiceId} ${sale.title} ${sale.customer} ${sale.orderId}'
+                  .toLowerCase()
+                  .contains(query);
+          return viewMatches && sourceMatches && dueMatches && searchMatches;
+        })
+        .toList(growable: false);
+  }
+
+  RetailerSaleRecord? get selectedSale {
+    final id = selectedSaleId;
+    if (id == null) return null;
+    for (final sale in sales) {
+      if (sale.invoiceId == id) return sale;
+    }
+    return null;
+  }
+
+  int get counterSalesTotal =>
+      counters.fold(0, (sum, counter) => sum + counter.salesAmount);
+
+  int get counterOrderTotal =>
+      counters.fold(0, (sum, counter) => sum + counter.orderCount);
+
+  int get openCounterCount =>
+      counters.where((counter) => counter.isOpen).length;
 
   void clearMessages() {
     errorMessage = null;
@@ -381,6 +495,555 @@ class RetailerSession extends ChangeNotifier {
       businessBookRecorded
           ? '₹${selectedOrder?.amount ?? 1240} sale and delivery proof are recorded in Business Book.'
           : 'Business Book is ready. This order will post only after delivery completion.',
+    );
+  }
+
+  void ensurePosOrderSource(RetailerOrderSource value, {String? counterId}) {
+    if (posOrderId == null) {
+      posSource = value;
+      customerKnown = value != RetailerOrderSource.counter;
+      posFulfilment = value == RetailerOrderSource.counter
+          ? RetailerFulfilment.counter
+          : RetailerFulfilment.moolDelivery;
+      posPayment = value == RetailerOrderSource.counter
+          ? RetailerPosPayment.upi
+          : RetailerPosPayment.paymentRequest;
+    }
+    if (counterId != null &&
+        counters.any((counter) => counter.id == counterId)) {
+      activeCounterId = counterId;
+    }
+  }
+
+  void selectPosSource(RetailerOrderSource value) {
+    if (posOrderId != null) {
+      _showError('Start a new order before changing how this order began.');
+      return;
+    }
+    clearMessages();
+    posSource = value;
+    customerKnown = value != RetailerOrderSource.counter;
+    customerMobile = '';
+    posFulfilment = value == RetailerOrderSource.counter
+        ? RetailerFulfilment.counter
+        : RetailerFulfilment.moolDelivery;
+    posPayment = value == RetailerOrderSource.counter
+        ? RetailerPosPayment.upi
+        : RetailerPosPayment.paymentRequest;
+    cashConfirmed = false;
+    notifyListeners();
+  }
+
+  void setCustomerMobile(String value) {
+    customerMobile = value.replaceAll(RegExp(r'\D'), '');
+    clearMessages();
+  }
+
+  bool findCounterCustomer() {
+    if (customerMobile.length != 10) {
+      _showError(
+        'Enter a 10-digit mobile number, or continue without customer details.',
+      );
+      return false;
+    }
+    customerKnown = true;
+    customerMessagingConsent = true;
+    clearMessages();
+    noticeMessage =
+        'Sharma Family found. Purchase history and invoice delivery are ready.';
+    notifyListeners();
+    return true;
+  }
+
+  void continueWithoutCustomer() {
+    customerKnown = false;
+    customerMobile = '';
+    customerMessagingConsent = false;
+    clearMessages();
+    noticeMessage =
+        'Counter sale can continue without personal customer details.';
+    notifyListeners();
+  }
+
+  void changeCounterCustomer() {
+    customerKnown = false;
+    customerMobile = '';
+    customerMessagingConsent = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setCustomerMessagingConsent(bool value) {
+    customerMessagingConsent = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void adjustPosQuantity(String productId, int change) {
+    if (posOrderId != null) {
+      _showError('Choose Edit order before changing reserved products.');
+      return;
+    }
+    final product = reviewPosProducts.firstWhere(
+      (item) => item.id == productId,
+    );
+    final current = posQuantity(productId);
+    final next = (current + change).clamp(0, product.stock).toInt();
+    clearMessages();
+    if (next == current && change > 0) {
+      noticeMessage =
+          '${product.name} is limited to ${product.stock} available packs.';
+    } else {
+      posCart[productId] = next;
+    }
+    notifyListeners();
+  }
+
+  void clearPosCart() {
+    if (posOrderId != null) return;
+    for (final product in reviewPosProducts) {
+      posCart[product.id] = 0;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void useRepeatBasket() {
+    if (posOrderId != null) return;
+    posCart
+      ..['oil'] = 1
+      ..['atta'] = 2
+      ..['salt'] = 1;
+    clearMessages();
+    noticeMessage = 'The last verified basket is ready for review.';
+    notifyListeners();
+  }
+
+  void useBarcodeResult({bool permissionDenied = false}) {
+    if (permissionDenied) {
+      _showError(
+        'Camera access was not allowed. Search My Stock or enable camera access in device settings.',
+      );
+      return;
+    }
+    adjustPosQuantity('salt', 1);
+    showNotice('Tata Salt matched in My Stock and was added once.');
+  }
+
+  void useVoiceResult({bool permissionDenied = false}) {
+    if (permissionDenied) {
+      _showError(
+        'Microphone access was not allowed. Search My Stock or enable microphone access in device settings.',
+      );
+      return;
+    }
+    adjustPosQuantity('atta', 1);
+    showNotice('“One atta 1 kg” matched and was added once.');
+  }
+
+  void selectPosFulfilment(RetailerFulfilment value) {
+    if (posOrderId != null) return;
+    clearMessages();
+    posFulfilment = value;
+    notifyListeners();
+  }
+
+  void selectPosPayment(RetailerPosPayment value) {
+    if (posSaleCompleted) return;
+    clearMessages();
+    posPayment = value;
+    cashConfirmed = value != RetailerPosPayment.cash;
+    notifyListeners();
+  }
+
+  Future<bool> createPosOrder() async {
+    if (posOrderId != null) {
+      showNotice('$posOrderId is already created. No duplicate was added.');
+      return true;
+    }
+    if (posItemCount == 0) {
+      _showError(
+        'Add at least one available product before creating the order.',
+      );
+      return false;
+    }
+    if (!availablePosPayments.contains(posPayment)) {
+      _showError('Choose a payment option available for this order source.');
+      return false;
+    }
+    if (!posOnline) {
+      _showError(
+        'You are offline. The draft remains on this device; reconnect and retry to reserve stock.',
+      );
+      return false;
+    }
+    final fingerprint =
+        '${posSource.name}-${posCart.entries.map((item) => '${item.key}:${item.value}').join(',')}-${posFulfilment.name}-${posPayment.name}';
+    return _runBool(
+      () async {
+        posOrderId = await posGateway.createOrder(fingerprint);
+      },
+      success: 'Order created. Products are reserved once for this customer.',
+      afterSuccess: () {
+        final id = posOrderId!;
+        if (posSource != RetailerOrderSource.counter &&
+            !orders.any((order) => order.id == id)) {
+          orders.insert(
+            0,
+            RetailerOrder(
+              id: id,
+              customer: customerKnown ? 'Sharma Family' : 'Phone customer',
+              area: 'Sardarpura · assisted order',
+              payment: '${posPayment.label} · ₹$posTotal',
+              fulfilment: posFulfilment.label,
+              deliveryPromise: posFulfilment == RetailerFulfilment.counter
+                  ? 'Collect at shop'
+                  : 'Delivery promise shown after acceptance',
+              amount: posTotal,
+              stage: RetailerOrderStage.accepted,
+              lines: [
+                for (final product in reviewPosProducts.where(
+                  (item) => posQuantity(item.id) > 0,
+                ))
+                  RetailerOrderLine(
+                    id: product.id,
+                    name: product.name,
+                    detail: product.pack,
+                    quantity: posQuantity(product.id),
+                    amount: product.price * posQuantity(product.id),
+                  ),
+              ],
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  void editCreatedPosOrder() {
+    posOrderId = null;
+    posInvoiceId = null;
+    cashConfirmed = posPayment != RetailerPosPayment.cash;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void startNewPosOrder({RetailerOrderSource? source}) {
+    posOrderId = null;
+    posInvoiceId = null;
+    lastSharedChannel = null;
+    cashConfirmed = false;
+    customerMobile = '';
+    for (final product in reviewPosProducts) {
+      posCart[product.id] = 0;
+    }
+    selectPosSource(source ?? RetailerOrderSource.counter);
+  }
+
+  void ensureSaleReady() {
+    if (posOrderId != null) return;
+    posSource = RetailerOrderSource.counter;
+    posFulfilment = RetailerFulfilment.counter;
+    posPayment = RetailerPosPayment.upi;
+    customerKnown = true;
+    customerMessagingConsent = true;
+    posCart
+      ..['oil'] = 1
+      ..['atta'] = 1
+      ..['salt'] = 1;
+    posOrderId = 'RT-3028';
+  }
+
+  void confirmCashReceived(bool value) {
+    cashConfirmed = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> completePosSale() async {
+    ensureSaleReady();
+    if (posInvoiceId != null) {
+      showNotice(
+        '$posInvoiceId is already complete. No second sale was posted.',
+      );
+      return true;
+    }
+    if (posPayment == RetailerPosPayment.cash && !cashConfirmed) {
+      _showError(
+        'Confirm that ₹$posTotal cash was received before completing the sale.',
+      );
+      return false;
+    }
+    if (!posOnline) {
+      _showError(
+        'You are offline. Payment is not posted; reconnect and retry before handing over the receipt.',
+      );
+      return false;
+    }
+    final orderId = posOrderId!;
+    final succeeded = await _runBool(
+      () async {
+        posInvoiceId = await posGateway.completeSale(orderId, posPayment.name);
+      },
+      success:
+          'Sale complete. Stock, payment, invoice and Sales Book were posted once.',
+    );
+    if (!succeeded) return false;
+    final invoiceId = posInvoiceId!;
+    if (!sales.any((sale) => sale.invoiceId == invoiceId)) {
+      sales.insert(
+        0,
+        RetailerSaleRecord(
+          invoiceId: invoiceId,
+          source: RetailerSaleSource.counter,
+          title: 'Counter ${activeCounter.number} · ${activeCounter.purpose}',
+          subtitle: 'Sharma Family · $posItemCount items · just now',
+          amount: posTotal,
+          payment: '${posPayment.label} received',
+          status: RetailerSaleStatus.paid,
+          customer: customerKnown ? 'Sharma Family' : 'Counter customer',
+          orderId: orderId,
+          fulfilment: posFulfilment.label,
+          stockPosting: '$posItemCount units posted',
+          margin: '₹64',
+        ),
+      );
+      activeCounter
+        ..orderCount += 1
+        ..salesAmount += posTotal
+        ..activity.insert(
+          0,
+          '$orderId · ${posPayment.label} paid · ₹$posTotal',
+        );
+      businessBookRecorded = true;
+      notifyListeners();
+    }
+    return true;
+  }
+
+  Future<bool> sharePosInvoice(String channel) async {
+    final invoiceId = posInvoiceId;
+    if (invoiceId == null) {
+      _showError('Complete the sale before sending its invoice.');
+      return false;
+    }
+    if ((channel == 'WhatsApp' || channel == 'SMS') &&
+        !customerMessagingConsent) {
+      _showError(
+        'Customer consent is required before sending an invoice by $channel.',
+      );
+      return false;
+    }
+    if (lastSharedChannel == channel) {
+      showNotice('Invoice $invoiceId was already prepared for $channel.');
+      return true;
+    }
+    if (!posOnline) {
+      _showError(
+        'Reconnect before sending the invoice. The sale remains complete.',
+      );
+      return false;
+    }
+    return _runBool(
+      () => posGateway.shareInvoice(invoiceId, channel),
+      success: channel == 'QR / Print'
+          ? 'Invoice QR is ready for the customer.'
+          : 'Invoice $invoiceId sent by $channel.',
+      afterSuccess: () => lastSharedChannel = channel,
+    );
+  }
+
+  void selectCounter(String id) {
+    if (!counters.any((counter) => counter.id == id)) return;
+    activeCounterId = id;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> createCounter({
+    required String purpose,
+    required String operatorName,
+    required bool open,
+  }) async {
+    final cleanPurpose = purpose.trim();
+    final cleanOperator = operatorName.trim();
+    if (cleanPurpose.length < 3) {
+      _showError('Enter a clear counter purpose, such as Main Billing.');
+      return false;
+    }
+    if (counters.any(
+      (counter) => counter.purpose.toLowerCase() == cleanPurpose.toLowerCase(),
+    )) {
+      _showError(
+        'A $cleanPurpose counter already exists. Choose it or use another purpose.',
+      );
+      return false;
+    }
+    if (!posOnline) {
+      _showError('Reconnect before creating a counter.');
+      return false;
+    }
+    final number = counters.length + 1;
+    final id = 'CTR-${number.toString().padLeft(2, '0')}';
+    return _runBool(
+      () => posGateway.saveCounter(id),
+      success: 'Counter $number created and ready for shop orders.',
+      afterSuccess: () {
+        counters.add(
+          RetailerCounter(
+            id: id,
+            number: number,
+            purpose: cleanPurpose,
+            operatorName: cleanOperator.isEmpty ? 'Unassigned' : cleanOperator,
+            isOpen: open,
+            orderCount: 0,
+            salesAmount: 0,
+            activity: [],
+          ),
+        );
+        activeCounterId = id;
+      },
+    );
+  }
+
+  Future<bool> updateActiveCounter({
+    required String purpose,
+    required String operatorName,
+    required bool open,
+  }) async {
+    final counter = activeCounter;
+    final cleanPurpose = purpose.trim();
+    if (cleanPurpose.length < 3) {
+      _showError('Enter a clear counter purpose before saving changes.');
+      return false;
+    }
+    if (counters.any(
+      (item) =>
+          item.id != counter.id &&
+          item.purpose.toLowerCase() == cleanPurpose.toLowerCase(),
+    )) {
+      _showError('Another counter already uses that purpose.');
+      return false;
+    }
+    if (!posOnline) {
+      _showError('Reconnect before saving counter changes.');
+      return false;
+    }
+    return _runBool(
+      () => posGateway.saveCounter(counter.id),
+      success: 'Counter ${counter.number} changes saved.',
+      afterSuccess: () {
+        counter
+          ..purpose = cleanPurpose
+          ..operatorName = operatorName.trim().isEmpty
+              ? 'Unassigned'
+              : operatorName.trim()
+          ..isOpen = open;
+      },
+    );
+  }
+
+  Future<bool> setActiveCounterOpen(bool open) async {
+    final counter = activeCounter;
+    if (counter.isOpen == open) {
+      showNotice(
+        'Counter ${counter.number} is already ${open ? 'open' : 'closed'}.',
+      );
+      return true;
+    }
+    if (!posOnline) {
+      _showError('Reconnect before changing counter availability.');
+      return false;
+    }
+    return _runBool(
+      () => posGateway.setCounterOpen(counter.id, open),
+      success:
+          'Counter ${counter.number} is ${open ? 'open for orders' : 'closed safely'}.',
+      afterSuccess: () => counter.isOpen = open,
+    );
+  }
+
+  void setPosConnectivity(bool online) {
+    posOnline = online;
+    clearMessages();
+    noticeMessage = online
+        ? 'Connection restored. You can retry the pending action.'
+        : 'Offline. Drafts remain visible, but stock and payment changes will wait.';
+    notifyListeners();
+  }
+
+  void setSalesBookView(RetailerSalesBookView value) {
+    salesBookView = value;
+    salesDueOnly = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setSalesSourceFilter(RetailerSaleSource? value, {bool dueOnly = false}) {
+    salesSourceFilter = value;
+    salesDueOnly = dueOnly;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void searchSales(String value) {
+    salesSearchQuery = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void clearSalesFilters() {
+    salesSearchQuery = '';
+    salesSourceFilter = null;
+    salesDueOnly = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void selectSale(String invoiceId) {
+    selectedSaleId = invoiceId;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void reviewPaymentAttention() {
+    salesBookView = RetailerSalesBookView.payments;
+    salesSourceFilter = null;
+    salesDueOnly = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> refreshSalesBook() async {
+    if (!businessBookAuthorized) {
+      _showError('Your current shop role cannot open financial records.');
+      return false;
+    }
+    if (!posOnline) {
+      _showError(
+        'The Sales Book is offline. Existing records remain available.',
+      );
+      return false;
+    }
+    return _runBool(
+      posGateway.refreshSales,
+      success: 'Sales Book is current. No sale was duplicated.',
+    );
+  }
+
+  Future<bool> exportSalesBook(String format) async {
+    if (!businessBookAuthorized) {
+      _showError('Owner or accountant permission is required for exports.');
+      return false;
+    }
+    if (!posOnline) {
+      _showError('Reconnect before creating a period-locked sales export.');
+      return false;
+    }
+    return _runBool(
+      () => posGateway.exportSales(format),
+      success: '$format is ready for the selected sales period.',
+      afterSuccess: () => lastExportFormat = format,
     );
   }
 

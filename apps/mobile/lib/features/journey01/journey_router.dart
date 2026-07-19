@@ -41,10 +41,13 @@ import '../ride/screens/ride_booking_screen.dart';
 import '../ride/screens/ride_support_screen.dart';
 import '../ride/screens/ride_trip_screen.dart';
 import '../retailer/retailer_models.dart';
+import '../retailer/retailer_pos_models.dart';
 import '../retailer/retailer_session.dart';
 import '../retailer/screens/retailer_delivery_screens.dart';
 import '../retailer/screens/retailer_home_screen.dart';
 import '../retailer/screens/retailer_order_screen.dart';
+import '../retailer/screens/retailer_pos_screens.dart';
+import '../retailer/screens/retailer_sales_book_screen.dart';
 import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
@@ -439,6 +442,33 @@ GoRouter createJourneyRouter(
           session: retailerSession,
           initialView: RetailerHomeView.orders,
         ),
+      ),
+      GoRoute(
+        path: '/app/retailer/orders/new',
+        builder: (context, state) => RetailerCreateOrderScreen(
+          session: retailerSession,
+          initialSource: switch (state.uri.queryParameters['source']) {
+            'counter' => RetailerOrderSource.counter,
+            'chat' => RetailerOrderSource.chat,
+            _ => RetailerOrderSource.phone,
+          },
+          counterId: state.uri.queryParameters['counterId'],
+        ),
+      ),
+      GoRoute(
+        path: '/app/retailer/pos/counters',
+        builder: (context, state) =>
+            RetailerCounterManagementScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/pos/sales/new',
+        builder: (context, state) =>
+            RetailerCounterSaleScreen(session: retailerSession),
+      ),
+      GoRoute(
+        path: '/app/retailer/books/sales',
+        builder: (context, state) =>
+            RetailerSalesBookScreen(session: retailerSession),
       ),
       GoRoute(
         path: '/app/retailer/orders/:orderId/tracking',

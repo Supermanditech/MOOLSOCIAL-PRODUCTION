@@ -52,7 +52,7 @@ Last reconciled: 19 July 2026
 | 7 | Recharge, bills, scan, request, refund and reversal | `pay-recharge`, `pay-bills`, `pay-scan`, `pay-request`, `pay-refund`, `pay-failure` | 04, 57–66 | Implemented in Flutter; safe debit confirmation, requests, pending lockout, failed-no-debit retry, refund and reversal passed dedicated black-box, two full regression cycles and physical-device replay |
 | 8 | Work identity and retailer onboarding | `earn-workspace`, `retailer-onboarding` | 04, 67–74 | Implemented in Flutter; opportunity, identity, proof, review and first live retailer product passed dedicated black-box, two full regression cycles and physical-device exact crash replay |
 | 9 | Retailer customer orders and delivery | `retailer-orders` | 13, 74–77 | Implemented in Flutter; paid-order acceptance, complete packing, captain assignment, OTP handover, tracking, receipt and Business Book entry passed dedicated black-box, two full regression cycles and physical-device integration replay |
-| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | Pending |
+| 10 | Retailer POS, procurement, books, services, growth and controls | remaining `retailer-*` operational flows | 74, 78–106 | POS flow 74 → 78 → 79 → 78 → 80 → 90 implemented; dedicated black-box, two full regressions and physical-device replay passed. Wholesale, remaining books, services, growth and controls are pending |
 | 11 | Manufacturer sales, procurement, growth and control | all `manufacturer-*` flows | 107–115 | Pending |
 | 12 | Captain ride and earnings | `captain-workspace` | 116–123 | Pending |
 | 13 | Creator studio, campaigns, commerce share, membership, licensing and YouTube Connect | all `creator-*` flows plus screen 166 | 05–07, 09, 12, 14, 17–18, 99–100, 113, 124–137, 152, 154, 156, 166 | Pending |
@@ -305,6 +305,33 @@ Last reconciled: 19 July 2026
   identity, OTP, live location, customer proof and Business Book posting
   remain replaceable external gateways and are not falsely represented as
   certified production services.
+
+## Retailer POS and Sales Book implementation decisions now locked
+
+- Counter, Phone and order-linked Chat use one order builder and one live-stock
+  truth. The order source controls only the relevant customer, fulfilment and
+  payment choices.
+- Counter mobile is optional. It is used only for customer lookup, invoice
+  delivery and purchase history; an anonymous counter sale remains possible.
+- Barcode and voice entry can add only a reviewed match from My Stock.
+  Permission denial leaves manual search and Add fully usable.
+- Order creation reserves available quantity once. Failure keeps the complete
+  draft, and exact retry cannot create another order.
+- Every counter retains its purpose, operator, availability, order and sales
+  trail while sharing the shop's authoritative inventory.
+- Cash needs explicit physical-receipt confirmation. UPI and Card expose the
+  matched transaction or authorisation before completion.
+- Sale completion posts stock, payment, invoice and the Sales Book only after
+  authoritative success. Failure preserves the existing order and payment for
+  retry.
+- WhatsApp and SMS invoice delivery require customer consent. MoolSocial Chat
+  and QR/Print remain available without using external messaging consent.
+- Sales Book is a read projection of orders, payments, invoices, inventory and
+  returns. Refresh and export cannot create or mutate a sale.
+- Business Book financial views and exports remain role controlled.
+- Orders, stock, payment, invoice, consent delivery, tax export and financial
+  projection remain replaceable external gateways and are not falsely
+  represented as certified production services.
 
 ## Release boundary
 
