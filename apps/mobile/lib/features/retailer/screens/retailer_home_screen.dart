@@ -175,7 +175,7 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
           textInputAction: TextInputAction.search,
           onChanged: widget.session.search,
           decoration: InputDecoration(
-            labelText: 'Search orders, products or customers',
+            labelText: 'Order, product or customer',
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: _search.text.isEmpty
                 ? IconButton(

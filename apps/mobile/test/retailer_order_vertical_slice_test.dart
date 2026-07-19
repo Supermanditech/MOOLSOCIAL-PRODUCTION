@@ -379,6 +379,7 @@ void main() {
         route: '/app/retailer/home',
         retailerSession: retailer,
       );
+      expect(find.text('Order, product or customer'), findsOneWidget);
 
       await tapVisible(tester, const Key('retailer-orders-online'));
       expect(find.textContaining('previous setting'), findsOneWidget);

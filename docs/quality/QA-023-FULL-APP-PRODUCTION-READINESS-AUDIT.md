@@ -271,6 +271,47 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: all seven targets remain visible and tappable at 360×800 with
   140% text scaling.
 
+### QA23-017 — real-device duration replay proved only the final choice
+
+- Discovery: the physical Creator lifecycle selected day 7 directly, while
+  compact widgets proved the other choices only in memory.
+- Root cause: the device test treated the selector as one control instead of
+  seven separate commercial intents.
+- Fix: the clean OPPO replay now taps days 1, 2, 3, 4, 5, 6 and 7 in order
+  for both a business-funded Reel and funded YouTube discovery. Every tap must
+  change authoritative session state before the journey can continue.
+- Exact replay: clean Creator session → compose funded Reel → tap/assert every
+  duration → publish failure/retry → YouTube Connect → tap/assert every
+  duration → publish failure/retry → campaign, earnings, rights and membership
+  failure/retry paths.
+- Acceptance: the complete physical Creator integration test passes and the
+  normal review APK is rebuilt, clean-installed and returned through OTP to
+  Universal.
+
+### QA23-018 — early-journey founder evidence was fragmented
+
+- Discovery: individual OPPO captures existed for Food, Ride, Book, Pay, Work
+  and Retailer orders, but they were not grouped into screenwise review boards.
+- Root cause: the board generator accepted only one filename substring.
+- Fix: it now accepts comma-separated filename filters and presents concise,
+  readable labels. Six early-journey boards preserve the original device
+  screenshots without changing their pixels.
+- Acceptance: every board opens at full resolution and supports direct
+  before/after or branch comparison during founder review.
+
+### QA23-019 — two early-screen labels were longer than their job
+
+- Discovery: the Book intent said “Book a clearly defined task”, and the
+  retailer home field spent scarce width on “Search orders, products or
+  customers”.
+- Root cause: both labels described the interface instead of expressing the
+  user’s action in the shortest complete production language.
+- Fix: Book now says “Book a task with clear terms”. Retailer search shows
+  “Order, product or customer” beside the search icon, preserving all three
+  searchable entities without clipping.
+- Acceptance: exact wording assertions, 29 affected journey tests, the
+  production-copy gate and the 149-route/no-op interaction gate all pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -300,6 +341,12 @@ Founder-readable boards are versioned with the audit:
 - [Captain](../../artifacts/quality/readable-captain.png)
 - [Shared account and controls](../../artifacts/quality/readable-shared.png)
 - [Superadmin desktop and mobile](../../artifacts/quality/readable-superadmin.png)
+- [Food, table and tiffin device journeys](../../artifacts/quality/readable-device-food.png)
+- [Ride device journey](../../artifacts/quality/readable-device-ride.png)
+- [Book, doctor, salon and task device journeys](../../artifacts/quality/readable-device-book.png)
+- [Pay device journey](../../artifacts/quality/readable-device-pay.png)
+- [Work and workspace device journeys](../../artifacts/quality/readable-device-work.png)
+- [Retailer order device journey](../../artifacts/quality/readable-device-retailer-orders.png)
 
 ## Exact failure replay summary
 
@@ -319,6 +366,9 @@ Founder-readable boards are versioned with the audit:
 | Hosted iOS build rejected Firebase Apple packages because the Runner targeted iOS 13 | Runner and embedded Flutter framework now declare iOS 15; a configuration test fixes the boundary | Hosted macOS build pending exact replay |
 | Flutter golden boards replaced application copy and button labels with block glyphs | Shared test setup loads packaged Inter and component themes preserve it | Readable 74-screen regeneration and nine-board review passed locally |
 | Paid Reel showed only days 1–5 without signalling hidden choices | Wrapping selector shows all 1–7 day funded durations | Exact selection replay and compact 140% text regression passed |
+| Physical Creator replay proved only day 7 | Every 1–7-day Reel and YouTube choice now changes state on the OPPO | Full eight-lifecycle Creator failure/retry replay passed |
+| Early device captures were difficult to review screenwise | Six filtered, labelled boards group 50 OPPO outcomes by journey | Full-resolution board review passed |
+| Book and retailer search wording was verbose for compact screens | Short, action-led labels preserve complete meaning | Exact copy assertions and 29 affected journey tests passed |
 
 ## Current verification
 
@@ -339,6 +389,8 @@ Founder-readable boards are versioned with the audit:
 | Readable golden regeneration | Passed, 313/313 before the compact duration assertion was added |
 | Current full regression cycle 1 | Passed, 314/314 |
 | Current full regression cycle 2 | Passed, 314/314 |
+| OPPO Creator paid-duration and failure/retry replay | Passed; every Reel and YouTube duration 1–7 changed state |
+| Book/retailer copy-refinement journey replay | Passed, 29/29 |
 | Corrected debug APK build | Passed |
 | Clean OPPO install and OTP-to-Universal replay | Passed after exact failure fixes; latest build remains open at Universal |
 

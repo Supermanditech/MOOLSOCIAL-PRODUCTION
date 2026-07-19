@@ -186,6 +186,7 @@ void main() {
     await openSection(tester, session, 'book');
 
     await tapVisible(tester, const Key('sub-action-book-get-done'));
+    expect(find.text('Book a task with clear terms'), findsOneWidget);
     await tapVisible(tester, const Key('open-intent-get-done'));
     expect(find.text('Get It Done'), findsWidgets);
     expect(find.byKey(const Key('task-detail')), findsOneWidget);

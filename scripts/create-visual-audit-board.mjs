@@ -6,17 +6,22 @@ const [, , inputArg, outputArg, filterArg = ""] = process.argv;
 
 if (!inputArg || !outputArg) {
   throw new Error(
-    "Usage: node scripts/create-visual-audit-board.mjs <input-dir> <output.png> [name-filter]",
+    "Usage: node scripts/create-visual-audit-board.mjs <input-dir> <output.png> [comma-separated-name-filters]",
   );
 }
 
 const inputDirectory = resolve(inputArg);
 const outputPath = resolve(outputArg);
+const filters = filterArg
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
 const files = (await readdir(inputDirectory))
   .filter(
     (name) =>
       name.toLowerCase().endsWith(".png") &&
-      name.toLowerCase().includes(filterArg.toLowerCase()),
+      (filters.length === 0 ||
+        filters.some((filter) => name.toLowerCase().includes(filter))),
   )
   .sort();
 
@@ -44,7 +49,12 @@ for (const [index, name] of files.entries()) {
     .resize(imageWidth, imageHeight, { fit: "contain" })
     .png()
     .toBuffer();
-  const escapedName = name
+  const displayName = name
+    .replace(/^moolsocial-production-/, "")
+    .replace(/^moolsocial-/, "")
+    .replace(/-device(?=\.png$)/, "")
+    .replace(/\.png$/, "");
+  const escapedName = displayName
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");

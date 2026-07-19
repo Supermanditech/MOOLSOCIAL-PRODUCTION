@@ -280,7 +280,7 @@ abstract final class UniversalIntentCatalog {
         section: 'book',
         id: 'get-done',
         label: 'Get It Done',
-        title: 'Book a clearly defined task',
+        title: 'Book a task with clear terms',
         description:
             'Choose a task with scope, price, timing, completion check and '
             'support shown before booking.',

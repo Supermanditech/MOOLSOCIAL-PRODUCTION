@@ -136,8 +136,15 @@ void main() {
         const Key('creator-post-caption'),
         'See how a verified shop packs the morning basket.',
       );
-      await tapVisible(tester, const Key('creator-reel-days-7'));
-      expect(creator.reelDurationDays, 7);
+      for (final days in [1, 2, 3, 4, 5, 6, 7]) {
+        await tapVisible(tester, Key('creator-reel-days-$days'));
+        expect(
+          creator.reelDurationDays,
+          days,
+          reason:
+              'Business-funded Reel duration $days must complete on-device.',
+        );
+      }
       await tapVisible(tester, const Key('creator-reel-funding-terms'));
       await tapVisible(tester, const Key('creator-rights-confirm'));
       await binding.takeScreenshot('creator-125-business-funded-reel');
@@ -177,7 +184,14 @@ void main() {
         key: const Key('youtube-campaign'),
         label: 'Funded Campaign Reel · CR-2048',
       );
-      await tapVisible(tester, const Key('youtube-days-7'));
+      for (final days in [1, 2, 3, 4, 5, 6, 7]) {
+        await tapVisible(tester, Key('youtube-days-$days'));
+        expect(
+          creator.youtubePlacementDays,
+          days,
+          reason: 'Funded YouTube placement $days must complete on-device.',
+        );
+      }
       await tapVisible(tester, const Key('youtube-rights'));
       await tapVisible(tester, const Key('youtube-action-truth'));
       await tapVisible(tester, const Key('youtube-action-preview'));
