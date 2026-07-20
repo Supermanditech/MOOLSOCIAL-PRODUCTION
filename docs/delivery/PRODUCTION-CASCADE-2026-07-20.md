@@ -380,6 +380,9 @@ returns success. Completion requires:
 
 ### PROD-WRK-003 — retailer live workspace
 
+- Source progress: My Work settlement now exposes a zero-due state and opens
+  the operating retailer workspace; attention cards cannot fall back to a
+  generic readiness notice.
 - Connect verified retailer identity to catalogue, stock, orders, delivery,
   books, staff permissions and settings.
 - Accept: workspace role and store scope are enforced server-side.

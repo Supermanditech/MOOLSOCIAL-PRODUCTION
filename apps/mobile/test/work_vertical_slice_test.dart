@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -476,6 +477,16 @@ void main() {
     await tapVisible(tester, const Key('my-work-other-list'));
     expect(find.byKey(const Key('my-work-other-list')), findsOneWidget);
     expect(find.text('Creator Work'), findsOneWidget);
+
+    await tapVisible(tester, const Key('my-work-settlement'));
+    expect(find.byKey(const Key('my-work-settlement-sheet')), findsOneWidget);
+    await tapVisible(tester, const Key('my-work-settlement-close'));
+    await tapVisible(tester, const Key('my-work-settlement'));
+    await tapVisible(tester, const Key('my-work-settlement-open-workspace'));
+    expect(find.byKey(const Key('retailer-home-screen')), findsOneWidget);
+    tester.element(find.byType(Scaffold).first).go('/app/work/my-work');
+    await tester.pumpAndSettle();
+
     await tapVisible(tester, const Key('my-work-add-another'));
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     expect(work.activeWorkspace?.name, 'Mahadev Fresh Mart');

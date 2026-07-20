@@ -461,6 +461,20 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: all 10 Ride journey tests, zero-issue analyzer and the exact
   empty/active connected-OPPO replay pass.
 
+### QA23-029 — My Work settlement summary was a generic SnackBar
+
+- Discovery: View summary under Settlement displayed “View summary is ready”
+  and did not expose payout status or the operating workspace.
+- Root cause: `_AttentionCard` allowed a generic fallback callback, so a
+  production action could be created without an intent owner.
+- Fix: every attention card now requires an explicit callback. Settlement opens
+  a zero-due summary, explains when completed orders/refunds/fees appear,
+  supports a non-mutating close, and opens the retailer operating workspace.
+- Exact replay: the first summary closed without changing state; the second
+  opened the correct retailer workspace.
+- Acceptance: all 12 Work journey tests, zero-issue analyzer and the exact
+  connected-OPPO close/open sequence pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -531,6 +545,7 @@ Founder-readable boards are versioned with the audit:
 | Eat Find and Offers stopped at “ready” notices | Find focuses real search; Offers exposes eligibility, cancel and direct food selection | 10/10 affected tests and exact OPPO replay passed |
 | Book, Work and Pay help stopped at “ready” notices | Each shortcut opens the filtered Support inbox and preserves its origin | Dedicated contract and exact three-route OPPO replay passed |
 | Ride header safety stopped at a “ready” notice | Shared Safety centre owns no-trip booking/support/emergency and active-trip share/report/emergency | 10/10 affected tests and empty/active OPPO replay passed |
+| My Work settlement View summary used a generic SnackBar | Required callback opens a real zero-due summary with close and operating-workspace actions | 12/12 affected tests and exact OPPO replay passed |
 
 ## Current verification
 
@@ -564,6 +579,8 @@ Founder-readable boards are versioned with the audit:
 | OPPO Book/Work/Pay support shortcut replay | Passed; each origin opened the filtered Support inbox |
 | Ride safety affected regression | Passed, 10/10 |
 | OPPO Ride safety replay | Passed; no-trip support and active-trip link completion both verified |
+| Work settlement affected regression | Passed, 12/12 |
+| OPPO Work settlement replay | Passed; non-mutating close and operating-workspace completion verified |
 | Production visual baseline set | Passed across 81 current mobile states |
 | Independent current full regression cycle 1 | Passed, 329/329 without baseline updates |
 | Independent current full regression cycle 2 | Passed, 329/329 without baseline updates |

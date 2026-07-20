@@ -110,13 +110,15 @@ class MyWorkScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),
-                const _AttentionCard(
+                _AttentionCard(
                   icon: Icons.payments_outlined,
-                  title: 'Settlement ready',
+                  title: 'Settlement summary',
                   detail:
-                      'The next payout can be reviewed inside the operating workspace.',
+                      'Review completed sales and any amount due in your operating workspace.',
                   actionLabel: 'View summary',
                   keyName: 'my-work-settlement',
+                  onPressed: () =>
+                      _showSettlementSummary(context, workspace.name),
                 ),
                 if (session.otherWorkspaces.isNotEmpty) ...[
                   const SizedBox(height: MoolSpacing.md),
@@ -476,7 +478,7 @@ class _AttentionCard extends StatelessWidget {
     required this.detail,
     required this.actionLabel,
     required this.keyName,
-    this.onPressed,
+    required this.onPressed,
   });
 
   final IconData icon;
@@ -484,7 +486,7 @@ class _AttentionCard extends StatelessWidget {
   final String detail;
   final String actionLabel;
   final String keyName;
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -518,17 +520,91 @@ class _AttentionCard extends StatelessWidget {
           const SizedBox(width: MoolSpacing.xs),
           TextButton(
             key: Key(keyName),
-            onPressed:
-                onPressed ??
-                () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$actionLabel is ready.')),
-                ),
+            onPressed: onPressed,
             child: Text(actionLabel),
           ),
         ],
       ),
     );
   }
+}
+
+Future<void> _showSettlementSummary(
+  BuildContext context,
+  String workspaceName,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('my-work-settlement-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Settlement summary',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          WorkCard(
+            color: const Color(0xFFF0FAF3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  workspaceName,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                const Text(
+                  'No payout is due now',
+                  style: TextStyle(
+                    color: MoolColors.success,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                const Text(
+                  'Completed orders, refunds and fees will appear here after '
+                  'their payment records are verified.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton(
+            key: const Key('my-work-settlement-open-workspace'),
+            onPressed: () {
+              Navigator.of(sheetContext).pop();
+              context.go('/app/retailer/home');
+            },
+            child: const Text('Open operating workspace'),
+          ),
+          TextButton(
+            key: const Key('my-work-settlement-close'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class WorkChooseActivityScreen extends StatefulWidget {
