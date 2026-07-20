@@ -87,7 +87,8 @@ rules above prevent those three paths.
 | ID | Prototype screen/state | Mobile route/state | Reported difference | Failed tap sequence | Status |
 | --- | --- | --- | --- | --- | --- |
 | UI-CONFORMANCE-001 | Complete approved prototype | Complete current app | App-wide visual, wording and tap-depth divergence | Founder physical review | Open |
-| UI-CONFORMANCE-002 | Screen 01 Splash / First Open — reference `v2` | `/boot` native Flutter UI V2 | Old Android launch logo created a duplicate brand screen and the complete promise had insufficient reading time | App icon → Android system launch → animated Screen 01 → existing-owner route | **Accepted — 2026-07-20; CI-locked on remediation branch** |
+| UI-CONFORMANCE-002 | Screen 01 Splash / First Open — reference `v3` | `/boot` native Flutter UI V2 | Old Android launch logo created a duplicate brand screen and the complete promise had insufficient reading time | App icon → Android system launch → animated Screen 01 → existing-owner route | **Accepted — 2026-07-20; CI-locked on remediation branch** |
+| UI-CONFORMANCE-003 | Screen 04 Universal HTML founder-review candidate SHA-256 `9d4bbc76104cb5208f54fdfd83603d89ee563bf0a0cdbb724249f1c27fcd9b86` | Production-bound Universal V2 design contract | The remake rendered founder/review/commentary language, replaced the approved Universal focus-shell hierarchy, action/sub-action treatment and bottom Mool/context/Chat rail with a different dashboard composition, and improvised branding instead of preserving the approved wordmark and tricolour identity | Screen 03 accepted sign-in completion → Universal default Social focus → inspect header, content focus, sub-actions, product/service placement, Mool rail and Chat return | **Open — founder rejected HTML candidate 2026-07-20** |
 
 New rows use `UI-CONFORMANCE-002`, `003`, and so on. One row may contain several
 closely related states only when they share the same root component and

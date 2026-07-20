@@ -20,14 +20,21 @@ deep links, notifications, payment handoff, signing and store metadata.
 
 ## Environment mapping
 
-| Environment | Android app | iOS app | Backend |
-| --- | --- | --- | --- |
-| Development | MoolSocial Android dev | MoolSocial iOS dev | `moolsocial-dev` |
-| Staging | MoolSocial Android staging | MoolSocial iOS staging | `moolsocial-staging` |
-| Production | MoolSocial Android production | MoolSocial iOS production | `moolsocial-production` |
+The complete authority is
+`docs/delivery/ENVIRONMENT-PROMOTION-BOUNDARY.md`.
 
-Each row is isolated. Android and iOS inside one row share users and business
-data. No client can select a different environment at runtime.
+| Boundary | Android app | iOS app | Backend |
+| --- | --- | --- | --- |
+| Local emulator | MoolSocial Android local | MoolSocial iOS local | `demo-moolsocial-local` |
+| Dev / Trial | MoolSocial Android dev | MoolSocial iOS dev | `moolsocial-dev-503018` |
+| Screenwise Preview | Same identified Dev artifact through App Distribution | Same identified Dev artifact through App Distribution | Dev backend; no fourth environment |
+| Clean Staging | MoolSocial Android staging | MoolSocial iOS staging | `moolsocial-staging-503018` |
+| Production | MoolSocial Android production | MoolSocial iOS production | Created later after separate founder authorization |
+
+Each runtime row is isolated. Android and iOS inside one row share users and
+business data. No client can select a different environment at runtime.
+Preview is a controlled tester group inside Dev, not another backend or a
+runtime environment switch.
 
 ## Compile-time environment boundary
 

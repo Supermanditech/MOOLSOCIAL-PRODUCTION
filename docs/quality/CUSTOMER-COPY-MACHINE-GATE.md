@@ -39,9 +39,15 @@ The executable test must reject customer wording that includes:
 - same screen, same verify screen, instead of email, instead of mobile;
 - this screen is used for, for review, for testing.
 
-The checker applies case-insensitively to normalized rendered copy. Technical
-language outside a simulated phone viewport in a screenbook engineering
-contract is allowed; it is never copied into native customer UI.
+The checker applies case-insensitively to normalized rendered copy. On a
+production-bound founder-review URL, it covers the entire visible page, not
+only the simulated phone viewport. Do not render review status, screen numbers,
+preview controls, commentary, test-state selectors, implementation notes or
+engineering contracts beside or around the customer screen. Keep that material
+in non-rendered metadata or separate evidence files.
+
+This whole-page rule is permanent for every remaining screen. A founder-review
+wrapper is not an exception to the production-copy standard.
 
 ## Screen 01–03 required state inventory
 
@@ -73,4 +79,3 @@ overlapping or unreachable primary actions are not.
 This matrix verifies Flutter logical layout on both platform size classes.
 Final staging still requires native Android and iOS artifacts and physical or
 hosted-device replay; Windows cannot substitute for iOS signing/runtime tests.
-

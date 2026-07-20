@@ -51,16 +51,22 @@ returns success. Completion requires:
 
 - Source progress: complete — mobile configuration now fails closed outside
   debug, and Auth/Data Connect emulator routing is compile-time isolated.
-- External progress: blocked — live dev, staging and production project
-  provisioning awaits resolution of the Google billing account.
-- Scope: `moolsocial-dev`, `moolsocial-staging`, `moolsocial-production`.
+- External progress: billing access and Firebase CLI authentication are
+  available; Google still reports that the completed prepayment may require up
+  to 24 hours to be credited. Dev project creation is blocked on the minimum
+  organisation-level Project Creator permission.
+- Scope: local emulators → `moolsocial-dev-503018` real-service Trial → Firebase
+  App Distribution screenwise Preview inside Dev →
+  `moolsocial-staging-503018` clean staging → separately authorized Production.
+- The production project is created later and is never used for experimentation.
 - Automate: Firebase app registration, Data Connect connector generation,
   Secret Manager references, App Check, Remote Config, FCM, Crashlytics,
   Performance Monitoring, budget alerts and least-privilege service accounts.
 - Never commit: production Firebase configuration files, OAuth secrets,
   signing keys or payment credentials.
-- Blocker: the `hello@moolsocial.com` Google Cloud billing/project issue must be
-  resolved by Google. Local implementation continues against emulators.
+- Provisioning evidence: the first `moolsocial-dev-503018` creation attempt
+  failed before project creation because Project Creator was not granted. Do
+  not create an unmanaged project outside the MoolSocial organisation.
 - Accept: each client build is permanently tied to one environment and cannot
   switch environments at runtime.
 

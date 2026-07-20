@@ -368,6 +368,95 @@ Founder acceptance recorded 20 July 2026:
   customer presentation. Combining later accepted screens with this checkpoint
   requires a new integration replay, not a rewrite of Screens 01–03.
 
+### Screen 04 HTML founder-review candidate — founder rejected, do not freeze
+
+Founder-authorized HTML work recorded 20 July 2026:
+
+- Screen 04 was remade only at
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\screens\04-universal-focus-shell.html`.
+- The founder-rejected candidate SHA-256 is
+  `9d4bbc76104cb5208f54fdfd83603d89ee563bf0a0cdbb724249f1c27fcd9b86`.
+- This is a founder-review candidate, not a `FINAL` or approved reference.
+  Never add this checksum to the approved manifest and never begin Flutter
+  implementation without a later explicit founder `FINAL`.
+- Universal visibly exposes Social, Buy, Eat, Ride, Book, Pay, Work and Chat.
+  Chat stays pinned. The Mool sheet provides the seven non-Chat focuses.
+- Incoming `world` restores the requested Universal focus. Incoming
+  `openMool=1` opens the Mool sheet, preserving the return contract already
+  used by Social and Chat.
+- Permanent serviceable-area selection belongs in signed-in
+  Universal/account. The accepted Screen 01–03 presentation remains immutable.
+- Every visible customer control must be named, at least 44×44 and connected
+  to a real in-page outcome or a concrete HTML destination.
+- Screen 04 copy review covers the default view and all reachable loading,
+  empty, denied, unavailable, failure, retry, permission-recovery and result
+  moments. Default-view-only review is not sufficient.
+- Every founder-requested revision must rerun exact pathname, visible heading,
+  primary-content, complete control, connected-destination,
+  compact/large/140%-text and Screen 01–03 lock checks before presentation.
+
+Founder rejection recorded after automated verification on 20 July 2026:
+
+- An automated tap or fitment pass does not override the founder's visual,
+  architectural, copy or brand decision.
+- Do not display `Screen 04`, `Founder review`, `Awaiting founder decision`,
+  `Preview other moments`, test-state buttons, commentary or similar working
+  language anywhere on the visible review page. Production-bound HTML must look
+  and read like the finished customer product from edge to edge. Engineering
+  controls and evidence belong in separate non-customer files.
+- The approved Universal core architecture is not discretionary. Learn it from
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\approved-final\screens\04-universal-focus-shell.html`
+  and the pre-remake Screen 04 history, then preserve its structure while
+  correcting copy and production readiness.
+- Universal opens in Social. It retains the approved command/search treatment,
+  focused sub-action strip, one focused product/service world at a time,
+  contextual content actions and the Apple-inspired bottom outcome rail.
+- The bottom rail keeps Mool and Chat stable. Mool exposes Social, Buy, Eat,
+  Ride, Book, Pay and Work; the focused action's sub-actions remain in their
+  approved placement. Do not replace this architecture with an unrelated
+  eight-tile dashboard or a founder-preview side panel.
+- Preserve the approved placement and hierarchy of Social, Buy, Eat, Ride,
+  Book, Pay, Work, Chat and their product/service sub-actions. A control-count
+  pass is not proof that their information architecture conforms.
+- Branding must use navy `#000080`, saffron `#FF9933`, green `#138808`, the
+  approved MoolSocial wordmark and tricolour identity line. Do not substitute
+  an improvised initial tile, generic mark, new one-off palette or unrelated
+  brand treatment.
+- The HTML is a production-bound design contract, not a production WebView and
+  not a visible prototype/demo. Native Flutter V2 begins only after explicit
+  founder `FINAL`, and production acceptance/locking occurs only after the
+  matching Flutter result passes the required device review.
+
+The complete candidate inventory, destination boundary and verification record
+is:
+
+`artifacts/quality/screen04-html-founder-review-20260720/SCREEN-04-HTML-FOUNDER-REVIEW-WORKLOG.md`
+
+### Founder-locked cloud environment and promotion memory
+
+Founder decision recorded 21 July 2026:
+
+- Local Firebase emulators remain the zero-cost first testing boundary.
+- `moolsocial-dev-503018` is the separate real-service Trial environment.
+- Screenwise Preview uses a Firebase App Distribution tester group inside Dev;
+  it is not a fourth backend environment.
+- `moolsocial-staging-503018` is clean staging and receives only promoted
+  candidates.
+- The Production project is created later and is never used for
+  experimentation.
+- Promotion is strictly:
+  `emulators → Dev/Trial → Dev Preview → clean Staging → Production`.
+- One client artifact cannot switch environments at runtime. Protected
+  environment configuration is supplied at build time and missing live values
+  fail closed.
+- Do not enable every free-looking API. Each API requires an approved journey
+  owner, restricted credentials, least privilege, quotas/cost controls,
+  failure coverage and rollback evidence.
+
+Both Android Studio Codex and every other Codex surface must read
+`docs/delivery/ENVIRONMENT-PROMOTION-BOUNDARY.md` before looking at or changing
+Google Cloud, Firebase, authentication, maps, APIs or distribution.
+
 ## Completion evidence
 
 A screen or journey is not production-ready until it has:
