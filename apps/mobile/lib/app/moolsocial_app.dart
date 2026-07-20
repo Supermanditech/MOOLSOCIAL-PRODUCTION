@@ -16,6 +16,7 @@ import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
 import '../features/work/work_session.dart';
+import '../ui_v2/launch/launch_presentation_gate.dart';
 
 class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
@@ -106,6 +107,8 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   late final SharedSession _sharedSession =
       widget.sharedSession ?? SharedSession();
   late final WorkSession _workSession = widget.workSession ?? WorkSession();
+  late final LaunchPresentationGate _launchPresentationGate =
+      LaunchPresentationGate();
   late final _router = createJourneyRouter(
     _session,
     _bookSession,
@@ -121,12 +124,14 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     _rideSession,
     _sharedSession,
     _workSession,
+    launchPresentationGate: _launchPresentationGate,
     initialLocation: widget.initialLocation,
   );
 
   @override
   void dispose() {
     _router.dispose();
+    _launchPresentationGate.dispose();
     if (widget.session == null || widget.disposeSession) {
       _session.dispose();
     }

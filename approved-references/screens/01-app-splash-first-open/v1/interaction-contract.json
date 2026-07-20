@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 1,
+    "id": "app-splash-first-open",
+    "routeOwner": "app.launch",
+    "productionRoute": "/boot",
+    "approvalVersion": "visual-v1",
+    "founderApprovedAt": "2026-07-20",
+    "approvalScope": [
+      "visual composition",
+      "brand motion",
+      "normal open state",
+      "slow silent-handoff state",
+      "recoverable boot-failure state",
+      "temporary two-line copy"
+    ],
+    "taglineStatus": "research-pending-temporary-copy-approved-for-v1"
+  },
+  "referenceCapture": {
+    "phoneViewportCssPixels": {
+      "width": 360,
+      "height": 720
+    },
+    "deviceScaleFactor": 1,
+    "textScaleFactor": 1,
+    "fontFamily": "Inter",
+    "motionReferencePhaseMs": 800
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "promisePrimary": "Create. Connect. Work. Grow.",
+    "promiseSecondary": "One app for life and business.",
+    "openingStatus": "Opening your MoolSocial space",
+    "handoffHeading": "Getting things ready",
+    "handoffBody": "We are checking app version, network and secure session before moving ahead.",
+    "handoffChecks": [
+      "App version ready",
+      "Network connected",
+      "Safe route selected"
+    ],
+    "handoffStatus": "Continuing automatically",
+    "recoveryHeading": "Connection paused",
+    "recoveryBody": "Please check your internet connection. Your app opening will continue from here.",
+    "retry": "Retry",
+    "help": "Help"
+  },
+  "entry": [
+    "fresh install opened from the store",
+    "app icon open",
+    "valid app link reaching the app shell"
+  ],
+  "states": [
+    {
+      "id": "normal-open",
+      "condition": "launch presentation minimum has not elapsed and no boot failure exists",
+      "durationMs": 1900,
+      "requiresTap": false,
+      "referenceImage": "reference-images/normal-open-motion-midpoint-360x720.png"
+    },
+    {
+      "id": "silent-handoff",
+      "condition": "launch presentation minimum elapsed while the existing session owner is still booting",
+      "requiresTap": false,
+      "referenceImage": "reference-images/silent-handoff-360x720.png"
+    },
+    {
+      "id": "recovery",
+      "condition": "the existing session owner reports bootFailure",
+      "requiresTap": true,
+      "referenceImage": "reference-images/recovery-360x720.png"
+    }
+  ],
+  "interactions": [
+    {
+      "state": "normal-open",
+      "action": "none",
+      "result": "existing session owner chooses setup, sign-in, ready, or preserved deep-link route"
+    },
+    {
+      "state": "silent-handoff",
+      "action": "none",
+      "result": "remain until the existing session owner chooses a route or reports failure"
+    },
+    {
+      "state": "recovery",
+      "action": "Retry",
+      "result": "invoke JourneySession.retryBoot and retain existing setup and deep-link state"
+    },
+    {
+      "state": "recovery",
+      "action": "Help",
+      "result": "preserve /app/chat as the pending help intent, retry boot, and continue through required setup/auth before opening chat"
+    }
+  ],
+  "motion": {
+    "cycleMs": 1600,
+    "tricolourCapsule": {
+      "trackWidth": 154,
+      "capsuleWidth": 60,
+      "travelPixels": 94,
+      "path": "left-to-right-to-left",
+      "colors": [
+        "#FF9933",
+        "#FFFFFF",
+        "#138808"
+      ]
+    },
+    "tagline": "synchronised tricolour sheen and subtle scale lift",
+    "reducedMotion": "disable moving capsule, sheen, scale lift, and copy entrance; show a static saffron-white-green identity line"
+  },
+  "routing": {
+    "freshInstall": "Screen 02 first setup",
+    "returningSignedOut": "sign in after setup checks",
+    "returningSignedIn": "Universal or preserved safe priority route",
+    "deepLink": "preserve intent through setup/auth and continue only when safe"
+  },
+  "prohibited": [
+    "role switch",
+    "permission prompt",
+    "guaranteed earning claim",
+    "marketplace or unavailable-service claim",
+    "HTML or WebView in Flutter"
+  ],
+  "nonUiOwners": [
+    "JourneySession",
+    "JourneyStore",
+    "OtpGateway",
+    "AccountBootstrapGateway",
+    "LocationPermissionGateway",
+    "GoRouter redirect contract"
+  ]
+}

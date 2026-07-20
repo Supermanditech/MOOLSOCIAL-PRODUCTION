@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>01 App Splash / First Open Handoff - MoolSocial Screenbook</title>
+  <link rel="stylesheet" href="../shared/moolsocial-ui-foundation.css" />
+  <style>
+    .screen-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .back-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .screen-link-home {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ms-navy);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .back-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .splash-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: stretch;
+      padding: 18px;
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .splash-phone {
+      width: min(100%, 390px);
+      min-height: 720px;
+      display: grid;
+      grid-template-rows: 34px 1fr;
+      border: 12px solid var(--ms-navy);
+      border-radius: 34px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      overflow: hidden;
+      justify-self: center;
+    }
+
+    .splash-status {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px 0;
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .splash-screen {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      padding: 34px 28px 28px;
+    }
+
+    .splash-center {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .splash-wordmark {
+      color: var(--ms-white);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: .95;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .splash-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+    }
+
+    .splash-line span:nth-child(1) { background: var(--ms-saffron); }
+    .splash-line span:nth-child(2) { background: var(--ms-white); }
+    .splash-line span:nth-child(3) { background: var(--ms-green); }
+
+    .splash-tagline {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--ms-pill);
+      padding: 0 12px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.35;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .boot-stack {
+      display: grid;
+      gap: 10px;
+      align-content: end;
+      color: var(--ms-white);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .boot-line {
+      display: grid;
+      grid-template-columns: 12px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .boot-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--ms-green);
+    }
+
+    .boot-progress {
+      height: 5px;
+      display: grid;
+      grid-template-columns: 42fr 28fr 30fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+      background: var(--ms-white);
+      margin-top: 4px;
+    }
+
+    .boot-progress span:nth-child(1) { background: var(--ms-saffron); }
+    .boot-progress span:nth-child(2) { background: var(--ms-white); }
+    .boot-progress span:nth-child(3) { background: var(--ms-green); }
+
+    .handoff-panel {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .handoff-flow {
+      display: grid;
+      gap: 10px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 12px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .step-num {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .flow-step b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ms-green);
+      font-size: 13px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .flow-step span {
+      display: block;
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .state-card {
+      min-height: 176px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding: 16px;
+      border-right: 1px solid var(--ms-navy);
+    }
+
+    .state-card:last-child {
+      border-right: 0;
+    }
+
+    .state-card h3,
+    .state-card p {
+      margin: 0;
+    }
+
+    .state-card h3 {
+      color: var(--ms-green);
+      font-size: 13px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .state-card p {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .mini-failure {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 14px;
+      background: var(--ms-white);
+    }
+
+    .mini-failure b {
+      color: var(--ms-navy);
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .mini-failure span {
+      color: var(--ms-navy);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .production-preview {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      border-bottom: 1px solid var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .production-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .production-stage {
+      display: grid;
+      gap: 10px;
+    }
+
+    .production-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .production-label span {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      padding: 0 9px;
+      color: var(--ms-green);
+      background: var(--ms-white);
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    .production-phone {
+      width: min(100%, 360px);
+      min-height: 700px;
+      display: grid;
+      grid-template-rows: 32px 1fr;
+      justify-self: center;
+      border: 10px solid var(--ms-navy);
+      border-radius: 32px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      overflow: hidden;
+    }
+
+    .production-status {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 0;
+      color: var(--ms-white);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .production-screen {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: 668px;
+      padding: 34px 26px 26px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .production-center {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .production-wordmark {
+      color: var(--ms-white);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: .95;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .production-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+    }
+
+    .production-line span:nth-child(1) { background: var(--ms-saffron); }
+    .production-line span:nth-child(2) { background: var(--ms-white); }
+    .production-line span:nth-child(3) { background: var(--ms-green); }
+
+    .production-tagline {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--ms-pill);
+      padding: 0 12px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.35;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .splash-promise,
+    .production-promise {
+      max-width: 276px;
+      display: grid;
+      gap: 4px;
+      color: rgba(255, 255, 255, .92);
+      font-weight: 820;
+      line-height: 1.35;
+      text-align: center;
+      animation: promise-arrive 700ms cubic-bezier(.22, 1, .36, 1) 280ms both;
+    }
+
+    .splash-promise span,
+    .production-promise span {
+      display: block;
+    }
+
+    .splash-promise .promise-primary,
+    .production-promise .promise-primary {
+      color: var(--ms-white);
+      font-size: 15px;
+      font-weight: 950;
+      line-height: 1.2;
+      letter-spacing: .01em;
+    }
+
+    .splash-promise .promise-secondary,
+    .production-promise .promise-secondary {
+      color: rgba(255, 255, 255, .88);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.3;
+    }
+
+    .splash-promise strong,
+    .production-promise strong {
+      color: var(--ms-white);
+      font-weight: 950;
+    }
+
+    .brand-motion-line {
+      width: 154px;
+      height: 6px;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background: rgba(255, 255, 255, .18);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, .08),
+        0 0 20px rgba(255, 255, 255, .12);
+    }
+
+    .brand-motion-line span {
+      opacity: 0;
+    }
+
+    .brand-motion-line::after {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      inset: 0 auto 0 0;
+      width: 60px;
+      border-radius: inherit;
+      background: linear-gradient(
+        90deg,
+        var(--ms-saffron) 0 36%,
+        var(--ms-white) 36% 62%,
+        var(--ms-green) 62% 100%
+      );
+      box-shadow:
+        0 0 12px rgba(255, 153, 51, .65),
+        0 0 18px rgba(255, 255, 255, .5),
+        0 0 12px rgba(19, 136, 8, .65);
+      animation: tricolour-return 1600ms cubic-bezier(.45, 0, .2, 1) infinite;
+    }
+
+    .brand-motion-tagline {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+      animation: tagline-lift 1600ms ease-in-out infinite;
+    }
+
+    .brand-motion-tagline span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-motion-tagline::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: -55%;
+      bottom: -55%;
+      left: 0;
+      width: 52%;
+      opacity: .62;
+      background: linear-gradient(
+        90deg,
+        transparent 0 8%,
+        var(--ms-saffron) 22%,
+        rgba(255, 255, 255, .92) 50%,
+        var(--ms-green) 78%,
+        transparent 92% 100%
+      );
+      filter: blur(1px);
+      transform: translateX(-130%) skewX(-16deg);
+      mix-blend-mode: multiply;
+      animation: tagline-splash-return 1600ms cubic-bezier(.45, 0, .2, 1) infinite;
+    }
+
+    @keyframes tricolour-return {
+      0%,
+      10% {
+        transform: translateX(0);
+      }
+
+      45%,
+      55% {
+        transform: translateX(94px);
+      }
+
+      90%,
+      100% {
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes tagline-splash-return {
+      0%,
+      16% {
+        transform: translateX(-130%) skewX(-16deg);
+      }
+
+      46%,
+      54% {
+        transform: translateX(175%) skewX(-16deg);
+      }
+
+      84%,
+      100% {
+        transform: translateX(-130%) skewX(-16deg);
+      }
+    }
+
+    @keyframes tagline-lift {
+      0%,
+      100% {
+        transform: scale(1);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+      }
+
+      50% {
+        transform: scale(1.025);
+        box-shadow:
+          -8px 0 22px rgba(255, 153, 51, .2),
+          8px 0 22px rgba(19, 136, 8, .2);
+      }
+    }
+
+    @keyframes promise-arrive {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .production-bottom {
+      display: grid;
+      gap: 10px;
+      color: var(--ms-white);
+    }
+
+    .production-boot-row {
+      display: grid;
+      grid-template-columns: 12px 1fr;
+      gap: 8px;
+      align-items: center;
+      color: var(--ms-white);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .production-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--ms-green);
+    }
+
+    .production-loader {
+      height: 5px;
+      display: grid;
+      grid-template-columns: 46fr 14fr 40fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+      background: var(--ms-white);
+    }
+
+    .production-loader span:nth-child(1) { background: var(--ms-saffron); }
+    .production-loader span:nth-child(2) { background: var(--ms-white); }
+    .production-loader span:nth-child(3) { background: var(--ms-green); }
+
+    .handoff-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-white);
+      border-radius: var(--ms-radius);
+      padding: 14px;
+      background: rgba(255, 255, 255, .08);
+    }
+
+    .handoff-card b {
+      color: var(--ms-white);
+      font-size: 18px;
+      line-height: 1.18;
+    }
+
+    .handoff-card span {
+      color: var(--ms-white);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .handoff-checks {
+      display: grid;
+      gap: 8px;
+    }
+
+    .handoff-check {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: center;
+      color: var(--ms-white);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .handoff-mark {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ms-green);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .recovery-shell {
+      display: grid;
+      align-content: center;
+      gap: 14px;
+      min-height: 668px;
+      padding: 28px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .recovery-brand {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+    }
+
+    .recovery-panel {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-white);
+      border-radius: var(--ms-radius);
+      padding: 18px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      text-align: center;
+    }
+
+    .recovery-panel h2,
+    .recovery-panel p {
+      margin: 0;
+    }
+
+    .recovery-panel h2 {
+      color: var(--ms-navy);
+      font-size: 22px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .recovery-panel p {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .recovery-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .recovery-button {
+      min-height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      color: var(--ms-white);
+      background: var(--ms-navy);
+      font-size: 13px;
+      font-weight: 950;
+      text-decoration: none;
+    }
+
+    .recovery-button.secondary {
+      color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    @media (max-width: 1020px) {
+      .splash-layout,
+      .state-grid,
+      .production-preview-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .state-card {
+        border-right: 0;
+        border-bottom: 1px solid var(--ms-navy);
+      }
+
+      .state-card:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .back-row {
+        display: grid;
+      }
+
+      .splash-layout {
+        padding: 14px;
+      }
+
+      .splash-phone {
+        min-height: 650px;
+        border-width: 9px;
+      }
+
+      .splash-tagline {
+        white-space: normal;
+        padding: 8px 16px;
+      }
+
+      .production-preview {
+        padding: 14px;
+      }
+
+      .production-phone {
+        min-height: 650px;
+        border-width: 9px;
+      }
+
+      .production-screen,
+      .recovery-shell {
+        min-height: 618px;
+      }
+
+      .production-tagline {
+        white-space: normal;
+        padding: 8px 16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html:not(.force-motion-preview) .brand-motion-line::after,
+      html:not(.force-motion-preview) .brand-motion-tagline,
+      html:not(.force-motion-preview) .brand-motion-tagline::after,
+      html:not(.force-motion-preview) .splash-promise,
+      html:not(.force-motion-preview) .production-promise {
+        animation: none;
+      }
+
+      html:not(.force-motion-preview) .brand-motion-line::after,
+      html:not(.force-motion-preview) .brand-motion-tagline::after {
+        display: none;
+      }
+
+      html:not(.force-motion-preview) .brand-motion-line span {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body class="ms-doc">
+  <main class="ms-page screen-shell">
+    <header>
+      <div class="back-row">
+        <a class="screen-link-home" href="../index.html">
+          <span class="back-mark">BR</span>
+          Back to Screenbook
+        </a>
+        <span class="ms-status">HTML FINAL · visual v1</span>
+      </div>
+      <h1 class="ms-title">Screen 01: App Splash / First Open Handoff</h1>
+      <p class="ms-lead">
+        The user has installed MoolSocial and taps Open. This screen confirms brand trust, performs silent boot checks,
+        and routes the user into the right first-open path without showing role switches or permission prompts.
+      </p>
+    </header>
+
+    <section class="ms-panel">
+      <div class="ms-section-head" id="final-production-preview">Founder-Approved User-Facing UI <span>Motion v1 + temporary tagline</span></div>
+      <div class="production-preview">
+        <div class="production-preview-grid">
+          <article class="production-stage">
+            <div class="production-label">Normal Open <span>0-2 seconds</span></div>
+            <section class="production-phone" aria-label="Production splash normal open">
+              <div class="production-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="production-screen">
+                <div class="production-center">
+                  <div class="production-wordmark">MoolSocial</div>
+                  <div class="production-line brand-motion-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <div class="production-tagline brand-motion-tagline"><span>India Ka Socio Commerce App</span></div>
+                  <div class="production-promise">
+                    <span class="promise-primary">Create. Connect. Work. Grow.</span>
+                    <span class="promise-secondary">One app for life and business.</span>
+                  </div>
+                </div>
+                <div class="production-bottom">
+                  <div class="production-boot-row"><span class="production-dot"></span><span>Opening your MoolSocial space</span></div>
+                  <div class="production-loader" aria-hidden="true"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+            </section>
+          </article>
+
+          <article class="production-stage">
+            <div class="production-label">Silent Handoff <span>No tap needed</span></div>
+            <section class="production-phone" aria-label="Production splash handoff state">
+              <div class="production-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="production-screen">
+                <div class="production-center">
+                  <div class="production-wordmark">MoolSocial</div>
+                  <div class="production-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <div class="handoff-card">
+                    <b>Getting things ready</b>
+                    <span>We are checking app version, network and secure session before moving ahead.</span>
+                    <div class="handoff-checks">
+                      <div class="handoff-check"><span class="handoff-mark">✓</span><span>App version ready</span></div>
+                      <div class="handoff-check"><span class="handoff-mark">✓</span><span>Network connected</span></div>
+                      <div class="handoff-check"><span class="handoff-mark">✓</span><span>Safe route selected</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="production-bottom">
+                  <div class="production-boot-row"><span class="production-dot"></span><span>Continuing automatically</span></div>
+                  <div class="production-loader" aria-hidden="true"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+            </section>
+          </article>
+
+          <article class="production-stage">
+            <div class="production-label">Recovery State <span>Only if needed</span></div>
+            <section class="production-phone" aria-label="Production splash recovery state">
+              <div class="production-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="recovery-shell">
+                <div class="recovery-brand">
+                  <div class="production-wordmark">MoolSocial</div>
+                  <div class="production-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                </div>
+                <div class="recovery-panel">
+                  <h2>Connection paused</h2>
+                  <p>Please check your internet connection. Your app opening will continue from here.</p>
+                  <div class="recovery-actions">
+                    <a class="recovery-button" href="02-first-setup-language-location.html?recovery=connection">Retry</a>
+                    <a class="recovery-button secondary" href="23-chat-inbox-home.html?topic=startup-help">Help</a>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </article>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Primary Visual <span>What user sees after Open</span></div>
+      <div class="splash-layout">
+        <section class="splash-phone" aria-label="MoolSocial splash visual">
+          <div class="splash-status">
+            <span>9:41</span>
+            <span>5G 100%</span>
+          </div>
+          <div class="splash-screen">
+            <div class="splash-center">
+              <div class="splash-wordmark">MoolSocial</div>
+              <div class="splash-line brand-motion-line" aria-hidden="true"><span></span><span></span><span></span></div>
+              <div class="splash-tagline brand-motion-tagline"><span>India Ka Socio Commerce App</span></div>
+              <div class="splash-promise">
+                <span class="promise-primary">Create. Connect. Work. Grow.</span>
+                <span class="promise-secondary">One app for life and business.</span>
+              </div>
+            </div>
+            <div class="boot-stack">
+              <div class="boot-line"><span class="boot-dot"></span><span>Opening your MoolSocial space</span></div>
+              <div class="boot-line"><span class="boot-dot"></span><span>Checking app version, network and secure session</span></div>
+              <div class="boot-progress" aria-hidden="true"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="handoff-panel">
+          <div class="ms-card" style="border:1px solid var(--ms-navy);">
+            <h3>Purpose</h3>
+            <p>Give the user an immediate trusted MoolSocial moment, then move forward. Splash is not a marketing page and not a permission page.</p>
+          </div>
+          <div class="handoff-flow">
+            <div class="flow-step">
+              <div class="step-num">01</div>
+              <div><b>Brand Confirm</b><span>Show approved MoolSocial wordmark, identity line and tagline on navy.</span></div>
+            </div>
+            <div class="flow-step">
+              <div class="step-num">02</div>
+              <div><b>Silent Boot</b><span>Check version, network, install source, locale, deep link, session and critical config.</span></div>
+            </div>
+            <div class="flow-step">
+              <div class="step-num">03</div>
+              <div><b>Route</b><span>Fresh install routes to Screen 02: language, location explanation and first setup. Returning users route by session state.</span></div>
+            </div>
+          </div>
+          <div class="mini-failure">
+            <b>If boot cannot continue</b>
+            <span>Show a calm retry/update/support state. Do not show login, role selection or permission prompts from this screen.</span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="ms-section-head">Screen Contract <span>Entry, behavior and exit</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Entry Condition</h3>
+          <p>User taps Open after installing, taps the app icon, or opens a valid app link that reaches the app shell.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Primary Behavior</h3>
+          <p>Auto-run boot checks and route forward. No user action is required unless a recoverable error appears.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Exit To Next Screen</h3>
+          <p>Fresh install exits to Screen 02: First Setup. The next screen will handle language, location explanation and permission timing.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Routing States <span>Production decision paths</span></div>
+      <div class="state-grid">
+        <article class="state-card">
+          <h3>Fresh Install</h3>
+          <p>No user session exists. Route to Screen 02 First Setup after boot checks pass.</p>
+        </article>
+        <article class="state-card">
+          <h3>Returning Signed Out</h3>
+          <p>Known device without valid session. Route to mobile login after first setup checks are complete.</p>
+        </article>
+        <article class="state-card">
+          <h3>Returning Signed In</h3>
+          <p>Valid session. Route to Universal Super-App Screen or pending priority action.</p>
+        </article>
+        <article class="state-card">
+          <h3>Deep Link</h3>
+          <p>Preserve target intent, complete auth/setup if needed, then continue to the target only if safe.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">What This Screen Must Not Show <span>Regression-sensitive</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>No Role Switch</h3>
+          <p>No Personal, Retailer, Taxi, Creator, Business or Work mode selector. Roles activate later through verified context.</p>
+        </article>
+        <article class="ms-card">
+          <h3>No Permission Prompt</h3>
+          <p>No location, camera, microphone, contacts, messages or notification permission prompt appears on splash.</p>
+        </article>
+        <article class="ms-card">
+          <h3>No Claims</h3>
+          <p>No earning claim, marketplace claim, discount claim or unavailable service claim appears during splash.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Data Needed <span>Inputs for production implementation</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Device And App Inputs</h3>
+          <ul class="ms-list">
+            <li>App version, build channel and minimum supported version.</li>
+            <li>Device OS, locale, timezone and network state.</li>
+            <li>Install source, campaign/referral/QR code and deep link payload.</li>
+            <li>Existing auth token, refresh state and anonymous device identity.</li>
+            <li>Permission state only as device metadata, not as a permission request.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Remote Config Inputs</h3>
+          <ul class="ms-list">
+            <li>Maintenance state and feature gate status.</li>
+            <li>Launch geography and category readiness flags.</li>
+            <li>Critical compliance blocks.</li>
+            <li>Minimum app version and force-update URL.</li>
+            <li>First setup route decision.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Failure States <span>Only if boot cannot continue</span></div>
+      <div class="ms-grid-4">
+        <article class="ms-card">
+          <h3>No Internet</h3>
+          <p>Show "Check connection" and Retry. Do not erase install attribution or deep-link intent.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Update Required</h3>
+          <p>Show Update App. Route to store. Do not allow unsupported build to continue.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Maintenance</h3>
+          <p>Show short maintenance state with Retry and Help. Keep wording calm and non-technical.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Invalid Link</h3>
+          <p>Continue as normal first open, but do not execute expired or unsafe deep-link action.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Compliance And Regression Lock <span>Before Screen 02</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Compliance Gates</h3>
+          <ul class="ms-list">
+            <li>Only approved MoolSocial logo and colours are used.</li>
+            <li>No sensitive permission prompt appears before explanation.</li>
+            <li>No user role is asked or implied.</li>
+            <li>No guaranteed earning, marketplace or unavailable service wording appears.</li>
+            <li>Only necessary technical boot checks run before consent-sensitive flows.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Regression Checklist</h3>
+          <ul class="ms-list">
+            <li>Open from Play Store routes to splash.</li>
+            <li>Fresh install routes to Screen 02.</li>
+            <li>Returning signed-in user can bypass setup only with valid session.</li>
+            <li>Deep-link intent is preserved through auth/setup.</li>
+            <li>Failure states show Retry, Update or Help without trapping the user.</li>
+            <li>Brand motion stops when the device requests reduced motion.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+<script>
+  (() => {
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get('source') || 'app-open';
+    if (params.get('founderReview') === '1') {
+      document.documentElement.classList.add('force-motion-preview');
+      return;
+    }
+    window.setTimeout(() => {
+      window.location.href = `02-first-setup-language-location.html?source=${encodeURIComponent(source)}&languageSource=device`;
+    }, 3000);
+  })();
+</script>
+<script type="application/json" id="productionRouteContract">{"contractVersion":"mvp-route-lock-2026-07-12","prototypeScreen":1,"productionModule":"launch","routeId":"app.launch","routePath":"/launch","routeState":"splash","implementation":"route-state","launchScope":"mvp-core","separateProductionRoute":false,"productionNote":"Do not create a separate production route. Implement splash inside /launch and reuse the owning route API, authorization, analytics and regression suite.","canonicalMap":"architecture/MVP-PRODUCTION-ROUTE-CONSOLIDATION.md"}</script><script type="application/json" id="prototypeApprovalContract">{"prototypeScreen":1,"status":"html-final-visual-v2","authoritative":true,"taglineStatus":"research-pending-temporary-copy-approved-for-v2","founderApprovedAt":"2026-07-20","supersedesVersion":"visual-v1","productionDecision":"one visible branded screen; Android system launch is plain navy; Flutter Screen 01 remains visible for 3000 ms"}</script>  <script src="../shared/resilience-state-runtime.js?v=micro-cycle-2-20260716c"></script>
+</body>
+</html>

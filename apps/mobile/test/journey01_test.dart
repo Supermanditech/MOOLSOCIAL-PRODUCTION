@@ -21,7 +21,7 @@ void main() {
     await tester.pumpWidget(
       MoolSocialApp(session: session, initialLocation: initialLocation),
     );
-    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 2000));
     await tester.pumpAndSettle();
   }
 

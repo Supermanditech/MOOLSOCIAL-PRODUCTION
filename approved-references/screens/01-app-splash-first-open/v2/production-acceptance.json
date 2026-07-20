@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 1,
+    "id": "app-splash-first-open",
+    "referenceVersion": "v2",
+    "route": "/boot"
+  },
+  "status": "Accepted",
+  "approval": {
+    "founderAcceptedAt": "2026-07-20",
+    "recordedAt": "2026-07-20",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "startingCommit": "576b977a38bb2401c01b1877391a94025b783585",
+    "scope": "native Flutter V2 Screen 01 production presentation",
+    "decision": "Android's required system launch window is plain navy and unbranded. Flutter V2 Screen 01 is the only visibly branded launch screen, remains visible for at least 3000 ms, and then yields to the existing JourneySession route owner."
+  },
+  "deviceReplay": {
+    "result": "passed",
+    "device": "OPPO CPH2375",
+    "android": "13",
+    "states": [
+      "plain navy Android system launch window",
+      "normal animated Flutter Screen 01",
+      "left-to-right-to-left tricolour travel",
+      "automatic existing-owner route handoff"
+    ]
+  },
+  "verification": {
+    "flutterAnalyze": "passed",
+    "affectedTests": {
+      "result": "passed",
+      "count": 18
+    },
+    "androidDebugBuild": "passed",
+    "referenceChecksums": "passed",
+    "candidatePromotionNote": "Two complete application regressions remain required before final candidate promotion; this accepted screen checkpoint does not partially merge to main."
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": "scripts/check-approved-ui-locks.ps1",
+    "changeRule": "Do not modify an accepted file or hash. A founder-directed replacement requires a new approved-reference version and a new acceptance record."
+  },
+  "lockedFiles": [
+    {
+      "path": "apps/mobile/lib/ui_v2/launch/launch_presentation_gate.dart",
+      "sha256": "24d41d7d62ae73d1df875f4b4f740bb79433badefc3b7b598f8f1f8925fe0ef0"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart",
+      "sha256": "08fc01f5a007d5619536523ae0d6ae360f6a05ae91970f8e81dfdfe3c1874a17"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/drawable/launch_transparent.xml",
+      "sha256": "517b2bc2d4d8c0ba64b4c1031c5f9b473b3855c965d03d0be8d7e6d2b4a977f0"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-v31/styles.xml",
+      "sha256": "84c8a1013f5c8e650090ae80294f7b6663afdb0c8fbbd1cfea77661b3842bd71"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-night-v31/styles.xml",
+      "sha256": "143cf58652d25013672c611fa1c47f54fc75048ca594435b1b82cd481dfa5222"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_app_splash_test.dart",
+      "sha256": "e44a45be1f6f1598904873249c7ba2064c9df960e95c23757440b4aaa1d03098"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_golden_test.dart",
+      "sha256": "a9fc88904c3e32464a361ae51f02da184a5488bf08859bf968193ef0f34e08ec"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_normal-motion-midpoint-360x720.png",
+      "sha256": "45ae6d228278c09429aeb3fb47d5cdd5e5bff37caf579e7179b655273d49b948"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_handoff-360x720.png",
+      "sha256": "cc38c9ed37c259b0e3ac1844181c4438d63b1f4af46139bd7dc84700c649c0bf"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_recovery-360x720.png",
+      "sha256": "0be4a2359be5125e9b29a026db40a4b7283a32f7140ef04ed150dc73d4a2ee52"
+    },
+    {
+      "path": "artifacts/quality/screen01-oppo-system-navy-final.png",
+      "sha256": "b0dc0c09944c179808c146a292eb6edbaa4e21b5b3533dea61002640687ef1cd"
+    },
+    {
+      "path": "artifacts/quality/screen01-oppo-one-visible-final/frame-4412ms.png",
+      "sha256": "7cfe1eb210cc9a9d0c8c53b072d50e55cfe73737d8686b6b0fed261da14850f5"
+    },
+    {
+      "path": "artifacts/quality/screen01-oppo-one-visible-final/frame-6000ms.png",
+      "sha256": "bc9b30949669522ae2c6a99447ab4ca32c77e4b821154ea7c6f9372bbf8323b5"
+    },
+    {
+      "path": "artifacts/quality/ui-v2-screen01-identical-viewport-comparison.png",
+      "sha256": "ed8ae78b0a74ed3f7d27e31210f3bcef79e2fb697164841c75bba4c974bd4ab6"
+    }
+  ]
+}

@@ -87,6 +87,7 @@ rules above prevent those three paths.
 | ID | Prototype screen/state | Mobile route/state | Reported difference | Failed tap sequence | Status |
 | --- | --- | --- | --- | --- | --- |
 | UI-CONFORMANCE-001 | Complete approved prototype | Complete current app | App-wide visual, wording and tap-depth divergence | Founder physical review | Open |
+| UI-CONFORMANCE-002 | Screen 01 Splash / First Open — reference `v2` | `/boot` native Flutter UI V2 | Old Android launch logo created a duplicate brand screen and the complete promise had insufficient reading time | App icon → Android system launch → animated Screen 01 → existing-owner route | **Accepted — 2026-07-20; CI-locked on remediation branch** |
 
 New rows use `UI-CONFORMANCE-002`, `003`, and so on. One row may contain several
 closely related states only when they share the same root component and

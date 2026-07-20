@@ -6,7 +6,7 @@ the prototype evidence into stable routes and state machines.
 | Prototype | Production owner | Current status |
 | --- | --- | --- |
 | Screen 00 Install App | Play Store listing and release pipeline | contract |
-| Screen 01 Splash / First Open | `/boot` | local UI and routing implemented |
+| Screen 01 Splash / First Open | `/boot` | **Founder Accepted for production** — native Flutter UI V2, immutable reference `v2`, CI-enforced production lock, OPPO replay passed |
 | Screen 02 Language / Location | `/setup` | local UI and validation implemented |
 | Screen 03 Login / Handoff | `/sign-in`, `/verify` | deterministic adapter implemented; live Firebase pending |
 | Screen 04 Universal Focus Shell | `/app/social`, `/app/mool`, universal nav | local shell implemented |

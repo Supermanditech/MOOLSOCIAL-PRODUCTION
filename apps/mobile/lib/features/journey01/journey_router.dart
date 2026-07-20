@@ -83,8 +83,9 @@ import '../retailer/screens/retailer_wholesale_fulfilment_screens.dart';
 import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
+import '../../ui_v2/launch/launch_presentation_gate.dart';
+import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import 'journey_session.dart';
-import 'screens/boot_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/universal_shell.dart';
@@ -105,18 +106,25 @@ GoRouter createJourneyRouter(
   RideSession rideSession,
   SharedSession sharedSession,
   WorkSession workSession, {
+  required LaunchPresentationGate launchPresentationGate,
   String initialLocation = '/boot',
 }) {
   late final GoRouter router;
   router = GoRouter(
     initialLocation: initialLocation,
-    refreshListenable: session,
+    refreshListenable: Listenable.merge([session, launchPresentationGate]),
     redirect: (context, state) {
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
 
       if (protected && !session.isReady) {
         session.captureReturnTo(location);
+      }
+
+      if (location == '/boot' &&
+          !launchPresentationGate.minimumElapsed &&
+          session.stage != JourneyStage.bootFailure) {
+        return null;
       }
 
       switch (session.stage) {
@@ -143,7 +151,10 @@ GoRouter createJourneyRouter(
     routes: [
       GoRoute(
         path: '/boot',
-        builder: (context, state) => BootScreen(session: session),
+        builder: (context, state) => AppSplashScreenV2(
+          session: session,
+          presentationGate: launchPresentationGate,
+        ),
       ),
       GoRoute(
         path: '/setup',

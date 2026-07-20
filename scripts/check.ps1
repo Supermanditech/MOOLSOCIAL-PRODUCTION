@@ -6,6 +6,7 @@ $flutterCommand = Get-Command flutter -ErrorAction SilentlyContinue
 
 & (Join-Path $PSScriptRoot "check-user-facing-copy.ps1")
 & (Join-Path $PSScriptRoot "check-interaction-contracts.ps1")
+& (Join-Path $PSScriptRoot "check-approved-ui-locks.ps1")
 
 if ($flutterCommand) {
   $flutterExecutable = $flutterCommand.Source

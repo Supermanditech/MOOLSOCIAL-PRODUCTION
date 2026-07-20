@@ -21,6 +21,9 @@ jobs:
       - name: Check controls and route contracts
         shell: pwsh
         run: ./scripts/check-interaction-contracts.ps1
+      - name: Check approved UI locks
+        shell: pwsh
+        run: ./scripts/check-approved-ui-locks.ps1
 
   mobile-quality:
     needs: product-contracts
