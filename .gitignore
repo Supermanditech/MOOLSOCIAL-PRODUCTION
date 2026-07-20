@@ -37,6 +37,7 @@ packages/generated/
 dataconnect/.dataconnect/
 artifacts/device/*
 artifacts/quality/review-*.png
+artifacts/review-runtime/
 !artifacts/device/moolsocial-clean-install.png
 !artifacts/device/moolsocial-lan-verified.png
 !artifacts/device/moolsocial-production-chat-device.png

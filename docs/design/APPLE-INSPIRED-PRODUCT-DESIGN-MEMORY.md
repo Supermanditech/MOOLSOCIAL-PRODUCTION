@@ -2,7 +2,32 @@
 
 Status: **mandatory for the complete application**
 
-Last confirmed by the product owner: 19 July 2026
+Last confirmed by the product owner: 20 July 2026
+
+## Open launch-blocking conformance issue
+
+On 20 July 2026, the product owner reported a material regression between the
+approved HTML prototype and the current physical-phone build. The reported
+scope is application-wide and includes:
+
+- visual hierarchy, styling, spacing and component treatment;
+- main action and sub-action wording;
+- tap, sub-tap and nested-tap structure;
+- the screens or visible results that complete each user intent.
+
+This issue is tracked as `UI-CONFORMANCE-001` in
+[`QA-024-APPROVED-PROTOTYPE-CONFORMANCE.md`](../quality/QA-024-APPROVED-PROTOTYPE-CONFORMANCE.md).
+It blocks founder design approval and any production-launch claim until the
+screenwise comparisons and acceptance replays are complete.
+
+The existing automated tests and 81 Flutter goldens prove consistency with the
+current implementation. They do **not** prove conformance to the approved
+prototype and must not be used as the sole design-approval oracle.
+
+All remediation work must be isolated from `main` until accepted. The working
+branch is `remediation/prototype-conformance-2026-07-20`. Screen-specific
+observations supplied by the product owner are appended to the QA-024 issue
+register before code is changed.
 
 ## Permanent product rule
 

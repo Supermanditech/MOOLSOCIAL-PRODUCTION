@@ -8,6 +8,9 @@
 4. No destructive production migration.
 5. No generated secret or live Firebase configuration committed.
 6. Accessibility semantics and minimum tap-target checks on touched UI.
+7. Every touched user-facing screen has an approved-prototype comparison;
+   current implementation goldens alone cannot approve visual or interaction
+   conformance.
 
 ## Every staging promotion
 
@@ -19,6 +22,8 @@
 6. Upload Android to App Distribution and iOS to TestFlight.
 7. Run Flutter integration tests on the Android and iOS device matrix.
 8. Verify Crashlytics, Performance and business-intent events by platform.
+9. Founder-approved screenwise visual and tap-path evidence is attached for
+   every journey changed by `UI-CONFORMANCE-001`.
 
 ## Every production promotion
 
