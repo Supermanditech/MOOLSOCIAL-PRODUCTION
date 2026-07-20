@@ -100,10 +100,21 @@ Provisioning checkpoint observed 21 July 2026:
 - Firebase CLI reauthentication succeeded.
 - Billing exists, but Google reports that the completed prepayment may take up
   to 24 hours to be credited.
-- The first Dev project creation attempt failed before creating a project
-  because the MoolSocial organisation account lacked Project Creator.
+- The authoritative organisation ID is `1067591230270`; the earlier
+  transposed value `1067591730370` must never be reused.
+- Direct Organisation Administrator and Project Creator roles are verified for
+  the MoolSocial admin principal.
+- `moolsocial-dev-503018` now exists inside `moolsocial.com` as Firebase project
+  `MoolSocial Dev Trial`, project number `760290687711`, state `ACTIVE`.
+- The immediate CLI Firebase attachment returned `403`; project IAM verified
+  Owner access, and Firebase console completion then reported the project
+  ready. The final state was independently rechecked with Firebase CLI.
+- Staging and Production have not been created. Billing and billable APIs have
+  not been attached to Dev/Trial.
 - Do not create the project outside the organisation as a workaround.
 - Do not enable APIs merely because they appear free.
+- Do not register Firebase apps or create API/OAuth credentials without the
+  applicable action-time confirmation and restriction plan.
 
 ## Regression history authorities
 

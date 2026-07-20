@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-moolsocial-local"
+    "default": "demo-moolsocial-local",
+    "dev": "moolsocial-dev-503018"
   }
 }

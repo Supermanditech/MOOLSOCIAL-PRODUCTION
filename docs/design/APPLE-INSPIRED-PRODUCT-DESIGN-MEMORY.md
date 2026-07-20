@@ -457,6 +457,24 @@ Both Android Studio Codex and every other Codex surface must read
 `docs/delivery/ENVIRONMENT-PROMOTION-BOUNDARY.md` before looking at or changing
 Google Cloud, Firebase, authentication, maps, APIs or distribution.
 
+Provisioning state recorded 21 July 2026:
+
+- The authoritative `moolsocial.com` Google Cloud organisation ID is
+  `1067591230270`.
+- An earlier transposed value, `1067591730370`, produced a false organisation
+  permission failure. Machine rule: never retype an observed cloud identifier
+  from memory; copy it from a current authoritative console/CLI observation and
+  verify the resource name before any mutation.
+- The MoolSocial admin principal has directly verified Organisation
+  Administrator and Project Creator grants.
+- `moolsocial-dev-503018` is now the active Firebase Dev/Trial project
+  (`MoolSocial Dev Trial`, project number `760290687711`).
+- Staging and Production remain uncreated. Dev/Trial creation does not authorize
+  billing attachment, unrestricted credentials, Maps/Places/Routes enablement,
+  or experimentation in Staging or Production.
+- Evidence:
+  `artifacts/quality/cloud-environment-bootstrap-20260721/CLOUD-ENVIRONMENT-BOOTSTRAP-EVIDENCE.md`.
+
 ## Completion evidence
 
 A screen or journey is not production-ready until it has:

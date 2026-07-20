@@ -106,13 +106,36 @@ Observed on 21 July 2026:
 - Google Cloud reported that the completed free-trial prepayment may require up
   to 24 hours to be credited; live billing status must be rechecked before a
   billable API or service is attached.
-- Creation of `moolsocial-dev-503018` was attempted once and failed before any
-  project was created because the MoolSocial organisation account lacked the
-  separate Project Creator permission.
-- No Dev, Staging or Production Firebase project was created by that failed
-  attempt.
+- The authoritative MoolSocial organisation ID is `1067591230270`. Do not copy,
+  infer or silently substitute this identifier; an earlier transposed value
+  (`1067591730370`) caused a false permission/organisation failure.
+- Organisation IAM directly grants the MoolSocial admin principal both
+  Organisation Administrator and Project Creator. The `moolsocial.com` domain
+  also retains its default Project Creator and Billing Account Creator grants.
+- Google Cloud project `moolsocial-dev-503018` was created inside the
+  `moolsocial.com` organisation with display name `MoolSocial Dev Trial`.
+- Firebase was added to that project through the Firebase console after the
+  immediate CLI add-Firebase request returned `403 PERMISSION_DENIED`.
+  Firebase's documented causes for that response include missing required
+  permissions or an account that has not yet accepted the Firebase Terms.
+  Project IAM independently verified the admin principal as project Owner
+  before console completion.
+- Firebase CLI independently reports the Dev/Trial project as `ACTIVE`, with
+  project number `760290687711`.
+- Adding Firebase automatically provisions a Browser API key. Firebase
+  documents that it is auto-restricted to Firebase-related APIs, but its
+  application restrictions remain an explicit pre-registration audit item; do
+  not assume that product-level API restrictions are sufficient for Android or
+  iOS client safety.
+- `moolsocial-staging-503018` has not been created. No Production Firebase
+  project has been created.
+- No billing account has been attached to Dev/Trial in this checkpoint, and no
+  billable Maps, Places, Routes or other API is authorized by project creation.
 
 Do not work around the organisation boundary by creating an unmanaged project.
-Grant only the minimum required project-creation permission after the founder's
-action-time confirmation, then verify the created project belongs to the
-MoolSocial organisation.
+Before app registration, Authentication provider enablement, App Distribution
+setup or API enablement, verify the owning journey, credential restrictions and
+the applicable action-time confirmation. Preserve the CLI and console evidence
+in:
+
+`artifacts/quality/cloud-environment-bootstrap-20260721/CLOUD-ENVIRONMENT-BOOTSTRAP-EVIDENCE.md`
