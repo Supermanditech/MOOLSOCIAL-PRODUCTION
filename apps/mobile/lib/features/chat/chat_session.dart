@@ -69,6 +69,15 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'task-helper': [
+        const ChatMessage(
+          id: 'm8',
+          sender: 'Ramesh Kumar',
+          text: 'I accepted the task and can see the approved instructions.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
     });
   }
 
@@ -121,6 +130,15 @@ class ChatSession extends ChangeNotifier {
       title: 'Sardarpura Clinic',
       subtitle: 'Verified clinic · Appointment support',
       preview: 'Your appointment details are linked.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'task-helper',
+      title: 'Ramesh Kumar',
+      subtitle: 'Verified helper · Active task',
+      preview: 'I can see the approved task instructions.',
       timeLabel: 'Now',
       type: ChatThreadType.business,
       verified: true,

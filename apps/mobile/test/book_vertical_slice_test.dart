@@ -376,6 +376,17 @@ void main() {
       await tapVisible(tester, const Key('confirm-task'));
       expect(gateway.taskCalls, 1);
       expect(book.task, isNotNull);
+      await tapVisible(tester, const Key('task-live-share'));
+      expect(book.noticeMessage, 'Live task link copied.');
+      await tapVisible(tester, const Key('dismiss-book-message'));
+      await tapVisible(tester, const Key('task-live-call'));
+      expect(book.noticeMessage, 'Calling Ramesh securely…');
+      await tapVisible(tester, const Key('dismiss-book-message'));
+      await tapVisible(tester, const Key('task-live-chat'));
+      expect(find.text('Ramesh Kumar'), findsWidgets);
+      await tapVisible(tester, const Key('chat-back'));
+      await tapVisible(tester, const Key('chat-back'));
+      expect(find.text('Live task'), findsWidgets);
       await tapVisible(tester, const Key('task-proof-arrived'));
       await tapVisible(tester, const Key('release-task-payment'));
       expect(gateway.releaseCalls, 1);
@@ -384,6 +395,8 @@ void main() {
       await tapVisible(tester, const Key('task-rating-5'));
       await tapVisible(tester, const Key('save-helper'));
       expect(book.helperSaved, isTrue);
+      await tapVisible(tester, const Key('task-share-receipt-proof'));
+      expect(book.noticeMessage, 'Receipt and proof link copied.');
     },
   );
 
@@ -490,6 +503,11 @@ void main() {
       expect(gateway.supportCalls, 2);
       await tapVisible(tester, const Key('view-task-decision'));
       await tapVisible(tester, const Key('task-resolution-refund'));
+      await tapVisible(tester, const Key('task-resolution-chat'));
+      expect(find.text('Order Support'), findsWidgets);
+      await tapVisible(tester, const Key('chat-back'));
+      await tapVisible(tester, const Key('chat-back'));
+      expect(find.text('Choose resolution'), findsWidgets);
       await tapVisible(tester, const Key('accept-task-resolution'));
       expect(find.textContaining('No money moved'), findsOneWidget);
       expect(book.resolutionComplete, isFalse);
@@ -497,6 +515,8 @@ void main() {
       expect(book.resolutionComplete, isTrue);
       expect(gateway.resolutionCalls, 2);
       expect(find.text('Resolution complete'), findsWidgets);
+      await tapVisible(tester, const Key('track-task-resolution'));
+      expect(find.text('Task completed'), findsWidgets);
     },
   );
 

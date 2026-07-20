@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
@@ -282,8 +283,12 @@ class TaskLiveScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => session.showNotice(
-                      'Task chat opened with instructions attached.',
+                    key: const Key('task-live-chat'),
+                    onPressed: () => context.go(
+                      Uri(
+                        path: '/app/chat/thread/task-helper',
+                        queryParameters: {'return': '/app/book/task/live'},
+                      ).toString(),
                     ),
                     icon: const Icon(Icons.chat_bubble_outline_rounded),
                     label: const Text('Chat'),
@@ -292,8 +297,9 @@ class TaskLiveScreen extends StatelessWidget {
                 const SizedBox(width: MoolSpacing.xs),
                 Expanded(
                   child: OutlinedButton.icon(
+                    key: const Key('task-live-call'),
                     onPressed: () =>
-                        session.showNotice('Masked call connected to Ramesh.'),
+                        session.showNotice('Calling Ramesh securely…'),
                     icon: const Icon(Icons.call_outlined),
                     label: const Text('Call'),
                   ),
@@ -301,8 +307,16 @@ class TaskLiveScreen extends StatelessWidget {
                 const SizedBox(width: MoolSpacing.xs),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        session.showNotice('Live task link is ready to share.'),
+                    key: const Key('task-live-share'),
+                    onPressed: () {
+                      Clipboard.setData(
+                        ClipboardData(
+                          text:
+                              'https://moolsocial.com/task/${session.task?.id ?? 'active'}',
+                        ),
+                      );
+                      session.showNotice('Live task link copied.');
+                    },
                     icon: const Icon(Icons.share_outlined),
                     label: const Text('Share'),
                   ),
@@ -516,8 +530,16 @@ class TaskCompletedScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.xs),
             OutlinedButton.icon(
-              onPressed: () =>
-                  session.showNotice('Receipt and proof are ready to share.'),
+              key: const Key('task-share-receipt-proof'),
+              onPressed: () {
+                Clipboard.setData(
+                  ClipboardData(
+                    text:
+                        'https://moolsocial.com/task/${session.task?.id ?? 'completed'}/receipt',
+                  ),
+                );
+                session.showNotice('Receipt and proof link copied.');
+              },
               icon: const Icon(Icons.share_outlined),
               label: const Text('Share receipt and proof'),
             ),
@@ -701,8 +723,12 @@ class TaskCaseScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.sm),
             OutlinedButton.icon(
-              onPressed: () => session.showNotice(
-                'Support chat opened with this case attached.',
+              key: const Key('task-case-chat'),
+              onPressed: () => context.go(
+                Uri(
+                  path: '/app/chat/thread/order-support',
+                  queryParameters: {'return': '/app/book/task/case'},
+                ).toString(),
               ),
               icon: const Icon(Icons.chat_bubble_outline_rounded),
               label: const Text('Ask support'),
@@ -786,8 +812,12 @@ class TaskResolutionScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.sm),
             OutlinedButton.icon(
-              onPressed: () => session.showNotice(
-                'Support chat opened before the case is closed.',
+              key: const Key('task-resolution-chat'),
+              onPressed: () => context.go(
+                Uri(
+                  path: '/app/chat/thread/order-support',
+                  queryParameters: {'return': '/app/book/task/resolution'},
+                ).toString(),
               ),
               icon: const Icon(Icons.chat_bubble_outline_rounded),
               label: const Text('Ask support a question'),
@@ -864,8 +894,7 @@ class TaskResolutionCompleteScreen extends StatelessWidget {
             const SizedBox(height: MoolSpacing.sm),
             OutlinedButton.icon(
               key: const Key('track-task-resolution'),
-              onPressed: () =>
-                  session.showNotice('Receipt and money status opened.'),
+              onPressed: () => context.go('/app/book/task/completed'),
               icon: const Icon(Icons.receipt_long_outlined),
               label: const Text('View receipt and status'),
             ),

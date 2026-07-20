@@ -299,8 +299,11 @@ returns success. Completion requires:
 
 - Source progress: Doctor clinic contact, patient QR, consent-bound invite
   link, one-time reception code, prescription QR and follow-up slot actions now
-  have visible owners. Repeated code and prescription actions remain
-  duplicate-safe, and the full nested sequence passes on the connected OPPO.
+  have visible owners. Local tasks now open the assigned helper and Support
+  conversations directly, copy the live-task and saved-receipt links, expose a
+  secure-call result and return resolution tracking to the completed task.
+  Repeated code and prescription actions remain duplicate-safe, and both full
+  nested sequences pass on the connected OPPO.
 - Implement provider catalogue, availability, slot/hold, patient consent,
   arrival/proof, protected release and support.
 - Separate health information from ordinary commerce and apply least-privilege

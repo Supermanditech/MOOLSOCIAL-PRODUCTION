@@ -546,6 +546,7 @@ Founder-readable boards are versioned with the audit:
 | Book, Work and Pay help stopped at “ready” notices | Each shortcut opens the filtered Support inbox and preserves its origin | Dedicated contract and exact three-route OPPO replay passed |
 | Ride header safety stopped at a “ready” notice | Shared Safety centre owns no-trip booking/support/emergency and active-trip share/report/emergency | 10/10 affected tests and empty/active OPPO replay passed |
 | My Work settlement View summary used a generic SnackBar | Required callback opens a real zero-due summary with close and operating-workspace actions | 12/12 affected tests and exact OPPO replay passed |
+| Book local-task chat, call, share and support actions stopped at generic notices or indirect navigation | Assigned helper and Support conversations now open directly with exact return routes; live-task and receipt links copy; resolution tracking opens the completed task | 17/17 Book/Chat affected tests and the complete OPPO nested replay passed |
 
 ## Current verification
 
@@ -581,6 +582,8 @@ Founder-readable boards are versioned with the audit:
 | OPPO Ride safety replay | Passed; no-trip support and active-trip link completion both verified |
 | Work settlement affected regression | Passed, 12/12 |
 | OPPO Work settlement replay | Passed; non-mutating close and operating-workspace completion verified |
+| Book local-task and Chat affected regression | Passed, 17/17 |
+| OPPO Book task replay | Passed; helper chat/return, copied live link, secure call, Support/return, resolution tracking and copied receipt completed |
 | Production visual baseline set | Passed across 81 current mobile states |
 | Independent current full regression cycle 1 | Passed, 329/329 without baseline updates |
 | Independent current full regression cycle 2 | Passed, 329/329 without baseline updates |
