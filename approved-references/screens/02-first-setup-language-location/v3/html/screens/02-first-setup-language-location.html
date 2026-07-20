@@ -1,0 +1,2615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>02 First Setup / Language + Location - MoolSocial Screenbook</title>
+  <link rel="stylesheet" href="../shared/moolsocial-ui-foundation.css" />
+  <style>
+    .screen-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .back-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .screen-link-home {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ms-navy);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .back-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .setup-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: stretch;
+      padding: 18px;
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .setup-phone {
+      width: min(100%, 390px);
+      min-height: 760px;
+      display: grid;
+      grid-template-rows: 34px auto 1fr;
+      justify-self: center;
+      border: 12px solid var(--ms-navy);
+      border-radius: 34px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      overflow: hidden;
+    }
+
+    .phone-status {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px 0;
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .setup-brand {
+      display: grid;
+      gap: 10px;
+      padding: 18px 18px 16px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .mini-wordmark {
+      color: var(--ms-white);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: .95;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .mini-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+    }
+
+    .mini-line span:nth-child(1) { background: var(--ms-saffron); }
+    .mini-line span:nth-child(2) { background: var(--ms-white); }
+    .mini-line span:nth-child(3) { background: var(--ms-green); }
+
+    .setup-brand p {
+      margin: 0;
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.35;
+    }
+
+    .setup-body {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      padding: 16px;
+      background: var(--ms-white);
+    }
+
+    .setup-card {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 14px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .setup-card h2,
+    .setup-card h3,
+    .setup-card p {
+      margin: 0;
+    }
+
+    .setup-card h2 {
+      color: var(--ms-navy);
+      font-size: 22px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .setup-card h3 {
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .setup-card p {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .auto-row {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .auto-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .auto-icon svg,
+    .final-symbol svg {
+      width: 23px;
+      height: 23px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .auto-row b {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--ms-navy);
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .auto-row span {
+      display: block;
+      color: var(--ms-navy);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .status-chip {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--ms-green);
+      border-radius: var(--ms-pill);
+      padding: 0 9px;
+      color: var(--ms-green);
+      background: var(--ms-white);
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .location-preview {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .location-preview b,
+    .location-preview span {
+      display: block;
+      color: var(--ms-white);
+    }
+
+    .location-preview b {
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .location-preview span {
+      margin-top: 3px;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .pulse-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--ms-green);
+      box-shadow: 0 0 0 6px rgba(19, 136, 8, .16);
+    }
+
+    .primary-action {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 14px;
+      font-weight: 950;
+      font-family: var(--ms-font);
+    }
+
+    .fine-note {
+      color: var(--ms-navy);
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .micro-chip {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      padding: 0 9px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .logic-panel {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .logic-flow {
+      display: grid;
+      gap: 10px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 12px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .step-num {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .flow-step b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ms-green);
+      font-size: 13px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .flow-step span {
+      display: block;
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .state-table {
+      display: grid;
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: 230px 1fr 1fr;
+      border-top: 1px solid var(--ms-navy);
+    }
+
+    .state-row:first-child {
+      border-top: 0;
+    }
+
+    .state-cell {
+      min-height: 86px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      padding: 14px;
+      border-right: 1px solid var(--ms-navy);
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .state-cell:last-child {
+      border-right: 0;
+    }
+
+    .state-cell b {
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .final-preview {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      border-bottom: 1px solid var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .final-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .final-single-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .final-stage {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stage-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .stage-label span {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      padding: 0 9px;
+      color: var(--ms-green);
+      background: var(--ms-white);
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    .final-phone {
+      width: min(100%, 360px);
+      min-height: 700px;
+      display: grid;
+      grid-template-rows: 32px 1fr;
+      justify-self: center;
+      border: 10px solid var(--ms-navy);
+      border-radius: 32px;
+      background: var(--ms-navy);
+      overflow: hidden;
+    }
+
+    .final-status {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 0;
+      color: var(--ms-white);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .final-app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 668px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      overflow: hidden;
+    }
+
+    .final-top {
+      display: grid;
+      gap: 10px;
+      padding: 18px 18px 16px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .final-wordmark {
+      color: var(--ms-white);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: .95;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .final-identity-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+    }
+
+    .final-identity-line span:nth-child(1) { background: var(--ms-saffron); }
+    .final-identity-line span:nth-child(2) { background: var(--ms-white); }
+    .final-identity-line span:nth-child(3) { background: var(--ms-green); }
+
+    .final-top-copy {
+      margin: 0;
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.35;
+    }
+
+    .final-content {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      padding: 16px;
+      background: var(--ms-white);
+    }
+
+    .final-title {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 27px;
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .final-copy {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .language-summary {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      border: 1px solid var(--ms-green);
+      border-radius: var(--ms-radius);
+      padding: 9px 10px;
+      background: rgba(19, 136, 8, .07);
+    }
+
+    .language-summary-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--ms-white);
+      background: var(--ms-green);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .language-summary b,
+    .language-summary span {
+      display: block;
+      color: var(--ms-navy);
+    }
+
+    .language-summary b {
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .language-summary span {
+      margin-top: 2px;
+      font-size: 10px;
+      line-height: 1.3;
+    }
+
+    .language-summary em {
+      color: var(--ms-green);
+      font-size: 10px;
+      font-style: normal;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .final-info-card {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 13px;
+      background: var(--ms-white);
+    }
+
+    .final-row {
+      display: grid;
+      grid-template-columns: 38px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .final-symbol {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .final-row b,
+    .final-row span {
+      display: block;
+      min-width: 0;
+    }
+
+    .final-row b {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.18;
+    }
+
+    .final-row span {
+      margin-top: 2px;
+      color: var(--ms-navy);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .final-pill {
+      min-height: 25px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--ms-green);
+      border-radius: var(--ms-pill);
+      padding: 0 8px;
+      color: var(--ms-green);
+      background: var(--ms-white);
+      font-size: 10px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .nearby-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 14px;
+      color: var(--ms-white);
+      background: var(--ms-navy);
+    }
+
+    .nearby-card b,
+    .nearby-card span {
+      display: block;
+      color: var(--ms-white);
+    }
+
+    .nearby-card b {
+      font-size: 17px;
+      line-height: 1.16;
+    }
+
+    .nearby-card span {
+      margin-top: 5px;
+      font-size: 12px;
+      line-height: 1.38;
+    }
+
+    .nearby-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .nearby-strip i {
+      min-height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-white);
+      border-radius: var(--ms-radius);
+      color: var(--ms-white);
+      font-style: normal;
+      font-size: 10px;
+      font-weight: 900;
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    .location-choice-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .location-choice {
+      appearance: none;
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: center;
+      min-height: 50px;
+      border: 1px solid var(--ms-white);
+      border-radius: var(--ms-radius);
+      padding: 10px;
+      color: var(--ms-white);
+      background: rgba(255, 255, 255, .08);
+      font-family: var(--ms-font);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .manual-area-sheet {
+      display: none;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, .68);
+      border-radius: var(--ms-radius);
+      padding: 10px;
+      background: rgba(255, 255, 255, .1);
+    }
+
+    .manual-area-sheet.active {
+      display: grid;
+    }
+
+    .manual-area-sheet label {
+      color: var(--ms-white);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .manual-area-sheet input {
+      min-width: 0;
+      border: 1px solid rgba(255, 255, 255, .8);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font: inherit;
+    }
+
+    .manual-area-actions {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+    }
+
+    .manual-area-actions button,
+    .manual-area-actions a {
+      min-height: 38px;
+      border: 1px solid var(--ms-white);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--ms-white);
+      background: transparent;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 900;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .manual-area-actions a {
+      display: grid;
+      place-items: center;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .choice-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ms-white);
+    }
+
+    .choice-icon svg {
+      width: 40px;
+      height: 40px;
+      stroke: none;
+      fill: none;
+      stroke-width: 0;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 5px 8px rgba(0, 0, 0, .28));
+    }
+
+    .location-choice b,
+    .location-choice span {
+      color: var(--ms-white);
+    }
+
+    .location-choice b {
+      font-size: 12px;
+      line-height: 1.15;
+    }
+
+    .location-choice span {
+      margin-top: 2px;
+      font-size: 10px;
+      line-height: 1.25;
+    }
+
+    .location-choice .choice-icon {
+      margin-top: 0;
+      color: var(--ms-white);
+    }
+
+    .location-choice .choice-icon svg {
+      stroke: none;
+    }
+
+    .auto-area-card {
+      gap: 10px;
+    }
+
+    .auto-area-card .location-choice {
+      min-height: 64px;
+    }
+
+    .legacy-location-choices[hidden] {
+      display: none;
+    }
+
+    .auto-home-link {
+      min-height: 36px;
+      border: 0;
+      padding: 4px 8px;
+      color: var(--ms-white);
+      background: transparent;
+      font-family: var(--ms-font);
+      font-size: 11px;
+      font-weight: 900;
+      text-align: center;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .auto-area-note {
+      margin: 0;
+      color: rgba(255, 255, 255, .82);
+      font-size: 10px;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .area-purpose-list {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .area-purpose-list li {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--ms-navy);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .area-purpose-list li::before {
+      content: "✓";
+      width: 21px;
+      height: 21px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--ms-white);
+      background: var(--ms-green);
+      font-weight: 950;
+    }
+
+    .area-pair {
+      display: grid;
+      gap: 8px;
+    }
+
+    .area-pair-row {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 10px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .area-pair-row.current {
+      border-color: var(--ms-green);
+      background: rgba(19, 136, 8, .07);
+    }
+
+    .area-pair-row b {
+      font-size: 10px;
+      color: var(--ms-green);
+      text-transform: uppercase;
+    }
+
+    .area-pair-row strong {
+      color: var(--ms-navy);
+      font-size: 14px;
+    }
+
+    .area-pair-row span {
+      color: var(--ms-navy);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .setup-detail {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .setup-detail[hidden] {
+      display: none;
+    }
+
+    .final-content.detail-open > :not(.setup-detail) {
+      display: none;
+    }
+
+    .detail-kicker {
+      margin: 0;
+      color: var(--ms-green);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .detail-title {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 25px;
+      line-height: 1.06;
+    }
+
+    .detail-copy {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .detail-card {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 13px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .detail-card.soft {
+      border-color: var(--ms-green);
+      background: rgba(19, 136, 8, .07);
+    }
+
+    .detail-card.warning {
+      border-color: var(--ms-saffron);
+      background: rgba(255, 153, 51, .12);
+    }
+
+    .detail-card b,
+    .detail-card span {
+      display: block;
+      color: var(--ms-navy);
+    }
+
+    .detail-card b {
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .detail-card span {
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .detail-actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    .detail-action {
+      min-height: 42px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      padding: 9px 12px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font-family: var(--ms-font);
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .detail-action.primary {
+      color: var(--ms-white);
+      background: var(--ms-navy);
+    }
+
+    .detail-action.danger {
+      border-color: var(--ms-saffron);
+    }
+
+    .detail-link {
+      min-height: 36px;
+      border: 0;
+      color: var(--ms-navy);
+      background: transparent;
+      font-family: var(--ms-font);
+      font-size: 11px;
+      font-weight: 900;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .setup-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .setup-field label {
+      color: var(--ms-navy);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .setup-field input {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--ms-navy);
+      border-radius: 9px;
+      padding: 11px 12px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font: 700 13px/1.3 var(--ms-font);
+    }
+
+    .setup-field-error {
+      margin: 0;
+      color: #a32626;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    .area-suggestions {
+      display: grid;
+      gap: 7px;
+    }
+
+    .area-suggestion {
+      min-height: 46px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 9px;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 10px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font-family: var(--ms-font);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .area-suggestion b,
+    .area-suggestion span {
+      display: block;
+      color: var(--ms-navy);
+    }
+
+    .area-suggestion b {
+      font-size: 12px;
+    }
+
+    .area-suggestion span {
+      margin-top: 2px;
+      font-size: 10px;
+    }
+
+    .area-suggestion strong {
+      color: var(--ms-green);
+      font-size: 18px;
+    }
+
+    .map-preview {
+      min-height: 190px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background:
+        linear-gradient(32deg, transparent 45%, rgba(255,255,255,.92) 46% 51%, transparent 52%),
+        linear-gradient(145deg, transparent 42%, rgba(255,255,255,.88) 43% 48%, transparent 49%),
+        linear-gradient(90deg, rgba(19,136,8,.25), rgba(74,144,226,.34));
+    }
+
+    .map-preview::before,
+    .map-preview::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+    }
+
+    .map-preview::before {
+      width: 54px;
+      height: 54px;
+      left: calc(50% - 27px);
+      top: calc(50% - 35px);
+      background: var(--ms-saffron);
+      box-shadow: 0 12px 24px rgba(0,0,0,.2);
+    }
+
+    .map-preview::after {
+      width: 19px;
+      height: 19px;
+      left: calc(50% - 9.5px);
+      top: calc(50% - 18px);
+      background: var(--ms-white);
+    }
+
+    .map-caption {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 10px;
+      border-radius: var(--ms-pill);
+      padding: 7px 10px;
+      color: var(--ms-white);
+      background: var(--ms-navy);
+      font-size: 10px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .detail-spinner {
+      width: 44px;
+      height: 44px;
+      margin: 18px auto 4px;
+      border: 5px solid rgba(0, 0, 128, .13);
+      border-top-color: var(--ms-green);
+      border-radius: 50%;
+      animation: setup-spin .8s linear infinite;
+    }
+
+    @keyframes setup-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .permission-sheet {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: 18px 18px 8px 8px;
+      padding: 15px;
+      background: var(--ms-white);
+      box-shadow: 0 -8px 0 rgba(0, 0, 128, .05);
+    }
+
+    .permission-sheet b {
+      color: var(--ms-navy);
+      font-size: 15px;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .permission-sheet span {
+      color: var(--ms-navy);
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    .permission-option {
+      min-height: 36px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .permission-option.primary {
+      color: var(--ms-white);
+      background: var(--ms-navy);
+    }
+
+    .area-confirm {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--ms-green);
+      border-radius: var(--ms-radius);
+      padding: 14px;
+      background: rgba(19, 136, 8, .08);
+    }
+
+    .area-confirm b {
+      color: var(--ms-green);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .area-confirm strong {
+      color: var(--ms-navy);
+      font-size: 22px;
+      line-height: 1.08;
+    }
+
+    .area-confirm span {
+      color: var(--ms-navy);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .route-panel {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 16px;
+      background: var(--ms-white);
+    }
+
+    .final-single-layout .route-panel {
+      grid-column: 1 / -1;
+    }
+
+    .route-panel h2,
+    .route-panel h3,
+    .route-panel p {
+      margin: 0;
+    }
+
+    .route-panel h2 {
+      color: var(--ms-navy);
+      font-size: 24px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .route-panel h3 {
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .route-panel p,
+    .route-panel li {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .route-list {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .route-list li {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 9px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+    }
+
+    .route-num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 11px;
+      font-weight: 950;
+    }
+
+    .outcome-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--ms-green);
+      border-radius: var(--ms-radius);
+      padding: 12px;
+      background: rgba(19, 136, 8, .08);
+    }
+
+    .deny-card {
+      border-color: var(--ms-saffron);
+      background: rgba(255, 153, 51, .13);
+    }
+
+    .manual-card {
+      border-color: var(--ms-navy);
+      background: var(--ms-white);
+    }
+
+    .secondary-action {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 14px;
+      font-weight: 950;
+      font-family: var(--ms-font);
+    }
+
+    .setup-action-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .setup-action {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 9px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .setup-action-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ms-navy);
+    }
+
+    .setup-action-icon svg {
+      width: 34px;
+      height: 34px;
+      stroke: none;
+      fill: none;
+      stroke-width: 0;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .setup-action b,
+    .setup-action span {
+      display: block;
+      color: var(--ms-navy);
+    }
+
+    .setup-action b {
+      font-size: 12px;
+      line-height: 1.15;
+    }
+
+    .setup-action span {
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .setup-action .setup-action-icon {
+      margin-top: 0;
+      color: var(--ms-navy);
+    }
+
+    .setup-action .setup-action-icon svg {
+      stroke: none;
+    }
+
+    @media (max-width: 1040px) {
+      .setup-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .final-preview-grid,
+      .final-single-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .state-row {
+        grid-template-columns: 1fr;
+      }
+
+      .state-cell {
+        border-right: 0;
+        border-bottom: 1px solid var(--ms-navy);
+      }
+
+      .state-cell:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .back-row {
+        display: grid;
+      }
+
+      .setup-layout {
+        padding: 14px;
+      }
+
+      .setup-phone {
+        min-height: 700px;
+        border-width: 9px;
+      }
+
+      .auto-row,
+      .location-preview {
+        grid-template-columns: 1fr;
+      }
+
+      .status-chip {
+        justify-self: start;
+      }
+
+      .final-phone {
+        min-height: 660px;
+        border-width: 9px;
+      }
+
+      .final-app {
+        min-height: 628px;
+      }
+
+      .final-row {
+        grid-template-columns: 38px 1fr;
+      }
+
+      .final-pill {
+        justify-self: start;
+      }
+
+    }
+  </style>
+</head>
+<body class="ms-doc">
+  <main class="ms-page screen-shell">
+    <header>
+      <div class="back-row">
+        <a class="screen-link-home" href="../index.html">
+          <span class="back-mark">BR</span>
+          Back to Screenbook
+        </a>
+        <span class="ms-status">Founder approved · FINAL v3</span>
+      </div>
+      <h1 class="ms-title">Screen 02: First Setup / Language + Location</h1>
+      <p class="ms-lead">
+        This simpler version uses the phone language automatically and asks for one clear location action.
+        MoolSocial detects the current travelling area from the phone, then lets the user continue immediately
+        or set a separate home/work area for local products, services and earning opportunities. There is no
+        first-open map picker, pin-code menu or three-way location choice.
+      </p>
+    </header>
+
+    <section class="ms-panel">
+      <div class="ms-section-head" id="final-user-ui-preview">Final User-Facing UI <span>Approved for production</span></div>
+      <div class="final-preview">
+        <div class="final-single-layout">
+          <article class="final-stage">
+            <div class="stage-label">User screen <span>Interactive journey</span></div>
+            <section class="final-phone" aria-label="MoolSocial area setup">
+              <div class="final-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="final-app">
+                <div class="final-top">
+                  <div class="final-wordmark">MoolSocial</div>
+                  <div class="final-identity-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <p class="final-top-copy">India Ka Socio Commerce App</p>
+                </div>
+                <div class="final-content">
+                  <h2 class="final-title">You’re in Sardarpura</h2>
+                  <p class="final-copy">Jodhpur, Rajasthan</p>
+                  <div class="language-summary" aria-label="App language English">
+                    <span class="language-summary-icon" aria-hidden="true">A</span>
+                    <span><b>English</b><span>Change language anytime in Settings</span></span>
+                    <em>✓</em>
+                  </div>
+                  <div class="nearby-card auto-area-card">
+                    <div>
+                      <b>Explore what’s around you</b>
+                      <span>See nearby products, services and earning opportunities in Sardarpura and Jodhpur.</span>
+                    </div>
+                    <button class="location-choice" type="button" data-area-action="continue">
+                      <span class="choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 48 48"><defs><linearGradient id="locPinV3" x1="14" y1="6" x2="34" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6A3D"/><stop offset=".55" stop-color="#E42D2D"/><stop offset="1" stop-color="#B4132D"/></linearGradient><radialGradient id="locGlowV3" cx="0" cy="0" r="1" gradientTransform="matrix(14 0 0 7 24 40)" gradientUnits="userSpaceOnUse"><stop stop-color="#1FB6FF" stop-opacity=".34"/><stop offset="1" stop-color="#1FB6FF" stop-opacity="0"/></radialGradient></defs><ellipse cx="24" cy="40" rx="14" ry="7" fill="url(#locGlowV3)"/><path fill="url(#locPinV3)" d="M24 4.5c-7.3 0-13.2 5.8-13.2 13 0 9.9 13.2 25.8 13.2 25.8s13.2-15.9 13.2-25.8c0-7.2-5.9-13-13.2-13Z"/><circle cx="24" cy="17.7" r="7.7" fill="#fff"/><circle cx="24" cy="17.7" r="4.1" fill="#0B57D0"/></svg>
+                      </span>
+                      <span><b>Continue</b><span>Use Sardarpura for nearby results</span></span>
+                    </button>
+                    <button class="auto-home-link" type="button" data-area-action="home">Set my home or work area</button>
+                    <p class="auto-area-note">Travelling? Your usual home or work area can stay separate.</p>
+                  </div>
+                  <div class="nearby-card legacy-location-choices" hidden>
+                    <div>
+                      <b>Which area should MoolSocial use?</b>
+                      <span>Use where you are now, set another area, or continue without one.</span>
+                    </div>
+                    <div class="location-choice-list">
+                      <button class="location-choice" type="button" data-area-action="current">
+                        <span class="choice-icon" aria-hidden="true">
+                          <svg viewBox="0 0 48 48"><defs><linearGradient id="locPinA" x1="14" y1="6" x2="34" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6A3D"/><stop offset=".55" stop-color="#E42D2D"/><stop offset="1" stop-color="#B4132D"/></linearGradient><radialGradient id="locGlowA" cx="0" cy="0" r="1" gradientTransform="matrix(14 0 0 7 24 40)" gradientUnits="userSpaceOnUse"><stop stop-color="#1FB6FF" stop-opacity=".34"/><stop offset="1" stop-color="#1FB6FF" stop-opacity="0"/></radialGradient></defs><ellipse cx="24" cy="40" rx="14" ry="7" fill="url(#locGlowA)"/><path fill="url(#locPinA)" d="M24 4.5c-7.3 0-13.2 5.8-13.2 13 0 9.9 13.2 25.8 13.2 25.8s13.2-15.9 13.2-25.8c0-7.2-5.9-13-13.2-13Z"/><path fill="#FFB199" d="M17.2 11.7c2.2-2.6 5.8-3.8 9.2-3.1-4.6.7-8.2 4.5-8.8 9.1-.3 2.2-3 2-3.1-.2-.1-2 .9-4 2.7-5.8Z" opacity=".72"/><circle cx="24" cy="17.7" r="7.7" fill="#fff"/><circle cx="24" cy="17.7" r="4.1" fill="#0B57D0"/></svg>
+                        </span>
+                        <span><b>Use current location</b><span>Best when you are at the place now</span></span>
+                      </button>
+                      <button class="location-choice" type="button" data-area-action="manual">
+                        <span class="choice-icon" aria-hidden="true">
+                          <svg viewBox="0 0 48 48"><defs><linearGradient id="mapPanelA" x1="7" y1="8" x2="41" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF1B8"/><stop offset=".45" stop-color="#B6E7C9"/><stop offset="1" stop-color="#9BD1FF"/></linearGradient><linearGradient id="mapPinA" x1="27" y1="9" x2="39" y2="31" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6A3D"/><stop offset="1" stop-color="#D7193F"/></linearGradient></defs><path fill="url(#mapPanelA)" d="m6.5 13.2 11.4-5 12.2 4.8 11.4-5.2v28l-11.4 5.4-12.2-4.9-11.4 5.1V13.2Z"/><path fill="#F4C542" d="M6.5 13.2 17.9 8v28.3L6.5 41.4V13.2Z" opacity=".95"/><path fill="#31A853" d="m17.9 8 12.2 4.9v28.3l-12.2-4.9V8Z" opacity=".94"/><path fill="#4A90E2" d="m30.1 12.9 11.4-5.1v28l-11.4 5.4V12.9Z" opacity=".95"/><path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.2" d="M11 26c4.7-3 8.3-3.2 11.7-.6 4.1 3.1 8.1 2.8 12.8-1.2"/><path fill="url(#mapPinA)" d="M33.6 8.2c-4.9 0-8.8 3.8-8.8 8.5 0 6.7 8.8 15 8.8 15s8.8-8.3 8.8-15c0-4.7-3.9-8.5-8.8-8.5Z"/><circle cx="33.6" cy="16.8" r="3.7" fill="#fff"/></svg>
+                        </span>
+                        <span><b>Set manually</b><span>Search area, pin code, address or choose on map</span></span>
+                      </button>
+                      <button class="location-choice" type="button" data-area-action="skip">
+                        <span class="choice-icon" aria-hidden="true">
+                          <svg viewBox="0 0 48 48"><defs><linearGradient id="skipDiscA" x1="9" y1="7" x2="39" y2="41" gradientUnits="userSpaceOnUse"><stop stop-color="#36D399"/><stop offset=".5" stop-color="#13A86B"/><stop offset="1" stop-color="#00796B"/></linearGradient><linearGradient id="skipArrowA" x1="16" y1="16" x2="36" y2="31" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF7C2"/><stop offset="1" stop-color="#FFB300"/></linearGradient></defs><circle cx="24" cy="24" r="18.5" fill="url(#skipDiscA)"/><path fill="#fff" d="M14 14.5h4.2v19H14v-19Z" opacity=".96"/><path fill="url(#skipArrowA)" d="M22.2 15.4 36.5 24 22.2 32.6v-5.7h-5.1v-5.8h5.1v-5.7Z"/><path fill="#fff" d="M16.1 10.7a17.5 17.5 0 0 1 13.5-2.4c-8.5.6-14.8 6.7-16 14.3-.4-3.8.5-8.1 2.5-11.9Z" opacity=".22"/></svg>
+                        </span>
+                        <span><b>Skip now</b><span>Continue to login and set area after signup</span></span>
+                      </button>
+                    </div>
+                  </div>
+                  <section class="setup-detail" data-setup-detail aria-live="polite" hidden></section>
+                </div>
+              </div>
+            </section>
+          </article>
+
+          <aside class="route-panel">
+            <h2>What happens after one tap</h2>
+            <p>Screen 02 detects the current area, then separates travelling location from the user's optional home/work area.</p>
+            <ul class="route-list">
+              <li><span class="route-num">1</span><span><b>Detect current area:</b> one explanatory tap opens the phone permission and resolves the current travelling area.</span></li>
+              <li><span class="route-num">2</span><span><b>Continue:</b> use the detected current area now and change it later from Settings.</span></li>
+              <li><span class="route-num">3</span><span><b>Home/work area:</b> optionally select a permanent area for local products, services and earning opportunities without overwriting the travelling area.</span></li>
+              <li><span class="route-num">4</span><span><b>Next:</b> Screen 03 opens the sign-in method screen. Login provider choices and OTP belong only to Screen 03.</span></li>
+            </ul>
+            <div class="outcome-card">
+              <h3>Travelling example</h3>
+              <p>If the phone detects New Delhi while the user permanently lives in Jodhpur, New Delhi stays current and Jodhpur can remain home/work.</p>
+            </div>
+            <div class="outcome-card manual-card">
+              <h3>Home/work area</h3>
+              <p>A single Google-backed search is shown only if the user wants a different permanent area. No map or pin-code menu appears during first setup.</p>
+            </div>
+            <div class="outcome-card deny-card">
+              <h3>Change later</h3>
+              <p>The user can continue without setting a permanent area and change current or home/work area later from Settings.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Primary Visual <span>Auto setup before sign in</span></div>
+      <div class="setup-layout">
+        <section class="setup-phone" aria-label="MoolSocial first setup visual">
+          <div class="phone-status">
+            <span>9:41</span>
+            <span>5G 100%</span>
+          </div>
+          <div class="setup-brand">
+            <div class="mini-wordmark">MoolSocial</div>
+            <div class="mini-line" aria-hidden="true"><span></span><span></span><span></span></div>
+            <p>India Ka Socio Commerce App</p>
+          </div>
+          <div class="setup-body">
+            <article class="setup-card">
+              <h2>Setting up your MoolSocial space</h2>
+              <p>Phone language is detected automatically in the background. The only setup decision shown here is area.</p>
+            </article>
+
+            <article class="setup-card">
+              <h3>Location</h3>
+              <p>Set area through current location, manual search, pin code, address, map selection, or skip for now. Manual selection supports users who are travelling.</p>
+              <div class="location-preview">
+                <div>
+                  <b>Current service area</b>
+                  <span>Can come from current location now or from manually selected home/default area.</span>
+                </div>
+                <span class="pulse-dot" aria-hidden="true"></span>
+              </div>
+              <div class="setup-action-list">
+                <div class="setup-action">
+                  <span class="setup-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 48 48"><defs><linearGradient id="locPinB" x1="14" y1="6" x2="34" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6A3D"/><stop offset=".55" stop-color="#E42D2D"/><stop offset="1" stop-color="#B4132D"/></linearGradient><radialGradient id="locGlowB" cx="0" cy="0" r="1" gradientTransform="matrix(14 0 0 7 24 40)" gradientUnits="userSpaceOnUse"><stop stop-color="#1FB6FF" stop-opacity=".34"/><stop offset="1" stop-color="#1FB6FF" stop-opacity="0"/></radialGradient></defs><ellipse cx="24" cy="40" rx="14" ry="7" fill="url(#locGlowB)"/><path fill="url(#locPinB)" d="M24 4.5c-7.3 0-13.2 5.8-13.2 13 0 9.9 13.2 25.8 13.2 25.8s13.2-15.9 13.2-25.8c0-7.2-5.9-13-13.2-13Z"/><path fill="#FFB199" d="M17.2 11.7c2.2-2.6 5.8-3.8 9.2-3.1-4.6.7-8.2 4.5-8.8 9.1-.3 2.2-3 2-3.1-.2-.1-2 .9-4 2.7-5.8Z" opacity=".72"/><circle cx="24" cy="17.7" r="7.7" fill="#fff"/><circle cx="24" cy="17.7" r="4.1" fill="#0B57D0"/></svg>
+                  </span>
+                  <span><b>Use current location</b><span>Ask phone permission</span></span>
+                </div>
+                <div class="setup-action">
+                  <span class="setup-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 48 48"><defs><linearGradient id="mapPanelB" x1="7" y1="8" x2="41" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF1B8"/><stop offset=".45" stop-color="#B6E7C9"/><stop offset="1" stop-color="#9BD1FF"/></linearGradient><linearGradient id="mapPinB" x1="27" y1="9" x2="39" y2="31" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6A3D"/><stop offset="1" stop-color="#D7193F"/></linearGradient></defs><path fill="url(#mapPanelB)" d="m6.5 13.2 11.4-5 12.2 4.8 11.4-5.2v28l-11.4 5.4-12.2-4.9-11.4 5.1V13.2Z"/><path fill="#F4C542" d="M6.5 13.2 17.9 8v28.3L6.5 41.4V13.2Z" opacity=".95"/><path fill="#31A853" d="m17.9 8 12.2 4.9v28.3l-12.2-4.9V8Z" opacity=".94"/><path fill="#4A90E2" d="m30.1 12.9 11.4-5.1v28l-11.4 5.4V12.9Z" opacity=".95"/><path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.2" d="M11 26c4.7-3 8.3-3.2 11.7-.6 4.1 3.1 8.1 2.8 12.8-1.2"/><path fill="url(#mapPinB)" d="M33.6 8.2c-4.9 0-8.8 3.8-8.8 8.5 0 6.7 8.8 15 8.8 15s8.8-8.3 8.8-15c0-4.7-3.9-8.5-8.8-8.5Z"/><circle cx="33.6" cy="16.8" r="3.7" fill="#fff"/></svg>
+                  </span>
+                  <span><b>Set manually</b><span>Search, pin code, address or map</span></span>
+                </div>
+                <div class="setup-action">
+                  <span class="setup-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 48 48"><defs><linearGradient id="skipDiscB" x1="9" y1="7" x2="39" y2="41" gradientUnits="userSpaceOnUse"><stop stop-color="#36D399"/><stop offset=".5" stop-color="#13A86B"/><stop offset="1" stop-color="#00796B"/></linearGradient><linearGradient id="skipArrowB" x1="16" y1="16" x2="36" y2="31" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF7C2"/><stop offset="1" stop-color="#FFB300"/></linearGradient></defs><circle cx="24" cy="24" r="18.5" fill="url(#skipDiscB)"/><path fill="#fff" d="M14 14.5h4.2v19H14v-19Z" opacity=".96"/><path fill="url(#skipArrowB)" d="M22.2 15.4 36.5 24 22.2 32.6v-5.7h-5.1v-5.8h5.1v-5.7Z"/><path fill="#fff" d="M16.1 10.7a17.5 17.5 0 0 1 13.5-2.4c-8.5.6-14.8 6.7-16 14.3-.4-3.8.5-8.1 2.5-11.9Z" opacity=".22"/></svg>
+                  </span>
+                  <span><b>Skip now</b><span>Continue to sign in</span></span>
+                </div>
+              </div>
+              <div class="fine-note">Only current location opens phone permission. Manual location uses search/map.</div>
+            </article>
+
+            <div class="chip-row" aria-label="location behavior summary">
+              <span class="micro-chip">Current area</span>
+              <span class="micro-chip">Manual area</span>
+              <span class="micro-chip">Skip now</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="logic-panel">
+          <div class="ms-card" style="border:1px solid var(--ms-navy);">
+            <h3>Verdict</h3>
+            <p>Do not ask the user to choose a language on first open. Do not run always-on live tracking. Let the user set area by current location, manual search, address, pin code, map, or skip now.</p>
+          </div>
+          <div class="logic-flow">
+            <div class="flow-step">
+              <div class="step-num">01</div>
+              <div><b>Auto Language</b><span>Read phone locale and preferred languages. Select supported language silently; if unsupported, continue with English India and keep change option later.</span></div>
+            </div>
+            <div class="flow-step">
+              <div class="step-num">02</div>
+              <div><b>Explain Area</b><span>Tell the user MoolSocial needs an area to make local results and actions accurate, without tying this to one user type.</span></div>
+            </div>
+            <div class="flow-step">
+              <div class="step-num">03</div>
+              <div><b>Choose Area Method</b><span>Use current location opens phone permission. Set manually opens search, pin code, address and map picker.</span></div>
+            </div>
+            <div class="flow-step">
+              <div class="step-num">04</div>
+              <div><b>Continue</b><span>Current location, manual selection or skip all continue to Screen 03 Login / Account Handoff with the correct area state.</span></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="ms-section-head">Screen Contract <span>Entry, behavior and exit</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Entry Condition</h3>
+          <p>Fresh install exits Screen 01 boot successfully and reaches first setup with device locale, timezone, install source and permission state available.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Primary Behavior</h3>
+          <p>Auto-select language, show area setup choices, support current-location/manual/skip, and avoid all role selection.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Exit To Next Screen</h3>
+          <p>After current area, manual area or a confirmed Continue without area path, route to Screen 03: Login / Account Handoff. If phone permission is not allowed, stay on Screen 02 and offer Retry, Enter area manually or Continue without area.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Language Logic <span>No first-open picker</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Auto Select</h3>
+          <p>Use the phone's preferred language, region and script. If the exact language is supported, it becomes the app language immediately.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Unsupported Phone Language</h3>
+          <p>If the phone language is not supported, use English India as the safe default. Do not block setup and do not force a language decision.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Content Layer</h3>
+          <p>System UI, category labels, trust messages and local help copy follow the selected app language. Seller/product names are not force-translated.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Language Coverage Architecture <span>India-wide without launch delay</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Target Coverage</h3>
+          <p>Build the platform so all major Indian territory languages can be added as language packs, including the 22 scheduled Indian languages over time.</p>
+        </article>
+        <article class="ms-card">
+          <h3>MVP Launch Rule</h3>
+          <p>Launch only with professionally checked UI languages. Missing languages must fall back cleanly instead of showing broken or low-trust translation.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Later User Control</h3>
+          <p>After first setup, keep language change in profile/settings and possibly in help. This follows large social-app behavior without slowing onboarding.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Fallback Decision Tree <span>Production language resolver</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>Exact Match</b>Phone language and region are supported.</div>
+          <div class="state-cell">Use exact app language pack, such as hi-IN, ta-IN or bn-IN.</div>
+          <div class="state-cell">No language UI appears on first setup.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Base Language Match</b>Phone region/script differs but base language is supported.</div>
+          <div class="state-cell">Use the closest base language pack and region-specific formats where available.</div>
+          <div class="state-cell">Keep correction available later in settings.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>No Supported Match</b>Phone language is outside current language packs.</div>
+          <div class="state-cell">Use English India as fallback and record unsupported locale for localization roadmap.</div>
+          <div class="state-cell">Do not show a first-open picker unless accessibility or comprehension signals require help.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Location Logic <span>Automated but consent-safe</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>Before Consent</b>Use coarse non-sensitive hints only for country/region readiness.</div>
+          <div class="state-cell">Do not call precise location APIs. Do not show fake nearby availability.</div>
+          <div class="state-cell">UI says area improves MoolSocial accuracy. It must not imply only shopping, rides, work or one user type.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Use Current Location</b>Request while-in-use location and resolve active service area.</div>
+          <div class="state-cell">Save area, timestamp, precision level and confidence. Do not label it as home unless user later confirms it.</div>
+          <div class="state-cell">Route to login automatically if confidence is high; show correction only when confidence is low.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Set Manually</b>User searches area, pin code, city, address or chooses on map.</div>
+          <div class="state-cell">Save as manually selected default/home area with source = manual and confidence from geocode/map selection.</div>
+          <div class="state-cell">No phone location permission is needed for this path unless the user taps current location inside map.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>If User Skips Now</b>Continue to login with current area unset.</div>
+          <div class="state-cell">After signup, MoolSocial asks again before location-based results or actions.</div>
+          <div class="state-cell">Do not block social viewing, creator use, chat, wallet education or general consumer access.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Travel And Home Handling <span>Important edge case</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>User Downloads While Travelling</h3>
+          <ul class="ms-list">
+            <li>If the user chooses current location while travelling, save it only as current area, not permanent home.</li>
+            <li>If the user wants home/default area while travelling, they use Set manually through search, pin code, address or map picker.</li>
+            <li>Screen 04 must later decide the exact active-area and correction UI.</li>
+            <li>Delivery address, pickup point, ride pickup and work site are confirmed at the transaction moment.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Refresh Policy</h3>
+          <ul class="ms-list">
+            <li>Refresh current area on app open, app resume and location-based action start when permission is available.</li>
+            <li>Do not overwrite manually selected home/default area without user confirmation.</li>
+            <li>Use low-frequency foreground checks, not constant tracking.</li>
+            <li>Background location is allowed only for active ride, delivery, field work or safety-critical task with separate consent.</li>
+            <li>If location is stale, show a one-tap refresh before showing decision-ready local cards.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Permission Timing <span>Where consent appears</span></div>
+      <div class="ms-grid-4">
+        <article class="ms-card">
+          <h3>Not On Splash</h3>
+          <p>Screen 01 never asks location, contacts, camera, microphone or notification permission.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Explain First</h3>
+          <p>Screen 02 explains that area makes MoolSocial accurate without tying the app to one user type or one service category.</p>
+        </article>
+        <article class="ms-card">
+          <h3>One Tap Then OS Prompt</h3>
+          <p>Only the "Use current location" action opens the phone permission prompt. Manual area and Skip now do not.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Ask Again In Context</h3>
+          <p>If the user taps Skip now or permission is unavailable, ask again after signup before an action that truly needs area.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Screen 03 Boundary <span>Sign in is not duplicated here</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>No Login UI Here</h3>
+          <p>Screen 02 ends after area outcome. It does not show Google, Apple, X, Instagram, Facebook, Email OTP, Mobile OTP or More choices.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Route Payload</h3>
+          <p>Pass resolved language, area state, permission outcome, install source and pending deep-link intent into Screen 03.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Screen 03 Owns Sign In</h3>
+          <p>All provider icons, email OTP, mobile OTP, autofill and session creation rules live in Screen 03 only.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Data Needed <span>Inputs for production implementation</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Device And Locale</h3>
+          <ul class="ms-list">
+            <li>Device language list, region, script and timezone.</li>
+            <li>App language support matrix, language pack version and fallback order.</li>
+            <li>Unsupported locale telemetry for prioritizing future Indian language packs.</li>
+            <li>Install source, referral/deep link and screen route from Screen 01.</li>
+            <li>Location permission state: unknown, allowed while using, skipped now, permission not allowed, approximate only, precise allowed.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Location And Service Area</h3>
+          <ul class="ms-list">
+            <li>Current latitude/longitude only after user consent.</li>
+            <li>Manual area query from search, pin code, address or map selection.</li>
+            <li>Reverse geocode result: country, state, city, locality and pin code where available.</li>
+            <li>Serviceability flags for commerce, social, ride, work, money and chat features.</li>
+            <li>Area timestamp, source: gps, manual_search, manual_map or skipped.</li>
+            <li>Area type: current_area, default_area or home_area_candidate.</li>
+            <li>Precision and confidence score.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Full-Stack Implementation Contract <span>What production must build</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Frontend UI Modules</h3>
+          <ul class="ms-list">
+            <li>FirstSetupScreen owns the full screen route after splash.</li>
+            <li>LanguageAutoResolver silently selects phone language or fallback without adding a first-open choice.</li>
+            <li>LocationValueCard explains area use before consent without tying the app to one user type.</li>
+            <li>LocationConsentButton opens the native phone permission prompt.</li>
+            <li>ManualAreaButton opens search, pin code, address and map picker.</li>
+            <li>ServiceAreaPreview shows current area, manual area, stale area, skipped state or low-confidence correction.</li>
+            <li>ContinueRouteGuard decides when to move to Screen 03 Login / Account Handoff.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Client State Machine</h3>
+          <ul class="ms-list">
+            <li>bootReady: received Screen 01 boot session and device metadata.</li>
+            <li>languageResolved: app language chosen from device or fallback.</li>
+            <li>locationExplained: user sees why location matters.</li>
+            <li>areaMethodSelected: gps, manual or skip.</li>
+            <li>permissionRequested: only after one tap on Use current location.</li>
+            <li>manualAreaSearch: user searches city, locality, pin code or address.</li>
+            <li>serviceAreaResolved: current or manual area saved with confidence and expiry.</li>
+            <li>routeReady: Login / Account Handoff can load with location outcome and local readiness flags.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Backend Ownership</h3>
+          <ul class="ms-list">
+            <li>Onboarding service owns setup session and route decision.</li>
+            <li>Localization service owns supported language packs and fallback order.</li>
+            <li>Location service owns current-location reverse geocode, manual search/map resolve, confidence and service area.</li>
+            <li>Serviceability service owns which local features are available in the area.</li>
+            <li>Consent service records permission state without forcing access.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">API Flow <span>Screen 02 network contract</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>1. Bootstrap Setup</b>POST /v1/onboarding/first-setup/bootstrap</div>
+          <div class="state-cell">Input: bootSessionId, anonymousDeviceId, appVersion, preferredLocales, timezone, install source, current permission state.</div>
+          <div class="state-cell">Output: resolved language, fallback reason if any, location copy keys, route policy and feature readiness flags.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>2. Resolve Language</b>POST /v1/onboarding/language/resolve</div>
+          <div class="state-cell">Input: preferredLocales, region, script, supportedLanguagePackVersion and app channel.</div>
+          <div class="state-cell">Output: languageCode, languageSource, fallbackUsed, copyBundleUrl and unsupportedLocaleRecorded.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>3. Resolve Current Area</b>POST /v1/location/current-service-area</div>
+          <div class="state-cell">Input: consentGrantId, approximate/precise flag, latitude/longitude after consent, device timestamp and accuracy.</div>
+          <div class="state-cell">Output: country, state, city, locality, pin code, confidence, precision, expiry and serviceability by feature.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>4. Resolve Manual Area</b>POST /v1/location/manual-area/resolve</div>
+          <div class="state-cell">Input: searchText, pinCode, addressText or mapPin, plus selected area type: default/home candidate.</div>
+          <div class="state-cell">Output: normalized area, map bounds, confidence, serviceability by feature and display label.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>5. Skip Or Permission Not Available</b>POST /v1/onboarding/location/outcome</div>
+          <div class="state-cell">Input: skipNow, permissionNotAllowed, approximateOnly or promptUnavailable, plus screen source and timestamp.</div>
+          <div class="state-cell">Output: login route, area-unset state and which later local actions must ask again in context.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>6. Complete Setup</b>POST /v1/onboarding/first-setup/complete</div>
+          <div class="state-cell">Input: languageCode, serviceAreaId if available, location permission state and current route intent.</div>
+          <div class="state-cell">Output: nextRoute, loginOptionsConfig, local feature flags and pending deep-link resume target.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Example Payloads <span>For full-stack coding</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Bootstrap Request</h3>
+          <pre class="ms-code">{
+  "bootSessionId": "boot_01HX...",
+  "anonymousDeviceId": "device_9f3...",
+  "appVersion": "1.0.0",
+  "preferredLocales": ["hi-IN", "en-IN"],
+  "timezone": "Asia/Kolkata",
+  "installSource": "play_store",
+  "locationPermission": "unknown"
+}</pre>
+        </article>
+        <article class="ms-card">
+          <h3>Bootstrap Response</h3>
+          <pre class="ms-code">{
+  "language": {
+    "code": "hi-IN",
+    "source": "device_exact",
+    "fallbackUsed": false
+  },
+  "location": {
+    "mode": "needs_consent",
+    "copyKey": "first_setup_location_value"
+  },
+  "routeAfterSetup": "login_account_handoff"
+}</pre>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Backend Data Model <span>Tables or collections needed</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Device Profile</h3>
+          <ul class="ms-list">
+            <li>anonymousDeviceId, platform, appVersion, buildChannel.</li>
+            <li>preferredLocales, resolvedLanguageCode, languageSource.</li>
+            <li>timezone, installSource, firstSeenAt and lastSeenAt.</li>
+            <li>Merges into user profile after login without losing anonymous setup.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Area Profile</h3>
+          <ul class="ms-list">
+            <li>serviceAreaId, city, locality, pin code, state and country.</li>
+            <li>areaSource: gps, manual_search, manual_map, pin_code, address_text or skipped.</li>
+            <li>areaType: current_area, default_area or user_home_area.</li>
+            <li>precision level, confidence score, source and expiresAt where relevant.</li>
+            <li>Current-location area is never permanent home automatically; manual selection may become user_home_area.</li>
+            <li>Store derived area for browsing; keep raw coordinates only when needed for active tasks.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Consent And Events</h3>
+          <ul class="ms-list">
+            <li>locationConsentGrantId, permission state, prompt source and timestamp.</li>
+            <li>languageFallbackEvent for unsupported locale prioritization.</li>
+            <li>setupCompletedEvent for route analytics and regression monitoring.</li>
+            <li>Skip now or permission-not-allowed state must not block login, social viewing, creator use or basic consumer access.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Integrations Needed <span>Native, backend and platform services</span></div>
+      <div class="ms-grid-4">
+        <article class="ms-card">
+          <h3>Native Device Layer</h3>
+          <p>Reads preferred languages, timezone, app version and permission state. Opens location permission only after the Screen 02 button tap.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Map And Geocode Layer</h3>
+          <p>Converts consented coordinates or manual map/search input into locality, city, pin code and confidence. Provider must be replaceable behind backend adapter.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Localization Layer</h3>
+          <p>Delivers language pack bundles, fallback copy and critical onboarding text with versioning and rollback.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Serviceability Layer</h3>
+          <p>Returns availability for social, commerce, work, ride, money and chat based on current service area.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Privacy, Security And Observability <span>Non-negotiable production rules</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Privacy</h3>
+          <p>Precise phone location is collected only after consent. Manual search/map can save a user-chosen home/default area. General browsing stores area, not constant movement.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Security</h3>
+          <p>All setup APIs require device attestation or signed anonymous session from Screen 01. Rate-limit location updates and reject impossible jumps or stale timestamps.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Monitoring</h3>
+          <p>Track setup completion rate, permission grant rate, fallback language rate, low-confidence geocode rate, API latency and route-to-Screen-03 failures.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Production Tests <span>Before this screen can be coded live</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Automated Tests</h3>
+          <ul class="ms-list">
+            <li>Unit tests for language resolver: exact, base, fallback and unsupported locale.</li>
+            <li>Unit tests for location state machine: unknown, location granted, manual selected, skip now, permission not available, approximate and stale.</li>
+            <li>Contract tests for every Screen 02 API request and response.</li>
+            <li>Integration test for travel install then manual home/default area selection.</li>
+            <li>Integration test for current-area refresh without overwriting manual home/default area.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Regression Gates</h3>
+          <ul class="ms-list">
+            <li>Visual baseline for the first setup screen on compact and large phones.</li>
+            <li>No first-open language picker appears.</li>
+            <li>No location prompt appears before the explanatory button tap.</li>
+            <li>Manual set location is available through search, pin code, address or map picker.</li>
+            <li>Skip now still routes to Screen 03 with current area unset.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">What This Screen Must Not Do <span>Regression-sensitive</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>No Language List</h3>
+          <p>Do not force Hindi, English, Gujarati, Marathi or any language choice during first setup. Phone language drives setup; fallback is automatic.</p>
+        </article>
+        <article class="ms-card">
+          <h3>No Auto Home Lock</h3>
+          <p>Do not store the first detected city as permanent home. Only user manual selection can create a home/default area.</p>
+        </article>
+        <article class="ms-card">
+          <h3>No Always-On Tracking</h3>
+          <p>Do not track live location in the background for general browsing. Use foreground refresh and task-based tracking only.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Regression Checklist <span>Before approval</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Happy Path</h3>
+          <ul class="ms-list">
+            <li>Phone language auto-selects without showing a picker.</li>
+            <li>Unsupported phone language falls back to English India without blocking setup.</li>
+            <li>Area setup is explained before any OS permission prompt.</li>
+            <li>Use current location creates a current-area record.</li>
+            <li>Set manually supports search, pin code, address and map picker.</li>
+            <li>High-confidence area routes to Login / Account Handoff.</li>
+            <li>No role switch appears anywhere.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Edge Paths</h3>
+          <ul class="ms-list">
+            <li>Unsupported phone language falls back without blocking setup.</li>
+            <li>Skip now keeps app usable and routes to login.</li>
+            <li>Travel install with current location does not become permanent home location.</li>
+            <li>Manual home/default area is not overwritten by later current-area refresh without confirmation.</li>
+            <li>Precise location is asked only for delivery, ride, pickup, work or fulfilment moments.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+<script type="text/plain" id="withdrawnV2Interaction">
+  (() => {
+    const params = new URLSearchParams(window.location.search);
+    const founderReview = params.get('founderReview') === '1';
+    const reviewState = params.get('reviewState') || 'choose';
+    const source = params.get('source') || 'app-open';
+    const languageSource = params.get('languageSource') || 'device';
+    const choices = document.querySelector('.location-choice-list');
+    const content = document.querySelector('.final-content');
+    const detail = document.querySelector('[data-setup-detail]');
+
+    const escapeHtml = (value) => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const detailShell = ({ kicker, title, copy, body }) => `
+      <p class="detail-kicker">${escapeHtml(kicker)}</p>
+      <h2 class="detail-title" tabindex="-1">${escapeHtml(title)}</h2>
+      <p class="detail-copy">${escapeHtml(copy)}</p>
+      ${body}
+    `;
+
+    function openDetail(state, markup, focusSelector = '.detail-title') {
+      content.classList.add('detail-open');
+      detail.hidden = false;
+      detail.dataset.state = state;
+      detail.innerHTML = markup;
+      window.requestAnimationFrame(() => detail.querySelector(focusSelector)?.focus());
+    }
+
+    function showChooser() {
+      content.classList.remove('detail-open');
+      detail.hidden = true;
+      detail.dataset.state = 'choose';
+      detail.replaceChildren();
+      choices.hidden = false;
+      document.querySelector('[data-area-action="current"]')?.focus();
+    }
+
+    function renderPermission() {
+      openDetail('permission', detailShell({
+        kicker: 'Current location',
+        title: 'Use where you are now?',
+        copy: 'MoolSocial will ask this phone for location only after you choose an option below.',
+        body: `
+          <div class="permission-sheet" role="group" aria-label="Location permission choices">
+            <b>Allow MoolSocial to find your current area?</b>
+            <span>Your area improves nearby results and actions. It is not saved as permanent home.</span>
+            <button class="permission-option primary" type="button" data-detail-action="permission-precise">Use precise location</button>
+            <button class="permission-option" type="button" data-detail-action="permission-approximate">Use approximate area</button>
+            <button class="permission-option" type="button" data-detail-action="permission-deny">Not now</button>
+          </div>
+          <button class="detail-link" type="button" data-detail-action="back">Back to area choices</button>
+        `
+      }));
+    }
+
+    function renderResolving(mode = 'precise', autoComplete = true) {
+      openDetail('resolving', detailShell({
+        kicker: 'Current location',
+        title: 'Finding your area',
+        copy: mode === 'approximate'
+          ? 'Using an approximate location. You can correct the area before continuing.'
+              : "Using this phone's current location. This is saved as current area, not permanent home.",
+        body: `
+          <div class="detail-card soft" aria-busy="true">
+            <div class="detail-spinner" aria-hidden="true"></div>
+            <b style="text-align:center;">Checking the current service area</b>
+            <span style="text-align:center;">Your language choice and route are retained.</span>
+          </div>
+        `
+      }));
+      if (autoComplete) {
+        window.setTimeout(() => renderResolved('Current area found', mode), 900);
+      }
+    }
+
+    function renderResolved(label, areaSource = 'device') {
+      const safeLabel = escapeHtml(label);
+      openDetail('resolved', detailShell({
+        kicker: 'Area ready',
+        title: 'Your area is set',
+        copy: 'Review the selected area, then continue to secure sign in.',
+        body: `
+          <div class="area-confirm">
+            <b>${areaSource === 'device' || areaSource === 'precise' || areaSource === 'approximate' ? 'Current area' : 'Selected area'}</b>
+            <strong>${safeLabel}</strong>
+            <span>${areaSource === 'approximate'
+              ? 'Approximate area · you can correct it later'
+              : areaSource === 'manual-map'
+                ? 'Chosen on map · no phone location permission used'
+                : areaSource === 'manual'
+                  ? 'Selected manually · no phone location permission used'
+                  : 'Found from this phone · not saved as permanent home'}</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="continue-area"
+              data-area-label="${safeLabel}" data-area-source="${escapeHtml(areaSource)}">Continue to sign in</button>
+            <button class="detail-action" type="button" data-detail-action="manual">Choose a different area</button>
+            <button class="detail-link" type="button" data-detail-action="back">Back to area choices</button>
+          </div>
+        `
+      }));
+    }
+
+    function renderDenied() {
+      openDetail('denied', detailShell({
+        kicker: 'Location not allowed',
+        title: 'Choose another way',
+        copy: 'Nothing is blocked. Set an area manually, try current location again, or continue without an area.',
+        body: `
+          <div class="detail-card warning">
+            <b>Your phone location remains off</b>
+            <span>MoolSocial did not collect or save a current location.</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="manual">Set area manually</button>
+            <button class="detail-action" type="button" data-detail-action="retry-location">Try current location again</button>
+            <button class="detail-action danger" type="button" data-detail-action="skip">Continue without area</button>
+            <button class="detail-link" type="button" data-detail-action="back">Back to area choices</button>
+          </div>
+        `
+      }));
+    }
+
+    function renderManual(value = '', error = '') {
+      const safeValue = escapeHtml(value);
+      openDetail('manual', detailShell({
+        kicker: 'Manual area',
+        title: 'Search for your area',
+        copy: 'Enter a locality, city, pin code or address. You can also choose a point on the map.',
+        body: `
+          <div class="setup-field">
+            <label for="manualAreaInput">Area, pin code or address</label>
+            <input id="manualAreaInput" name="area" value="${safeValue}" minlength="3"
+              placeholder="Example: locality, city or 6-digit pin code" autocomplete="street-address"
+              aria-invalid="${error ? 'true' : 'false'}" />
+            ${error ? `<p class="setup-field-error" role="alert">${escapeHtml(error)}</p>` : ''}
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="manual-search">Find this area</button>
+            <button class="detail-action" type="button" data-detail-action="manual-map">Choose on map</button>
+            <button class="detail-link" type="button" data-detail-action="back">Back to area choices</button>
+          </div>
+        `
+      }), '#manualAreaInput');
+    }
+
+    function renderManualResults(query) {
+      const cleanQuery = query.trim();
+      const safeQuery = escapeHtml(cleanQuery);
+      openDetail('manual-results', detailShell({
+        kicker: 'Manual area',
+        title: 'Choose the matching area',
+        copy: 'Select the correct result. Production search will return normalized localities, cities, addresses and pin codes.',
+        body: `
+          <div class="area-suggestions" role="list">
+            <button class="area-suggestion" type="button" role="listitem"
+              data-detail-action="manual-result" data-area-label="${safeQuery}">
+              <span><b>${safeQuery}</b><span>Use the area exactly as entered</span></span><strong>›</strong>
+            </button>
+            <button class="area-suggestion" type="button" role="listitem"
+              data-detail-action="manual-map">
+              <span><b>Check ${safeQuery} on map</b><span>Confirm the correct point visually</span></span><strong>›</strong>
+            </button>
+          </div>
+          <button class="detail-link" type="button" data-detail-action="manual" data-manual-value="${safeQuery}">Edit search</button>
+        `
+      }));
+    }
+
+    function renderMap() {
+      openDetail('map', detailShell({
+        kicker: 'Manual area',
+        title: 'Choose on map',
+        copy: 'Move the map to your preferred area. Phone location permission is not needed for a manual map choice.',
+        body: `
+          <div class="map-preview" role="img" aria-label="Map with a centered area pin">
+            <span class="map-caption">Map pin · selected area preview</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="use-map">Use this map area</button>
+            <button class="detail-action" type="button" data-detail-action="manual">Search instead</button>
+            <button class="detail-link" type="button" data-detail-action="back">Back to area choices</button>
+          </div>
+        `
+      }));
+    }
+
+    function renderSkip() {
+      openDetail('skip-confirm', detailShell({
+        kicker: 'No area for now',
+        title: 'Continue without an area?',
+        copy: 'You can sign in and use general MoolSocial features. We will ask again before a result or action truly needs an area.',
+        body: `
+          <div class="detail-card warning">
+            <b>Area-dependent results stay unfiltered</b>
+            <span>No phone permission is requested and no area is saved.</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="confirm-skip">Continue to sign in</button>
+            <button class="detail-action" type="button" data-detail-action="back">Set an area instead</button>
+          </div>
+        `
+      }));
+    }
+
+    function renderError() {
+      openDetail('error', detailShell({
+        kicker: 'Area unavailable',
+        title: 'We could not find your area',
+        copy: 'Your language and setup choices are safe. Retry current location, set an area manually, or continue without one.',
+        body: `
+          <div class="detail-card warning">
+            <b>No area was saved</b>
+            <span>Check the connection or choose another method.</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="retry-location">Retry current location</button>
+            <button class="detail-action" type="button" data-detail-action="manual">Set manually</button>
+            <button class="detail-action danger" type="button" data-detail-action="skip">Continue without area</button>
+          </div>
+        `
+      }));
+    }
+
+    function continueToSignIn({ area, areaSource }) {
+      const next = new URL('03-login-account-handoff.html', window.location.href);
+      next.searchParams.set('area', area);
+      next.searchParams.set('areaSource', areaSource);
+      next.searchParams.set('source', source);
+      next.searchParams.set('languageSource', languageSource);
+      if (!founderReview) {
+        window.location.href = next.href;
+        return;
+      }
+      openDetail('complete', detailShell({
+        kicker: 'Screen 02 complete',
+        title: 'Ready for secure sign in',
+        copy: area === 'unset'
+          ? 'Area remains unset. Screen 03 will open without requesting another permission.'
+          : `${area} will continue to Screen 03 with source ${areaSource}.`,
+        body: `
+          <div class="detail-card soft">
+            <b>Next owner: Screen 03</b>
+            <span>Sign-in methods and OTP begin only after this setup outcome is retained.</span>
+          </div>
+          <div class="detail-actions">
+            <a class="detail-action primary" style="display:grid;place-items:center;text-decoration:none;"
+              href="${next.href}">Open Screen 03 review</a>
+            <button class="detail-action" type="button" data-detail-action="back">Review Screen 02 again</button>
+          </div>
+        `
+      }));
+    }
+
+    document.addEventListener('click', (event) => {
+      const actionButton = event.target.closest('[data-area-action]');
+      const action = actionButton?.dataset.areaAction;
+      if (action === 'current') renderPermission();
+      if (action === 'manual') renderManual();
+      if (action === 'skip') renderSkip();
+
+      const detailAction = event.target.closest('[data-detail-action]');
+      if (!detailAction) return;
+      const intent = detailAction.dataset.detailAction;
+      if (intent === 'back') showChooser();
+      if (intent === 'permission-precise') renderResolving('precise');
+      if (intent === 'permission-approximate') renderResolving('approximate');
+      if (intent === 'permission-deny') renderDenied();
+      if (intent === 'retry-location') renderPermission();
+      if (intent === 'manual') renderManual(detailAction.dataset.manualValue || '');
+      if (intent === 'manual-map') renderMap();
+      if (intent === 'manual-search') {
+        const input = detail.querySelector('#manualAreaInput');
+        const value = input?.value.trim() || '';
+        if (value.length < 3) renderManual(value, 'Enter at least 3 characters, a locality, or a valid pin code.');
+        else renderManualResults(value);
+      }
+      if (intent === 'manual-result') renderResolved(detailAction.dataset.areaLabel, 'manual');
+      if (intent === 'use-map') renderResolved('Selected map area', 'manual-map');
+      if (intent === 'skip') renderSkip();
+      if (intent === 'confirm-skip') continueToSignIn({ area: 'unset', areaSource: 'skipped' });
+      if (intent === 'continue-area') {
+        continueToSignIn({
+          area: detailAction.dataset.areaLabel,
+          areaSource: detailAction.dataset.areaSource
+        });
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.target.id !== 'manualAreaInput') return;
+      event.preventDefault();
+      detail.querySelector('[data-detail-action="manual-search"]')?.click();
+    });
+
+    const initialStates = {
+      permission: renderPermission,
+      resolving: () => renderResolving('precise', false),
+      denied: renderDenied,
+      manual: () => renderManual(params.get('area') || ''),
+      'manual-results': () => params.get('area')
+        ? renderManualResults(params.get('area'))
+        : renderManual('', 'Enter a review area first.'),
+      map: renderMap,
+      'resolved-current': () => renderResolved('Current area found', 'precise'),
+      'resolved-manual': () => renderResolved(params.get('area') || 'Selected area', 'manual'),
+      skip: renderSkip,
+      error: renderError
+    };
+    initialStates[reviewState]?.();
+  })();
+</script>
+<script>
+  (() => {
+    const params = new URLSearchParams(window.location.search);
+    const founderReview = params.get('founderReview') === '1';
+    const reviewState = params.get('reviewState') || 'choose';
+    const source = params.get('source') || 'app-open';
+    const languageSource = params.get('languageSource') || 'device';
+    const detectedArea = params.get('currentArea') || 'Sardarpura, Jodhpur, Rajasthan';
+    const content = document.querySelector('.final-content');
+    const detail = document.querySelector('[data-setup-detail]');
+
+    const escapeHtml = (value) => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const detailShell = ({ kicker, title, copy, body }) => `
+      <p class="detail-kicker">${escapeHtml(kicker)}</p>
+      <h2 class="detail-title" tabindex="-1">${escapeHtml(title)}</h2>
+      <p class="detail-copy">${escapeHtml(copy)}</p>
+      ${body}
+    `;
+
+    function openDetail(state, markup, focusSelector = '.detail-title') {
+      content.classList.add('detail-open');
+      detail.hidden = false;
+      detail.dataset.state = state;
+      detail.innerHTML = markup;
+      window.requestAnimationFrame(() => detail.querySelector(focusSelector)?.focus());
+    }
+
+    function showStart() {
+      content.classList.remove('detail-open');
+      detail.hidden = true;
+      detail.dataset.state = 'choose';
+      detail.replaceChildren();
+      document.querySelector('[data-area-action="continue"]')?.focus();
+    }
+
+    function renderHomeSearch(value = '', error = '') {
+      const safeValue = escapeHtml(value);
+      openDetail('home-search', detailShell({
+        kicker: 'Home or work area',
+        title: 'Where do you usually live or work?',
+        copy: 'Choose the area you want to use for local shopping, services, business and work opportunities.',
+        body: `
+          <div class="setup-field">
+            <label for="homeAreaInput">City or area</label>
+            <input id="homeAreaInput" name="homeArea" value="${safeValue}" minlength="3"
+              placeholder="Jodhpur" autocomplete="address-level2"
+              aria-invalid="${error ? 'true' : 'false'}" />
+            ${error ? `<p class="setup-field-error" role="alert">${escapeHtml(error)}</p>` : ''}
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="home-search">Search</button>
+            <button class="detail-link" type="button" data-detail-action="back">Keep Sardarpura</button>
+          </div>
+        `
+      }), '#homeAreaInput');
+    }
+
+    function renderHomeResults(query) {
+      const safeQuery = escapeHtml(query.trim());
+      openDetail('home-results', detailShell({
+        kicker: 'Home or work area',
+        title: 'Select your area',
+        copy: 'Choose the place where you usually live or work.',
+        body: `
+          <div class="area-suggestions" role="list">
+            <button class="area-suggestion" type="button" role="listitem"
+              data-detail-action="home-result" data-area-label="${safeQuery}">
+              <span><b>${safeQuery}</b><span>Use as my home or work area</span></span><strong>›</strong>
+            </button>
+          </div>
+          <button class="detail-link" type="button" data-detail-action="home"
+            data-home-value="${safeQuery}">Edit search</button>
+        `
+      }));
+    }
+
+    function renderAreaPair(homeArea) {
+      const safeCurrent = escapeHtml(detectedArea);
+      const safeHome = escapeHtml(homeArea);
+      openDetail('home-confirmed', detailShell({
+        kicker: 'Your areas',
+        title: 'Your areas are ready',
+        copy: 'Nearby results follow where you are. Your home or work area stays available when you travel.',
+        body: `
+          <div class="area-pair">
+            <div class="area-pair-row current">
+              <b>Current area</b>
+              <strong>${safeCurrent}</strong>
+              <span>Products and services near you today</span>
+            </div>
+            <div class="area-pair-row">
+              <b>Home or work area</b>
+              <strong>${safeHome}</strong>
+              <span>Local shopping, services, business and work opportunities</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="continue-home"
+              data-home-label="${safeHome}">Continue</button>
+            <button class="detail-link" type="button" data-detail-action="home"
+              data-home-value="${safeHome}">Change home or work area</button>
+          </div>
+        `
+      }));
+    }
+
+    function renderUnavailable() {
+      openDetail('unavailable', detailShell({
+        kicker: 'Choose your area',
+        title: 'Where are you?',
+        copy: 'We couldn’t confirm your area. Choose your city now or continue and change it later.',
+        body: `
+          <div class="detail-card warning">
+            <b>Your area isn’t set yet</b>
+            <span>You can still continue and add it anytime in Settings.</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action primary" type="button" data-detail-action="home">Choose my area</button>
+            <button class="detail-link" type="button" data-detail-action="continue-later">Change later</button>
+          </div>
+        `
+      }));
+    }
+
+    function complete({ currentArea, homeArea, areaSource }) {
+      const next = new URL('03-login-account-handoff.html', window.location.href);
+      next.searchParams.set('currentArea', currentArea);
+      if (homeArea) next.searchParams.set('homeArea', homeArea);
+      next.searchParams.set('areaSource', areaSource);
+      next.searchParams.set('source', source);
+      next.searchParams.set('languageSource', languageSource);
+      if (!founderReview) {
+        window.location.href = next.href;
+        return;
+      }
+      openDetail('complete', detailShell({
+        kicker: 'Area saved',
+        title: 'You’re all set',
+        copy: homeArea
+          ? `${currentArea} is nearby now. ${homeArea} is your home or work area.`
+          : currentArea === 'unset'
+            ? 'You can add your area anytime in Settings.'
+            : `${currentArea} will be used for nearby results. You can change it anytime.`,
+        body: `
+          <div class="detail-card soft">
+            <b>Made for where you are</b>
+            <span>Your local shopping, services and opportunities will now feel more relevant.</span>
+          </div>
+          <div class="detail-actions">
+            <a class="detail-action primary" style="display:grid;place-items:center;text-decoration:none;"
+              href="${next.href}">Continue</a>
+            <button class="detail-action" type="button" data-detail-action="back">Change area</button>
+          </div>
+        `
+      }));
+    }
+
+    document.addEventListener('click', (event) => {
+      const areaAction = event.target.closest('[data-area-action]')?.dataset.areaAction;
+      if (areaAction === 'continue') {
+        complete({ currentArea: detectedArea, homeArea: '', areaSource: 'phone-current' });
+      }
+      if (areaAction === 'home') renderHomeSearch();
+
+      const control = event.target.closest('[data-detail-action]');
+      if (!control) return;
+      const intent = control.dataset.detailAction;
+      if (intent === 'back') showStart();
+      if (intent === 'unavailable') renderUnavailable();
+      if (intent === 'home') renderHomeSearch(control.dataset.homeValue || '');
+      if (intent === 'home-search') {
+        const value = detail.querySelector('#homeAreaInput')?.value.trim() || '';
+        if (value.length < 3) renderHomeSearch(value, 'Enter at least 3 characters for your home or work area.');
+        else renderHomeResults(value);
+      }
+      if (intent === 'home-result') renderAreaPair(control.dataset.areaLabel);
+      if (intent === 'continue-current') {
+        complete({
+          currentArea: control.dataset.areaLabel,
+          homeArea: '',
+          areaSource: 'phone-current'
+        });
+      }
+      if (intent === 'continue-home') {
+        complete({
+          currentArea: detectedArea,
+          homeArea: control.dataset.homeLabel,
+          areaSource: 'phone-current+home-search'
+        });
+      }
+      if (intent === 'continue-later') {
+        complete({ currentArea: 'unset', homeArea: '', areaSource: 'change-later' });
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.target.id !== 'homeAreaInput') return;
+      event.preventDefault();
+      detail.querySelector('[data-detail-action="home-search"]')?.click();
+    });
+
+    const initialStates = {
+      'home-search': () => renderHomeSearch(params.get('homeArea') || ''),
+      'home-results': () => params.get('homeArea')
+        ? renderHomeResults(params.get('homeArea'))
+        : renderHomeSearch('', 'Enter a review home/work area first.'),
+      'home-confirmed': () => renderAreaPair(params.get('homeArea') || 'Jodhpur'),
+      unavailable: renderUnavailable
+    };
+    initialStates[reviewState]?.();
+  })();
+</script>
+<script type="application/json" id="productionRouteContract">{"contractVersion":"mvp-route-lock-2026-07-20-v3","prototypeScreen":2,"productionModule":"journey01","routeId":"onboarding.setup","routePath":"/setup","routeState":"resolved-current-and-optional-home-work-area","implementation":"route-state","launchScope":"mvp-core","separateProductionRoute":false,"productionNote":"Reuse JourneySession, JourneyStore and LocationPermissionGateway. Current travelling area and home/work area remain separate. No WebView.","canonicalMap":"docs/traceability/PROTOTYPE-TO-PRODUCTION.md"}</script><script type="application/json" id="prototypeApprovalContract">{"prototypeScreen":2,"status":"founder-approved-final-v3","authoritative":true,"reviewedAt":"2026-07-20","supersedes":"founder-approved-final-v2-withdrawn-before-production-acceptance","approvalRule":"Immutable after production freeze. Any customer-visible copy or interaction change requires a new version and renewed founder approval."}</script>  <script src="../shared/resilience-state-runtime.js?v=micro-cycle-2-20260716c"></script>
+</body>
+</html>

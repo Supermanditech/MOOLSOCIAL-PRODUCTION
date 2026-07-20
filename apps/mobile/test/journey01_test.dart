@@ -21,7 +21,7 @@ void main() {
     await tester.pumpWidget(
       MoolSocialApp(session: session, initialLocation: initialLocation),
     );
-    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
   }
 
@@ -31,7 +31,8 @@ void main() {
     String initialLocation = '/boot',
   }) async {
     await openApp(tester, session, initialLocation: initialLocation);
-    await tapVisible(tester, const Key('area-skip'));
+    await tapVisible(tester, const Key('setup-v4-allow-location'));
+    await tapVisible(tester, const Key('setup-v4-continue'));
   }
 
   Future<void> authenticate(
@@ -47,29 +48,27 @@ void main() {
     await tapVisible(tester, const Key('verify-otp'));
   }
 
-  testWidgets('clean install offers the approved manual area path', (
+  testWidgets('clean install asks before resolving the current area', (
     tester,
   ) async {
-    final location = ReviewLocationPermissionGateway();
-    final session = JourneySession(locationGateway: location);
+    final store = MemoryJourneyStore();
+    final area = ReviewCurrentAreaGateway();
+    final session = JourneySession(store: store, currentAreaGateway: area);
     addTearDown(session.dispose);
 
     await openApp(tester, session);
-    expect(find.text('Almost ready'), findsOneWidget);
-    expect(find.text('Set your area'), findsOneWidget);
+    expect(find.byKey(const Key('screen02-v4')), findsOneWidget);
+    expect(find.text('See what’s around you'), findsOneWidget);
+    expect(area.resolveCount, 0);
 
-    await tapVisible(tester, const Key('area-manual'));
-    await tester.enterText(find.byKey(const Key('manual-area-field')), '');
-    await tapVisible(tester, const Key('continue-to-sign-in'));
-    expect(find.text('Enter at least 3 characters for your area.'), findsOne);
+    await tapVisible(tester, const Key('setup-v4-allow-location'));
+    expect(find.text('You’re in Sardarpura'), findsOneWidget);
+    expect(area.resolveCount, 1);
 
-    await tester.enterText(
-      find.byKey(const Key('manual-area-field')),
-      'Sardarpura',
-    );
-    await tapVisible(tester, const Key('continue-to-sign-in'));
+    await tapVisible(tester, const Key('setup-v4-continue'));
     expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
-    expect(location.requestCount, 0);
+    expect(session.currentAreaLabel, 'Sardarpura, Jodhpur, Rajasthan');
+    expect(store.snapshot?.currentAreaLabel, session.currentAreaLabel);
   });
 
   testWidgets('boot failure exact retry returns to the safe setup screen', (
@@ -83,11 +82,11 @@ void main() {
     expect(find.byKey(const Key('boot-error')), findsOneWidget);
     store.readFailure = null;
     await tapVisible(tester, const Key('retry-boot'));
-    expect(find.text('Almost ready'), findsOneWidget);
-    expect(find.byKey(const Key('area-current')), findsOneWidget);
+    expect(find.byKey(const Key('screen02-v4')), findsOneWidget);
+    expect(find.byKey(const Key('setup-v4-allow-location')), findsOneWidget);
   });
 
-  testWidgets('language selection is visible and retained through setup', (
+  testWidgets('phone language is summarized and retained through setup', (
     tester,
   ) async {
     final store = MemoryJourneyStore();
@@ -95,56 +94,64 @@ void main() {
     addTearDown(session.dispose);
 
     await openApp(tester, session);
-    await tapVisible(tester, const Key('language-hi'));
-    expect(session.languageCode, 'hi');
-    await tapVisible(tester, const Key('area-skip'));
-    expect(store.snapshot?.languageCode, 'hi');
+    expect(find.byKey(const Key('setup-v4-language-summary')), findsOneWidget);
+    expect(find.byKey(const Key('language-hi')), findsNothing);
+    expect(find.byKey(const Key('language-en')), findsNothing);
+    expect(session.languageCode, 'en');
+    await tapVisible(tester, const Key('setup-v4-continue-for-now'));
+    expect(store.snapshot?.languageCode, 'en');
     expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
-    expect(find.byKey(const Key('email-otp-method')), findsNothing);
-    expect(find.text('Google'), findsNothing);
+    expect(find.byKey(const Key('email-otp-method')), findsOneWidget);
+    for (final provider in const [
+      'Google',
+      'YouTube',
+      'Apple',
+      'X',
+      'Instagram',
+      'Facebook',
+    ]) {
+      expect(find.text(provider), findsOneWidget);
+    }
   });
 
-  testWidgets(
-    'location denial is recoverable and skip requests no permission',
-    (tester) async {
-      final location = ReviewLocationPermissionGateway(
-        result: LocationPermissionResult.denied,
-      );
-      final session = JourneySession(locationGateway: location);
-      addTearDown(session.dispose);
-
-      await openApp(tester, session);
-      await tapVisible(tester, const Key('area-current'));
-      expect(location.requestCount, 1);
-      expect(find.byKey(const Key('setup-error')), findsOneWidget);
-      expect(find.byKey(const Key('mobile-otp-method')), findsNothing);
-      await tapVisible(tester, const Key('area-skip'));
-      expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
-    },
-  );
-
-  testWidgets('location failure recovers through a suggested manual area', (
+  testWidgets('unavailable current area can continue without branching', (
     tester,
   ) async {
-    final location = ReviewLocationPermissionGateway(
-      failure: StateError('location unavailable'),
+    final area = ReviewCurrentAreaGateway(
+      failureReason: CurrentAreaFailureReason.unavailable,
     );
-    final session = JourneySession(locationGateway: location);
+    final session = JourneySession(currentAreaGateway: area);
     addTearDown(session.dispose);
 
     await openApp(tester, session);
-    await tapVisible(tester, const Key('area-current'));
-    expect(
-      find.text(
-        'Your location could not be detected. Enter your area or skip for now.',
-      ),
-      findsOneWidget,
-    );
-    await tapVisible(tester, const Key('area-manual'));
-    await tapVisible(tester, const Key('area-suggestion-sardarpura'));
-    await tapVisible(tester, const Key('continue-to-sign-in'));
-    expect(session.manualArea, 'Sardarpura');
+    expect(area.resolveCount, 0);
+    await tapVisible(tester, const Key('setup-v4-allow-location'));
+    expect(area.resolveCount, 1);
+    expect(find.text('We couldn’t get your location'), findsOneWidget);
+    expect(find.byKey(const Key('mobile-otp-method')), findsNothing);
+    await tapVisible(tester, const Key('setup-v4-continue-for-now'));
     expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
+    expect(session.areaChoice, AreaChoice.skipped);
+  });
+
+  testWidgets('area failure retries without exposing a pre-login area form', (
+    tester,
+  ) async {
+    final area = ReviewCurrentAreaGateway(
+      failureReason: CurrentAreaFailureReason.unavailable,
+    );
+    final session = JourneySession(currentAreaGateway: area);
+    addTearDown(session.dispose);
+
+    await openApp(tester, session);
+    await tapVisible(tester, const Key('setup-v4-allow-location'));
+    expect(find.text('We couldn’t get your location'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    area.failureReason = null;
+    await tapVisible(tester, const Key('setup-v4-retry'));
+    expect(find.text('You’re in Sardarpura'), findsOneWidget);
+    expect(area.resolveCount, 2);
   });
 
   testWidgets('invalid mobile and OTP remain recoverable', (tester) async {
@@ -188,7 +195,7 @@ void main() {
       find.text('You appear to be offline. Reconnect and retry.'),
       findsOne,
     );
-    expect(session.areaChoice, AreaChoice.skipped);
+    expect(session.areaChoice, AreaChoice.current);
 
     auth.requestFailure = null;
     await tapVisible(tester, const Key('send-otp'));
@@ -209,7 +216,7 @@ void main() {
     await tapVisible(tester, const Key('change-method'));
 
     expect(find.text('Sign in'), findsOneWidget);
-    expect(session.areaChoice, AreaChoice.skipped);
+    expect(session.areaChoice, AreaChoice.current);
   });
 
   testWidgets('protected deep link survives setup and sign-in', (tester) async {
@@ -297,7 +304,7 @@ void main() {
     await tapVisible(tester, const Key('sign-out'));
     await tapVisible(tester, const Key('confirm-sign-out'));
     expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
-    expect(session.areaChoice, AreaChoice.skipped);
+    expect(session.areaChoice, AreaChoice.current);
     expect(auth.signedIn, isFalse);
   });
 }

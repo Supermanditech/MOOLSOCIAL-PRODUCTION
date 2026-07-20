@@ -16,6 +16,7 @@ import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
 import '../features/work/work_session.dart';
+import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 
 class MoolSocialApp extends StatefulWidget {
@@ -35,6 +36,7 @@ class MoolSocialApp extends StatefulWidget {
     this.rideSession,
     this.sharedSession,
     this.workSession,
+    this.launchInterruptionGuard,
     this.initialLocation = '/boot',
     this.disposeSession = false,
     this.disposeBookSession = false,
@@ -50,6 +52,7 @@ class MoolSocialApp extends StatefulWidget {
     this.disposeRideSession = false,
     this.disposeSharedSession = false,
     this.disposeWorkSession = false,
+    this.disposeLaunchInterruptionGuard = false,
   });
 
   final JourneySession? session;
@@ -66,6 +69,7 @@ class MoolSocialApp extends StatefulWidget {
   final RideSession? rideSession;
   final SharedSession? sharedSession;
   final WorkSession? workSession;
+  final LaunchInterruptionGuard? launchInterruptionGuard;
   final String initialLocation;
   final bool disposeSession;
   final bool disposeBookSession;
@@ -81,6 +85,7 @@ class MoolSocialApp extends StatefulWidget {
   final bool disposeRideSession;
   final bool disposeSharedSession;
   final bool disposeWorkSession;
+  final bool disposeLaunchInterruptionGuard;
 
   @override
   State<MoolSocialApp> createState() => _MoolSocialAppState();
@@ -109,6 +114,8 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   late final WorkSession _workSession = widget.workSession ?? WorkSession();
   late final LaunchPresentationGate _launchPresentationGate =
       LaunchPresentationGate();
+  late final LaunchInterruptionGuard _launchInterruptionGuard =
+      widget.launchInterruptionGuard ?? LaunchInterruptionGuard();
   late final _router = createJourneyRouter(
     _session,
     _bookSession,
@@ -125,13 +132,26 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     _sharedSession,
     _workSession,
     launchPresentationGate: _launchPresentationGate,
+    launchInterruptionGuard: _launchInterruptionGuard,
     initialLocation: widget.initialLocation,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _launchInterruptionGuard.start();
+    });
+  }
 
   @override
   void dispose() {
     _router.dispose();
     _launchPresentationGate.dispose();
+    if (widget.launchInterruptionGuard == null ||
+        widget.disposeLaunchInterruptionGuard) {
+      _launchInterruptionGuard.dispose();
+    }
     if (widget.session == null || widget.disposeSession) {
       _session.dispose();
     }

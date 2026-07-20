@@ -99,9 +99,35 @@ void main() {
 
     expect(servicesSource, contains('class FirebaseOtpGateway'));
     expect(servicesSource, contains('String? emulatorHost'));
+    expect(servicesSource, contains('String? emulatorFallbackHost'));
     expect(servicesSource, contains('_requestEmulatorCode'));
     expect(servicesSource, contains('_verifyEmulatorCode'));
     expect(servicesSource, contains('if (!_usesEmulatorReview) return null'));
     expect(servicesSource, contains('if (emulatorHost != null)'));
+  });
+
+  test('mobile OTP never turns a review-route failure into an offline claim', () {
+    final servicesSource = File(
+      'lib/features/journey01/review_journey_services.dart',
+    ).readAsStringSync();
+    final mobileGatewaySource = servicesSource.substring(
+      servicesSource.indexOf('class FirebaseOtpGateway'),
+      servicesSource.indexOf('class FirebaseSocialAuthGateway'),
+    );
+    final mainSource = File('lib/main.dart').readAsStringSync();
+
+    expect(
+      mobileGatewaySource,
+      isNot(contains('You appear to be offline')),
+      reason:
+          'A missing physical-device review route does not prove the customer is offline.',
+    );
+    expect(
+      mobileGatewaySource,
+      contains(
+        'Mobile sign-in could not connect. Check your connection and try again.',
+      ),
+    );
+    expect(mainSource, contains('MOOLSOCIAL_EMULATOR_FALLBACK_HOST'));
   });
 }

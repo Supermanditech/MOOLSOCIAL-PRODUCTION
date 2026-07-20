@@ -83,13 +83,14 @@ import '../retailer/screens/retailer_wholesale_fulfilment_screens.dart';
 import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
+import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
+import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
+import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
+import '../../ui_v2/screens/screen03_login/otp_screen_v2.dart';
 import 'journey_session.dart';
-import 'screens/setup_screen.dart';
-import 'screens/sign_in_screen.dart';
 import 'screens/universal_shell.dart';
-import 'screens/verify_otp_screen.dart';
 
 GoRouter createJourneyRouter(
   JourneySession session,
@@ -107,12 +108,17 @@ GoRouter createJourneyRouter(
   SharedSession sharedSession,
   WorkSession workSession, {
   required LaunchPresentationGate launchPresentationGate,
+  required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
 }) {
   late final GoRouter router;
   router = GoRouter(
     initialLocation: initialLocation,
-    refreshListenable: Listenable.merge([session, launchPresentationGate]),
+    refreshListenable: Listenable.merge([
+      session,
+      launchPresentationGate,
+      launchInterruptionGuard,
+    ]),
     redirect: (context, state) {
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
@@ -122,7 +128,8 @@ GoRouter createJourneyRouter(
       }
 
       if (location == '/boot' &&
-          !launchPresentationGate.minimumElapsed &&
+          (!launchPresentationGate.minimumElapsed ||
+              !launchInterruptionGuard.canHandoff) &&
           session.stage != JourneyStage.bootFailure) {
         return null;
       }
@@ -158,15 +165,15 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/setup',
-        builder: (context, state) => SetupScreen(session: session),
+        builder: (context, state) => FirstSetupScreenV2(session: session),
       ),
       GoRoute(
         path: '/sign-in',
-        builder: (context, state) => SignInScreen(session: session),
+        builder: (context, state) => LoginScreenV2(session: session),
       ),
       GoRoute(
         path: '/verify',
-        builder: (context, state) => VerifyOtpScreen(session: session),
+        builder: (context, state) => OtpScreenV2(session: session),
       ),
       GoRoute(
         path: '/app/buy/grocery',

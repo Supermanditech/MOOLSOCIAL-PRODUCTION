@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "routeOwner": "journey01",
+    "productionRoutes": [
+      "/sign-in",
+      "/verify"
+    ],
+    "approvalVersion": "visual-v1",
+    "founderApprovedAt": "2026-07-20",
+    "approvalSource": "http://127.0.0.1:8765/screens/03-login-account-handoff.html?founderReview=1&area=Khema-Ka-Kuwa%2C%20Jodhpur%2C%20Rajasthan",
+    "approvalScope": [
+      "login-method selection",
+      "Google provider handoff",
+      "YouTube through Google identity",
+      "Apple provider handoff",
+      "X provider handoff",
+      "Instagram provider handoff when enabled",
+      "Facebook provider handoff",
+      "email OTP entry and verification",
+      "mobile OTP entry, autofill and verification",
+      "provider cancel, denial, unavailable, offline and retry recovery",
+      "Screen 02 area preservation",
+      "verified handoff to Universal",
+      "Screen 02 and Screen 03 connected acceptance checkpoint"
+    ]
+  },
+  "referenceCapture": {
+    "phoneViewportCssPixels": {
+      "width": 360,
+      "height": 720
+    },
+    "deviceScaleFactor": 1,
+    "textScaleFactor": 1,
+    "fontFamily": "Inter",
+    "referenceImages": [
+      "reference-images/login-options-360x720.png",
+      "reference-images/mobile-otp-360x720.png"
+    ]
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "methodTitle": "Sign in",
+    "methodBody": "Choose one method to continue.",
+    "socialTitle": "Social account",
+    "providers": [
+      "Google",
+      "YouTube",
+      "Apple",
+      "X",
+      "Instagram",
+      "Facebook"
+    ],
+    "emailOtp": "Email OTP",
+    "emailOtpHint": "Use any email address",
+    "mobileOtp": "Mobile OTP",
+    "mobileOtpHint": "Use mobile number",
+    "otpTitle": "Enter OTP",
+    "mobileOtpBody": "Sent to +91 ******4821",
+    "verify": "Verify",
+    "resend": "Resend in 24s",
+    "changeMethod": "Change method"
+  },
+  "entry": {
+    "requiredPreviousScreen": "Screen 02 First Setup / Language + Area",
+    "routeCondition": "JourneyStage.signIn",
+    "requiredState": [
+      "setup completion is durably persisted",
+      "resolved language is preserved",
+      "current service area is preserved",
+      "anonymous return route is preserved when present"
+    ]
+  },
+  "states": [
+    {
+      "id": "choose-method",
+      "actions": [
+        "Continue with Google",
+        "Continue with YouTube",
+        "Continue with Apple",
+        "Continue with X",
+        "Continue with Instagram",
+        "Continue with Facebook",
+        "Email OTP",
+        "Mobile OTP"
+      ]
+    },
+    {
+      "id": "provider-pending",
+      "actions": [
+        "complete provider-controlled sign-in",
+        "cancel provider-controlled sign-in"
+      ],
+      "rule": "The provider owns its native or secure browser approval surface. MoolSocial never reproduces provider credentials or consent in HTML or Flutter."
+    },
+    {
+      "id": "provider-recovery",
+      "outcomes": [
+        "cancelled",
+        "denied",
+        "offline",
+        "not configured",
+        "temporarily unavailable"
+      ],
+      "actions": [
+        "Try again",
+        "Choose another method"
+      ]
+    },
+    {
+      "id": "otp-target",
+      "channels": [
+        "email",
+        "mobile"
+      ],
+      "validation": "Normalize and validate the selected target before requesting a code."
+    },
+    {
+      "id": "otp-pending",
+      "actions": [
+        "Verify",
+        "Resend after cooldown",
+        "Change method"
+      ],
+      "mobileAutofill": "Use OS one-time-code autofill APIs; never read the SMS inbox silently."
+    },
+    {
+      "id": "session-ready",
+      "action": "Merge anonymous setup into the authenticated account and open Universal immediately without an intermediate MoolSocial success screen."
+    }
+  ],
+  "providerRules": {
+    "youtube": "Use Google basic identity only. Request YouTube channel scopes later and only from creator tools with feature-specific consent.",
+    "instagram": "Show only when the production provider configuration, policy, scopes, country and device are supported; otherwise expose a truthful recoverable unavailable state in review/testing and omit the dead action from a released provider configuration.",
+    "externalSurface": "Google, YouTube/Google, Apple, X, Instagram and Facebook account chooser or approval screens are provider-controlled.",
+    "security": [
+      "PKCE where applicable",
+      "state and nonce validation",
+      "redirect allowlist",
+      "provider token validation",
+      "idempotent account/session merge",
+      "no raw credentials logged or collected by MoolSocial UI"
+    ]
+  },
+  "routing": {
+    "screen02Exit": "/sign-in",
+    "methodSelection": "/sign-in",
+    "otpVerification": "/verify",
+    "authenticatedExit": "/app/social unless a valid captured /app/ return route exists",
+    "lifecycleRule": "Process death, background/resume, call interruption, provider cancel and cold relaunch must resolve from durable setup/auth state without returning to Screen 01 mid-journey or skipping an incomplete verification."
+  },
+  "nonUiOwners": [
+    "JourneySession",
+    "JourneyStore",
+    "OtpGateway",
+    "SocialAuthGateway",
+    "AccountBootstrapGateway",
+    "FirebaseAuth adapter",
+    "GoRouter redirect contract"
+  ],
+  "prohibited": [
+    "HTML or WebView in Flutter",
+    "mixing the legacy SignInScreen or VerifyOtpScreen into UI V2",
+    "role or business onboarding before Universal",
+    "requesting YouTube channel-management scopes at login",
+    "fake provider success in a production build",
+    "dead provider actions",
+    "internal planning, implementation, review or test language in customer-visible copy",
+    "dropping the Screen 02 area during authentication"
+  ]
+}

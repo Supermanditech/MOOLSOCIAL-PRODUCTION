@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 2,
+    "id": "first-setup-language-location",
+    "routeOwner": "journey01",
+    "productionRoute": "/setup",
+    "approvalVersion": "visual-v2",
+    "founderApprovedAt": "2026-07-20",
+    "approvalScope": [
+      "visual composition",
+      "phone-language summary",
+      "current-location explanation and permission timing",
+      "permission denial recovery",
+      "manual area search and validation",
+      "manual map choice",
+      "resolved-area confirmation",
+      "confirmed continuation without area",
+      "Screen 01 to Screen 02 route continuity",
+      "no OTP before Screen 03"
+    ]
+  },
+  "referenceCapture": {
+    "phoneViewportCssPixels": {
+      "width": 360,
+      "height": 720
+    },
+    "deviceScaleFactor": 1,
+    "textScaleFactor": 1,
+    "fontFamily": "Inter",
+    "referenceImage": "reference-images/choose-area-360x720.png"
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "title": "Set your area",
+    "intro": "MoolSocial matched this phone's language. Now choose the area you want to use.",
+    "languageLabel": "App language: English",
+    "languageSource": "Matched from this phone · change later in Settings",
+    "choiceHeading": "Which area should MoolSocial use?",
+    "choiceBody": "Use where you are now, set another area, or continue without one.",
+    "current": "Use current location",
+    "currentHint": "Best when you are at the place now",
+    "manual": "Set manually",
+    "manualHint": "Search area, pin code, address or choose on map",
+    "skip": "Skip now",
+    "skipHint": "Continue to login and set area after signup"
+  },
+  "entry": {
+    "requiredPreviousScreen": "Screen 01 App Splash / First Open Handoff",
+    "routeCondition": "JourneyStage.setup",
+    "legacyMigration": "A saved setup older than approved setup experience version 2 must show Screen 02 once before sign in or Universal."
+  },
+  "states": [
+    {
+      "id": "choose",
+      "actions": [
+        "Use current location",
+        "Set manually",
+        "Skip now"
+      ]
+    },
+    {
+      "id": "permission",
+      "actions": [
+        "Use precise location",
+        "Use approximate area",
+        "Not now",
+        "Back to area choices"
+      ]
+    },
+    {
+      "id": "resolving",
+      "actions": [],
+      "automaticResult": "resolved or denied/error"
+    },
+    {
+      "id": "denied",
+      "actions": [
+        "Set area manually",
+        "Try current location again",
+        "Continue without area",
+        "Back to area choices"
+      ]
+    },
+    {
+      "id": "manual",
+      "actions": [
+        "Find this area",
+        "Choose on map",
+        "Back to area choices"
+      ],
+      "validation": "Require at least 3 characters, a locality, or a valid pin code."
+    },
+    {
+      "id": "manual-results",
+      "actions": [
+        "Use the area exactly as entered",
+        "Check entered area on map",
+        "Edit search"
+      ]
+    },
+    {
+      "id": "map",
+      "actions": [
+        "Use this map area",
+        "Search instead",
+        "Back to area choices"
+      ]
+    },
+    {
+      "id": "resolved",
+      "actions": [
+        "Continue to sign in",
+        "Choose a different area",
+        "Back to area choices"
+      ]
+    },
+    {
+      "id": "skip-confirm",
+      "actions": [
+        "Continue to sign in",
+        "Set an area instead"
+      ]
+    },
+    {
+      "id": "error",
+      "actions": [
+        "Retry current location",
+        "Set manually",
+        "Continue without area"
+      ]
+    }
+  ],
+  "routing": {
+    "screen01Exit": "/setup",
+    "screen02Owner": "JourneySession and GoRouter",
+    "completeWithArea": "persist language and area, then route to Screen 03 sign in unless an authenticated session was already restored",
+    "completeWithoutArea": "persist confirmed skipped state, then route to Screen 03 sign in unless an authenticated session was already restored",
+    "otpBoundary": "Screen 02 never requests or displays OTP. /verify is reachable only after Screen 03 requests a code."
+  },
+  "nonUiOwners": [
+    "JourneySession",
+    "JourneyStore",
+    "SharedPreferencesJourneyStore",
+    "LocationPermissionGateway",
+    "DeviceLocationPermissionGateway",
+    "GoRouter redirect contract"
+  ],
+  "prohibited": [
+    "first-open language picker",
+    "location permission before explanation and user tap",
+    "automatic permanent-home assignment from current location",
+    "unconfirmed skip",
+    "OTP UI or OTP request",
+    "role switch",
+    "HTML or WebView in Flutter",
+    "mixing the legacy SetupScreen into UI V2"
+  ]
+}

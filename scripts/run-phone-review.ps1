@@ -1,5 +1,5 @@
 param(
-  [string]$EmulatorHost = "127.0.0.1",
+  [string]$EmulatorHost = "",
   [switch]$KeepAppState
 )
 
@@ -32,6 +32,22 @@ Allow USB debugging prompt for this computer.
 "@
 }
 
+if (-not $EmulatorHost) {
+  $EmulatorHost = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object {
+      $_.IPAddress -notlike "127.*" -and
+      $_.IPAddress -notlike "169.254*" -and
+      $_.PrefixOrigin -ne "WellKnown"
+    } |
+    Sort-Object {
+      if ($_.InterfaceAlias -match "Wi-?Fi") { 0 } else { 1 }
+    } |
+    Select-Object -ExpandProperty IPAddress -First 1
+}
+if (-not $EmulatorHost) {
+  throw "No directly reachable laptop IPv4 address was found for phone review."
+}
+
 foreach ($port in 9099, 9399) {
   $listener = Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
   if (-not $listener) {
@@ -40,6 +56,20 @@ foreach ($port in 9099, 9399) {
   if ($EmulatorHost -in @("127.0.0.1", "localhost")) {
     & $adb -s $serial reverse "tcp:$port" "tcp:$port" | Out-Null
   }
+}
+
+$authHealthUrl = (
+  "http://${EmulatorHost}:9099/emulator/v1/projects/$projectId/config"
+)
+$deviceAuthStatus = (
+  & $adb -s $serial shell curl --connect-timeout 5 -sS -o /dev/null `
+    -w "%{http_code}" $authHealthUrl 2>$null
+) -join ""
+if ($LASTEXITCODE -ne 0 -or $deviceAuthStatus.Trim() -ne "200") {
+  throw (
+    "The OPPO cannot reach the mobile OTP service at $authHealthUrl. " +
+    "Do not hand off this APK for founder testing."
+  )
 }
 
 if (-not $KeepAppState) {

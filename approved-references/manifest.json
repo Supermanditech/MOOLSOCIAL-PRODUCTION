@@ -55,7 +55,7 @@
       "screenNumber": 1,
       "screenId": "app-splash-first-open",
       "version": "v2",
-      "status": "production-accepted",
+      "status": "superseded-production-accepted",
       "founderApprovedAt": "2026-07-20",
       "taglineStatus": "research-pending-temporary-copy-approved-for-v2",
       "supersedes": "v1",
@@ -100,6 +100,299 @@
         {
           "path": "reference-images/silent-handoff-360x720.png",
           "sha256": "bfbd09d7231dfa4c92220d84395e45c24c83241235fd4194a67a2d6b671ee631"
+        }
+      ]
+    },
+    {
+      "screenNumber": 2,
+      "screenId": "first-setup-language-location",
+      "version": "v2",
+      "status": "withdrawn-before-production-acceptance",
+      "founderApprovedAt": "2026-07-20",
+      "withdrawnAt": "2026-07-20",
+      "withdrawalReason": "Founder requested a simpler one-tap detected-current-area flow with an optional separate home/work area.",
+      "productionDecision": "native Flutter UI V2 /setup immediately after Screen 01; no OTP request or OTP UI before Screen 03",
+      "root": "screens/02-first-setup-language-location/v2",
+      "interactionContract": "screens/02-first-setup-language-location/v2/interaction-contract.json",
+      "checksums": "screens/02-first-setup-language-location/v2/SHA256SUMS",
+      "files": [
+        {
+          "path": "html/screens/02-first-setup-language-location.html",
+          "sha256": "3231aa8ddafd4299cdd45d6cf578d366c6ae4f06604db380f57999a8b1ea7918"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "2f2e3c5af1faa6d23c08163ba6e1e571845f4f5cdcc226ffaf544ad6fa66be15"
+        },
+        {
+          "path": "README.md",
+          "sha256": "6ac3a1f45384f107a3eb95591051fca7df47df50af76a0fa35bbad216ea67fad"
+        },
+        {
+          "path": "reference-images/choose-area-360x720.png",
+          "sha256": "cb85d47eededbec415c862f82b12cb97cc38d4c110f8ed1a251335a234b0b0b8"
+        }
+      ]
+    },
+    {
+      "screenNumber": 2,
+      "screenId": "first-setup-language-location",
+      "version": "v3",
+      "status": "html-final",
+      "founderApprovedAt": "2026-07-20",
+      "supersedes": "v2",
+      "productionDecision": "resolved current area appears immediately after Screen 01; one-tap Continue; optional separate home or work area; no customer-visible implementation language; no OTP before the later sign-in screen",
+      "root": "screens/02-first-setup-language-location/v3",
+      "interactionContract": "screens/02-first-setup-language-location/v3/interaction-contract.json",
+      "checksums": "screens/02-first-setup-language-location/v3/SHA256SUMS",
+      "files": [
+        {
+          "path": "html/screens/02-first-setup-language-location.html",
+          "sha256": "cd41a4c5c59fdb4c1cd56ee2df1baf5317d64b5bd2a16a893d8b84dd4d23dca7"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "5b3b2c117cd9b3d77002da8db1198ba053c072b11a5d6fb3f82ab0e5a27bffe9"
+        },
+        {
+          "path": "README.md",
+          "sha256": "32281af1ba2064a9aabcfca0828da8d03841758c6c5f4d89df0beebb8ba3b737"
+        },
+        {
+          "path": "reference-images/resolved-current-area-360x720.png",
+          "sha256": "c3a260a44ecae6679d37038018ce5b30eb4a9427e713a30498f958de3320547e"
+        }
+      ]
+    },
+    {
+      "screenNumber": 3,
+      "screenId": "login-account-handoff",
+      "version": "v1",
+      "status": "html-final",
+      "founderApprovedAt": "2026-07-20",
+      "approvalSource": "http://127.0.0.1:8765/screens/03-login-account-handoff.html?founderReview=1&area=Khema-Ka-Kuwa%2C%20Jodhpur%2C%20Rajasthan",
+      "productionDecision": "fresh native Flutter UI V2 method selection and OTP routes; six provider choices with provider-owned secure handoffs; YouTube uses Google basic identity; verified login preserves Screen 02 state and opens Universal",
+      "connectedAcceptanceCheckpoint": [
+        "screen-02-first-setup-language-location",
+        "screen-03-login-account-handoff"
+      ],
+      "root": "screens/03-login-account-handoff/v1",
+      "interactionContract": "screens/03-login-account-handoff/v1/interaction-contract.json",
+      "checksums": "screens/03-login-account-handoff/v1/SHA256SUMS",
+      "files": [
+        {
+          "path": "html/screens/03-login-account-handoff.html",
+          "sha256": "535a30ef39506c1553f7642c734a1c5dc3adfb5df23bad9cb49a524a1e4bc2af"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "daa3c4e954f8ab30edc2ca430732f210839bcbf6b08529e11052eb8c26c6545f"
+        },
+        {
+          "path": "README.md",
+          "sha256": "506d9793797e042eb8d8b00ac314711cb52659ab7d0b6a212186fd61cb2c7d52"
+        },
+        {
+          "path": "reference-images/login-options-360x720.png",
+          "sha256": "4a49129bc8be2f2286f75fb23813807ab2b4da879e9fbad5ac78d262c86b4c00"
+        },
+        {
+          "path": "reference-images/mobile-otp-360x720.png",
+          "sha256": "82c221982b3b49466ef8c13477c145c4d85242480effdcd23375b04f20a398b8"
+        }
+      ]
+    },
+    {
+      "screenNumber": 1,
+      "screenId": "app-splash-first-open",
+      "version": "v3",
+      "status": "production-accepted",
+      "founderApprovedAt": "2026-07-20",
+      "taglineStatus": "research-pending-temporary-copy-approved",
+      "supersedes": "v2",
+      "productionDecision": "one visibly branded Flutter screen; minimum 3000 ms; same customer-facing presentation during slow startup; plain navy Android system window",
+      "connectedAcceptanceCheckpoint": [
+        "screen-01-app-splash-first-open",
+        "screen-02-first-setup-language-location",
+        "screen-03-login-account-handoff"
+      ],
+      "root": "screens/01-app-splash-first-open/v3",
+      "interactionContract": "screens/01-app-splash-first-open/v3/interaction-contract.json",
+      "checksums": "screens/01-app-splash-first-open/v3/SHA256SUMS",
+      "productionAcceptance": "screens/01-app-splash-first-open/v3/production-acceptance.json",
+      "files": [
+        {
+          "path": "html/screens/01-app-splash-first-open.html",
+          "sha256": "3908857907d04ec540b8c0dd7d00148e749cb76787d6281f81fda0bf321e9c60"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "84329787331f2d62336ba145ed0f670c8c6f331d570eb2fe1e80efee574f230c"
+        },
+        {
+          "path": "production-acceptance.json",
+          "sha256": "8aa59820dbee38a8073f35dc242b10d7df09719efc4d727654f017f0bab3351e"
+        },
+        {
+          "path": "README.md",
+          "sha256": "a661705d9aac2941a6cb0d88357d0fbca0990998535e532a60523451aa68cfbb"
+        },
+        {
+          "path": "reference-images/normal-open-motion-midpoint-360x720.png",
+          "sha256": "45ae6d228278c09429aeb3fb47d5cdd5e5bff37caf579e7179b655273d49b948"
+        },
+        {
+          "path": "reference-images/recovery-360x720.png",
+          "sha256": "17d7b837a4de81d9a5224efd374b87b5f1ac32deb473b0a76fee69c8f142d930"
+        },
+        {
+          "path": "reference-images/slow-start-360x720.png",
+          "sha256": "984fca330458176afd92c9055d73dcbe33f89d82ed75967d3fa6356142f50b7c"
+        }
+      ]
+    },
+    {
+      "screenNumber": 2,
+      "screenId": "first-setup-language-location",
+      "version": "v4",
+      "status": "production-accepted",
+      "founderApprovedAt": "2026-07-20",
+      "supersedes": "v3",
+      "productionDecision": "location benefit and consent, Android permission/settings, resolved current area, explicit continuation to Screen 03; permanent serviceable area only inside Universal after login",
+      "connectedAcceptanceCheckpoint": [
+        "screen-01-app-splash-first-open",
+        "screen-02-first-setup-language-location",
+        "screen-03-login-account-handoff"
+      ],
+      "root": "screens/02-first-setup-language-location/v4",
+      "interactionContract": "screens/02-first-setup-language-location/v4/interaction-contract.json",
+      "checksums": "screens/02-first-setup-language-location/v4/SHA256SUMS",
+      "productionAcceptance": "screens/02-first-setup-language-location/v4/production-acceptance.json",
+      "files": [
+        {
+          "path": "html/screens/02-first-setup-language-location.html",
+          "sha256": "8d7e5926b8b60cba52aa92d1b37b2c5cb0200c572847ff633eaed0540ea843a0"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "ecbcdd21e5272d3a179e53b9ab9063ea39deb9d29a8f0fe3fdcfc381490e4a1f"
+        },
+        {
+          "path": "production-acceptance.json",
+          "sha256": "fae95ca7dc2dde691799980aa69fba4c944f9d773ec788cf0be7e0b14da5c54a"
+        },
+        {
+          "path": "README.md",
+          "sha256": "9786ff7b573bf33de8d7a25cc37f88d5eb01563255b903591708f3c9c1474d80"
+        },
+        {
+          "path": "reference-images/choose-area-360x720.png",
+          "sha256": "d8abdc44fe1a1c1db4f80ab023aba278ea01863f6551a5c507963bd8a83afdc4"
+        },
+        {
+          "path": "reference-images/location-consent-360x720.png",
+          "sha256": "22b0a659aa72c25944d8262740d39a787fae16bb9501815e1fc023cc3019e26d"
+        },
+        {
+          "path": "reference-images/resolved-current-area-360x720.png",
+          "sha256": "c8bdae0a591ab1e8c155029c04dac261e7cf33552a92be68f2d62b39b5198b90"
+        }
+      ]
+    },
+    {
+      "screenNumber": 3,
+      "screenId": "login-account-handoff",
+      "version": "v2",
+      "status": "production-accepted",
+      "founderApprovedAt": "2026-07-20",
+      "supersedes": "v1",
+      "approvalSource": "http://127.0.0.1:8765/screens/03-login-account-handoff.html?founderReview=1&area=Khema-Ka-Kuwa%2C%20Jodhpur%2C%20Rajasthan",
+      "productionDecision": "six social-provider handoffs plus email/mobile OTP; verified login preserves Screen 02 state and opens Universal; device-review route failure never becomes a false offline claim",
+      "connectedAcceptanceCheckpoint": [
+        "screen-01-app-splash-first-open",
+        "screen-02-first-setup-language-location",
+        "screen-03-login-account-handoff"
+      ],
+      "root": "screens/03-login-account-handoff/v2",
+      "interactionContract": "screens/03-login-account-handoff/v2/interaction-contract.json",
+      "checksums": "screens/03-login-account-handoff/v2/SHA256SUMS",
+      "productionAcceptance": "screens/03-login-account-handoff/v2/production-acceptance.json",
+      "files": [
+        {
+          "path": "html/screens/03-login-account-handoff.html",
+          "sha256": "c8b58bed63b6616f83d06c7d95faa335db537b3c6df37593d601d19037ecdfef"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/shared/resilience-state-runtime.js",
+          "sha256": "358457d3992e5a172ec47d4acb55422d12b71c5d1e8768b300ee5565d71bc990"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "05fb4086ea4601f1c09a3d1ffd3de0e036c58dea803d396172f0070c93e40413"
+        },
+        {
+          "path": "production-acceptance.json",
+          "sha256": "e77c45d2ea5cea6c3f4d7f9e75d6c8c928826254ea9d9b2934e3964eb335baf1"
+        },
+        {
+          "path": "README.md",
+          "sha256": "e1235e47a2eac51faa286a7957e8ea66d7759af2a1356abf46f4cb72d94070c6"
+        },
+        {
+          "path": "reference-images/email-otp-360x720.png",
+          "sha256": "66c34ad4646b24a7e74ff569f387e7c46bf66a053eb49da4775a45562690f43d"
+        },
+        {
+          "path": "reference-images/login-options-360x720.png",
+          "sha256": "4f0361824b6ce41905004e1bc4f13d213ce1eb78abf61dfc9ffcec3afd98e287"
+        },
+        {
+          "path": "reference-images/mobile-otp-360x720.png",
+          "sha256": "714129642847519910a621124c5bcd8ae8c22ba1e894c0bf69517422b097e8d5"
         }
       ]
     }

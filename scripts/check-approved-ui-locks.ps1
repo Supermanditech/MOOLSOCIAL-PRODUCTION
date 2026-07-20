@@ -87,12 +87,16 @@ foreach ($screen in $manifest.screens) {
       throw "Production acceptance is not Accepted: $acceptancePath"
     }
 
-    foreach ($lockedFile in $acceptance.lockedFiles) {
-      $relative = $lockedFile.path.Replace("/", [IO.Path]::DirectorySeparatorChar)
-      Assert-Hash `
-        -Path (Join-Path $root $relative) `
-        -Expected $lockedFile.sha256 `
-        -Label "$($screen.screenId) accepted production file $($lockedFile.path)"
+    # Superseded acceptance packages remain immutable historical evidence, but
+    # only the current production-accepted version governs mutable source.
+    if ($screen.status -eq "production-accepted") {
+      foreach ($lockedFile in $acceptance.lockedFiles) {
+        $relative = $lockedFile.path.Replace("/", [IO.Path]::DirectorySeparatorChar)
+        Assert-Hash `
+          -Path (Join-Path $root $relative) `
+          -Expected $lockedFile.sha256 `
+          -Label "$($screen.screenId) accepted production file $($lockedFile.path)"
+      }
     }
   }
 }

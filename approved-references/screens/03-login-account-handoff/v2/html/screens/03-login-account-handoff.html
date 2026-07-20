@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>03 Login / Account Handoff - MoolSocial Screenbook</title>
+  <link rel="stylesheet" href="../shared/moolsocial-ui-foundation.css" />
+  <style>
+    .screen-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .back-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .screen-link-home {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ms-navy);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .back-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .preview-wrap {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .phone-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stage {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .stage-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .stage-label span {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      padding: 0 9px;
+      color: var(--ms-green);
+      background: var(--ms-white);
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    .phone {
+      width: min(100%, 360px);
+      min-height: 700px;
+      display: grid;
+      grid-template-rows: 32px 1fr;
+      justify-self: center;
+      border: 10px solid var(--ms-navy);
+      border-radius: 32px;
+      background: var(--ms-navy);
+      overflow: hidden;
+    }
+
+    .phone-status {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 0;
+      color: var(--ms-white);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .phone-app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 668px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      overflow: hidden;
+    }
+
+    .phone-top {
+      display: grid;
+      gap: 10px;
+      padding: 18px 18px 15px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .wordmark {
+      color: var(--ms-white);
+      font-size: 25px;
+      font-weight: 950;
+      line-height: .95;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .identity-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      border-radius: var(--ms-pill);
+      overflow: hidden;
+    }
+
+    .identity-line span:nth-child(1) { background: var(--ms-saffron); }
+    .identity-line span:nth-child(2) { background: var(--ms-white); }
+    .identity-line span:nth-child(3) { background: var(--ms-green); }
+
+    .top-copy {
+      margin: 0;
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.35;
+    }
+
+    .phone-body {
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .title {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 29px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .copy {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .provider-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 13px;
+      background: var(--ms-white);
+    }
+
+    .provider-card h3 {
+      margin: 0;
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .provider {
+      appearance: none;
+      min-width: 0;
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--ms-navy);
+      font-family: var(--ms-font);
+      cursor: default;
+    }
+
+    .provider-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 128, .14);
+      background: var(--ms-white);
+      color: var(--ms-white);
+      box-shadow: 0 9px 18px rgba(0, 0, 128, .13);
+      overflow: hidden;
+    }
+
+    .provider-icon svg {
+      width: 25px;
+      height: 25px;
+      display: block;
+    }
+
+    .provider b {
+      max-width: 72px;
+      color: var(--ms-navy);
+      font-size: 10px;
+      line-height: 1.15;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    .provider-apple .provider-icon,
+    .provider-x .provider-icon {
+      border-color: #111;
+      background: #111;
+    }
+
+    .provider-instagram .provider-icon {
+      border-color: #df3f8f;
+      background: radial-gradient(circle at 30% 105%, #feda75 0 18%, #fa7e1e 32%, #d62976 54%, #962fbf 72%, #4f5bd5 100%);
+    }
+
+    .provider-facebook .provider-icon {
+      border-color: #1877f2;
+      background: #1877f2;
+    }
+
+    .provider-youtube .provider-icon {
+      border-color: #ff0033;
+      background: var(--ms-white);
+    }
+
+    .stage-review-result {
+      margin: 0;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 10px 12px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 11px;
+      font-weight: 820;
+      line-height: 1.35;
+    }
+
+    .stage-review-result[hidden] {
+      display: none;
+    }
+
+    .line-icon {
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .method-stack {
+      display: grid;
+      gap: 9px;
+    }
+
+    .method-button {
+      appearance: none;
+      min-height: 50px;
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 9px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-family: var(--ms-font);
+      text-align: left;
+      cursor: default;
+    }
+
+    .method-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+    }
+
+    .method-icon svg {
+      width: 30px;
+      height: 30px;
+      display: block;
+    }
+
+    .method-button b,
+    .method-button span {
+      display: block;
+      color: var(--ms-navy);
+    }
+
+    .method-button b {
+      font-size: 13px;
+      line-height: 1.15;
+    }
+
+    .method-button span {
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .arrow-mark {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .arrow-mark svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .input-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 13px;
+      background: var(--ms-white);
+    }
+
+    .input-label {
+      color: var(--ms-green);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .field {
+      min-height: 48px;
+      display: grid;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 0 12px;
+      color: var(--ms-navy);
+      background: var(--ms-white);
+      font-size: 14px;
+      font-weight: 850;
+    }
+
+    .otp-row {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .otp-cell {
+      min-height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 18px;
+      font-weight: 950;
+    }
+
+    .primary-button {
+      min-height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-pill);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .secondary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .stage-note {
+      color: var(--ms-navy);
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .flow-item {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      min-height: 150px;
+      padding: 16px;
+      border-right: 1px solid var(--ms-navy);
+    }
+
+    .flow-item:nth-child(4n) {
+      border-right: 0;
+    }
+
+    .flow-num {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--ms-radius);
+      background: var(--ms-navy);
+      color: var(--ms-white);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .flow-item b {
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .flow-item span {
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .state-table {
+      display: grid;
+      border-bottom: 1px solid var(--ms-navy);
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: 220px 1fr 1fr;
+      border-top: 1px solid var(--ms-navy);
+    }
+
+    .state-row:first-child {
+      border-top: 0;
+    }
+
+    .state-cell {
+      min-height: 82px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      padding: 14px;
+      border-right: 1px solid var(--ms-navy);
+      color: var(--ms-navy);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .state-cell:last-child {
+      border-right: 0;
+    }
+
+    .state-cell b {
+      color: var(--ms-green);
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 1100px) {
+      .phone-grid,
+      .flow-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-item {
+        border-right: 0;
+        border-bottom: 1px solid var(--ms-navy);
+      }
+
+      .flow-item:last-child {
+        border-bottom: 0;
+      }
+
+      .state-row {
+        grid-template-columns: 1fr;
+      }
+
+      .state-cell {
+        border-right: 0;
+        border-bottom: 1px solid var(--ms-navy);
+      }
+
+      .state-cell:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .back-row {
+        display: grid;
+      }
+
+      .preview-wrap {
+        padding: 14px;
+      }
+
+      .phone {
+        min-height: 660px;
+        border-width: 9px;
+      }
+
+      .phone-app {
+        min-height: 628px;
+      }
+    }
+  </style>
+</head>
+<body class="ms-doc">
+  <main class="ms-page screen-shell">
+    <header>
+      <div class="back-row">
+        <a class="screen-link-home" href="../index.html">
+          <span class="back-mark">BR</span>
+          Back to Screenbook
+        </a>
+        <span class="ms-status">Founder review · customer-copy correction</span>
+      </div>
+      <h1 class="ms-title">Screen 03: Login / Account Handoff</h1>
+      <p class="ms-lead">
+        Screen 03 continues directly from Screen 02 and turns the completed location setup into a
+        verified MoolSocial session. The user chooses one method only: supported social account,
+        email OTP, or mobile OTP. YouTube is included through secure Google identity without requesting
+        channel-management access during sign-in. After success, the app opens Universal with the
+        Screen 02 location preserved. Screen 02 and Screen 03 are reviewed as one connected checkpoint.
+      </p>
+    </header>
+
+    <section class="ms-panel">
+      <div class="ms-section-head">Final User-Facing UI <span>Approval preview</span></div>
+      <div class="preview-wrap">
+        <div class="phone-grid">
+          <article class="stage">
+            <div class="stage-label">User screen <span>Choose method</span></div>
+            <section class="phone" aria-label="MoolSocial sign-in methods">
+              <div class="phone-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="phone-app">
+                <div class="phone-top">
+                  <div class="wordmark">MoolSocial</div>
+                  <div class="identity-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <p class="top-copy">India Ka Socio Commerce App</p>
+                </div>
+                <div class="phone-body">
+                  <h2 class="title">Sign in</h2>
+                  <p class="copy">Choose one method to continue.</p>
+                  <div class="provider-card">
+                    <h3>Social account</h3>
+                    <div class="provider-grid" aria-label="Social sign-in providers">
+                      <button class="provider provider-google" type="button" aria-label="Continue with Google" data-auth-provider="google">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.1 12.2c0-.7-.1-1.3-.2-1.9H12v3.8h5.7c-.3 1.3-1 2.4-2.1 3.1v2.6h3.4c2-1.8 3.1-4.5 3.1-7.6Z"/>
+                            <path fill="#34A853" d="M12 22c2.8 0 5.2-.9 7-2.6l-3.4-2.6c-.9.6-2.1 1-3.6 1-2.8 0-5.1-1.9-5.9-4.4H2.6v2.7C4.3 19.6 7.9 22 12 22Z"/>
+                            <path fill="#FBBC05" d="M6.1 13.4a6.1 6.1 0 0 1 0-3.8V6.9H2.6a10 10 0 0 0 0 10.2l3.5-2.7Z"/>
+                            <path fill="#EA4335" d="M12 6.2c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0 0 2.6 6.9l3.5 2.7C6.9 8.1 9.2 6.2 12 6.2Z"/>
+                          </svg>
+                        </span>
+                        <b>Google</b>
+                      </button>
+                      <button class="provider provider-youtube" type="button" aria-label="Continue with YouTube" data-auth-provider="youtube">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path fill="#FF0033" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8Z"/>
+                            <path fill="#fff" d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z"/>
+                          </svg>
+                        </span>
+                        <b>YouTube</b>
+                      </button>
+                      <button class="provider provider-apple" type="button" aria-label="Continue with Apple" data-auth-provider="apple">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16.6 13.1c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.1-2.8.9-3.6.9-.7 0-1.9-.9-3.1-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 6.8 1.1 9.1.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3.1.7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.3-.9-2.3-3.7ZM14.3 6.2c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.6 1 .1 2-.5 2.6-1.2Z"/></svg>
+                        </span>
+                        <b>Apple</b>
+                      </button>
+                      <button class="provider provider-x" type="button" aria-label="Continue with X" data-auth-provider="x">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14.3 10.2 22 2h-1.8l-6.7 7.1L8.2 2H2l8.1 10.8L2 22h1.8l7.1-7.6 5.7 7.6H22l-7.7-11.8Zm-2.5 2.7-.8-1.1L4.5 3.4h2.8l5.2 6.9.8 1.1 6.8 9.2h-2.8l-5.5-7.7Z"/></svg>
+                        </span>
+                        <b>X</b>
+                      </button>
+                      <button class="provider provider-instagram" type="button" aria-label="Continue with Instagram" data-auth-provider="instagram">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg class="line-icon" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="4"/><circle cx="12" cy="12" r="3.2"/><path d="M16.8 7.4h.1"/></svg>
+                        </span>
+                        <b>Instagram</b>
+                      </button>
+                      <button class="provider provider-facebook" type="button" aria-label="Continue with Facebook" data-auth-provider="facebook">
+                        <span class="provider-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.1 8H17V4.8c-.3 0-1.5-.1-2.8-.1-2.8 0-4.6 1.7-4.6 4.8V12H6.5v3.6h3.1V22h3.7v-6.4h3.1l.5-3.6h-3.6V9.8c0-1 .3-1.8 1.8-1.8Z"/></svg>
+                        </span>
+                        <b>Facebook</b>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="method-stack">
+                    <button class="method-button" type="button" data-auth-otp="email">
+                      <span class="method-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path fill="#EA4335" d="M3 6.5 12 13l9-6.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5Z"/><path fill="#FBBC05" d="M3.8 5h16.4L12 11.2 3.8 5Z"/><path fill="#34A853" d="M3 6.5 10.8 12 3 18V6.5Z"/><path fill="#4285F4" d="M21 6.5 13.2 12 21 18V6.5Z"/></svg>
+                      </span>
+                      <span><b>Email OTP</b><span>Use any email address</span></span>
+                      <span class="arrow-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span>
+                    </button>
+                    <button class="method-button" type="button" data-auth-otp="mobile">
+                      <span class="method-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="6" y="2.8" width="12" height="18.4" rx="2.5" fill="#138808"/><rect x="7.7" y="5.3" width="8.6" height="11.6" rx="1.2" fill="#E8F5FF"/><circle cx="12" cy="18.8" r="1" fill="#fff"/><circle cx="10" cy="10.8" r="1.1" fill="#4285F4"/><circle cx="14" cy="10.8" r="1.1" fill="#4285F4"/><circle cx="12" cy="13.8" r="1.1" fill="#EA4335"/></svg>
+                      </span>
+                      <span><b>Mobile OTP</b><span>Use mobile number</span></span>
+                      <span class="arrow-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <p class="stage-review-result" data-provider-review hidden></p>
+          </article>
+
+          <article class="stage">
+            <div class="stage-label">User screen <span>OTP verify</span></div>
+            <section class="phone" aria-label="MoolSocial OTP verification">
+              <div class="phone-status">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="phone-app">
+                <div class="phone-top">
+                  <div class="wordmark">MoolSocial</div>
+                  <div class="identity-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <p class="top-copy">India Ka Socio Commerce App</p>
+                </div>
+                <div class="phone-body">
+                  <h2 class="title">Enter OTP</h2>
+                  <p class="copy">Sent to +91 ******4821</p>
+                  <div class="input-card">
+                    <div class="input-label">Mobile OTP</div>
+                    <div class="field">+91 ******4821</div>
+                    <div class="otp-row" aria-label="OTP entry">
+                      <span class="otp-cell">4</span>
+                      <span class="otp-cell">8</span>
+                      <span class="otp-cell">2</span>
+                      <span class="otp-cell">7</span>
+                      <span class="otp-cell">1</span>
+                      <span class="otp-cell">9</span>
+                    </div>
+                    <button class="primary-button" type="button" data-verify-otp>Verify</button>
+                    <div class="secondary-row">
+                      <span>Resend in 24s</span>
+                      <span>Change method</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <p class="stage-review-result" data-otp-review hidden></p>
+          </article>
+
+        </div>
+      </div>
+
+      <div class="ms-section-head">Screen Contract <span>Entry, behavior and exit</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Entry Condition</h3>
+          <p>Screen 02 completed or skipped area setup. Anonymous device session, resolved language, area state and login options config are available.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Primary Behavior</h3>
+          <p>Show one-method login. Social provider, email OTP or mobile OTP can each create or resume the same MoolSocial user identity.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Exit To Next Screen</h3>
+          <p>After verified login, mint session, merge anonymous setup data into the user account and route to Screen 04. Screen 04 UI is intentionally not defined here.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">User Flow <span>One method is enough</span></div>
+      <div class="flow-grid">
+        <article class="flow-item">
+          <div class="flow-num">01</div>
+          <b>Choose Method</b>
+          <span>User selects social provider, email OTP or mobile OTP. No role choice appears.</span>
+        </article>
+        <article class="flow-item">
+          <div class="flow-num">02</div>
+          <b>Verify</b>
+          <span>OAuth callback or OTP success proves control of the selected identity method.</span>
+        </article>
+        <article class="flow-item">
+          <div class="flow-num">03</div>
+          <b>Merge Setup</b>
+          <span>Language, area, install source and pending deep-link move from anonymous setup into the user account.</span>
+        </article>
+        <article class="flow-item">
+          <div class="flow-num">04</div>
+          <b>Open Next</b>
+          <span>User moves to Screen 04 with a ready session. The exact first main-app view is designed separately.</span>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Identity Rules <span>Production decisions</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>Individual First</h3>
+          <p>Login creates or resumes an individual user. Work, business, creator or captain layers are not requested here.</p>
+        </article>
+        <article class="ms-card">
+          <h3>No Double Verification</h3>
+          <p>Successful social login is sufficient unless risk rules demand recovery or step-up checks later. Email/mobile use OTP as their own path.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Account Linking</h3>
+          <p>If the same email/mobile/provider maps to an existing account, resume it. If a new provider is added later, link only after verified consent.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Method Handling <span>Visible choices and backend result</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>Google / YouTube / Apple / X / Instagram / Facebook</b>Secure provider identity path.</div>
+          <div class="state-cell">Open provider auth, receive callback, verify token server-side and map provider subject to one MoolSocial account.</div>
+          <div class="state-cell">Success routes to Screen 04. Failure returns to method screen with retry and alternate methods.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Email OTP</b>Official or personal email.</div>
+          <div class="state-cell">Normalize email, rate-limit request, send OTP, verify code, then create/resume account.</div>
+          <div class="state-cell">Official email is only a future trust signal. It must not unlock work/business role by itself.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Mobile OTP</b>Mobile number identity.</div>
+          <div class="state-cell">Normalize number, rate-limit request, send OTP, verify code, then create/resume account.</div>
+          <div class="state-cell">Mobile OTP can later support payment, delivery or safety checks, but login alone keeps user as consumer-first.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Social Provider Route Logic <span>What appears after tap</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>Google</b>User taps Google icon.</div>
+          <div class="state-cell">Open native Google Sign-In/account chooser when available; otherwise open secure OAuth in browser/custom tab. User may choose account and approve first-time consent on Google's own surface.</div>
+          <div class="state-cell">MoolSocial receives callback, validates ID token/code on backend, creates or resumes session, merges Screen 02 setup and auto-routes to Screen 04.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>YouTube</b>User taps YouTube icon.</div>
+          <div class="state-cell">Use secure Google identity with YouTube as the selected sign-in context. Request only basic identity during login; do not request channel upload, management or analytics access here.</div>
+          <div class="state-cell">Create or resume the same MoolSocial account. If the user later chooses creator tools, connect a YouTube channel separately with clear, feature-specific consent.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Apple</b>User taps Apple icon.</div>
+          <div class="state-cell">On iOS, show native Sign in with Apple sheet. User may approve with Face ID, passcode or Apple account confirmation. Private relay email is accepted as a verified Apple identity.</div>
+          <div class="state-cell">Backend validates Apple identity token and nonce. No extra OTP unless risk/recovery rules require a later step-up check.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>X</b>User taps X icon.</div>
+          <div class="state-cell">Open X OAuth in secure browser/custom tab or native app handoff if supported. User signs in or approves authorization on X's screen.</div>
+          <div class="state-cell">Callback verifies OAuth state, PKCE and provider subject. Cancel or denial returns to method selection with retry and alternate methods.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Facebook</b>User taps Facebook icon.</div>
+          <div class="state-cell">Open Facebook Login through native SDK or secure OAuth. User approves with Facebook's own login/consent screen when needed.</div>
+          <div class="state-cell">Backend validates Meta token, maps account, and routes forward. If provider email is unavailable, provider subject remains the identity key.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>Instagram</b>User taps Instagram icon.</div>
+          <div class="state-cell">Show only if policy, scopes and provider access are approved. Use Instagram/Meta auth surface; user approves on provider screen.</div>
+          <div class="state-cell">If Instagram login is not enabled for the build/country/device, hide the icon from login options instead of showing a dead action.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Provider Screen Ownership <span>Automatic vs MoolSocial-owned</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>External Screens</h3>
+          <p>Google, YouTube, Apple, X, Facebook and Instagram approval screens are native/provider-controlled surfaces. They appear automatically after tap and are not separate MoolSocial UI screens.</p>
+        </article>
+        <article class="ms-card">
+          <h3>MoolSocial Screens</h3>
+          <p>MoolSocial owns only method selection, OTP entry, retry/cancel return, blocked-provider messaging and post-callback route handling on Screen 03.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Auto Exit</h3>
+          <p>After successful OAuth or OTP verification, Screen 03 should not show a separate success/loading page. It immediately routes to Screen 04 bootstrap.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Client State Machine <span>Screen 03 states</span></div>
+      <div class="ms-grid-4">
+        <article class="ms-card">
+          <h3>Choose</h3>
+          <p>Default state. Shows provider icons, Email OTP and Mobile OTP. No role selector, no personal/business toggle.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Provider Pending</h3>
+          <p>Native/provider approval surface is active. On return, validate state nonce and provider result with backend; on cancel, return to method selection.</p>
+        </article>
+        <article class="ms-card">
+          <h3>OTP Pending</h3>
+          <p>Email or mobile OTP sent. User can verify, resend after cooldown, change method, or recover from expiry.</p>
+        </article>
+        <article class="ms-card">
+          <h3>OTP Autofill</h3>
+          <p>Mobile OTP fields support Android SMS Retriever/User Consent and iOS one-time-code autofill. Do not silently read the SMS inbox.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Session Ready</h3>
+          <p>Backend returns user session, feature flags, area state and Screen 04 bootstrap. Frontend routes immediately without a visible loading screen.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">API Flow <span>Full-stack coding contract</span></div>
+      <div class="state-table">
+        <div class="state-row">
+          <div class="state-cell"><b>1. Login Options</b>GET /v1/auth/options</div>
+          <div class="state-cell">Input: anonymousSessionId, platform, locale, country, appVersion and area state.</div>
+          <div class="state-cell">Output: enabled providers, provider display order, provider route type native/oauth_browser/hidden, OTP cooldown rules, copy keys and route policy.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>2. OAuth Start</b>POST /v1/auth/oauth/start</div>
+          <div class="state-cell">Input: provider, anonymousSessionId, redirectUri, PKCE challenge and anti-CSRF state.</div>
+          <div class="state-cell">Output: native provider payload or authorization URL, callback route, state nonce, provider timeout and cancel return route.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>3. OAuth Callback</b>POST /v1/auth/oauth/callback</div>
+          <div class="state-cell">Input: provider, authorization code or native token, PKCE verifier, state, nonce and device attestation.</div>
+          <div class="state-cell">Output: authResult success/cancel/denied/error, accountMatch, session token and nextRoute when successful.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>4. OTP Request</b>POST /v1/auth/otp/request</div>
+          <div class="state-cell">Input: channel email/mobile, normalized target, anonymousSessionId and risk context.</div>
+          <div class="state-cell">Output: otpAttemptId, masked target, expiry, resendAfter, attempt limit and allowed autofill mode.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>5. OTP Verify</b>POST /v1/auth/otp/verify</div>
+          <div class="state-cell">Input: otpAttemptId, code, autofillSource manual/os_sms/os_keyboard, anonymousSessionId, device fingerprint and locale.</div>
+          <div class="state-cell">Output: authResult, accountMatch, session token and nextRoute when successful.</div>
+        </div>
+        <div class="state-row">
+          <div class="state-cell"><b>6. Setup Merge</b>POST /v1/auth/session/complete</div>
+          <div class="state-cell">Input: session token, anonymous setup state, area state, install source and pending deep-link.</div>
+          <div class="state-cell">Output: userSession, screen04Bootstrap, feature flags and recovery warnings if any.</div>
+        </div>
+      </div>
+
+      <div class="ms-section-head">Backend Data Model <span>Tables or collections needed</span></div>
+      <div class="ms-grid-3">
+        <article class="ms-card">
+          <h3>User Identity</h3>
+          <ul class="ms-list">
+            <li>userId, status, createdAt, lastLoginAt and primary locale.</li>
+            <li>consumer profile is always active after login.</li>
+            <li>Role layers remain separate verified records later.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Identity Methods</h3>
+          <ul class="ms-list">
+            <li>provider, providerSubject, email hash, mobile hash and verification time.</li>
+            <li>One user can link multiple verified methods later.</li>
+            <li>Provider tokens are never trusted without backend validation.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Anonymous Merge</h3>
+          <ul class="ms-list">
+            <li>anonymousDeviceId, language, area, install source and pending route.</li>
+            <li>Merge must be idempotent to survive retry and app resume.</li>
+            <li>No duplicate user creation on repeated callback/OTP submit.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Security And Abuse Controls <span>Non-negotiable</span></div>
+      <div class="ms-grid-4">
+        <article class="ms-card">
+          <h3>Rate Limits</h3>
+          <p>Limit OTP requests by device, IP, target, area and attempt. Cooldowns must be visible and enforced by backend.</p>
+        </article>
+        <article class="ms-card">
+          <h3>OAuth Safety</h3>
+          <p>Use PKCE, state nonce, provider token verification, redirect allowlist and device/session binding.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Session Safety</h3>
+          <p>Short-lived access token, refresh token rotation, device record and server-side session revocation.</p>
+        </article>
+        <article class="ms-card">
+          <h3>Privacy</h3>
+          <p>Store masked contact in UI. Raw contact data must be protected, hashed for lookup where possible and never logged in plain text.</p>
+        </article>
+      </div>
+
+      <div class="ms-section-head">Regression Checklist <span>Before approval</span></div>
+      <div class="ms-grid-2">
+        <article class="ms-card">
+          <h3>Happy Paths</h3>
+          <ul class="ms-list">
+            <li>Google login succeeds and returns a Screen 04 route.</li>
+            <li>YouTube sign-in succeeds through Google identity without requesting channel-management access.</li>
+            <li>Email OTP succeeds and returns a Screen 04 route.</li>
+            <li>Mobile OTP succeeds and returns a Screen 04 route.</li>
+            <li>Phone OTP autofills into fields through supported OS autofill APIs where available.</li>
+            <li>Screen 02 area state is preserved after login.</li>
+            <li>Existing account resumes instead of creating duplicate user.</li>
+          </ul>
+        </article>
+        <article class="ms-card">
+          <h3>Edge Paths</h3>
+          <ul class="ms-list">
+            <li>Provider failure returns to method selection.</li>
+            <li>Expired OTP shows resend without losing selected method.</li>
+            <li>Too many attempts locks request briefly and suggests alternate method.</li>
+            <li>No role switch or business onboarding appears on this screen.</li>
+            <li>No verified role layer is created from email/mobile/social login alone.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+<script>
+  (() => {
+    const params = new URLSearchParams(window.location.search);
+    const founderReview = params.get('founderReview') === '1';
+    const area = params.get('area') || 'unset';
+    const requestedReturn = params.get('returnTo');
+    const otpStage = document.querySelector('[aria-label="MoolSocial OTP verification"]')?.closest('.stage');
+    const otpCopy = otpStage?.querySelector('.copy');
+    const inputLabel = otpStage?.querySelector('.input-label');
+    const providerReview = document.querySelector('[data-provider-review]');
+    const otpReview = document.querySelector('[data-otp-review]');
+    let otpMethod = 'mobile';
+
+    function postAuthTarget(authMethod, otpVerified = false) {
+      let target = new URL('04-universal-focus-shell.html', window.location.href);
+      if (requestedReturn) {
+        const candidate = new URL(requestedReturn, window.location.href);
+        const file = candidate.pathname.split('/').pop() || '';
+        if (candidate.origin === window.location.origin && /^\d{2,3}-[a-z0-9-]+\.html$/i.test(file)) target = candidate;
+      }
+      target.searchParams.set('auth', authMethod);
+      target.searchParams.set('authState', 'verified');
+      target.searchParams.set('area', area);
+      if (otpVerified) target.searchParams.set('otp', 'autofilled');
+      return target.href;
+    }
+
+    document.addEventListener('click', (event) => {
+      const providerButton = event.target.closest('[data-auth-provider]');
+      if (providerButton) {
+        const provider = providerButton.dataset.authProvider;
+        providerButton.setAttribute('aria-busy', 'true');
+        providerButton.classList.add('selected');
+        if (founderReview) {
+          const providerName = providerButton.textContent.trim();
+          providerButton.removeAttribute('aria-busy');
+          if (providerReview) {
+            providerReview.hidden = false;
+            providerReview.textContent = `${providerName} selected. The provider’s secure account chooser opens next; successful sign-in returns directly to Universal.`;
+          }
+          return;
+        }
+        window.location.href = postAuthTarget(provider);
+        return;
+      }
+
+      const otpButton = event.target.closest('[data-auth-otp]');
+      if (otpButton) {
+        otpMethod = otpButton.dataset.authOtp;
+        document.querySelectorAll('[data-auth-otp]').forEach((button) => button.classList.toggle('selected', button === otpButton));
+        if (inputLabel) inputLabel.textContent = otpMethod === 'email' ? 'Email OTP' : 'Mobile OTP';
+        if (otpCopy) otpCopy.textContent = otpMethod === 'email' ? 'Sent to your email address' : 'Sent to +91 ******4821';
+        otpStage?.setAttribute('data-selected', 'true');
+        otpStage?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      if (event.target.closest('[data-verify-otp]')) {
+        const verify = event.target.closest('[data-verify-otp]');
+        verify.setAttribute('aria-busy', 'true');
+        verify.textContent = 'Verified';
+        if (founderReview) {
+          verify.removeAttribute('aria-busy');
+          if (otpReview) {
+            otpReview.hidden = false;
+            otpReview.textContent = `${otpMethod === 'email' ? 'Email' : 'Mobile'} OTP verified. The connected production journey opens Universal next.`;
+          }
+          return;
+        }
+        window.location.href = postAuthTarget(otpMethod + '_otp', true);
+      }
+    });
+  })();
+</script>
+<script type="application/json" id="productionRouteContract">{"contractVersion":"mvp-route-founder-review-2026-07-20-v2","prototypeScreen":3,"productionModule":"identity","routeId":"identity.auth","routePath":"/auth","routeState":"social-provider-or-otp-to-universal","implementation":"route-state","launchScope":"mvp-core","separateProductionRoute":true,"productionNote":"Screen 03 is bundled with Screen 02 for founder acceptance. Include Google, YouTube through Google identity, Apple, X, Instagram, Facebook, email OTP and mobile OTP. YouTube channel scopes are requested only later from creator tools. No WebView.","canonicalMap":"architecture/MVP-PRODUCTION-ROUTE-CONSOLIDATION.md"}</script><script type="application/json" id="prototypeApprovalContract">{"prototypeScreen":3,"status":"founder-approved-final-v2","authoritative":true,"reviewedAt":"2026-07-20","supersedes":"founder-approved-final-v1","approvalDecision":"Founder accepted Screen 03 with mobile and email OTP after exact-APK OPPO replay; Screen 01–03 are one locked production checkpoint."}</script>  <script src="../shared/resilience-state-runtime.js?v=micro-cycle-2-20260716c"></script>
+</body>
+</html>

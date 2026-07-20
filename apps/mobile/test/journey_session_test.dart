@@ -40,6 +40,13 @@ void main() {
 
   test('account bootstrap timeout reaches a retryable boot failure', () async {
     final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
       otpGateway: ReviewOtpGateway(signedIn: true),
       accountBootstrapGateway: _NeverCompletesAccountBootstrap(),
       accountBootstrapTimeout: const Duration(milliseconds: 1),
@@ -52,6 +59,132 @@ void main() {
     expect(session.busy, isFalse);
     expect(session.errorMessage, contains('Nothing was changed'));
   });
+
+  test('legacy completed setup must show approved Screen 02 once', () async {
+    final store = MemoryJourneyStore(
+      snapshot: const JourneySnapshot(
+        languageCode: 'en',
+        areaMode: 'skipped',
+        setupComplete: true,
+        setupExperienceVersion: 1,
+      ),
+    );
+    final session = JourneySession(store: store);
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.setup);
+    session.selectArea(AreaChoice.skipped);
+    expect(await session.completeSetup(), isTrue);
+    expect(session.stage, JourneyStage.signIn);
+    expect(
+      store.snapshot?.setupExperienceVersion,
+      approvedSetupExperienceVersion,
+    );
+  });
+
+  test(
+    'completed Screen 02 V4 must show corrected Screen 02 V5 once',
+    () async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+          setupExperienceVersion: 4,
+        ),
+      );
+      final session = JourneySession(store: store);
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.setup);
+      session.selectArea(AreaChoice.skipped);
+      expect(await session.completeSetup(), isTrue);
+      expect(session.stage, JourneyStage.signIn);
+      expect(
+        store.snapshot?.setupExperienceVersion,
+        approvedSetupExperienceVersion,
+      );
+    },
+  );
+
+  test(
+    'unrelated persistence cannot claim required Screen 02 completion',
+    () async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+          setupExperienceVersion: 4,
+        ),
+      );
+      final session = JourneySession(store: store);
+
+      await session.start();
+      expect(session.stage, JourneyStage.setup);
+      expect(session.completedSetupExperienceVersion, 4);
+
+      expect(await session.updateLanguage('hi'), isTrue);
+      expect(store.snapshot?.setupExperienceVersion, 4);
+
+      session.captureReturnTo('/app/buy/grocery');
+      await Future<void>.delayed(Duration.zero);
+      expect(store.snapshot?.setupExperienceVersion, 4);
+
+      final restarted = JourneySession(store: store);
+      await restarted.start();
+      expect(restarted.stage, JourneyStage.setup);
+      expect(restarted.completedSetupExperienceVersion, 4);
+    },
+  );
+
+  test(
+    'fresh protected route cannot manufacture Screen 02 completion',
+    () async {
+      final store = MemoryJourneyStore();
+      final session = JourneySession(store: store);
+
+      session.captureReturnTo('/app/buy/grocery');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(store.snapshot?.setupComplete, isFalse);
+      expect(store.snapshot?.setupExperienceVersion, 0);
+
+      await session.start();
+      expect(session.stage, JourneyStage.setup);
+      expect(session.completedSetupExperienceVersion, 0);
+    },
+  );
+
+  test(
+    'authenticated legacy setup returns ready after approved Screen 02',
+    () async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+          setupExperienceVersion: 1,
+        ),
+      );
+      final session = JourneySession(
+        store: store,
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+      expect(session.stage, JourneyStage.setup);
+      session.selectArea(AreaChoice.manual, label: 'Jodhpur');
+      expect(await session.completeSetup(), isTrue);
+      expect(session.stage, JourneyStage.ready);
+    },
+  );
 
   test(
     'expired OTP fails, resend is cooled down, then retry succeeds',

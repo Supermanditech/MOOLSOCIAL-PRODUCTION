@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "referenceVersion": "v2",
+    "routes": [
+      "/sign-in",
+      "/verify"
+    ]
+  },
+  "status": "Accepted",
+  "approval": {
+    "founderAcceptedAt": "2026-07-20",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "candidateId": "screen01-screen03-production-lock-v6-20260720",
+    "scope": "native Flutter UI V2 Screen 03 method selection and OTP presentation",
+    "decision": "Six social-provider handoffs plus email/mobile OTP; verified authentication opens Universal; Screen 01–03 remain untouched while the next isolated UI set is developed."
+  },
+  "deviceReplay": {
+    "result": "passed",
+    "device": "OPPO CPH2375",
+    "android": "13",
+    "adbReverseDuringFinalMobileReplay": "absent",
+    "mobileOtp": "requested, autofilled, verified and opened Universal",
+    "mobileAuthenticatedRelaunch": "opened Universal",
+    "emailOtp": "requested, autofilled, verified and opened Universal",
+    "socialProviders": "all six actions reached truthful recoverable review returns"
+  },
+  "verification": {
+    "flutterAnalyze": "passed",
+    "customerCopyGate": "passed for every Screen 01–03 state",
+    "fitmentMatrix": "passed at supported compact/large Android/iOS logical viewports and 140% text",
+    "fullRegressionCycles": [
+      "375/375 passed",
+      "375/375 passed"
+    ],
+    "apkSha256": "76c40d1a3dead71358a72afb77db940f0e9f88751b4a48d958368451d2330ed0",
+    "installedApkSha256": "76c40d1a3dead71358a72afb77db940f0e9f88751b4a48d958368451d2330ed0"
+  },
+  "nonUiIntegrationPolicy": {
+    "presentationImmutable": true,
+    "liveProviderConfigurationMayAdvance": true,
+    "rule": "Future backend/provider configuration must preserve the locked presentation, interaction contract and regression gates."
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": "scripts/check-approved-ui-locks.ps1",
+    "changeRule": "Do not modify an accepted file or hash. A founder-directed replacement requires a new approved-reference version and acceptance record."
+  },
+  "lockedFiles": [
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/screen03_frame_v2.dart",
+      "sha256": "352c126b7ce8d65c6f3363c200f36559f61841693adda61e6ed81960adadfe95"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "sha256": "9f8f8a72aced405332920bc8f46b71b9907a14f6b440ad851abfd2a96bfcd28b"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/otp_screen_v2.dart",
+      "sha256": "1913d3c1ee387a509d5035f3f894a850b653adcd979f00a0379b2a6fd96fe8e5"
+    },
+    {
+      "path": "apps/mobile/assets/prototype/provider-youtube.svg",
+      "sha256": "34ded30aeb15e83c96015c925d472eacdbf2478c68cbaefe4b51c5b8a84a925a"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen03_login_test.dart",
+      "sha256": "a36a4fd2b6bdba9f0da4262eb360bb7885fb9e7270bec37cc50d5b75181a6c5a"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen03_golden_test.dart",
+      "sha256": "26e70e444f455fc95def13d8b32eea91cf6d139981407096adea7128e6ec76cb"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_customer_copy_machine_gate_test.dart",
+      "sha256": "b07468f487a5c04286f0d228cdccf7ead373154c756600c58dc216a4edd2bd11"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_03_fitment_matrix_test.dart",
+      "sha256": "8cce94ba9e7e508a2b449e8d73ce3eb60558ab3197951f862134ebc0b35e85f2"
+    },
+    {
+      "path": "apps/mobile/test/platform_configuration_test.dart",
+      "sha256": "490721029d88301e42dc593526618b4f94198ab586c1e55d709cae12776123bc"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_login-360x720.png",
+      "sha256": "4f0361824b6ce41905004e1bc4f13d213ce1eb78abf61dfc9ffcec3afd98e287"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_mobile-otp-360x720.png",
+      "sha256": "714129642847519910a621124c5bcd8ae8c22ba1e894c0bf69517422b097e8d5"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_email-otp-360x720.png",
+      "sha256": "66c34ad4646b24a7e74ff569f387e7c46bf66a053eb49da4775a45562690f43d"
+    }
+  ]
+}

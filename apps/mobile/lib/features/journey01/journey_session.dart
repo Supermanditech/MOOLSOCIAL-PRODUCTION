@@ -6,27 +6,38 @@ enum JourneyStage { booting, bootFailure, setup, signIn, verify, ready }
 
 enum AreaChoice { current, manual, skipped }
 
+enum SocialAuthState { idle, pending, cancelled, failed }
+
 class JourneySession extends ChangeNotifier {
   JourneySession({
     JourneyStore? store,
     OtpGateway? otpGateway,
+    EmailOtpGateway? emailOtpGateway,
+    SocialAuthGateway? socialAuthGateway,
     AccountBootstrapGateway? accountBootstrapGateway,
     LocationPermissionGateway? locationGateway,
+    CurrentAreaGateway? currentAreaGateway,
     DateTime Function()? now,
     this.otpValidity = const Duration(minutes: 2),
     this.resendCooldown = const Duration(seconds: 30),
     this.accountBootstrapTimeout = const Duration(seconds: 8),
   }) : _store = store ?? MemoryJourneyStore(),
        _otpGateway = otpGateway ?? ReviewOtpGateway(),
+       _emailOtpGateway = emailOtpGateway ?? ReviewEmailOtpGateway(),
+       _socialAuthGateway = socialAuthGateway ?? ReviewSocialAuthGateway(),
        _accountBootstrapGateway =
            accountBootstrapGateway ?? ReviewAccountBootstrapGateway(),
        _locationGateway = locationGateway ?? ReviewLocationPermissionGateway(),
+       _currentAreaGateway = currentAreaGateway ?? ReviewCurrentAreaGateway(),
        _now = now ?? DateTime.now;
 
   final JourneyStore _store;
   final OtpGateway _otpGateway;
+  final EmailOtpGateway _emailOtpGateway;
+  final SocialAuthGateway _socialAuthGateway;
   final AccountBootstrapGateway _accountBootstrapGateway;
   final LocationPermissionGateway _locationGateway;
+  final CurrentAreaGateway _currentAreaGateway;
   final DateTime Function() _now;
   final Duration otpValidity;
   final Duration resendCooldown;
@@ -36,7 +47,16 @@ class JourneySession extends ChangeNotifier {
   String languageCode = 'en';
   AreaChoice? areaChoice;
   String? manualArea;
+  String? currentAreaPrimary;
+  String? currentAreaSecondary;
+  String? currentAreaLabel;
+  String? homeOrWorkArea;
+  CurrentAreaFailureReason? currentAreaFailureReason;
   String? phoneNumber;
+  String? emailAddress;
+  OtpChannel? otpChannel;
+  SocialAuthProvider? socialAuthProvider;
+  SocialAuthState socialAuthState = SocialAuthState.idle;
   String? errorMessage;
   String? noticeMessage;
   String? reviewCode;
@@ -45,11 +65,15 @@ class JourneySession extends ChangeNotifier {
   DateTime? otpExpiresAt;
   DateTime? resendAvailableAt;
   bool busy = false;
+  bool resolvingCurrentArea = false;
 
   bool _started = false;
+  bool _authenticatedAtBoot = false;
   bool _authenticationCompletionInProgress = false;
+  int _completedSetupExperienceVersion = 0;
 
   bool get isReady => stage == JourneyStage.ready;
+  int get completedSetupExperienceVersion => _completedSetupExperienceVersion;
 
   bool get canResend => resendSeconds == 0 && !busy;
 
@@ -65,9 +89,24 @@ class JourneySession extends ChangeNotifier {
     return _remainingSeconds(expires);
   }
 
+  String get maskedOtpDestination {
+    if (otpChannel == OtpChannel.email) {
+      final value = emailAddress ?? '';
+      final separator = value.indexOf('@');
+      if (separator <= 1) return value;
+      final local = value.substring(0, separator);
+      final domain = value.substring(separator);
+      return '${local.substring(0, 1)}${'*' * (local.length - 1)}$domain';
+    }
+    final value = phoneNumber ?? '';
+    if (value.length < 4) return value;
+    return '+91 ******${value.substring(value.length - 4)}';
+  }
+
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    _completedSetupExperienceVersion = 0;
     _setBusy(true);
     errorMessage = null;
 
@@ -75,24 +114,60 @@ class JourneySession extends ChangeNotifier {
       final capturedRoute = returnTo;
       final snapshot = await _store.read();
       if (snapshot != null) {
+        _completedSetupExperienceVersion = snapshot.setupExperienceVersion;
         languageCode = snapshot.languageCode;
         areaChoice = _areaChoiceFromStorage(snapshot.areaMode);
         manualArea = snapshot.areaLabel;
+        currentAreaLabel = snapshot.currentAreaLabel;
+        homeOrWorkArea = snapshot.homeOrWorkAreaLabel;
+        if (currentAreaLabel case final label?) {
+          final parts = label
+              .split(',')
+              .map((part) => part.trim())
+              .where((part) => part.isNotEmpty)
+              .toList(growable: false);
+          currentAreaPrimary = parts.isEmpty ? label : parts.first;
+          currentAreaSecondary = parts.length > 1
+              ? parts.skip(1).join(', ')
+              : 'Nearby results are ready';
+        }
         returnTo = capturedRoute ?? snapshot.pendingRoute;
       }
 
-      final signedIn = await _otpGateway.hasAuthenticatedUser();
-      if (signedIn) {
+      final signedIn =
+          await _otpGateway.hasAuthenticatedUser() ||
+          await _socialAuthGateway.hasAuthenticatedUser();
+      final requiresApprovedSetup =
+          snapshot == null ||
+          _completedSetupExperienceVersion < approvedSetupExperienceVersion;
+      if (requiresApprovedSetup) {
+        _authenticatedAtBoot = signedIn;
+        stage = JourneyStage.setup;
+      } else if (signedIn) {
         await _prepareAuthenticatedAccount();
         stage = JourneyStage.ready;
-      } else if (snapshot?.setupComplete ?? false) {
+      } else if (snapshot.setupComplete) {
         stage = JourneyStage.signIn;
       } else {
         stage = JourneyStage.setup;
       }
+      if (kDebugMode) {
+        debugPrint(
+          'MOOLSOCIAL_STARTUP '
+          'stage=${stage.name} '
+          'snapshot=${snapshot != null} '
+          'setupComplete=${snapshot?.setupComplete ?? false} '
+          'completedSetupVersion=$_completedSetupExperienceVersion '
+          'requiredSetupVersion=$approvedSetupExperienceVersion '
+          'authenticated=$signedIn',
+        );
+      }
       noticeMessage = null;
     } on Object {
       stage = JourneyStage.bootFailure;
+      if (kDebugMode) {
+        debugPrint('MOOLSOCIAL_STARTUP stage=${stage.name}');
+      }
       errorMessage =
           'MoolSocial could not restore your setup. Nothing was changed.';
     } finally {
@@ -102,6 +177,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<void> retryBoot() async {
     _started = false;
+    _authenticatedAtBoot = false;
     stage = JourneyStage.booting;
     notifyListeners();
     await start();
@@ -116,6 +192,103 @@ class JourneySession extends ChangeNotifier {
   void selectArea(AreaChoice value, {String? label}) {
     areaChoice = value;
     manualArea = value == AreaChoice.manual ? label : null;
+    if (value == AreaChoice.skipped) {
+      currentAreaPrimary = null;
+      currentAreaSecondary = null;
+      currentAreaLabel = null;
+      homeOrWorkArea = null;
+    }
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  Future<bool> resolveCurrentArea({bool requestPermission = true}) async {
+    if (resolvingCurrentArea) return false;
+    resolvingCurrentArea = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final area = await _currentAreaGateway.resolve(
+        requestPermission: requestPermission,
+      );
+      currentAreaPrimary = area.primaryLabel;
+      currentAreaSecondary = area.secondaryLabel;
+      currentAreaLabel = area.fullLabel;
+      areaChoice = AreaChoice.current;
+      manualArea = area.fullLabel;
+      currentAreaFailureReason = null;
+      errorMessage = null;
+      return true;
+    } on CurrentAreaException catch (error) {
+      currentAreaPrimary = null;
+      currentAreaSecondary = null;
+      currentAreaLabel = null;
+      areaChoice = null;
+      manualArea = null;
+      currentAreaFailureReason = error.reason;
+      errorMessage = switch (error.reason) {
+        CurrentAreaFailureReason.locationServicesOff =>
+          'Turn on Location Services to see what’s near you.',
+        CurrentAreaFailureReason.permissionNotAllowed ||
+        CurrentAreaFailureReason.permissionPermanentlyNotAllowed =>
+          'Allow location to see what’s near you.',
+        CurrentAreaFailureReason.unavailable =>
+          'We couldn’t get your location. Try again or continue for now.',
+      };
+      return false;
+    } on Object {
+      currentAreaPrimary = null;
+      currentAreaSecondary = null;
+      currentAreaLabel = null;
+      areaChoice = null;
+      manualArea = null;
+      currentAreaFailureReason = CurrentAreaFailureReason.unavailable;
+      errorMessage =
+          'We couldn’t get your location. Try again or continue for now.';
+      return false;
+    } finally {
+      resolvingCurrentArea = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> openLocationServicesSettings() =>
+      _currentAreaGateway.openLocationServicesSettings();
+
+  Future<void> openCurrentAreaAppSettings() =>
+      _currentAreaGateway.openAppSettings();
+
+  bool setHomeOrWorkArea(String value) {
+    final area = value.trim();
+    if (area.length < 3) {
+      errorMessage = 'Enter at least 3 characters for your home or work area.';
+      notifyListeners();
+      return false;
+    }
+    homeOrWorkArea = area;
+    if (currentAreaLabel == null) {
+      currentAreaPrimary = area;
+      currentAreaSecondary = 'Your chosen area';
+      currentAreaLabel = area;
+      areaChoice = AreaChoice.current;
+      manualArea = area;
+    }
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+    return true;
+  }
+
+  void changeAreaLater() {
+    areaChoice = AreaChoice.skipped;
+    manualArea = null;
+    currentAreaPrimary = null;
+    currentAreaSecondary = null;
+    currentAreaLabel = null;
+    homeOrWorkArea = null;
+    currentAreaFailureReason = null;
     errorMessage = null;
     noticeMessage = null;
     notifyListeners();
@@ -223,20 +396,72 @@ class JourneySession extends ChangeNotifier {
     }
 
     _setBusy(true);
+    final previousCompletedVersion = _completedSetupExperienceVersion;
+    _completedSetupExperienceVersion = approvedSetupExperienceVersion;
     try {
       await _persist(setupComplete: true);
-      stage = JourneyStage.signIn;
+      if (_authenticatedAtBoot) {
+        await _prepareAuthenticatedAccount();
+        stage = JourneyStage.ready;
+      } else {
+        stage = JourneyStage.signIn;
+      }
       errorMessage = null;
       noticeMessage = null;
       notifyListeners();
       return true;
     } on Object {
+      _completedSetupExperienceVersion = previousCompletedVersion;
       errorMessage = 'Your setup could not be saved. Please retry.';
       notifyListeners();
       return false;
     } finally {
       _setBusy(false);
     }
+  }
+
+  Future<bool> signInWithSocial(SocialAuthProvider provider) async {
+    if (busy) return false;
+    socialAuthProvider = provider;
+    socialAuthState = SocialAuthState.pending;
+    errorMessage = null;
+    noticeMessage = null;
+    _setBusy(true);
+    try {
+      final result = await _socialAuthGateway.signIn(provider);
+      if (result.outcome == SocialAuthOutcome.cancelled) {
+        socialAuthState = SocialAuthState.cancelled;
+        errorMessage =
+            '${_socialProviderLabel(provider)} sign-in was cancelled. '
+            'Try again or choose another method.';
+        notifyListeners();
+        return false;
+      }
+      await _completeAuthentication();
+      return true;
+    } on JourneyServiceException catch (error) {
+      socialAuthState = SocialAuthState.failed;
+      errorMessage = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      socialAuthState = SocialAuthState.failed;
+      errorMessage =
+          '${_socialProviderLabel(provider)} sign-in could not be completed. '
+          'Check the connection and try again.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  void clearSocialAuthResult() {
+    socialAuthProvider = null;
+    socialAuthState = SocialAuthState.idle;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
   }
 
   Future<bool> requestOtp(String value) async {
@@ -249,12 +474,33 @@ class JourneySession extends ChangeNotifier {
     }
 
     phoneNumber = digits;
+    otpChannel = OtpChannel.mobile;
     return _sendOtp();
+  }
+
+  Future<bool> requestEmailOtp(String value) async {
+    if (busy) return false;
+    final email = value.trim().toLowerCase();
+    if (!_isValidEmail(email)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+
+    emailAddress = email;
+    otpChannel = OtpChannel.email;
+    return _sendEmailOtp();
   }
 
   Future<bool> resendOtp() async {
     if (busy) return false;
-    if (phoneNumber == null) {
+    if (otpChannel == OtpChannel.email) {
+      if (emailAddress == null) {
+        errorMessage = 'Enter your email address and request a code.';
+        notifyListeners();
+        return false;
+      }
+    } else if (phoneNumber == null) {
       errorMessage = 'Enter your mobile number and request a code.';
       notifyListeners();
       return false;
@@ -264,7 +510,7 @@ class JourneySession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    return _sendOtp();
+    return otpChannel == OtpChannel.email ? _sendEmailOtp() : _sendOtp();
   }
 
   Future<bool> _sendOtp() async {
@@ -305,6 +551,38 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
+  Future<bool> _sendEmailOtp() async {
+    final email = emailAddress;
+    if (email == null) return false;
+
+    _setBusy(true);
+    errorMessage = null;
+    noticeMessage = null;
+    reviewCode = null;
+
+    try {
+      await _emailOtpGateway.requestCode(email);
+      otpExpiresAt = _now().add(otpValidity);
+      resendAvailableAt = _now().add(resendCooldown);
+      stage = JourneyStage.verify;
+      reviewCode = await _emailOtpGateway.reviewCodeFor(email);
+      noticeMessage = 'A verification code is ready.';
+      notifyListeners();
+      return true;
+    } on JourneyServiceException catch (error) {
+      errorMessage = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      errorMessage =
+          'The verification service is unavailable. Check the connection and retry.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
   Future<bool> verifyOtp(String value) async {
     if (isReady || _authenticationCompletionInProgress) return true;
     if (busy) return false;
@@ -324,7 +602,11 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     errorMessage = null;
     try {
-      await _otpGateway.verifyCode(code);
+      if (otpChannel == OtpChannel.email) {
+        await _emailOtpGateway.verifyCode(code);
+      } else {
+        await _otpGateway.verifyCode(code);
+      }
       await _completeAuthentication();
       return true;
     } on JourneyServiceException catch (error) {
@@ -353,6 +635,8 @@ class JourneySession extends ChangeNotifier {
       errorMessage = null;
       noticeMessage = null;
       reviewCode = null;
+      socialAuthProvider = null;
+      socialAuthState = SocialAuthState.idle;
       notifyListeners();
     } finally {
       _authenticationCompletionInProgress = false;
@@ -364,6 +648,7 @@ class JourneySession extends ChangeNotifier {
     otpExpiresAt = null;
     resendAvailableAt = null;
     reviewCode = null;
+    otpChannel = null;
     errorMessage = null;
     noticeMessage = null;
     notifyListeners();
@@ -374,8 +659,13 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       await _otpGateway.signOut();
+      await _socialAuthGateway.signOut();
       stage = JourneyStage.signIn;
       phoneNumber = null;
+      emailAddress = null;
+      otpChannel = null;
+      socialAuthProvider = null;
+      socialAuthState = SocialAuthState.idle;
       errorMessage = null;
       noticeMessage =
           'You are signed out. Your language and area are retained.';
@@ -414,14 +704,35 @@ class JourneySession extends ChangeNotifier {
         languageCode: languageCode,
         areaMode: areaChoice?.name,
         areaLabel: manualArea,
+        currentAreaLabel: currentAreaLabel,
+        homeOrWorkAreaLabel: homeOrWorkArea,
         setupComplete: setupComplete,
         pendingRoute: returnTo,
+        setupExperienceVersion: _completedSetupExperienceVersion,
       ),
     );
   }
 
   bool _isValidIndianMobile(String digits) {
     return RegExp(r'^[6-9]\d{9}$').hasMatch(digits);
+  }
+
+  bool _isValidEmail(String value) {
+    return RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+      caseSensitive: false,
+    ).hasMatch(value);
+  }
+
+  String _socialProviderLabel(SocialAuthProvider provider) {
+    return switch (provider) {
+      SocialAuthProvider.google => 'Google',
+      SocialAuthProvider.youtube => 'YouTube',
+      SocialAuthProvider.apple => 'Apple',
+      SocialAuthProvider.x => 'X',
+      SocialAuthProvider.instagram => 'Instagram',
+      SocialAuthProvider.facebook => 'Facebook',
+    };
   }
 
   AreaChoice? _areaChoiceFromStorage(String? value) {

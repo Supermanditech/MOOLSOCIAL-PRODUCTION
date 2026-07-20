@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 2,
+    "id": "first-setup-language-location",
+    "referenceVersion": "v4",
+    "route": "/setup"
+  },
+  "status": "Accepted",
+  "approval": {
+    "founderAcceptedAt": "2026-07-20",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "candidateId": "screen01-screen03-production-lock-v6-20260720",
+    "scope": "native Flutter UI V2 Screen 02 presentation and first-open transition",
+    "decision": "Consent, Android permission/settings, resolved current area, explicit continuation, then Screen 03. Permanent serviceable area selection remains inside Universal after login."
+  },
+  "deviceReplay": {
+    "result": "passed",
+    "device": "OPPO CPH2375",
+    "android": "13",
+    "states": [
+      "fresh install",
+      "app switch, call-equivalent and lock during Screen 01",
+      "process death before Screen 02 completion",
+      "location consent and Android permission",
+      "permission denied and phone settings return",
+      "Location Services off and settings return",
+      "resolved Khema-Ka-Kuwa, Jodhpur, Rajasthan",
+      "explicit Continue for now",
+      "explicit resolved-location Continue"
+    ]
+  },
+  "verification": {
+    "flutterAnalyze": "passed",
+    "customerCopyGate": "passed",
+    "fitmentMatrix": "passed",
+    "fullRegressionCycles": [
+      "375/375 passed",
+      "375/375 passed"
+    ],
+    "apkSha256": "76c40d1a3dead71358a72afb77db940f0e9f88751b4a48d958368451d2330ed0",
+    "installedApkSha256": "76c40d1a3dead71358a72afb77db940f0e9f88751b4a48d958368451d2330ed0"
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": "scripts/check-approved-ui-locks.ps1",
+    "changeRule": "Do not modify an accepted file or hash. A founder-directed replacement requires a new approved-reference version and acceptance record."
+  },
+  "lockedFiles": [
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart",
+      "sha256": "52097cfc7c1fed1b7cb06c543d9007a279cdb1e64b3d3404fa1b8edeb0d96432"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+      "sha256": "5dceb1482f366c2a4dc1ecf0a2a85c5aef73ae341d18d1e977e46bee76f8298c"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen02_first_setup_test.dart",
+      "sha256": "d5991b6f851ba8ab12dcf0edb0a127046edc32d38400276e489020d11c7afa4f"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen02_golden_test.dart",
+      "sha256": "2bf31dcfcd76149faefcf06e396f8e653f83d5249f541b051bba60b838cf2d7b"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen02_location-consent-360x720.png",
+      "sha256": "22b0a659aa72c25944d8262740d39a787fae16bb9501815e1fc023cc3019e26d"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen02_resolved-current-360x720.png",
+      "sha256": "c8bdae0a591ab1e8c155029c04dac261e7cf33552a92be68f2d62b39b5198b90"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen02_choose-area-360x720.png",
+      "sha256": "d8abdc44fe1a1c1db4f80ab023aba278ea01863f6551a5c507963bd8a83afdc4"
+    }
+  ]
+}

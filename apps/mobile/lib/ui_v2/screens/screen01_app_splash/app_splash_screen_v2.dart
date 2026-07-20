@@ -276,8 +276,9 @@ class _SilentHandoffState extends StatelessWidget {
     return Semantics(
       key: const Key('splash-v2-handoff'),
       label:
-          'MoolSocial. Getting things ready. App version ready. '
-          'Network connected. Safe route selected. Continuing automatically.',
+          'MoolSocial. India Ka Socio Commerce App. '
+          'Create. Connect. Work. Grow. One app for life and business. '
+          'Still opening your MoolSocial space.',
       liveRegion: true,
       child: ExcludeSemantics(
         child: Padding(
@@ -296,53 +297,21 @@ class _SilentHandoffState extends StatelessWidget {
                     children: [
                       const _Wordmark(),
                       const SizedBox(height: 10),
-                      const _StaticIdentityLine(width: 126, height: 4),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: _SplashV2Tokens.white),
-                          borderRadius: BorderRadius.circular(8),
-                          color: _SplashV2Tokens.white.withValues(alpha: .05),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Getting things ready',
-                              style: TextStyle(
-                                color: _SplashV2Tokens.white,
-                                fontSize: 18,
-                                height: 1.2,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              'We are checking app version, network and secure '
-                              'session before moving ahead.',
-                              style: TextStyle(
-                                color: _SplashV2Tokens.white,
-                                fontSize: 12,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            _HandoffCheck(label: 'App version ready'),
-                            SizedBox(height: 8),
-                            _HandoffCheck(label: 'Network connected'),
-                            SizedBox(height: 8),
-                            _HandoffCheck(label: 'Safe route selected'),
-                          ],
-                        ),
+                      const _StaticIdentityLine(
+                        width: _SplashV2Tokens.trackWidth,
+                        height: _SplashV2Tokens.trackHeight,
                       ),
+                      const SizedBox(height: 10),
+                      const _StaticTagline(),
+                      const SizedBox(height: 10),
+                      const _ApprovedPromise(),
                     ],
                   ),
                 ),
               ),
-              const _OpeningFooter(status: 'Continuing automatically'),
+              const _OpeningFooter(
+                status: 'Still opening your MoolSocial space',
+              ),
             ],
           ),
         ),
@@ -395,8 +364,7 @@ class _RecoveryState extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Please check your internet connection. Your app opening '
-                    'will continue from here.',
+                    'Check your internet connection, then try again.',
                     key: Key('boot-error'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -409,7 +377,7 @@ class _RecoveryState extends StatelessWidget {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    height: 41,
+                    height: 44,
                     child: Semantics(
                       button: true,
                       child: Material(
@@ -437,7 +405,7 @@ class _RecoveryState extends StatelessWidget {
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    height: 41,
+                    height: 44,
                     child: Semantics(
                       button: true,
                       child: Material(
@@ -732,6 +700,42 @@ class _StaticIdentityLine extends StatelessWidget {
   }
 }
 
+class _StaticTagline extends StatelessWidget {
+  const _StaticTagline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 30,
+      constraints: const BoxConstraints(minWidth: 214),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _SplashV2Tokens.white,
+        borderRadius: BorderRadius.circular(99),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x24000000),
+            offset: Offset(0, 8),
+            blurRadius: 24,
+          ),
+        ],
+      ),
+      child: const Text(
+        'India Ka Socio Commerce App',
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        style: TextStyle(
+          color: _SplashV2Tokens.navy,
+          fontSize: 12,
+          height: 1.35,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _OpeningFooter extends StatelessWidget {
   const _OpeningFooter({required this.status});
 
@@ -759,13 +763,15 @@ class _OpeningFooter extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                status,
-                style: const TextStyle(
-                  color: _SplashV2Tokens.white,
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  status,
+                  style: const TextStyle(
+                    color: _SplashV2Tokens.white,
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -778,51 +784,6 @@ class _OpeningFooter extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HandoffCheck extends StatelessWidget {
-  const _HandoffCheck({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(
-          width: 21,
-          height: 21,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _SplashV2Tokens.green,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '✓',
-                style: TextStyle(
-                  color: _SplashV2Tokens.white,
-                  fontSize: 13,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: _SplashV2Tokens.white,
-            fontSize: 12,
-            height: 1.35,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

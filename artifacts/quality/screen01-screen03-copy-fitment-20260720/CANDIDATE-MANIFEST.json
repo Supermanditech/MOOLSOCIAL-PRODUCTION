@@ -1,0 +1,67 @@
+{
+  "status": "production-accepted",
+  "candidateId": "screen01-screen03-production-lock-v6-20260720",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "sourceHead": "fe3ef5b",
+  "productionLocked": true,
+  "lockReason": "Founder accepted Screens 01–03 after exact-APK OPPO mobile and email OTP replay.",
+  "apk": "apps/mobile/build/app/outputs/flutter-apk/app-debug.apk",
+  "apkSha256": "76C40D1A3DEAD71358A72AFB77DB940F0E9F88751B4A48D958368451D2330ED0",
+  "installedApk": "oppo-installed-v6-base.apk",
+  "installedApkSha256": "76C40D1A3DEAD71358A72AFB77DB940F0E9F88751B4A48D958368451D2330ED0",
+  "installedMatchesCandidate": true,
+  "htmlCandidate": {
+    "screen01Sha256": "3908857907D04EC540B8C0DD7D00148E749CB76787D6281F81FDA0BF321E9C60",
+    "screen02Sha256": "8D7E5926B8B60CBA52AA92D1B37B2C5CB0200C572847FF633EAED0540EA843A0",
+    "screen03Sha256": "C8B58BED63B6616F83D06C7D95FAA335DB537B3C6DF37593D601D19037ECDFEF"
+  },
+  "automatedVerification": {
+    "customerCopyFlutterStateGate": "passed",
+    "customerCopyHtmlStates": 9,
+    "customerCopyHtmlGate": "passed",
+    "phoneMatrix": [
+      "320x568",
+      "360x640",
+      "360x720",
+      "375x667",
+      "390x844",
+      "412x915",
+      "430x932",
+      "320x568@140%-text",
+      "360x640@140%-text"
+    ],
+    "androidAndIosSafeAreaInsets": "passed-logical-layout",
+    "minimumTapTarget": "44-logical-pixels",
+    "fullRegressionRun1": "375/375 passed",
+    "fullRegressionRun2": "375/375 passed",
+    "mobileFlutterAnalyze": "passed-no-issues",
+    "gitDiffCheck": "passed",
+    "iosRuntimeBuild": "requires macOS CI before staging promotion"
+  },
+  "device": {
+    "manufacturer": "OPPO",
+    "model": "CPH2375",
+    "android": 13,
+    "serial": "2b3e0f71",
+    "physicalPixels": "720x1612",
+    "leftOn": "universal-after-email-otp",
+    "screen02Incomplete": false
+  },
+  "physicalReplay": {
+    "screen01InterruptionResume": "passed",
+    "screen01ToScreen02": "passed",
+    "androidLocationPermission": "passed",
+    "locationServicesOffRecovery": "passed",
+    "resolvedAreaKhemaKaKuwa": "passed",
+    "screen02ToScreen03": "passed",
+    "allSixSocialProviderReturns": "passed",
+    "emailOtpCopyAndAccessibilityAudit": "passed",
+    "mobileOtpCopyAndAccessibilityAudit": "passed",
+    "invalidOtpRecovery": "passed",
+    "mobileOtpToUniversal": "passed",
+    "mobileOtpWithoutAdbReverse": "passed",
+    "emailOtpToUniversalSeparateCleanInstall": "passed",
+    "authenticatedRelaunchToUniversal": "passed",
+    "fatalAndroidOrFlutterException": "none-observed"
+  }
+}

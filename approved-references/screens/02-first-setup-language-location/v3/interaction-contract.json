@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 2,
+    "id": "first-setup-language-location",
+    "routeOwner": "journey01",
+    "productionRoute": "/setup",
+    "approvalVersion": "visual-v3",
+    "founderApprovedAt": "2026-07-20",
+    "approvalScope": [
+      "resolved-current-area initial state",
+      "phone-language summary",
+      "one-tap continuation with current area",
+      "separate home or work area",
+      "home or work area search and validation",
+      "current and home area confirmation",
+      "area-unavailable recovery",
+      "Screen 01 to Screen 02 route continuity",
+      "no OTP before the later sign-in screen",
+      "customer-copy boundary"
+    ]
+  },
+  "referenceCapture": {
+    "phoneViewportCssPixels": {
+      "width": 360,
+      "height": 720
+    },
+    "deviceScaleFactor": 1,
+    "textScaleFactor": 1,
+    "fontFamily": "Inter",
+    "referenceImage": "reference-images/resolved-current-area-360x720.png"
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "title": "You’re in Sardarpura",
+    "area": "Jodhpur, Rajasthan",
+    "language": "English",
+    "languageHint": "Change language anytime in Settings",
+    "benefitTitle": "Explore what’s around you",
+    "benefitBody": "See nearby products, services and earning opportunities in Sardarpura and Jodhpur.",
+    "continue": "Continue",
+    "continueHint": "Use Sardarpura for nearby results",
+    "homeWorkAction": "Set my home or work area",
+    "travellerHint": "Travelling? Your usual home or work area can stay separate."
+  },
+  "entry": {
+    "requiredPreviousScreen": "Screen 01 App Splash / First Open Handoff",
+    "routeCondition": "JourneyStage.setup",
+    "legacyMigration": "A saved setup older than approved setup experience version 3 must show Screen 02 once before sign in or Universal."
+  },
+  "states": [
+    {
+      "id": "resolved-current",
+      "actions": [
+        "Continue",
+        "Set my home or work area"
+      ]
+    },
+    {
+      "id": "home-search",
+      "actions": [
+        "Search",
+        "Keep Sardarpura"
+      ],
+      "validation": "Require at least 3 characters for a home or work area."
+    },
+    {
+      "id": "home-results",
+      "actions": [
+        "Use as my home or work area",
+        "Edit search"
+      ]
+    },
+    {
+      "id": "home-confirmed",
+      "actions": [
+        "Continue",
+        "Change home or work area"
+      ]
+    },
+    {
+      "id": "unavailable",
+      "actions": [
+        "Choose my area",
+        "Change later"
+      ]
+    },
+    {
+      "id": "complete",
+      "actions": [
+        "Continue",
+        "Change area"
+      ]
+    }
+  ],
+  "routing": {
+    "screen01Exit": "/setup",
+    "screen02Owner": "JourneySession and GoRouter",
+    "completeWithCurrentArea": "persist language and current area, then route to the later sign-in screen unless an authenticated session was restored",
+    "completeWithHomeArea": "persist current area and the separate home or work area, then continue",
+    "completeWithoutArea": "persist the confirmed change-later choice, then continue",
+    "otpBoundary": "Screen 02 never requests or displays OTP. /verify is reachable only after the later sign-in screen requests a code."
+  },
+  "nonUiOwners": [
+    "JourneySession",
+    "JourneyStore",
+    "SharedPreferencesJourneyStore",
+    "LocationPermissionGateway",
+    "DeviceLocationPermissionGateway",
+    "GoRouter redirect contract"
+  ],
+  "customerCopyBoundary": {
+    "rule": "Customer-visible copy states results, benefits and clear actions. Internal planning, implementation, review and test language is prohibited.",
+    "prohibitedExamples": [
+      "Detect my current location",
+      "production search",
+      "prototype",
+      "review state",
+      "next owner",
+      "next screen",
+      "route",
+      "provider",
+      "fallback",
+      "test"
+    ]
+  },
+  "prohibited": [
+    "first-open language picker",
+    "app-authored location-detection prompt as the initial state",
+    "automatic permanent-home assignment from current location",
+    "OTP UI or OTP request",
+    "role switch",
+    "HTML or WebView in Flutter",
+    "mixing the legacy SetupScreen into UI V2",
+    "internal or implementation language in customer-visible copy"
+  ]
+}

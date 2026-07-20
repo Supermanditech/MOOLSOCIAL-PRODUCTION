@@ -68,8 +68,10 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 1450));
       expect(find.byKey(const Key('splash-v2-handoff')), findsOneWidget);
-      expect(find.text('Getting things ready'), findsOneWidget);
-      expect(find.text('Continuing automatically'), findsOneWidget);
+      expect(find.text('Still opening your MoolSocial space'), findsOneWidget);
+      expect(find.textContaining('app version'), findsNothing);
+      expect(find.textContaining('Network connected'), findsNothing);
+      expect(find.textContaining('route selected'), findsNothing);
       expect(tester.takeException(), isNull);
 
       read.complete(null);
