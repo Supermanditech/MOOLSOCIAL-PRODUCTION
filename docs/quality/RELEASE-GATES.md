@@ -24,6 +24,8 @@
 8. Verify Crashlytics, Performance and business-intent events by platform.
 9. Founder-approved screenwise visual and tap-path evidence is attached for
    every journey changed by `UI-CONFORMANCE-001`.
+10. While `UI-CONFORMANCE-001` is open, no partial UI remediation is promoted
+    to `main`; review occurs from the isolated complete candidate branch.
 
 ## Every production promotion
 

@@ -51,6 +51,33 @@ production source files on the remediation branch; we do not duplicate the app
 or maintain a second set of screen files. Atomic commits preserve rollback.
 Nothing merges to `main` merely because tests pass.
 
+The branch initially contains every UI/UX defect inherited from `main`. A
+branch does not remove an inherited defect; only an accepted correction does.
+Therefore the branch must never be described as prototype-conformant while any
+screen remains unreviewed, open or rejected.
+
+## Candidate promotion policy
+
+- The rollback baseline is `ed2a44d`, recorded by the tag
+  `baseline-ui-before-conformance-2026-07-20`.
+- User-facing UI changes on `main` are frozen while this blocker is open.
+- Every prototype screen/state must be classified as `Unreviewed`, `Open`,
+  `Fixed — awaiting founder`, `Accepted` or `Explicitly deferred`.
+- Founder acceptance of one screen preserves that checkpoint on the branch but
+  does not trigger a partial merge.
+- The complete branch is reviewed as one release candidate on the physical
+  phone.
+- Only after all launch-scope rows are `Accepted` or `Explicitly deferred` may
+  `main` be fast-forwarded to the exact tested candidate commit.
+- If `main` moves for an unavoidable non-UI change, that change is integrated
+  into the candidate first and the affected plus two full regressions are
+  repeated. Conflict resolution must not choose the old `main` UI wholesale.
+
+At final promotion, `main` becomes the candidate tree. Git does not add the old
+UI a second time. Remaining defects would appear only if they were never fixed,
+if `main` changed in parallel, or if a conflict was resolved incorrectly; the
+rules above prevent those three paths.
+
 ## Screenwise issue register
 
 | ID | Prototype screen/state | Mobile route/state | Reported difference | Failed tap sequence | Status |
@@ -83,9 +110,11 @@ Every screenwise correction follows this sequence:
    states where applicable.
 8. **Run the full application twice** — no golden update is accepted unless the
    visual change is tied to an approved-reference record.
-9. **Founder checkpoint** — provide the corrected phone screen for approval.
-10. **Merge only accepted batches** — branch remains isolated if any screen in
-    the batch is rejected.
+9. **Founder checkpoint** — provide the corrected phone screen for approval and
+   record the screen as accepted or rejected.
+10. **Preserve the checkpoint on the branch** — no partial UI batch merges to
+    `main`; the branch remains isolated while any launch-scope screen is
+    unreviewed, open or rejected.
 
 ## Change ordering
 
@@ -111,7 +140,8 @@ This blocker closes only when:
 - exact OPPO failure replays and affected journeys pass;
 - two full regressions pass without unexplained baseline changes;
 - Android and iOS builds pass from the same commit;
-- the founder explicitly accepts the reviewed screenwise batch.
+- the founder explicitly accepts the complete reviewed candidate;
+- `main` has no parallel UI commit after the recorded rollback baseline.
 
 Until then, the correct recommendation is:
 
