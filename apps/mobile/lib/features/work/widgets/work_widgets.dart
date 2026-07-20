@@ -89,8 +89,14 @@ class WorkPageScaffold extends StatelessWidget {
                 IconButton.outlined(
                   key: const Key('work-help'),
                   tooltip: 'Work help',
-                  onPressed: () => session.showNotice(
-                    'Work help is ready. Your opportunity and setup progress remain saved.',
+                  onPressed: () => context.go(
+                    Uri(
+                      path: '/app/chat',
+                      queryParameters: {
+                        'type': 'support',
+                        'return': GoRouterState.of(context).uri.toString(),
+                      },
+                    ).toString(),
                   ),
                   icon: const Icon(Icons.support_agent_outlined),
                 ),

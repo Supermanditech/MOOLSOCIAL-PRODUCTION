@@ -92,8 +92,14 @@ class PayPageScaffold extends StatelessWidget {
                 IconButton.outlined(
                   key: const Key('pay-help-shortcut'),
                   tooltip: 'Payment help',
-                  onPressed: () => session.showNotice(
-                    'Payment help is ready. Every case keeps its payee, amount and bank references.',
+                  onPressed: () => context.go(
+                    Uri(
+                      path: '/app/chat',
+                      queryParameters: {
+                        'type': 'support',
+                        'return': GoRouterState.of(context).uri.toString(),
+                      },
+                    ).toString(),
                   ),
                   icon: const Icon(Icons.shield_outlined),
                 ),

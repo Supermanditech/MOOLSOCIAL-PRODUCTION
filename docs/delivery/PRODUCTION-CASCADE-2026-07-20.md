@@ -165,6 +165,8 @@ returns success. Completion requires:
   poll, invite, detail and update intents now have direct owners; empty and
   duplicate drafts, failure, retry, protected return, compact and four approved
   visual states pass locally and on the connected OPPO.
+- Book, Work and Pay help shortcuts now enter the filtered Support inbox with
+  their exact return route instead of ending at a readiness notice.
 - Use Firestore realtime conversation state, Cloud Storage attachments and FCM
   fan-out behind a versioned messaging API.
 - Separate people, business, order and support permissions.

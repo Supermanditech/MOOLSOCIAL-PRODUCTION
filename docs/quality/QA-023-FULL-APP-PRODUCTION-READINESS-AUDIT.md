@@ -432,6 +432,20 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: all 10 Eat journey tests, zero-issue analyzer and the exact
   connected-OPPO Find/Offers sequence pass.
 
+### QA23-027 — Book, Work and Pay help shortcuts stopped at “ready”
+
+- Discovery: the three vertical headers acknowledged a help tap but did not
+  open a support owner or let the user continue the help intent.
+- Root cause: their shared page scaffolds used informational banners as the
+  help action contract.
+- Fix: each shortcut now opens the filtered Support inbox and preserves the
+  exact originating route for return. Current selections and progress remain in
+  their owning session rather than being restated as reassurance copy.
+- Exact replay: Book, Work and Pay each opened only the Support conversation
+  list from its own starting route.
+- Acceptance: the dedicated shortcut contract test, affected vertical suites,
+  interaction/copy gates and the three-route connected-OPPO replay pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -500,6 +514,7 @@ Founder-readable boards are versioned with the audit:
 | Chat context actions stopped at a notice or extra Universal step | Each nested action now owns its direct route, sheet or validated in-place completion | Six affected tests, exact invalid/duplicate/retry replay and expanded OPPO replay passed |
 | Doctor invite and follow-up actions stopped at “ready” notices | Clinic chat, QR, secure link, one-time code, prescription state and slot selection each expose their owned outcome | 17/17 affected tests and the complete OPPO nested replay passed |
 | Eat Find and Offers stopped at “ready” notices | Find focuses real search; Offers exposes eligibility, cancel and direct food selection | 10/10 affected tests and exact OPPO replay passed |
+| Book, Work and Pay help stopped at “ready” notices | Each shortcut opens the filtered Support inbox and preserves its origin | Dedicated contract and exact three-route OPPO replay passed |
 
 ## Current verification
 
@@ -529,9 +544,11 @@ Founder-readable boards are versioned with the audit:
 | OPPO Doctor invite and follow-up replay | Passed; clinic conversation, QR, secure link, duplicate-safe code and prescription QR, and exact slot completed |
 | Eat affected regression | Passed, 10/10 |
 | OPPO Eat Find/Offers replay | Passed; search focus/filter, offer visibility/cancel and direct food selection completed |
+| Book/Work/Pay support shortcut contract | Passed |
+| OPPO Book/Work/Pay support shortcut replay | Passed; each origin opened the filtered Support inbox |
 | Production visual baseline set | Passed across 81 current mobile states |
-| Independent current full regression cycle 1 | Passed, 327/327 without baseline updates |
-| Independent current full regression cycle 2 | Passed, 327/327 without baseline updates |
+| Independent current full regression cycle 1 | Passed, 328/328 without baseline updates |
+| Independent current full regression cycle 2 | Passed, 328/328 without baseline updates |
 | Corrected debug APK build | Passed |
 | Clean OPPO install and OTP-to-Universal replay | Passed after exact failure fixes; latest build remains open at Universal |
 

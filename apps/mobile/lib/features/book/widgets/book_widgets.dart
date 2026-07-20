@@ -89,9 +89,16 @@ class BookPageScaffold extends StatelessWidget {
             child:
                 trailing ??
                 IconButton.outlined(
-                  tooltip: 'Open booking help',
-                  onPressed: () => session.showNotice(
-                    'Booking help is ready. Your current selection remains saved.',
+                  key: const Key('book-help'),
+                  tooltip: 'Booking support',
+                  onPressed: () => context.go(
+                    Uri(
+                      path: '/app/chat',
+                      queryParameters: {
+                        'type': 'support',
+                        'return': GoRouterState.of(context).uri.toString(),
+                      },
+                    ).toString(),
                   ),
                   icon: const Icon(Icons.support_agent_rounded),
                 ),
