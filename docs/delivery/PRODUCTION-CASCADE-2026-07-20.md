@@ -286,6 +286,9 @@ returns success. Completion requires:
 
 ### PROD-OPS-002 — ride/captain dispatch
 
+- Source progress: the shared Ride Safety centre now owns both no-trip and
+  active-trip outcomes: booking, private Support, emergency assistance,
+  live-trip link and route-evidence reporting.
 - Integrate maps/geocoding, eligible supply, fare quote, captain offer,
   pickup-code verification, live trip, safety and final fare.
 - Accept: customer and captain observe one trip state; final payment requires

@@ -401,6 +401,37 @@ void main() {
     expect(find.textContaining('ready to share'), findsOneWidget);
   });
 
+  testWidgets(
+    'safety shortcut handles no active trip and opens private support',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final ride = RideSession(
+        gateway: ReviewRideGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(ride.dispose);
+      await mount(
+        tester,
+        route: '/app/ride/book',
+        journey: journey,
+        ride: ride,
+      );
+
+      await tapVisible(tester, const Key('ride-safety-shortcut'));
+      expect(find.textContaining('There is no active trip'), findsOneWidget);
+      await tapVisible(tester, const Key('ride-safety-book'));
+      expect(find.byKey(const Key('ride-booking-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('ride-safety-shortcut'));
+      await tapVisible(tester, const Key('ride-safety-report'));
+      expect(
+        find.byKey(const Key('chat-open-thread-order-support')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('compact ride targets remain at least 44 points', (tester) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     tester.platformDispatcher.textScaleFactorTestValue = 1.25;

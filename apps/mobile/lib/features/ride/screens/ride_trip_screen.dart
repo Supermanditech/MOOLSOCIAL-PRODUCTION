@@ -352,7 +352,11 @@ class _CaptainArriving extends StatelessWidget {
                   key: const Key('ride-open-safety'),
                   onPressed: session.rideCancelled
                       ? null
-                      : () => _showSafetyCentre(context, session, tripId),
+                      : () => showRideSafetyCentre(
+                          context,
+                          session,
+                          tripId: tripId,
+                        ),
                   icon: const Icon(Icons.shield_outlined),
                   label: const Text('Safety centre'),
                 ),
@@ -491,8 +495,11 @@ class _LiveTrip extends StatelessWidget {
                       key: const Key('ride-live-safety'),
                       label: 'Safety',
                       icon: Icons.shield_outlined,
-                      onPressed: () =>
-                          _showSafetyCentre(context, session, tripId),
+                      onPressed: () => showRideSafetyCentre(
+                        context,
+                        session,
+                        tripId: tripId,
+                      ),
                     ),
                   ],
                 ),
@@ -1335,76 +1342,4 @@ class _TripPoint extends StatelessWidget {
       ],
     );
   }
-}
-
-Future<void> _showSafetyCentre(
-  BuildContext context,
-  RideSession session,
-  String tripId,
-) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Safety centre',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text(
-            'Trip details, live route and captain identity are saved.',
-            style: TextStyle(color: MoolColors.muted),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          ListTile(
-            key: const Key('ride-safety-share'),
-            leading: const Icon(Icons.ios_share_rounded),
-            title: const Text('Share live trip'),
-            subtitle: const Text('Send your route and captain details'),
-            onTap: () {
-              session.showNotice('Live trip safety link is ready to share.');
-              Navigator.pop(sheetContext);
-            },
-          ),
-          ListTile(
-            key: const Key('ride-safety-emergency'),
-            leading: const Icon(
-              Icons.emergency_outlined,
-              color: Color(0xFFB42318),
-            ),
-            title: const Text('Call emergency help'),
-            subtitle: const Text('Connect to emergency assistance now'),
-            onTap: () {
-              session.showNotice('Connecting to emergency assistance…');
-              Navigator.pop(sheetContext);
-            },
-          ),
-          ListTile(
-            key: const Key('ride-safety-report'),
-            leading: const Icon(Icons.report_outlined),
-            title: const Text('Report a safety concern'),
-            subtitle: const Text('Route evidence will be attached'),
-            onTap: () {
-              session.chooseIssue(RideIssueType.safety);
-              Navigator.pop(sheetContext);
-              context.go('/app/ride/trip/$tripId/support');
-            },
-          ),
-        ],
-      ),
-    ),
-  );
 }

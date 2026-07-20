@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../ride_models.dart';
 import '../ride_session.dart';
 
 String rideMoney(int value) => '₹$value';
@@ -91,8 +93,10 @@ class RidePageScaffold extends StatelessWidget {
                 IconButton.outlined(
                   key: const Key('ride-safety-shortcut'),
                   tooltip: 'Open safety centre',
-                  onPressed: () => session.showNotice(
-                    'Safety centre is ready. Share your trip or call emergency help.',
+                  onPressed: () => showRideSafetyCentre(
+                    context,
+                    session,
+                    tripId: session.trip?.id,
                   ),
                   icon: const Icon(Icons.shield_outlined),
                 ),
@@ -402,4 +406,119 @@ class RideBottomDock extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> showRideSafetyCentre(
+  BuildContext context,
+  RideSession session, {
+  required String? tripId,
+}) {
+  final hasActiveTrip = tripId != null;
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('ride-safety-centre-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Safety centre',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          Text(
+            hasActiveTrip
+                ? 'Trip details, live route and captain identity are saved.'
+                : 'There is no active trip. Emergency help and MoolSocial '
+                      'support remain available.',
+            key: const Key('ride-safety-context'),
+            style: const TextStyle(color: MoolColors.muted),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          if (hasActiveTrip)
+            ListTile(
+              key: const Key('ride-safety-share'),
+              leading: const Icon(Icons.ios_share_rounded),
+              title: const Text('Copy live trip link'),
+              subtitle: const Text('Includes route and captain details'),
+              onTap: () {
+                Clipboard.setData(
+                  ClipboardData(text: 'https://moolsocial.com/trip/$tripId'),
+                );
+                session.showNotice('Live trip safety link copied.');
+                Navigator.pop(sheetContext);
+              },
+            )
+          else
+            ListTile(
+              key: const Key('ride-safety-book'),
+              leading: const Icon(Icons.local_taxi_outlined),
+              title: const Text('Book a ride'),
+              subtitle: const Text('Choose a verified bike, auto or cab'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.go('/app/ride/book');
+              },
+            ),
+          ListTile(
+            key: const Key('ride-safety-emergency'),
+            leading: const Icon(
+              Icons.emergency_outlined,
+              color: Color(0xFFB42318),
+            ),
+            title: const Text('Call emergency help'),
+            subtitle: const Text('Connect to emergency assistance now'),
+            onTap: () {
+              session.showNotice('Connecting to emergency assistance…');
+              Navigator.pop(sheetContext);
+            },
+          ),
+          ListTile(
+            key: const Key('ride-safety-report'),
+            leading: const Icon(Icons.report_outlined),
+            title: Text(
+              hasActiveTrip
+                  ? 'Report a safety concern'
+                  : 'Contact safety support',
+            ),
+            subtitle: Text(
+              hasActiveTrip
+                  ? 'Route evidence will be attached'
+                  : 'Open a private support conversation',
+            ),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              if (hasActiveTrip) {
+                session.chooseIssue(RideIssueType.safety);
+                context.go('/app/ride/trip/$tripId/support');
+                return;
+              }
+              context.go(
+                Uri(
+                  path: '/app/chat',
+                  queryParameters: {
+                    'type': 'support',
+                    'return': GoRouterState.of(context).uri.toString(),
+                  },
+                ).toString(),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
 }

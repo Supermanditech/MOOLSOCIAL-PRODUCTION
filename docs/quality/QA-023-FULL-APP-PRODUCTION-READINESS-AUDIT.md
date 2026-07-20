@@ -446,6 +446,21 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: the dedicated shortcut contract test, affected vertical suites,
   interaction/copy gates and the three-route connected-OPPO replay pass.
 
+### QA23-028 — Ride safety shortcut stopped before safety actions
+
+- Discovery: the persistent Ride header shield said the safety centre was
+  “ready” but did not reveal emergency, support or live-trip actions.
+- Root cause: the complete safety sheet existed only inside a matched trip and
+  was private to that screen.
+- Fix: one shared Safety centre now handles both states. Without a trip it
+  offers ride booking, emergency help and a private Support conversation. With
+  an active trip it exposes a copied live-trip link, emergency help and a
+  route-evidence support case.
+- Exact replay: the no-trip path opened private Support, then a matched trip
+  copied one current safety link without changing trip state.
+- Acceptance: all 10 Ride journey tests, zero-issue analyzer and the exact
+  empty/active connected-OPPO replay pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -515,6 +530,7 @@ Founder-readable boards are versioned with the audit:
 | Doctor invite and follow-up actions stopped at “ready” notices | Clinic chat, QR, secure link, one-time code, prescription state and slot selection each expose their owned outcome | 17/17 affected tests and the complete OPPO nested replay passed |
 | Eat Find and Offers stopped at “ready” notices | Find focuses real search; Offers exposes eligibility, cancel and direct food selection | 10/10 affected tests and exact OPPO replay passed |
 | Book, Work and Pay help stopped at “ready” notices | Each shortcut opens the filtered Support inbox and preserves its origin | Dedicated contract and exact three-route OPPO replay passed |
+| Ride header safety stopped at a “ready” notice | Shared Safety centre owns no-trip booking/support/emergency and active-trip share/report/emergency | 10/10 affected tests and empty/active OPPO replay passed |
 
 ## Current verification
 
@@ -546,9 +562,11 @@ Founder-readable boards are versioned with the audit:
 | OPPO Eat Find/Offers replay | Passed; search focus/filter, offer visibility/cancel and direct food selection completed |
 | Book/Work/Pay support shortcut contract | Passed |
 | OPPO Book/Work/Pay support shortcut replay | Passed; each origin opened the filtered Support inbox |
+| Ride safety affected regression | Passed, 10/10 |
+| OPPO Ride safety replay | Passed; no-trip support and active-trip link completion both verified |
 | Production visual baseline set | Passed across 81 current mobile states |
-| Independent current full regression cycle 1 | Passed, 328/328 without baseline updates |
-| Independent current full regression cycle 2 | Passed, 328/328 without baseline updates |
+| Independent current full regression cycle 1 | Passed, 329/329 without baseline updates |
+| Independent current full regression cycle 2 | Passed, 329/329 without baseline updates |
 | Corrected debug APK build | Passed |
 | Clean OPPO install and OTP-to-Universal replay | Passed after exact failure fixes; latest build remains open at Universal |
 
