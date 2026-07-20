@@ -29,6 +29,12 @@ branch is `remediation/prototype-conformance-2026-07-20`. Screen-specific
 observations supplied by the product owner are appended to the QA-024 issue
 register before code is changed.
 
+The accepted implementation strategy is the parallel native Flutter UI V2
+rebuild in
+[`ADR-0002-PARALLEL-UI-V2-CONFORMANCE-REBUILD.md`](../decisions/ADR-0002-PARALLEL-UI-V2-CONFORMANCE-REBUILD.md).
+Approved HTML is finalized and frozen screenwise before V2 implementation;
+existing tested non-UI application layers are reused.
+
 ## Permanent product rule
 
 Every MoolSocial user-facing surface must use one coherent, Apple-inspired

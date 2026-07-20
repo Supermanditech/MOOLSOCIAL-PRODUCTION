@@ -46,9 +46,13 @@ Remediation is performed on:
 
 `remediation/prototype-conformance-2026-07-20`
 
-`main` remains the last green technical baseline. We edit the existing
-production source files on the remediation branch; we do not duplicate the app
-or maintain a second set of screen files. Atomic commits preserve rollback.
+The accepted architecture is defined in
+[`ADR-0002-PARALLEL-UI-V2-CONFORMANCE-REBUILD.md`](../decisions/ADR-0002-PARALLEL-UI-V2-CONFORMANCE-REBUILD.md).
+`main` remains the last green technical baseline. A fresh Flutter UI V2
+presentation layer is built in this repository while existing non-UI
+models/controllers/services, native configuration and CI are reused. The old
+presentation remains read-only until V2 acceptance. This is neither a separate
+production repository nor an HTML WebView. Atomic commits preserve rollback.
 Nothing merges to `main` merely because tests pass.
 
 The branch initially contains every UI/UX defect inherited from `main`. A
