@@ -415,6 +415,23 @@ columns so a prototype control cannot create a false production pass.
 - Acceptance: the 17/17 affected Book/Chat tests, zero-issue analyzer and the
   full nested sequence on the connected OPPO pass.
 
+### QA23-026 — Eat Find and Offers did not expose their owned actions
+
+- Discovery: Find and Offers on Eat home returned “ready” notices while the
+  actual restaurant search and food-selection journey remained elsewhere on
+  the same screen.
+- Root cause: the compact context grid was connected to copy acknowledgements,
+  not to the already implemented search focus and order route.
+- Fix: Find now scrolls to and focuses the real search input. Offers opens the
+  selected restaurant’s current offer, states that eligibility and final
+  savings are checked before payment, supports cancellation, and continues
+  directly to food selection.
+- Exact replay: Find filtered to the intended restaurant, Offers closed without
+  changing the order, and the second Offers attempt opened the owned order
+  screen.
+- Acceptance: all 10 Eat journey tests, zero-issue analyzer and the exact
+  connected-OPPO Find/Offers sequence pass.
+
 ## Visual review method
 
 The visual-board generator composes current golden evidence without altering
@@ -482,6 +499,7 @@ Founder-readable boards are versioned with the audit:
 | Chat threads exposed only Back as an exit | Labelled Mool action is persistent in the composer | Compact, visual and OPPO thread-to-Mool replays passed |
 | Chat context actions stopped at a notice or extra Universal step | Each nested action now owns its direct route, sheet or validated in-place completion | Six affected tests, exact invalid/duplicate/retry replay and expanded OPPO replay passed |
 | Doctor invite and follow-up actions stopped at “ready” notices | Clinic chat, QR, secure link, one-time code, prescription state and slot selection each expose their owned outcome | 17/17 affected tests and the complete OPPO nested replay passed |
+| Eat Find and Offers stopped at “ready” notices | Find focuses real search; Offers exposes eligibility, cancel and direct food selection | 10/10 affected tests and exact OPPO replay passed |
 
 ## Current verification
 
@@ -509,6 +527,8 @@ Founder-readable boards are versioned with the audit:
 | OPPO Chat filter/Mool/nested-action/failure replay | Passed; four filters, direct Mool, media, poll, invite, details, updates and one-message retry completed |
 | Doctor and clinic affected regression | Passed, 17/17 |
 | OPPO Doctor invite and follow-up replay | Passed; clinic conversation, QR, secure link, duplicate-safe code and prescription QR, and exact slot completed |
+| Eat affected regression | Passed, 10/10 |
+| OPPO Eat Find/Offers replay | Passed; search focus/filter, offer visibility/cancel and direct food selection completed |
 | Production visual baseline set | Passed across 81 current mobile states |
 | Independent current full regression cycle 1 | Passed, 327/327 without baseline updates |
 | Independent current full regression cycle 2 | Passed, 327/327 without baseline updates |

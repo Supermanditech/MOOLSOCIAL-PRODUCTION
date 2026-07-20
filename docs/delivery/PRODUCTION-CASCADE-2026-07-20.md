@@ -233,6 +233,9 @@ returns success. Completion requires:
 
 ### PROD-COM-003 — food, table and tiffin contracts
 
+- Source progress: Eat Find now focuses and filters the real restaurant search;
+  Offers exposes eligibility, cancel and direct food-selection actions instead
+  of a readiness notice. The exact nested flow passes on the connected OPPO.
 - Implement menu availability, kitchen capacity, customization, table hold,
   deposit, subscription schedule, skip/pause and cancellation.
 - Accept: order/table/tiffin remain separate authoritative contracts while

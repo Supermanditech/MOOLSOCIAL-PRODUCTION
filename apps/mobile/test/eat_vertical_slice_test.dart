@@ -34,7 +34,7 @@ void main() {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
       MoolSocialApp(
-        key: ValueKey(route),
+        key: UniqueKey(),
         session: journey,
         eatSession: eat,
         initialLocation: route,
@@ -235,6 +235,24 @@ void main() {
 
       await tester.enterText(find.byKey(const Key('eat-home-search')), '');
       await tester.pumpAndSettle();
+
+      await tapVisible(tester, const Key('eat-context-find'));
+      final search = tester.widget<TextField>(
+        find.byKey(const Key('eat-home-search')),
+      );
+      expect(search.focusNode?.hasFocus, isTrue);
+      await tester.enterText(find.byKey(const Key('eat-home-search')), 'Spice');
+      await tester.pumpAndSettle();
+      expect(find.text('Spice Darbar'), findsWidgets);
+
+      await tapVisible(tester, const Key('eat-context-offers'));
+      expect(find.byKey(const Key('eat-offer-sheet')), findsOneWidget);
+      await tapVisible(tester, const Key('eat-offer-close'));
+      await tapVisible(tester, const Key('eat-context-offers'));
+      await tapVisible(tester, const Key('eat-offer-order'));
+      expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
+
+      await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
       await tapVisible(tester, const Key('eat-context-qr'));
       await tapVisible(tester, const Key('eat-qr-continue'));
       expect(find.text('Enter or scan a valid table code.'), findsOneWidget);

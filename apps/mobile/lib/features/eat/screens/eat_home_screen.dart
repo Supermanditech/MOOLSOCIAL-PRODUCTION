@@ -18,11 +18,26 @@ class EatHomeScreen extends StatefulWidget {
 
 class _EatHomeScreenState extends State<EatHomeScreen> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  final _searchAnchorKey = GlobalKey();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _focusSearch() {
+    final anchorContext = _searchAnchorKey.currentContext;
+    if (anchorContext != null) {
+      Scrollable.ensureVisible(
+        anchorContext,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    _searchFocusNode.requestFocus();
   }
 
   @override
@@ -48,34 +63,38 @@ class _EatHomeScreenState extends State<EatHomeScreen> {
               MoolSpacing.xxl,
             ),
             children: [
-              TextField(
-                key: const Key('eat-home-search'),
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Search biryani, thali, cafe or tiffin',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _searchController.text.isEmpty
-                      ? IconButton(
-                          key: const Key('eat-home-voice'),
-                          tooltip: 'Use voice search',
-                          onPressed: () => _showVoiceSearch(context),
-                          icon: const Icon(Icons.mic_none_rounded),
-                        )
-                      : IconButton(
-                          key: const Key('eat-home-clear'),
-                          tooltip: 'Clear search',
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
+              Container(
+                key: _searchAnchorKey,
+                child: TextField(
+                  key: const Key('eat-home-search'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  textInputAction: TextInputAction.search,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search biryani, thali, cafe or tiffin',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? IconButton(
+                            key: const Key('eat-home-voice'),
+                            tooltip: 'Use voice search',
+                            onPressed: () => _showVoiceSearch(context),
+                            icon: const Icon(Icons.mic_none_rounded),
+                          )
+                        : IconButton(
+                            key: const Key('eat-home-clear'),
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
-              _ContextChoices(session: widget.session),
+              _ContextChoices(session: widget.session, onFind: _focusSearch),
               const SizedBox(height: MoolSpacing.sm),
               if (restaurants.isEmpty)
                 _EmptyRestaurants(
@@ -221,9 +240,10 @@ class _EatHomeScreenState extends State<EatHomeScreen> {
 }
 
 class _ContextChoices extends StatelessWidget {
-  const _ContextChoices({required this.session});
+  const _ContextChoices({required this.session, required this.onFind});
 
   final EatSession session;
+  final VoidCallback onFind;
 
   @override
   Widget build(BuildContext context) {
@@ -266,18 +286,14 @@ class _ContextChoices extends StatelessWidget {
                 icon: Icons.storefront_outlined,
                 title: 'Find',
                 detail: 'place',
-                onTap: () => session.showNotice(
-                  'Search is ready. Enter a restaurant, cuisine or area.',
-                ),
+                onTap: onFind,
               ),
               _ContextButton(
                 key: const Key('eat-context-offers'),
                 icon: Icons.local_offer_outlined,
                 title: 'Offers',
                 detail: 'save',
-                onTap: () => session.showNotice(
-                  '${session.selectedRestaurant.offer} is ready before payment.',
-                ),
+                onTap: () => _showSelectedOffer(context, session),
               ),
             ],
           ),
@@ -285,6 +301,80 @@ class _ContextChoices extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showSelectedOffer(BuildContext context, EatSession session) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('eat-offer-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Available offer',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          EatSurfaceCard(
+            color: const Color(0xFFF0FAF3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.selectedRestaurant.name,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                Text(
+                  session.selectedRestaurant.offer,
+                  style: const TextStyle(
+                    color: MoolColors.success,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                const Text(
+                  'Eligibility and the final saving are shown before payment.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton(
+            key: const Key('eat-offer-order'),
+            onPressed: () {
+              Navigator.of(sheetContext).pop();
+              context.go('/app/eat/order');
+            },
+            child: const Text('Choose food with this offer'),
+          ),
+          TextButton(
+            key: const Key('eat-offer-close'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Keep browsing'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ContextButton extends StatelessWidget {
