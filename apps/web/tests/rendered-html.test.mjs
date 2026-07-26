@@ -36,6 +36,8 @@ test("ships the MoolSocial early-access experience without starter UI", async ()
   assert.match(product, /Minutes/);
   assert.match(product, /Seconds/);
   assert.match(product, /hero-showcase/);
+  assert.doesNotMatch(product, /<a\b[^>]*className="showcase-stage hero-showcase"/);
+  assert.match(product, /className="showcase-stage hero-showcase"/);
   assert.doesNotMatch(product, /<figcaption>/);
   assert.doesNotMatch(product, />\s*(?:iPhone|Android)(?:\s*·|\s*<)/);
   assert.match(product, /phone-platform-ios/);
@@ -60,6 +62,13 @@ test("ships the MoolSocial early-access experience without starter UI", async ()
   assert.match(product, /@media \(max-width:\s*420px\)/);
   assert.match(product, /@media \(min-width:\s*1440px\)/);
   assert.match(product, /@keyframes brand-word-depth/);
+  assert.match(product, /href="#launch">Launch</);
+  assert.match(product, /className="outcome-section" id="launch"/);
+  assert.match(product, /<section className="outcome-section" id="launch">[\s\S]*?className="launch-countdown"/);
+  assert.match(product, /Built in India/);
+  assert.match(product, /Follow the journey to launch/);
+  assert.doesNotMatch(product, /Complete product and partner readiness|operating support and launch participation/);
+  assert.doesNotMatch(product, /Coming to India/);
   assert.match(product, /app-preview-universal-actions\.webp/);
   assert.match(product, /app-preview-social-video\.webp/);
   assert.match(product, /Social/);

@@ -69,7 +69,7 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.match(content.company, /data-countdown-hours/);
   assert.match(content.company, /data-countdown-minutes/);
   assert.match(content.company, /data-countdown-seconds/);
-  assert.match(content.company, /src="\/site\.js\?v=20260726-2"/);
+  assert.match(content.company, /src="\/site\.js\?v=20260726-5"/);
   assert.match(content.company, /100\+ upcoming roles/);
   assert.match(content.company, /freelancers/i);
   assert.match(content.company, /quick-commerce delivery partners/);
@@ -109,6 +109,7 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
     /\b(?:prototype|concept|preview|example|demo|mock|placeholder|implementation|workflow|state machine|endpoint|payload|backend|provider callback|for review|for testing)\b/i,
   );
   assert.doesNotMatch(customerCopy(content.company), /Motion shows|Choose an action|One tap|not final|may change/i);
+  assert.doesNotMatch(customerCopy(content.company), /\b(?:roadmap|readiness|validate|validation|implementation|workflow|backend)\b|operating support|launch participation/i);
   assert.doesNotMatch(customerCopy(content.company), /Scheduled public launch|Saturday,\s*24 October 2026/i);
   assert.equal((customerCopy(content.company).match(/24 October 2026/g) ?? []).length, 1);
   assert.deepEqual(repeatedMarketingBlocks(content.company), []);
@@ -124,6 +125,34 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.match(navigation, />Join us</);
   assert.match(navigation, /href="mailto:hello@moolsocial\.com\?subject=MoolSocial%20contact">Contact</);
   assert.doesNotMatch(navigation, />Platform<|>MoolSocial<|>Privacy<|>Support</);
+
+  const navigationContracts = [
+    ["Our story", "about", /MoolSocial at a glance[\s\S]*?Indian technology company/],
+    ["Our vision", "vision", /Responsible intelligence[\s\S]*?AI-enabled by design/],
+    ["Launch", "launch", /Built in India[\s\S]*?Follow the journey to launch/],
+    ["Join us", "opportunities", /Opportunities across India[\s\S]*?Careers and partnerships/],
+  ];
+  for (const [label, id, destinationCopy] of navigationContracts) {
+    assert.match(navigation, new RegExp(`href="#${id}">${label}<`));
+    const section = content.company.match(new RegExp(`<section\\b[^>]*\\bid="${id}"[^>]*>[\\s\\S]*?<\\/section>`))?.[0] ?? "";
+    assert.match(section, destinationCopy, `${label} does not lead to the content it promises`);
+  }
+
+  const launchSection = content.company.match(/<section\b[^>]*\bid="launch"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? "";
+  const heroSection = content.company.match(/<section class="hero">[\s\S]*?<\/section>/)?.[0] ?? "";
+  assert.doesNotMatch(heroSection, /data-launch-countdown|Register your interest|Contact MoolSocial/);
+  assert.match(launchSection, /class="launch-date-card"/);
+  assert.match(launchSection, /data-launch-countdown/);
+  assert.match(launchSection, /24 October 2026/);
+  assert.match(launchSection, /Register your interest/);
+  assert.match(launchSection, /Contact MoolSocial/);
+  assert.match(launchSection, /class="launch-roadmap"/);
+  assert.equal((launchSection.match(/<li>/g) ?? []).length, 3);
+  assert.match(launchSection, />Join early</);
+  assert.match(launchSection, />Stay connected</);
+  assert.match(launchSection, />Public launch</);
+  assert.doesNotMatch(launchSection, /readiness|validate|operating support/i);
+  assert.doesNotMatch(launchSection, /Coming to India/i);
 
   const css = await readFile(new URL("site.css", publicRoot), "utf8");
   assert.match(css, /perspective:\s*1800px/);
@@ -207,12 +236,15 @@ test("every public click has a real destination and every contact action emails 
 
   for (const [name, html] of Object.entries(content)) {
     assert.doesNotMatch(html, /<button\b/i, `${name} contains an unowned button`);
-    const links = [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"[^>]*>/gi)];
+    const links = [...html.matchAll(/<a\b([^>]*)\bhref="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi)];
     assert.ok(links.length > 0, `${name} has no links`);
 
-    for (const [, href] of links) {
+    for (const [, beforeHref, href, afterHref, body] of links) {
       assert.notEqual(href, "#", `${name} contains an empty fragment link`);
       assert.doesNotMatch(href, /^javascript:/i, `${name} contains a script link`);
+      const attributes = `${beforeHref} ${afterHref}`;
+      const accessibleName = `${attributes.match(/\baria-label="([^"]+)"/i)?.[1] ?? ""} ${body.replace(/<[^>]+>/g, " ")}`.replace(/\s+/g, " ").trim();
+      assert.ok(accessibleName.length > 0, `${name} contains an unnamed link to ${href}`);
 
       if (href.startsWith("mailto:")) {
         assert.match(href, /^mailto:hello@moolsocial\.com(?:\?|$)/i, `${name} contact does not use hello@moolsocial.com`);
@@ -238,12 +270,18 @@ test("every public click has a real destination and every contact action emails 
     }
   }
 
+  assert.doesNotMatch(
+    content.company,
+    /<a\b[^>]*class="[^"]*(?:showcase-stage|value-card|action-universe)[^"]*"/i,
+    "decorative or informational surfaces must not open another page or email application",
+  );
+
   const contactSurfaces = [
     ...content.company.matchAll(
-      /<a\s+class="[^"]*(?:button|value-card|action-universe|showcase-stage)[^"]*"[^>]*href="([^"]+)"/gi,
+      /<a\s+class="[^"]*button[^"]*"[^>]*href="([^"]+)"/gi,
     ),
   ];
-  assert.ok(contactSurfaces.length >= 10);
+  assert.ok(contactSurfaces.length >= 6);
   for (const [, href] of contactSurfaces) {
     assert.match(href, /^mailto:hello@moolsocial\.com(?:\?|$)/i);
   }

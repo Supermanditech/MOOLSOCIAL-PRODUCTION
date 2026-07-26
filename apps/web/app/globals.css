@@ -1247,6 +1247,25 @@ a {
   background: var(--navy-ink);
 }
 
+.outcome-section .launch-date-card {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, auto);
+  gap: clamp(22px, 4vw, 48px);
+  align-items: end;
+  padding-block: clamp(34px, 4vw, 48px) 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.outcome-section .launch-countdown {
+  max-width: 620px;
+  margin: 0;
+}
+
+.outcome-section .hero-actions {
+  justify-content: flex-end;
+  margin: 0;
+}
+
 .outcome-grid {
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
@@ -2095,6 +2114,7 @@ footer {
 
   .hero-content,
   .outcome-grid,
+  .outcome-section .launch-date-card,
   .growth-section,
   .waitlist-section,
   .showcase-layout {
@@ -2136,6 +2156,10 @@ footer {
   .opportunity-card,
   .social-card {
     min-height: 480px;
+  }
+
+  .outcome-section .hero-actions {
+    justify-content: flex-start;
   }
 
   .footer-content {

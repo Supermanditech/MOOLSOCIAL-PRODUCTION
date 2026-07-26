@@ -253,7 +253,8 @@ export function LandingPage() {
           </a>
           <div className="nav-links">
             <a href="#audiences">Our story</a>
-            <a href="#experience">Experience</a>
+            <a href="#experience">Our vision</a>
+            <a href="#launch">Launch</a>
             <a href="#early-access">Join us</a>
             <a className="nav-action" href="mailto:hello@moolsocial.com?subject=MoolSocial%20contact">Contact</a>
           </div>
@@ -268,30 +269,6 @@ export function LandingPage() {
               digital services, opportunities and relationships that shape
               everyday life in India.
             </p>
-            <div className="launch-countdown">
-              <div
-                className="countdown-grid"
-                aria-label="Time remaining until the MoolSocial launch"
-              >
-                <span><strong>{launchCountdown.months}</strong><small>Months</small></span>
-                <span><strong>{launchCountdown.days}</strong><small>Days</small></span>
-                <span><strong>{launchCountdown.hours}</strong><small>Hours</small></span>
-                <span><strong>{launchCountdown.minutes}</strong><small>Minutes</small></span>
-                <span><strong>{launchCountdown.seconds}</strong><small>Seconds</small></span>
-              </div>
-              <p>
-                Launching across India
-                <time dateTime="2026-10-24">24 October 2026</time>
-              </p>
-            </div>
-            <div className="hero-actions">
-              <a className="button button-primary" href="#early-access">
-                Reserve my early access
-              </a>
-              <a className="button button-secondary" href="#audiences">
-                See what is coming
-              </a>
-            </div>
             <div className="trust-row" aria-label="MoolSocial principles">
               <span>Useful actions</span>
               <span>Verified opportunities</span>
@@ -299,11 +276,7 @@ export function LandingPage() {
             </div>
           </div>
 
-          <a
-            className="showcase-stage hero-showcase"
-            href="mailto:hello@moolsocial.com?subject=Tell%20me%20more%20about%20MoolSocial"
-            aria-label="Email MoolSocial about the connected product experience"
-          >
+          <div className="showcase-stage hero-showcase">
             <span className="showcase-halo showcase-halo-one" aria-hidden="true" />
             <span className="showcase-halo showcase-halo-two" aria-hidden="true" />
             <span className="showcase-orbit" aria-hidden="true" />
@@ -336,7 +309,7 @@ export function LandingPage() {
                 ))}
               </div>
             ))}
-          </a>
+          </div>
         </div>
       </section>
 
@@ -411,32 +384,58 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="outcome-section">
+      <section className="outcome-section" id="launch">
+        <div className="launch-date-card shell">
+          <div className="launch-countdown">
+            <div
+              className="countdown-grid"
+              aria-label="Time remaining until the MoolSocial launch"
+            >
+              <span><strong>{launchCountdown.months}</strong><small>Months</small></span>
+              <span><strong>{launchCountdown.days}</strong><small>Days</small></span>
+              <span><strong>{launchCountdown.hours}</strong><small>Hours</small></span>
+              <span><strong>{launchCountdown.minutes}</strong><small>Minutes</small></span>
+              <span><strong>{launchCountdown.seconds}</strong><small>Seconds</small></span>
+            </div>
+            <p>
+              Launching across India
+              <time dateTime="2026-10-24">24 October 2026</time>
+            </p>
+          </div>
+          <div className="hero-actions">
+            <a className="button button-primary" href="#early-access">
+              Reserve my early access
+            </a>
+            <a className="button button-secondary" href="#audiences">
+              See what is coming
+            </a>
+          </div>
+        </div>
         <div className="shell outcome-grid">
           <div>
-            <p className="eyebrow light">Why join before launch?</p>
-            <h2>Your early signal helps shape your MoolSocial.</h2>
+            <p className="eyebrow light">Built in India</p>
+            <h2>Follow the journey to launch.</h2>
           </div>
           <div className="outcome-list">
             <div>
               <span>01</span>
               <p>
-                Choose the role and city that matter to you, so we launch the
-                right local experiences first.
+                Be part of the beginning with launch news, early access and
+                opportunities relevant to you.
               </p>
             </div>
             <div>
               <span>02</span>
               <p>
-                Receive launch access, product updates and invitations relevant
-                to your selected purpose.
+                See the MoolSocial story unfold across social participation,
+                creation, commerce, mobility, payments and work.
               </p>
             </div>
             <div>
               <span>03</span>
               <p>
-                Invite your network with a personal link and help bring useful
-                demand, talent and opportunity together.
+                Discover, participate, create, work and grow through one
+                connected experience across India.
               </p>
             </div>
           </div>
