@@ -22,7 +22,7 @@ const roles: Role[] = [
     shortName: "Use MoolSocial",
     promise: "Find, buy, book and get things done locally.",
     description:
-      "Discover useful products, trusted services and everyday opportunities from one action-led app.",
+      "Discover useful products, trusted services and everyday opportunities through one connected app.",
     action: "Join as a user",
   },
   {
@@ -30,9 +30,9 @@ const roles: Role[] = [
     number: "02",
     name: "Creators",
     shortName: "Create & earn",
-    promise: "Turn trusted influence into measurable outcomes.",
+    promise: "Create, reach people and earn.",
     description:
-      "Connect your audience, promote verified offers and earn through transparent campaigns and results.",
+      "Build an audience, work with businesses and earn through eligible content and commerce opportunities.",
     action: "Join as a creator",
   },
   {
@@ -40,9 +40,9 @@ const roles: Role[] = [
     number: "03",
     name: "Workers & job seekers",
     shortName: "Find verified work",
-    promise: "Access work with clear tasks, proof and payout rules.",
+    promise: "Find work with clear terms and payment information.",
     description:
-      "Build a trusted work record through local jobs, quick-commerce delivery, sales, service and outcome-based assignments.",
+      "Build your work record through local jobs, quick-commerce delivery, sales and service opportunities.",
     action: "Join for work",
   },
   {
@@ -52,7 +52,7 @@ const roles: Role[] = [
     shortName: "Grow my business",
     promise: "Reach customers, creators and local talent from one place.",
     description:
-      "Grow retail, wholesale, services and customer relationships through useful products, demand and accountable execution.",
+      "Grow retail, wholesale, services and customer relationships through MoolSocial.",
     action: "Join as a business",
   },
 ];
@@ -61,34 +61,34 @@ const productViewSets = [
   [
     {
       src: "/app-preview-social-video.webp",
-      alt: "MoolSocial Social with For You, Shorts, Videos and Live",
+      alt: "MoolSocial social feed showing Shorts, Videos and Live",
       height: 1820,
     },
     {
       src: "/app-preview-universal-actions.webp",
-      alt: "MoolSocial home with Social, Shorts, Videos, Create, Earn, Buy, Ride, Pay and Work",
+      alt: "MoolSocial home screen showing Social, Create, Earn, Buy, Ride, Pay and Work",
       height: 1821,
     },
     {
       src: "/app-preview-for-you.webp",
-      alt: "MoolSocial For You for discovery, shopping, booking and local activity",
+      alt: "MoolSocial personalised home screen showing local places, shopping, bookings and services",
       height: 1821,
     },
   ],
   [
     {
       src: "/app-preview-shop-deliver.webp",
-      alt: "MoolSocial shopping, quick commerce and delivery",
+      alt: "MoolSocial marketplace screen showing local shopping and delivery",
       height: 1821,
     },
     {
       src: "/app-preview-create-earn.webp",
-      alt: "MoolSocial creator and freelancer workspace",
+      alt: "MoolSocial creator workspace showing publishing, campaigns and earnings",
       height: 1821,
     },
     {
       src: "/app-preview-work-grow.webp",
-      alt: "MoolSocial work opportunities and business operations",
+      alt: "MoolSocial work screen showing jobs, applications and business performance",
       height: 1821,
     },
   ],
@@ -265,14 +265,14 @@ export function LandingPage() {
             <p className="eyebrow">Designed across platforms</p>
             <h1>MoolSocial moves with you.</h1>
             <p className="hero-intro">
-              MoolSocial is building a trusted AI-enabled ecosystem for the
-              digital services, opportunities and relationships that shape
-              everyday life in India.
+              MoolSocial is building an AI-enabled social commerce platform
+              that brings content, commerce, services, mobility, payments and
+              work together for people and businesses across India.
             </p>
             <div className="trust-row" aria-label="MoolSocial principles">
-              <span>Useful actions</span>
-              <span>Verified opportunities</span>
-              <span>Clear outcomes</span>
+              <span>Everyday convenience</span>
+              <span>Trusted opportunities</span>
+              <span>Simple choices</span>
             </div>
           </div>
 
@@ -315,7 +315,7 @@ export function LandingPage() {
 
       <section className="signal-strip" aria-label="MoolSocial value">
         <div className="shell signal-content">
-          <p>Built for people who want to act—not just scroll.</p>
+          <p>Content, commerce and opportunity in one place.</p>
           <span>
             Buy • Create • Work • Sell • Serve • Grow
           </span>
@@ -324,11 +324,11 @@ export function LandingPage() {
 
       <section className="audiences shell" id="audiences">
         <header className="section-heading">
-          <p className="eyebrow dark">Choose what MoolSocial should do for you</p>
-          <h2>Every user type. One connected economy.</h2>
+          <p className="eyebrow dark">MoolSocial for everyone</p>
+          <h2>Choose how MoolSocial fits your life.</h2>
           <p>
-            Tell us why you are joining so your launch experience starts with
-            the right products, work and opportunities.
+            Join for the products, services, work and opportunities that matter
+            to you.
           </p>
         </header>
 
@@ -353,18 +353,15 @@ export function LandingPage() {
       <section className="concept-section" id="experience">
         <div className="shell showcase-layout">
           <header className="section-heading">
-            <p className="eyebrow dark">One connected ecosystem</p>
+            <p className="eyebrow dark">Everything works together</p>
             <h2>One connected experience, built around real life.</h2>
-            <p>
-              Move naturally from discovery to meaningful action through one
-              consistent MoolSocial experience.
-            </p>
+            <p>Watch, create, shop, book, ride, pay and work—all within MoolSocial.</p>
           </header>
           <div className="network-card" aria-label="MoolSocial network">
-            <p className="network-label">Your MoolSocial network</p>
+            <p className="network-label">MoolSocial</p>
             <div className="network-center">
               <span className="network-brand">Mool</span>
-              <span>One trusted starting point</span>
+              <span>One connected experience</span>
             </div>
             <div className="network-paths">
               {roles.map((role) => (
@@ -389,7 +386,7 @@ export function LandingPage() {
           <div className="launch-countdown">
             <div
               className="countdown-grid"
-              aria-label="Time remaining until the MoolSocial launch"
+              aria-label="Time remaining until the MoolSocial launch across India"
             >
               <span><strong>{launchCountdown.months}</strong><small>Months</small></span>
               <span><strong>{launchCountdown.days}</strong><small>Days</small></span>
@@ -448,7 +445,7 @@ export function LandingPage() {
           <h2>Help build MoolSocial in your city.</h2>
           <p>
             Applications and partnership enquiries are open for 100+ upcoming
-            roles, freelancers, content creators, businesses, city operations
+            roles, freelancers, content creators, businesses, local teams
             and delivery partners across quick commerce, retail and wholesale
             in India.
           </p>
@@ -470,8 +467,7 @@ export function LandingPage() {
           <p>
             Follow MoolSocial on X, YouTube, Instagram, Facebook and LinkedIn
             for launch news, opportunities, creator updates and business
-            stories. Until each verified profile link is published, email us
-            for the official account.
+            stories. Official links will be published here after verification.
           </p>
           <div className="social-list" aria-label="MoolSocial social channels">
             <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20X%20profile">
@@ -519,8 +515,8 @@ export function LandingPage() {
             <span>For everyone</span>
             <p>
               People, job applicants, freelancers, creators, businesses,
-              retailers, wholesalers and delivery partners can register early
-              interest before the 24 October 2026 launch.
+              retailers, wholesalers and delivery partners can register their
+              interest before launch.
             </p>
           </div>
           <p className="social-pending">
@@ -540,7 +536,7 @@ export function LandingPage() {
             product updates.
           </p>
           <div className="selected-purpose">
-            <span>Your selected purpose</span>
+            <span>You are joining to</span>
             <strong>{activeRole.shortName}</strong>
             <p>{activeRole.promise}</p>
           </div>

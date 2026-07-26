@@ -60,6 +60,10 @@
             "value": "camera=(), microphone=(), geolocation=(), payment=()"
           },
           {
+            "key": "Cache-Control",
+            "value": "public,max-age=0,must-revalidate"
+          },
+          {
             "key": "Content-Security-Policy",
             "value": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'; upgrade-insecure-requests"
           }

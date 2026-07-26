@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = host ? `${protocol}://${host}` : "https://moolsocial.com";
   const title = "MoolSocial — AI-Enabled Social Commerce";
   const description =
-    "Join MoolSocial before the 24 October 2026 launch as a user, creator, freelancer, professional, delivery partner, retailer, wholesaler or business.";
+    "MoolSocial brings content, commerce, services, mobility, payments and work together for people and businesses across India.";
 
   return {
     title,

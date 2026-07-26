@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -10,6 +11,15 @@ const pages = {
   support: "support/index.html",
   disconnect: "disconnect/index.html",
   deletion: "delete-account/index.html",
+};
+
+const approvedCopyDigests = {
+  company: "682c245968880b4e34e84720a737791348a4da32e1e1e14d526e70d1dd92576b",
+  privacy: "77c93fb8d887b233bc65fe8f7c3454322dbcb49b06c63ed17302f49fb9429af6",
+  terms: "9840209eeadae43463724b0d4d027b0e28f1a3228357555ca8ac07e131d03685",
+  support: "5d339025d99123cd8a42684b8484df804f49f72f9806b0b9cd32def8b62f7a8a",
+  disconnect: "006abf94d94c80d7baa5d43743ddfb740f8e3bf9e751332642e920f03d90e17e",
+  deletion: "dfded552130632b83675202c0d68a21aa5886b09a4b36bfe2306a78b664bc2b6",
 };
 
 async function readPage(path) {
@@ -27,12 +37,53 @@ function customerCopy(html) {
   return `${visible} ${attributes}`.replace(/\s+/g, " ").trim();
 }
 
+function publicCopySurface(html) {
+  const metadata = [...html.matchAll(/<meta\b([^>]*)>/gi)]
+    .map((match) => match[1])
+    .map((attributes) => {
+      const key = attributes.match(/\b(?:name|property)="([^"]+)"/i)?.[1] ?? "";
+      const content = attributes.match(/\bcontent="([^"]*)"/i)?.[1] ?? "";
+      return /^(?:description|og:title|og:description|twitter:title|twitter:description)$/i.test(key)
+        ? `${key}: ${content}`
+        : "";
+    })
+    .filter(Boolean);
+  const attributes = [...html.matchAll(/\b(?:aria-label|title|placeholder|alt)="([^"]*)"/gi)]
+    .map((match) => match[1]);
+  const destinations = [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"/gi)]
+    .map((match) => match[1]);
+  const visible = html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return [...metadata, ...attributes, ...destinations, visible].join("\n");
+}
+
+function copyDigest(html) {
+  return createHash("sha256").update(publicCopySurface(html), "utf8").digest("hex");
+}
+
 function repeatedMarketingBlocks(html) {
   const blocks = [...html.matchAll(/<(h[1-3]|p)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
     .map((match) => match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
     .filter((text) => text.length >= 32);
   return blocks.filter((text, index) => blocks.indexOf(text) !== index);
 }
+
+test("locks every approved public-facing character, label and destination", async () => {
+  for (const [name, path] of Object.entries(pages)) {
+    const html = await readPage(path);
+    assert.equal(
+      copyDigest(html),
+      approvedCopyDigests[name],
+      `${name} public copy changed without a new character-level review`,
+    );
+    assert.doesNotMatch(html, /\uFFFD/, `${name} contains a replacement character`);
+    assert.doesNotMatch(html, /<!--[\s\S]*?-->/, `${name} contains a public HTML comment`);
+  }
+});
 
 test("ships the Firebase-ready MoolSocial company and compliance surface", async () => {
   const entries = await Promise.all(
@@ -41,15 +92,15 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   const content = Object.fromEntries(entries);
   const product = Object.values(content).join("\n");
 
-  assert.match(content.company, /trusted AI-enabled ecosystem/);
+  assert.match(content.company, /AI-enabled social commerce platform/);
   assert.match(content.company, /social(?:-| )commerce/i);
   assert.match(content.company, /India Ka Social Commerce App/);
   assert.match(content.company, /action-universe/);
   assert.match(content.company, /<section class="hero">[\s\S]*?<p class="eyebrow">Designed across platforms<\/p>[\s\S]*?<h1>MoolSocial moves with you\.<\/h1>/);
   assert.match(content.company, /<section class="hero">[\s\S]*?class="showcase-stage hero-showcase"/);
   assert.match(content.company, /<section class="section preview-section"[\s\S]*?class="action-universe"/);
-  assert.match(content.company, /MoolSocial at a glance/);
-  assert.match(content.company, /Indian technology company built around participation and economic opportunity/);
+  assert.match(content.company, /About MoolSocial/);
+  assert.match(content.company, /Indian technology company connecting people, businesses and opportunity/);
   assert.match(content.company, /<section class="section preview-section"[\s\S]*?<h2>One connected experience, built around real life\.<\/h2>/);
   assert.doesNotMatch(content.company, />\s*(?:iPhone|Android)(?:\s*·|\s*<)/);
   assert.equal((content.company.match(/phone-platform-ios/g) ?? []).length, 2);
@@ -69,11 +120,11 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.match(content.company, /data-countdown-hours/);
   assert.match(content.company, /data-countdown-minutes/);
   assert.match(content.company, /data-countdown-seconds/);
-  assert.match(content.company, /src="\/site\.js\?v=20260726-5"/);
-  assert.match(content.company, /100\+ upcoming roles/);
+  assert.match(content.company, /src="\/site\.js\?v=20260726-6"/);
+  assert.match(content.company, /100\+ planned roles/);
   assert.match(content.company, /freelancers/i);
-  assert.match(content.company, /quick-commerce delivery partners/);
-  assert.match(content.company, /X, YouTube, Instagram, Facebook and LinkedIn/);
+  assert.match(content.company, /quick-commerce\s+operators and delivery partners/);
+  assert.match(content.company, /X,\s+YouTube, Instagram, Facebook and\s+LinkedIn/);
   assert.match(content.company, /social-icon-x/);
   assert.match(content.company, /social-icon-youtube/);
   assert.match(content.company, /social-icon-instagram/);
@@ -94,7 +145,7 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.match(content.privacy, /security\.google\.com\/settings\/security\/permissions/);
   assert.match(content.privacy, /within 7 calendar days/);
   assert.match(content.privacy, /Payment gateways, aggregators, banks or payment networks/);
-  assert.match(content.privacy, /does not store actual card data, CVV/);
+  assert.match(content.privacy, /does not store full card details, CVV/);
   assert.match(content.privacy, /Social or content services, commerce partners, maps, mobility/);
   assert.match(content.terms, /External providers remain separate services/);
   assert.match(content.disconnect, /revoke/);
@@ -110,6 +161,10 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   );
   assert.doesNotMatch(customerCopy(content.company), /Motion shows|Choose an action|One tap|not final|may change/i);
   assert.doesNotMatch(customerCopy(content.company), /\b(?:roadmap|readiness|validate|validation|implementation|workflow|backend)\b|operating support|launch participation/i);
+  assert.doesNotMatch(
+    customerCopy(content.company),
+    /meaningful action|shared digital environment|accountable execution|responsible execution|operating locations|field execution|act on what matters/i,
+  );
   assert.doesNotMatch(customerCopy(content.company), /Scheduled public launch|Saturday,\s*24 October 2026/i);
   assert.equal((customerCopy(content.company).match(/24 October 2026/g) ?? []).length, 1);
   assert.deepEqual(repeatedMarketingBlocks(content.company), []);
@@ -127,10 +182,10 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.doesNotMatch(navigation, />Platform<|>MoolSocial<|>Privacy<|>Support</);
 
   const navigationContracts = [
-    ["Our story", "about", /MoolSocial at a glance[\s\S]*?Indian technology company/],
-    ["Our vision", "vision", /Responsible intelligence[\s\S]*?AI-enabled by design/],
-    ["Launch", "launch", /Built in India[\s\S]*?Follow the journey to launch/],
-    ["Join us", "opportunities", /Opportunities across India[\s\S]*?Careers and partnerships/],
+    ["Our story", "about", /About MoolSocial[\s\S]*?Indian technology company/],
+    ["Our vision", "vision", /AI with clear accountability[\s\S]*?Useful intelligence/],
+    ["Launch", "launch", /Built in India[\s\S]*?Join MoolSocial from the beginning/],
+    ["Join us", "opportunities", /Join MoolSocial[\s\S]*?Build your future with MoolSocial/],
   ];
   for (const [label, id, destinationCopy] of navigationContracts) {
     assert.match(navigation, new RegExp(`href="#${id}">${label}<`));
@@ -148,9 +203,9 @@ test("ships the Firebase-ready MoolSocial company and compliance surface", async
   assert.match(launchSection, /Contact MoolSocial/);
   assert.match(launchSection, /class="launch-roadmap"/);
   assert.equal((launchSection.match(/<li>/g) ?? []).length, 3);
-  assert.match(launchSection, />Join early</);
-  assert.match(launchSection, />Stay connected</);
-  assert.match(launchSection, />Public launch</);
+  assert.match(launchSection, />Register now</);
+  assert.match(launchSection, />Follow MoolSocial</);
+  assert.match(launchSection, />Launch day</);
   assert.doesNotMatch(launchSection, /readiness|validate|operating support/i);
   assert.doesNotMatch(launchSection, /Coming to India/i);
 
@@ -325,4 +380,17 @@ test("every public page meets the structural go-live gate", async () => {
     .find((header) => header.key === "Content-Security-Policy")?.value ?? "";
   assert.match(csp, /script-src 'self'/);
   assert.doesNotMatch(csp, /script-src 'none'/);
+
+  const globalHeaders = firebaseConfig.hosting.headers
+    .find((entry) => entry.source === "**")?.headers ?? [];
+  assert.equal(
+    globalHeaders.find((header) => header.key === "Cache-Control")?.value,
+    "public,max-age=0,must-revalidate",
+  );
+  const assetHeaders = firebaseConfig.hosting.headers
+    .find((entry) => entry.source === "**/*.@(css|png|jpg|jpeg|webp|svg|woff|woff2)")?.headers ?? [];
+  assert.equal(
+    assetHeaders.find((header) => header.key === "Cache-Control")?.value,
+    "public,max-age=3600",
+  );
 });
