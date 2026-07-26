@@ -42,7 +42,7 @@ const roles: Role[] = [
     shortName: "Find verified work",
     promise: "Access work with clear tasks, proof and payout rules.",
     description:
-      "Build a trusted work record through local jobs, delivery, sales, service and outcome-based assignments.",
+      "Build a trusted work record through local jobs, quick-commerce delivery, sales, service and outcome-based assignments.",
     action: "Join for work",
   },
   {
@@ -52,17 +52,89 @@ const roles: Role[] = [
     shortName: "Grow my business",
     promise: "Reach customers, creators and local talent from one place.",
     description:
-      "Launch products, demand campaigns, sales targets and specialised offers for the people you serve.",
+      "Grow retail, wholesale, services and customer relationships through useful products, demand and accountable execution.",
     action: "Join as a business",
   },
 ];
 
-const launchDate = new Date("2026-10-16T09:00:00+05:30");
+const productViewSets = [
+  [
+    {
+      src: "/app-preview-social-video.webp",
+      alt: "MoolSocial Social with For You, Shorts, Videos and Live",
+      height: 1820,
+    },
+    {
+      src: "/app-preview-universal-actions.webp",
+      alt: "MoolSocial home with Social, Shorts, Videos, Create, Earn, Buy, Ride, Pay and Work",
+      height: 1821,
+    },
+    {
+      src: "/app-preview-for-you.webp",
+      alt: "MoolSocial For You for discovery, shopping, booking and local activity",
+      height: 1821,
+    },
+  ],
+  [
+    {
+      src: "/app-preview-shop-deliver.webp",
+      alt: "MoolSocial shopping, quick commerce and delivery",
+      height: 1821,
+    },
+    {
+      src: "/app-preview-create-earn.webp",
+      alt: "MoolSocial creator and freelancer workspace",
+      height: 1821,
+    },
+    {
+      src: "/app-preview-work-grow.webp",
+      alt: "MoolSocial work opportunities and business operations",
+      height: 1821,
+    },
+  ],
+] as const;
 
 type SignupResult = {
   referralUrl: string;
   existing: boolean;
 };
+
+const launchTarget = new Date("2026-10-24T00:00:00+05:30").getTime();
+const monthMs = 30 * 24 * 60 * 60 * 1000;
+const dayMs = 24 * 60 * 60 * 1000;
+const hourMs = 60 * 60 * 1000;
+const minuteMs = 60 * 1000;
+
+function getLaunchCountdown(now: number | null) {
+  if (now === null) {
+    return {
+      months: "--",
+      days: "--",
+      hours: "--",
+      minutes: "--",
+      seconds: "--",
+    };
+  }
+
+  let remaining = Math.max(0, launchTarget - now);
+  const months = Math.floor(remaining / monthMs);
+  remaining -= months * monthMs;
+  const days = Math.floor(remaining / dayMs);
+  remaining -= days * dayMs;
+  const hours = Math.floor(remaining / hourMs);
+  remaining -= hours * hourMs;
+  const minutes = Math.floor(remaining / minuteMs);
+  remaining -= minutes * minuteMs;
+  const seconds = Math.floor(remaining / 1000);
+
+  return {
+    months: String(months).padStart(2, "0"),
+    days: String(days).padStart(2, "0"),
+    hours: String(hours).padStart(2, "0"),
+    minutes: String(minutes).padStart(2, "0"),
+    seconds: String(seconds).padStart(2, "0"),
+  };
+}
 
 export function LandingPage() {
   const [selectedRole, setSelectedRole] = useState<RoleId>("member");
@@ -71,19 +143,20 @@ export function LandingPage() {
   >("idle");
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<SignupResult | null>(null);
-  const [daysToLaunch, setDaysToLaunch] = useState(90);
+  const [countdownNow, setCountdownNow] = useState<number | null>(null);
   const activeRole = useMemo(
     () => roles.find((role) => role.id === selectedRole) ?? roles[0],
     [selectedRole],
   );
+  const launchCountdown = useMemo(
+    () => getLaunchCountdown(countdownNow),
+    [countdownNow],
+  );
 
   useEffect(() => {
-    const updateCountdown = () => {
-      const remaining = Math.max(0, launchDate.getTime() - Date.now());
-      setDaysToLaunch(Math.ceil(remaining / 86_400_000));
-    };
-    updateCountdown();
-    const timer = window.setInterval(updateCountdown, 60_000);
+    const update = () => setCountdownNow(Date.now());
+    update();
+    const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -176,24 +249,41 @@ export function LandingPage() {
           <a className="brand-lockup" href="#top" aria-label="MoolSocial home">
             <span className="brand-wordmark">MoolSocial</span>
             <span className="brand-line" aria-hidden="true" />
-            <span className="brand-tagline">India Ka Socio Commerce App</span>
+            <span className="brand-tagline">India Ka Social Commerce App</span>
           </a>
-          <a className="nav-action" href="#early-access">
-            Join early access
-          </a>
+          <div className="nav-links">
+            <a href="#audiences">Our story</a>
+            <a href="#experience">Experience</a>
+            <a href="#early-access">Join us</a>
+            <a className="nav-action" href="mailto:hello@moolsocial.com?subject=MoolSocial%20contact">Contact</a>
+          </div>
         </nav>
 
         <div className="hero-content shell">
           <div className="hero-copy">
-            <p className="eyebrow">Launching first in India</p>
-            <h1>
-              One app.
-              <span>More ways to live, earn and grow.</span>
-            </h1>
+            <p className="eyebrow">Designed across platforms</p>
+            <h1>MoolSocial moves with you.</h1>
             <p className="hero-intro">
-              MoolSocial is bringing people, creators, work and businesses into
-              one outcome-driven network.
+              MoolSocial is building a trusted AI-enabled ecosystem for the
+              digital services, opportunities and relationships that shape
+              everyday life in India.
             </p>
+            <div className="launch-countdown">
+              <div
+                className="countdown-grid"
+                aria-label="Time remaining until the MoolSocial launch"
+              >
+                <span><strong>{launchCountdown.months}</strong><small>Months</small></span>
+                <span><strong>{launchCountdown.days}</strong><small>Days</small></span>
+                <span><strong>{launchCountdown.hours}</strong><small>Hours</small></span>
+                <span><strong>{launchCountdown.minutes}</strong><small>Minutes</small></span>
+                <span><strong>{launchCountdown.seconds}</strong><small>Seconds</small></span>
+              </div>
+              <p>
+                Launching across India
+                <time dateTime="2026-10-24">24 October 2026</time>
+              </p>
+            </div>
             <div className="hero-actions">
               <a className="button button-primary" href="#early-access">
                 Reserve my early access
@@ -207,41 +297,46 @@ export function LandingPage() {
               <span>Verified opportunities</span>
               <span>Clear outcomes</span>
             </div>
-            <div className="launch-date">
-              <div>
-                <span>Public launch target</span>
-                <strong>16 October 2026</strong>
-              </div>
-              <p>
-                <strong>{daysToLaunch}</strong>
-                <span>{daysToLaunch === 1 ? "day" : "days"} remaining</span>
-              </p>
-            </div>
           </div>
 
-          <div className="network-card" aria-label="MoolSocial network preview">
-            <p className="network-label">Your MoolSocial network</p>
-            <div className="network-center">
-              <span className="network-brand">Mool</span>
-              <span>One trusted starting point</span>
-            </div>
-            <div className="network-paths">
-              {roles.map((role) => (
-                <button
-                  className="network-path"
-                  key={role.id}
-                  onClick={() => selectRole(role.id)}
-                  type="button"
-                >
-                  <span>{role.number}</span>
-                  <strong>{role.shortName}</strong>
-                </button>
-              ))}
-            </div>
-            <p className="network-foot">
-              Choose your intent. Reach the outcome. Build your value.
-            </p>
-          </div>
+          <a
+            className="showcase-stage hero-showcase"
+            href="mailto:hello@moolsocial.com?subject=Tell%20me%20more%20about%20MoolSocial"
+            aria-label="Email MoolSocial about the connected product experience"
+          >
+            <span className="showcase-halo showcase-halo-one" aria-hidden="true" />
+            <span className="showcase-halo showcase-halo-two" aria-hidden="true" />
+            <span className="showcase-orbit" aria-hidden="true" />
+            <span className="showcase-ribbon" aria-hidden="true" />
+            {productViewSets.map((set, setIndex) => (
+              <div
+                className={`showcase-set showcase-set-${setIndex === 0 ? "one" : "two"}`}
+                key={setIndex}
+              >
+                {set.map((view, viewIndex) => (
+                  <figure
+                    className={`showcase-phone-card ${
+                      viewIndex === 1 ? "phone-platform-ios" : "phone-platform-android"
+                    } showcase-phone-${
+                      viewIndex === 0 ? "left" : viewIndex === 1 ? "center" : "right"
+                    }`}
+                    key={view.src}
+                  >
+                    <div className="showcase-phone">
+                      <img
+                        alt={view.alt}
+                        height={view.height}
+                        loading="eager"
+                        src={view.src}
+                        width="864"
+                      />
+                      <span className="motion-tap" aria-hidden="true" />
+                    </div>
+                  </figure>
+                ))}
+              </div>
+            ))}
+          </a>
         </div>
       </section>
 
@@ -257,7 +352,7 @@ export function LandingPage() {
       <section className="audiences shell" id="audiences">
         <header className="section-heading">
           <p className="eyebrow dark">Choose what MoolSocial should do for you</p>
-          <h2>Four ways to join. One connected economy.</h2>
+          <h2>Every user type. One connected economy.</h2>
           <p>
             Tell us why you are joining so your launch experience starts with
             the right products, work and opportunities.
@@ -279,6 +374,40 @@ export function LandingPage() {
               </button>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="concept-section" id="experience">
+        <div className="shell showcase-layout">
+          <header className="section-heading">
+            <p className="eyebrow dark">One connected ecosystem</p>
+            <h2>One connected experience, built around real life.</h2>
+            <p>
+              Move naturally from discovery to meaningful action through one
+              consistent MoolSocial experience.
+            </p>
+          </header>
+          <div className="network-card" aria-label="MoolSocial network">
+            <p className="network-label">Your MoolSocial network</p>
+            <div className="network-center">
+              <span className="network-brand">Mool</span>
+              <span>One trusted starting point</span>
+            </div>
+            <div className="network-paths">
+              {roles.map((role) => (
+                <button
+                  className="network-path"
+                  key={role.id}
+                  onClick={() => selectRole(role.id)}
+                  type="button"
+                >
+                  <span>{role.number}</span>
+                  <strong>{role.shortName}</strong>
+                </button>
+              ))}
+            </div>
+            <p className="network-foot">Live. Earn. Grow.</p>
+          </div>
         </div>
       </section>
 
@@ -319,18 +448,20 @@ export function LandingPage() {
           <p className="eyebrow light">Opportunities across India</p>
           <h2>Help build MoolSocial in your city.</h2>
           <p>
-            We are inviting interest for pre-launch roles, creator
-            partnerships, city operations, business onboarding, field work and
-            verified earning opportunities across India.
+            Applications and partnership enquiries are open for 100+ upcoming
+            roles, freelancers, content creators, businesses, city operations
+            and delivery partners across quick commerce, retail and wholesale
+            in India.
           </p>
           <a
             className="button opportunity-button"
             href="mailto:hello@moolsocial.com?subject=MoolSocial%20India%20Opportunity"
           >
-            Contact hello@moolsocial.com
+            Email your résumé or profile
           </a>
           <span className="opportunity-note">
-            Mention your city, experience and the role or partnership you want.
+            Mention your city, experience and preferred role. MoolSocial does
+            not charge application or recruitment fees.
           </span>
         </div>
 
@@ -338,42 +469,64 @@ export function LandingPage() {
           <p className="eyebrow dark">Build the community before launch</p>
           <h2>Follow MoolSocial. Grow with MoolSocial.</h2>
           <p>
-            Follow <strong>@MoolSocial</strong>, turn on updates and invite
-            people who want to buy, create, work or grow a business.
+            Follow MoolSocial on X, YouTube, Instagram, Facebook and LinkedIn
+            for launch news, opportunities, creator updates and business
+            stories. Until each verified profile link is published, email us
+            for the official account.
           </p>
           <div className="social-list" aria-label="MoolSocial social channels">
-            <div>
+            <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20X%20profile">
+              <span className="social-brand-icon social-brand-icon-x" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z" /></svg>
+              </span>
               <span>X</span>
-              <strong>@MoolSocial</strong>
-              <small>Follow</small>
-            </div>
-            <div>
+              <strong>MoolSocial</strong>
+              <small>Request link</small>
+            </a>
+            <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20YouTube%20channel">
+              <span className="social-brand-icon social-brand-icon-youtube" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814ZM9.545 15.568V8.432L15.818 12l-6.273 3.568Z" /></svg>
+              </span>
               <span>YouTube</span>
-              <strong>@MoolSocial</strong>
-              <small>Subscribe</small>
-            </div>
-            <div>
+              <strong>MoolSocial</strong>
+              <small>Request link</small>
+            </a>
+            <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20Instagram%20profile">
+              <span className="social-brand-icon social-brand-icon-instagram" aria-hidden="true">
+                <svg viewBox="0 0 448 512"><path d="M224.3 141a115 115 0 1 0-.6 230 115 115 0 1 0 .6-230Zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1-.6-149.2Zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1-53.6 0Zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1S3.5 127.5 1.7 163.4c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8ZM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1Z" /></svg>
+              </span>
               <span>Instagram</span>
-              <strong>@MoolSocial</strong>
-              <small>Follow</small>
-            </div>
-            <div>
+              <strong>MoolSocial</strong>
+              <small>Request link</small>
+            </a>
+            <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20Facebook%20page">
+              <span className="social-brand-icon social-brand-icon-facebook" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103.513.061.894.126 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z" /></svg>
+              </span>
               <span>Facebook</span>
-              <strong>@MoolSocial</strong>
-              <small>Follow</small>
-            </div>
+              <strong>MoolSocial</strong>
+              <small>Request link</small>
+            </a>
+            <a href="mailto:hello@moolsocial.com?subject=Official%20MoolSocial%20LinkedIn%20page">
+              <span className="social-brand-icon social-brand-icon-linkedin" aria-hidden="true">
+                <img alt="" height="542" src="/social-linkedin.png" width="606" />
+              </span>
+              <span>LinkedIn</span>
+              <strong>MoolSocial</strong>
+              <small>Request link</small>
+            </a>
           </div>
-          <div className="creator-callout">
-            <span>For creators</span>
+          <div className="community-callout">
+            <span>For everyone</span>
             <p>
-              Start building genuine followers now. Your trusted audience and
-              consistent content can unlock verified campaigns and earning
-              opportunities when MoolSocial launches.
+              People, job applicants, freelancers, creators, businesses,
+              retailers, wholesalers and delivery partners can register early
+              interest before the 24 October 2026 launch.
             </p>
           </div>
           <p className="social-pending">
-            Official profile links will activate here after the social accounts
-            are verified.
+            Verified profile links will activate here as each official account
+            goes live.
           </p>
         </div>
       </section>
@@ -426,7 +579,7 @@ export function LandingPage() {
               <input
                 autoComplete="email"
                 name="email"
-                placeholder="you@example.com"
+                placeholder="name@domain.com"
                 required
                 type="email"
               />
@@ -495,7 +648,14 @@ export function LandingPage() {
           <a className="footer-brand" href="#top">
             MoolSocial
           </a>
-          <p>India Ka Socio Commerce App</p>
+          <nav className="footer-links" aria-label="Legal and support">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/support">Support</a>
+            <a href="mailto:hello@moolsocial.com?subject=MoolSocial%20contact">
+              Contact
+            </a>
+          </nav>
           <a href="mailto:hello@moolsocial.com">hello@moolsocial.com</a>
           <p>© {new Date().getFullYear()} SuperMandi Tech Pvt Ltd</p>
         </div>

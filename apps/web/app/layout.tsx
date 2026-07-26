@@ -18,9 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${protocol}://${host}` : "https://moolsocial.com";
-  const title = "MoolSocial — Live, Earn and Grow";
+  const title = "MoolSocial — AI-Enabled Social Commerce";
   const description =
-    "Join MoolSocial before the 16 October 2026 launch as a user, creator, worker, job seeker or business.";
+    "Join MoolSocial before the 24 October 2026 launch as a user, creator, freelancer, professional, delivery partner, retailer, wholesaler or business.";
 
   return {
     title,
@@ -32,13 +32,13 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       url: origin,
       siteName: "MoolSocial",
-      images: [`${origin}/og.png`],
+      images: [`${origin}/og-2026-10-24.png`],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${origin}/og.png`],
+      images: [`${origin}/og-2026-10-24.png`],
     },
   };
 }

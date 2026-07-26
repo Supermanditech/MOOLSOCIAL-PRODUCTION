@@ -1,6 +1,80 @@
 {
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "MoolSocial",
+        "supportEmail": "hello@moolsocial.com"
+      }
+    }
+  },
   "dataconnect": {
     "source": "dataconnect"
+  },
+  "functions": [
+    {
+      "source": "backend/functions",
+      "codebase": "provider",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ],
+      "ignore": [
+        ".git",
+        ".runtimeconfig.json",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "node_modules",
+        "lib/**/*.test.js",
+        "lib/**/*.test.js.map",
+        "src/**/*.test.ts"
+      ]
+    }
+  ],
+  "firestore": {
+    "database": "(default)",
+    "rules": "backend/firestore/youtube-private-dev.rules"
+  },
+  "hosting": {
+    "public": "apps/web/public",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(), microphone=(), geolocation=(), payment=()"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'; upgrade-insecure-requests"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(css|png|jpg|jpeg|webp|svg|woff|woff2)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public,max-age=3600"
+          }
+        ]
+      }
+    ]
   },
   "emulators": {
     "auth": {
@@ -11,6 +85,10 @@
       "host": "0.0.0.0",
       "port": 9399,
       "dataDir": "dataconnect/.dataconnect/pgliteData"
+    },
+    "functions": {
+      "host": "0.0.0.0",
+      "port": 5001
     },
     "ui": {
       "enabled": true,
