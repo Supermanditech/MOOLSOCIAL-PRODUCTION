@@ -1938,3 +1938,47 @@ model is recorded at
 `docs/decisions/ADR-0009-UNIFIED-BUY-CATALOGUE-OFFERS-AND-FULFILMENT.md`.
 It requires separate founder approval before it becomes the HTML design
 authority.
+
+## Latest founder decision — Buy HTML authority approved, 27 July 2026
+
+The founder approved ADR-0009 as the information-architecture authority for a
+new Buy HTML UI/UX candidate and explicitly reserved final product approval
+until that interactive HTML is reviewed.
+
+The active boundary is:
+
+1. preserve the protected Social baseline, the accepted Screen 04 v8 HTML and
+   the OPPO/Dev trial evidence;
+2. leave every approved-final screenbook file unchanged;
+3. revise only the editable Buy HTML and its isolated review/audit support;
+4. demonstrate Personal Buy, verified Business Buy, canonical products,
+   context-specific offers, seller comparison, PIN-code serviceability and
+   truthful price/stock recovery;
+5. present the exact interactive HTML for founder `FINAL`; and
+6. do not change Flutter, freeze an immutable Buy reference or begin a Dev
+   deployment trial before that decision.
+
+### Buy HTML review draft prepared
+
+- Editable review source:
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\screens\09-buy.html`
+- Isolated Buy styling:
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\shared\moolsocial-buy-v2.css`
+- Isolated Buy interaction model:
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\shared\moolsocial-buy-v2.js`
+- Founder-review evidence:
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\BUY-HTML-FOUNDER-REVIEW-20260727.md`
+- Saved screenbook commit:
+  `fab6eab5823de83533e0516c53a065ea6756e7a7`
+- After-restart review launcher:
+  `C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\START-BUY-HTML-REVIEW.cmd`
+- Personal review URL:
+  `http://127.0.0.1:8765/screens/09-buy.html`
+- Business review URL:
+  `http://127.0.0.1:8765/screens/09-buy.html?context=business`
+
+The draft covers the approved unified catalogue/offers/fulfilment model,
+Personal and Business contexts, per-pack MOQ, seller comparison, saved baskets,
+medicine, serviceability, recovery, checkout, consent, confirmation and native
+order tracking. It remains an editable founder-review draft. No approved-final
+reference, Flutter implementation or deployment is authorized at this stage.

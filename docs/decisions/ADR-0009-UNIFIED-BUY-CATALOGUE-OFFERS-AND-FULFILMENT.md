@@ -1,8 +1,14 @@
 # ADR-0009: Unified Buy catalogue, offers and fulfilment
 
-Status: **Proposed for founder approval**
+Status: **Founder-approved for HTML prototyping; final product approval pending HTML review**
 
 Recorded: 26 July 2026
+
+Founder decision: 27 July 2026. The operating model below is approved as the
+information-architecture authority for a new Buy HTML founder-review
+candidate. This approval does not mark the Buy UI/UX `FINAL`, freeze an
+accepted reference, authorize Flutter implementation or authorize a Dev
+deployment trial.
 
 ## Context
 
@@ -219,9 +225,10 @@ flags.
 - Letting a delivery partner appear as the seller.
 - Showing wholesale commitments in the household product grid.
 
-## Founder decision required
+## Founder decision gate
 
-Founder approval of this ADR authorizes the shared Buy HTML information
-architecture. It does not authorize Flutter changes, participant activation,
-payments, production data, cloud deployment or a claim that any live offer is
-the lowest price.
+The founder approved this ADR for the shared Buy HTML information architecture
+on 27 July 2026 and reserved final product approval until the complete
+interactive HTML is reviewed. Flutter changes, participant activation,
+payments, production data, cloud deployment and any live lowest-price claim
+remain unauthorized.
