@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="MoolSocial">
+  <rect width="512" height="512" rx="112" fill="#000080"/>
+  <path d="M104 338V174c0-30 36-46 58-25l94 90 94-90c22-21 58-5 58 25v164h-62V246l-69 66a31 31 0 0 1-42 0l-69-66v92z" fill="#fff"/>
+  <rect x="104" y="374" width="101" height="18" rx="9" fill="#ff9933"/>
+  <rect x="205" y="374" width="102" height="18" fill="#fff"/>
+  <rect x="307" y="374" width="101" height="18" rx="9" fill="#138808"/>
+</svg>

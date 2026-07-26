@@ -13,11 +13,20 @@ const pages = {
   deletion: "delete-account/index.html",
 };
 
+const canonicalUrls = {
+  company: "https://moolsocial.com/",
+  privacy: "https://moolsocial.com/privacy",
+  terms: "https://moolsocial.com/terms",
+  support: "https://moolsocial.com/support",
+  disconnect: "https://moolsocial.com/disconnect",
+  deletion: "https://moolsocial.com/delete-account",
+};
+
 const approvedCopyDigests = {
   company: "682c245968880b4e34e84720a737791348a4da32e1e1e14d526e70d1dd92576b",
-  privacy: "77c93fb8d887b233bc65fe8f7c3454322dbcb49b06c63ed17302f49fb9429af6",
-  terms: "9840209eeadae43463724b0d4d027b0e28f1a3228357555ca8ac07e131d03685",
-  support: "5d339025d99123cd8a42684b8484df804f49f72f9806b0b9cd32def8b62f7a8a",
+  privacy: "647123836ff438a8f5d6a8e25d2bd999126c885262765fd5c7a57bd27207d8ab",
+  terms: "9948a1d9b0e1d48e86a5f466d4f3414b875facf1a09e568390e281339a6d3559",
+  support: "1cd3bcd1c934945b3e401ab95f7fa071c1321e1906e07a7afa6ed4596492e1ae",
   disconnect: "006abf94d94c80d7baa5d43743ddfb740f8e3bf9e751332642e920f03d90e17e",
   deletion: "dfded552130632b83675202c0d68a21aa5886b09a4b36bfe2306a78b664bc2b6",
 };
@@ -393,4 +402,81 @@ test("every public page meets the structural go-live gate", async () => {
     assetHeaders.find((header) => header.key === "Cache-Control")?.value,
     "public,max-age=3600",
   );
+});
+
+test("publishes a coherent Google discovery and canonicalization surface", async () => {
+  const content = Object.fromEntries(
+    await Promise.all(
+      Object.entries(pages).map(async ([name, path]) => [name, await readPage(path)]),
+    ),
+  );
+
+  for (const [name, html] of Object.entries(content)) {
+    assert.match(html, /<html lang="en-IN">/, `${name} must declare its Indian English locale`);
+    assert.equal(
+      (html.match(/<link rel="canonical"/g) ?? []).length,
+      1,
+      `${name} must expose exactly one canonical URL`,
+    );
+    assert.match(
+      html,
+      new RegExp(
+        `<link rel="canonical" href="${canonicalUrls[name].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">`,
+      ),
+      `${name} canonical URL is incorrect`,
+    );
+    assert.match(html, /<meta name="robots" content="[^"]+">/);
+    assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+    assert.match(html, /<link rel="manifest" href="\/site\.webmanifest">/);
+  }
+
+  for (const name of ["company", "privacy", "terms", "support"]) {
+    assert.match(content[name], /<meta name="robots" content="index,follow/);
+  }
+  for (const name of ["disconnect", "deletion"]) {
+    assert.match(content[name], /<meta name="robots" content="noindex,follow">/);
+  }
+
+  assert.match(content.company, /<meta property="og:site_name" content="MoolSocial">/);
+  assert.match(content.company, /<meta property="og:locale" content="en_IN">/);
+  assert.match(content.company, /<meta property="og:image:width" content="1536">/);
+  assert.match(content.company, /<meta property="og:image:height" content="1024">/);
+  assert.match(content.company, /<meta name="twitter:image:alt" content="MoolSocial — AI-Enabled Social Commerce">/);
+
+  const jsonLdSource = content.company.match(
+    /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
+  )?.[1];
+  assert.ok(jsonLdSource, "company page must include JSON-LD");
+  const jsonLd = JSON.parse(jsonLdSource);
+  const organization = jsonLd["@graph"].find((entry) => entry["@type"] === "Organization");
+  const website = jsonLd["@graph"].find((entry) => entry["@type"] === "WebSite");
+  assert.equal(organization.name, "MoolSocial");
+  assert.equal(organization.legalName, "SuperMandi Tech Pvt Ltd");
+  assert.equal(organization.url, canonicalUrls.company);
+  assert.equal(organization.email, "hello@moolsocial.com");
+  assert.equal(website.url, canonicalUrls.company);
+  assert.equal(website.publisher["@id"], "https://moolsocial.com/#organization");
+
+  const robots = await readPage("robots.txt");
+  assert.match(robots, /^User-agent: \*\r?\nAllow: \//);
+  assert.match(robots, /Sitemap: https:\/\/moolsocial\.com\/sitemap\.xml/);
+  assert.doesNotMatch(robots, /Disallow:\s*\//);
+
+  const sitemap = await readPage("sitemap.xml");
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+  assert.deepEqual(sitemapUrls, [
+    canonicalUrls.company,
+    canonicalUrls.privacy,
+    canonicalUrls.terms,
+    canonicalUrls.support,
+  ]);
+  assert.doesNotMatch(sitemap, /disconnect|delete-account/);
+  assert.equal((sitemap.match(/<lastmod>2026-07-26<\/lastmod>/g) ?? []).length, 4);
+
+  const manifest = JSON.parse(await readPage("site.webmanifest"));
+  assert.equal(manifest.name, "MoolSocial");
+  assert.equal(manifest.start_url, "/");
+  assert.equal(manifest.theme_color, "#000080");
+  await access(new URL("favicon.svg", publicRoot));
 });

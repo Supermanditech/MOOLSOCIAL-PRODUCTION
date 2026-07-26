@@ -1,0 +1,49 @@
+{
+  "auditId": "moolsocial-web-seo-20260726-01",
+  "observedAt": "2026-07-26T14:53:00.3781921Z",
+  "publicUrl": "https://moolsocial.com/",
+  "firebase": {
+    "project": "moolsocial-dev-503018",
+    "channel": "live",
+    "release": "projects/moolsocial-dev-503018/sites/moolsocial-dev-503018/channels/live/releases/1785077458371000",
+    "version": "projects/moolsocial-dev-503018/sites/moolsocial-dev-503018/versions/9a11fef857fe4bd9",
+    "status": "FINALIZED",
+    "releaseTime": "2026-07-26T14:50:58.371Z",
+    "releaseUser": "hello@moolsocial.com"
+  },
+  "verification": {
+    "build": "PASS",
+    "tests": "PASS 7/7",
+    "lintErrors": 0,
+    "sourceToLiveFiles": "PASS 23/23",
+    "googlebotHomeStatus": 200,
+    "robotsStatus": 200,
+    "sitemapStatus": 200,
+    "faviconStatus": 200,
+    "manifestStatus": 200,
+    "canonical": "https://moolsocial.com/",
+    "robotsDirective": "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1",
+    "structuredDataTypes": [
+      "Organization",
+      "WebSite"
+    ],
+    "browserConsoleErrors": 0,
+    "horizontalOverflow": false
+  },
+  "indexableUrls": [
+    "https://moolsocial.com/",
+    "https://moolsocial.com/privacy",
+    "https://moolsocial.com/terms",
+    "https://moolsocial.com/support"
+  ],
+  "noindexUtilities": [
+    "https://moolsocial.com/disconnect",
+    "https://moolsocial.com/delete-account"
+  ],
+  "searchConsole": {
+    "account": "hello@moolsocial.com",
+    "property": "sc-domain:moolsocial.com",
+    "access": "NOT_VERIFIED",
+    "remainingAction": "Verify ownership, submit sitemap.xml, inspect the homepage and request indexing."
+  }
+}
