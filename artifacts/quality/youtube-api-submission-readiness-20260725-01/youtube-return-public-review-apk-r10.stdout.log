@@ -1,0 +1,7 @@
+Running Gradle task 'assembleDebug'...                          
+Running Gradle task 'assembleDebug'...                             76.5s
+√ Built build\app\outputs\flutter-apk\app-debug.apk
+YouTube return public-review APK build passed.
+CANDIDATE=youtube-return-oppo-20260726-10
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\youtube-private-dev-oppo-public-viewing-20260725-01\moolsocial-youtube-videos-shorts-private-dev-r10.apk
+SHA256=4B69C0F284B9AA1AACF80C764F2B3497996CEA2E1728F068B896F0D6DF8798E9

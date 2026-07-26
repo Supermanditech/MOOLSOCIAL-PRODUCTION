@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "screenId": "universal-focus-shell",
+  "version": "v5",
+  "verifiedAt": "2026-07-22",
+  "sourceHtmlSha256": "b4a7f6b91a1f488ec5ba78d2a84379316ee9fd918264715c0be1ed11f78a459a",
+  "founderDecision": "Approved; proceed with native Flutter",
+  "checks": {
+    "directCreate": {
+      "formats": ["Reel", "Carousel", "Post"],
+      "postTools": ["Image", "Image Poll", "Quick Poll", "Quiz"],
+      "ownedLongFormVideoAbsent": true,
+      "sameSurface": true
+    },
+    "responsive": {
+      "viewports": ["320x568", "412x915"],
+      "horizontalOverflow": 0,
+      "panelOverflow": 0,
+      "minimumTapTarget": 44,
+      "undersizedTargets": 0
+    },
+    "runtime": {
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    "referenceCaptures": [
+      "create-390x844.png",
+      "create-reel-direct-390x844.png",
+      "create-carousel-direct-390x844.png",
+      "create-image-poll-direct-390x844.png",
+      "create-quick-poll-direct-390x844.png",
+      "create-quiz-direct-390x844.png"
+    ]
+  },
+  "nativeAcceptance": "pending connected OPPO founder review"
+}

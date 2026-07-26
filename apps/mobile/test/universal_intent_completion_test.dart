@@ -33,6 +33,7 @@ void main() {
         key: UniqueKey(),
         session: session,
         initialLocation: '/app/$section',
+        legacyPresentationForTestsOnly: true,
       ),
     );
     await tester.pumpAndSettle();
@@ -540,7 +541,11 @@ void main() {
     addTearDown(session.dispose);
     await tester.binding.setSurfaceSize(const Size(360, 800));
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/social'),
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/social',
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
 

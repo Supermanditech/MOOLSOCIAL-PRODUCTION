@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-social-feed-create",
+  "version": "v1",
+  "status": "founder-approved-html-scope",
+  "entry": {
+    "pathname": "/screens/04-universal-focus-shell.html",
+    "world": "social",
+    "choices": ["feed", "create"]
+  },
+  "protectedRail": {
+    "labels": ["Mool", "Shorts", "Videos", "Feed", "Create", "Chat"],
+    "cssSha256": "6d225260f19b04dd9fbaba70ec72bc163e36ce9c6560cfda4faddb8db32fe49c",
+    "markupSha256": "85769e85707c44e14bf30d2a3545c37c025d2af93a9e23690b4b99f5e8bfd4b6",
+    "navigationRuntimeSha256": "f0f009649cdeebe115fcb1cc2ffd369f627e8136c36f93b562cc1fc15faba7fb"
+  },
+  "feed": {
+    "discoveryModes": ["For You", "Following", "Nearby", "Promoted"],
+    "requirements": [
+      "Each discovery mode changes the actual visible MoolSocial Post or Carousel content",
+      "Feed remains MoolSocial-native and does not reproduce a closed external network feed",
+      "Engagement controls belong to each content item and change or reveal a concrete state",
+      "Carousel controls change the visible photo without leaving Feed",
+      "Commerce appears only on a real eligible content-campaign relationship with sponsor and creator-commission disclosure",
+      "Creator and Business account tools do not appear as general Feed actions"
+    ]
+  },
+  "createLanding": {
+    "choices": ["Create a Reel", "Write a Post", "Build a Carousel", "Continue a Draft"],
+    "requirements": [
+      "Personal Create contains only MoolSocial-native Reel, Post, Carousel and Draft choices",
+      "Creator Studio, campaign, connected-channel, analytics, earnings and payout tools remain under the Creator account",
+      "Each visible choice has a concrete next action",
+      "Create does not claim external-network publishing permission from MoolSocial sign-in"
+    ]
+  },
+  "responsiveMatrix": [
+    "320x568@100%",
+    "320x568@140%",
+    "360x640@100%",
+    "360x640@140%",
+    "360x720@100%",
+    "360x720@140%",
+    "375x667@100%",
+    "375x667@140%",
+    "390x844@100%",
+    "390x844@140%",
+    "412x915@100%",
+    "412x915@140%",
+    "430x932@100%",
+    "430x932@140%"
+  ],
+  "acceptanceEvidence": {
+    "contentFitment": "28/28",
+    "interactions": "14/14",
+    "copyAndAccountBoundary": "2/2",
+    "consoleErrors": 0,
+    "failures": 0
+  },
+  "knownProtectedRailObservation": "The accepted rail is crowded near Create at 320x568 with simulated 140% text. The rail remains unchanged pending separate founder authorization.",
+  "nativeImplementationAuthorized": false
+}

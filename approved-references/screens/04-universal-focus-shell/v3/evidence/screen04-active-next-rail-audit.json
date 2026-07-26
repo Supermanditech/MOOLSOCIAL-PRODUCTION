@@ -1,0 +1,6710 @@
+{
+  "ticket": "FND-U04-RAIL-003",
+  "contract": "active selection and its next available action remain visible; direct horizontal swipe remains enabled",
+  "url": "http://127.0.0.1:8765/screens/04-universal-focus-shell.html?founderReview=1&rail=capability",
+  "startedAt": "2026-07-22T09:03:55.547Z",
+  "checks": [
+    {
+      "name": "320x568 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "320x568 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 87,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 150,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 174,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 214,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 197,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 276,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 28,
+        "scrollWidth": 253,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 79,
+        "scrollWidth": 253,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 70,
+        "scrollWidth": 244,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 276,
+        "scrollWidth": 450,
+        "clientWidth": 174,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "320x568 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "320x568 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 45,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 109,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 174,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 159,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 240,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 217,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 217,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 47,
+        "scrollWidth": 217,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 205,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 314,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 284,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 284,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 47,
+        "scrollWidth": 284,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 96,
+        "scrollWidth": 284,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 95,
+        "scrollWidth": 254,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 314,
+        "scrollWidth": 473,
+        "clientWidth": 159,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "320x568 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "360x640 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "360x640 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 9,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 139,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 204,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 269,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 54,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 112,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 109,
+        "scrollWidth": 302,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 269,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "360x640 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "360x640 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 38,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 105,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 172,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 240,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 312,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 135,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 137,
+        "scrollWidth": 314,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 312,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x640 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "360x720 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "360x720 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 9,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 139,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 193,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 204,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 50,
+        "scrollWidth": 243,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 269,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 54,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 112,
+        "scrollWidth": 305,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 109,
+        "scrollWidth": 302,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 269,
+        "scrollWidth": 462,
+        "clientWidth": 193,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "360x720 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "360x720 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 38,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 105,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 172,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 15,
+        "scrollWidth": 192,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 240,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 260,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 76,
+        "scrollWidth": 253,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 312,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 74,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 135,
+        "scrollWidth": 340,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 137,
+        "scrollWidth": 314,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 312,
+        "scrollWidth": 489,
+        "clientWidth": 177,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "360x720 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "375x667 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "375x667 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 62,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 127,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 208,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 192,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 243,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 254,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 305,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 47,
+        "scrollWidth": 305,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 97,
+        "scrollWidth": 305,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 94,
+        "scrollWidth": 302,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 254,
+        "scrollWidth": 462,
+        "clientWidth": 208,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "375x667 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "375x667 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 23,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 90,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 158,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 192,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 225,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 260,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 253,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 296,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 61,
+        "scrollWidth": 340,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 122,
+        "scrollWidth": 340,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 122,
+        "scrollWidth": 314,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 297,
+        "scrollWidth": 489,
+        "clientWidth": 192,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "375x667 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "390x844 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "390x844 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 54,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 119,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 223,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 185,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 20,
+        "scrollWidth": 243,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 239,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 307,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 307,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 31,
+        "scrollWidth": 307,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 84,
+        "scrollWidth": 307,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 79,
+        "scrollWidth": 302,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 239,
+        "scrollWidth": 462,
+        "clientWidth": 223,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "390x844 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "390x844 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 8,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 75,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 143,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 207,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 210,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 53,
+        "scrollWidth": 260,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 46,
+        "scrollWidth": 253,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 281,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 54,
+        "scrollWidth": 340,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 115,
+        "scrollWidth": 340,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 107,
+        "scrollWidth": 314,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 282,
+        "scrollWidth": 489,
+        "clientWidth": 207,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "390x844 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "412x915 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "412x915 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 34,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 108,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 174,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 245,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 217,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 310,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 310,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 22,
+        "scrollWidth": 310,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 65,
+        "scrollWidth": 310,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 57,
+        "scrollWidth": 302,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 217,
+        "scrollWidth": 462,
+        "clientWidth": 245,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "412x915 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "412x915 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 64,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 131,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 229,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 199,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 31,
+        "scrollWidth": 260,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 24,
+        "scrollWidth": 253,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 260,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 35,
+        "scrollWidth": 340,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 104,
+        "scrollWidth": 340,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 85,
+        "scrollWidth": 314,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 260,
+        "scrollWidth": 489,
+        "clientWidth": 229,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "412x915 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "430x932 100% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "430x932 100% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 27,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 99,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 165,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 263,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 199,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 310,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 310,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 14,
+        "scrollWidth": 310,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 47,
+        "scrollWidth": 310,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 39,
+        "scrollWidth": 302,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 199,
+        "scrollWidth": 462,
+        "clientWidth": 263,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 100% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    },
+    {
+      "name": "430x932 140% HTTP and initial pair",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "430x932 140% Social/Shorts active+next",
+      "passed": true,
+      "details": {
+        "active": "Shorts",
+        "next": "Videos",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Social/Videos active+next",
+      "passed": true,
+      "details": {
+        "active": "Videos",
+        "next": "Feed",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Social/Feed active+next",
+      "passed": true,
+      "details": {
+        "active": "Feed",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 6,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Social/Create active+next",
+      "passed": true,
+      "details": {
+        "active": "Create",
+        "next": "Create",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 6,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Social root active+next",
+      "passed": true,
+      "details": {
+        "active": "Social",
+        "next": "Buy",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Buy/Grocery active+next",
+      "passed": true,
+      "details": {
+        "active": "Grocery",
+        "next": "Categories",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Buy/Categories active+next",
+      "passed": true,
+      "details": {
+        "active": "Categories",
+        "next": "Medicine",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Buy/Medicine active+next",
+      "passed": true,
+      "details": {
+        "active": "Medicine",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 6,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Buy/Basket active+next",
+      "passed": true,
+      "details": {
+        "active": "Basket",
+        "next": "Basket",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 6,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Buy root active+next",
+      "passed": true,
+      "details": {
+        "active": "Buy",
+        "next": "Eat",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Eat/Order Food active+next",
+      "passed": true,
+      "details": {
+        "active": "Order Food",
+        "next": "Book Table",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Eat/Book Table active+next",
+      "passed": true,
+      "details": {
+        "active": "Book Table",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Eat/Tiffin active+next",
+      "passed": true,
+      "details": {
+        "active": "Tiffin",
+        "next": "Tiffin",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Eat root active+next",
+      "passed": true,
+      "details": {
+        "active": "Eat",
+        "next": "Ride",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 55,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Ride/Bike active+next",
+      "passed": true,
+      "details": {
+        "active": "Bike",
+        "next": "Auto",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Ride/Auto active+next",
+      "passed": true,
+      "details": {
+        "active": "Auto",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Ride/Cab active+next",
+      "passed": true,
+      "details": {
+        "active": "Cab",
+        "next": "Cab",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Ride root active+next",
+      "passed": true,
+      "details": {
+        "active": "Ride",
+        "next": "Book",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 122,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Book/Get It Done active+next",
+      "passed": true,
+      "details": {
+        "active": "Get It Done",
+        "next": "Doctor",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Book/Doctor active+next",
+      "passed": true,
+      "details": {
+        "active": "Doctor",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Book/Salon active+next",
+      "passed": true,
+      "details": {
+        "active": "Salon",
+        "next": "Salon",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 247,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Book root active+next",
+      "passed": true,
+      "details": {
+        "active": "Book",
+        "next": "Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 190,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Pay/Recharge active+next",
+      "passed": true,
+      "details": {
+        "active": "Recharge",
+        "next": "Bills",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Pay/Bills active+next",
+      "passed": true,
+      "details": {
+        "active": "Bills",
+        "next": "Scan & Pay",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 260,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Pay/Scan & Pay active+next",
+      "passed": true,
+      "details": {
+        "active": "Scan & Pay",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 13,
+        "scrollWidth": 260,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Pay/Receipts active+next",
+      "passed": true,
+      "details": {
+        "active": "Receipts",
+        "next": "Receipts",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 6,
+        "scrollWidth": 253,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Pay root active+next",
+      "passed": true,
+      "details": {
+        "active": "Pay",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 242,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work/Earn Today active+next",
+      "passed": true,
+      "details": {
+        "active": "Earn Today",
+        "next": "Delivery",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work/Delivery active+next",
+      "passed": true,
+      "details": {
+        "active": "Delivery",
+        "next": "Onboard",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 0,
+        "scrollWidth": 340,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work/Onboard active+next",
+      "passed": true,
+      "details": {
+        "active": "Onboard",
+        "next": "Verify",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 28,
+        "scrollWidth": 340,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work/Verify active+next",
+      "passed": true,
+      "details": {
+        "active": "Verify",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 93,
+        "scrollWidth": 340,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work/Workspace active+next",
+      "passed": true,
+      "details": {
+        "active": "Workspace",
+        "next": "Workspace",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 67,
+        "scrollWidth": 314,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% Work root active+next",
+      "passed": true,
+      "details": {
+        "active": "Work",
+        "next": "Work",
+        "activeVisible": true,
+        "nextVisible": true,
+        "scrollLeft": 242,
+        "scrollWidth": 489,
+        "clientWidth": 247,
+        "overflowX": "auto"
+      }
+    },
+    {
+      "name": "430x932 140% horizontal discovery remains enabled",
+      "passed": true,
+      "details": {
+        "scrollable": true,
+        "overflowX": "auto",
+        "touchAction": "pan-x"
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "failures": [],
+  "completedAt": "2026-07-22T09:06:38.906Z",
+  "summary": {
+    "checks": 490,
+    "passes": 490,
+    "failures": 0,
+    "consoleErrors": 0,
+    "passed": true
+  }
+}

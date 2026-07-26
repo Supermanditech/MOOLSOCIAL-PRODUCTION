@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "social-protected-baseline-20260726-01",
+  "recordedAt": "2026-07-26",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "repositoryHeadBeforeBaselineCommit": "745657f3a45179bc51dcd829bde4d60e23190be9",
+  "protectedSource": {
+    "fileCount": 119,
+    "portableTreeSha256": "927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851",
+    "hashAlgorithm": "SHA-256",
+    "lineEndingPolicy": "UTF-8 text is normalized from CRLF to LF; binary files use raw bytes",
+    "gate": "scripts/check-social-protected-baseline.ps1"
+  },
+  "html": {
+    "manifest": "approved-references/manifest.json",
+    "manifestRawSha256AtRecord": "c099c3775d052d83078d5c72bfa9568016f68856a82575bebca3a29a9986e6c2",
+    "lockGate": "scripts/check-approved-ui-locks.ps1",
+    "acceptedScreen04Version": "v8",
+    "acceptedScreen04SourceSha256": "0997f3ad7adaad76eb3fd7f5a96cf63c1d691413da92f368fc4ec005e0d86410",
+    "workingScreenbookBranch": "founder-review/youtube-screen04-2026-07-25",
+    "workingScreenbookHead": "2febd426c7ea254292c1e822221efc00b08a82f3",
+    "workingScreen04Sha256": "667190f9e1837721bc6d9e4a19090fa089a67cfdf02a73fce42dfe8408f91e93",
+    "workingScreen04Status": "unapproved-founder-review-draft",
+    "existingBuyDraftSha256": "91ea647b56a5c017ea16346018394e63e39e06045e841a80e66eda9410a4cf8b",
+    "note": "The approved-reference manifest and each reference package remain the HTML authority. This baseline does not upgrade a draft or reopen a frozen reference."
+  },
+  "flutter": {
+    "retainedDeployedCandidate": "youtube-return-oppo-20260726-10",
+    "retainedApk": "artifacts/quality/youtube-private-dev-oppo-public-viewing-20260725-01/moolsocial-youtube-videos-shorts-private-dev-r10.apk",
+    "retainedApkSha256": "4b69c0f284b9aa1aacf80c764f2b3497996cea2e1728f068b896f0d6df8798e9",
+    "installedOppoApkSha256": "4b69c0f284b9aa1aacf80c764f2b3497996cea2e1728f068b896f0d6df8798e9",
+    "installedOppoSerial": "2b3e0f71",
+    "installedOppoModel": "CPH2375",
+    "installedOppoLastUpdate": "2026-07-26 13:59:11",
+    "installedArtifactMatch": true,
+    "installedOppoScreenshot": "artifacts/quality/social-protected-baseline-20260726-01/oppo-r10-live-videos-20260726.png",
+    "installedOppoScreenshotSha256": "9fa47c4f6e3e33b43c8b5218e981aab17cd1e93649fffd0cec32bae484950feb",
+    "installedOppoUiDump": "artifacts/quality/social-protected-baseline-20260726-01/oppo-r10-live-videos-20260726.xml",
+    "installedOppoUiDumpSha256": "2f5e7acfb593f0aa86538c6c4860c00080ca9369096a1d257ee166bf9dccb693",
+    "currentSourceBuildProof": "apps/mobile/build/app/outputs/flutter-apk/app-debug.apk",
+    "currentSourceBuildProofSha256": "97853d03a05dd6a74334aa0aec4ec15bef3f374fed049e6ce2f1024d7cf15c26",
+    "currentSourceBuildProofDeployed": false,
+    "operationalGoldenTest": "apps/mobile/test/screen04_social_operational_baseline_test.dart",
+    "historicalV8GoldenPreserved": true
+  },
+  "trialDeployment": {
+    "firebaseProject": "moolsocial-dev-503018",
+    "capabilityProfile": "PublicDataReview",
+    "lastRecordedCloudRunRevision": "youtubeprovider-00024-dol",
+    "firebaseFunctionSourceHash": "8a3afd8e81e30322f1d64f13e3d79f6360516aab",
+    "firebaseFunctionsState": "ACTIVE",
+    "firebaseReadOnlyVerifiedAt": "2026-07-26",
+    "publicDataEnabled": true,
+    "ownerConnectEnabled": false,
+    "ownerActionsEnabled": false,
+    "creatorAssetsEnabled": false,
+    "liveEnabled": false,
+    "privateUploadEnabled": false,
+    "ownerAnalyticsEnabled": false,
+    "evidence": "artifacts/quality/youtube-private-dev-oppo-public-viewing-20260725-01/LIVE-PUBLIC-VIDEOS-SHORTS-PROOF.md"
+  },
+  "providerDependencyGate": {
+    "testsPassed": 271,
+    "highSeverityAuditFindings": 0,
+    "moderateSeverityTransitiveFindings": 7,
+    "highSeverityRemediation": "google-gax rimraf overridden to 6.1.3; full provider verification passed",
+    "auditCommand": "npm audit --omit=dev --audit-level=high"
+  },
+  "verification": {
+    "dartFormat": "passed",
+    "flutterAnalyze": "passed-no-issues",
+    "flutterFullTestsPassed": 572,
+    "flutterFullTestsSkipped": 4,
+    "flutterFullTestsFailed": 0,
+    "flutterFullTestLog": "artifacts/quality/social-protected-baseline-20260726-01/flutter-full-regression-20260726.log",
+    "flutterFullTestLogSha256": "f34aa4cf6fbf6424c4e0e7b4cf0e7d94aafa36f1711e86f804a0190b675df569",
+    "androidDebugBuild": "passed",
+    "customerCopyGate": "passed",
+    "interactionContractGate": "passed-153-routes",
+    "approvedUiLocks": "passed",
+    "protectedSocialGate": "passed-119-files"
+  },
+  "buyBoundary": {
+    "htmlFounderFinalRequired": true,
+    "immutableReferenceRequiredBeforeFlutter": true,
+    "nativeFlutterRequired": true,
+    "socialRegressionRequired": true,
+    "physicalOppoReplayRequired": true,
+    "deploymentTrialAllowedBeforeCompleteBuy": false
+  }
+}

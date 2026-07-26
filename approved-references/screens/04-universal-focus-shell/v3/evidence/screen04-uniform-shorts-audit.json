@@ -1,0 +1,2370 @@
+{
+  "audit": "Screen 04 uniform Shorts, premium rail and responsive type",
+  "url": "http://127.0.0.1:8765/screens/04-universal-focus-shell.html?founderReview=1&rail=capability",
+  "results": [
+    {
+      "name": "320x568@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 2.957501173019409,
+          "right": 320,
+          "bottom": 491.6137511730194,
+          "left": 0,
+          "width": 320,
+          "height": 488.65625,
+          "clientWidth": 320,
+          "clientHeight": 489,
+          "scrollWidth": 322,
+          "scrollHeight": 492
+        },
+        "player": {
+          "top": 2.957501173019409,
+          "right": 320,
+          "bottom": 491.6137511730194,
+          "left": 0,
+          "width": 320,
+          "height": 488.65625,
+          "clientWidth": 320,
+          "clientHeight": 489,
+          "scrollWidth": 320,
+          "scrollHeight": 489
+        },
+        "media": {
+          "top": 2.957501173019409,
+          "right": 320,
+          "bottom": 491.6137511730194,
+          "left": 0,
+          "width": 320,
+          "height": 488.65625,
+          "clientWidth": 320,
+          "clientHeight": 489,
+          "scrollWidth": 320,
+          "scrollHeight": 489
+        },
+        "story": {
+          "top": 308.3168640136719,
+          "right": 308.8125,
+          "bottom": 480.0981140136719,
+          "left": 11.1875,
+          "width": 297.625,
+          "height": 171.78125,
+          "clientWidth": 298,
+          "clientHeight": 172,
+          "scrollWidth": 298,
+          "scrollHeight": 172
+        },
+        "rail": {
+          "top": 488.65625,
+          "right": 311.203125,
+          "bottom": 560.8125,
+          "left": 8.796875,
+          "width": 302.40625,
+          "height": 72.15625,
+          "clientWidth": 300,
+          "clientHeight": 70,
+          "scrollWidth": 300,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 69.109375,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 79.109375,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 68.0625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 79.8125,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 49.99998474121094
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 221.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 71.046875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 71.0625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 71.046875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 71.0625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 54,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 568,
+        "viewportHeight": 568,
+        "titleFontSize": 16,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "320x568@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 2.0397770404815674,
+          "right": 320,
+          "bottom": 482.96165204048157,
+          "left": 0,
+          "width": 320,
+          "height": 480.921875,
+          "clientWidth": 320,
+          "clientHeight": 481,
+          "scrollWidth": 322,
+          "scrollHeight": 485
+        },
+        "player": {
+          "top": 2.0397770404815674,
+          "right": 320,
+          "bottom": 482.96165204048157,
+          "left": 0,
+          "width": 320,
+          "height": 480.921875,
+          "clientWidth": 320,
+          "clientHeight": 481,
+          "scrollWidth": 320,
+          "scrollHeight": 481
+        },
+        "media": {
+          "top": 2.0397770404815674,
+          "right": 320,
+          "bottom": 482.96165204048157,
+          "left": 0,
+          "width": 320,
+          "height": 480.921875,
+          "clientWidth": 320,
+          "clientHeight": 481,
+          "scrollWidth": 320,
+          "scrollHeight": 481
+        },
+        "story": {
+          "top": 222.38352966308594,
+          "right": 304.328125,
+          "bottom": 466.8366394042969,
+          "left": 15.671875,
+          "width": 288.65625,
+          "height": 244.45310974121094,
+          "clientWidth": 289,
+          "clientHeight": 244,
+          "scrollWidth": 289,
+          "scrollHeight": 244
+        },
+        "rail": {
+          "top": 480.921875,
+          "right": 307.6875,
+          "bottom": 557.921875,
+          "left": 12.3125,
+          "width": 295.375,
+          "height": 77,
+          "clientWidth": 293,
+          "clientHeight": 75,
+          "scrollWidth": 293,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 71.03125,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 85.046875,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 69.5625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 86.03125,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 49.99998474121094
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 182.5625,
+            "height": 43.99998474121094
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 43.99998474121094
+          },
+          {
+            "label": "Save",
+            "width": 67.453125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 67.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 67.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 67.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 44,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 54,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 568,
+        "viewportHeight": 568,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "360x640@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 1.3983653783798218,
+          "right": 360,
+          "bottom": 562.0546153783798,
+          "left": 0,
+          "width": 360,
+          "height": 560.65625,
+          "clientWidth": 360,
+          "clientHeight": 561,
+          "scrollWidth": 363,
+          "scrollHeight": 565
+        },
+        "player": {
+          "top": 1.3983653783798218,
+          "right": 360,
+          "bottom": 562.0546153783798,
+          "left": 0,
+          "width": 360,
+          "height": 560.65625,
+          "clientWidth": 360,
+          "clientHeight": 561,
+          "scrollWidth": 360,
+          "scrollHeight": 561
+        },
+        "media": {
+          "top": 1.3983653783798218,
+          "right": 360,
+          "bottom": 562.0546153783798,
+          "left": 0,
+          "width": 360,
+          "height": 560.65625,
+          "clientWidth": 360,
+          "clientHeight": 561,
+          "scrollWidth": 360,
+          "scrollHeight": 561
+        },
+        "story": {
+          "top": 377.94525146484375,
+          "right": 348.8125,
+          "bottom": 550.5390014648438,
+          "left": 11.1875,
+          "width": 337.625,
+          "height": 172.59375,
+          "clientWidth": 338,
+          "clientHeight": 173,
+          "scrollWidth": 338,
+          "scrollHeight": 173
+        },
+        "rail": {
+          "top": 560.65625,
+          "right": 351.203125,
+          "bottom": 632.8125,
+          "left": 8.796875,
+          "width": 342.40625,
+          "height": 72.15625,
+          "clientWidth": 340,
+          "clientHeight": 70,
+          "scrollWidth": 340,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 79.109375,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 89.109375,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 78.0625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 89.8125,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 261.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 81.046875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 81.0625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 81.046875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 81.0625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 640,
+        "viewportHeight": 640,
+        "titleFontSize": 16.74,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "360x640@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 0.20677906274795532,
+          "right": 360,
+          "bottom": 553.128654062748,
+          "left": 0,
+          "width": 360,
+          "height": 552.921875,
+          "clientWidth": 360,
+          "clientHeight": 553,
+          "scrollWidth": 363,
+          "scrollHeight": 557
+        },
+        "player": {
+          "top": 0.20677906274795532,
+          "right": 360,
+          "bottom": 553.128654062748,
+          "left": 0,
+          "width": 360,
+          "height": 552.921875,
+          "clientWidth": 360,
+          "clientHeight": 553,
+          "scrollWidth": 360,
+          "scrollHeight": 553
+        },
+        "media": {
+          "top": 0.20677906274795532,
+          "right": 360,
+          "bottom": 553.128654062748,
+          "left": 0,
+          "width": 360,
+          "height": 552.921875,
+          "clientWidth": 360,
+          "clientHeight": 553,
+          "scrollWidth": 360,
+          "scrollHeight": 553
+        },
+        "story": {
+          "top": 292.550537109375,
+          "right": 344.328125,
+          "bottom": 537.003662109375,
+          "left": 15.671875,
+          "width": 328.65625,
+          "height": 244.453125,
+          "clientWidth": 329,
+          "clientHeight": 244,
+          "scrollWidth": 329,
+          "scrollHeight": 244
+        },
+        "rail": {
+          "top": 552.921875,
+          "right": 347.6875,
+          "bottom": 629.921875,
+          "left": 12.3125,
+          "width": 335.375,
+          "height": 77,
+          "clientWidth": 333,
+          "clientHeight": 75,
+          "scrollWidth": 333,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 74.71875,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 88.734375,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 73.25,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 89.71875,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50.00001525878906
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 222.5625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 77.453125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 640,
+        "viewportHeight": 640,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "360x720@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 55.6216926574707,
+          "right": 360,
+          "bottom": 642.6998176574707,
+          "left": 0,
+          "width": 360,
+          "height": 587.078125,
+          "clientWidth": 360,
+          "clientHeight": 587,
+          "scrollWidth": 363,
+          "scrollHeight": 591
+        },
+        "player": {
+          "top": 55.6216926574707,
+          "right": 360,
+          "bottom": 642.6998176574707,
+          "left": 0,
+          "width": 360,
+          "height": 587.078125,
+          "clientWidth": 360,
+          "clientHeight": 587,
+          "scrollWidth": 360,
+          "scrollHeight": 587
+        },
+        "media": {
+          "top": 55.6216926574707,
+          "right": 360,
+          "bottom": 642.6998176574707,
+          "left": 0,
+          "width": 360,
+          "height": 587.078125,
+          "clientWidth": 360,
+          "clientHeight": 587,
+          "scrollWidth": 360,
+          "scrollHeight": 587
+        },
+        "story": {
+          "top": 447.3404541015625,
+          "right": 348.8125,
+          "bottom": 631.1842041015625,
+          "left": 11.1875,
+          "width": 337.625,
+          "height": 183.84375,
+          "clientWidth": 338,
+          "clientHeight": 184,
+          "scrollWidth": 338,
+          "scrollHeight": 184
+        },
+        "rail": {
+          "top": 640.65625,
+          "right": 351.203125,
+          "bottom": 712.8125,
+          "left": 8.796875,
+          "width": 342.40625,
+          "height": 72.15625,
+          "clientWidth": 340,
+          "clientHeight": 70,
+          "scrollWidth": 340,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 78.421875,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Following",
+            "width": 89.8125,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Nearby",
+            "width": 77.21875,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Promoted",
+            "width": 90.609375,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 261.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 81.046875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 81.0625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 81.046875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 81.0625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 720,
+        "viewportHeight": 720,
+        "titleFontSize": 16.74,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "360x720@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 60.38100814819336,
+          "right": 360,
+          "bottom": 635.8810081481934,
+          "left": 0,
+          "width": 360,
+          "height": 575.5,
+          "clientWidth": 360,
+          "clientHeight": 576,
+          "scrollWidth": 363,
+          "scrollHeight": 580
+        },
+        "player": {
+          "top": 60.38100814819336,
+          "right": 360,
+          "bottom": 635.8810081481934,
+          "left": 0,
+          "width": 360,
+          "height": 575.5,
+          "clientWidth": 360,
+          "clientHeight": 576,
+          "scrollWidth": 360,
+          "scrollHeight": 576
+        },
+        "media": {
+          "top": 60.38100814819336,
+          "right": 360,
+          "bottom": 635.8810081481934,
+          "left": 0,
+          "width": 360,
+          "height": 575.5,
+          "clientWidth": 360,
+          "clientHeight": 576,
+          "scrollWidth": 360,
+          "scrollHeight": 576
+        },
+        "story": {
+          "top": 359.5997619628906,
+          "right": 344.328125,
+          "bottom": 619.7559814453125,
+          "left": 15.671875,
+          "width": 328.65625,
+          "height": 260.1562194824219,
+          "clientWidth": 329,
+          "clientHeight": 260,
+          "scrollWidth": 329,
+          "scrollHeight": 260
+        },
+        "rail": {
+          "top": 632.921875,
+          "right": 347.6875,
+          "bottom": 709.921875,
+          "left": 12.3125,
+          "width": 335.375,
+          "height": 77,
+          "clientWidth": 333,
+          "clientHeight": 75,
+          "scrollWidth": 333,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 84.5625,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 100.5,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 82.890625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 101.609375,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 222.5625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 77.453125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 77.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 720,
+        "viewportHeight": 720,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "375x667@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 56.53229904174805,
+          "right": 375,
+          "bottom": 590.610424041748,
+          "left": 0,
+          "width": 375,
+          "height": 534.078125,
+          "clientWidth": 375,
+          "clientHeight": 534,
+          "scrollWidth": 378,
+          "scrollHeight": 538
+        },
+        "player": {
+          "top": 56.53229904174805,
+          "right": 375,
+          "bottom": 590.610424041748,
+          "left": 0,
+          "width": 375,
+          "height": 534.078125,
+          "clientWidth": 375,
+          "clientHeight": 534,
+          "scrollWidth": 375,
+          "scrollHeight": 534
+        },
+        "media": {
+          "top": 56.53229904174805,
+          "right": 375,
+          "bottom": 590.610424041748,
+          "left": 0,
+          "width": 375,
+          "height": 534.078125,
+          "clientWidth": 375,
+          "clientHeight": 534,
+          "scrollWidth": 375,
+          "scrollHeight": 534
+        },
+        "story": {
+          "top": 394.31353759765625,
+          "right": 363.8125,
+          "bottom": 579.0947875976562,
+          "left": 11.1875,
+          "width": 352.625,
+          "height": 184.78125,
+          "clientWidth": 353,
+          "clientHeight": 185,
+          "scrollWidth": 353,
+          "scrollHeight": 185
+        },
+        "rail": {
+          "top": 587.65625,
+          "right": 366.203125,
+          "bottom": 659.8125,
+          "left": 8.796875,
+          "width": 357.40625,
+          "height": 72.15625,
+          "clientWidth": 355,
+          "clientHeight": 70,
+          "scrollWidth": 355,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 82.171875,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Following",
+            "width": 93.5625,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Nearby",
+            "width": 80.96875,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Promoted",
+            "width": 94.359375,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 276.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 84.796875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 84.8125,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 84.796875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 84.8125,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 667,
+        "viewportHeight": 667,
+        "titleFontSize": 17.4375,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "375x667@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 63.68274688720703,
+          "right": 375,
+          "bottom": 586.182746887207,
+          "left": 0,
+          "width": 375,
+          "height": 522.5,
+          "clientWidth": 375,
+          "clientHeight": 523,
+          "scrollWidth": 378,
+          "scrollHeight": 526
+        },
+        "player": {
+          "top": 63.68274688720703,
+          "right": 375,
+          "bottom": 586.182746887207,
+          "left": 0,
+          "width": 375,
+          "height": 522.5,
+          "clientWidth": 375,
+          "clientHeight": 523,
+          "scrollWidth": 375,
+          "scrollHeight": 523
+        },
+        "media": {
+          "top": 63.68274688720703,
+          "right": 375,
+          "bottom": 586.182746887207,
+          "left": 0,
+          "width": 375,
+          "height": 522.5,
+          "clientWidth": 375,
+          "clientHeight": 523,
+          "scrollWidth": 375,
+          "scrollHeight": 523
+        },
+        "story": {
+          "top": 309.9014892578125,
+          "right": 359.328125,
+          "bottom": 570.0577392578125,
+          "left": 15.671875,
+          "width": 343.65625,
+          "height": 260.15625,
+          "clientWidth": 344,
+          "clientHeight": 260,
+          "scrollWidth": 344,
+          "scrollHeight": 260
+        },
+        "rail": {
+          "top": 579.921875,
+          "right": 362.6875,
+          "bottom": 656.921875,
+          "left": 12.3125,
+          "width": 350.375,
+          "height": 77,
+          "clientWidth": 348,
+          "clientHeight": 75,
+          "scrollWidth": 348,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 84.5625,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 100.5,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 82.890625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 101.609375,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 237.5625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 81.203125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 81.21875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 81.21875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 81.21875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 667,
+        "viewportHeight": 667,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "390x844@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 53.67698287963867,
+          "right": 390,
+          "bottom": 764.7551078796387,
+          "left": 0,
+          "width": 390,
+          "height": 711.078125,
+          "clientWidth": 390,
+          "clientHeight": 711,
+          "scrollWidth": 393,
+          "scrollHeight": 716
+        },
+        "player": {
+          "top": 53.67698287963867,
+          "right": 390,
+          "bottom": 764.7551078796387,
+          "left": 0,
+          "width": 390,
+          "height": 711.078125,
+          "clientWidth": 390,
+          "clientHeight": 711,
+          "scrollWidth": 390,
+          "scrollHeight": 711
+        },
+        "media": {
+          "top": 53.67698287963867,
+          "right": 390,
+          "bottom": 764.7551078796387,
+          "left": 0,
+          "width": 390,
+          "height": 711.078125,
+          "clientWidth": 390,
+          "clientHeight": 711,
+          "scrollWidth": 390,
+          "scrollHeight": 711
+        },
+        "story": {
+          "top": 567.114501953125,
+          "right": 378.8125,
+          "bottom": 753.239501953125,
+          "left": 11.1875,
+          "width": 367.625,
+          "height": 186.125,
+          "clientWidth": 368,
+          "clientHeight": 186,
+          "scrollWidth": 368,
+          "scrollHeight": 186
+        },
+        "rail": {
+          "top": 764.65625,
+          "right": 381.203125,
+          "bottom": 836.8125,
+          "left": 8.796875,
+          "width": 372.40625,
+          "height": 72.15625,
+          "clientWidth": 370,
+          "clientHeight": 70,
+          "scrollWidth": 370,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 85.921875,
+            "height": 44.000003814697266
+          },
+          {
+            "label": "Following",
+            "width": 97.3125,
+            "height": 44.000003814697266
+          },
+          {
+            "label": "Nearby",
+            "width": 84.71875,
+            "height": 44.000003814697266
+          },
+          {
+            "label": "Promoted",
+            "width": 98.109375,
+            "height": 44.000003814697266
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 291.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 88.546875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 88.5625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 88.546875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 88.5625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 844,
+        "viewportHeight": 844,
+        "titleFontSize": 18.135,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "390x844@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 58.357872009277344,
+          "right": 390,
+          "bottom": 757.8578720092773,
+          "left": 0,
+          "width": 390,
+          "height": 699.5,
+          "clientWidth": 390,
+          "clientHeight": 700,
+          "scrollWidth": 393,
+          "scrollHeight": 705
+        },
+        "player": {
+          "top": 58.357872009277344,
+          "right": 390,
+          "bottom": 757.8578720092773,
+          "left": 0,
+          "width": 390,
+          "height": 699.5,
+          "clientWidth": 390,
+          "clientHeight": 700,
+          "scrollWidth": 390,
+          "scrollHeight": 700
+        },
+        "media": {
+          "top": 58.357872009277344,
+          "right": 390,
+          "bottom": 757.8578720092773,
+          "left": 0,
+          "width": 390,
+          "height": 699.5,
+          "clientWidth": 390,
+          "clientHeight": 700,
+          "scrollWidth": 390,
+          "scrollHeight": 700
+        },
+        "story": {
+          "top": 481.5766296386719,
+          "right": 374.328125,
+          "bottom": 741.7328491210938,
+          "left": 15.671875,
+          "width": 358.65625,
+          "height": 260.1562194824219,
+          "clientWidth": 359,
+          "clientHeight": 260,
+          "scrollWidth": 359,
+          "scrollHeight": 260
+        },
+        "rail": {
+          "top": 756.921875,
+          "right": 377.6875,
+          "bottom": 833.921875,
+          "left": 12.3125,
+          "width": 365.375,
+          "height": 77,
+          "clientWidth": 363,
+          "clientHeight": 75,
+          "scrollWidth": 363,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 84.5625,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 100.5,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 82.890625,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 101.609375,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 252.5625,
+            "height": 44.000030517578125
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44.000030517578125
+          },
+          {
+            "label": "Save",
+            "width": 84.953125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 84.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 84.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 84.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 844,
+        "viewportHeight": 844,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "412x915@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 57.8636360168457,
+          "right": 412,
+          "bottom": 839.9417610168457,
+          "left": 0,
+          "width": 412,
+          "height": 782.078125,
+          "clientWidth": 412,
+          "clientHeight": 782,
+          "scrollWidth": 415,
+          "scrollHeight": 788
+        },
+        "player": {
+          "top": 57.8636360168457,
+          "right": 412,
+          "bottom": 839.9417610168457,
+          "left": 0,
+          "width": 412,
+          "height": 782.078125,
+          "clientWidth": 412,
+          "clientHeight": 782,
+          "scrollWidth": 412,
+          "scrollHeight": 782
+        },
+        "media": {
+          "top": 57.8636360168457,
+          "right": 412,
+          "bottom": 839.9417610168457,
+          "left": 0,
+          "width": 412,
+          "height": 782.078125,
+          "clientWidth": 412,
+          "clientHeight": 782,
+          "scrollWidth": 412,
+          "scrollHeight": 782
+        },
+        "story": {
+          "top": 640.7230224609375,
+          "right": 400.8125,
+          "bottom": 828.4261474609375,
+          "left": 11.1875,
+          "width": 389.625,
+          "height": 187.703125,
+          "clientWidth": 390,
+          "clientHeight": 188,
+          "scrollWidth": 390,
+          "scrollHeight": 188
+        },
+        "rail": {
+          "top": 835.65625,
+          "right": 403.203125,
+          "bottom": 907.8125,
+          "left": 8.796875,
+          "width": 394.40625,
+          "height": 72.15625,
+          "clientWidth": 392,
+          "clientHeight": 70,
+          "scrollWidth": 392,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 91.421875,
+            "height": 43.99999237060547
+          },
+          {
+            "label": "Following",
+            "width": 102.8125,
+            "height": 43.99999237060547
+          },
+          {
+            "label": "Nearby",
+            "width": 90.21875,
+            "height": 43.99999237060547
+          },
+          {
+            "label": "Promoted",
+            "width": 103.609375,
+            "height": 43.99999237060547
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 313.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 94.046875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 94.0625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 94.046875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 94.0625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54.640625,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54.640625,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54.640625,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54.640625,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 915,
+        "viewportHeight": 915,
+        "titleFontSize": 18.88,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "412x915@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 59.46617126464844,
+          "right": 412,
+          "bottom": 829.9661712646484,
+          "left": 0,
+          "width": 412,
+          "height": 770.5,
+          "clientWidth": 412,
+          "clientHeight": 771,
+          "scrollWidth": 415,
+          "scrollHeight": 776
+        },
+        "player": {
+          "top": 59.46617126464844,
+          "right": 412,
+          "bottom": 829.9661712646484,
+          "left": 0,
+          "width": 412,
+          "height": 770.5,
+          "clientWidth": 412,
+          "clientHeight": 771,
+          "scrollWidth": 412,
+          "scrollHeight": 771
+        },
+        "media": {
+          "top": 59.46617126464844,
+          "right": 412,
+          "bottom": 829.9661712646484,
+          "left": 0,
+          "width": 412,
+          "height": 770.5,
+          "clientWidth": 412,
+          "clientHeight": 771,
+          "scrollWidth": 412,
+          "scrollHeight": 771
+        },
+        "story": {
+          "top": 598.2786865234375,
+          "right": 396.328125,
+          "bottom": 813.8411865234375,
+          "left": 15.671875,
+          "width": 380.65625,
+          "height": 215.5625,
+          "clientWidth": 381,
+          "clientHeight": 216,
+          "scrollWidth": 381,
+          "scrollHeight": 216
+        },
+        "rail": {
+          "top": 827.921875,
+          "right": 399.6875,
+          "bottom": 904.921875,
+          "left": 12.3125,
+          "width": 387.375,
+          "height": 77,
+          "clientWidth": 385,
+          "clientHeight": 75,
+          "scrollWidth": 385,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 86.78125,
+            "height": 44
+          },
+          {
+            "label": "Following",
+            "width": 102.71875,
+            "height": 44
+          },
+          {
+            "label": "Nearby",
+            "width": 85.109375,
+            "height": 44
+          },
+          {
+            "label": "Promoted",
+            "width": 103.828125,
+            "height": 44
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 274.5625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 90.453125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 90.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 90.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 90.46875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 915,
+        "viewportHeight": 915,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "430x932@100%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 54.97401809692383,
+          "right": 430,
+          "bottom": 854.0521430969238,
+          "left": 0,
+          "width": 430,
+          "height": 799.078125,
+          "clientWidth": 430,
+          "clientHeight": 799,
+          "scrollWidth": 433,
+          "scrollHeight": 805
+        },
+        "player": {
+          "top": 54.97401809692383,
+          "right": 430,
+          "bottom": 854.0521430969238,
+          "left": 0,
+          "width": 430,
+          "height": 799.078125,
+          "clientWidth": 430,
+          "clientHeight": 799,
+          "scrollWidth": 430,
+          "scrollHeight": 799
+        },
+        "media": {
+          "top": 54.97401809692383,
+          "right": 430,
+          "bottom": 854.0521430969238,
+          "left": 0,
+          "width": 430,
+          "height": 799.078125,
+          "clientWidth": 430,
+          "clientHeight": 799,
+          "scrollWidth": 430,
+          "scrollHeight": 799
+        },
+        "story": {
+          "top": 654.8333740234375,
+          "right": 418.8125,
+          "bottom": 842.5364990234375,
+          "left": 11.1875,
+          "width": 407.625,
+          "height": 187.703125,
+          "clientWidth": 408,
+          "clientHeight": 188,
+          "scrollWidth": 408,
+          "scrollHeight": 188
+        },
+        "rail": {
+          "top": 852.65625,
+          "right": 421.203125,
+          "bottom": 924.8125,
+          "left": 8.796875,
+          "width": 412.40625,
+          "height": 72.15625,
+          "clientWidth": 410,
+          "clientHeight": 70,
+          "scrollWidth": 410,
+          "scrollHeight": 70
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 95.921875,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Following",
+            "width": 107.3125,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Nearby",
+            "width": 94.71875,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Promoted",
+            "width": 108.109375,
+            "height": 43.999996185302734
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 331.265625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 68.6875,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 98.546875,
+            "height": 44
+          },
+          {
+            "label": "Discuss",
+            "width": 98.5625,
+            "height": 44
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 98.546875,
+            "height": 44
+          },
+          {
+            "label": "Details",
+            "width": 98.5625,
+            "height": 44
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 59.140625,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 59.140625,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 59.140625,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 59.140625,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 932,
+        "viewportHeight": 932,
+        "titleFontSize": 18.88,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    },
+    {
+      "name": "430x932@140%",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "reached": true,
+        "reel": {
+          "top": 58.35801315307617,
+          "right": 430,
+          "bottom": 845.8580131530762,
+          "left": 0,
+          "width": 430,
+          "height": 787.5,
+          "clientWidth": 430,
+          "clientHeight": 788,
+          "scrollWidth": 433,
+          "scrollHeight": 793
+        },
+        "player": {
+          "top": 58.35801315307617,
+          "right": 430,
+          "bottom": 845.8580131530762,
+          "left": 0,
+          "width": 430,
+          "height": 787.5,
+          "clientWidth": 430,
+          "clientHeight": 788,
+          "scrollWidth": 430,
+          "scrollHeight": 788
+        },
+        "media": {
+          "top": 58.35801315307617,
+          "right": 430,
+          "bottom": 845.8580131530762,
+          "left": 0,
+          "width": 430,
+          "height": 787.5,
+          "clientWidth": 430,
+          "clientHeight": 788,
+          "scrollWidth": 430,
+          "scrollHeight": 788
+        },
+        "story": {
+          "top": 614.1705322265625,
+          "right": 414.328125,
+          "bottom": 829.7330322265625,
+          "left": 15.671875,
+          "width": 398.65625,
+          "height": 215.5625,
+          "clientWidth": 399,
+          "clientHeight": 216,
+          "scrollWidth": 399,
+          "scrollHeight": 216
+        },
+        "rail": {
+          "top": 844.921875,
+          "right": 417.6875,
+          "bottom": 921.921875,
+          "left": 12.3125,
+          "width": 405.375,
+          "height": 77,
+          "clientWidth": 403,
+          "clientHeight": 75,
+          "scrollWidth": 403,
+          "scrollHeight": 75
+        },
+        "targets": [
+          {
+            "label": "For You",
+            "width": 91.28125,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Following",
+            "width": 107.21875,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Nearby",
+            "width": 89.609375,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Promoted",
+            "width": 108.328125,
+            "height": 44.00000762939453
+          },
+          {
+            "label": "Watch A fast breakfast for a busy morning",
+            "width": 50,
+            "height": 50
+          },
+          {
+            "label": "EKEveryday Kitchen India2.42M subscribers",
+            "width": 292.5625,
+            "height": 44
+          },
+          {
+            "label": "Subscribe",
+            "width": 95.34375,
+            "height": 44
+          },
+          {
+            "label": "Save",
+            "width": 94.953125,
+            "height": 52.921875
+          },
+          {
+            "label": "Discuss",
+            "width": 94.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Share this YouTube video",
+            "width": 94.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Details",
+            "width": 94.96875,
+            "height": 52.921875
+          },
+          {
+            "label": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "label": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "label": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "horizontalOverflow": 0,
+        "pageHeight": 932,
+        "viewportHeight": 932,
+        "titleFontSize": 22.4,
+        "titleClipped": false,
+        "sourceVisible": true,
+        "modesVisible": true,
+        "creatorVisible": true,
+        "actionsVisible": true,
+        "actionCount": 4,
+        "aspectRatio": "9 / 16"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "name": "MoolSocial reel controls hide and return on tap",
+      "passed": true,
+      "details": {
+        "hidden": true,
+        "restored": true
+      }
+    },
+    {
+      "name": "Vertical navigation continues across providers",
+      "passed": true,
+      "details": {
+        "before": "A fast breakfast for a busy morning",
+        "after": "From carved block to printed cotton"
+      }
+    },
+    {
+      "name": "Rail selection motion acknowledges the active destination",
+      "passed": true,
+      "details": {
+        "active": true,
+        "animation": "rail-acknowledged",
+        "sheen": "rail-sheen"
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "failures": [],
+  "startedAt": "2026-07-22T08:59:37.583Z",
+  "completedAt": "2026-07-22T09:00:07.766Z",
+  "summary": {
+    "viewportChecks": 14,
+    "viewportPasses": 14,
+    "interactionChecks": 3,
+    "interactionPasses": 3,
+    "consoleErrors": 0,
+    "failures": 0,
+    "passed": true
+  }
+}

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/moolsocial_app.dart';
+import 'core/navigation/youtube_connect_return_route.dart';
+import 'core/youtube/youtube_private_dev_app_check.dart';
 import 'features/journey01/journey_services.dart';
 import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
@@ -21,6 +23,9 @@ const _useEmulators = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+const _youtubePublicReviewMode = bool.fromEnvironment(
+  'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW',
+);
 const _candidateId = String.fromEnvironment(
   'MOOLSOCIAL_CANDIDATE_ID',
   defaultValue: 'unidentified',
@@ -42,12 +47,17 @@ Future<void> main() async {
     debugPrint(
       'MOOLSOCIAL_CANDIDATE '
       'id=$_candidateId '
-      'requiredSetupVersion=$approvedSetupExperienceVersion',
+      'requiredSetupVersion=$approvedSetupExperienceVersion '
+      'youtubePublicReview=$_youtubePublicReviewMode',
     );
   }
   _validateRuntimeMode();
   final firebaseOptions = _firebaseOptions();
   await Firebase.initializeApp(options: firebaseOptions);
+  await activateYouTubePrivateDevAppCheckIfEnabled(
+    useEmulators: _useEmulators,
+    firebaseProjectId: firebaseOptions.projectId,
+  );
 
   const emulatorHost = String.fromEnvironment(
     'MOOLSOCIAL_EMULATOR_HOST',
@@ -61,47 +71,79 @@ Future<void> main() async {
   }
 
   final preferences = await SharedPreferences.getInstance();
-  final session = JourneySession(
-    store: SharedPreferencesJourneyStore(preferences),
-    otpGateway: FirebaseOtpGateway(
-      FirebaseAuth.instance,
-      emulatorHost: _useEmulators ? emulatorHost : null,
-      emulatorFallbackHost:
-          _deviceReviewMode && emulatorFallbackHost.trim().isNotEmpty
-          ? emulatorFallbackHost
-          : null,
-      emulatorProjectId: _useEmulators ? firebaseOptions.projectId : null,
-      emulatorApiKey: firebaseOptions.apiKey,
-      directEmulatorAuth: _deviceReviewMode,
-      reviewPreferences: _deviceReviewMode ? preferences : null,
-    ),
-    emailOtpGateway: _deviceReviewMode
-        ? SharedPreferencesReviewEmailOtpGateway(preferences)
-        : HttpEmailOtpGateway(
-            FirebaseAuth.instance,
-            apiBaseUrl: _authApiBaseUrl,
-          ),
-    socialAuthGateway: _deviceReviewMode
-        ? ReviewSocialAuthGateway(
-            responseDelay: const Duration(milliseconds: 650),
-          )
-        : FirebaseSocialAuthGateway(FirebaseAuth.instance),
-    accountBootstrapGateway: _deviceReviewMode
-        ? ReviewAccountBootstrapGateway()
-        : DataConnectAccountBootstrapGateway(
-            emulatorHost: _useEmulators ? emulatorHost : null,
-          ),
-    locationGateway: DeviceLocationPermissionGateway(),
-    currentAreaGateway: DeviceCurrentAreaGateway(),
+  final initialLocation = youtubeConnectReturnLocation(
+    WidgetsBinding.instance.platformDispatcher.defaultRouteName,
   );
+  final session = _youtubePublicReviewMode
+      ? JourneySession(
+          store: MemoryJourneyStore(
+            snapshot: const JourneySnapshot(
+              languageCode: 'en',
+              areaMode: 'current',
+              areaLabel: 'Khema-Ka-Kuwa, Jodhpur, Rajasthan',
+              setupComplete: true,
+              setupExperienceVersion: approvedSetupExperienceVersion,
+              pendingRoute: '/app/social?sub=videos',
+            ),
+          ),
+          otpGateway: ReviewOtpGateway(signedIn: true),
+          accountBootstrapGateway: ReviewAccountBootstrapGateway(),
+          locationGateway: DeviceLocationPermissionGateway(),
+          currentAreaGateway: DeviceCurrentAreaGateway(),
+        )
+      : JourneySession(
+          store: SharedPreferencesJourneyStore(preferences),
+          otpGateway: FirebaseOtpGateway(
+            FirebaseAuth.instance,
+            emulatorHost: _useEmulators ? emulatorHost : null,
+            emulatorFallbackHost:
+                _deviceReviewMode && emulatorFallbackHost.trim().isNotEmpty
+                ? emulatorFallbackHost
+                : null,
+            emulatorProjectId: _useEmulators ? firebaseOptions.projectId : null,
+            emulatorApiKey: firebaseOptions.apiKey,
+            directEmulatorAuth: _deviceReviewMode,
+            reviewPreferences: _deviceReviewMode ? preferences : null,
+          ),
+          emailOtpGateway: _deviceReviewMode
+              ? SharedPreferencesReviewEmailOtpGateway(preferences)
+              : HttpEmailOtpGateway(
+                  FirebaseAuth.instance,
+                  apiBaseUrl: _authApiBaseUrl,
+                ),
+          socialAuthGateway: _deviceReviewMode
+              ? ReviewSocialAuthGateway(
+                  responseDelay: const Duration(milliseconds: 650),
+                )
+              : FirebaseSocialAuthGateway(FirebaseAuth.instance),
+          accountBootstrapGateway: _deviceReviewMode
+              ? ReviewAccountBootstrapGateway()
+              : DataConnectAccountBootstrapGateway(
+                  emulatorHost: _useEmulators ? emulatorHost : null,
+                ),
+          locationGateway: DeviceLocationPermissionGateway(),
+          currentAreaGateway: DeviceCurrentAreaGateway(),
+        );
 
-  runApp(MoolSocialApp(session: session, disposeSession: true));
+  runApp(
+    MoolSocialApp(
+      session: session,
+      disposeSession: true,
+      initialLocation: initialLocation ?? '/boot',
+    ),
+  );
 }
 
 void _validateRuntimeMode() {
   if (_deviceReviewMode && !_useEmulators) {
     throw StateError(
       'Device review mode requires the isolated local emulator environment.',
+    );
+  }
+  if (_youtubePublicReviewMode &&
+      (!youtubePrivateDevProofEnabled || _useEmulators)) {
+    throw StateError(
+      'YouTube public review requires the dedicated private Dev proof.',
     );
   }
 }

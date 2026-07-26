@@ -1,0 +1,104 @@
+enum ExternalProvider {
+  YOUTUBE
+}
+
+enum ExternalProviderConnectionStatus {
+  ACTIVE
+  REVOKED
+  DELETION_PENDING
+  DELETED
+}
+
+enum ExternalPublicationState {
+  SESSION_CREATING
+  SESSION_READY
+  UPLOADING
+  PROCESSING
+  COMPLETE
+  FAILED
+  CANCELLED
+}
+
+# Privileged server-owned table. No mobile connector operation exposes tokens.
+type ExternalProviderConnection
+  @table(name: "external_provider_connection", key: "connectionKey") {
+  connectionKey: String! @col(dataType: "varchar(180)")
+  userId: String! @col(dataType: "varchar(128)")
+  provider: ExternalProvider!
+  channelId: String! @col(dataType: "varchar(128)")
+  channelTitle: String! @col(dataType: "varchar(180)")
+  grantedScopesJson: String! @col(dataType: "text")
+  status: ExternalProviderConnectionStatus!
+  connectedAt: Timestamp!
+  lastVerifiedAt: Timestamp!
+  revokedAt: Timestamp
+  deletionDueAt: Timestamp
+}
+
+type ExternalProviderCredential
+  @table(name: "external_provider_credential", key: "connectionKey") {
+  connectionKey: String! @col(dataType: "varchar(180)")
+  encryptedRefreshToken: String! @col(dataType: "text")
+  grantedScopesJson: String! @col(dataType: "text")
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+# Short-lived, encrypted OAuth state. The authorization code is never stored.
+type ExternalOAuthAttempt
+  @table(name: "external_oauth_attempt", key: "stateHash") {
+  stateHash: String! @col(dataType: "varchar(128)")
+  userId: String! @col(dataType: "varchar(128)")
+  provider: ExternalProvider!
+  encryptedCodeVerifier: String! @col(dataType: "text")
+  requestedScopesJson: String! @col(dataType: "text")
+  redirectUri: String! @col(dataType: "varchar(512)")
+  createdAt: Timestamp!
+  expiresAt: Timestamp!
+  consumedAt: Timestamp
+}
+
+# Stores upload orchestration metadata only. Video bytes go directly to YouTube.
+type ExternalPublicationJob
+  @table(name: "external_publication_job", key: "jobKey") {
+  jobKey: String! @col(dataType: "varchar(180)")
+  userId: String! @col(dataType: "varchar(128)")
+  connectionKey: String! @col(dataType: "varchar(180)")
+  provider: ExternalProvider!
+  idempotencyKey: String! @col(dataType: "varchar(180)")
+  requestFingerprint: String! @col(dataType: "varchar(96)")
+  title: String! @col(dataType: "varchar(100)")
+  privacyStatus: String! @col(dataType: "varchar(20)")
+  contentLength: String! @col(dataType: "varchar(24)")
+  encryptedSessionUrl: String! @col(dataType: "text")
+  sessionExpiresAt: Timestamp
+  state: ExternalPublicationState!
+  videoId: String @col(dataType: "varchar(64)")
+  failureCode: String @col(dataType: "varchar(80)")
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+# Project-wide provider protection. Reservation is performed atomically by the
+# privileged backend; clients have no direct operation for this table.
+type ProviderQuotaUsage
+  @table(name: "provider_quota_usage", key: "quotaKey") {
+  quotaKey: String! @col(dataType: "varchar(180)")
+  bucket: String! @col(dataType: "varchar(32)")
+  windowId: String! @col(dataType: "varchar(32)")
+  used: Int!
+  hardCap: Int!
+  resetAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type ProviderAuditEvent
+  @table(name: "provider_audit_event", key: "eventKey") {
+  eventKey: String! @col(dataType: "varchar(180)")
+  userId: String @col(dataType: "varchar(128)")
+  provider: ExternalProvider!
+  eventType: String! @col(dataType: "varchar(80)")
+  requestId: String! @col(dataType: "varchar(128)")
+  redactedDetailJson: String! @col(dataType: "text")
+  occurredAt: Timestamp!
+}

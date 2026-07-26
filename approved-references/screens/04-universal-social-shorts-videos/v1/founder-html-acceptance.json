@@ -1,0 +1,23 @@
+{
+  "status": "Accepted",
+  "acceptedAt": "2026-07-21",
+  "acceptedBy": "Founder",
+  "scope": [
+    "Screen 04 Social Shorts state",
+    "Screen 04 Social Videos discovery state",
+    "Screen 04 Social selected-video watch state",
+    "Accepted Universal capability bottom rail as rendered with those states"
+  ],
+  "excluded": [
+    "Screen 04 Feed",
+    "Screen 04 Create",
+    "Buy, Eat, Ride, Book, Pay and Work first layers",
+    "Flutter V2 implementation",
+    "backend, provider, API and cloud implementation",
+    "main branch promotion"
+  ],
+  "sourceHtmlSha256": "a5307eb077e136b09064b40bb015c1856ee0b4a407f13cea359b6303c75268b1",
+  "founderDecision": "Social video and Social are approved; park them safely, do not begin Flutter, and continue with Feed and Create.",
+  "flutterAuthorized": false,
+  "wholeScreen04Final": false
+}

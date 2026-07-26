@@ -38,6 +38,19 @@ class SharedSession extends ChangeNotifier {
   final Map<int, String> searches = <int, String>{};
   final Map<String, bool> _controlValues = <String, bool>{};
   final Set<String> _completedActions = <String>{};
+  final List<SocialPublishedItem> _socialPublishedItems =
+      <SocialPublishedItem>[];
+  int _socialPublishSequence = 0;
+
+  List<SocialPublishedItem> get socialPublishedItems =>
+      List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
+
+  SocialPublishedItem? get latestPublishedReel {
+    for (final item in _socialPublishedItems) {
+      if (item.type == SocialPublishedContentType.reel) return item;
+    }
+    return null;
+  }
 
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
@@ -62,6 +75,12 @@ class SharedSession extends ChangeNotifier {
 
   void setAuthorized(bool value) {
     authorized = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void setSubscriptionActive(bool value) {
+    subscriptionActive = value;
     clearMessages();
     notifyListeners();
   }
@@ -306,6 +325,230 @@ class SharedSession extends ChangeNotifier {
   void completeLocal(String message) {
     errorMessage = null;
     noticeMessage = message;
+    notifyListeners();
+  }
+
+  Future<SocialPublishedItem?> publishSocialContent({
+    required SocialPublishedContentType type,
+    required String authorName,
+    required String authorHandle,
+    required String body,
+    String audience = 'Public',
+    List<String> mediaPaths = const <String>[],
+    bool mediaAreAssets = false,
+    List<SocialPublishedChoice> choices = const <SocialPublishedChoice>[],
+    int? correctChoiceIndex,
+    DateTime? closesAt,
+  }) async {
+    final normalizedBody = body.trim();
+    final normalizedChoices = choices
+        .map(
+          (choice) => SocialPublishedChoice(
+            label: choice.label.trim(),
+            imagePath: choice.imagePath,
+            imageIsAsset: choice.imageIsAsset,
+            votes: choice.votes,
+          ),
+        )
+        .toList(growable: false);
+    final validation = _validateSocialContent(
+      type: type,
+      body: normalizedBody,
+      mediaPaths: mediaPaths,
+      choices: normalizedChoices,
+      correctChoiceIndex: correctChoiceIndex,
+    );
+    if (validation != null) {
+      errorMessage = validation;
+      noticeMessage = null;
+      notifyListeners();
+      return null;
+    }
+    if (!online) {
+      errorMessage =
+          'You are offline. Your content is still here. Reconnect and post again.';
+      noticeMessage = null;
+      notifyListeners();
+      return null;
+    }
+    if (!authorized) {
+      errorMessage = 'Sign in again before posting to your public profile.';
+      noticeMessage = null;
+      notifyListeners();
+      return null;
+    }
+    if (busy) {
+      errorMessage = 'Your current post is still finishing.';
+      noticeMessage = null;
+      notifyListeners();
+      return null;
+    }
+
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    final nextSequence = _socialPublishSequence + 1;
+    final id = 'MS-SOCIAL-${nextSequence.toString().padLeft(4, '0')}';
+    try {
+      await gateway.execute('SOCIAL-PUBLISH-$id');
+      final item = SocialPublishedItem(
+        id: id,
+        type: type,
+        authorName: authorName.trim().isEmpty ? 'Your profile' : authorName,
+        authorHandle: authorHandle.trim().isEmpty
+            ? 'Public profile'
+            : authorHandle,
+        body: normalizedBody,
+        audience: audience,
+        publishedAt: DateTime.now(),
+        mediaPaths: List<String>.unmodifiable(mediaPaths),
+        mediaAreAssets: mediaAreAssets,
+        choices: List<SocialPublishedChoice>.unmodifiable(normalizedChoices),
+        correctChoiceIndex: correctChoiceIndex,
+        closesAt: closesAt,
+      );
+      _socialPublishSequence = nextSequence;
+      _socialPublishedItems.insert(0, item);
+      errorMessage = null;
+      noticeMessage = type == SocialPublishedContentType.reel
+          ? 'Reel posted to Shorts and your public profile.'
+          : 'Posted to Feed and your public profile.';
+      return item;
+    } on SharedGatewayException catch (error) {
+      errorMessage = error.message;
+      noticeMessage = null;
+      return null;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  String? _validateSocialContent({
+    required SocialPublishedContentType type,
+    required String body,
+    required List<String> mediaPaths,
+    required List<SocialPublishedChoice> choices,
+    required int? correctChoiceIndex,
+  }) {
+    switch (type) {
+      case SocialPublishedContentType.reel:
+        if (mediaPaths.length != 1) {
+          return 'Record or choose one Reel before posting.';
+        }
+        break;
+      case SocialPublishedContentType.carousel:
+        if (mediaPaths.length < 2 || mediaPaths.length > 10) {
+          return 'Choose between 2 and 10 photos for your carousel.';
+        }
+        break;
+      case SocialPublishedContentType.post:
+        if (body.isEmpty && mediaPaths.isEmpty) {
+          return 'Write something or add an image before posting.';
+        }
+        break;
+      case SocialPublishedContentType.imagePoll:
+        if (body.isEmpty) return 'Add a question for your Image Poll.';
+        if (choices.length < 2 ||
+            choices.any(
+              (choice) =>
+                  choice.label.isEmpty || choice.imagePath?.isEmpty != false,
+            )) {
+          return 'Add a name and image for at least two choices.';
+        }
+        break;
+      case SocialPublishedContentType.quickPoll:
+        if (body.isEmpty) return 'Add a question for your Quick Poll.';
+        if (choices.length < 2 ||
+            choices.any((choice) => choice.label.isEmpty)) {
+          return 'Add at least two choices.';
+        }
+        break;
+      case SocialPublishedContentType.quiz:
+        if (body.isEmpty) return 'Add a question for your Quiz.';
+        if (choices.length < 2 ||
+            choices.any((choice) => choice.label.isEmpty)) {
+          return 'Add at least two answers.';
+        }
+        if (correctChoiceIndex == null ||
+            correctChoiceIndex < 0 ||
+            correctChoiceIndex >= choices.length) {
+          return 'Choose the correct answer before posting.';
+        }
+        break;
+    }
+    return null;
+  }
+
+  void toggleSocialLike(String id) {
+    _updateSocialItem(id, (item) {
+      final liked = !item.liked;
+      return item.copyWith(
+        liked: liked,
+        likeCount: (item.likeCount + (liked ? 1 : -1))
+            .clamp(0, 1 << 31)
+            .toInt(),
+      );
+    });
+  }
+
+  void toggleSocialSave(String id) {
+    _updateSocialItem(id, (item) => item.copyWith(saved: !item.saved));
+  }
+
+  void recordSocialReply(String id) {
+    _updateSocialItem(
+      id,
+      (item) => item.copyWith(replyCount: item.replyCount + 1),
+    );
+  }
+
+  void recordSocialShare(String id) {
+    _updateSocialItem(
+      id,
+      (item) => item.copyWith(shareCount: item.shareCount + 1),
+    );
+  }
+
+  void recordSocialRepost(String id) {
+    _updateSocialItem(
+      id,
+      (item) => item.copyWith(repostCount: item.repostCount + 1),
+    );
+  }
+
+  bool voteOnSocialContent(String id, int choiceIndex) {
+    final index = _socialPublishedItems.indexWhere((item) => item.id == id);
+    if (index < 0) return false;
+    final item = _socialPublishedItems[index];
+    if (item.selectedChoiceIndex != null ||
+        choiceIndex < 0 ||
+        choiceIndex >= item.choices.length) {
+      return false;
+    }
+    final choices = <SocialPublishedChoice>[
+      for (var choice = 0; choice < item.choices.length; choice++)
+        item.choices[choice].copyWith(
+          votes: item.choices[choice].votes + (choice == choiceIndex ? 1 : 0),
+        ),
+    ];
+    _socialPublishedItems[index] = item.copyWith(
+      choices: List<SocialPublishedChoice>.unmodifiable(choices),
+      selectedChoiceIndex: choiceIndex,
+    );
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  void _updateSocialItem(
+    String id,
+    SocialPublishedItem Function(SocialPublishedItem item) update,
+  ) {
+    final index = _socialPublishedItems.indexWhere((item) => item.id == id);
+    if (index < 0) return;
+    _socialPublishedItems[index] = update(_socialPublishedItems[index]);
+    clearMessages();
     notifyListeners();
   }
 }

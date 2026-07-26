@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v7",
+  "status": "founder-delegated-final-html-gate-0",
+  "founderDecision": "Complete the corrected Social HTML gate without an intermediate approval stop, freeze it, then proceed through native Flutter and OPPO verification.",
+  "founderApprovedAt": "2026-07-23",
+  "approvalSource": "Founder explicitly directed the uninterrupted mission workflow: correct and locally verify HTML, automatically approve and freeze the corrected reference, implement native Flutter parity, compare it, and test on the connected OPPO before handoff.",
+  "sourceHtmlSha256": "dbd9c3d20f230533e8513536e6ba2b4bddbbb4aecf509c77265187ffdff5e72f",
+  "supersedes": "../v6",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison, interaction replay and connected OPPO review.",
+  "verification": {
+    "directCreateFormats": ["Reel", "Carousel", "Post"],
+    "contentLibrary": "Session-owned Drafts, Scheduled, Published and Archived items only, with truthful empty states and no fabricated content",
+    "postActions": ["Image", "Image Poll", "Quick Poll", "Quiz"],
+    "verifiedViewports": ["320x568", "360x640", "360x720", "375x667", "390x844", "412x915", "430x932"],
+    "verifiedTextScales": ["100%", "140%"],
+    "minimumTapTarget": "44x44 logical pixels",
+    "consoleErrors": 0,
+    "assertions": "897/897",
+    "progressiveVideoPath": ["Discovery", "Watch", "Description", "Channel", "Back to Description", "Back to Watch", "Back to Discovery"],
+    "rejectedControl": "No page-level Videos back pill",
+    "referenceViews": [
+      "Create at 390x844",
+      "Direct Reel at 390x844",
+      "Direct Carousel at 390x844",
+      "Image Poll at 390x844",
+      "Quick Poll at 390x844",
+      "Quiz at 390x844",
+      "Videos Discovery at 390x844",
+      "Videos Watch at 390x844",
+      "Videos Description at 390x844",
+      "Videos Channel at 390x844",
+      "Shorts at 390x844",
+      "Feed at 390x844"
+    ]
+  }
+}

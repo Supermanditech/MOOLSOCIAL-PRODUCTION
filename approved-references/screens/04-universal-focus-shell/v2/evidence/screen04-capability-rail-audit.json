@@ -1,0 +1,2865 @@
+{
+  "ticket": "FND-U04-RAIL-001",
+  "revision": "capability-02",
+  "url": "http://127.0.0.1:8765/screens/04-universal-focus-shell.html?founderReview=1&rail=capability",
+  "startedAt": "2026-07-22T07:24:52.956Z",
+  "viewportResults": [
+    {
+      "name": "320x568 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 63.08240509033203,
+            "height": 59.0125732421875
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 54,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "320x568 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 75.20414733886719,
+            "height": 57.88055419921875
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 54,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "360x640 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 61.3541259765625,
+            "height": 57.395751953125
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "360x640 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 75.2039794921875,
+            "height": 57.88037109375
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "360x720 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 61.87164306640625,
+            "height": 57.8798828125
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "360x720 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 75.201904296875,
+            "height": 57.8787841796875
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "375x667 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 62.335662841796875,
+            "height": 58.31402587890625
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "375x667 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 74.57275390625,
+            "height": 57.39459228515625
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "390x844 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 61.8719482421875,
+            "height": 57.88018798828125
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "390x844 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 76.6761474609375,
+            "height": 59.01348876953125
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "412x915 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 60.79107666015625,
+            "height": 56.86907958984375
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "412x915 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 74.57605743408203,
+            "height": 57.39715576171875
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "430x932 100% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 60.79399871826172,
+            "height": 56.871826171875
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "430x932 140% text",
+      "passed": true,
+      "details": {
+        "responseStatus": 200,
+        "minimumWidth": 44,
+        "minimumHeight": 52,
+        "clipped": [],
+        "heading": "Social",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous action, Work",
+        "nextLabel": "Next action, Buy",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Social choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Work",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 74.57666015625,
+            "height": 57.3975830078125
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 65.296875,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 70.25,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 72.140625,
+            "height": 58
+          },
+          {
+            "name": "Next action, Buy",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    }
+  ],
+  "interactionResults": [
+    {
+      "name": "One main-action tap reveals Work choices",
+      "passed": true,
+      "details": {
+        "heading": "Work",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Earn Today",
+          "Delivery",
+          "Onboard",
+          "Verify",
+          "Workspace"
+        ],
+        "activeRoot": "Work",
+        "activeChoice": "Earn Today",
+        "previousLabel": "Previous Work choice, Workspace",
+        "nextLabel": "Next Work choice, Delivery",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Work choice, Workspace",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Earn Today",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Delivery",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Onboard",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Verify",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Workspace",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Next Work choice, Delivery",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Earn Today",
+            "clipped": false
+          },
+          {
+            "name": "Delivery",
+            "clipped": false
+          },
+          {
+            "name": "Onboard",
+            "clipped": false
+          },
+          {
+            "name": "Verify",
+            "clipped": false
+          },
+          {
+            "name": "Workspace",
+            "clipped": true
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Mool returns to all main actions",
+      "passed": true,
+      "details": {
+        "heading": "Work",
+        "mode": "main",
+        "moolOpen": true,
+        "mainVisible": true,
+        "choicesVisible": false,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Earn Today",
+          "Delivery",
+          "Onboard",
+          "Verify",
+          "Workspace"
+        ],
+        "activeRoot": "Work",
+        "activeChoice": "Earn Today",
+        "previousLabel": "Previous action, Pay",
+        "nextLabel": "Next action, Social",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show Work choices",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous action, Pay",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Social",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Buy",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Eat",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Ride",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Book",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Pay",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Work",
+            "width": 62.150146484375,
+            "height": 58.1405029296875
+          },
+          {
+            "name": "Next action, Social",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Social",
+            "clipped": false
+          },
+          {
+            "name": "Buy",
+            "clipped": false
+          },
+          {
+            "name": "Eat",
+            "clipped": false
+          },
+          {
+            "name": "Ride",
+            "clipped": false
+          },
+          {
+            "name": "Book",
+            "clipped": false
+          },
+          {
+            "name": "Pay",
+            "clipped": false
+          },
+          {
+            "name": "Work",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Mouse arrow moves to the next action and reveals its choices",
+      "passed": true,
+      "details": {
+        "heading": "Social",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Shorts",
+          "Videos",
+          "Feed",
+          "Create"
+        ],
+        "activeRoot": "Social",
+        "activeChoice": "Shorts",
+        "previousLabel": "Previous Social choice, Create",
+        "nextLabel": "Next Social choice, Videos",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Social choice, Create",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Shorts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Videos",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Feed",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Create",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Next Social choice, Videos",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Shorts",
+            "clipped": false
+          },
+          {
+            "name": "Videos",
+            "clipped": false
+          },
+          {
+            "name": "Feed",
+            "clipped": false
+          },
+          {
+            "name": "Create",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Mouse arrow advances focused sub-actions",
+      "passed": true,
+      "details": {
+        "heading": "Pay",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Recharge",
+          "Bills",
+          "Scan & Pay",
+          "Receipts"
+        ],
+        "activeRoot": "Pay",
+        "activeChoice": "Bills",
+        "previousLabel": "Previous Pay choice, Recharge",
+        "nextLabel": "Next Pay choice, Scan & Pay",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Pay choice, Recharge",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Recharge",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Bills",
+            "width": 54.483154296875,
+            "height": 58.51898193359375
+          },
+          {
+            "name": "Scan & Pay",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Receipts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Next Pay choice, Scan & Pay",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Recharge",
+            "clipped": true
+          },
+          {
+            "name": "Bills",
+            "clipped": false
+          },
+          {
+            "name": "Scan & Pay",
+            "clipped": false
+          },
+          {
+            "name": "Receipts",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Keyboard arrow advances focused sub-actions",
+      "passed": true,
+      "details": {
+        "heading": "Pay",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Recharge",
+          "Bills",
+          "Scan & Pay",
+          "Receipts"
+        ],
+        "activeRoot": "Pay",
+        "activeChoice": "Scan & Pay",
+        "previousLabel": "Previous Pay choice, Bills",
+        "nextLabel": "Next Pay choice, Receipts",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Pay choice, Bills",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Recharge",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Bills",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Scan & Pay",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Receipts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Next Pay choice, Receipts",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Recharge",
+            "clipped": true
+          },
+          {
+            "name": "Bills",
+            "clipped": false
+          },
+          {
+            "name": "Scan & Pay",
+            "clipped": false
+          },
+          {
+            "name": "Receipts",
+            "clipped": false
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Direct swipe advances focused sub-actions",
+      "passed": true,
+      "details": {
+        "heading": "Pay",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Recharge",
+          "Bills",
+          "Scan & Pay",
+          "Receipts"
+        ],
+        "activeRoot": "Pay",
+        "activeChoice": "Receipts",
+        "previousLabel": "Previous Pay choice, Scan & Pay",
+        "nextLabel": "Next Pay choice, Recharge",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Pay choice, Scan & Pay",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Recharge",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Bills",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Scan & Pay",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Receipts",
+            "width": 54.2860107421875,
+            "height": 58.30718994140625
+          },
+          {
+            "name": "Next Pay choice, Recharge",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Recharge",
+            "clipped": true
+          },
+          {
+            "name": "Bills",
+            "clipped": false
+          },
+          {
+            "name": "Scan & Pay",
+            "clipped": false
+          },
+          {
+            "name": "Receipts",
+            "clipped": true
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    },
+    {
+      "name": "Back and Forward restore rail mode and action",
+      "passed": true,
+      "details": {
+        "back": {
+          "heading": "Buy",
+          "mode": "main",
+          "moolOpen": true,
+          "mainVisible": true,
+          "choicesVisible": false,
+          "rootLabels": [
+            "Social",
+            "Buy",
+            "Eat",
+            "Ride",
+            "Book",
+            "Pay",
+            "Work"
+          ],
+          "choiceLabels": [
+            "Grocery",
+            "Categories",
+            "Medicine",
+            "Basket"
+          ],
+          "activeRoot": "Buy",
+          "activeChoice": "Grocery",
+          "previousLabel": "Previous action, Social",
+          "nextLabel": "Next action, Eat",
+          "stepHitWidth": 44,
+          "stepHitHeight": 52,
+          "stepVisualWidth": 0,
+          "stepVisualHeight": 0,
+          "stepVisualDisplay": "none",
+          "stepCueWidth": 6,
+          "stepCueHeight": 6,
+          "targets": [
+            {
+              "name": "Show Buy choices",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Previous action, Social",
+              "width": 44,
+              "height": 52
+            },
+            {
+              "name": "Social",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Buy",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Eat",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Ride",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Book",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Pay",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Work",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Next action, Eat",
+              "width": 44,
+              "height": 52
+            },
+            {
+              "name": "Chat\n          3",
+              "width": 62,
+              "height": 58
+            }
+          ],
+          "labels": [
+            {
+              "name": "Social",
+              "clipped": false
+            },
+            {
+              "name": "Buy",
+              "clipped": false
+            },
+            {
+              "name": "Eat",
+              "clipped": false
+            },
+            {
+              "name": "Ride",
+              "clipped": false
+            },
+            {
+              "name": "Book",
+              "clipped": false
+            },
+            {
+              "name": "Pay",
+              "clipped": false
+            },
+            {
+              "name": "Work",
+              "clipped": false
+            }
+          ],
+          "documentOverflow": 0,
+          "railWithinViewport": true,
+          "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+          "activeAccentHeight": "3px",
+          "forbiddenCopy": false
+        },
+        "forward": {
+          "heading": "Pay",
+          "mode": "choices",
+          "moolOpen": false,
+          "mainVisible": false,
+          "choicesVisible": true,
+          "rootLabels": [
+            "Social",
+            "Buy",
+            "Eat",
+            "Ride",
+            "Book",
+            "Pay",
+            "Work"
+          ],
+          "choiceLabels": [
+            "Recharge",
+            "Bills",
+            "Scan & Pay",
+            "Receipts"
+          ],
+          "activeRoot": "Pay",
+          "activeChoice": "Recharge",
+          "previousLabel": "Previous Pay choice, Receipts",
+          "nextLabel": "Next Pay choice, Bills",
+          "stepHitWidth": 44,
+          "stepHitHeight": 52,
+          "stepVisualWidth": 0,
+          "stepVisualHeight": 0,
+          "stepVisualDisplay": "none",
+          "stepCueWidth": 6,
+          "stepCueHeight": 6,
+          "targets": [
+            {
+              "name": "Show all MoolSocial actions",
+              "width": 62,
+              "height": 58
+            },
+            {
+              "name": "Previous Pay choice, Receipts",
+              "width": 44,
+              "height": 52
+            },
+            {
+              "name": "Recharge",
+              "width": 54,
+              "height": 58
+            },
+            {
+              "name": "Bills",
+              "width": 54,
+              "height": 58
+            },
+            {
+              "name": "Scan & Pay",
+              "width": 54,
+              "height": 58
+            },
+            {
+              "name": "Receipts",
+              "width": 54,
+              "height": 58
+            },
+            {
+              "name": "Next Pay choice, Bills",
+              "width": 44,
+              "height": 52
+            },
+            {
+              "name": "Chat\n          3",
+              "width": 62,
+              "height": 58
+            }
+          ],
+          "labels": [
+            {
+              "name": "Recharge",
+              "clipped": true
+            },
+            {
+              "name": "Bills",
+              "clipped": false
+            },
+            {
+              "name": "Scan & Pay",
+              "clipped": false
+            },
+            {
+              "name": "Receipts",
+              "clipped": false
+            }
+          ],
+          "documentOverflow": 0,
+          "railWithinViewport": true,
+          "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+          "activeAccentHeight": "3px",
+          "forbiddenCopy": false
+        }
+      }
+    },
+    {
+      "name": "Selected action has premium acknowledgement styling",
+      "passed": true,
+      "details": {
+        "heading": "Pay",
+        "mode": "choices",
+        "moolOpen": false,
+        "mainVisible": false,
+        "choicesVisible": true,
+        "rootLabels": [
+          "Social",
+          "Buy",
+          "Eat",
+          "Ride",
+          "Book",
+          "Pay",
+          "Work"
+        ],
+        "choiceLabels": [
+          "Recharge",
+          "Bills",
+          "Scan & Pay",
+          "Receipts"
+        ],
+        "activeRoot": "Pay",
+        "activeChoice": "Receipts",
+        "previousLabel": "Previous Pay choice, Scan & Pay",
+        "nextLabel": "Next Pay choice, Recharge",
+        "stepHitWidth": 44,
+        "stepHitHeight": 52,
+        "stepVisualWidth": 0,
+        "stepVisualHeight": 0,
+        "stepVisualDisplay": "none",
+        "stepCueWidth": 6,
+        "stepCueHeight": 6,
+        "targets": [
+          {
+            "name": "Show all MoolSocial actions",
+            "width": 62,
+            "height": 58
+          },
+          {
+            "name": "Previous Pay choice, Scan & Pay",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Recharge",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Bills",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Scan & Pay",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Receipts",
+            "width": 54,
+            "height": 58
+          },
+          {
+            "name": "Next Pay choice, Recharge",
+            "width": 44,
+            "height": 52
+          },
+          {
+            "name": "Chat\n          3",
+            "width": 62,
+            "height": 58
+          }
+        ],
+        "labels": [
+          {
+            "name": "Recharge",
+            "clipped": true
+          },
+          {
+            "name": "Bills",
+            "clipped": false
+          },
+          {
+            "name": "Scan & Pay",
+            "clipped": false
+          },
+          {
+            "name": "Receipts",
+            "clipped": true
+          }
+        ],
+        "documentOverflow": 0,
+        "railWithinViewport": true,
+        "activeBackground": "radial-gradient(circle at 25% 8%, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0) 35%), linear-gradient(145deg, rgb(32, 32, 200), rgb(0, 0, 128) 76%)",
+        "activeAccentHeight": "3px",
+        "forbiddenCopy": false
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "failures": [],
+  "completedAt": "2026-07-22T07:25:00.133Z",
+  "summary": {
+    "viewportChecks": 14,
+    "viewportPasses": 14,
+    "interactionChecks": 8,
+    "interactionPasses": 8,
+    "consoleErrors": 0,
+    "failures": 0,
+    "passed": true
+  }
+}

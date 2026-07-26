@@ -395,6 +395,427 @@
           "sha256": "714129642847519910a621124c5bcd8ae8c22ba1e894c0bf69517422b097e8d5"
         }
       ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-social-shorts-videos",
+      "version": "v1",
+      "status": "founder-approved-html-scope",
+      "founderApprovedAt": "2026-07-21",
+      "approvalScope": "Social Shorts, Videos discovery and selected-video watch states only; Feed, Create, remaining Universal actions and Flutter are excluded",
+      "approvalSource": "Founder decision recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "a5307eb077e136b09064b40bb015c1856ee0b4a407f13cea359b6303c75268b1",
+      "root": "screens/04-universal-social-shorts-videos/v1",
+      "interactionContract": "screens/04-universal-social-shorts-videos/v1/interaction-contract.json",
+      "checksums": "screens/04-universal-social-shorts-videos/v1/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-social-shorts-videos/v1/founder-html-acceptance.json",
+      "files": [
+        {
+          "path": "html/screens/04-universal-focus-shell.html",
+          "sha256": "a5307eb077e136b09064b40bb015c1856ee0b4a407f13cea359b6303c75268b1"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/assets/shorts-market-grocery.png",
+          "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "0600e334cbafa76b7bc67bf7fb5d6af364a3476893e0f2acdbdb650db4ed72e4"
+        },
+        {
+          "path": "founder-html-acceptance.json",
+          "sha256": "45c9d7f5351d7516e8bbefdfca1f9a7ccb7534293a93d9e36140c7e498b1aa1c"
+        },
+        {
+          "path": "README.md",
+          "sha256": "2cac2899d9855b27cf54c079685342d07573e96679d064c7128916612fc6a95b"
+        },
+        {
+          "path": "reference-images/youtube-short-entry-320x568-text140.png",
+          "sha256": "125ce76723f53ebeb69e791e293db3b96b23f11e272654f5b1470a623336025d"
+        },
+        {
+          "path": "reference-images/youtube-short-entry-390x844.png",
+          "sha256": "9152c374bb5db577f5794d626316864e4a310aa349fb2337ac23ab6e9cc3b99a"
+        },
+        {
+          "path": "reference-images/videos-home-390x844.png",
+          "sha256": "e1e1b244c5e9765ce32f3dc2252ceedf77f193d6d32456fda8f1032ccf19527e"
+        },
+        {
+          "path": "reference-images/video-watch-390x844.png",
+          "sha256": "0d9aaac96f2bbdefd87f9b591b3cd34a3ba380c4ddd93e557fed9f1bc2d28882"
+        }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-social-feed-create",
+      "version": "v1",
+      "status": "founder-approved-html-scope",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Social Feed first layer, Post/Carousel first-layer presentation and personal Create landing only; deeper Feed/Create states, remaining Universal actions and Flutter are excluded",
+      "approvalSource": "Founder decision recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "1a0f35a26527c02b402c4b88b96384c74c858dcae72fb81c253e0a022cc1ddc7",
+      "root": "screens/04-universal-social-feed-create/v1",
+      "interactionContract": "screens/04-universal-social-feed-create/v1/interaction-contract.json",
+      "checksums": "screens/04-universal-social-feed-create/v1/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-social-feed-create/v1/founder-html-acceptance.json",
+      "files": [
+        {
+          "path": "html/screens/04-universal-focus-shell.html",
+          "sha256": "1a0f35a26527c02b402c4b88b96384c74c858dcae72fb81c253e0a022cc1ddc7"
+        },
+        {
+          "path": "html/shared/moolsocial-ui-foundation.css",
+          "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1"
+        },
+        {
+          "path": "html/assets/shorts-market-grocery.png",
+          "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6"
+        },
+        {
+          "path": "interaction-contract.json",
+          "sha256": "df4bd49a44c44191f3f2a0607e451798fbd137204e574ebcf18742acb8036f4d"
+        },
+        {
+          "path": "founder-html-acceptance.json",
+          "sha256": "6384e1555d169d3e29be57b9d023a0c9a0e83ee87bbb1eda448aedd3d9cfb8f5"
+        },
+        {
+          "path": "README.md",
+          "sha256": "bee33805810942412c255ecdeb2ceec7a14c8bb95116575ebe149870c5e296ae"
+        },
+        {
+          "path": "reference-images/feed-for-you-390x844.png",
+          "sha256": "79b92fd3f3061e73b75509d95e65c56ce562eb968ca66f64741f8a0a88c59d61"
+        },
+        {
+          "path": "reference-images/feed-promoted-390x844.png",
+          "sha256": "f5ca0de5ea2f4376559da240638c56ded094e173b71ff4c2ccebb33f10ac0ec7"
+        },
+        {
+          "path": "reference-images/create-390x844.png",
+          "sha256": "73f75159b8fd69af7e4dc13b38a4857a30e65d50efe0838f3f7267dcfd8f76e8"
+        },
+        {
+          "path": "reference-images/create-320x568-text140.png",
+          "sha256": "9bc9e7e5caab212dbe9d53631a447cc59d085cb13897e4c8e7e52f829e15d35d"
+        }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-social-feed-create",
+      "version": "v2",
+      "status": "founder-approved-html-scope",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Social Feed and personal Create including verified comments, sharing, Post, Reel, Carousel, Draft and publish or schedule states; remaining Social screens, subscriptions, campaigns, Creator Studio and Flutter are excluded from this reference alone",
+      "approvalSource": "Founder continuous-batch decision recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f",
+      "root": "screens/04-universal-social-feed-create/v2",
+      "interactionContract": "screens/04-universal-social-feed-create/v2/interaction-contract.json",
+      "checksums": "screens/04-universal-social-feed-create/v2/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-social-feed-create/v2/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "interaction-contract.json", "sha256": "4ab769077886c8b721b3adfa8939b99fb407663810f44544d014c52033acd8aa" },
+        { "path": "founder-html-acceptance.json", "sha256": "70877084629635fd255866c6e56d136710a8b74429bdaf5363ce4f7f31aaed83" },
+        { "path": "README.md", "sha256": "62f8aa976559f52527c42f71e412287049a8e67ef5f9d70b4ac5a37a558ce228" },
+        { "path": "reference-images/feed-for-you-390x844.png", "sha256": "79b92fd3f3061e73b75509d95e65c56ce562eb968ca66f64741f8a0a88c59d61" },
+        { "path": "reference-images/create-390x844.png", "sha256": "73f75159b8fd69af7e4dc13b38a4857a30e65d50efe0838f3f7267dcfd8f76e8" },
+        { "path": "reference-images/feed-comments-390x844.png", "sha256": "d894f2911d4b9708e6c947ae05d23edf8428cee39905417bd0b44dfa23129ac1" },
+        { "path": "reference-images/post-compose-390x844.png", "sha256": "a3d6a52672990ebbf70fdab959bf04ba0f05e277e0cca2c6df8af96554ac04d4" },
+        { "path": "reference-images/post-poll-320x568-text140.png", "sha256": "98760cf9cf09ad435c2d3aea9893f54f9ad6c765a315ff7f43a2528b1876d20c" },
+        { "path": "reference-images/reel-camera-390x844.png", "sha256": "9c385af290d380535af6a6cf2d3aaafabf2b0ea00e1ea75a27f64fd183d781d2" },
+        { "path": "reference-images/reel-editor-390x844.png", "sha256": "6e288988f9e59df14db3ad138e5917c4fe6b2b75def04688759f15d6cc58db3e" },
+        { "path": "reference-images/carousel-ready-390x844.png", "sha256": "32fe4bbe16dc384c7dac5155a22fb29a844f3f0771c8b24940d0a729f2a86616" },
+        { "path": "reference-images/drafts-390x844.png", "sha256": "1155e82055ab0980d85d86e7d2db1f0d414ec7cb58a1c93d2733ee34deb13dfc" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v1",
+      "status": "founder-approved-html-full-screen",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Complete Screen 04 Universal shell, capability rail, Social first layer, all seven main-world first layers, header commands and recovery contracts; native Flutter acceptance remains pending OPPO review",
+      "approvalSource": "Founder decision recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f",
+      "root": "screens/04-universal-focus-shell/v1",
+      "interactionContract": "screens/04-universal-focus-shell/v1/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v1/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v1/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "c6741154866a2ac42afaf89e6f6f15db3e6e6de4e86822bcdc5bf035b070f153" },
+        { "path": "founder-html-acceptance.json", "sha256": "85535fcf91ffe69205ccd0297ddc41b674c67e2ffe65b6ff673cfe8c1a38eca8" },
+        { "path": "README.md", "sha256": "0c4a3e7dfdb44faeb1037ababd3eb848b6de97cc75d01e4e920cf6c497f075f3" },
+        { "path": "reference-images/youtube-short-entry-320x568-text140.png", "sha256": "125ce76723f53ebeb69e791e293db3b96b23f11e272654f5b1470a623336025d" },
+        { "path": "reference-images/youtube-short-entry-390x844.png", "sha256": "9152c374bb5db577f5794d626316864e4a310aa349fb2337ac23ab6e9cc3b99a" },
+        { "path": "reference-images/videos-home-390x844.png", "sha256": "e1e1b244c5e9765ce32f3dc2252ceedf77f193d6d32456fda8f1032ccf19527e" },
+        { "path": "reference-images/video-watch-390x844.png", "sha256": "0d9aaac96f2bbdefd87f9b591b3cd34a3ba380c4ddd93e557fed9f1bc2d28882" },
+        { "path": "reference-images/feed-for-you-390x844.png", "sha256": "79b92fd3f3061e73b75509d95e65c56ce562eb968ca66f64741f8a0a88c59d61" },
+        { "path": "reference-images/feed-comments-390x844.png", "sha256": "d894f2911d4b9708e6c947ae05d23edf8428cee39905417bd0b44dfa23129ac1" },
+        { "path": "reference-images/create-390x844.png", "sha256": "73f75159b8fd69af7e4dc13b38a4857a30e65d50efe0838f3f7267dcfd8f76e8" },
+        { "path": "reference-images/post-compose-390x844.png", "sha256": "a3d6a52672990ebbf70fdab959bf04ba0f05e277e0cca2c6df8af96554ac04d4" },
+        { "path": "reference-images/post-poll-320x568-text140.png", "sha256": "98760cf9cf09ad435c2d3aea9893f54f9ad6c765a315ff7f43a2528b1876d20c" },
+        { "path": "reference-images/reel-camera-390x844.png", "sha256": "9c385af290d380535af6a6cf2d3aaafabf2b0ea00e1ea75a27f64fd183d781d2" },
+        { "path": "reference-images/reel-editor-390x844.png", "sha256": "6e288988f9e59df14db3ad138e5917c4fe6b2b75def04688759f15d6cc58db3e" },
+        { "path": "reference-images/carousel-ready-390x844.png", "sha256": "32fe4bbe16dc384c7dac5155a22fb29a844f3f0771c8b24940d0a729f2a86616" },
+        { "path": "reference-images/drafts-390x844.png", "sha256": "1155e82055ab0980d85d86e7d2db1f0d414ec7cb58a1c93d2733ee34deb13dfc" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v2",
+      "status": "founder-approved-html-full-screen",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v1, including uniform edge-to-edge MoolSocial and YouTube Shorts, premium capability-rail motion, native haptic contract, responsive typography, customer-copy safeguards, all seven main-world first layers, header commands and recovery contracts; native Flutter acceptance remains pending OPPO review",
+      "approvalSource": "Founder response FINAL recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "4d6b6a37e818ba860cf057879371555d2b7f811d3c16e569428c323bfec6a8cd",
+      "supersedes": "screens/04-universal-focus-shell/v1",
+      "root": "screens/04-universal-focus-shell/v2",
+      "interactionContract": "screens/04-universal-focus-shell/v2/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v2/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v2/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "4d6b6a37e818ba860cf057879371555d2b7f811d3c16e569428c323bfec6a8cd" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "a93170b23dba7ecaf795928b1a0209575eb786a1b0cec836f803b03d36e4aec6" },
+        { "path": "founder-html-acceptance.json", "sha256": "64f6cf82a5738d9560b00925311005e4f7aeabaad08a5a8f29255e2149abfd45" },
+        { "path": "README.md", "sha256": "65ed668804a94fd041e989d13629d3d8c1a56ba706b58160966ec0e996ed7f74" },
+        { "path": "evidence/screen04-full-audit.json", "sha256": "eb68e49e964c0c692f5143dd938e411bed261310e5183a7cc821aa3e4b7f6cdf" },
+        { "path": "evidence/screen04-capability-rail-audit.json", "sha256": "9a14a09c1d910db2ba3fd9a44f09903cf729471dd15479e351e7d5d8f4af3c9d" },
+        { "path": "evidence/screen04-uniform-shorts-audit.json", "sha256": "bb88d911d0f56905b03ca7c7e32610c33744f50f58c533eba2ef4a2a30dec693" },
+        { "path": "reference-images/320x568-100-.png", "sha256": "67d2b24bc2f48ddaeb46dcc5162552ef18b0299fb644e306ba381683a3db09d0" },
+        { "path": "reference-images/320x568-140-.png", "sha256": "0881e6ba1ad97941a06e04b1563370f420981aafa094a50fc143510ed7dc5d0f" },
+        { "path": "reference-images/360x640-100-.png", "sha256": "eb7444858d10604c07fcf8ac63e30d7b4839722e37d847274c100d4b0ab2376f" },
+        { "path": "reference-images/360x640-140-.png", "sha256": "b79c997699900dcb0fc8b7f9afd15e0e73ae6d9b05942680d138177a55334006" },
+        { "path": "reference-images/360x720-100-.png", "sha256": "3876cff074b364a2ce7b8b7752e9b727d11f659b4e1ea074651231149fb88ff3" },
+        { "path": "reference-images/360x720-140-.png", "sha256": "ea1f554507e3e4515a323dfe7c0438ccf739662d58d01d79e8156c1a54595b14" },
+        { "path": "reference-images/375x667-100-.png", "sha256": "218193e1d0a20343b16572fc90955b276ac5694a417435e46d3c5b11411d40d1" },
+        { "path": "reference-images/375x667-140-.png", "sha256": "227557132fd4991cf8b8a2197e9561fff352079fdd8d9ae2412ce8f7d68875d4" },
+        { "path": "reference-images/390x844-100-.png", "sha256": "279fe6529d4abd558cbbee89fe979aaec132924d5865142f9a648ed9e7c14520" },
+        { "path": "reference-images/390x844-140-.png", "sha256": "9a7895fd2c3adba6d52e29879d78a7057cb07bfbfd1e3e50f0ba41d912c9c53f" },
+        { "path": "reference-images/412x915-100-.png", "sha256": "10101066c70d5ae8489784174ba53fa5f1ff32a14929d1e1394efa28cb0d3237" },
+        { "path": "reference-images/412x915-140-.png", "sha256": "a190344c744409a84d0572195ac6784bbb7549b6afa47ccb028af9bc1a71e5f3" },
+        { "path": "reference-images/430x932-100-.png", "sha256": "2d1de47afe4a6a4b1ec6efe1e968820143f807722e2b6fa7c7acfe3bc422fed4" },
+        { "path": "reference-images/430x932-140-.png", "sha256": "b2373d5aab9c7560e881373f0f9bd339984595ce750e1aea73e4f92ea3195cf3" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v3",
+      "status": "founder-approved-html-full-screen",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v2, including premium icon-only Shorts play control, non-blocking swipe cues and automatic active-plus-next visibility for every main action and sub-action; native Flutter acceptance remains pending OPPO review",
+      "approvalSource": "Founder response FINAL followed by explicit play-control and rail-visibility amendments recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "55eb65f2a01d709502cb69d6bbed62eaedb069d8c32e38b816d13b7bb5a23f48",
+      "supersedes": "screens/04-universal-focus-shell/v2",
+      "root": "screens/04-universal-focus-shell/v3",
+      "interactionContract": "screens/04-universal-focus-shell/v3/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v3/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v3/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "55eb65f2a01d709502cb69d6bbed62eaedb069d8c32e38b816d13b7bb5a23f48" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "2f619383c360b05b6bf16033ec4985a6a397f68c33df463ed1da9db5bbd1ce4a" },
+        { "path": "founder-html-acceptance.json", "sha256": "eedc7ced63a9ab2217db511e96a2c43c06021382c66802c83ce393f56e713ef1" },
+        { "path": "README.md", "sha256": "ab505a541fc7c2d6f9a77f7edab992a1d34837be4674900fbf887283298bf1f1" },
+        { "path": "evidence/screen04-full-audit.json", "sha256": "9c362f0684757ffe07ad49db8418bf791284e202ff99b6ba7896148f287ce241" },
+        { "path": "evidence/screen04-capability-rail-audit.json", "sha256": "ded90ae1ea4e7d4873cdfdf0eb508b5a87e3147d2c973fada1fb41b9fc9e4b17" },
+        { "path": "evidence/screen04-active-next-rail-audit.json", "sha256": "ded90ae1ea4e7d4873cdfdf0eb508b5a87e3147d2c973fada1fb41b9fc9e4b17" },
+        { "path": "evidence/screen04-uniform-shorts-audit.json", "sha256": "c9e2ec1c89c118b51f4130f4d813dcad9434e9f09aded43b94126588b7933b2a" },
+        { "path": "reference-images/320x568-100-.png", "sha256": "be46c1286a50cbefbef3457f7c13ee3ad676166f8436c1d62b3c57a860530dd1" },
+        { "path": "reference-images/320x568-140-.png", "sha256": "4719afd0983159d6e56aa2acb18cdb218c4dac0b1b9bdb048aba88faed4a4160" },
+        { "path": "reference-images/360x640-100-.png", "sha256": "5904fdbae67b1c3978986f8a5bf7ed25e8feaad17b9693407c5cbb507e925ff4" },
+        { "path": "reference-images/360x640-140-.png", "sha256": "5688b1e5057f28bf0d5731aeda4c56d649f5a63dc009a140c1c8ce7d3eae48cc" },
+        { "path": "reference-images/360x720-100-.png", "sha256": "1f62bb11ea99f23676ca6239faa718007f1609aeda5b6a8a9c4da6c340485635" },
+        { "path": "reference-images/360x720-140-.png", "sha256": "5bda45a1f8656856c3754470cbaa8b35b744fb40bef0aa6e585d051b863a9242" },
+        { "path": "reference-images/375x667-100-.png", "sha256": "9a09edb537ae0b702d28fb93f50c6ba96192c6538f01e9920af5daded7bee53d" },
+        { "path": "reference-images/375x667-140-.png", "sha256": "1e3a62a4b1e4b65a7fd42824d75b2f5d141695667302e351e36d8fe67faa250b" },
+        { "path": "reference-images/390x844-100-.png", "sha256": "74de9473a20d0189eb124cd40f3a04e58328096d46dadee4e0402a4b8edeaa6b" },
+        { "path": "reference-images/390x844-140-.png", "sha256": "502947c215f1c56ebd35794b8b444d80d744e41c98752285f308855045d68e0d" },
+        { "path": "reference-images/412x915-100-.png", "sha256": "e1677fccbc09033f35494dce46530c03fdf735258a05c31626c7284129d655d3" },
+        { "path": "reference-images/412x915-140-.png", "sha256": "7b4ca06eb548071774f648863c0df58b74f7d2d3adc48105eed3d1676e3ebc9d" },
+        { "path": "reference-images/430x932-100-.png", "sha256": "aa2b4039b711cafed80f9776784724c0831f641ecb3bc6eb9eb59974e631f78e" },
+        { "path": "reference-images/430x932-140-.png", "sha256": "b780c182e9a886eeeba076ed8f2d9181511a99af4f6b4778c19c40fc0a1b4cda" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v4",
+      "status": "founder-approved-html-gate-0",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v3, including founder-accepted direct public composition for every authenticated account on Feed and Create, rich creation choices, uniform Social media presentation, persistent user-controlled Shorts details, provider-accurate YouTube boundaries, approved capability rail and customer-copy safeguards; native Flutter acceptance remains pending OPPO review",
+      "approvalSource": "Founder accepted Gate 0 and directed Flutter implementation after the direct public Create composer correction recorded in founder-html-acceptance.json",
+      "sourceHtmlSha256": "80fa50ce9ba1493e8bd137b96c415183ba81473fbb726cad5b7b5747f30dd243",
+      "supersedes": "screens/04-universal-focus-shell/v3",
+      "root": "screens/04-universal-focus-shell/v4",
+      "interactionContract": "screens/04-universal-focus-shell/v4/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v4/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v4/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "80fa50ce9ba1493e8bd137b96c415183ba81473fbb726cad5b7b5747f30dd243" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "7a5c39b0b5cf595a4c48f1806a8b3636ef3909c89adf7ad2bf8193ef39a38ae3" },
+        { "path": "founder-html-acceptance.json", "sha256": "9a6f0c7a84a56ae176f42902e805f594b2cb3a994335c923cf8e9aab9813be3f" },
+        { "path": "README.md", "sha256": "00ef641c921188b945b3c941168a41afcc4bf65539dd731f629112874340543d" },
+        { "path": "evidence/screen04-social-correction-v4-audit.json", "sha256": "d64058a142dc480d4a2a56eeb040cd4a97e0cc16a68edf9ab7ac7d9fd63d8aa2" },
+        { "path": "reference-images/shorts-320x568-text140.png", "sha256": "306907a7f892da0f01d94b272080abd46541bf4c8696f4c206fda9f9d7cc07ec" },
+        { "path": "reference-images/videos-320x568-text140.png", "sha256": "aba9c0b16c46e3ce1ba40b6f16786f1b75a28cee0d4a4acc6b6ee6d80c7b7447" },
+        { "path": "reference-images/feed-320x568-text140.png", "sha256": "d2cbc4d30af4f0cc24aed523814bc8266e9b06281345adf95ccc05fe00cd9e90" },
+        { "path": "reference-images/create-320x568-text140.png", "sha256": "f86319480876b9b624cbb1d9b93d09b6d240ce8ed20013f2a7653621369edef6" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v5",
+      "status": "founder-approved-html-gate-0",
+      "founderApprovedAt": "2026-07-22",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v4, including the same-surface Reel, Carousel and Post Create workbench; direct Image, Image Poll, Quick Poll and Quiz post tools; no owned long-form Video creator; approved capability rail; and founder-directed native public results for Reel, Carousel, Post, Image Poll, Quick Poll and Quiz",
+      "approvalSource": "Founder stated approved and directed native Flutter implementation with complete public content outcomes; see founder-html-acceptance.json",
+      "sourceHtmlSha256": "b4a7f6b91a1f488ec5ba78d2a84379316ee9fd918264715c0be1ed11f78a459a",
+      "supersedes": "screens/04-universal-focus-shell/v4",
+      "root": "screens/04-universal-focus-shell/v5",
+      "interactionContract": "screens/04-universal-focus-shell/v5/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v5/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v5/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "b4a7f6b91a1f488ec5ba78d2a84379316ee9fd918264715c0be1ed11f78a459a" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "2354e3d1b044fb8d533704c444c9b30b374d8fbdc518a17e9626ac8f437432f2" },
+        { "path": "founder-html-acceptance.json", "sha256": "13bd85c57fe64042f781220542af2a61a14069ebf00712b6ded8dada198421ff" },
+        { "path": "README.md", "sha256": "df188ae89e4d8939e53a7d26fee8b12a81af92fdb913515498e99247292833cb" },
+        { "path": "evidence/screen04-v5-founder-final-verification.json", "sha256": "5c14f872b1d3084d1d858aa57fdf3fc812150b42e99b8f7affdaf2b0b990b139" },
+        { "path": "reference-images/create-390x844.png", "sha256": "54683ca451cd0fb29f403072201ca7396757f6b58e8eaec9f2bce41cfdf53edb" },
+        { "path": "reference-images/create-reel-direct-390x844.png", "sha256": "f94cf50be3f6eb8d3c781ae5b17b8eab7a3d7234a65143c6949d24091592b9ec" },
+        { "path": "reference-images/create-carousel-direct-390x844.png", "sha256": "b239c98df39f9e0cc37f0afe8657e9ea4e3a9e101b7feb7aded5c4e8b25e0713" },
+        { "path": "reference-images/create-image-poll-direct-390x844.png", "sha256": "718c6b1a5802d731ed864e8f365e6761be8057e0a3bebcda7a9e7f190461491f" },
+        { "path": "reference-images/create-quick-poll-direct-390x844.png", "sha256": "e568cfe1e26d4e5e620d8312fe7a293d9970ea149fd982cda8fa0ba17d6cc424" },
+        { "path": "reference-images/create-quiz-direct-390x844.png", "sha256": "243f8f86c5d5ac53c30d89a0cd0229ae1fd672a1deb58a729eafc6c2022a577f" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v6",
+      "status": "founder-delegated-final-html-gate-0",
+      "founderApprovedAt": "2026-07-23",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v5, including corrected Social Videos Discovery, Watch, Description and Channel progression; removal of the duplicate page-level Videos back pill; native history restoration; retained Shorts, Feed, direct Create, capability rail, typography, branding and customer-copy contracts; native Flutter acceptance remains pending OPPO founder review",
+      "approvalSource": "Founder directed an uninterrupted mission workflow with automatic approval after local HTML verification, then native Flutter parity and connected OPPO verification; see founder-html-acceptance.json",
+      "sourceHtmlSha256": "b49f9f649f720e828a7320d833bd231a17a396e5a65fa9e5335c93b5e6235b50",
+      "supersedes": "screens/04-universal-focus-shell/v5",
+      "root": "screens/04-universal-focus-shell/v6",
+      "interactionContract": "screens/04-universal-focus-shell/v6/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v6/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v6/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "b49f9f649f720e828a7320d833bd231a17a396e5a65fa9e5335c93b5e6235b50" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "f79b1626774beda110081d7dd29f153496c9fcf6af6abeea732ab824f29e1b9b" },
+        { "path": "founder-html-acceptance.json", "sha256": "9dc6d1c839bbfb6076aaaad5de89db7ed177e348f3581e4ea6869cc0e16c2076" },
+        { "path": "README.md", "sha256": "701ac5e63753bd24b4f0e16c9b6927b0db172a2111b232a97195a0a01aca6aae" },
+        { "path": "evidence/screen04-social-final-mission-audit.cjs", "sha256": "ab99213b414eb2df0c70e207ebed68770b460361e888c312155312b97ba81941" },
+        { "path": "evidence/screen04-social-final-mission-audit-result.json", "sha256": "9b3543b2c066c3a479d7ec5043b7b77919bcbb91078f3afa48e77b3270bafeab" },
+        { "path": "reference-images/01-videos-discovery-390x844.png", "sha256": "b4a9aa5603035f291822631f593b6f68853437b7688bdf96f61bec4edb8db048" },
+        { "path": "reference-images/02-videos-watch-390x844.png", "sha256": "edcd6be11472ca23f3791e132afb53373d2390f91e87ea29a4ae88660d12a593" },
+        { "path": "reference-images/03-videos-description-390x844.png", "sha256": "b62bfe312eaab707d13990d9f2edff7d4c959ae90305b9aba11638cc4d9a3d88" },
+        { "path": "reference-images/04-videos-channel-390x844.png", "sha256": "5b2a0af6af97c8d00e23a29e3d8eafb907446164f32c261c90fee1dcb604275c" },
+        { "path": "reference-images/05-shorts-390x844.png", "sha256": "1fd72750bc289b6d7b6c7035ccbbc8942ed97a80425c4c12afaaf3cca2e8f6a7" },
+        { "path": "reference-images/06-feed-390x844.png", "sha256": "ed041ce1256bcc5aba2c1448032848360b61330ed37a637978bc8b48a8bcd748" },
+        { "path": "reference-images/07-create-390x844.png", "sha256": "7fb0ec0007eed02e05345a470a3df63a4105233e0ef75cdc829cb5b98cd8484a" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v7",
+      "status": "founder-delegated-final-html-gate-0",
+      "founderApprovedAt": "2026-07-23",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v6, retaining the corrected Social Videos progression, Shorts, Feed, direct Create, capability rail, typography, branding and customer-copy contracts while replacing fabricated Create-library samples with authenticated session-owned content or truthful empty states; native Flutter acceptance remains pending OPPO founder review",
+      "approvalSource": "Founder directed an uninterrupted mission workflow with automatic approval after local HTML verification, then native Flutter parity and connected OPPO verification; see founder-html-acceptance.json",
+      "sourceHtmlSha256": "dbd9c3d20f230533e8513536e6ba2b4bddbbb4aecf509c77265187ffdff5e72f",
+      "supersedes": "screens/04-universal-focus-shell/v6",
+      "root": "screens/04-universal-focus-shell/v7",
+      "interactionContract": "screens/04-universal-focus-shell/v7/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v7/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v7/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "dbd9c3d20f230533e8513536e6ba2b4bddbbb4aecf509c77265187ffdff5e72f" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "811179f7eb5b5fb9c74e605daace8b9d42eded30904ed3f6f1b66c5046fa6287" },
+        { "path": "founder-html-acceptance.json", "sha256": "2c1e06d46101bddf265f8cd867e3d3b910a5b78d220848ee791cf729b32f4336" },
+        { "path": "README.md", "sha256": "56cf6ad51eaeb7ffd64a58ea5f3e7b532b108fb06c08d08e2ba7ed94134432e0" },
+        { "path": "evidence/screen04-social-final-mission-audit.cjs", "sha256": "ab99213b414eb2df0c70e207ebed68770b460361e888c312155312b97ba81941" },
+        { "path": "evidence/screen04-social-final-mission-audit-result.json", "sha256": "067f8c7258610c39fc95be86a79f0453b8f04d3f7d9a67aee38384a09cd8f011" },
+        { "path": "reference-images/01-videos-discovery-390x844.png", "sha256": "b4a9aa5603035f291822631f593b6f68853437b7688bdf96f61bec4edb8db048" },
+        { "path": "reference-images/02-videos-watch-390x844.png", "sha256": "a5fb00e34f6fa934d6eeef73b8ddf6225be4576586387663ebf61ca7f45252fd" },
+        { "path": "reference-images/03-videos-description-390x844.png", "sha256": "3d31cb59b9370d991ae5cbb9a18c12c407c592ed56bd9775d58bcaf5497e471d" },
+        { "path": "reference-images/04-videos-channel-390x844.png", "sha256": "5b2a0af6af97c8d00e23a29e3d8eafb907446164f32c261c90fee1dcb604275c" },
+        { "path": "reference-images/05-shorts-390x844.png", "sha256": "4dba6f1764f1d89d7fffaf39c22f185dbcb49221d0901f2af2a4068ef16ff8ce" },
+        { "path": "reference-images/06-feed-390x844.png", "sha256": "ed041ce1256bcc5aba2c1448032848360b61330ed37a637978bc8b48a8bcd748" },
+        { "path": "reference-images/07-create-390x844.png", "sha256": "b7479ac59593c63b837aea2fe5fb92049f99aecea04693e5d72204400d5dcf74" }
+      ]
+    },
+    {
+      "screenNumber": 4,
+      "screenId": "universal-focus-shell",
+      "version": "v8",
+      "status": "founder-delegated-final-html-gate-0",
+      "founderApprovedAt": "2026-07-23",
+      "approvalScope": "Complete Screen 04 Universal shell superseding v7: compact expandable Videos search without location or Universal command bar, progressive Videos detail journey, thumb-zone Feed composer, thumb-zone direct Create workbench, Shorts, capability rail, typography, branding and customer-copy contracts; native Flutter acceptance remains pending OPPO founder review",
+      "approvalSource": "Founder rejected the prior native candidate and directed uninterrupted HTML correction, browser verification, automatic approval and freezing, native Flutter parity and connected OPPO verification; see founder-html-acceptance.json",
+      "sourceHtmlSha256": "0997f3ad7adaad76eb3fd7f5a96cf63c1d691413da92f368fc4ec005e0d86410",
+      "supersedes": "screens/04-universal-focus-shell/v7",
+      "root": "screens/04-universal-focus-shell/v8",
+      "interactionContract": "screens/04-universal-focus-shell/v8/interaction-contract.json",
+      "checksums": "screens/04-universal-focus-shell/v8/SHA256SUMS",
+      "founderHtmlAcceptance": "screens/04-universal-focus-shell/v8/founder-html-acceptance.json",
+      "files": [
+        { "path": "html/screens/04-universal-focus-shell.html", "sha256": "0997f3ad7adaad76eb3fd7f5a96cf63c1d691413da92f368fc4ec005e0d86410" },
+        { "path": "html/shared/moolsocial-ui-foundation.css", "sha256": "924e02b1b2620fc86c3fd3ae07f1fb9b052f186ad6b228dde8997c1b377447f1" },
+        { "path": "html/assets/shorts-market-grocery.png", "sha256": "7a4e0d7589be6c1e6dfe976f6d78be6cf19a638d994b62a01475e235351b49a6" },
+        { "path": "contracts/UI-CONFORMANCE-003-DIFFERENCE-CONTRACT-20260720.md", "sha256": "6f304c266c733943771820b8a1a839b89851a12d25480c240e5d18c2ce2a041a" },
+        { "path": "interaction-contract.json", "sha256": "889d5c5c107422e205922954ffbbd5dc96826d05e827c3b9f408b18dd34bcaff" },
+        { "path": "founder-html-acceptance.json", "sha256": "e931f39c5729b736bc29e95e73bca096f54a835204401a0265ef81e657cca7be" },
+        { "path": "README.md", "sha256": "684c953662463e15f951ded1d89ea66359348eea3dce7435dfa155c870164f63" },
+        { "path": "evidence/screen04-social-v8-mission-audit.cjs", "sha256": "bc14b8d73c70a7fc2bfbbc4712f5e872eae3fc21b20864ed3bb41db93c6ebaea" },
+        { "path": "evidence/screen04-social-v8-mission-audit-result.json", "sha256": "f673f8a09b1da1ed53e515110e5f1a32114750d1dd9b9d63c5da38c1dfd65798" },
+        { "path": "reference-images/01-videos-discovery-390x844.png", "sha256": "cb68bc779d5b52111193d66936a20399a4016bca6b5d0ddf6ae5ab0d3b3a7d81" },
+        { "path": "reference-images/02-videos-watch-390x844.png", "sha256": "11c1fef4f034e77f554653a1352652f7c1b2c0bf2d6897ed56958987533dc582" },
+        { "path": "reference-images/03-videos-description-390x844.png", "sha256": "6cadcfea561bb147c8229088f977da23e94f6f1556aeabdded9ac011702cc70e" },
+        { "path": "reference-images/04-videos-channel-390x844.png", "sha256": "ec50106cc2427defbaf083bccea10ec3aa00a704fce03405971575dff11243ce" },
+        { "path": "reference-images/05-shorts-390x844.png", "sha256": "1fd72750bc289b6d7b6c7035ccbbc8942ed97a80425c4c12afaaf3cca2e8f6a7" },
+        { "path": "reference-images/06-feed-390x844.png", "sha256": "63d2a6b8b54600a80e2f2c9257350967eb0e28d57bd0d0751a9d9dd948ecaac2" },
+        { "path": "reference-images/07-create-390x844.png", "sha256": "402ac201f58c74c8870706319aa6860ff863f592ad18c0c3e54193a472f73d0e" }
+      ]
     }
   ]
 }

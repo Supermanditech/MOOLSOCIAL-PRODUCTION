@@ -5,6 +5,27 @@ Target launch: 2026-09-01
 Rule: a journey is not complete until its original failed sequences and its
 affected regression pass on staging.
 
+## Founder sequencing and Buy operating model — 26 July 2026
+
+- Comprehensive YouTube work is on provider-review hold after submission.
+- Preserve the current Social module and its accepted/deployed Dev evidence as
+  a regression baseline. The exact HTML, Flutter/source, OPPO-installed APK and
+  Dev deployment identities are recorded in
+  `artifacts/quality/social-protected-baseline-20260726-01/`.
+- The mandatory Buy sequence is: complete shared UI/UX → prepare and verify
+  Buy HTML → founder `FINAL` → freeze immutable reference → implement native
+  Flutter → pass Social plus Buy regression → connected OPPO replay → separate
+  deployment-trial decision.
+- No Flutter Buy implementation starts from an unapproved HTML draft, and no
+  Buy deployment trial starts from HTML approval or partial Flutter work.
+- Use one canonical catalogue with separate retail and wholesale buying
+  contexts, participant offers and PIN-code fulfilment.
+- Shops, retailers, wholesalers, distributors, manufacturers and delivery
+  partners may onboard, but each selling, buying and fulfilment capability is
+  activated only after its own verification.
+- The detailed proposed operating decision is
+  `docs/decisions/ADR-0009-UNIFIED-BUY-CATALOGUE-OFFERS-AND-FULFILMENT.md`.
+
 ## Days 1-5: foundation and universal entry
 
 - Repository, environments, CI, design tokens and architecture boundaries.
@@ -18,16 +39,20 @@ Exit: `PROD-JRN-001` works against real staging services.
 
 ## Days 6-13: consumer buy
 
-- Product discovery and decision-ready product details.
+- Canonical product discovery and decision-ready retail offers.
 - Basket, home-delivery address, availability reservation and exact price.
 - Razorpay sandbox payment, webhook inbox, idempotent order and status.
+- Verified business workspaces may expose the separate wholesale context; no
+  MOQ, case-price, credit or trade term appears in Personal Buy.
 
 Exit: one consumer can pay once and see one authoritative order.
 
 ## Days 14-20: retailer fulfilment
 
-- Retailer workspace activation, catalogue/offer/stock.
+- Retailer/shop workspace activation, catalogue matching, offer and stock.
 - Order acceptance, pick/pack, delivery handoff and customer status.
+- Capability-gated wholesaler, distributor, manufacturer and delivery-partner
+  onboarding for eligible PIN codes.
 - Minimal Superadmin user/workspace/offer provisioning.
 
 Exit: the paid consumer order completes through the retailer side.

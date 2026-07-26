@@ -38,6 +38,7 @@ class MoolSocialApp extends StatefulWidget {
     this.workSession,
     this.launchInterruptionGuard,
     this.initialLocation = '/boot',
+    this.legacyPresentationForTestsOnly = false,
     this.disposeSession = false,
     this.disposeBookSession = false,
     this.disposeBuySession = false,
@@ -71,6 +72,10 @@ class MoolSocialApp extends StatefulWidget {
   final WorkSession? workSession;
   final LaunchInterruptionGuard? launchInterruptionGuard;
   final String initialLocation;
+
+  /// Keeps historical presentation regression tests attached to the untouched
+  /// legacy widgets. Product builds must use the default native V2 routes.
+  final bool legacyPresentationForTestsOnly;
   final bool disposeSession;
   final bool disposeBookSession;
   final bool disposeBuySession;
@@ -134,6 +139,7 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
     launchPresentationGate: _launchPresentationGate,
     launchInterruptionGuard: _launchInterruptionGuard,
     initialLocation: widget.initialLocation,
+    legacyPresentationForTestsOnly: widget.legacyPresentationForTestsOnly,
   );
 
   @override

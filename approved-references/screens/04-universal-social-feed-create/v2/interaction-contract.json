@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-social-feed-create",
+  "version": "v2",
+  "status": "founder-approved-html-scope",
+  "entry": {
+    "pathname": "/screens/04-universal-focus-shell.html",
+    "world": "social",
+    "choices": ["feed", "create"]
+  },
+  "protectedRail": {
+    "labels": ["Mool", "Shorts", "Videos", "Feed", "Create", "Chat"],
+    "cssSha256": "6d225260f19b04dd9fbaba70ec72bc163e36ce9c6560cfda4faddb8db32fe49c",
+    "markupSha256": "85769e85707c44e14bf30d2a3545c37c025d2af93a9e23690b4b99f5e8bfd4b6",
+    "navigationRuntimeSha256": "f0f009649cdeebe115fcb1cc2ffd369f627e8136c36f93b562cc1fc15faba7fb"
+  },
+  "feed": {
+    "discoveryModes": ["For You", "Following", "Nearby", "Promoted"],
+    "itemActions": ["Like", "Comment", "Share", "Save", "Follow", "Carousel navigation", "Eligible commerce action"],
+    "shareActions": ["Repost", "Undo Repost", "Add your thoughts", "Send in Chat", "Copy link"],
+    "requirements": [
+      "Every discovery mode changes the actual visible MoolSocial content",
+      "Comments open immediately in place and Back restores the originating Feed item",
+      "Engagement state belongs to the individual item",
+      "Quoted sharing opens the personal Post composer with the original item attached",
+      "Commerce appears only for an eligible attributable relationship with disclosure"
+    ]
+  },
+  "personalCreate": {
+    "landingChoices": ["Create a Reel", "Write a Post", "Build a Carousel", "Continue a Draft"],
+    "post": ["Text", "One photo", "Two-to-four-choice poll", "Connected follow-up post", "Everyone", "Followers", "Nearby", "Post now", "Schedule"],
+    "reel": ["Open Camera", "Choose Video", "Camera ready", "Recording", "Finish Reel", "Caption", "Audience", "Cover", "Captions", "Post"],
+    "carousel": ["Choose two-to-ten photos", "Add photo", "Remove photo", "Reorder intent", "Caption", "Audience", "Post"],
+    "drafts": ["Post draft", "Reel draft", "Carousel draft"],
+    "requirements": [
+      "Every creation journey remains in the current Social surface",
+      "Personal Create never exposes Creator Studio, campaign, external-channel, analytics, commission or payout controls",
+      "Camera recording begins only after an explicit user action",
+      "Every interactive target is at least 44 by 44 logical pixels",
+      "All confirmation copy names the actual completed or scheduled result"
+    ]
+  },
+  "responsiveMatrix": [
+    "320x568@100%", "320x568@140%", "360x640@100%", "360x640@140%",
+    "360x720@100%", "360x720@140%", "375x667@100%", "375x667@140%",
+    "390x844@100%", "390x844@140%", "412x915@100%", "412x915@140%",
+    "430x932@100%", "430x932@140%"
+  ],
+  "acceptanceEvidence": {
+    "responsiveStates": "182/182",
+    "interactions": "20/20",
+    "copyAndAccountBoundary": "1/1",
+    "shortsVideoRegression": "56/56 fitment; 24/24 interactions",
+    "youtubeRegression": "28/28 fitment; 16/16 interactions",
+    "consoleErrors": 0,
+    "failures": 0
+  },
+  "nativeImplementationAuthorizedByReferenceAlone": false
+}

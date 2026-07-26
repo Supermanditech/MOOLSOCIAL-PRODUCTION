@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v3",
+  "status": "founder-approved-html-full-screen",
+  "entry": {
+    "pathname": "/screens/04-universal-focus-shell.html",
+    "defaultWorld": "social",
+    "defaultChoice": "shorts",
+    "rail": "capability"
+  },
+  "branding": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineProportions": [45, 14, 41],
+    "wordmark": "MoolSocial"
+  },
+  "worlds": {
+    "Social": ["Shorts", "Videos", "Feed", "Create"],
+    "Buy": ["Grocery", "Categories", "Medicine", "Basket"],
+    "Eat": ["Order Food", "Book Table", "Tiffin"],
+    "Ride": ["Bike", "Auto", "Cab"],
+    "Book": ["Get It Done", "Doctor", "Salon"],
+    "Pay": ["Recharge", "Bills", "Scan & Pay", "Receipts"],
+    "Work": ["Earn Today", "Delivery", "Onboard", "Verify", "Workspace"]
+  },
+  "shorts": {
+    "providerOrder": "Eligible paid MoolSocial Reels remain first; eligible YouTube Shorts participate in the same continuous vertical flow.",
+    "mediaInput": "9:16",
+    "stage": "One edge-to-edge Shorts canvas for MoolSocial and YouTube with no provider-specific side shrink.",
+    "fit": "Center-crop inside the 9:16 safe canvas; never stretch media. Keep faces, titles, commerce and controls inside protected overlays.",
+    "navigation": ["Vertical swipe", "Vertical keyboard navigation", "Continuous provider transition"],
+    "chrome": "Show controls when an item opens, hide after 2800 ms, restore on a non-action tap; keep required sponsored identity visible.",
+    "playControl": "Use one compact premium frosted circular control with an icon-only solid play or pause glyph. Do not display Watch or Pause text on the media surface; preserve finished accessibility labels.",
+    "moolSocialActions": ["Like", "Comment", "Share", "Remix", "Follow", "Eligible commerce action"],
+    "youtubeActions": ["Save", "Discuss", "Share", "Details", "Subscribe", "Eligible commerce action"],
+    "youtubeBoundary": "YouTube attribution and official-player behavior remain visible and accurate. MoolSocial actions remain distinct from YouTube account actions."
+  },
+  "bottomRail": {
+    "fixedEdges": ["Mool", "Chat"],
+    "focusedMode": "The middle ribbon exposes every sub-action for the active world.",
+    "moolMode": "Tapping Mool replaces only the middle ribbon with Social, Buy, Eat, Ride, Book, Pay and Work.",
+    "navigation": ["Tap", "Horizontal swipe", "Subtle previous cue", "Subtle next cue"],
+    "autoReveal": "After every main-action or sub-action selection, reposition the middle ribbon so the active action and its next available action are visible. The last action remains visible when no next action exists.",
+    "cueBoundary": "Previous and next chevrons are non-blocking visual swipe cues. They never intercept a main-action or sub-action tap.",
+    "motion": "A 280 ms selection lift and 460 ms restrained sheen acknowledge the active destination; progress movement reflects the selected world.",
+    "nativeHaptics": "Use Flutter selection haptics for ribbon choices and a light impact for Mool, world and Chat transitions. Respect platform accessibility settings.",
+    "minimumTapTarget": "44x44 logical pixels"
+  },
+  "typographyAndFitment": {
+    "rule": "Scale type by semantic role and available space. Preserve readable titles, metadata and action labels without crowding or clipping.",
+    "textScales": ["100%", "140%"],
+    "viewports": ["320x568", "360x640", "360x720", "375x667", "390x844", "412x915", "430x932"],
+    "platformCoverage": ["compact Android", "large Android", "compact iPhone", "large iPhone"],
+    "overflow": "No horizontal page overflow, clipped action label, inaccessible content or undersized visible action."
+  },
+  "customerCopy": {
+    "forbidden": ["example", "sample", "demo", "mock", "placeholder", "prototype", "founder review", "review build", "implementation", "developer", "working note", "internal plan", "state machine", "payload", "endpoint", "next screen", "for testing"],
+    "rule": "Visible copy contains only customer-facing actions, facts, outcomes, disclosures and recovery guidance."
+  },
+  "nativeRules": [
+    "Implement with native Flutter widgets; never render this HTML in a WebView.",
+    "Reuse existing non-UI sessions, services and route owners.",
+    "Do not import or modify the legacy Flutter presentation.",
+    "Do not modify accepted Screens 01, 02 or 03.",
+    "Do not claim native acceptance before identical-viewport comparison and connected OPPO replay."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v3",
+  "status": "founder-approved-html-full-screen",
+  "founderDecision": "FINAL with founder-directed play-control and rail-visibility amendments",
+  "founderApprovedAt": "2026-07-22",
+  "approvalSource": "Founder response FINAL followed by explicit directions to remove Watch text, use a premium icon-only play control and keep the active plus next rail action visible without requiring manual swipe",
+  "sourceHtmlSha256": "55eb65f2a01d709502cb69d6bbed62eaedb069d8c32e38b816d13b7bb5a23f48",
+  "supersedes": "../v2",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison and connected OPPO replay.",
+  "verification": {
+    "fullAssertions": { "passed": 363, "total": 363 },
+    "taps": { "passed": 218, "total": 218 },
+    "visibleCopyViews": { "passed": 44, "total": 44 },
+    "responsiveCases": { "passed": 14, "total": 14 },
+    "capabilityRailCases": { "passed": 490, "total": 490 },
+    "uniformShortsCases": { "passed": 14, "total": 14 },
+    "consoleErrors": 0
+  }
+}

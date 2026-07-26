@@ -33,6 +33,14 @@ This is a clean presentation rebuild, not a second application:
 - approved HTML is a design and interaction specification, never a production
   WebView.
 
+Founder amendment recorded 21 July 2026: this ban applies to MoolSocial
+presentation and remains in force. The isolated provider-owned YouTube player
+defined in
+`docs/delivery/SOCIAL-EXTERNAL-REACH-AND-CREATOR-STUDIO-FULL-STACK-CONTRACT.md`
+is the sole approved MVP exception. It loads the official YouTube embed
+directly in an OS WebView/WKWebView; no MoolSocial HTML, navigation, forms or
+business UI may be rendered there.
+
 No new production repository will be created. The old UI will not be gradually
 patched into a mixture of old and new shared components.
 
@@ -135,3 +143,5 @@ screens before their approved references are inventoried.
 Rejected because it weakens native accessibility, navigation, performance,
 platform integration, testing and long-term maintainability.
 
+This rejection concerns MoolSocial application UI. It does not prohibit the
+narrow official-provider player exception above.

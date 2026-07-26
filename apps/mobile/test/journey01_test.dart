@@ -19,7 +19,11 @@ void main() {
     String initialLocation = '/boot',
   }) async {
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: initialLocation),
+      MoolSocialApp(
+        session: session,
+        initialLocation: initialLocation,
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();

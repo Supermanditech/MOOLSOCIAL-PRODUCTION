@@ -3,6 +3,7 @@
 .vscode/settings.json
 *.iml
 node_modules/
+backend/functions/lib/
 .next/
 coverage/
 .firebase/

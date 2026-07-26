@@ -58,6 +58,13 @@ distribution or environment action, read these files completely:
 6. `docs/design/APPLE-INSPIRED-PRODUCT-DESIGN-MEMORY.md`
 7. `docs/quality/ACTIVE-CODEX-HANDOFF.md`
 
+Before Social, creator commerce, external playback, channel connection,
+publishing, analytics or payout work, also read completely:
+
+1. `docs/decisions/ADR-0003-CREATOR-COMMERCE-ATTRIBUTION-AND-PAYOUT.md`
+2. `docs/decisions/ADR-0004-CREATOR-CONTENT-DISTRIBUTION-AND-ANALYTICS.md`
+3. `docs/delivery/SOCIAL-EXTERNAL-REACH-AND-CREATOR-STUDIO-FULL-STACK-CONTRACT.md`
+
 The permanent order is local emulators, `moolsocial-dev-503018` as the
 real-service Trial, a screenwise Firebase App Distribution Preview group inside
 Dev, clean `moolsocial-staging-503018`, then a later separately authorized
@@ -74,7 +81,11 @@ experimentation and never enable an API merely because it appears free.
   business logic.
 - Keep legacy Flutter presentation read-only until complete V2 acceptance.
 - Never mix legacy and V2 presentation components.
-- Never use HTML inside a Flutter WebView.
+- Never use HTML or a WebView as MoolSocial presentation. The sole approved
+  MVP exception is a provider-owned YouTube embedded player loaded directly in
+  an OS-provided Android `WebView` or Apple `WKWebView` under the full-stack
+  Social contract. It may contain no MoolSocial page, navigation, form,
+  business logic or copied provider interface.
 - Never partially merge accepted screens into `main`.
 
 ## Approved-reference workflow

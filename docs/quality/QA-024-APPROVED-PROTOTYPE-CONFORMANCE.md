@@ -88,11 +88,27 @@ rules above prevent those three paths.
 | --- | --- | --- | --- | --- | --- |
 | UI-CONFORMANCE-001 | Complete approved prototype | Complete current app | App-wide visual, wording and tap-depth divergence | Founder physical review | Open |
 | UI-CONFORMANCE-002 | Screen 01 Splash / First Open — reference `v3` | `/boot` native Flutter UI V2 | Old Android launch logo created a duplicate brand screen and the complete promise had insufficient reading time | App icon → Android system launch → animated Screen 01 → existing-owner route | **Accepted — 2026-07-20; CI-locked on remediation branch** |
-| UI-CONFORMANCE-003 | Screen 04 Universal HTML founder-review candidate SHA-256 `9d4bbc76104cb5208f54fdfd83603d89ee563bf0a0cdbb724249f1c27fcd9b86` | Production-bound Universal V2 design contract | The remake rendered founder/review/commentary language, replaced the approved Universal focus-shell hierarchy, action/sub-action treatment and bottom Mool/context/Chat rail with a different dashboard composition, and improvised branding instead of preserving the approved wordmark and tricolour identity | Screen 03 accepted sign-in completion → Universal default Social focus → inspect header, content focus, sub-actions, product/service placement, Mool rail and Chat return | **Open — founder rejected HTML candidate 2026-07-20** |
+| UI-CONFORMANCE-003 | Screen 04 Universal immutable reference `v8` preserved; editable Social v9 founder correction active | Native `/app/social` Universal V2 v8 candidate preserved; v9 native work blocked | Founder reopened Social ownership before accepting native v8: Reels must own compact Reel/creator search plus direct contextual creation; Feed must own the thumb-zone direct composer for Photo/GIF, Carousel, Existing Reel, Image Poll, Quick Poll and Quiz; general Feed/owned long-form video remains excluded; visible Create is only a removal candidate after compatibility proof. | Screen 03 accepted sign-in completion → Universal Social → Reels search/create → Feed direct composer/all supported formats → former Create deep links/state → rail/Back/forward/Chat → interruption/relaunch | **v8 preserved; v9 HTML correction open — awaiting explicit founder `FINAL`; Flutter blocked** |
 
 New rows use `UI-CONFORMANCE-002`, `003`, and so on. One row may contain several
 closely related states only when they share the same root component and
 acceptance replay.
+
+Current UI-CONFORMANCE-003 history: immutable reference
+`approved-references/screens/04-universal-focus-shell/v8` remains preserved at
+HTML SHA-256
+`0997F3AD7ADAAD76EB3FD7F5A96CF63C1D691413DA92F368FC4EC005E0D86410`.
+The native v8 candidate at SHA-256
+`37F8E3718E4E7A53D1DB8949B4D1A14D3C6D77039DB5841442F020CBB07C09A1`
+passed the 91-test affected suite, two 448-test full regressions, the approved
+Screens 01–03 lock and exact-APK OPPO replay on 23 July 2026. The founder
+reopened the screen before accepting that native candidate.
+
+The active v9 correction is governed by
+[`SCREEN-04-SOCIAL-FOUNDER-CORRECTION-TICKETS-20260723.md`](../delivery/SCREEN-04-SOCIAL-FOUNDER-CORRECTION-TICKETS-20260723.md).
+No v9 HTML checksum is approved, no new reference is frozen and no Flutter
+change is authorized until explicit founder `FINAL`. v8 evidence remains in
+`artifacts/quality/screen04-social-v8-mission-20260723`.
 
 ## Regression-safe correction protocol
 

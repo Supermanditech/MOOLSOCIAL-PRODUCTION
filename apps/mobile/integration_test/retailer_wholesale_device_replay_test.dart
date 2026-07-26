@@ -16,9 +16,10 @@ void main() {
       final scrollables = find.byWidgetPredicate(
         (widget) =>
             widget is Scrollable &&
-            {AxisDirection.down, AxisDirection.up}.contains(
-              widget.axisDirection,
-            ),
+            {
+              AxisDirection.down,
+              AxisDirection.up,
+            }.contains(widget.axisDirection),
       );
       expect(scrollables, findsWidgets, reason: 'No scrollable for $key');
       final scrollable = tester.state<ScrollableState>(scrollables.last);
@@ -107,10 +108,7 @@ void main() {
 
       await tapVisible(tester, const Key('wholesale-track-orders'));
       for (var index = 0; index < 3; index += 1) {
-        await tapVisible(
-          tester,
-          const Key('wholesale-refresh-delivery'),
-        );
+        await tapVisible(tester, const Key('wholesale-refresh-delivery'));
       }
       expect(
         retailer.selectedPurchaseOrder!.stage,
@@ -131,16 +129,12 @@ void main() {
       );
       await binding.takeScreenshot('retailer-86-receipt-result');
 
-      await tapVisible(
-        tester,
-        const Key('receipt-open-purchase-book'),
-      );
+      await tapVisible(tester, const Key('receipt-open-purchase-book'));
       expect(find.byKey(const Key('purchase-book-screen')), findsOneWidget);
       await reveal(tester, const Key('purchase-entry-PUR-85021'));
       await binding.takeScreenshot('retailer-87-purchase-book');
       expect(
-        retailer.purchases
-            .where((purchase) => purchase.grnId == 'GRN-85021'),
+        retailer.purchases.where((purchase) => purchase.grnId == 'GRN-85021'),
         hasLength(1),
       );
     },

@@ -1,0 +1,25 @@
+{
+  "status": "Accepted for native Screen 04 implementation",
+  "acceptedAt": "2026-07-22",
+  "acceptedBy": "Founder",
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "sourceHtmlSha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f",
+  "scope": [
+    "Complete Screen 04 Universal focus shell rendered by the frozen HTML",
+    "Approved capability bottom rail and its Mool, focused-choice and Chat modes",
+    "Social Shorts, Videos, Feed and personal Create first-layer states",
+    "Buy, Eat, Ride, Book, Pay and Work Universal first-layer states",
+    "Header commands, sheets, recovery states and connected Screen 04 contracts",
+    "Native Flutter V2 implementation and OPPO verification of Screen 04"
+  ],
+  "protected": [
+    "Screens 01, 02 and 03 remain read-only and accepted",
+    "Later destination screens remain outside this acceptance until approved one by one",
+    "The approved HTML, bottom rail, interaction contract and branding must not be redesigned during native implementation"
+  ],
+  "founderDecision": "Develop Screen 04 in production exactly from the approved HTML UI, UX, bottom rail and contracts; cross-verify HTML and Flutter and test it on the connected OPPO before beginning any later screen.",
+  "flutterImplementationAuthorized": true,
+  "nativeFlutterAccepted": false,
+  "mainBranchPromotionAuthorized": false
+}

@@ -9,7 +9,7 @@ the prototype evidence into stable routes and state machines.
 | Screen 01 Splash / First Open | `/boot` | **Production Accepted and locked:** immutable reference `v3`. One visible branded Flutter screen, minimum 3000 ms, same customer presentation during slow startup, plain navy Android system launch window. |
 | Screen 02 Language / Location | `/setup` | **Production Accepted and locked:** immutable reference `v4`. Consent → Android permission/settings → resolved current area or explicit continue-for-now → Screen 03. Permanent serviceable area remains inside Universal after login. |
 | Screen 03 Login / Handoff | `/sign-in`, `/verify` | **Production Accepted and locked:** immutable reference `v2`. Six provider handoffs plus email/mobile OTP. Exact APK passed both channels to Universal on OPPO; mobile passed after ADB reverse was deliberately removed. |
-| Screen 04 Universal Focus Shell | `/app/social`, `/app/mool`, universal nav | local shell implemented |
+| Screen 04 Universal Focus Shell | `/app/social`, `/app/mool`, universal nav | **HTML v8 frozen; native v8 verified, awaiting founder:** immutable full-screen HTML `v8` at SHA-256 `0997F3AD…` freezes compact Videos search and progressive details, the approved rail, Shorts, thumb-zone Feed and direct Create contracts. The native v8 APK at SHA-256 `37F8E371…` passed 91 affected tests, two 448-test full regressions, Screen 01–03 locks and byte-identical installed-APK OPPO replay. It is not native Accepted until the founder reviews that installed candidate. Live YouTube integration remains Gate 3 Dev/Trial work. |
 
 The exact source requirements remain in:
 

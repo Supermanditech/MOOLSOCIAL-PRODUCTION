@@ -1,0 +1,26 @@
+{
+  "status": "Accepted",
+  "acceptedAt": "2026-07-22",
+  "acceptedBy": "Founder",
+  "scope": [
+    "Screen 04 Social Feed discovery and Post/Carousel presentation",
+    "Feed item Like, Save, comments, share, repost, undo repost and quoted-share states",
+    "Screen 04 personal Create landing",
+    "Same-screen Post, Reel and Carousel creation states",
+    "Personal Draft resume and publish or schedule confirmation states",
+    "Accepted Universal capability bottom rail as rendered with those states"
+  ],
+  "excluded": [
+    "Remaining Shorts and Video downstream screens",
+    "Professional Creator Studio and external distribution",
+    "MoolSocial subscriptions and advertising campaigns",
+    "Buy, Eat, Ride, Book, Pay and Work first layers",
+    "backend, provider, API and cloud implementation",
+    "main branch promotion"
+  ],
+  "sourceHtmlSha256": "a38ad64a05425dd36bb0ed89679badfd14276ed805e33b71c3c907f9260c1b7f",
+  "founderDecision": "Social Shorts, Videos, Feed and personal Create are approved to be parked. Continue the remaining Social HTML and then native Flutter work as one uninterrupted verified batch without intermediate founder approval.",
+  "flutterAuthorizedByThisReferenceAlone": false,
+  "continuousBatchAuthorized": true,
+  "wholeScreen04Final": false
+}

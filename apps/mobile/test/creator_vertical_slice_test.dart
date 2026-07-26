@@ -46,6 +46,7 @@ void main() {
         session: journey,
         creatorSession: creator,
         initialLocation: route,
+        legacyPresentationForTestsOnly: true,
       ),
     );
     await settle(tester);

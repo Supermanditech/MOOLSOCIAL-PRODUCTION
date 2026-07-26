@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v5",
+  "status": "founder-approved-html-gate-0",
+  "founderDecision": "Approved; proceed with native Flutter and complete public content outcomes",
+  "founderApprovedAt": "2026-07-22",
+  "approvalSource": "Founder approved the direct Create state and authorized native Flutter implementation, including complete public Reel, Carousel, Post, Image Poll, Quick Poll and Quiz presentations.",
+  "sourceHtmlSha256": "b4a7f6b91a1f488ec5ba78d2a84379316ee9fd918264715c0be1ed11f78a459a",
+  "supersedes": "../v4",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison, interaction replay and connected OPPO review.",
+  "verification": {
+    "directCreateFormats": ["Reel", "Carousel", "Post"],
+    "postActions": ["Image", "Image Poll", "Quick Poll", "Quiz"],
+    "verifiedViewports": ["320x568", "412x915"],
+    "minimumTapTarget": "44x44 logical pixels",
+    "consoleErrors": 0,
+    "referenceViews": [
+      "Create at 390x844",
+      "Direct Reel at 390x844",
+      "Direct Carousel at 390x844",
+      "Image Poll at 390x844",
+      "Quick Poll at 390x844",
+      "Quiz at 390x844"
+    ]
+  }
+}

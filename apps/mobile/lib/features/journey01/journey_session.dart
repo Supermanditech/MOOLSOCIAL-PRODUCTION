@@ -68,6 +68,7 @@ class JourneySession extends ChangeNotifier {
   bool resolvingCurrentArea = false;
 
   bool _started = false;
+  bool _storeRestored = false;
   bool _authenticatedAtBoot = false;
   bool _authenticationCompletionInProgress = false;
   int _completedSetupExperienceVersion = 0;
@@ -131,8 +132,9 @@ class JourneySession extends ChangeNotifier {
               ? parts.skip(1).join(', ')
               : 'Nearby results are ready';
         }
-        returnTo = capturedRoute ?? snapshot.pendingRoute;
+        returnTo = returnTo ?? capturedRoute ?? snapshot.pendingRoute;
       }
+      _storeRestored = true;
 
       final signedIn =
           await _otpGateway.hasAuthenticatedUser() ||
@@ -150,6 +152,11 @@ class JourneySession extends ChangeNotifier {
         stage = JourneyStage.signIn;
       } else {
         stage = JourneyStage.setup;
+      }
+      if (returnTo != null && returnTo != snapshot?.pendingRoute) {
+        await _persist(
+          setupComplete: snapshot?.setupComplete ?? areaChoice != null,
+        );
       }
       if (kDebugMode) {
         debugPrint(
@@ -177,6 +184,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<void> retryBoot() async {
     _started = false;
+    _storeRestored = false;
     _authenticatedAtBoot = false;
     stage = JourneyStage.booting;
     notifyListeners();
@@ -679,7 +687,38 @@ class JourneySession extends ChangeNotifier {
   void captureReturnTo(String location) {
     if (returnTo == null && location.startsWith('/app/')) {
       returnTo = location;
-      _persist(setupComplete: areaChoice != null);
+      if (_storeRestored) {
+        _persist(setupComplete: areaChoice != null);
+      } else {
+        _persistCapturedRouteBeforeRestore(location);
+      }
+    }
+  }
+
+  Future<void> _persistCapturedRouteBeforeRestore(String location) async {
+    try {
+      final snapshot = await _store.read();
+      if (_storeRestored || returnTo != location) {
+        return;
+      }
+      if (snapshot == null) {
+        await _persist(setupComplete: false);
+        return;
+      }
+      await _store.write(
+        JourneySnapshot(
+          languageCode: snapshot.languageCode,
+          areaMode: snapshot.areaMode,
+          areaLabel: snapshot.areaLabel,
+          currentAreaLabel: snapshot.currentAreaLabel,
+          homeOrWorkAreaLabel: snapshot.homeOrWorkAreaLabel,
+          setupComplete: snapshot.setupComplete,
+          pendingRoute: location,
+          setupExperienceVersion: snapshot.setupExperienceVersion,
+        ),
+      );
+    } on Object {
+      // Startup still retains the route in memory and owns visible recovery.
     }
   }
 

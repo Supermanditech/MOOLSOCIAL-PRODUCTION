@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v8",
+  "status": "founder-delegated-final-html-gate-0",
+  "founderDecision": "Reject the prior native candidate, correct Videos, Feed and Create in HTML, verify locally, automatically approve the corrected HTML, freeze it, then complete native Flutter and connected OPPO verification without an intermediate approval stop.",
+  "founderApprovedAt": "2026-07-23",
+  "approvalSource": "Founder explicitly authorized the uninterrupted mission workflow and delegated HTML approval after successful browser verification.",
+  "sourceHtmlSha256": "0997f3ad7adaad76eb3fd7f5a96cf63c1d691413da92f368fc4ec005e0d86410",
+  "supersedes": "../v7",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison, complete interaction replay and connected OPPO review.",
+  "verification": {
+    "videosHeader": "Compact top-left expandable search; no serviceable area or Universal command bar on Videos",
+    "feedComposer": "Persistent lower thumb-zone public composer",
+    "createWorkbench": "Persistent lower thumb-zone one-screen workbench",
+    "directCreateFormats": ["Reel", "Carousel", "Post"],
+    "contentLibrary": "Session-owned Drafts, Scheduled, Published and Archived items only, with truthful empty states and no fabricated content",
+    "postActions": ["Image", "Image Poll", "Quick Poll", "Quiz"],
+    "verifiedViewports": ["320x568", "360x640", "360x720", "375x667", "390x844", "412x915", "430x932"],
+    "verifiedTextScales": ["100%", "140%"],
+    "minimumTapTarget": "44x44 logical pixels",
+    "consoleErrors": 0,
+    "assertions": "1023/1023",
+    "progressiveVideoPath": ["Discovery", "Watch", "Description", "Channel", "Back to Description", "Back to Watch", "Back to Discovery"],
+    "rejectedControls": ["Serviceable area on Videos", "Universal command bar on Videos", "Page-level Videos back pill", "Top-only Feed composer", "Top-only Create action surface"],
+    "referenceViews": [
+      "Videos Discovery at 390x844",
+      "Videos Watch at 390x844",
+      "Videos Description at 390x844",
+      "Videos Channel at 390x844",
+      "Shorts at 390x844",
+      "Feed at 390x844",
+      "Create at 390x844"
+    ]
+  }
+}

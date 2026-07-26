@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v2",
+  "status": "founder-approved-html-full-screen",
+  "founderDecision": "FINAL",
+  "founderApprovedAt": "2026-07-22",
+  "approvalSource": "Founder response FINAL after visual review of the uniform Shorts, premium rail motion and responsive typography revision",
+  "sourceHtmlSha256": "4d6b6a37e818ba860cf057879371555d2b7f811d3c16e569428c323bfec6a8cd",
+  "supersedes": "../v1",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison and connected OPPO replay.",
+  "verification": {
+    "fullAssertions": { "passed": 363, "total": 363 },
+    "taps": { "passed": 218, "total": 218 },
+    "visibleCopyViews": { "passed": 44, "total": 44 },
+    "responsiveCases": { "passed": 14, "total": 14 },
+    "capabilityRailCases": { "passed": 14, "total": 14 },
+    "uniformShortsCases": { "passed": 14, "total": 14 },
+    "consoleErrors": 0
+  }
+}

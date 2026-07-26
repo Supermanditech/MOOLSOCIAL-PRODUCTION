@@ -2,6 +2,12 @@
 
 Status: **implemented and verified twice for the local production-demo scope**
 
+Founder-directed successor work is recorded in
+`FOUNDER-UNIVERSAL-NAVIGATION-BUY-TICKETS-20260721.md`. The older `NAV-001`,
+`BUY-001` and related completion labels below describe the historical local
+review build only; they do not close the new production-bound Screen 04 rail,
+action-shell, Buy, founder-approval or native V2 gates.
+
 Source of truth:
 
 - Approved prototype screens `00` through `04` in
@@ -351,3 +357,72 @@ device set and iOS simulator/device set.
 - final full-regression results;
 - remaining real-device or external blockers;
 - evidence-based **GO** or **NO-GO** recommendation.
+
+## Current Social full-stack successor tickets
+
+The historical `SOC-001` review-build completion above does not approve the
+new production-bound Social/Creator Studio system. The founder-approved
+authority is:
+
+`SOCIAL-EXTERNAL-REACH-AND-CREATOR-STUDIO-FULL-STACK-CONTRACT.md`
+
+| Order | Ticket | Outcome | Status |
+| --- | --- | --- | --- |
+| 1 | `SOC-FS-001` | Preserve the accepted Universal rail and revise the Social first-layer HTML to the final native/YouTube discovery boundary | Shorts/Videos and Feed/Create first-layer states founder-approved and frozen as separate scoped HTML references `v1`; no Flutter authorization |
+| 1B | `SOC-FS-001B` | Complete low-effort same-screen native Feed/Create interactions without exposing Creator/Business account tools | HTML candidate verified 182/182 responsive states and 20/20 journeys; founder visual/tap approval pending |
+| 2 | `SOC-FS-002` | Design destination-first Creator Studio HTML with eligibility and requirements shown before upload | Pending |
+| 3 | `SOC-FS-003` | Design Standard Publish HTML with compatible-destination selection, per-destination preview and partial results | Pending |
+| 4 | `SOC-FS-004` | Obtain explicit founder approval for the Social/Creator Studio HTML states without freezing Screen 04 prematurely | Pending |
+| 5 | `SOC-FS-005` | Prove provider contracts using local mocks/emulators | Pending; no live credentials |
+| 6 | `SOC-FS-006` | After separate authorization, prove YouTube playback/private upload, Instagram Professional publishing and Facebook Page publishing in Dev/Trial | Pending authorization |
+| 7 | `SOC-FS-007` | Implement native Flutter V2 and backend services only after the first-layer Universal founder gate and applicable frozen references | Blocked by approval gates |
+| 8 | `SOC-FS-008` | Replay provider, interruption, idempotency, quota/cost and partial-success matrices on the exact OPPO candidate and supported iOS/Android sizes | Pending implementation |
+
+The founder-authorized uninterrupted execution sequence and its expanded
+subscription/promotion inventory are controlled by
+`SOCIAL-CONTINUOUS-BATCH-EXECUTION-20260722.md`. Its `SOC-BATCH-001` through
+`SOC-BATCH-017` and `SOC-NATIVE-001` through `SOC-NATIVE-008` tickets supersede
+intermediate review stops for this batch but do not permit accepted-reference
+overwrites, production-cloud experimentation or a partial merge to `main`.
+
+`SOC-FS-001` must not redesign the founder-approved bottom rail. None of these
+tickets authorizes an API, OAuth client, credential, Flutter change, manifest
+freeze or promotion by itself.
+
+## Screen 04 Social v9 founder-correction successor
+
+The founder reopened the verified v8 candidate before native acceptance and
+authorized a new HTML-first ownership assessment. The detailed contract and
+acceptance inventory is
+[`SCREEN-04-SOCIAL-FOUNDER-CORRECTION-TICKETS-20260723.md`](SCREEN-04-SOCIAL-FOUNDER-CORRECTION-TICKETS-20260723.md).
+Immutable v8 and all earlier references remain preserved.
+
+| Order | Ticket | Outcome | Status |
+| --- | --- | --- | --- |
+| 1 | `FND-U04-REEL-009` | Reels owns contextual direct creation and its creation/editor states | Implemented in editable v9 HTML — verification pending |
+| 2 | `FND-U04-FEED-010` | Feed owns the thumb-zone direct composer and supported inline formats | Implemented in editable v9 HTML — verification pending |
+| 3 | `FND-U04-CREATE-011` | Map every responsibility and compatibility entry before deciding visible Create removal | Implemented in editable v9 HTML — compatibility proof pending |
+| 4 | `FND-U04-SEARCH-012` | Compact top-left expandable Reel/creator search | Implemented in editable v9 HTML — verification pending |
+| 5 | `FND-U04-QA-013` | Complete v9 interaction, navigation, copy, fitment and compatibility verification | In progress — founder-review evidence pending |
+| 6 | `FND-NATIVE-014` | Freeze founder-final v9 and implement native Flutter parity | Blocked by explicit founder `FINAL` |
+
+These tickets supersede the older instruction to keep the four-item Social
+sub-action rail only for the active editable v9 assessment. They do not alter
+v8, approve visible Create removal, authorize Flutter or permit a manifest,
+API, OAuth, cloud, commit, push or promotion action.
+
+## Deferred Creator/Business Workspace Google growth successors
+
+Merchant Center, YouTube Shopping affiliate reporting and Google Ads Demand
+Gen are future Workspace integrations governed by:
+
+- `ADR-0007-GOOGLE-COMMERCE-AND-PAID-GROWTH-WORKSPACE-BOUNDARY.md`; and
+- `GOOGLE-COMMERCE-AND-DEMAND-GEN-WORKSPACE-BACKLOG-20260723.md`.
+
+`Work -> Workspace` or Profile may enter or select a workspace, but provider
+configuration begins only inside the selected verified Creator/Business
+Workspace. It does not appear on public Work or Social first layers.
+
+This deferred successor does not block the Social MVP, does not enable
+Merchant API or Google Ads API and does not authorize credentials, spend, HTML
+or Flutter work.

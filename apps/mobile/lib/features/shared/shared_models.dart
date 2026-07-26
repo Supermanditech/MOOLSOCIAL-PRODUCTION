@@ -5,6 +5,114 @@ class SharedStat {
   final String value;
 }
 
+enum SocialPublishedContentType {
+  reel,
+  carousel,
+  post,
+  imagePoll,
+  quickPoll,
+  quiz,
+}
+
+class SocialPublishedChoice {
+  const SocialPublishedChoice({
+    required this.label,
+    this.imagePath,
+    this.imageIsAsset = false,
+    this.votes = 0,
+  });
+
+  final String label;
+  final String? imagePath;
+  final bool imageIsAsset;
+  final int votes;
+
+  SocialPublishedChoice copyWith({int? votes}) => SocialPublishedChoice(
+    label: label,
+    imagePath: imagePath,
+    imageIsAsset: imageIsAsset,
+    votes: votes ?? this.votes,
+  );
+}
+
+class SocialPublishedItem {
+  const SocialPublishedItem({
+    required this.id,
+    required this.type,
+    required this.authorName,
+    required this.authorHandle,
+    required this.body,
+    required this.audience,
+    required this.publishedAt,
+    this.mediaPaths = const <String>[],
+    this.mediaAreAssets = false,
+    this.choices = const <SocialPublishedChoice>[],
+    this.correctChoiceIndex,
+    this.selectedChoiceIndex,
+    this.closesAt,
+    this.liked = false,
+    this.saved = false,
+    this.likeCount = 0,
+    this.replyCount = 0,
+    this.repostCount = 0,
+    this.shareCount = 0,
+  });
+
+  final String id;
+  final SocialPublishedContentType type;
+  final String authorName;
+  final String authorHandle;
+  final String body;
+  final String audience;
+  final DateTime publishedAt;
+  final List<String> mediaPaths;
+  final bool mediaAreAssets;
+  final List<SocialPublishedChoice> choices;
+  final int? correctChoiceIndex;
+  final int? selectedChoiceIndex;
+  final DateTime? closesAt;
+  final bool liked;
+  final bool saved;
+  final int likeCount;
+  final int replyCount;
+  final int repostCount;
+  final int shareCount;
+
+  int get voteCount =>
+      choices.fold<int>(0, (sum, choice) => sum + choice.votes);
+
+  SocialPublishedItem copyWith({
+    List<SocialPublishedChoice>? choices,
+    int? selectedChoiceIndex,
+    bool? liked,
+    bool? saved,
+    int? likeCount,
+    int? replyCount,
+    int? repostCount,
+    int? shareCount,
+  }) => SocialPublishedItem(
+    id: id,
+    type: type,
+    authorName: authorName,
+    authorHandle: authorHandle,
+    body: body,
+    audience: audience,
+    publishedAt: publishedAt,
+    mediaPaths: mediaPaths,
+    mediaAreAssets: mediaAreAssets,
+    choices: choices ?? this.choices,
+    correctChoiceIndex: correctChoiceIndex,
+    selectedChoiceIndex: selectedChoiceIndex ?? this.selectedChoiceIndex,
+    closesAt: closesAt,
+    liked: liked ?? this.liked,
+    saved: saved ?? this.saved,
+    likeCount: likeCount ?? this.likeCount,
+    replyCount: replyCount ?? this.replyCount,
+    repostCount: repostCount ?? this.repostCount,
+    shareCount: shareCount ?? this.shareCount,
+  );
+}
+
 class SharedFact {
   const SharedFact(this.label, this.value);
 

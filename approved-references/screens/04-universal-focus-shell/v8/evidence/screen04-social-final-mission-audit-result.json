@@ -1,0 +1,42 @@
+{
+  "url": "http://127.0.0.1:8765/screens/04-universal-focus-shell.html?founderReview=1&rail=capability&social=videos",
+  "checkedAt": "2026-07-22T20:31:25.921Z",
+  "viewports": [
+    [
+      320,
+      568
+    ],
+    [
+      360,
+      640
+    ],
+    [
+      360,
+      720
+    ],
+    [
+      375,
+      667
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      412,
+      915
+    ],
+    [
+      430,
+      932
+    ]
+  ],
+  "textScales": [
+    1,
+    1.4
+  ],
+  "assertions": 897,
+  "passed": 897,
+  "findings": [],
+  "consoleErrors": []
+}

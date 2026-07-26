@@ -53,6 +53,54 @@
     `adb reverse` state. A reachable laptop service plus a failed phone route
     is a review-routing failure and must never be presented as proof that the
     customer is offline.
+18. Social/external-media changes comply with
+    `docs/delivery/SOCIAL-EXTERNAL-REACH-AND-CREATOR-STUDIO-FULL-STACK-CONTRACT.md`. No
+    WebView renders MoolSocial UI; only the direct official YouTube provider
+    player may use the narrow OS WebView/WKWebView exception.
+19. Creator publishing chooses a destination before upload or uses the
+    validated Standard Publish preset. Every selected destination passes its
+    live capability rules and receives an explicit preview and consent.
+20. Provider connections are separate from sign-in, least-privilege and name
+    the exact eligible channel, Professional account, Page or business sender.
+    Provider secrets and refresh tokens never enter client code or logs.
+21. Distribution tests prove idempotency, unknown-outcome reconciliation,
+    token revocation, quota/rate limits, cost stops and partial success without
+    deleting successful external publications.
+22. YouTube Social acceptance cannot be based on one hard-coded video. Evidence
+    proves paginated native browsing from multiple supported source types,
+    selection of multiple distinct eligible videos and replacement/release of
+    the single active official player without leaving MoolSocial.
+23. Buy work starts only after both `scripts/check-approved-ui-locks.ps1` and
+    `scripts/check-social-protected-baseline.ps1` pass. A Buy change must not
+    rebaseline Social, YouTube, Screens 01–03 or their accepted HTML packages.
+24. A new Buy HTML/UI-UX candidate is reviewed and receives explicit founder
+    `FINAL` before any native Flutter Buy implementation. The accepted package
+    receives a new immutable checksum version; an earlier HTML file or
+    reference is never overwritten.
+25. Consumer Buy and verified Business Buy may share canonical product and pack
+    identity, but their offers remain context-specific. Consumer UI cannot
+    expose wholesale MOQ, trade credit or tax/freight terms, and Business UI
+    cannot silently reuse consumer totals as landed wholesale price.
+
+## Buy module trial sequence
+
+1. Preserve the accepted HTML packages, current protected Social source tree,
+   exact OPPO-installed trial APK and current Dev provider boundary in the
+   traceable baseline.
+2. Approve the unified Buy operating model and prepare the complete Buy HTML
+   candidate without editing Flutter.
+3. Receive explicit founder `FINAL`, freeze a new immutable Buy reference and
+   verify its interaction contract.
+4. Implement native Flutter from that exact reference; do not embed the HTML
+   prototype or substitute screenshots for production UI.
+5. Pass formatting, analysis, full Flutter tests, operational goldens,
+   Android/iOS builds, Functions verification and the complete Social plus Buy
+   regression suite.
+6. Install the exact built APK on the connected OPPO and replay clean,
+   retained-data, interruption, Personal Buy and Business Buy journeys.
+7. Only then create a separately identified Dev deployment trial from the same
+   committed source. Record source commit, APK SHA-256, installed APK SHA-256,
+   backend revision/hash and rollback boundary.
 
 ## Every staging promotion
 
@@ -97,6 +145,15 @@
     viewport, representative current phones, a large phone and accessibility
     text scaling. Physical Android evidence supplements but does not replace
     the cross-platform widget matrix.
+21. Flutter production fitment is verified separately from HTML approval. The
+    native matrix covers the approved phone viewports at 100% and 140% text,
+    supported accessibility scaling above 140%, portrait/landscape, safe-area
+    and cutout insets, keyboard/IME, display zoom, gesture/three-button
+    navigation, interruption/resume, tablets, split-window resizing and
+    foldable cover/unfolded/hinge states. Provider players retain minimum usable
+    size, unobscured controls and correct fullscreen/orientation behavior. A
+    founder-approved support boundary is required for any excluded device
+    class; HTML screenshots alone never satisfy this gate.
 
 ## Every production promotion
 

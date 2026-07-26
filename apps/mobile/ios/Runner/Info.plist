@@ -8,6 +8,19 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>MoolSocial</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.moolsocial.app.youtube-return</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>moolsocial</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,9 +42,11 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MoolSocial uses your area to show nearby products, services and work only after you choose current location.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>MoolSocial uses the camera only when you choose to scan a supported payment or MoolSocial code.</string>
+	<string>MoolSocial uses the camera only when you choose to scan a supported code or capture media for your post.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MoolSocial opens your photo library only when you choose media for a Reel, carousel, post, poll or profile.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>MoolSocial uses the microphone only when you choose voice search.</string>
+	<string>MoolSocial uses the microphone only when you choose voice search or record a Reel with sound.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>MoolSocial converts your short voice search into text so you can review it before searching.</string>
 	<key>UIApplicationSceneManifest</key>

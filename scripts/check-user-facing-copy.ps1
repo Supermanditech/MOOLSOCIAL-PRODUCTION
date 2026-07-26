@@ -64,6 +64,10 @@ foreach ($file in $files) {
   foreach ($line in Get-Content -LiteralPath $file.FullName) {
     $lineNumber += 1
     $lower = $line.ToLowerInvariant()
+    $nonVisibleDartKey = (
+      $file.Extension -eq ".dart" -and
+      $line -match '\b(?:Key|ValueKey|ObjectKey)\s*\('
+    )
     foreach ($phrase in $blocked) {
       if ($lower.Contains($phrase)) {
         $relative = $file.FullName.Substring($root.Length + 1)
@@ -71,7 +75,10 @@ foreach ($file in $files) {
       }
     }
     foreach ($word in $blockedQuotedWords) {
-      if ($line -match "['`"][^'`"]*\b$word\b[^'`"]*['`"]") {
+      if (
+        -not $nonVisibleDartKey -and
+        $line -match "['`"][^'`"]*\b$word\b[^'`"]*['`"]"
+      ) {
         $relative = $file.FullName.Substring($root.Length + 1)
         $violations.Add("${relative}:${lineNumber}: prohibited word '$word'")
       }

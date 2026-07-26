@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v1",
+  "status": "founder-approved-html-full-screen",
+  "entry": {
+    "pathname": "/screens/04-universal-focus-shell.html",
+    "defaultWorld": "social",
+    "defaultChoice": "shorts",
+    "rail": "capability"
+  },
+  "branding": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineProportions": [45, 14, 41],
+    "wordmark": "MoolSocial"
+  },
+  "header": [
+    "MoolSocial home",
+    "Serviceable area",
+    "Notifications",
+    "Profile and account",
+    "Search",
+    "Scan",
+    "Voice"
+  ],
+  "worlds": {
+    "Social": ["Shorts", "Videos", "Feed", "Create"],
+    "Buy": ["Grocery", "Categories", "Medicine", "Basket"],
+    "Eat": ["Order Food", "Book Table", "Tiffin"],
+    "Ride": ["Bike", "Auto", "Cab"],
+    "Book": ["Get It Done", "Doctor", "Salon"],
+    "Pay": ["Recharge", "Bills", "Scan & Pay", "Receipts"],
+    "Work": ["Earn Today", "Delivery", "Onboard", "Verify", "Workspace"]
+  },
+  "bottomRail": {
+    "fixedEdges": ["Mool", "Chat"],
+    "focusedMode": "The middle ribbon exposes every sub-action for the active world",
+    "moolMode": "Tapping Mool replaces only the middle ribbon with Social, Buy, Eat, Ride, Book, Pay and Work",
+    "navigation": ["Tap", "Horizontal swipe", "Previous hint", "Next hint"],
+    "minimumTapTarget": "44x44 logical pixels"
+  },
+  "social": {
+    "Shorts": ["For You", "Following", "Nearby", "Promoted", "Swipe to next item", "Per-item Like", "Per-item Comment", "Per-item Share", "Per-item Remix", "Eligible commerce action"],
+    "Videos": ["Discover", "Popular", "Nearby", "Learning", "Live", "Eligible public YouTube discovery", "Official player watch", "Metadata", "More to watch"],
+    "Feed": ["For You", "Following", "Nearby", "Promoted", "Post", "Carousel", "Like", "Comment", "Share", "Save", "Repost", "Eligible commerce action"],
+    "Create": ["Create a Reel", "Write a Post", "Build a Carousel", "Continue a Draft", "Post now", "Schedule", "Publish result", "Retry"]
+  },
+  "overlaysAndRecovery": {
+    "Search": ["ready", "validation", "loading", "retrying", "results", "empty", "unavailable", "failure"],
+    "Scan": ["introduction", "permission", "ready", "denied", "settings recovery", "unavailable", "unreadable", "result", "manual entry", "validation", "manual result"],
+    "Voice": ["introduction", "permission", "listening", "denied", "settings recovery", "unavailable", "failure", "recognized request"],
+    "Notifications": ["loading", "retrying", "ready", "settings", "empty", "denied", "settings recovery", "unavailable", "failure"],
+    "Profile": ["account home", "language", "account and safety", "alerts", "sign-out confirmation"],
+    "Serviceable area": ["current area", "manual search", "validation", "loading", "results", "empty", "confirmation", "location prompt", "nearby result", "denied", "settings recovery", "unavailable", "failure", "retrying"]
+  },
+  "responsiveMatrix": [
+    "320x568@100%", "320x568@140%", "360x640@100%", "360x640@140%",
+    "360x720@100%", "360x720@140%", "375x667@100%", "375x667@140%",
+    "390x844@100%", "390x844@140%", "412x915@100%", "412x915@140%",
+    "430x932@100%", "430x932@140%"
+  ],
+  "nativeRules": [
+    "Implement with native Flutter widgets; never render this HTML in a WebView",
+    "Reuse existing non-UI sessions, services and route owners",
+    "Do not import or modify the legacy Flutter presentation",
+    "Do not modify accepted Screens 01, 02 or 03",
+    "Do not claim native acceptance before identical-viewport comparison and connected OPPO replay"
+  ]
+}

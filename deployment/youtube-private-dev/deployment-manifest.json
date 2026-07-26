@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "environment": "dev",
+  "projectId": "moolsocial-dev-503018",
+  "projectNumber": "760290687711",
+  "organizationId": "1067591230270",
+  "authorizedBillingAccountId": "01F9D3-44031C-B5E225",
+  "region": "asia-south1",
+  "firebase": {
+    "functionsCodebase": "provider",
+    "runtimeServiceAccount": "youtube-provider-runtime@moolsocial-dev-503018.iam.gserviceaccount.com",
+    "buildServiceAccount": "760290687711-compute@developer.gserviceaccount.com",
+    "buildAccess": {
+      "projectRoles": [
+        "roles/logging.logWriter"
+      ],
+      "sourceBucket": "gcf-v2-sources-760290687711-asia-south1",
+      "sourceBucketRoles": [
+        "roles/storage.objectViewer"
+      ],
+      "artifactRepository": "gcf-artifacts",
+      "artifactRepositoryLocation": "asia-south1",
+      "artifactRepositoryRoles": [
+        "roles/artifactregistry.writer"
+      ]
+    },
+    "extensions": {
+      "apiPurpose": "firebase-cli-functions-deployment-prerequisite",
+      "supportingServices": [
+        "deploymentmanager.googleapis.com",
+        "firebaseextensions.googleapis.com"
+      ],
+      "installedInstancesAllowed": false
+    },
+    "functions": [
+      "youtubeProvider",
+      "youtubeOAuthCallback"
+    ],
+    "exactDeployTargets": [
+      "functions:provider:youtubeProvider",
+      "functions:provider:youtubeOAuthCallback",
+      "firestore:rules"
+    ],
+    "firestoreRulesPath": "backend/firestore/youtube-private-dev.rules"
+  },
+  "persistence": {
+    "activeAdapter": "cloud-firestore",
+    "databaseId": "(default)",
+    "databaseType": "firestore-native",
+    "edition": "standard",
+    "location": "asia-south1",
+    "deleteProtection": true,
+    "pointInTimeRecovery": false,
+    "ttlPolicies": false,
+    "clientAccess": false,
+    "dataConnectAdapter": "preserved-deferred",
+    "cloudSqlProvisioningForbidden": true
+  },
+  "deploymentPrerequisiteServices": [
+    "apikeys.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "billingbudgets.googleapis.com",
+    "cloudbilling.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "deploymentmanager.googleapis.com",
+    "eventarc.googleapis.com",
+    "firebase.googleapis.com",
+    "firebaseextensions.googleapis.com",
+    "firebaserules.googleapis.com",
+    "firestore.googleapis.com",
+    "iam.googleapis.com",
+    "pubsub.googleapis.com",
+    "run.googleapis.com",
+    "secretmanager.googleapis.com",
+    "serviceusage.googleapis.com",
+    "storage.googleapis.com"
+  ],
+  "providerServices": [
+    "firebaseappcheck.googleapis.com",
+    "playintegrity.googleapis.com",
+    "youtube.googleapis.com",
+    "youtubeanalytics.googleapis.com",
+    "youtubereporting.googleapis.com"
+  ],
+  "preExistingPlatformServices": [
+    "analyticshub.googleapis.com",
+    "appengine.googleapis.com",
+    "bigquery.googleapis.com",
+    "bigqueryconnection.googleapis.com",
+    "bigquerydatapolicy.googleapis.com",
+    "bigquerydatatransfer.googleapis.com",
+    "bigquerymigration.googleapis.com",
+    "bigqueryreservation.googleapis.com",
+    "bigquerystorage.googleapis.com",
+    "cloudaicompanion.googleapis.com",
+    "cloudapis.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "containerregistry.googleapis.com",
+    "dataform.googleapis.com",
+    "dataplex.googleapis.com",
+    "datastore.googleapis.com",
+    "fcm.googleapis.com",
+    "fcmregistrations.googleapis.com",
+    "firebaseappdistribution.googleapis.com",
+    "firebasehosting.googleapis.com",
+    "firebaseinstallations.googleapis.com",
+    "firebaseremoteconfig.googleapis.com",
+    "firebaseremoteconfigrealtime.googleapis.com",
+    "iamcredentials.googleapis.com",
+    "identitytoolkit.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com",
+    "runtimeconfig.googleapis.com",
+    "securetoken.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "source.googleapis.com",
+    "sql-component.googleapis.com",
+    "storage-api.googleapis.com",
+    "storage-component.googleapis.com",
+    "telemetry.googleapis.com",
+    "testing.googleapis.com"
+  ],
+  "allowedEnabledServices": [
+    "analyticshub.googleapis.com",
+    "apikeys.googleapis.com",
+    "appengine.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "bigquery.googleapis.com",
+    "bigqueryconnection.googleapis.com",
+    "bigquerydatapolicy.googleapis.com",
+    "bigquerydatatransfer.googleapis.com",
+    "bigquerymigration.googleapis.com",
+    "bigqueryreservation.googleapis.com",
+    "bigquerystorage.googleapis.com",
+    "billingbudgets.googleapis.com",
+    "cloudaicompanion.googleapis.com",
+    "cloudapis.googleapis.com",
+    "cloudbilling.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "containerregistry.googleapis.com",
+    "dataform.googleapis.com",
+    "dataplex.googleapis.com",
+    "datastore.googleapis.com",
+    "deploymentmanager.googleapis.com",
+    "eventarc.googleapis.com",
+    "fcm.googleapis.com",
+    "fcmregistrations.googleapis.com",
+    "firebase.googleapis.com",
+    "firebaseappcheck.googleapis.com",
+    "firebaseappdistribution.googleapis.com",
+    "firebaseextensions.googleapis.com",
+    "firebasehosting.googleapis.com",
+    "firebaseinstallations.googleapis.com",
+    "firebaseremoteconfig.googleapis.com",
+    "firebaseremoteconfigrealtime.googleapis.com",
+    "firebaserules.googleapis.com",
+    "firestore.googleapis.com",
+    "iam.googleapis.com",
+    "iamcredentials.googleapis.com",
+    "identitytoolkit.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com",
+    "playintegrity.googleapis.com",
+    "pubsub.googleapis.com",
+    "run.googleapis.com",
+    "runtimeconfig.googleapis.com",
+    "secretmanager.googleapis.com",
+    "securetoken.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "serviceusage.googleapis.com",
+    "source.googleapis.com",
+    "sql-component.googleapis.com",
+    "storage-api.googleapis.com",
+    "storage-component.googleapis.com",
+    "storage.googleapis.com",
+    "telemetry.googleapis.com",
+    "testing.googleapis.com",
+    "youtube.googleapis.com",
+    "youtubeanalytics.googleapis.com",
+    "youtubereporting.googleapis.com"
+  ],
+  "deferredServices": [
+    "firebasedataconnect.googleapis.com",
+    "sqladmin.googleapis.com"
+  ],
+  "runtime": {
+    "node": "22",
+    "minInstances": 0,
+    "maxInstances": 1,
+    "concurrency": 1,
+    "timeoutSeconds": 120,
+    "memory": "512MiB"
+  },
+  "artifactCleanup": {
+    "location": "asia-south1",
+    "retentionDays": 1,
+    "requiredImmediatelyAfterFunctionDeploy": true
+  },
+  "capabilities": {
+    "YOUTUBE_PUBLIC_DATA_ENABLED": false,
+    "YOUTUBE_OWNER_CONNECT_ENABLED": false,
+    "YOUTUBE_OWNER_ACTIONS_ENABLED": false,
+    "YOUTUBE_CREATOR_ASSETS_ENABLED": false,
+    "YOUTUBE_LIVE_ENABLED": false,
+    "YOUTUBE_PRIVATE_UPLOAD_ENABLED": false,
+    "YOUTUBE_OWNER_ANALYTICS_ENABLED": false
+  },
+  "supervisedProof": {
+    "maximumMinutes": 30,
+    "profiles": [
+      "PublicData",
+      "OwnerConnect",
+      "OwnerActions",
+      "CreatorAssets",
+      "Live",
+      "PrivateUpload",
+      "OwnerAnalytics"
+    ],
+    "serverEnforcedExpiryVariable": "YOUTUBE_PROOF_EXPIRES_AT",
+    "serverEnforcedProfileVariable": "YOUTUBE_PROOF_PROFILE",
+    "baselineProfile": "Disabled",
+    "hardContainmentRemovesOnly": "unconditional allUsers roles/run.invoker"
+  },
+  "acceptedPublicReview": {
+    "profile": "PublicDataReview",
+    "allowedTarget": "moolsocial-dev-503018",
+    "modeVariable": "YOUTUBE_PUBLIC_DATA_REVIEW_MODE",
+    "modeValue": "accepted",
+    "onlyPublicDataEnabled": true,
+    "appCheckRequired": true,
+    "stagingForbidden": true,
+    "productionForbidden": true
+  },
+  "quotaCaps": {
+    "YOUTUBE_DEV_SEARCH_DAILY_CAP": 20,
+    "YOUTUBE_DEV_UPLOAD_DAILY_CAP": 10,
+    "YOUTUBE_DEV_BATCH_STATS_DAILY_CAP": 500,
+    "YOUTUBE_DEV_ANALYTICS_DAILY_CAP": 100,
+    "YOUTUBE_DEV_GENERAL_DAILY_CAP": 2000
+  },
+  "oauth": {
+    "clientType": "web",
+    "redirectUri": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeOAuthCallback",
+    "testUsersOnly": true,
+    "incrementalScopes": [
+      "https://www.googleapis.com/auth/youtube.readonly",
+      "https://www.googleapis.com/auth/youtube.force-ssl",
+      "https://www.googleapis.com/auth/youtube",
+      "https://www.googleapis.com/auth/youtube.channel-memberships.creator",
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/yt-analytics.readonly"
+    ]
+  },
+  "secretNames": [
+    "YOUTUBE_SERVER_API_KEY",
+    "YOUTUBE_OAUTH_CLIENT_ID",
+    "YOUTUBE_OAUTH_CLIENT_SECRET",
+    "YOUTUBE_TOKEN_ENCRYPTION_KEY_V1",
+    "YOUTUBE_TOKEN_ENCRYPTION_KEY_V2"
+  ],
+  "budget": {
+    "currency": "INR",
+    "approvedMonthlyAmount": 1000,
+    "controlType": "alert-target-not-spend-cap",
+    "displayName": "MoolSocial Dev Trial monthly guardrail",
+    "projectResource": "projects/760290687711",
+    "calendarPeriod": "MONTH",
+    "spendBasis": "CURRENT_SPEND",
+    "thresholds": [
+      0.5,
+      0.8,
+      1.0
+    ],
+    "requiredBeforeDeployment": true
+  },
+  "promotion": {
+    "allowedTarget": "moolsocial-dev-503018",
+    "stagingForbidden": true,
+    "productionForbidden": true,
+    "publicOrUnlistedUploadForbidden": true
+  }
+}

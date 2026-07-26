@@ -11,3 +11,4 @@ schema:
         schemaValidation: "COMPATIBLE"
 connectorDirs:
   - "./mobile"
+  - "./provider"

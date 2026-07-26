@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v4",
+  "status": "founder-approved-html-gate-0",
+  "founderDecision": "Gate 0 accepted with direct public Create composer",
+  "founderApprovedAt": "2026-07-22",
+  "approvalSource": "Founder accepted the remaining Gate 0 work and directed Flutter implementation after adding prompt public-post actions to Create for signed-in users.",
+  "sourceHtmlSha256": "80fa50ce9ba1493e8bd137b96c415183ba81473fbb726cad5b7b5747f30dd243",
+  "supersedes": "../v3",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "Founder acceptance is still required after identical-viewport comparison and connected OPPO replay.",
+  "verification": {
+    "htmlAssertions": { "passed": 1442, "total": 1442 },
+    "consoleErrors": 0,
+    "referenceViews": [
+      "Shorts at 320x568 and 140% text",
+      "Videos at 320x568 and 140% text",
+      "Feed at 320x568 and 140% text",
+      "Create at 320x568 and 140% text"
+    ]
+  }
+}

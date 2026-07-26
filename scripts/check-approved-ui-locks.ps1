@@ -22,7 +22,16 @@ function Assert-Hash {
   }
 
   $expectedLower = $Expected.ToLowerInvariant()
-  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+  $rawSha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $actual = (
+      [BitConverter]::ToString(
+        $rawSha.ComputeHash([IO.File]::ReadAllBytes($Path))
+      ).Replace("-", "").ToLowerInvariant()
+    )
+  } finally {
+    $rawSha.Dispose()
+  }
   if ($actual -eq $expectedLower) {
     return
   }

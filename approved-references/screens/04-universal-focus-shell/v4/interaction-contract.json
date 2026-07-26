@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 3,
+  "screenNumber": 4,
+  "screenId": "universal-focus-shell",
+  "version": "v4",
+  "status": "founder-approved-html-gate-0",
+  "entry": {
+    "pathname": "/screens/04-universal-focus-shell.html",
+    "defaultWorld": "Social",
+    "defaultChoice": "Shorts",
+    "rail": "capability"
+  },
+  "branding": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineProportions": [45, 14, 41],
+    "wordmark": "MoolSocial"
+  },
+  "worlds": {
+    "Social": ["Shorts", "Videos", "Feed", "Create"],
+    "Buy": ["Grocery", "Categories", "Medicine", "Basket"],
+    "Eat": ["Order Food", "Book Table", "Tiffin"],
+    "Ride": ["Bike", "Auto", "Cab"],
+    "Book": ["Get It Done", "Doctor", "Salon"],
+    "Pay": ["Recharge", "Bills", "Scan & Pay", "Receipts"],
+    "Work": ["Earn Today", "Delivery", "Onboard", "Verify", "Workspace"]
+  },
+  "social": {
+    "filters": ["For You", "Following", "Nearby", "Promoted"],
+    "shorts": {
+      "providerOrder": "Eligible paid MoolSocial Reels remain first; eligible YouTube Shorts participate in the same continuous vertical flow.",
+      "mediaInput": "9:16",
+      "stage": "One edge-to-edge Shorts canvas for MoolSocial and YouTube with no provider-specific side shrink.",
+      "fit": "Center-crop inside the 9:16 safe canvas; never stretch media.",
+      "navigation": ["Vertical swipe", "Vertical keyboard navigation", "Continuous provider transition"],
+      "details": "Controls and content details open with the item and remain available until the user explicitly hides them. More and Less expand or collapse long copy without a timer.",
+      "playControl": "Use one compact premium frosted circular control with an icon-only solid play or pause glyph. Do not display Watch or Pause text on the media surface.",
+      "moolSocialActions": ["Like", "Comment", "Share", "Remix", "Follow", "Eligible commerce action"],
+      "youtubeActions": ["Save", "Discuss", "Share", "Details", "Subscribe", "Eligible commerce action"],
+      "youtubeBoundary": "YouTube attribution and official-player behavior remain visible and accurate. MoolSocial actions remain distinct from YouTube account actions."
+    },
+    "videos": {
+      "filters": ["All", "Popular", "Live", "Learning", "Local", "Business"],
+      "home": "Native MoolSocial discovery cards use public metadata supported by the YouTube Data API; playback uses the official YouTube player surface.",
+      "metadata": ["title", "channel", "published time", "views when available", "duration", "description", "tags", "category", "live status"],
+      "accountActions": "Like, comment, subscribe and other YouTube account actions require a connected YouTube account and remain provider actions."
+    },
+    "feed": {
+      "composer": "An always-ready public composer appears on the Feed for every authenticated MoolSocial account.",
+      "directActions": ["Photo", "Poll", "Post"],
+      "result": "Publishing stays on Feed and immediately exposes the new public item."
+    },
+    "create": {
+      "composer": "An always-ready public composer appears first on Create for every authenticated MoolSocial account.",
+      "directActions": ["Photo", "Poll", "Post"],
+      "richActions": ["Create a Reel", "Build a Carousel", "Write a Post", "Continue a Draft"],
+      "result": "A direct public Post publishes without sending the user through a format-selection journey.",
+      "workspaceBoundary": "A Creator or Business workspace is not required for ordinary public posting. It is required only for creator earnings, campaigns, brand selection, analytics and external-account distribution."
+    }
+  },
+  "bottomRail": {
+    "fixedEdges": ["Mool", "Chat"],
+    "focusedMode": "The middle ribbon exposes every sub-action for the active world.",
+    "moolMode": "Tapping Mool replaces only the middle ribbon with Social, Buy, Eat, Ride, Book, Pay and Work.",
+    "navigation": ["Tap", "Horizontal swipe", "System Back", "System Forward"],
+    "autoReveal": "After every main-action or sub-action selection, reposition the middle ribbon so the active action and its next available action are visible.",
+    "motion": "Use restrained selection motion and native selection haptics; respect reduced-motion and platform accessibility settings.",
+    "minimumTapTarget": "44x44 logical pixels"
+  },
+  "navigation": {
+    "back": "Return to the previous meaningful state without changing the accepted Screens 01-03 boundary.",
+    "forward": "Restore a forward state only when a valid history entry exists.",
+    "root": "Mool returns the middle ribbon to all seven main worlds in one tap.",
+    "chat": "Chat is a direct destination and does not expose capability-ribbon previous or next controls."
+  },
+  "typographyAndFitment": {
+    "textScales": ["100%", "140%"],
+    "viewports": ["320x568", "360x640", "360x720", "375x667", "390x844", "412x915", "430x932"],
+    "platformCoverage": ["compact Android", "large Android", "compact iPhone", "large iPhone"],
+    "overflow": "No horizontal page overflow, clipped action label, inaccessible content or undersized visible action."
+  },
+  "customerCopy": {
+    "forbidden": ["example", "sample", "demo", "mock", "placeholder", "prototype", "founder review", "review build", "implementation", "developer", "working note", "internal plan", "state machine", "payload", "endpoint", "next screen", "for testing"],
+    "rule": "Visible copy contains only customer-facing actions, facts, outcomes, disclosures and recovery guidance."
+  },
+  "nativeRules": [
+    "Implement with native Flutter widgets; never render this HTML in a WebView.",
+    "Reuse existing non-UI sessions, services and route owners.",
+    "Do not import or modify the legacy Flutter presentation.",
+    "Do not modify accepted Screens 01, 02 or 03.",
+    "Do not integrate the live YouTube API until the native Gate 1 screen is founder-accepted.",
+    "Do not claim native acceptance before identical-viewport comparison and connected OPPO replay."
+  ]
+}

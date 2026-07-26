@@ -1,0 +1,21 @@
+name: youtube_embedded_player_private_dev
+description: Isolated debug-only native registration for the provider player probe.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.moolsocial.youtube_embedded_player_private_dev
+        pluginClass: YouTubeEmbeddedPlayerPrivateDevPlugin
+      ios:
+        pluginClass: YouTubeEmbeddedPlayerPrivateDevPlugin

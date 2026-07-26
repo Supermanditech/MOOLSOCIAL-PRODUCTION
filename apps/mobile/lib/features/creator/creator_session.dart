@@ -12,6 +12,7 @@ class CreatorSession extends ChangeNotifier {
   bool online = true;
   bool authorized = true;
   bool busy = false;
+  bool creatorWorkspaceActive = false;
   String? errorMessage;
   String? noticeMessage;
 
@@ -115,6 +116,13 @@ class CreatorSession extends ChangeNotifier {
   void showNotice(String message) {
     errorMessage = null;
     noticeMessage = message;
+    notifyListeners();
+  }
+
+  void activateCreatorWorkspace() {
+    creatorWorkspaceActive = true;
+    errorMessage = null;
+    noticeMessage = 'Creator workspace added to your MoolSocial account.';
     notifyListeners();
   }
 

@@ -1,0 +1,506 @@
+query ActiveYouTubeConnection($userId: String!) @auth(level: NO_ACCESS) {
+  externalProviderConnections(
+    where: {
+      userId: {eq: $userId}
+      provider: {eq: YOUTUBE}
+      status: {eq: ACTIVE}
+    }
+    limit: 1
+  ) {
+    connectionKey
+    userId
+    channelId
+    channelTitle
+    grantedScopesJson
+    connectedAt
+    lastVerifiedAt
+    status
+  }
+}
+
+mutation SaveYouTubeConnection(
+  $connectionKey: String!
+  $userId: String!
+  $channelId: String!
+  $channelTitle: String!
+  $scopesJson: String!
+  $status: ExternalProviderConnectionStatus!
+  $connectedAt: Timestamp!
+  $lastVerifiedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  externalProviderConnection_upsert(
+    data: {
+      connectionKey: $connectionKey
+      userId: $userId
+      provider: YOUTUBE
+      channelId: $channelId
+      channelTitle: $channelTitle
+      grantedScopesJson: $scopesJson
+      status: $status
+      connectedAt: $connectedAt
+      lastVerifiedAt: $lastVerifiedAt
+    }
+  )
+}
+
+mutation RevokeYouTubeConnection(
+  $connectionKey: String!
+  $revokedAt: Timestamp!
+  $deletionDueAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  externalProviderConnection_update(
+    key: {connectionKey: $connectionKey}
+    data: {
+      status: REVOKED
+      revokedAt: $revokedAt
+      deletionDueAt: $deletionDueAt
+    }
+  )
+}
+
+mutation DeleteYouTubeConnection($connectionKey: String!)
+@auth(level: NO_ACCESS) {
+  externalProviderConnection_delete(key: {connectionKey: $connectionKey})
+}
+
+query YouTubeCredential($connectionKey: String!)
+@auth(level: NO_ACCESS) {
+  externalProviderCredential(key: {connectionKey: $connectionKey}) {
+    connectionKey
+    encryptedRefreshToken
+    grantedScopesJson
+    createdAt
+    updatedAt
+  }
+}
+
+mutation SaveYouTubeCredential(
+  $connectionKey: String!
+  $encryptedRefreshToken: String!
+  $scopesJson: String!
+  $createdAt: Timestamp!
+  $updatedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  externalProviderCredential_upsert(
+    data: {
+      connectionKey: $connectionKey
+      encryptedRefreshToken: $encryptedRefreshToken
+      grantedScopesJson: $scopesJson
+      createdAt: $createdAt
+      updatedAt: $updatedAt
+    }
+  )
+}
+
+mutation MigrateYouTubeCredentialEncryption(
+  $connectionKey: String!
+  $expectedEncryptedRefreshToken: String!
+  $encryptedRefreshToken: String!
+  $scopesJson: String!
+  $updatedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  migrated: _executeReturningFirst(
+    sql: """
+      UPDATE external_provider_credential
+      SET
+        encrypted_refresh_token = $3,
+        granted_scopes_json = $4,
+        updated_at = $5
+      WHERE
+        connection_key = $1
+        AND encrypted_refresh_token = $2
+      RETURNING connection_key
+    """
+    params: [
+      $connectionKey
+      $expectedEncryptedRefreshToken
+      $encryptedRefreshToken
+      $scopesJson
+      $updatedAt
+    ]
+  )
+}
+
+mutation DeleteYouTubeCredential($connectionKey: String!)
+@auth(level: NO_ACCESS) {
+  externalProviderCredential_delete(key: {connectionKey: $connectionKey})
+}
+
+mutation SaveYouTubeOAuthAttempt(
+  $stateHash: String!
+  $userId: String!
+  $encryptedCodeVerifier: String!
+  $scopesJson: String!
+  $redirectUri: String!
+  $createdAt: Timestamp!
+  $expiresAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  externalOAuthAttempt_upsert(
+    data: {
+      stateHash: $stateHash
+      userId: $userId
+      provider: YOUTUBE
+      encryptedCodeVerifier: $encryptedCodeVerifier
+      requestedScopesJson: $scopesJson
+      redirectUri: $redirectUri
+      createdAt: $createdAt
+      expiresAt: $expiresAt
+      consumedAt: null
+    }
+  )
+}
+
+mutation ConsumeYouTubeOAuthAttempt(
+  $stateHash: String!
+  $userId: String!
+) @auth(level: NO_ACCESS) {
+  attempt: _executeReturningFirst(
+    sql: """
+      UPDATE external_oauth_attempt
+      SET consumed_at = NOW()
+      WHERE
+        state_hash = $1
+        AND user_id = $2
+        AND consumed_at IS NULL
+        AND expires_at > NOW()
+      RETURNING
+        state_hash,
+        user_id,
+        encrypted_code_verifier,
+        requested_scopes_json,
+        redirect_uri,
+        created_at,
+        expires_at
+    """
+    params: [$stateHash, $userId]
+  )
+}
+
+mutation ConsumeYouTubeOAuthAttemptByState($stateHash: String!)
+@auth(level: NO_ACCESS) {
+  attempt: _executeReturningFirst(
+    sql: """
+      UPDATE external_oauth_attempt
+      SET consumed_at = NOW()
+      WHERE
+        state_hash = $1
+        AND consumed_at IS NULL
+        AND expires_at > NOW()
+      RETURNING
+        state_hash,
+        user_id,
+        encrypted_code_verifier,
+        requested_scopes_json,
+        redirect_uri,
+        created_at,
+        expires_at
+    """
+    params: [$stateHash]
+  )
+}
+
+mutation DeleteYouTubeOAuthAttempts($userId: String!)
+@auth(level: NO_ACCESS) {
+  _execute(
+    sql: """
+      DELETE FROM external_oauth_attempt
+      WHERE user_id = $1 AND provider = 'YOUTUBE'
+    """
+    params: [$userId]
+  )
+}
+
+query YouTubePublicationByIdempotency(
+  $userId: String!
+  $idempotencyKey: String!
+) @auth(level: NO_ACCESS) {
+  externalPublicationJobs(
+    where: {
+      userId: {eq: $userId}
+      idempotencyKey: {eq: $idempotencyKey}
+      provider: {eq: YOUTUBE}
+    }
+    limit: 1
+  ) {
+    jobKey
+    userId
+    connectionKey
+    idempotencyKey
+    requestFingerprint
+    title
+    privacyStatus
+    contentLength
+    encryptedSessionUrl
+    sessionExpiresAt
+    state
+    videoId
+    failureCode
+    createdAt
+    updatedAt
+  }
+}
+
+query YouTubePublicationByKey(
+  $jobKey: String!
+  $userId: String!
+)
+@auth(level: NO_ACCESS) {
+  externalPublicationJobs(
+    where: {
+      jobKey: {eq: $jobKey}
+      userId: {eq: $userId}
+    }
+    limit: 1
+  ) {
+    jobKey
+    userId
+    connectionKey
+    idempotencyKey
+    requestFingerprint
+    title
+    privacyStatus
+    contentLength
+    encryptedSessionUrl
+    sessionExpiresAt
+    state
+    videoId
+    failureCode
+    createdAt
+    updatedAt
+  }
+}
+
+mutation ReserveYouTubePublication(
+  $jobKey: String!
+  $userId: String!
+  $connectionKey: String!
+  $idempotencyKey: String!
+  $requestFingerprint: String!
+  $title: String!
+  $contentLength: String!
+  $createdAt: Timestamp!
+  $updatedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  reservation: _executeReturningFirst(
+    sql: """
+      WITH active_connection AS MATERIALIZED (
+        SELECT connection.connection_key
+        FROM external_provider_connection AS connection
+        WHERE
+          connection.connection_key = $3
+          AND connection.user_id = $2
+          AND connection.provider = 'YOUTUBE'
+          AND connection.status = 'ACTIVE'
+        FOR UPDATE
+      )
+      INSERT INTO external_publication_job (
+        job_key,
+        user_id,
+        connection_key,
+        provider,
+        idempotency_key,
+        request_fingerprint,
+        title,
+        privacy_status,
+        content_length,
+        encrypted_session_url,
+        state,
+        created_at,
+        updated_at
+      )
+      SELECT
+        $1,
+        $2,
+        $3,
+        'YOUTUBE',
+        $4,
+        $5,
+        $6,
+        'private',
+        $7,
+        '',
+        'SESSION_CREATING',
+        $8,
+        $9
+      FROM active_connection
+      ON CONFLICT (job_key) DO NOTHING
+      RETURNING job_key
+    """
+    params: [
+      $jobKey
+      $userId
+      $connectionKey
+      $idempotencyKey
+      $requestFingerprint
+      $title
+      $contentLength
+      $createdAt
+      $updatedAt
+    ]
+  )
+}
+
+mutation UpdateYouTubePublicationIfConnected(
+  $jobKey: String!
+  $userId: String!
+  $hasEncryptedSessionUrl: Boolean!
+  $encryptedSessionUrl: String!
+  $hasSessionExpiresAt: Boolean!
+  $sessionExpiresAt: Timestamp
+  $hasState: Boolean!
+  $state: String!
+  $hasVideoId: Boolean!
+  $videoId: String
+  $hasFailureCode: Boolean!
+  $failureCode: String
+  $hasUpdatedAt: Boolean!
+  $updatedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  updated: _executeReturningFirst(
+    sql: """
+      WITH active_connection AS MATERIALIZED (
+        SELECT
+          connection.connection_key,
+          connection.user_id
+        FROM external_provider_connection AS connection
+        WHERE
+          connection.user_id = $2
+          AND connection.provider = 'YOUTUBE'
+          AND connection.status = 'ACTIVE'
+        FOR UPDATE
+      )
+      UPDATE external_publication_job AS job
+      SET
+        encrypted_session_url = CASE
+          WHEN $3 THEN $4
+          ELSE job.encrypted_session_url
+        END,
+        session_expires_at = CASE
+          WHEN $5 THEN $6
+          ELSE job.session_expires_at
+        END,
+        state = CASE
+          WHEN $7 THEN $8
+          ELSE job.state
+        END,
+        video_id = CASE
+          WHEN $9 THEN $10
+          ELSE job.video_id
+        END,
+        failure_code = CASE
+          WHEN $11 THEN $12
+          ELSE job.failure_code
+        END,
+        updated_at = CASE
+          WHEN $13 THEN $14
+          ELSE job.updated_at
+        END
+      FROM active_connection AS connection
+      WHERE
+        job.job_key = $1
+        AND job.user_id = $2
+        AND job.provider = 'YOUTUBE'
+        AND connection.connection_key = job.connection_key
+        AND connection.user_id = job.user_id
+      RETURNING job.job_key
+    """
+    params: [
+      $jobKey
+      $userId
+      $hasEncryptedSessionUrl
+      $encryptedSessionUrl
+      $hasSessionExpiresAt
+      $sessionExpiresAt
+      $hasState
+      $state
+      $hasVideoId
+      $videoId
+      $hasFailureCode
+      $failureCode
+      $hasUpdatedAt
+      $updatedAt
+    ]
+  )
+}
+
+mutation DeleteYouTubePublications($userId: String!)
+@auth(level: NO_ACCESS) {
+  _execute(
+    sql: """
+      DELETE FROM external_publication_job
+      WHERE user_id = $1 AND provider = 'YOUTUBE'
+    """
+    params: [$userId]
+  )
+}
+
+mutation ReserveYouTubeQuota(
+  $quotaKey: String!
+  $bucket: String!
+  $windowId: String!
+  $units: Int!
+  $hardCap: Int!
+  $resetAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  reservation: _executeReturningFirst(
+    sql: """
+      INSERT INTO provider_quota_usage
+        (quota_key, bucket, window_id, used, hard_cap, reset_at, updated_at)
+      SELECT $1, $2, $3, $4, $5, $6, NOW()
+      WHERE $4 <= $5
+      ON CONFLICT (quota_key)
+      DO UPDATE SET
+        used = provider_quota_usage.used + EXCLUDED.used,
+        hard_cap = EXCLUDED.hard_cap,
+        reset_at = EXCLUDED.reset_at,
+        updated_at = NOW()
+      WHERE
+        provider_quota_usage.window_id = EXCLUDED.window_id
+        AND provider_quota_usage.used + EXCLUDED.used
+          <= EXCLUDED.hard_cap
+      RETURNING quota_key, bucket, window_id, used, hard_cap, reset_at
+    """
+    params: [
+      $quotaKey
+      $bucket
+      $windowId
+      $units
+      $hardCap
+      $resetAt
+    ]
+  )
+}
+
+mutation RecordYouTubeAuditEvent(
+  $eventKey: String!
+  $userId: String
+  $eventType: String!
+  $requestId: String!
+  $redactedDetailJson: String!
+  $occurredAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  _execute(
+    sql: """
+      INSERT INTO provider_audit_event
+        (
+          event_key,
+          user_id,
+          provider,
+          event_type,
+          request_id,
+          redacted_detail_json,
+          occurred_at
+        )
+      VALUES ($1, $2, 'YOUTUBE', $3, $4, $5, $6)
+      ON CONFLICT (event_key) DO NOTHING
+    """
+    params: [
+      $eventKey
+      $userId
+      $eventType
+      $requestId
+      $redactedDetailJson
+      $occurredAt
+    ]
+  )
+}

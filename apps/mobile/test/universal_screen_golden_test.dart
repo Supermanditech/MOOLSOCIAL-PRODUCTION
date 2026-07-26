@@ -27,7 +27,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/social'),
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/social',
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -44,7 +48,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/social'),
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/social',
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -61,7 +69,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/social'),
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/social',
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav-mool')));
@@ -80,7 +92,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MoolSocialApp(session: session, initialLocation: '/app/buy'),
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/buy',
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
 

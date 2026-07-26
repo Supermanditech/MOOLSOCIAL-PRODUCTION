@@ -1,0 +1,23 @@
+{
+  "status": "Accepted",
+  "acceptedAt": "2026-07-22",
+  "acceptedBy": "Founder",
+  "scope": [
+    "Screen 04 Social Feed first-layer discovery modes",
+    "Screen 04 Social Post and Carousel first-layer presentation",
+    "Screen 04 personal Create landing choices",
+    "Accepted Universal capability bottom rail as rendered with those states"
+  ],
+  "excluded": [
+    "Deeper Feed comment, share and post-detail states",
+    "Same-screen Post, Reel and Carousel composer states",
+    "Buy, Eat, Ride, Book, Pay and Work first layers",
+    "Flutter V2 implementation",
+    "backend, provider, API and cloud implementation",
+    "main branch promotion"
+  ],
+  "sourceHtmlSha256": "1a0f35a26527c02b402c4b88b96384c74c858dcae72fb81c253e0a022cc1ddc7",
+  "founderDecision": "Feed and Create are approved to park for production; do not begin Flutter, and continue with the deeper Feed and Create layers.",
+  "flutterAuthorized": false,
+  "wholeScreen04Final": false
+}

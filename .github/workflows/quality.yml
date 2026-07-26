@@ -24,6 +24,9 @@ jobs:
       - name: Check approved UI locks
         shell: pwsh
         run: ./scripts/check-approved-ui-locks.ps1
+      - name: Check protected Social baseline
+        shell: pwsh
+        run: ./scripts/check-social-protected-baseline.ps1
 
   mobile-quality:
     needs: product-contracts
@@ -135,3 +138,21 @@ jobs:
           node-version: "24"
       - run: npm install --global firebase-tools@15.5.1
       - run: firebase dataconnect:sdk:generate --project demo-moolsocial-local
+
+  provider-functions:
+    needs: product-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend/functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/functions/package-lock.json
+      - run: npm ci
+      - run: npm run verify
+      - run: npm audit --omit=dev --audit-level=high

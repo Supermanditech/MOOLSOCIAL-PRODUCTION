@@ -89,6 +89,10 @@ import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/otp_screen_v2.dart';
+import '../../ui_v2/social/social_v2_consumer.dart';
+import '../../ui_v2/social/social_v2_creator.dart';
+import '../../ui_v2/social/social_v2_plans_promotion.dart';
+import '../../ui_v2/social/social_v2_youtube_connect.dart';
 import 'journey_session.dart';
 import 'screens/universal_shell.dart';
 
@@ -110,6 +114,7 @@ GoRouter createJourneyRouter(
   required LaunchPresentationGate launchPresentationGate,
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
+  bool legacyPresentationForTestsOnly = false,
 }) {
   late final GoRouter router;
   router = GoRouter(
@@ -122,9 +127,16 @@ GoRouter createJourneyRouter(
     redirect: (context, state) {
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
+      final youtubeConnectResult = state.uri.queryParameters['youtubeConnect'];
+      final returnLocation =
+          location == '/app/creator/youtube-connect' &&
+              (youtubeConnectResult == 'complete' ||
+                  youtubeConnectResult == 'failed')
+          ? state.uri.toString()
+          : location;
 
       if (protected && !session.isReady) {
-        session.captureReturnTo(location);
+        session.captureReturnTo(returnLocation);
       }
 
       if (location == '/boot' &&
@@ -149,7 +161,7 @@ GoRouter createJourneyRouter(
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (session.isReady &&
                 router.routeInformationProvider.value.uri.path == location) {
-              session.confirmReadyRoute(location);
+              session.confirmReadyRoute(returnLocation);
             }
           });
           return null;
@@ -499,8 +511,13 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/creator',
-        builder: (context, state) =>
-            CreatorStudioHomeScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorStudioHomeScreen(session: creatorSession)
+            : CreatorSocialV2Screen(
+                session: creatorSession,
+                owner: CreatorSocialV2Owner.home,
+                initialState: state.uri.queryParameters['state'],
+              ),
       ),
       GoRoute(
         path: '/app/creator/publish',
@@ -512,53 +529,103 @@ GoRouter createJourneyRouter(
               ..reelFundingCampaignId = campaign
               ..sponsored = true;
           }
-          return CreatorPublishScreen(session: creatorSession);
+          return legacyPresentationForTestsOnly
+              ? CreatorPublishScreen(session: creatorSession)
+              : CreatorSocialV2Screen(
+                  session: creatorSession,
+                  owner: CreatorSocialV2Owner.publish,
+                  initialState: state.uri.queryParameters['state'],
+                );
         },
       ),
       GoRoute(
         path: '/app/creator/youtube-connect',
-        builder: (context, state) =>
-            CreatorYouTubeConnectScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorYouTubeConnectScreen(session: creatorSession)
+            : SocialYouTubeConnectV2Screen(
+                session: creatorSession,
+                youtubeConnectResult:
+                    state.uri.queryParameters['youtubeConnect'],
+              ),
       ),
       GoRoute(
         path: '/app/creator/content',
         builder: (context, state) {
           creatorSession.contentTab =
-              switch (state.uri.queryParameters['tab']) {
+              switch (state.uri.queryParameters['state'] == 'processing'
+              ? 'unavailable'
+              : state.uri.queryParameters['tab']) {
                 'drafts' => CreatorContentTab.drafts,
                 'scheduled' => CreatorContentTab.scheduled,
                 'unavailable' => CreatorContentTab.unavailable,
                 _ => CreatorContentTab.published,
               };
-          return CreatorContentLibraryScreen(session: creatorSession);
+          return legacyPresentationForTestsOnly
+              ? CreatorContentLibraryScreen(session: creatorSession)
+              : CreatorSocialV2Screen(
+                  session: creatorSession,
+                  owner: CreatorSocialV2Owner.library,
+                  initialState: state.uri.queryParameters['state'],
+                );
         },
       ),
       GoRoute(
         path: '/app/creator/performance',
-        builder: (context, state) =>
-            CreatorPerformanceScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorPerformanceScreen(session: creatorSession)
+            : CreatorSocialV2Screen(
+                session: creatorSession,
+                owner: CreatorSocialV2Owner.performance,
+                initialState: state.uri.queryParameters['state'],
+              ),
       ),
       GoRoute(
         path: '/app/creator/audience',
-        builder: (context, state) =>
-            state.uri.queryParameters['tab'] == 'memberships'
-            ? CreatorMembershipsScreen(session: creatorSession)
-            : CreatorAudienceScreen(session: creatorSession),
+        builder: (context, state) {
+          final memberships = state.uri.queryParameters['tab'] == 'memberships';
+          if (legacyPresentationForTestsOnly) {
+            return memberships
+                ? CreatorMembershipsScreen(session: creatorSession)
+                : CreatorAudienceScreen(session: creatorSession);
+          }
+          return CreatorSocialV2Screen(
+            session: creatorSession,
+            owner: memberships
+                ? CreatorSocialV2Owner.memberships
+                : CreatorSocialV2Owner.audience,
+            initialState: state.uri.queryParameters['state'],
+          );
+        },
       ),
       GoRoute(
         path: '/app/creator/campaigns',
-        builder: (context, state) =>
-            CreatorCampaignsScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorCampaignsScreen(session: creatorSession)
+            : CreatorSocialV2Screen(
+                session: creatorSession,
+                owner: CreatorSocialV2Owner.campaigns,
+                initialState: state.uri.queryParameters['state'],
+              ),
       ),
       GoRoute(
         path: '/app/creator/earnings',
-        builder: (context, state) =>
-            CreatorEarningsScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorEarningsScreen(session: creatorSession)
+            : CreatorSocialV2Screen(
+                session: creatorSession,
+                owner: CreatorSocialV2Owner.earnings,
+                initialState: state.uri.queryParameters['state'],
+              ),
       ),
       GoRoute(
         path: '/app/creator/control',
-        builder: (context, state) =>
-            CreatorControlScreen(session: creatorSession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? CreatorControlScreen(session: creatorSession)
+            : CreatorSocialV2Screen(
+                session: creatorSession,
+                owner: CreatorSocialV2Owner.safety,
+                initialState: state.uri.queryParameters['state'],
+              ),
       ),
       GoRoute(
         path: '/app/earn',
@@ -1068,6 +1135,22 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/account/plans',
+        builder: (context, state) => SocialPlansV2Screen(
+          sharedSession: sharedSession,
+          retailerSession: retailerSession,
+          creatorSession: creatorSession,
+        ),
+      ),
+      GoRoute(
+        path: '/app/social/promote',
+        builder: (context, state) => SocialPromotionV2Screen(
+          session: retailerSession,
+          initialState: state.uri.queryParameters['state'],
+          initialStep: int.tryParse(state.uri.queryParameters['step'] ?? ''),
+        ),
+      ),
+      GoRoute(
         path: '/app/work',
         builder: (context, state) => WorkEarnScreen(session: workSession),
       ),
@@ -1119,11 +1202,37 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/:section',
-        builder: (context, state) => UniversalShell(
-          session: session,
-          section: state.pathParameters['section'] ?? 'social',
-          initialSubAction: state.uri.queryParameters['sub'],
-        ),
+        builder: (context, state) {
+          final section = state.pathParameters['section'] ?? 'social';
+          if (!legacyPresentationForTestsOnly &&
+              const {
+                'social',
+                'buy',
+                'eat',
+                'ride',
+                'book',
+                'pay',
+                'work',
+              }.contains(section)) {
+            return SocialUniversalV2(
+              session: session,
+              creatorSession: creatorSession,
+              retailerSession: retailerSession,
+              sharedSession: sharedSession,
+              initialWorld: state.uri.queryParameters['world'] ?? section,
+              initialSubAction: state.uri.queryParameters['sub'],
+              initialState:
+                  state.uri.queryParameters['state'] ??
+                  state.uri.queryParameters['mode'],
+              initialItem: state.uri.queryParameters['item'],
+            );
+          }
+          return UniversalShell(
+            session: session,
+            section: section,
+            initialSubAction: state.uri.queryParameters['sub'],
+          );
+        },
       ),
     ],
   );
