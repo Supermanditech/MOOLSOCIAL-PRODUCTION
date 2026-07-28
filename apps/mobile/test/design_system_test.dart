@@ -7,6 +7,8 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 
 void main() {
   test('full-app design tokens protect production interaction sizes', () {
+    expect(MoolBrand.wordmark, 'MoolSocial');
+    expect(MoolBrand.moolLauncherIcon, Icons.grid_view_rounded);
     expect(MoolMetrics.minimumTapTarget, greaterThanOrEqualTo(44));
     expect(MoolMetrics.compactTapTarget, greaterThanOrEqualTo(44));
     expect(MoolRadii.control, lessThan(MoolRadii.card));
@@ -104,6 +106,7 @@ void main() {
     );
 
     expect(find.bySemanticsLabel('Outcome navigation'), findsOneWidget);
+    expect(find.byIcon(MoolBrand.moolLauncherIcon), findsOneWidget);
     for (final id in const ['mool', 'first', 'second', 'third', 'chat']) {
       final target = find.byKey(Key('dock-$id'));
       expect(target, findsOneWidget);

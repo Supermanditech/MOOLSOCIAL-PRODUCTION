@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-complete",
+  "version": "v1",
+  "status": "founder-final-html-locked",
+  "founderDecision": "Entire Buy module screens approved and lock them permanently. Do not touch again without founder approval.",
+  "founderApprovedAt": "2026-07-29",
+  "approvalSource": "Founder explicitly declared the entire Buy module approved and directed a permanent lock in the active Codex task on 29 July 2026.",
+  "approvalScope": [
+    "Mool to Buy route ownership",
+    "Always-visible Shop, Wholesale, Medicine and Orders Buy dock",
+    "Shop catalogue, category rail, search, filters, products and product decisions",
+    "Wholesale catalogue, category rail, search, filters, products, MOQ and product decisions",
+    "Medicine catalogue, category rail, search, filters, regulatory product decisions, saved prescription, one-prescription medicine-line matching and pharmacist review",
+    "Compact floating Cart indicator and Add feedback",
+    "Unified Cart with Shop, Wholesale, Medicine and rupee Total scopes",
+    "Saved Home, Work, Third party and Other place destinations, editable receiving contact and address, map choices and address request",
+    "Checkout and order confirmation",
+    "Active and delivered Orders, Shop, Wholesale and Medicine tracking",
+    "Editable reorder and direct zero-item Cart return",
+    "Centralized Mool Assist with AI-assisted response, in-app chat and in-app call",
+    "Price, stock, serviceability, payment, network and delivery recovery states",
+    "Responsive and large-text behavior recorded by the frozen evidence"
+  ],
+  "immutableRule": "Never modify this accepted version. A change requires explicit founder authorization, a new immutable version and a new founder acceptance cycle.",
+  "sourceHtmlSha256": "408a095c038dd88113fbe2f901291a9bdfdcd4dc7a4c2414a27bc51b05172341",
+  "sourceCssSha256": "0b6167e2489de016f4c90d4a2ef23cf83992eafa0638353be47cde2b1b099fae",
+  "sourceJavascriptSha256": "d380a5e50f50346c999d12824649c10094af10d3ceb6f9b2a749abc223e38026",
+  "nativeFlutterAuthorized": true,
+  "nativeFlutterAccepted": false,
+  "deploymentAuthorized": false
+}

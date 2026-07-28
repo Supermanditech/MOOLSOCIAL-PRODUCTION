@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 
 import 'mool_colors.dart';
 
+/// App-wide brand identity that must remain stable across every product
+/// vertical. Mool is a service launcher, not a second MoolSocial logo.
+abstract final class MoolBrand {
+  static const String wordmark = 'MoolSocial';
+  static const IconData moolLauncherIcon = Icons.grid_view_rounded;
+}
+
 /// Shared full-app design tokens.
 ///
 /// Product screens must use these values instead of introducing local spacing,
@@ -402,13 +409,24 @@ class _MoolEdgeDockAction extends StatelessWidget {
             children: [
               Center(
                 child: isMool
-                    ? const Text(
-                        'Mool',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            MoolBrand.moolLauncherIcon,
+                            color: Colors.white,
+                            size: 19,
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Mool',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,

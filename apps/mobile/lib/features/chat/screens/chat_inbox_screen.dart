@@ -65,7 +65,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 key: const Key('chat-open-mool'),
                 tooltip: 'Open Mool',
                 onPressed: () => context.go('/app/mool'),
-                icon: const Icon(Icons.blur_circular_rounded),
+                icon: const Icon(MoolBrand.moolLauncherIcon),
               ),
               const SizedBox(width: MoolSpacing.xs),
               IconButton.filled(

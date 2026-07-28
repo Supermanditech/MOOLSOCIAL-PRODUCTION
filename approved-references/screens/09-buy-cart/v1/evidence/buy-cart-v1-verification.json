@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-cart",
+  "version": "v1",
+  "verifiedAt": "2026-07-27T19:47:54.047Z",
+  "viewport": "390x844",
+  "routes": [
+    {
+      "name": "01-retail-cart-390x844.png",
+      "url": "http://127.0.0.1:8765/screens/09-buy.html?seed=retail-cart&view=basket&cart=retail",
+      "activeView": "basket",
+      "cartLabel": "Cart",
+      "finalActions": [
+        "Pay securely ₹4,839"
+      ],
+      "horizontalOverflowPx": 0,
+      "minimumEffectiveTargetHeightPx": 44,
+      "modeLabels": [
+        "All13",
+        "Retail13",
+        "Wholesale0"
+      ],
+      "orderRegions": [],
+      "pathname": "/screens/09-buy.html",
+      "search": "?seed=retail-cart&view=basket&cart=retail",
+      "selectedMode": "Retail13",
+      "title": "MoolSocial Buy",
+      "undersizedEffectiveTargets": [],
+      "visibleTargetCount": 24
+    },
+    {
+      "name": "02-wholesale-cart-390x844.png",
+      "url": "http://127.0.0.1:8765/screens/09-buy.html?context=business&seed=1&view=basket&cart=wholesale",
+      "activeView": "basket",
+      "cartLabel": "Cart",
+      "finalActions": [
+        "Place purchase order ₹4,840"
+      ],
+      "horizontalOverflowPx": 0,
+      "minimumEffectiveTargetHeightPx": 44,
+      "modeLabels": [
+        "All3",
+        "Retail2",
+        "Wholesale1"
+      ],
+      "orderRegions": [],
+      "pathname": "/screens/09-buy.html",
+      "search": "?context=business&seed=1&view=basket&cart=wholesale",
+      "selectedMode": "Wholesale1",
+      "title": "MoolSocial Buy",
+      "undersizedEffectiveTargets": [],
+      "visibleTargetCount": 22
+    },
+    {
+      "name": "03-combined-cart-390x844.png",
+      "url": "http://127.0.0.1:8765/screens/09-buy.html?seed=combined-cart&view=basket&cart=all",
+      "activeView": "basket",
+      "cartLabel": "Cart",
+      "finalActions": [
+        "Place both orders ₹9,039"
+      ],
+      "horizontalOverflowPx": 0,
+      "minimumEffectiveTargetHeightPx": 44,
+      "modeLabels": [
+        "All14",
+        "Retail13",
+        "Wholesale1"
+      ],
+      "orderRegions": [],
+      "pathname": "/screens/09-buy.html",
+      "search": "?seed=combined-cart&view=basket&cart=all",
+      "selectedMode": "All14",
+      "title": "MoolSocial Buy",
+      "undersizedEffectiveTargets": [],
+      "visibleTargetCount": 23
+    }
+  ],
+  "assertions": {
+    "allRoutesBasket": true,
+    "allRoutesHaveThreeModes": true,
+    "allRoutesHaveFinalAction": true,
+    "zeroHorizontalOverflow": true,
+    "minimumEffectiveTapTarget44": true
+  }
+}

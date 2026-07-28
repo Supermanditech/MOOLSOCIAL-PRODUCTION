@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-catalogue",
+  "version": "v1",
+  "status": "founder-approved-html-slice-gate-0",
+  "entry": {
+    "pathname": "/screens/09-buy.html",
+    "defaultContext": "Retail",
+    "businessContextQuery": "context=business"
+  },
+  "branding": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineProportions": [45, 14, 41],
+    "wordmark": "MoolSocial",
+    "moolIcon": "shared two-by-two grid launcher"
+  },
+  "contexts": {
+    "Retail": {
+      "packModel": "Single and small packs",
+      "productInformation": [
+        "final delivered price",
+        "pack size",
+        "verified seller",
+        "stock and serviceability",
+        "delivery commitment",
+        "eligible Wholesale price and MOQ"
+      ],
+      "quantityStart": 1,
+      "shortResultContinuation": "You may also need"
+    },
+    "Wholesale": {
+      "packModel": "MOQ and case prices",
+      "productInformation": [
+        "case or trade pack",
+        "MOQ",
+        "landed price context",
+        "verified supplier",
+        "tax and freight visibility",
+        "dispatch or delivery commitment"
+      ],
+      "quantityStart": "selected pack MOQ",
+      "shortResultContinuation": "Commonly ordered together"
+    }
+  },
+  "categoryRail": {
+    "compactEntries": [
+      "All",
+      "five context-priority or selected categories",
+      "More"
+    ],
+    "moreBehavior": "Reveal all 34 context categories plus Medicine inside the rail without a modal, backdrop, route change or product-grid displacement.",
+    "expandedScrollViewportPx": 420,
+    "selectionBehavior": "Update the same-screen product result immediately, collapse the rail and keep the selected category visible.",
+    "taxonomyRule": "Every canonical product has exactly one Retail primary category and one Wholesale primary category. No category may repeat a product card within a context."
+  },
+  "productGrid": {
+    "sameScreenResult": true,
+    "exactResultRule": "The first grid contains only exact category matches and the displayed count equals those matches.",
+    "minimumProductsPerCategory": 2,
+    "recommendationRule": "When an exact category has fewer than four products, show two complementary products in a separately labelled section without changing the exact category count.",
+    "cardAction": "ADD changes in place to minus, quantity and plus.",
+    "decrementRule": "Decreasing below the permitted minimum removes the line and restores ADD.",
+    "basketSync": "Every quantity change updates the Retail basket or Wholesale bulk-order pill immediately.",
+    "minimumTapTargetPx": 44
+  },
+  "bottomRail": {
+    "destinations": ["Mool", "Buy", "Orders", "Chat"],
+    "activeDestination": "Buy",
+    "moolTarget": "04-universal-focus-shell.html?openMool=1&world=buy&rail=capability",
+    "chatTarget": "23-chat-inbox-home.html?return=buy"
+  },
+  "responsiveFitment": {
+    "viewportsPreviouslyVerified": [
+      "320x568",
+      "360x640",
+      "375x667",
+      "390x844",
+      "412x915",
+      "430x932",
+      "laptop"
+    ],
+    "horizontalOverflow": "Forbidden",
+    "clippedCategoryLabel": "Forbidden",
+    "minimumVisibleAction": "44x44 logical pixels"
+  },
+  "nativeRules": [
+    "Implement with native Flutter widgets; never render this HTML in a WebView.",
+    "Do not change accepted Screens 01, 02 or 03.",
+    "Do not rebaseline the protected Social or YouTube slice.",
+    "Do not start native Buy implementation until the remaining connected Buy HTML journey is founder approved and frozen.",
+    "Treat this version as immutable; any approved change requires a new version."
+  ]
+}

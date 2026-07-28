@@ -24,9 +24,15 @@ jobs:
       - name: Check approved UI locks
         shell: pwsh
         run: ./scripts/check-approved-ui-locks.ps1
+      - name: Check founder FINAL Buy reference
+        shell: pwsh
+        run: ./scripts/check-buy-approved-reference.ps1
       - name: Check protected Social baseline
         shell: pwsh
         run: ./scripts/check-social-protected-baseline.ps1
+      - name: Check MoolSocial brand integrity
+        shell: pwsh
+        run: ./scripts/check-brand-integrity.ps1 -Surface App
 
   mobile-quality:
     needs: product-contracts

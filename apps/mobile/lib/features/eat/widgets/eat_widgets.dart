@@ -240,7 +240,7 @@ class EatBottomDock extends StatelessWidget {
         keyName: 'eat-dock-mool',
         id: 'mool',
         label: 'Mool',
-        icon: Icons.blur_circular_rounded,
+        icon: MoolBrand.moolLauncherIcon,
         onPressed: () => open('/app/mool'),
       ),
       actions: [

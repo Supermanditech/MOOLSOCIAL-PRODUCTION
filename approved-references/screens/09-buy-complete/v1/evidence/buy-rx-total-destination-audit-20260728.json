@@ -1,0 +1,81 @@
+{
+  "audit": "MoolSocial Buy prescription coverage, Total Cart and destination types",
+  "date": "2026-07-28",
+  "candidate": {
+    "screen": "screens/09-buy.html",
+    "reviewBoard": "quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html",
+    "script": "shared/moolsocial-buy-v2.js",
+    "styles": "shared/moolsocial-buy-v2.css",
+    "cacheToken": "20260728-buy-rx-destination-55"
+  },
+  "prescriptionCoverage": {
+    "parentPrescription": "Heart & BP · Dr Meera Sharma",
+    "matchedMedicineCount": 2,
+    "matchedMedicines": [
+      "Telmisartan 40 mg tablets",
+      "Atorvastatin 10 mg tablets"
+    ],
+    "reviewState": "Both matched medicines displayed as Reviewing",
+    "approvalState": "Both matched medicines displayed Add without a repeated prescription upload",
+    "unrelatedLockedMedicineCount": 5,
+    "unrelatedState": "Use Rx",
+    "result": "passed"
+  },
+  "cartScopes": {
+    "route": "screens/09-buy.html?seed=mixed-cart&view=basket&cart=all",
+    "visibleTotalLabel": "₹ Total",
+    "totalProductCount": 4,
+    "totalAmount": "₹4,318",
+    "shopCount": 1,
+    "wholesaleCount": 2,
+    "medicineCount": 1,
+    "result": "passed"
+  },
+  "deliveryDestinations": {
+    "types": [
+      "Home",
+      "Work",
+      "Third party",
+      "Other place"
+    ],
+    "receivingPersonOrBusinessSeparate": true,
+    "receivingContactSeparate": true,
+    "thirdPartyRequestChannels": [
+      "WhatsApp",
+      "MoolSocial",
+      "More apps"
+    ],
+    "result": "passed"
+  },
+  "fitment": [
+    {
+      "viewport": "320x780",
+      "state": "Add delivery address",
+      "visualInspection": "Destination types and all address fields remained readable and tappable"
+    },
+    {
+      "viewport": "390x844",
+      "state": "Two-medicine prescription verified",
+      "visualInspection": "Linked medicines, total, approval facts and primary action remained visible"
+    }
+  ],
+  "browserConsoleErrors": 0,
+  "scriptSyntax": "passed",
+  "status": "passed",
+  "founderGate": "READY_FOR_RX_TOTAL_DESTINATION_FOUNDER_REVIEW",
+  "implementationContract": {
+    "prescription": "One parent prescription with server-authoritative per-medicine line matches and approvals",
+    "cart": "Internal all scope may remain; customer-facing scope is ₹ Total",
+    "address": "Destination type is separate from receiving person/business and receiving contact"
+  },
+  "notAuthorized": [
+    "Complete Buy HTML FINAL",
+    "Immutable complete-Buy reference freeze",
+    "Flutter implementation",
+    "Clinical or pharmacy backend activation",
+    "Firebase or GCP deployment",
+    "Git commit",
+    "Git push",
+    "Merge"
+  ]
+}

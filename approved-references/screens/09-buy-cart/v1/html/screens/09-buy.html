@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000080" />
+  <title>MoolSocial Buy</title>
+  <link rel="stylesheet" href="../shared/moolsocial-ui-foundation.css" />
+  <link rel="stylesheet" href="../shared/moolsocial-buy-v2.css?v=20260728-commerce-cart-26" />
+  <script src="../shared/moolsocial-buy-v2.js?v=20260728-commerce-cart-26" defer></script>
+</head>
+<body>
+  <div class="buy-app" data-buy-app>
+    <header class="buy-header">
+      <div class="brand-row">
+        <a class="brand-lockup" href="04-universal-focus-shell.html?openMool=1&amp;world=buy&amp;rail=capability" aria-label="Open Mool">
+          <span>
+            <strong>MoolSocial</strong>
+            <i aria-hidden="true"><b></b><b></b><b></b></i>
+          </span>
+        </a>
+        <div class="header-actions">
+          <button class="icon-button" type="button" data-action="saved" aria-label="Saved items">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h12v16l-6-4-6 4z" /></svg>
+          </button>
+          <button class="account-button" type="button" data-action="account" aria-label="Choose account">
+            <span>DC</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="location-row" type="button" data-action="location">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
+        <span>
+          <small data-location-label>Delivering to</small>
+          <strong data-location-value>Sardarpura · 342003</strong>
+        </span>
+        <svg class="location-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+      </button>
+
+      <div class="buy-mode-switch" data-mode-switch role="tablist" aria-label="Pack and price mode">
+        <button class="mode-option active" type="button" role="tab" aria-selected="true" data-context="personal">
+          <strong>Retail</strong>
+          <small>Single &amp; small packs</small>
+        </button>
+        <button class="mode-option" type="button" role="tab" aria-selected="false" data-context="business">
+          <strong>Wholesale</strong>
+          <small>MOQ &amp; case prices</small>
+        </button>
+      </div>
+
+      <div class="workspace-strip" data-workspace-strip hidden>
+        <span class="workspace-icon" aria-hidden="true">SB</span>
+        <span>
+          <small>Buying for</small>
+          <strong>Shree Balaji Retail</strong>
+        </span>
+        <span class="verified-badge">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7" /></svg>
+          Verified
+        </span>
+      </div>
+
+      <div class="search-row">
+        <label class="search-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+          <input type="search" placeholder="Search products or brands" autocomplete="off" data-search />
+          <button class="clear-search" type="button" data-action="clear-search" aria-label="Clear search" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
+        </label>
+        <button class="scan-button" type="button" data-action="scan" aria-label="Scan a product">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 8h8v8H8z" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="buy-stage" data-buy-stage>
+      <section class="buy-view active" data-view="catalogue" aria-labelledby="catalogue-title">
+        <div class="delivery-promise">
+          <span class="promise-art" aria-hidden="true">
+            <svg viewBox="0 0 64 48"><path d="M7 13h30v25H7zM37 21h11l9 9v8H37z" /><circle cx="18" cy="39" r="5" /><circle cx="47" cy="39" r="5" /><path d="M16 21h13M16 27h9" /></svg>
+          </span>
+          <span>
+            <small data-promise-kicker>Nearby sellers</small>
+            <strong data-promise-title>Essentials from 12 minutes</strong>
+            <em data-promise-note>Final delivered prices shown</em>
+          </span>
+          <button type="button" data-action="delivery-times">See times</button>
+        </div>
+
+        <div class="catalogue-heading">
+          <span>
+            <small data-catalogue-kicker>For your home</small>
+            <h1 id="catalogue-title" data-catalogue-title>Recommended for you</h1>
+          </span>
+          <button class="filter-button" type="button" data-action="filters">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4" /></svg>
+            Filter
+          </button>
+        </div>
+
+        <div class="catalogue-layout">
+          <aside class="category-rail" aria-label="Product categories" data-category-rail>
+            <button class="category-toggle" type="button" data-category="all" aria-label="Show all products">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" /></svg>
+              <b data-category-total>34</b>
+              <span>All</span>
+            </button>
+            <div class="category-items" data-category-items></div>
+            <button class="category-more" type="button" data-category-more
+              data-action="category-more" aria-expanded="false" aria-controls="buy-category-list">
+              <span aria-hidden="true">+</span>
+              <b>More</b>
+            </button>
+          </aside>
+
+          <div class="catalogue-results">
+            <div class="active-filter-row" data-active-filter-row hidden>
+              <span data-active-filter>Fast delivery</span>
+              <button type="button" data-action="clear-filter" aria-label="Remove filter">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+              </button>
+            </div>
+            <div class="catalogue-scope">
+              <span>
+                <small data-catalogue-scope-kicker>Retail category</small>
+                <strong data-catalogue-scope-title>All retail products</strong>
+              </span>
+              <b data-catalogue-scope-count>84 products</b>
+            </div>
+            <section class="household-baskets" data-household-baskets hidden
+              aria-labelledby="household-baskets-title">
+              <div class="household-baskets-heading">
+                <span>
+                  <small>Monthly essentials</small>
+                  <h2 id="household-baskets-title">Household baskets</h2>
+                </span>
+                <b data-household-basket-saving>Save ₹0</b>
+              </div>
+              <article class="household-basket-card" data-household-basket-card></article>
+            </section>
+            <div class="subcategory-row" data-subcategory-row role="group" aria-label="Refine this category" hidden></div>
+            <div class="product-grid" data-product-grid aria-live="polite"></div>
+            <div class="empty-results" data-empty-results hidden>
+              <span aria-hidden="true">
+                <svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="18" /><path d="m41 41 15 15M20 28h16" /></svg>
+              </span>
+              <h2>No matching products</h2>
+              <p>Try another word or browse all categories.</p>
+              <button type="button" data-action="reset-search">View all products</button>
+            </div>
+            <section class="related-products" data-related-products hidden>
+              <div class="related-products-heading">
+                <span>
+                  <small data-related-kicker>Popular nearby</small>
+                  <h2 data-related-title>You may also need</h2>
+                </span>
+              </div>
+              <div class="product-grid related-product-grid" data-related-product-grid></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="buy-view product-view return-cue-view" data-view="product" aria-labelledby="product-title">
+        <span class="buy-return-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg>
+        </span>
+        <div class="view-toolbar">
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+          <strong>Product details</strong>
+          <button class="icon-button light" type="button" data-action="save-product" aria-label="Save product">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h12v16l-6-4-6 4z" /></svg>
+          </button>
+        </div>
+
+        <div class="product-hero">
+          <div class="product-hero-art" data-product-art></div>
+          <span class="product-context-badge" data-product-context>Retail</span>
+        </div>
+
+        <article class="product-decision">
+          <div class="product-title-row">
+            <span>
+              <small data-product-brand>Quality checked</small>
+              <h1 id="product-title" data-product-title>Fresh tomatoes</h1>
+              <p data-product-pack>500 g pack</p>
+            </span>
+            <span class="stock-badge" data-product-stock>In stock</span>
+          </div>
+
+          <div class="product-spec-grid" data-product-specs></div>
+
+          <div class="pack-choice" role="radiogroup" aria-label="Choose pack" data-pack-choice></div>
+
+          <section class="selected-offer" aria-labelledby="selected-offer-title">
+            <div class="offer-price-row">
+              <span>
+                <small id="selected-offer-title" data-offer-label>Final delivered price</small>
+                <strong data-offer-price>₹37</strong>
+                <em data-offer-unit>₹74/kg</em>
+              </span>
+              <span class="selection-reason" data-offer-reason>Lowest delivered price</span>
+            </div>
+            <div class="seller-row">
+              <span class="seller-avatar" data-seller-avatar>SB</span>
+              <span>
+                <small>Sold by</small>
+                <strong data-offer-seller>Shree Balaji Fresh</strong>
+                <em data-offer-seller-type>Verified retailer</em>
+              </span>
+              <button type="button" data-action="compare">Compare sellers</button>
+            </div>
+            <div class="offer-facts" data-offer-facts></div>
+          </section>
+
+          <div class="product-buy-panel">
+            <div class="quantity-row">
+              <span><small>Quantity</small><strong data-quantity-label>1 pack</strong></span>
+              <div class="quantity-stepper" aria-label="Choose quantity">
+                <button type="button" data-action="decrease" aria-label="Decrease quantity">−</button>
+                <output data-quantity>1</output>
+                <button type="button" data-action="increase" aria-label="Increase quantity">+</button>
+              </div>
+            </div>
+
+            <button class="primary-action" type="button" data-action="add-detail">
+              <span data-add-detail-label>Add to cart</span>
+              <strong data-add-detail-price>₹37</strong>
+            </button>
+            <button class="secondary-action product-order-shortcut" type="button" data-action="basket" data-product-order-shortcut hidden>
+              <span data-product-order-shortcut-label>View cart</span>
+              <strong data-product-order-shortcut-total>₹0</strong>
+            </button>
+          </div>
+
+          <section class="delivery-commitment" aria-labelledby="delivery-commitment-title">
+            <div class="delivery-commitment-heading">
+              <span aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z" /><circle cx="7" cy="18" r="2" /><circle cx="18" cy="18" r="2" /></svg>
+              </span>
+              <span>
+                <small>Supplier-confirmed delivery</small>
+                <strong id="delivery-commitment-title" data-commitment-delivery>Mon, 27 Jul</strong>
+              </span>
+              <b data-commitment-status>Confirmed</b>
+            </div>
+            <div class="delivery-commitment-grid" data-delivery-commitment></div>
+            <p data-commitment-note>Confirmed by the selected seller for this pack and destination.</p>
+          </section>
+
+          <section class="business-terms" data-business-terms hidden>
+            <div class="section-title">
+              <span><small>Wholesale savings</small><h2>Price breaks and order terms</h2></span>
+            </div>
+            <div class="price-breaks" data-price-breaks></div>
+            <div class="term-grid" data-term-grid></div>
+          </section>
+
+          <section class="protection-card">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.6-2.4 8-7 10-4.6-2-7-5.4-7-10V6z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></svg>
+            <span>
+              <strong data-protection-title>Quality protected</strong>
+              <small data-protection-note>Refund available for a verified quality issue within 24 hours.</small>
+            </span>
+          </section>
+        </article>
+      </section>
+
+      <section class="buy-view return-cue-view" data-view="medicine" aria-labelledby="medicine-title">
+        <span class="buy-return-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg>
+        </span>
+        <div class="view-toolbar">
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+          <strong>Medicine</strong>
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+        </div>
+        <div class="medicine-hero">
+          <span aria-hidden="true">
+            <svg viewBox="0 0 72 72"><path d="M20 12h22v13H20zM17 25h28v35H17z" /><path d="M25 35h12M31 29v12" /><path d="M50 36c8 0 12 5 12 12s-4 12-12 12" /></svg>
+          </span>
+          <small>Verified pharmacies</small>
+          <h1 id="medicine-title">Order medicines safely</h1>
+          <p>Prescription medicines are reviewed by a pharmacist before the order is confirmed.</p>
+        </div>
+        <label class="medicine-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+          <input type="search" placeholder="Search medicine or health product" data-medicine-search />
+        </label>
+        <div class="medicine-results" data-medicine-results hidden aria-live="polite"></div>
+        <div class="medicine-actions">
+          <button type="button" data-action="upload-prescription">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4" /></svg>
+            <span><strong>Upload prescription</strong><small>PDF, photo or camera</small></span>
+          </button>
+          <button type="button" data-action="pharmacist">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H9l-5 4z" /><path d="M8 10h8M8 13h5" /></svg>
+            <span><strong>Ask a pharmacist</strong><small>Get help with your order</small></span>
+          </button>
+        </div>
+        <section class="refill-card">
+          <span class="refill-art" aria-hidden="true">30</span>
+          <span><small>Monthly refill</small><strong>Keep regular medicines together</strong><em>Review quantities before each order</em></span>
+          <button type="button" data-action="start-refill">Start</button>
+        </section>
+      </section>
+
+      <section class="buy-view return-cue-view" data-view="basket" aria-labelledby="basket-title">
+        <span class="buy-return-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg>
+        </span>
+        <div class="view-toolbar cart-toolbar">
+          <span class="cart-toolbar-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 4h2l2 11h10l3-8H7M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2" /></svg>
+          </span>
+          <span class="cart-toolbar-copy">
+            <strong id="basket-title" data-basket-title>Cart</strong>
+            <small data-cart-toolbar-summary>Your products and order total</small>
+          </span>
+          <button class="text-button" type="button" data-action="clear-basket">Clear</button>
+        </div>
+        <div class="cart-scope-tabs" role="tablist" aria-label="Cart type" data-cart-scope-tabs>
+          <button type="button" role="tab" data-cart-scope="all">
+            <span>All</span><b data-cart-scope-count="all">0</b>
+          </button>
+          <button type="button" role="tab" data-cart-scope="retail">
+            <span>Retail</span><b data-cart-scope-count="retail">0</b>
+          </button>
+          <button type="button" role="tab" data-cart-scope="wholesale">
+            <span>Wholesale</span><b data-cart-scope-count="wholesale">0</b>
+          </button>
+        </div>
+        <div class="basket-context" data-basket-context hidden></div>
+        <div class="basket-commitment-summary" data-basket-commitment-summary hidden></div>
+        <div class="basket-items" data-basket-items></div>
+        <section class="cart-checkout" data-cart-checkout hidden aria-labelledby="cart-checkout-title">
+          <div class="cart-section-heading">
+            <span>
+              <small>Delivery and payment</small>
+              <h2 id="cart-checkout-title">Complete your order</h2>
+            </span>
+            <b>Secure</b>
+          </div>
+          <div class="cart-choice-grid">
+            <button class="cart-choice" type="button" data-action="change-address">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10 12 3l8 7v10H4zM9 20v-6h6v6" /></svg>
+              <span><small data-cart-address-label>Deliver to</small><strong data-cart-address-value>Home · Sardarpura</strong><em data-cart-address-detail>Jodhpur, Rajasthan 342003</em></span>
+              <b>Change</b>
+            </button>
+            <button class="cart-choice" type="button" data-action="delivery-slot">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>
+              <span><small data-cart-slot-label>Delivery</small><strong data-cart-slot-value>Today · 7:00–7:30 pm</strong><em data-cart-slot-detail>All items in one delivery</em></span>
+              <b>Change</b>
+            </button>
+          </div>
+          <div class="cart-payment">
+            <span class="cart-payment-heading">
+              <small data-cart-payment-kicker>Secure payment</small>
+              <strong data-cart-payment-title>Pay with</strong>
+            </span>
+            <div class="cart-payment-options" role="radiogroup" aria-label="Payment method" data-cart-payment-options></div>
+          </div>
+          <label class="consent-row" data-cart-business-consent hidden>
+            <input type="checkbox" data-cart-po-consent />
+            <span>I confirm the pack, quantity, tax, delivery and payment terms for this purchase order.</span>
+          </label>
+        </section>
+        <section class="cart-checkout combined-cart-checkout" data-combined-cart-checkout hidden
+          aria-labelledby="combined-cart-checkout-title">
+          <div class="cart-section-heading">
+            <span>
+              <small>Delivery and payment</small>
+              <h2 id="combined-cart-checkout-title">Complete both orders</h2>
+            </span>
+            <b>Secure</b>
+          </div>
+          <div class="combined-checkout-orders">
+            <article>
+              <span class="combined-order-kind retail" aria-hidden="true">R</span>
+              <span>
+                <small>Retail order</small>
+                <strong data-combined-retail-address>Home · Sardarpura</strong>
+                <em data-combined-retail-delivery>Delivery shown for every product</em>
+              </span>
+              <b>UPI</b>
+            </article>
+            <article>
+              <span class="combined-order-kind wholesale" aria-hidden="true">W</span>
+              <span>
+                <small>Wholesale order</small>
+                <strong data-combined-wholesale-address>Shree Balaji Retail</strong>
+                <em data-combined-wholesale-delivery>Supplier dispatch shown for every pack</em>
+              </span>
+              <b>Bank</b>
+            </article>
+          </div>
+          <label class="consent-row combined-consent-row">
+            <input type="checkbox" data-combined-cart-consent />
+            <span>I confirm the wholesale pack, quantity, tax, delivery and payment terms.</span>
+          </label>
+        </section>
+        <div class="basket-empty" data-basket-empty hidden>
+          <span aria-hidden="true">
+            <svg viewBox="0 0 72 72"><path d="M18 27h40l-4 28H22zM26 27c0-8 4-13 12-13s12 5 12 13" /></svg>
+          </span>
+          <h2 data-empty-order-title>Your cart is ready when you are</h2>
+          <p data-empty-order-copy>Add products to see final prices and delivery choices.</p>
+          <button type="button" data-action="catalogue">View products</button>
+        </div>
+        <section class="basket-summary" data-basket-summary>
+          <div><span>Products</span><strong data-basket-subtotal>₹0</strong></div>
+          <div><span data-delivery-label>Delivery</span><strong data-basket-delivery>₹0</strong></div>
+          <div class="basket-total"><span data-total-label>Total</span><strong data-basket-total>₹0</strong></div>
+          <small data-total-note>Includes all charges shown above</small>
+        </section>
+        <div class="cart-final-actions">
+          <button class="secondary-action basket-add-products" type="button" data-action="catalogue">
+            Add products
+          </button>
+          <button class="primary-action basket-continue" type="button" data-action="confirm-order">
+            <span data-checkout-label>Pay securely</span>
+            <strong data-checkout-total>₹0</strong>
+          </button>
+        </div>
+      </section>
+
+      <section class="buy-view return-cue-view" data-view="checkout" aria-labelledby="checkout-title">
+        <span class="buy-return-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg>
+        </span>
+        <div class="view-toolbar">
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+          <strong id="checkout-title" data-checkout-title>Review order</strong>
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+        </div>
+        <section class="checkout-card">
+          <button class="checkout-choice" type="button" data-action="change-address">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10 12 3l8 7v10H4zM9 20v-6h6v6" /></svg>
+            <span><small data-address-label>Deliver to</small><strong data-address-value>Home · Sardarpura</strong><em data-address-detail>Jodhpur, Rajasthan 342003</em></span>
+            <svg class="choice-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+          <button class="checkout-choice" type="button" data-action="delivery-slot">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>
+            <span><small data-slot-label>Delivery</small><strong data-slot-value>Today · 7:00–7:30 pm</strong><em data-slot-detail>All items in one delivery</em></span>
+            <svg class="choice-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+        </section>
+
+        <section class="payment-section">
+          <div class="section-title">
+            <span><small data-payment-kicker>Secure payment</small><h2 data-payment-title>Choose payment method</h2></span>
+          </div>
+          <div class="payment-options" role="radiogroup" aria-label="Payment method" data-payment-options></div>
+        </section>
+
+        <section class="checkout-total-card">
+          <div><span data-review-total-label>Amount to pay</span><strong data-review-total>₹0</strong></div>
+          <p data-review-note>Price and stock will be checked once more before payment.</p>
+        </section>
+
+        <label class="consent-row" data-business-consent hidden>
+          <input type="checkbox" data-po-consent />
+          <span>I confirm the pack, quantity, tax, delivery and payment terms for this purchase order.</span>
+        </label>
+
+        <button class="primary-action checkout-confirm" type="button" data-action="confirm-order">
+          <span data-confirm-label>Pay securely</span>
+          <strong data-confirm-total>₹0</strong>
+        </button>
+      </section>
+
+      <section class="buy-view confirmation-view" data-view="confirmed" aria-labelledby="confirmation-title">
+        <div class="confirmation-mark" aria-hidden="true">
+          <svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" /><path d="m22 36 9 9 20-21" /></svg>
+        </div>
+        <small data-confirmation-kicker>Thank you</small>
+        <h1 id="confirmation-title" data-confirmation-title>Order confirmed</h1>
+        <p data-confirmation-note>Your order will arrive today between 7:00 and 7:30 pm.</p>
+        <div class="confirmation-number">
+          <small data-confirmation-number-label>Order</small>
+          <strong data-confirmation-number>MS-240782</strong>
+        </div>
+        <section class="confirmation-progress" aria-labelledby="confirmation-progress-title">
+          <div class="confirmation-progress-heading">
+            <span><small>Order status</small><strong id="confirmation-progress-title" data-confirmation-progress-title>Preparing your order</strong></span>
+            <b data-confirmation-progress-time>Now</b>
+          </div>
+          <ol aria-label="Order progress">
+            <li class="complete"><i aria-hidden="true"></i><span><strong data-confirmation-step-one>Order confirmed</strong><small data-confirmation-step-one-note>Payment and stock checked</small></span><b>✓</b></li>
+            <li class="active"><i aria-hidden="true"></i><span><strong data-confirmation-step-two>Preparing your order</strong><small data-confirmation-step-two-note>Seller is packing your items</small></span><b>Now</b></li>
+            <li><i aria-hidden="true"></i><span><strong data-confirmation-step-three>Out for delivery</strong><small data-confirmation-step-three-note>Live tracking starts after pickup</small></span></li>
+          </ol>
+        </section>
+        <div class="confirmation-actions">
+          <button class="primary-action" type="button" data-action="continue-shopping">
+            <span>Add more products</span>
+          </button>
+          <button class="secondary-action" type="button" data-action="orders">View all orders</button>
+        </div>
+      </section>
+
+      <section class="buy-view tracking-view return-cue-view" data-view="tracking" aria-labelledby="tracking-title">
+        <span class="buy-return-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg>
+        </span>
+        <div class="view-toolbar">
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+          <strong>Order status</strong>
+          <span class="toolbar-spacer" aria-hidden="true"></span>
+        </div>
+        <article class="tracking-hero">
+          <span class="tracking-orbit" aria-hidden="true">
+            <svg viewBox="0 0 72 72"><path d="M13 43h33V22H13zM46 30h9l8 9v4H46z" /><circle cx="25" cy="50" r="6" /><circle cx="54" cy="50" r="6" /><path d="M7 28h12M5 35h14" /></svg>
+          </span>
+          <small data-tracking-kicker>Preparing your order</small>
+          <h1 id="tracking-title" data-tracking-title>Order is on schedule</h1>
+          <p data-tracking-note>Your delivery commitment and every status update stay visible here.</p>
+          <strong class="tracking-number" data-tracking-number>MS-240782</strong>
+        </article>
+        <ol class="tracking-timeline" aria-label="Order progress">
+          <li class="complete"><i aria-hidden="true"></i><span><strong data-tracking-step-one>Order confirmed</strong><small data-tracking-step-one-note>Payment and stock checked</small></span><b>✓</b></li>
+          <li class="active"><i aria-hidden="true"></i><span><strong data-tracking-step-two>Preparing your order</strong><small data-tracking-step-two-note>Seller is packing your items</small></span><b>Now</b></li>
+          <li><i aria-hidden="true"></i><span><strong data-tracking-step-three>Out for delivery</strong><small data-tracking-step-three-note>Live tracking starts after pickup</small></span></li>
+        </ol>
+        <section class="tracking-update">
+          <small>Latest update</small>
+          <strong data-tracking-update-title>Seller confirmed your order</strong>
+          <p data-tracking-update-note>All items are available and preparation has started.</p>
+        </section>
+        <div class="tracking-actions">
+          <button class="primary-action tracking-shop" type="button" data-action="catalogue" data-tracking-primary>
+            <span data-tracking-primary-label>Continue shopping</span>
+          </button>
+          <button class="secondary-action" type="button" data-action="catalogue" data-tracking-secondary>
+            Add products
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <button class="basket-pill" type="button" data-action="basket" hidden>
+      <span class="basket-pill-count" data-basket-pill-count>0</span>
+      <span><small data-basket-pill-label>Cart</small><strong data-basket-pill-copy>View cart</strong></span>
+      <b data-basket-pill-total>₹0</b>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+    </button>
+
+    <nav class="buy-dock" aria-label="Buy navigation">
+      <a class="dock-edge mool-edge" href="04-universal-focus-shell.html?openMool=1&amp;world=buy&amp;rail=capability" aria-label="Open Mool">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+        <span>Mool</span>
+      </a>
+      <div class="dock-centre">
+        <button class="dock-action active" type="button" data-nav="buy" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-1 11H5zM8 9V6a4 4 0 0 1 8 0v3" /></svg>
+          <span>Buy</span>
+        </button>
+        <button class="dock-action" type="button" data-nav="orders">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" /></svg>
+          <span>Orders</span>
+        </button>
+      </div>
+      <a class="dock-edge chat-edge" href="23-chat-inbox-home.html?return=buy" aria-label="Open Chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H9l-5 4z" /><path d="M8 10h8M8 13h5" /></svg>
+        <span>Chat</span>
+      </a>
+    </nav>
+
+    <div class="sheet-layer" data-sheet-layer hidden>
+      <button class="sheet-scrim" type="button" data-action="close-sheet" aria-label="Close"></button>
+      <section class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-sheet>
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <span><small data-sheet-kicker>Choose</small><h2 id="sheet-title" data-sheet-title>Options</h2></span>
+          <button class="icon-button light" type="button" data-action="close-sheet" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
+        </div>
+        <div class="sheet-content" data-sheet-content></div>
+      </section>
+    </div>
+
+    <div class="notice-layer" data-notice-layer hidden>
+      <section class="notice-card" role="alertdialog" aria-modal="true" aria-labelledby="notice-title">
+        <span class="notice-icon" data-notice-icon aria-hidden="true"></span>
+        <small data-notice-kicker>Cart update</small>
+        <h2 id="notice-title" data-notice-title>Price updated</h2>
+        <p data-notice-message></p>
+        <div class="notice-actions" data-notice-actions></div>
+      </section>
+    </div>
+
+    <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
+  </div>
+</body>
+</html>

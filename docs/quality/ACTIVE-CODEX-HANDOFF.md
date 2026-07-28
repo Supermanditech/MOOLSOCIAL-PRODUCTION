@@ -1982,3 +1982,1183 @@ Personal and Business contexts, per-pack MOQ, seller comparison, saved baskets,
 medicine, serviceability, recovery, checkout, consent, confirmation and native
 order tracking. It remains an editable founder-review draft. No approved-final
 reference, Flutter implementation or deployment is authorized at this stage.
+
+## Latest founder refinement — Buy customer navigation, 27 July 2026
+
+The editable Buy HTML now uses the founder-selected customer hierarchy:
+
+- Buy remains the Universal main action.
+- Buy and Orders are the durable bottom destinations. Mool and Chat remain the
+  shared edge actions.
+- Retail and Wholesale are in-page pack/price/quantity modes, not bottom
+  destinations. They are directly tappable and support horizontal
+  swipe-changing with best-effort device haptics.
+- Retail and Wholesale use separate category/search states over the canonical
+  catalogue.
+- Both modes now expose an independently scrollable, complete FMCG department
+  taxonomy; existing sample products were remapped to their canonical
+  departments without duplicating product records.
+- Retail cards reveal eligible Wholesale price and MOQ and open the matching Wholesale
+  product decision.
+- Retail uses Basket; Wholesale uses Bulk order and then purchase orders.
+- Buy again remains in saved/past-order controls, not the bottom rail.
+- Medicine is a Buy product category with its specialist pharmacy flow.
+
+The corrected editable review remains at
+`http://127.0.0.1:8765/screens/09-buy.html`. Syntax, balanced-container,
+responsive overflow, 44 px tap-target, Retail/Wholesale tap, two-way swipe,
+separate discovery state, Bulk preview, Basket/Bulk order terminology,
+Medicine category, Buy destination and Orders destination checks passed.
+Founder `FINAL` is still required before reference freeze, Flutter
+implementation or any Dev deployment trial.
+
+## Latest founder refinement — Universal Mool route ownership, 27 July 2026
+
+The founder reported that returning through Mool reopened the legacy route
+state and legacy action rail. The editable HTML review now has one
+context-aware navigation contract:
+
+- Screen 04 honours `world=social` and `world=buy` when Mool is opened.
+- Social is owned by the current dedicated HTML screens: Shorts 05, Videos 06,
+  Feed 07 and Create 08.
+- Buy is owned by the current Screen 09 HTML: Retail, Wholesale, Orders and
+  Medicine deep-link to the matching Screen 09 state.
+- Social and Buy both return to
+  `04-universal-focus-shell.html?openMool=1&world=<context>&rail=capability`.
+- The Buy Orders deep link is `09-buy.html?sheet=orders`; closing the sheet
+  removes that transient URL state.
+- Mool main actions and Social/Buy sub-actions no longer route into the legacy
+  embedded Social/Buy destinations.
+
+Browser verification passed for Social → Mool, Mool → Videos, Mool → Create,
+Social Mool → Buy, Mool → Retail, Mool → Wholesale, Mool → Medicine and
+Mool → Orders. JavaScript syntax, route-target existence, malformed-query scan
+and diff checks passed. Approved-reference and protected-Social production
+gates remain unchanged. This is still editable founder-review HTML: no
+approved-final freeze, Flutter implementation, commit, deployment trial or
+public deployment is authorized by this refinement.
+
+## Latest founder lock — app-wide brand integrity, 27 July 2026
+
+The founder directed that MoolSocial identity remain consistent across every
+editable HTML screen, native Flutter screen and cloud trial artifact, with a
+permanent regression control. The website is recorded as pending and is not
+changed under this decision.
+
+The locked app identity is:
+
+- exact `MoolSocial` wordmark;
+- navy `#000080`, saffron `#FF9933`, white `#FFFFFF` and green `#138808`;
+- saffron → white → green identity-line order; and
+- one Mool service-launcher symbol: a two-by-two grid. Mool is navigation, not
+  an alternate company logo.
+
+The Buy-only custom M artwork was removed from the editable Screen 09 header
+and dock. The header now uses the same wordmark plus identity line, while the
+Buy Mool action uses the same grid as accepted Social. Shared Flutter identity
+now exposes `MoolBrand`, the shared outcome dock and Chat render its canonical
+grid, and existing vertical call sites reference the same constant. Protected
+Social source was not changed.
+
+Durable controls:
+
+- `docs/design/MOOLSOCIAL-BRAND-INTEGRITY-CONTRACT.md`
+- `config/brand-integrity.json`
+- `scripts/check-brand-integrity.ps1`
+
+The gate is part of local `scripts/check.ps1`, pull-request product contracts
+and release gates. Buy remains an editable founder-review HTML candidate:
+brand correction does not grant Buy `FINAL`, authorize new Flutter Buy
+implementation, or authorize a Dev/cloud deployment trial.
+
+## Latest founder refinement — populated Retail and Wholesale range, 27 July 2026
+
+The founder directed that every Retail and Wholesale category contain an
+actual product range rather than a complete category rail backed by only six
+sample products.
+
+The editable Buy HTML now contains 42 canonical founder-review products:
+
+- all 20 Retail catalogue departments have at least two products;
+- all 21 Wholesale catalogue departments have at least two products;
+- HoReCa and retail-supply Wholesale departments reuse the same canonical
+  underlying products exposed in the relevant Retail departments;
+- every added product carries Retail pack, delivered price, seller, stock,
+  delivery and return information;
+- every added product carries Wholesale pack, MOQ, landed price, price breaks,
+  supplier, tax, freight, payment, credit and dispatch information; and
+- search includes product names, brands and common customer terms while
+  retaining separate Retail and Wholesale discovery state.
+
+Rendered browser verification opened every department. The minimum result was
+two products with no empty department. Retail `pyaz` search resolved Fresh red
+onions, Wholesale `haldi` search resolved Turmeric powder, and switching modes
+preserved each query independently. Turmeric Wholesale details exposed two
+packs, three price breaks, four terms, two supplier choices and the Bulk order
+action. A runtime assertion now blocks the HTML candidate if any ordinary
+Retail or Wholesale department drops below two products.
+
+This remains an editable HTML founder-review candidate. No approved-final
+reference was frozen, no native Buy implementation began, and no Dev/cloud
+deployment trial was performed.
+
+## Latest founder refinement — precise Retail and Wholesale taxonomy, 27 July 2026
+
+The founder directed that category taps expose a wider and more precise product
+range in both Retail and Wholesale, without duplicate product identities or
+ambiguous category ownership. This supersedes the earlier two-products-per-
+department review threshold.
+
+The editable Buy HTML now contains 84 canonical founder-review products:
+
+- all 20 ordinary Retail departments and all 21 ordinary Wholesale departments
+  have at least four products;
+- tapping a primary department shows all matching products immediately, while
+  optional count-labelled subcategory chips provide a second, precise filter;
+- Retail and Wholesale keep independent primary-category, subcategory and
+  search state;
+- entering a search clears an older narrow category/subcategory filter and
+  searches globally inside the current Retail or Wholesale context;
+- tapping a department clears an older search so its complete four-or-more
+  product range is visible immediately;
+- every product has one Retail category/subcategory and one Wholesale
+  category/subcategory;
+- different cross-context mappings are limited to an explicit allowlist:
+  kitchen/disposable products become HoReCa supplies and relevant store
+  consumables become Retail supplies for Wholesale discovery; and
+- runtime assertions reject duplicate product IDs, undeclared category or
+  subcategory mappings, unapproved cross-context mappings, empty
+  subcategories and departments below the four-product minimum.
+
+Rendered proof reported 84 products, Retail minimum 4, Wholesale minimum 4,
+zero duplicate identities, zero taxonomy conflicts and zero empty
+subcategories. Retail Fruits & vegetables opened four products and Fruits
+narrowed to Fresh bananas. Wholesale Retail supplies opened POS rolls, price
+labels, barcode labels and reusable carry bags. A Wholesale carry-bag product
+decision exposed two packs, three price breaks, four commercial terms and the
+Bulk order action. Responsive checks at 320 × 568, 390 × 844 and 430 × 932
+found no horizontal overflow, no clipped category label and no sub-44 px
+category or subcategory target.
+
+This is still an editable founder-review HTML candidate. The change does not
+grant Buy `FINAL`, freeze an approved reference, authorize native Flutter Buy
+implementation, or authorize a Dev/cloud deployment trial.
+
+## Latest founder refinement — definitive Buy main-category rails, 27 July 2026
+
+The founder clarified that the left customer rail itself must contain more
+definitive main categories; adding product tiles below broad departments was
+not sufficient. The editable Buy HTML now replaces the earlier 20 Retail and
+21 Wholesale broad departments with 34 primary purchase categories in each
+mode.
+
+- Combined departments were separated where customer purchase intent differs:
+  Eggs & poultry / Meat & seafood; Flour, rice & grains / Dals & staples;
+  Ground spices / Whole spices; Breakfast & cereals / Instant foods; Biscuits
+  & chocolate / Namkeen & chips; and equivalent precise personal care, home
+  care, baby, pet, packaging and business-supply categories.
+- Retail has dedicated Food storage & packs, Cups & tissues, School & office
+  and Shop supplies categories.
+- Wholesale has dedicated HoReCa food packs, HoReCa tableware, Retail supplies
+  and Stationery & office categories.
+- All 84 canonical products have exactly one Retail primary category and one
+  Wholesale primary category. Retail and Wholesale offers may differ, but the
+  product identity is not copied and no product repeats across categories
+  inside either mode.
+- Every primary category opens its matching purchasable products on the first
+  tap. A subcategory row appears only when it adds a meaningful further choice.
+- Runtime gates reject missing assignments, duplicate context assignments,
+  duplicate product identities, undeclared taxonomy mappings, empty
+  subcategories and categories below two products.
+
+Rendered direct-route proof opened all 34 Retail and all 34 Wholesale
+categories. Each context covered all 84 products exactly once; no route was
+empty and no route repeated a product. Retail Eggs & poultry showed eggs and
+chicken, Retail Ground spices showed turmeric and red chilli, Wholesale
+HoReCa food packs showed aluminium foil and takeaway containers, and Wholesale
+Retail supplies showed the four intended store-consumable products. Runtime
+data reported zero duplicate assignments and zero taxonomy conflicts.
+
+This remains an editable founder-review HTML candidate. No Buy `FINAL`,
+approved-reference freeze, native Flutter Buy implementation, Git commit,
+deployment trial or public deployment is authorized by this refinement.
+
+## Latest founder refinement — complete category discovery, 27 July 2026
+
+The founder observed that the 34-category expansion was not visibly
+discoverable: the narrow rail showed only a few entries while the rest were
+hidden inside its independent scroll, and Retail and Wholesale appeared to
+start with the same categories.
+
+The editable Buy HTML now uses the rail’s first control as a persistent
+`All 34` entry. It opens a complete three-column category panel containing all
+34 context-specific categories and their product counts, plus direct access to
+all products and Medicine. Choosing any panel category closes the panel and
+shows its purchasable products immediately.
+
+Retail keeps the consumer-first order. Wholesale now visibly starts with
+Retail supplies, HoReCa food packs, HoReCa tableware and Stationery & office,
+then continues through the shared FMCG product families. The underlying
+canonical product identity remains shared only where appropriate; Retail and
+Wholesale pack, price, MOQ and commercial offers remain context-specific.
+
+Rendered proof confirmed:
+
+- 34 cards in the Retail complete-category panel;
+- 34 cards in the Wholesale complete-category panel;
+- accurate product counts and zero horizontal overflow at the live review
+  viewport;
+- effective panel targets of at least 68 px;
+- Wholesale HoReCa tableware opened only paper cups and paper tissues; and
+- Retail Ground spices opened only turmeric and red chilli.
+
+The full-product-universe scope remains the founder-approved FMCG Buy
+catalogue. No unrelated marketplace department was silently added. This is
+still editable founder-review HTML and does not grant Buy `FINAL`, freeze an
+approved reference, authorize Flutter implementation, or authorize a Dev/
+cloud deployment trial.
+
+## Latest founder refinement — categories directly visible in both rails, 27 July 2026
+
+The founder clarified that the complete Retail and Wholesale category sets
+must be directly present in the left rail. A short rail with hidden internal
+scrolling, even when accompanied by an `All 34` panel, did not meet that
+requirement.
+
+The editable Buy HTML now renders a compact, full-height rail in each mode.
+The rail participates in the normal page scroll and has no nested vertical
+scroll. Retail and Wholesale each contain 36 direct controls: `All`, all 34
+context-specific product categories and `Medicine`. The existing `All 34`
+panel remains only an optional discovery shortcut; it is not required to
+reach any category.
+
+Rendered verification confirmed:
+
+- 36 direct rail entries in Retail and 36 in Wholesale;
+- `overflow-y: visible` and equal client/scroll heights for both category
+  containers, proving that no rail entry is hidden in an internal scroll;
+- 16 Retail and 15 Wholesale categories simultaneously visible beside product
+  cards at normal page position `scrollY = 1200`;
+- final Retail rail entry `Shop supplies` and final Wholesale rail entry
+  `Cat care`;
+- direct Retail `Shop supplies` selection opened POS thermal paper rolls,
+  self-adhesive price labels and barcode label rolls; and
+- zero horizontal overflow in both rendered review routes.
+
+This supersedes the earlier independently scrollable rail behavior. The
+complete-category panel, taxonomy, canonical 84-product catalogue and
+Retail/Wholesale offer separation remain intact. This is still an editable
+founder-review HTML candidate; no Buy `FINAL`, approved-reference freeze,
+native Flutter Buy implementation, Git commit, deployment trial or public
+deployment is authorized.
+
+## Latest founder refinement — compact expandable category rail, 27 July 2026
+
+The founder then observed that permanently rendering the complete rail beside
+a category with only two or three matching products left a long category
+column and an empty product area. The direct full-height rail is therefore
+superseded by a compact in-rail disclosure pattern.
+
+Retail and Wholesale now show five context-priority/selected category entries
+plus a `More` control. Tapping `More` expands all 36 direct entries inside the
+same left rail and changes the control to `Less`; it does not open another page
+and does not introduce nested scrolling. Choosing a category immediately
+returns the rail to its compact state and keeps the selected category in the
+final compact slot, even when that category is normally farther down the
+taxonomy.
+
+Rendered verification confirmed:
+
+- five compact category entries and `More 31` in both Retail and Wholesale;
+- the selected deep category remains visible in the compact rail;
+- `More 31` expands all 36 direct rail entries and `Less` collapses them;
+- selecting Wholesale `Dog care` from the expanded rail restored the compact
+  rail and opened Adult dog food and Chicken dog treats;
+- direct Retail `Shop supplies` preserved the compact rail and opened its
+  three matching purchasable products;
+- the compact Wholesale `Namkeen & chips` rail measured 355 px beside its
+  258 px two-product row, eliminating the earlier full-height empty-column
+  effect; and
+- zero horizontal overflow in both Retail and Wholesale review routes.
+
+The optional `All 34` panel, complete taxonomy, canonical 84-product catalogue
+and separate Retail/Wholesale category order remain intact. This is still an
+editable founder-review HTML candidate; no Buy `FINAL`, approved-reference
+freeze, native Flutter Buy implementation, Git commit, deployment trial or
+public deployment is authorized.
+
+## Latest founder refinement — fixed rail, category drawer and balanced results, 27 July 2026
+
+The founder found that even the temporary in-page rail expansion could remain
+much taller than a two- or four-product category, creating a large empty
+product column. The inline `More`/`Less` expansion is superseded.
+
+The editable Buy HTML now keeps the left rail permanently compact. It contains
+the `All` result control, five context-priority/selected category entries and
+`More`. `More` opens the existing complete 34-category drawer over the
+catalogue without changing document height. Selecting a drawer category closes
+the overlay, preserves the compact rail and pins the selected category when it
+is outside the priority set.
+
+Short result sets are balanced without corrupting taxonomy:
+
+- the category result count and first grid contain only exact category
+  matches;
+- categories with fewer than four exact matches add two separately labelled
+  complementary products beneath the exact grid;
+- Retail uses `You may also need`;
+- Wholesale uses `Commonly ordered together`; and
+- categories with four or more exact products, filtered/search results and the
+  all-products result do not show this recommendation section.
+
+Rendered verification confirmed:
+
+- fixed 355 px rail height in Retail and Wholesale;
+- five rail categories plus `More`, with no in-page category expansion;
+- 34 context categories and accurate counts in each drawer;
+- drawer selection closes the overlay and keeps the active category visible;
+- Wholesale `Meat & seafood`: two exact products plus two separately labelled
+  complementary products;
+- Retail `Shop supplies`: three exact products plus two separately labelled
+  nearby recommendations;
+- Wholesale `Stationery & office`: four exact products and no recommendation
+  section;
+- top `All`: 84 exact products, active/pressed treatment and no recommendation
+  section; and
+- zero horizontal overflow in every tested state.
+
+The complete taxonomy, canonical 84-product catalogue, exact Retail/Wholesale
+offer separation and optional Medicine entry remain intact. This is still an
+editable founder-review HTML candidate; no Buy `FINAL`, approved-reference
+freeze, native Flutter Buy implementation, Git commit, deployment trial or
+public deployment is authorized.
+
+## Latest founder refinement — uninterrupted in-rail shopping and card quantity controls, 27 July 2026
+
+The founder rejected the complete-category modal because its dimmed backdrop
+and detached sheet interrupted the direct shopping path. The modal-based
+`More` interaction is superseded.
+
+`More` now reveals all 34 context product categories plus Medicine inside the
+left rail itself. The rail uses a fixed 420 px internal scroll viewport, so it
+does not grow through the page or displace the product result. Exact and
+complementary products remain visible and actionable beside category
+discovery. Selecting a category updates products immediately, collapses the
+rail to five entries and pins the new selection. No modal, backdrop or
+detached category page is used.
+
+Product cards now support direct basket control:
+
+- `ADD` changes in place to `− quantity +`;
+- Retail starts at one pack;
+- Wholesale starts at the selected pack's MOQ;
+- `+` and `−` update basket/bulk-order count and total immediately;
+- decreasing below the permitted minimum removes the line and restores
+  `ADD`; and
+- each decrement/increment target is 44 × 44 px.
+
+Rendered verification confirmed:
+
+- Wholesale expanded rail: 35 direct choices, 420 px client height, 1,642 px
+  scroll height, 544 px total rail height, `overflow-y: auto`, zero modal and
+  zero horizontal overflow;
+- selecting Wholesale `Cat care` restored a 356 px compact rail and immediately
+  opened Adult cat food and Clumping cat litter beside it;
+- selecting Retail `Ground spices` restored the compact rail, opened Turmeric
+  powder and Red chilli powder and preserved the existing basket;
+- Wholesale Adult cat food respected MOQ 2, incremented to 3, decremented to 2
+  and removed/restored `ADD` on the next decrement;
+- Retail Fresh boneless fish fillets incremented 1 → 2 and decremented 2 → 1;
+  and
+- all card stepper buttons measured 44 × 44 px.
+
+The separately labelled recommendations for short exact result sets remain,
+but they never alter category counts. The canonical 84-product catalogue,
+Retail/Wholesale taxonomy and context-specific offers remain intact. This is
+still editable founder-review HTML; no Buy `FINAL`, reference freeze, native
+Flutter Buy implementation, Git commit, deployment trial or public deployment
+is authorized.
+
+## Latest founder approval — Buy catalogue slice frozen, 27 July 2026
+
+The founder explicitly approved the Retail and Wholesale category rail,
+product grid and bottom rail and directed that this exact slice be recorded as
+founder approved before the next Buy sub-tap set.
+
+The immutable partial reference is:
+
+`approved-references/screens/09-buy-catalogue/v1`
+
+It freezes:
+
+- the 34-category Retail taxonomy and 34-category Wholesale taxonomy over one
+  canonical 84-product catalogue;
+- compact context-priority rails with `All`, five category entries and
+  `More`;
+- all 34 context categories plus Medicine revealed inside the fixed-height
+  rail, with no modal, backdrop or detached page;
+- same-screen exact product results and separately labelled complementary
+  recommendations;
+- context-specific Retail and Wholesale pack, price, seller and fulfilment
+  presentation;
+- direct `ADD` to `− quantity +`, including Retail quantity one and Wholesale
+  selected-pack MOQ;
+- immediate basket or bulk-order pill updates; and
+- fixed Mool, Buy, Orders and Chat bottom navigation.
+
+The frozen source HTML SHA-256 is
+`7D73CDFF4EC2E91F405837A3DD215B1F4AC52EB0573C5C444E0E5D57FD4E093F`.
+The package includes exact HTML and shared assets, an interaction contract,
+founder acceptance, SHA-256 sums, verification evidence and four 390 × 844
+reference images.
+
+The approval is deliberately limited. Product detail, pack selection, seller
+comparison, basket/bulk-order review, checkout, payment, confirmation,
+tracking, Medicine, native Flutter and deployment are not approved by this
+decision.
+
+The next founder-review set is the product-decision path:
+
+1. open a Retail or Wholesale product without losing catalogue context;
+2. compare pack and seller choices;
+3. preserve final delivered-price or landed-cost clarity;
+4. add Retail quantity to Basket or Wholesale MOQ quantity to Bulk order; and
+5. return to the exact category, scroll and quantity state.
+
+Native Buy implementation remains blocked until the complete connected Buy
+HTML reference required for implementation is founder approved and frozen.
+No Git commit, push, Flutter implementation, Firebase/GCP deployment or public
+deployment was authorized.
+
+## Latest Buy HTML review slice — product decision, 27 July 2026
+
+After freezing the approved catalogue slice, the editable screenbook advanced
+to product decisions without altering the immutable
+`screens/09-buy-catalogue/v1` package.
+
+The next founder-review slice now provides:
+
+- product detail entered from the approved Retail or Wholesale grid;
+- two pack choices for every product, with selected-pack pricing;
+- Retail final delivered price and Wholesale landed price kept explicit;
+- seller comparison priced for the currently selected pack rather than the
+  default pack;
+- a visible selected-seller treatment and updated seller, delivery, badge,
+  unit cost and call-to-action after selection;
+- Wholesale pack-dependent MOQ, landed cost and price-break scaling;
+- Retail quantity in packs and Wholesale quantity in trade packs;
+- `Add to basket` or `Add to bulk order` changing to `Update basket` or
+  `Update bulk order` once the line exists;
+- reopening an existing line at its saved pack and quantity; and
+- Back restoring the exact context, category, catalogue scroll position,
+  selected pack display, quantity control and basket/bulk-order pill.
+
+The runtime product-decision integrity gate covered all 84 products, 168
+Retail/Wholesale offers, 336 pack choices and 344 seller choices. Every choice
+resolved to a positive price. Browser checks passed the Retail and Wholesale
+detail routes at 320 × 568, 390 × 844 and 430 × 932 with two visible pack
+choices, no target below 44 px, zero horizontal overflow and no console error
+or warning.
+
+Connected verification also confirmed:
+
+- Retail 1,000 g fish changed seller prices from ₹595 to ₹618 and updated the
+  selected delivered price and unit price;
+- Wholesale double-carton POS rolls changed landed price to ₹4,200, MOQ to one
+  and scaled price breaks, while the alternate supplier changed the landed
+  price to ₹4,326 and the unit cost to ₹10.82 per roll;
+- Wholesale Barcode label rolls preserved a 395 px catalogue position,
+  selected double carton, quantity two and the compact Retail supplies rail
+  after product Back; and
+- the frozen catalogue regression still passed its 356 px compact rails,
+  35-choice/420 px in-rail expansion, exact product grids, MOQ stepper,
+  Mool/Buy/Orders/Chat bottom navigation and zero-overflow checks.
+
+Founder-review routes:
+
+- Retail:
+  `http://127.0.0.1:8765/screens/09-buy.html?category=meat-seafood&product=fish-fillet&view=product`
+- Wholesale:
+  `http://127.0.0.1:8765/screens/09-buy.html?context=business&category=retail-supplies&product=thermal-rolls&view=product`
+
+This product-decision slice is editable and awaiting founder review. It has not
+been added to the immutable manifest and does not authorize Flutter,
+deployment, commit, push or merge.
+
+## Latest Buy HTML review slice — rich purchase facts and direct order review
+
+The editable Screen 09 candidate now carries complete customer buying facts
+from product decision into Basket or supplier-grouped Bulk order without
+adding another product-information route.
+
+Every Retail and Wholesale product shows variant, selected pack, net quantity,
+unit price, minimum quantity/MOQ, available stock, seller and return terms.
+Every pack/seller combination also derives a current dated commitment with
+supplier origin, destination PIN, order cut-off, dispatch date, delivery
+window and seller confirmation. Late orders roll forward from the current
+order date. Runtime coverage is 84 products, 168 context offers, 336 pack
+choices, 344 seller choices and 688 pack/seller delivery commitments with zero
+missing purchase facts.
+
+After Add/Update, product detail exposes a direct `View basket` or
+`View bulk order` action. Retail Basket keeps inline quantity, net quantity,
+seller and delivery detail. Wholesale Bulk order groups lines by supplier,
+shows origin/confirmation/dispatch and keeps an MOQ-aware inline stepper.
+Checkout, confirmation and tracking use the same commitment summary rather
+than a generic conflicting delivery date.
+
+Browser verification mounted 16 direct states and 10 sheets/recovery surfaces.
+All had zero prohibited customer copy, zero horizontal overflow and no target
+below 44 px. Retail product, Wholesale product, Retail basket and Wholesale
+Bulk order passed at 320 × 568, 390 × 844 and 430 × 932. The full Retail and
+Wholesale order paths retained their delivery date through checkout,
+confirmation and tracking. Wholesale `+` recalculated landed totals and net
+quantity; decrement below MOQ removed the line.
+
+Founder-review routes:
+
+- Retail product:
+  `http://127.0.0.1:8765/screens/09-buy.html?category=meat-seafood&product=fish-fillet&view=product`
+- Wholesale product:
+  `http://127.0.0.1:8765/screens/09-buy.html?context=business&category=retail-supplies&product=thermal-rolls&view=product`
+- Retail basket:
+  `http://127.0.0.1:8765/screens/09-buy.html?seed=1&view=basket`
+- Wholesale Bulk order:
+  `http://127.0.0.1:8765/screens/09-buy.html?context=business&seed=1&view=basket`
+
+The immutable Buy catalogue `v1` remains unchanged and checksum-clean. This
+new set is editable and awaiting founder approval. No new reference freeze,
+Flutter work, Firebase/GCP action, deployment, commit, push or merge is
+authorized.
+
+## Latest Buy HTML review slice — Cart and retailer Household Basket
+
+The editable Screen 09 candidate now uses `Cart` for the customer's temporary
+Retail product selection. `Household Basket` is reserved for a retailer-created
+multi-product offer, such as a 30-day household essentials combination.
+
+The first inline Retail offer contains 12 products and lets the customer scale
+calculated pack quantities, regular value, Basket price and saving for 2–8
+household members. It shows the retailer and dated delivery commitment, expands
+to the exact product list on the catalogue, and enters Cart as one Basket line.
+Cart may contain that Basket and individual products together. Wholesale
+continues to use supplier-grouped `Bulk order`.
+
+This design adds no new screen, route or bottom-navigation destination. Browser
+checks passed at 320 × 568 and 390 × 844 with zero horizontal overflow, zero
+effective targets below 44 px, zero missing purchase facts and zero prohibited
+customer-facing commentary. Member scaling, inline expansion, add to Cart,
+Cart-side member updates and mixed Cart totals were verified.
+
+The immutable Buy catalogue `v1` remains unchanged and checksum-clean. This
+Cart/Household Basket clarification remains editable and awaits founder
+approval. No new reference freeze, Flutter work, Firebase/GCP action,
+deployment, commit, push or merge is authorized.
+
+## Latest Buy HTML review slice — reduced-tap connected commerce
+
+The editable Screen 09 candidate now uses this connected customer path:
+
+`catalogue → product or direct ADD → Cart/Bulk order → Pay/Place purchase order
+→ confirmation with order progress`.
+
+Product detail uses a compact non-catalogue header and a fixed quantity/Add
+control above the Buy dock. The opening viewport carries the product, pack,
+final delivered/landed price and seller decision; all variant, pack, unit,
+stock, returns, origin, destination, cut-off, dispatch, delivery, price-break
+and Wholesale terms remain on the same page.
+
+Retail Cart and Wholesale Bulk order now own editable quantities, address,
+dated delivery, payment, totals and the final action. The separate checkout
+step is no longer reachable; an older `view=checkout` link resolves to the
+order review. Confirmation includes order progress without another tap.
+
+Orders exposes active tracking and delivered purchases. Delivered Retail and
+Wholesale orders can be reordered into editable Cart/Bulk order lines or added
+to the catalogue as a retained order while the customer adds new products.
+Existing quantities may be increased, decreased or removed before payment.
+
+Browser verification covered 11 direct Retail/Wholesale states with zero
+horizontal overflow, zero missing purchase facts and zero prohibited customer
+copy. Effective targets passed the 44 px rule. The 320 × 568 Retail Cart/
+payment/confirmation path and 390 × 844 Wholesale product path passed. The
+Wholesale product → order → payment/terms → confirmation and delivered →
+reorder → edit → add-products journeys were replayed.
+
+The immutable Buy catalogue `v1` remains unchanged and checksum-clean. This
+reduced-tap journey remains editable and awaits founder approval. No new
+reference freeze, Flutter work, Firebase/GCP action, deployment, commit, push
+or merge is authorized.
+
+## Latest Buy HTML refinement — back-free Buy subviews
+
+The founder clarified that removing visible back navigation must not remove
+any Buy screen or its content. The editable Screen 09 candidate therefore
+removes only the circular back-arrow controls from the current Product,
+Medicine, Cart/Bulk order, legacy-checkout and Tracking toolbars.
+
+All views and buying information remain intact. Product, Medicine, Cart/Bulk
+order and Tracking return through the persistent Buy destination; Orders
+remains available throughout; Cart/Bulk order keeps Add products;
+confirmation keeps Add more products and View all orders; delivered tracking
+keeps Reorder and Add products. Native phone/browser Back history remains
+unchanged.
+
+Browser verification mounted Retail Product, Wholesale Product, Medicine,
+Retail Cart, Wholesale Bulk order, the legacy checkout redirect, active
+Tracking and delivered Tracking. Each retained its expected content, Buy and
+Orders destinations and zero visible or semantic back-arrow controls. A
+Wholesale product opened from the catalogue also returned to the exact prior
+catalogue route through browser Back.
+
+The immutable Buy catalogue `v1` remains unchanged and checksum-clean. This
+back-free toolbar refinement remains editable and awaits founder approval. No
+Flutter work, Firebase/GCP action, deployment, commit, push or merge is
+authorized.
+
+## Latest Buy HTML trial — Product-detail return cue
+
+The editable Wholesale Product-detail route alone now demonstrates a subtle
+return affordance for founder review:
+
+- a 360 ms right-to-left Product-detail entry;
+- a word-free left-edge chevron that pulses for 5.6 seconds and then remains
+  faintly visible;
+- a matching temporary halo on the persistent visible `Buy` destination; and
+- Product-only accessible naming of `Buy` as `Return to Buy catalogue`.
+
+The decorative edge cue is `aria-hidden`, accepts no pointer events and does
+not replace navigation. Tapping `Buy` returns to the exact catalogue context;
+native phone/browser Back remains unchanged. Medicine, Cart/Bulk order and
+Tracking have no active cue and were not changed by this trial.
+
+Runtime verification retained all seven Buy views, zero visible back arrows,
+zero horizontal overflow and exact return to Wholesale `Retail supplies`.
+This one-screen trial awaits explicit founder approval before any broader
+rollout. The frozen Buy catalogue `v1` remains unchanged. No Flutter work,
+Firebase/GCP action, deployment, commit, push or merge is authorized.
+
+## Latest Buy HTML approval — return cues across former back-arrow views
+
+The founder approved the one-screen Product-detail trial and directed its
+rollout to each Buy view whose circular back arrow had been removed.
+
+The editable HTML now applies the same word-free left-edge cue and 360 ms
+entry transition to Product, Medicine, Retail Cart, Wholesale Bulk order,
+legacy order review and Tracking. Product, Medicine and order review
+temporarily highlight the persistent `Buy` destination with the accessible
+name `Return to Buy catalogue`. Tracking highlights the context-correct
+`Orders` destination with `Return to Orders`.
+
+Catalogue and confirmation have no cue because they did not own the removed
+back arrow. All cues are decorative, `aria-hidden` and non-interactive. Native
+phone/browser Back remains unchanged.
+
+Runtime replay covered both Retail and Wholesale variants of every affected
+state. Each retained all seven Buy views, zero visible back arrows, the correct
+return destination and zero horizontal overflow. Product, Medicine and Bulk
+order returned to their catalogue context; Tracking opened Orders; browser
+Back restored the exact Wholesale Product route.
+
+The frozen Buy catalogue `v1` remains unchanged and checksum-clean. This
+founder approval is limited to the return affordance and is not a complete Buy
+HTML `FINAL`. No Flutter work, Firebase/GCP action, deployment, commit, push or
+merge is authorized.
+
+## Latest Buy HTML acceptance — Wholesale Bulk order
+
+The founder explicitly accepted the connected Wholesale Bulk order shown after
+adding POS thermal paper rolls from Product details.
+
+The accepted screenwise checkpoint carries the product, variant, selected
+pack, landed unit price and total; MOQ-aware quantity controls; supplier,
+origin, destination, confirmation, dispatch and dated delivery; payment and
+business-delivery choices; purchase-order terms; `Place purchase order`; add
+products; and the approved word-free return cue.
+
+The reviewed state contained one Rajasthan Retail Supply supplier group at
+₹4,200 for two trade packs and 400 rolls, with zero visible back arrows and
+zero horizontal overflow.
+
+This is an accepted editable-HTML screen checkpoint, not the complete Buy HTML
+`FINAL`. No new immutable reference, Flutter implementation, Firebase/GCP
+action, deployment, commit, push or merge is authorized.
+
+## Latest Buy HTML candidate — unified Cart
+
+The editable Screen 09 Cart now supports Retail, Wholesale and combined
+shopping in one destination:
+
+- Retail keeps personal delivery, individual products and retailer-created
+  Household Baskets;
+- Wholesale keeps verified-workspace packs, supplier grouping, MOQ, landed
+  price and purchase-order terms; and
+- All shows both as two clearly separated order groups with one combined Cart
+  total.
+
+Combined checkout preserves separate Retail delivery and Wholesale supplier
+commitments. It confirms the two resulting orders separately rather than
+merging consumer and business terms. Retail and Wholesale quantities remain
+independently editable from the combined Cart.
+
+Founder-review routes:
+
+- Retail:
+  `http://127.0.0.1:8765/screens/09-buy.html?seed=retail-cart&view=basket&cart=retail`
+- Wholesale:
+  `http://127.0.0.1:8765/screens/09-buy.html?context=business&seed=1&view=basket&cart=wholesale`
+- Combined:
+  `http://127.0.0.1:8765/screens/09-buy.html?seed=combined-cart&view=basket&cart=all`
+
+Runtime replay passed mode switching, independent quantity changes, totals,
+combined consent, two-order confirmation and canonical-width horizontal
+fitment. The existing missing normal-product Cart identifier was corrected so
+Cart steppers now update the intended Retail or Wholesale line.
+
+This unified Cart remains an editable founder-review candidate. It does not
+change the immutable Buy catalogue `v1` and does not authorize Flutter,
+deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — compact unified Cart
+
+The unified Cart candidate has been compacted consistently in its `All`,
+`Retail` and `Wholesale` modes. The duplicate global fulfilment card was
+removed; its dated information remains available in the order header and each
+product row. Header, mode switch, order grouping, product rows, supplier
+groups, checkout choices, totals and add-products spacing are now denser while
+all visible controls retain 44px minimum touch targets.
+
+The Cart still supports all three intended purchase states: Retail-only,
+Wholesale-only and a combined Cart containing products from both catalogues.
+The combined mode keeps separate fulfilment commitments and produces separate
+Retail and Wholesale order identifiers.
+
+Browser replay passed the three mode switches, independent quantity changes,
+combined two-order confirmation, horizontal fitment and touch-target checks.
+The frozen Buy catalogue `v1` remains unchanged. The compact Cart remains an
+editable founder-review candidate and does not authorize Flutter, deployment,
+commit, push or merge.
+
+## Latest Buy HTML candidate — professional commerce Cart redesign
+
+Founder feedback rejected the spacing-only compact pass. The editable Screen
+09 Cart has now been restructured into a flatter professional commerce
+hierarchy: one concise header, one Retail/Wholesale/All switch, slim order
+headers, dense line items, inline quantity controls, accessible icon removal,
+flat supplier groups, compact checkout, a compact total and one final
+two-action purchase bar.
+
+Standard Retail and Wholesale product rows measure approximately 109–111px at
+the canonical review width while retaining complete product, pack, unit,
+seller or supplier, route, delivery, quantity and price information. The
+Household Basket alone retains a taller row for its directly expandable
+product manifest. All controls remain at least 44px.
+
+Cart counts are now consistent product counts. When both Retail and Wholesale
+contain products, the catalogue exposes one combined Cart entry with the
+combined total; it opens `All` directly and the same Cart still exposes the
+two individual modes. Combined checkout continues to create separate Retail
+and Wholesale order identifiers and preserves their respective fulfilment
+terms.
+
+Browser replay passed catalogue return, combined entry, all three modes,
+independent quantity changes, accessible removal, two-order confirmation,
+horizontal fitment and touch-target checks. This remains an editable
+founder-review candidate. The frozen Buy catalogue `v1` is unchanged; Flutter,
+deployment, commit, push and merge remain unauthorized.
+
+## Latest founder approval — professional unified Cart HTML
+
+On 28 July 2026 the founder explicitly approved the professional Screen 09
+Cart redesign after rejecting the earlier spacing-only compact pass. The
+approval covers the Retail-only, Wholesale-only and combined Retail +
+Wholesale states, the unified catalogue Cart entry, inline quantity/removal
+controls, separate fulfilment terms and two-order combined confirmation.
+
+This is an approved editable-HTML screen checkpoint. It has not yet been
+frozen as a new immutable Buy reference because the complete Buy HTML has not
+received founder `FINAL`. The existing frozen Buy catalogue `v1` remains
+unchanged. Flutter, deployment, commit, push and merge remain unauthorized.
+
+## Latest founder clarification — approved Buy screen count
+
+On 28 July 2026 the founder clarified that the current Buy approval must be
+reported as three screen families: Retail catalogue, Wholesale catalogue and
+Cart. Retail and Wholesale include the approved shared bottom navigation and
+compact/expanded left category rail. Cart includes the Retail-only,
+Wholesale-only and combined Retail + Wholesale states.
+
+This equals five approved visible review states when the three Cart modes are
+counted separately. The rails are approved components, not extra screens.
+Product-detail content, Medicine, Order confirmation and Orders/Tracking
+remain pending full content approval. The approved word-free return cue is a
+navigation-treatment approval only. Complete Buy HTML `FINAL`, a new immutable
+complete-Buy reference, Flutter implementation, Firebase/GCP action,
+deployment, commit, push and merge remain unauthorized.
+
+## Latest Buy HTML delivery — complete end-to-end founder-review candidate
+
+On 28 July 2026 the remaining Buy HTML journey was completed in the editable
+screenbook without changing Screens 01–03 or implementing Flutter.
+
+The founder-review candidate now covers Product details, Medicine and
+prescription review, Retail/Wholesale/combined confirmation, first-class
+Orders, Retail/Wholesale tracking, delivered-order reorder and price, stock,
+service-area, payment, network and delivery-delay recovery. The previously
+approved Retail catalogue, Wholesale catalogue and professional Cart remain
+the accepted baseline.
+
+Connected browser replay passed Product -> Cart -> payment -> confirmation ->
+Orders -> tracking; combined Retail + Wholesale ordering; delivered Retail
+reorder; Wholesale reorder-plus-add with refresh-stable business context; and
+prescription -> pharmacist review -> precise quote -> Cart. Direct-route and
+responsive audits covered 320 x 568, 390 x 844 and 430 x 932 with zero
+horizontal overflow, no visible target below 44px and no internal/prototype
+wording.
+
+Founder review board:
+
+`http://127.0.0.1:8765/quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html`
+
+Audit evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-end-to-end-audit-20260728.json`
+
+The immutable approved Cart checkpoint is stored at
+`approved-references/screens/09-buy-cart/v1` and all 11 checksum entries pass.
+The immutable catalogue checkpoint remains unchanged.
+
+State: `READY_FOR_COMPLETE_BUY_HTML_FOUNDER_REVIEW`. This is not complete Buy
+HTML `FINAL`; it does not authorize Flutter, Firebase/GCP trial deployment,
+commit, push or merge.
+
+## Latest Buy HTML refinement — one Reorder and saved delivery addresses
+
+On 28 July 2026 the editable Buy founder-review candidate replaced the
+delivered-order `Reorder` plus `Reorder + add` pair with one Reorder action.
+Shop, Wholesale and Medicine Reorder now open their existing editable Cart,
+where quantity, remove and Add products remain available. Medicine Add
+products returns to Medicine.
+
+Cart delivery addressing now includes saved Home, Work, business, warehouse
+and recipient choices; Add/Edit address; current-area prefill with manual
+correction; and a recipient-address request choice for WhatsApp, MoolSocial
+and the system share surface. A mixed Cart keeps separate Shop/Medicine and
+Wholesale destinations.
+
+Payment and purchase-order placement now open one compact address confirmation.
+Changing either mixed-Cart destination returns directly to the same
+confirmation, and confirmation is invalidated after an address change or a new
+repeat purchase.
+
+Direct browser replay passed:
+
+- three delivered-order families with exactly one Reorder action each;
+- Shop Reorder -> editable Cart with `−`, `+`, remove and Add products;
+- Medicine Reorder -> editable Medicine Cart -> retained Medicine catalogue;
+- saved Work selection and Cart refresh;
+- automatic area prefill and editable address fields;
+- recipient request through the WhatsApp choice;
+- mixed Cart consent -> personal/business address confirmation -> business
+  address change -> direct confirmation return -> two-order confirmation; and
+- targeted manual fitment for compact 320 x 568 at 100% and 140% text,
+  current iPhone, large Android, phone landscape and unfolded foldable states.
+
+Founder review remains:
+
+`http://127.0.0.1:8765/quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html`
+
+Targeted audit evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-reorder-address-audit-20260728.json`
+
+State: `READY_FOR_REORDER_AND_ADDRESS_FOUNDER_REVIEW`. This extends the
+complete Buy HTML candidate but is not complete Buy HTML `FINAL`; it does not
+authorize Flutter, production messaging/location integration, Firebase/GCP
+trial deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — exact Medicine approval and four-scope Cart
+
+On 28 July 2026 the editable Screen 09 founder-review candidate closed the
+prescription-product Cart gap. Every Medicine card now opens a rich product
+detail state. A prescription medicine retains its exact product identity while
+a saved or new prescription is reviewed; after the approval result, the same
+medicine exposes Add to Cart and enters the Medicine Cart with its pharmacy and
+delivery commitment.
+
+The unified Cart now exposes four precise scopes: All, Shop, Wholesale and
+Medicine. Every available scope carries its own product count and total and
+isolates its order group. All preserves the three purchase families as
+separate Shop, Medicine and Wholesale orders inside one Cart.
+
+Delivery-address entry now carries recipient phone, house/building/street,
+area, six-digit PIN and landmark; current-location, map-pin and Google Maps
+choices; and recipient request choices for WhatsApp, MoolSocial and the device
+share surface. The previous vague `Any app` label is absent.
+
+Targeted connected-browser replay passed:
+
+- Telmisartan 40 mg -> saved prescription -> pharmacist review -> verified
+  product detail -> Add to Cart -> Medicine Cart;
+- mixed Cart All -> Shop, Medicine and Wholesale scope isolation with
+  independent counts and totals;
+- address form, map-pin and named share-fallback states;
+- Medicine fitment at 320 x 568, 360 x 800, 390 x 844 and 430 x 932;
+- two-column Medicine fallback at 320 and three columns from 360 upward;
+- zero horizontal overflow, zero clipped Medicine decision text and zero
+  browser console errors in the tested states.
+
+Founder review board:
+
+`http://127.0.0.1:8765/quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html`
+
+Targeted evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-medicine-cart-address-audit-20260728.json`
+
+State: `READY_FOR_MEDICINE_AND_UNIFIED_CART_FOUNDER_REVIEW`. This is still an
+editable HTML candidate. It does not grant complete Buy HTML `FINAL`, freeze a
+new immutable complete-Buy reference, authorize Flutter implementation,
+Firebase/GCP deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — one Rx, ₹ Total and destination types
+
+On 28 July 2026 the editable Screen 09 candidate replaced repeated
+medicine-by-medicine prescription upload with prescription-level coverage.
+Selecting the Heart & BP saved prescription links Telmisartan 40 mg and
+Atorvastatin 10 mg into one pharmacist review. Approval enables Add to Cart on
+both matched medicines; unrelated prescription medicines remain locked and
+still require a matching prescription.
+
+The review UI lists every linked medicine, shows a compact animated
+linked/verified state and returns to the verified prescription catalogue in
+one tap. This is an HTML interaction demonstration. Flutter/backend must
+persist one prescription parent record plus server-authoritative medicine-line
+matches, strength/form/quantity approval, expiry and audit records.
+
+The combined Cart's customer-facing `All` tab is now **₹ Total**, carrying the
+total product count and amount. Shop, Wholesale and Medicine remain separate
+scopes. Delivery-address classification is now Home, Work, Third party and
+Other place. Receiving person or business and receiving contact are separate,
+required fields for every destination type.
+
+Connected-browser replay passed:
+
+- Telmisartan review displaying two linked medicines;
+- one approval enabling Telmisartan and Atorvastatin Add-to-Cart;
+- five unrelated prescription medicines remaining on Use Rx;
+- ₹ Total displaying 4 products and ₹4,318 in the mixed Cart;
+- Home, Work, Third party and Other place plus receiving-contact fields at
+  320 x 780;
+- the verified two-medicine summary at 390 x 844; and
+- zero browser console errors in the replayed states.
+
+Founder review board:
+
+`http://127.0.0.1:8765/quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html`
+
+Targeted evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-rx-total-destination-audit-20260728.json`
+
+State: `READY_FOR_RX_TOTAL_DESTINATION_FOUNDER_REVIEW`. This remains an
+editable HTML candidate and does not authorize complete Buy HTML `FINAL`,
+Flutter implementation, backend/clinical integration, Firebase/GCP
+deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — bottom purchase controls and compact address
+
+On 29 July 2026 the editable Screen 09 candidate standardized the product-card
+hierarchy across Shop, Wholesale and Medicine. Product identity, variant,
+pack, price, delivery commitment, named fulfilment partner and route now
+precede the purchase action. `ADD`, `Use Rx` and quantity steppers occupy the
+true bottom of their cards instead of interrupting decision information.
+
+The three catalogue families now share one card type scale for kicker, title,
+variant/composition, pack, price, delivery and fulfilment information. The
+saved delivery-address control was reduced to its content width so the
+chevron remains beside the address rather than consuming the complete header.
+
+Focused browser verification passed Shop, Wholesale and Medicine at 320 × 568
+with 100% and 140% text and at 390 × 844 with 100% text. Shop, Wholesale and
+Medicine `ADD` interactions each changed to a quantity stepper while retaining
+the bottom action position. JavaScript syntax, diff hygiene, approved UI locks,
+the protected Social baseline and app brand integrity passed.
+
+Editable source checksums:
+
+- `screens/09-buy.html`:
+  `084374AAE08EAF272A7E9E9832E0822602642467772AAFFB2D3B12E1CD072E42`
+- `shared/moolsocial-buy-v2.css`:
+  `2DA8DBB06A7B57386C50B0D8C33EC4BB41BECAC959610EB9FCFDC63E447470E8`
+- `shared/moolsocial-buy-v2.js`:
+  `790BD591A3D89738CAD2B7F1257A43888E8ACECE40C0097690217468BB914A95`
+
+State: `READY_FOR_TILE_ALIGNMENT_FOUNDER_REVIEW`. This remains an editable HTML
+candidate. It does not authorize complete Buy HTML `FINAL`, immutable freeze,
+Flutter implementation, deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — context-specific Mool filter
+
+On 29 July 2026 the editable Screen 09 candidate replaced the generic
+single-choice ecommerce filter with a MoolSocial decision lens. The new
+surface combines one delivery priority, one price priority and one
+fulfilment/terms priority without leaving the product catalogue. It uses the
+MoolSocial navy, saffron and green visual system, live result counts, subtle
+motion and a compact result action.
+
+Shop, Wholesale and Medicine now have isolated filter state, vocabulary,
+matching and search scope:
+
+- Shop: Anytime, Fast delivery, Today, Lowest delivered, Nearby sellers and
+  Easy returns.
+- Wholesale: Any schedule, Fastest delivery, Within 2 days, Lowest wholesale,
+  Freight included, Flexible MOQ and Manufacturer.
+- Medicine: Anytime, Fast delivery, Today, Lowest delivered, Without Rx,
+  Nearby pharmacy and Manufacturer.
+
+Direct browser replay verified combined selections in every catalogue,
+separate restoration of Shop and Wholesale filter state, no Shop/Medicine
+search leakage and no cross-surface option leakage. Shop, Wholesale and
+Medicine filter sheets passed at 320 × 568 with 140% text: zero horizontal
+overflow, zero clipped filter controls and zero effective targets below
+44 px. Browser console output remained clean.
+
+Editable source checksums:
+
+- `screens/09-buy.html`:
+  `C0E007651E9DBFC69B68DAF284FB8AE577DAE6ECE1E1725911BA4D5F84CCCF04`
+- `shared/moolsocial-buy-v2.css`:
+  `534CC8E241AE911313625233E007C6A085EB13A3EA4365AEBBEAE1A9A564ED6D`
+- `shared/moolsocial-buy-v2.js`:
+  `8984D3903BF694FB7F8093D2FE1086D996D17B333CB9E2D725CC6076EAD03BAF`
+
+Evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-final-adversarial-ux-audit-20260729.json`
+
+State: `READY_FOR_CONTEXT_FILTER_FOUNDER_REVIEW`. This remains an editable HTML
+candidate. It does not authorize complete Buy HTML `FINAL`, immutable freeze,
+Flutter implementation, deployment, commit, push or merge.
+
+## Latest Buy HTML refinement — compact live Cart indicator
+
+On 29 July 2026 the editable Screen 09 candidate replaced the full-width Cart
+banner above the Buy dock with a compact floating control across Shop,
+Wholesale and Medicine. Its resting state is 154 × 44 px and keeps the Cart
+icon, total quantity and payable total visible while leaving the product grid
+available for continued shopping.
+
+After an Add action, the control expands to 270 × 44 px for 2.6 seconds to
+identify the added product, then contracts automatically. Add feedback is no
+longer duplicated in a separate toast. The mixed Cart preserves Shop,
+Medicine and Wholesale together and opens directly from the same compact
+control.
+
+Connected-browser replay verified:
+
+- Shop, Wholesale and Medicine Add actions;
+- the temporary product-name state and automatic compact resting state;
+- total-quantity and payable-total updates;
+- mixed Cart scope and total after opening the indicator;
+- 320 × 568 at 140% text, 390 × 844, 430 × 932 and 568 × 320;
+- no horizontal overflow in the compact Cart cases; and
+- zero direct Buy-screen console errors.
+
+Editable source checksums:
+
+- `screens/09-buy.html`:
+  `90422D3FAC31967F3C8F7F4FA89930FA502FE6FC7B9A953CB55134C3C100200D`
+- `shared/moolsocial-buy-v2.css`:
+  `0B6167E2489DE016F4C90D4A2EF23CF83992EAFA0638353BE47CDE2B1B099FAE`
+- `shared/moolsocial-buy-v2.js`:
+  `CF7486659C548FC61E8657E36B51148EE7796765F4EEBF47B64A6AFA5C11A851`
+
+Evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-final-adversarial-ux-audit-20260729.json`
+
+State: `READY_FOR_COMPACT_CART_FOUNDER_REVIEW`. This remains an editable HTML
+candidate. It does not authorize complete Buy HTML `FINAL`, immutable freeze,
+Flutter implementation, deployment, commit, push or merge.
+
+## Latest Buy HTML correction — always-visible purchase dock
+
+On 29 July 2026 the founder rejected the temporary centred-Cart/paged-dock
+experiment. The editable Screen 09 candidate now keeps Shop, Wholesale,
+Medicine and Orders visible together at all times. Switching a catalogue,
+opening Orders and vertical scrolling do not hide, replace or page any of the
+four Buy subactions.
+
+Cart has returned to the previously reviewed compact floating position above
+the dock. It rests at 154 × 44 px with total quantity and payable total,
+expands to 270 × 44 px for 2.6 seconds to identify an added product, and then
+contracts without disappearing while products remain. The rejected centred
+Cart action, pager, hidden subactions, swipe-page logic and related styling
+are absent.
+
+Connected-browser replay verified:
+
+- all four Buy subactions visible before and after Shop, Wholesale, Medicine
+  and Orders taps;
+- all four subactions still visible after scrolling each catalogue and Orders;
+- Shop, Wholesale and Medicine Add feedback plus persistent compact Cart;
+- mixed Shop + Wholesale + Medicine totals in the same Cart indicator;
+- Compact phone at 320 × 568 with 140% text, iPhone current at 390 × 844 and
+  Compact landscape at 568 × 320; and
+- zero horizontal overflow in the tested fitment cases.
+
+Editable source checksums:
+
+- `screens/09-buy.html`:
+  `408A095C038DD88113FBE2F901291A9BDFDCD4DC7A4C2414A27BC51B05172341`
+- `shared/moolsocial-buy-v2.css`:
+  `0B6167E2489DE016F4C90D4A2EF23CF83992EAFA0638353BE47CDE2B1B099FAE`
+- `shared/moolsocial-buy-v2.js`:
+  `D380A5E50F50346C999D12824649C10094AF10D3CEB6F9B2A749ABC223E38026`
+- `quality/BUY-DEVICE-FITMENT-20260728.html`:
+  `C87562EF39318417C6339A2EFE44976D996940419A9FB4D81429ADEC74D9411B`
+
+Evidence:
+
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\quality\generated\buy-final-adversarial-ux-audit-20260729.json`
+
+State: `READY_FOR_ALWAYS_VISIBLE_DOCK_AND_COMPACT_CART_FOUNDER_REVIEW`. This
+supersedes the temporary centred-Cart experiment and remains an editable HTML
+candidate. It does not authorize complete Buy HTML `FINAL`, immutable freeze,
+Flutter implementation, deployment, commit, push or merge.
+
+## Founder FINAL — complete Buy module permanently locked, 29 July 2026
+
+The founder declared the entire Buy module approved and directed that it be
+locked permanently and never touched without founder approval.
+
+The immutable production authority is:
+
+`approved-references/screens/09-buy-complete/v1`
+
+Frozen source:
+
+- `html/screens/09-buy.html`
+  `408A095C038DD88113FBE2F901291A9BDFDCD4DC7A4C2414A27BC51B05172341`
+- `html/shared/moolsocial-buy-v2.css`
+  `0B6167E2489DE016F4C90D4A2EF23CF83992EAFA0638353BE47CDE2B1B099FAE`
+- `html/shared/moolsocial-buy-v2.js`
+  `D380A5E50F50346C999D12824649C10094AF10D3CEB6F9B2A749ABC223E38026`
+- `quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html`
+  `DEB0034D3BE39B5BB2727E9EE40040D20E69A66324264105FA855D11219545CE`
+- `quality/BUY-DEVICE-FITMENT-20260728.html`
+  `C87562EF39318417C6339A2EFE44976D996940419A9FB4D81429ADEC74D9411B`
+
+The reference contains the complete interaction contract, founder acceptance,
+25-file checksum list, responsive/adversarial audit evidence and ten current
+visual route captures. The earlier catalogue and Cart v1 references remain
+unchanged historical checkpoints.
+
+State: `FOUNDER_FINAL_HTML_LOCKED_NATIVE_FLUTTER_V2_AUTHORIZED`.
+
+Native Flutter is authorized only as an isolated V2 presentation using
+existing non-UI owners. The accepted HTML and legacy Flutter Buy presentation
+are read-only. Flutter is not accepted and no deployment is authorized until
+exact parity, affected tests, two full regressions, device fitment, exact APK
+checksum verification on the connected OPPO and founder acceptance pass.

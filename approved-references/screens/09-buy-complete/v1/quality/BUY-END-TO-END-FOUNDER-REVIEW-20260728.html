@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MoolSocial Buy — Founder Review</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #080099;
+      --ink: #111330;
+      --muted: #666b86;
+      --line: #dfe2f1;
+      --surface: #f5f6fc;
+      --saffron: #ff962f;
+      --green: #168b23;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 600 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 12% 5%, rgba(255, 150, 47, 0.13), transparent 26rem),
+        radial-gradient(circle at 88% 7%, rgba(22, 139, 35, 0.11), transparent 25rem),
+        var(--surface);
+    }
+
+    header {
+      display: grid;
+      gap: 10px;
+      padding: 22px clamp(18px, 4vw, 54px);
+      color: white;
+      background: linear-gradient(118deg, #060059, var(--navy) 58%, #072b72);
+      box-shadow: 0 14px 38px rgba(8, 0, 65, 0.24);
+    }
+
+    header::after {
+      width: min(360px, 72vw);
+      height: 4px;
+      content: "";
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--saffron) 0 33%, white 33% 66%, var(--green) 66%);
+    }
+
+    header small {
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      opacity: 0.74;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(24px, 3vw, 38px); }
+    header p { max-width: 900px; color: rgba(255, 255, 255, 0.8); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(350px, 430px);
+      align-items: start;
+      gap: 26px;
+      max-width: 1500px;
+      margin: auto;
+      padding: 28px clamp(16px, 3vw, 44px) 64px;
+    }
+
+    .journey {
+      display: grid;
+      gap: 26px;
+      min-width: 0;
+    }
+
+    section { display: grid; gap: 12px; }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 4px;
+    }
+
+    .section-heading span { display: grid; gap: 3px; }
+    .section-heading h2 { color: var(--navy); font-size: 19px; }
+    .section-heading p { color: var(--muted); font-size: 11px; }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+    }
+
+    .route-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) 22px;
+      align-items: center;
+      gap: 10px;
+      min-height: 78px;
+      padding: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      color: var(--ink);
+      text-decoration: none;
+      background: white;
+      box-shadow: 0 8px 22px rgba(18, 20, 63, 0.07);
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .route-card::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      content: "";
+      background: linear-gradient(var(--saffron) 0 33%, white 33% 66%, var(--green) 66%);
+    }
+
+    .route-card:hover,
+    .route-card:focus-visible {
+      border-color: rgba(8, 0, 153, 0.35);
+      outline: none;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(18, 20, 63, 0.12);
+    }
+
+    .route-card > b {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      color: white;
+      font-size: 12px;
+      background: var(--navy);
+    }
+
+    .route-card > span { display: grid; gap: 3px; min-width: 0; }
+    .route-card strong { color: var(--navy); font-size: 12px; }
+    .route-card small { color: var(--muted); font-size: 9px; line-height: 1.35; }
+    .route-card > i { color: var(--green); font-size: 20px; font-style: normal; }
+
+    .preview {
+      position: sticky;
+      top: 18px;
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: white;
+      box-shadow: 0 18px 45px rgba(18, 20, 63, 0.14);
+    }
+
+    .preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 4px;
+    }
+
+    .preview-head span { display: grid; gap: 2px; }
+    .preview-head strong { color: var(--navy); }
+    .preview-head small { color: var(--muted); font-size: 9px; }
+
+    .preview-head a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0 13px;
+      border-radius: 12px;
+      color: white;
+      font-size: 10px;
+      text-decoration: none;
+      background: var(--navy);
+    }
+
+    iframe {
+      width: 100%;
+      height: min(74vh, 844px);
+      min-height: 620px;
+      border: 1px solid rgba(8, 0, 153, 0.12);
+      border-radius: 20px;
+      background: white;
+    }
+
+    .recovery .route-card > b { background: #272b4f; }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .preview { position: static; order: -1; }
+      iframe { height: 72vh; min-height: 560px; }
+    }
+
+    @media (max-width: 520px) {
+      header { padding: 18px; }
+      main { padding: 18px 10px 48px; }
+      .route-grid { grid-template-columns: 1fr; }
+      .preview { padding: 8px; border-radius: 18px; }
+      iframe { min-height: 600px; border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <small>MoolSocial Buy · 28 July 2026</small>
+    <h1>End-to-end founder review</h1>
+    <p>Review the corrected Buy navigation, context-specific Shop, Wholesale and Medicine filters, readable category rails, product flow and shared Cart before continuing through Orders and tracking.</p>
+  </header>
+
+  <main>
+    <div class="journey">
+      <section>
+        <div class="section-heading">
+          <span><h2>Mool → Buy navigation</h2><p>Buy opens its focused Shop, Wholesale, Medicine and Orders choices.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/04-universal-focus-shell.html?openMool=1&amp;rail=capability" target="buy-preview"><b>M</b><span><strong>Mool actions</strong><small>Tap Buy to open the approved Buy experience</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html" target="buy-preview"><b>B</b><span><strong>Buy</strong><small>Shop · Wholesale · Medicine · Orders</small></span><i>›</i></a>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <span><h2>Medicine</h2><p>Medicine categories open products on the same screen; prescription products enter pharmacist review.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/09-buy.html?view=medicine" target="buy-preview"><b>+</b><span><strong>Medicine catalogue</strong><small>Category rail · product photos · price · pack · delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;med=rx" target="buy-preview"><b>Rx</b><span><strong>Prescription medicines</strong><small>Upload prescription · pharmacist review</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;med=diabetes" target="buy-preview"><b>D</b><span><strong>Diabetes care</strong><small>Medicines and testing supplies</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;med=devices" target="buy-preview"><b>▣</b><span><strong>Health devices</strong><small>Pack, warranty, price and delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;medicine=telmisartan-40&amp;sheet=medicine-detail" target="buy-preview"><b>i</b><span><strong>Medicine details</strong><small>Composition · pack · prescription · pharmacy · delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;medicine=telmisartan-40&amp;prescription=review&amp;sheet=prescription-status" target="buy-preview"><b>20</b><span><strong>One-Rx pharmacist review</strong><small>Every medicine listed on the selected prescription is linked once</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;medicine=telmisartan-40&amp;prescription=quote&amp;sheet=prescription-status" target="buy-preview"><b>Rx</b><span><strong>Verified medicine list</strong><small>One approval · two matched medicines · no repeat upload</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;medicine=atorvastatin-10&amp;prescription=quote&amp;sheet=medicine-detail" target="buy-preview"><b>+</b><span><strong>Second matched medicine</strong><small>The same verified prescription enables Add to Cart</small></span><i>›</i></a>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <span><h2>Browse and decide</h2><p>Shop and Wholesale remain distinct inside one Buy destination.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/09-buy.html" target="buy-preview"><b>S</b><span><strong>Shop catalogue</strong><small>Categories · product grid · navigation</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?context=business" target="buy-preview"><b>W</b><span><strong>Wholesale catalogue</strong><small>Trade packs · MOQ · landed prices</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?sheet=filters" target="buy-preview"><b>≋</b><span><strong>Shop filter</strong><small>Delivery · delivered price · nearby sellers</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?context=business&amp;sheet=filters" target="buy-preview"><b>≋</b><span><strong>Wholesale filter</strong><small>Supply · wholesale price · delivery terms</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=medicine&amp;sheet=filters" target="buy-preview"><b>≋</b><span><strong>Medicine filter</strong><small>Delivery · delivered price · pharmacy or manufacturer</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?category=meat-seafood&amp;product=fish-fillet&amp;view=product" target="buy-preview"><b>P</b><span><strong>Shop product</strong><small>Pack · unit · seller · delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?context=business&amp;category=retail-supplies&amp;product=thermal-rolls&amp;view=product" target="buy-preview"><b>P</b><span><strong>Wholesale product</strong><small>Carton · MOQ · supplier commitment</small></span><i>›</i></a>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <span><h2>Cart and confirmation</h2><p>Shop, Medicine and Wholesale can stay in one Cart with clear delivery and purchase-order groups.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/09-buy.html?seed=retail-cart&amp;view=basket&amp;cart=shop" target="buy-preview"><b>S</b><span><strong>Shop Cart</strong><small>Products · delivery · payment</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=medicine-cart&amp;view=basket&amp;cart=medicine" target="buy-preview"><b>+</b><span><strong>Medicine Cart</strong><small>Medicine packs · quantity · pharmacist-safe delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?context=business&amp;seed=1&amp;view=basket&amp;cart=wholesale" target="buy-preview"><b>W</b><span><strong>Wholesale Cart</strong><small>Supplier group · order terms</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all" target="buy-preview"><b>₹</b><span><strong>Total Cart</strong><small>Shop + Wholesale · amount and product count</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all" target="buy-preview"><b>3</b><span><strong>One Cart · three purchase types</strong><small>Shop + Medicine + Wholesale</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=location" target="buy-preview"><b>⌂</b><span><strong>Saved destinations</strong><small>Home · Work · Third party · Other place</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=address-form" target="buy-preview"><b>+</b><span><strong>Add delivery address</strong><small>Destination type · receiving contact · street · PIN · landmark</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=map-location" target="buy-preview"><b>⌖</b><span><strong>Choose on map</strong><small>Current location · map pin · Google Maps</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=address-request" target="buy-preview"><b>↗</b><span><strong>Request an address</strong><small>WhatsApp · MoolSocial · More apps</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=share-apps" target="buy-preview"><b>⋯</b><span><strong>Share address request</strong><small>Copy · email · messages</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=mixed-cart&amp;view=basket&amp;cart=all&amp;sheet=confirm-address" target="buy-preview"><b>✓</b><span><strong>Address confirmation</strong><small>Personal and business delivery before payment</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=retail-cart&amp;cart=shop&amp;confirm=shop&amp;view=confirmed" target="buy-preview"><b>✓</b><span><strong>Shop confirmation</strong><small>Order · delivery · status</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?context=business&amp;seed=1&amp;cart=wholesale&amp;confirm=wholesale&amp;view=confirmed" target="buy-preview"><b>✓</b><span><strong>Wholesale confirmation</strong><small>Purchase order · supply window</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;cart=all&amp;confirm=all&amp;view=confirmed" target="buy-preview"><b>2</b><span><strong>Combined confirmation</strong><small>Two separately traceable orders</small></span><i>›</i></a>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <span><h2>Orders and repeat purchase</h2><p>Track, receive, reorder, change products and buy again.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/09-buy.html?view=orders" target="buy-preview"><b>O</b><span><strong>Active Orders</strong><small>Shop + Wholesale + Medicine</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=orders&amp;sheet=assist" target="buy-preview"><b>AI</b><span><strong>Mool Assist</strong><small>AI answer · in-app chat · in-app call</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=orders&amp;orders=delivered" target="buy-preview"><b>O</b><span><strong>Delivered Orders</strong><small>View · one editable reorder</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=tracking&amp;order=retail-active" target="buy-preview"><b>S</b><span><strong>Shop tracking</strong><small>Date · partner · destination · status</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=tracking&amp;order=wholesale-active" target="buy-preview"><b>W</b><span><strong>Wholesale tracking</strong><small>Supplier confirmation · dispatch</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=tracking&amp;order=medicine-active" target="buy-preview"><b>M</b><span><strong>Medicine tracking</strong><small>Pharmacy · prescription · delivery</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=tracking&amp;order=retail-delivered" target="buy-preview"><b>↻</b><span><strong>Delivered and reorder</strong><small>Editable quantity · add · remove</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?view=orders&amp;ordersState=empty" target="buy-preview"><b>0</b><span><strong>Empty Orders</strong><small>Direct return to Buy</small></span><i>›</i></a>
+        </div>
+      </section>
+
+      <section class="recovery">
+        <div class="section-heading">
+          <span><h2>Recovery states</h2><p>Clear outcomes when price, stock, payment, network or delivery changes.</p></span>
+        </div>
+        <div class="route-grid">
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=price" target="buy-preview"><b>₹</b><span><strong>Price update</strong><small>Accept or remove product</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=stock" target="buy-preview"><b>S</b><span><strong>Stock unavailable</strong><small>Choose pack or remove</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=unavailable" target="buy-preview"><b>PIN</b><span><strong>Location unavailable</strong><small>Change location or receive notice</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=payment" target="buy-preview"><b>₹</b><span><strong>Payment recovery</strong><small>No charge · retry or change method</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=network" target="buy-preview"><b>↻</b><span><strong>Network recovery</strong><small>Cart remains available</small></span><i>›</i></a>
+          <a class="route-card" href="../screens/09-buy.html?seed=combined-cart&amp;view=basket&amp;cart=all&amp;condition=delivery" target="buy-preview"><b>⏱</b><span><strong>Delivery delay</strong><small>Keep order or get help</small></span><i>›</i></a>
+        </div>
+      </section>
+    </div>
+
+    <aside class="preview">
+      <div class="preview-head">
+        <span><strong>Live screen</strong><small>Choose any state from the review list</small></span>
+        <a href="../screens/09-buy.html" target="_blank">Open full size</a>
+      </div>
+      <iframe name="buy-preview" title="MoolSocial Buy live preview" src="../screens/09-buy.html"></iframe>
+    </aside>
+  </main>
+</body>
+</html>

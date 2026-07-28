@@ -389,7 +389,7 @@ class WorkBottomDock extends StatelessWidget {
         keyName: 'work-dock-mool',
         id: 'mool',
         label: 'Mool',
-        icon: Icons.blur_circular_rounded,
+        icon: MoolBrand.moolLauncherIcon,
         onPressed: () => open('/app/work/mool'),
       ),
       actions: [

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "reference": "screens/09-buy-complete/v1",
+  "verifiedAt": "2026-07-29",
+  "candidate": "screens/09-buy.html cache generation 20260729-buy-mini-cart-71",
+  "source": {
+    "screenHtmlSha256": "408a095c038dd88113fbe2f901291a9bdfdcd4dc7a4c2414a27bc51b05172341",
+    "buyCssSha256": "0b6167e2489de016f4c90d4a2ef23cf83992eafa0638353be47cde2b1b099fae",
+    "buyJavascriptSha256": "d380a5e50f50346c999d12824649c10094af10d3ceb6f9b2a749abc223e38026",
+    "reviewBoardSha256": "deb0034d3be39b5bb2727e9ee40040d20e69a66324264105fa855d11219545ce",
+    "fitmentBoardSha256": "c87562ef39318417c6339a2efe44976d996940419a9fb4d81429adec74d9411b"
+  },
+  "results": {
+    "responsiveRouteCases": 80,
+    "horizontalOverflowFailures": 0,
+    "offscreenVisibleElementFailures": 0,
+    "undersizedEffectiveTargetFailures": 0,
+    "largeTextTargetedCases": 16,
+    "largeTextFailuresAfterCorrection": 0,
+    "browserConsoleErrorsOrWarnings": 0,
+    "interactionContracts": "153 unique routes passed",
+    "javascriptSyntax": "passed",
+    "approvedUiLocks": "passed",
+    "protectedSocialBaseline": {
+      "result": "passed",
+      "files": 119,
+      "tree": "927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851"
+    },
+    "appBrandIntegrity": "passed",
+    "userFacingCopyGate": "passed",
+    "founderFinal": true,
+    "flutterAccepted": false,
+    "deploymentAuthorized": false
+  }
+}

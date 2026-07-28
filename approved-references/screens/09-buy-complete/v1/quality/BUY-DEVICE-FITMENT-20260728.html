@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MoolSocial Buy device fitment</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #10152f;
+      background: #eef0f9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+    }
+
+    header {
+      position: sticky;
+      z-index: 4;
+      top: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      color: #fff;
+      background: #000080;
+      box-shadow: 0 10px 30px rgba(0, 0, 70, 0.18);
+    }
+
+    header strong {
+      display: block;
+      font-size: 18px;
+    }
+
+    header span {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      opacity: 0.82;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 14px;
+      color: #000080;
+      background: #fff;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(260px, 360px) minmax(320px, 1fr);
+      gap: 16px;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .summary,
+    .stage {
+      border: 1px solid #daddf0;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 14px 40px rgba(29, 35, 89, 0.08);
+    }
+
+    .summary {
+      align-self: start;
+      position: sticky;
+      top: 88px;
+      padding: 16px;
+    }
+
+    .summary h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+    }
+
+    .summary p {
+      margin: 0;
+      color: #626984;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .metric {
+      min-height: 76px;
+      padding: 12px;
+      border-radius: 15px;
+      background: #f2f3fb;
+    }
+
+    .metric small {
+      display: block;
+      color: #70778f;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      color: #000080;
+      font-size: 22px;
+    }
+
+    progress {
+      width: 100%;
+      height: 10px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 999px;
+      accent-color: #138b23;
+    }
+
+    #status {
+      margin: 9px 0 0;
+      min-height: 38px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .contracts {
+      display: grid;
+      gap: 6px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+    }
+
+    .contracts li {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      line-height: 1.35;
+    }
+
+    .contracts b { color: #138b23; }
+
+    .failures {
+      max-height: 330px;
+      margin: 14px 0 0;
+      padding: 0;
+      overflow: auto;
+      list-style: none;
+    }
+
+    .failures li {
+      margin-top: 7px;
+      padding: 9px;
+      border-left: 4px solid #c32424;
+      border-radius: 8px;
+      color: #6d1717;
+      background: #fff1f1;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .stage {
+      min-height: 740px;
+      padding: 14px;
+      overflow: auto;
+      background:
+        radial-gradient(circle at 10% 15%, rgba(255, 153, 51, 0.1), transparent 30%),
+        radial-gradient(circle at 90% 85%, rgba(19, 139, 35, 0.1), transparent 30%),
+        #f7f7fc;
+    }
+
+    .device-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 44px;
+      margin-bottom: 10px;
+      color: #000080;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .viewport-shell {
+      width: max-content;
+      min-width: 320px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 8px solid #111528;
+      border-radius: 30px;
+      background: #fff;
+      box-shadow: 0 24px 60px rgba(16, 21, 47, 0.22);
+    }
+
+    iframe {
+      display: block;
+      border: 0;
+      background: #fff;
+    }
+
+    .offscreen-runners {
+      position: fixed;
+      z-index: -1;
+      top: -20000px;
+      left: -20000px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; }
+      .summary { position: static; }
+      .stage { min-height: 640px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong>MoolSocial Buy fitment gate</strong>
+      <span>Android, iPhone, foldable, tablet, landscape and large-text browser geometry</span>
+    </div>
+    <button type="button" id="run">Run matrix</button>
+  </header>
+
+  <main>
+    <section class="summary" aria-live="polite">
+      <h1>Responsive audit</h1>
+      <p>This quality-only page loads each customer state at representative logical device sizes. It does not change the Buy experience.</p>
+      <div class="metrics">
+        <div class="metric"><small>Cases</small><strong id="cases">0</strong></div>
+        <div class="metric"><small>Passed</small><strong id="passed">0</strong></div>
+        <div class="metric"><small>Failed</small><strong id="failed">0</strong></div>
+        <div class="metric"><small>Progress</small><strong id="percent">0%</strong></div>
+      </div>
+      <progress id="progress" max="1" value="0"></progress>
+      <p id="status">Ready.</p>
+      <ul class="contracts">
+        <li><b>✓</b><span>HTML viewport uses <code>viewport-fit=cover</code>.</span></li>
+        <li><b>✓</b><span>Header and bottom dock consume CSS safe-area insets.</span></li>
+        <li><b>✓</b><span>Native Flutter, real iOS hardware, OPPO, keyboard and cutout proof remain separate post-FINAL gates.</span></li>
+      </ul>
+      <ul class="failures" id="failures"></ul>
+      <output id="partial-json" hidden></output>
+    </section>
+
+    <section class="stage">
+      <div class="device-label">
+        <span id="device">No case loaded</span>
+        <span id="route"></span>
+      </div>
+      <div class="viewport-shell" id="shell">
+        <iframe id="preview" title="Buy fitment preview"></iframe>
+      </div>
+    </section>
+  </main>
+
+  <div class="offscreen-runners" aria-hidden="true">
+    <iframe class="fitment-runner" tabindex="-1" title="Fitment runner 2"></iframe>
+    <iframe class="fitment-runner" tabindex="-1" title="Fitment runner 3"></iframe>
+    <iframe class="fitment-runner" tabindex="-1" title="Fitment runner 4"></iframe>
+    <iframe class="fitment-runner" tabindex="-1" title="Fitment runner 5"></iframe>
+    <iframe class="fitment-runner" tabindex="-1" title="Fitment runner 6"></iframe>
+  </div>
+
+  <script>
+    (() => {
+      const devices = [
+        { name: "Compact phone", width: 320, height: 568 },
+        { name: "Compact tall phone", width: 320, height: 640 },
+        { name: "Foldable cover", width: 344, height: 882 },
+        { name: "Android compact", width: 360, height: 640 },
+        { name: "Android standard", width: 360, height: 720 },
+        { name: "Android tall", width: 360, height: 800 },
+        { name: "iPhone compact", width: 375, height: 667 },
+        { name: "iPhone notched compact", width: 375, height: 812 },
+        { name: "Android medium", width: 384, height: 824 },
+        { name: "iPhone current", width: 390, height: 844 },
+        { name: "iPhone Pro", width: 393, height: 852 },
+        { name: "iPhone Plus", width: 414, height: 896 },
+        { name: "Android large", width: 412, height: 915 },
+        { name: "iPhone Pro Max", width: 430, height: 932 },
+        { name: "Large Android", width: 480, height: 1040 },
+        { name: "Foldable unfolded", width: 673, height: 841 },
+        { name: "Small tablet", width: 600, height: 960 },
+        { name: "Tablet portrait", width: 768, height: 1024 },
+        { name: "Large tablet", width: 820, height: 1180 },
+        { name: "Pro tablet", width: 1024, height: 1366 },
+        { name: "Compact landscape", width: 568, height: 320 },
+        { name: "Phone landscape", width: 844, height: 390 },
+        { name: "Large-phone landscape", width: 932, height: 430 },
+        { name: "Foldable landscape", width: 841, height: 673 },
+        { name: "Tablet landscape", width: 1024, height: 768 }
+      ];
+
+      const routes = [
+        { name: "Shop", url: "../screens/09-buy.html", view: "catalogue" },
+        { name: "Wholesale", url: "../screens/09-buy.html?context=business", view: "catalogue" },
+        { name: "Shop product", url: "../screens/09-buy.html?category=meat-seafood&product=fish-fillet&view=product", view: "product" },
+        { name: "Wholesale product", url: "../screens/09-buy.html?context=business&category=retail-supplies&product=thermal-rolls&view=product", view: "product" },
+        { name: "Medicine", url: "../screens/09-buy.html?view=medicine", view: "medicine" },
+        { name: "Prescription sheet", url: "../screens/09-buy.html?view=medicine&sheet=prescription", view: "medicine" },
+        { name: "Prescription review", url: "../screens/09-buy.html?view=medicine&prescription=review", view: "medicine" },
+        { name: "Shop Cart", url: "../screens/09-buy.html?seed=retail-cart&view=basket&cart=retail", view: "basket" },
+        { name: "Wholesale Cart", url: "../screens/09-buy.html?context=business&seed=1&view=basket&cart=wholesale", view: "basket" },
+        { name: "One Cart", url: "../screens/09-buy.html?seed=mixed-cart&view=basket&cart=all", view: "basket" },
+        { name: "Saved addresses", url: "../screens/09-buy.html?seed=mixed-cart&view=basket&cart=all&sheet=location", view: "basket" },
+        { name: "New address", url: "../screens/09-buy.html?seed=retail-cart&view=basket&cart=retail&sheet=address-form", view: "basket" },
+        { name: "Address request", url: "../screens/09-buy.html?seed=retail-cart&view=basket&cart=retail&sheet=address-request", view: "basket" },
+        { name: "Address confirmation", url: "../screens/09-buy.html?seed=mixed-cart&view=basket&cart=all&sheet=confirm-address", view: "basket" },
+        { name: "Confirmation", url: "../screens/09-buy.html?seed=combined-cart&cart=all&confirm=all&view=confirmed", view: "confirmed" },
+        { name: "Orders", url: "../screens/09-buy.html?view=orders", view: "orders" },
+        { name: "Delivered reorder", url: "../screens/09-buy.html?view=orders&orders=delivered", view: "orders" },
+        { name: "Tracking", url: "../screens/09-buy.html?view=tracking&order=medicine-active", view: "tracking" },
+        { name: "Mool Assist", url: "../screens/09-buy.html?view=orders&sheet=assist", view: "orders" },
+        { name: "Recovery", url: "../screens/09-buy.html?seed=combined-cart&view=basket&cart=all&condition=payment", view: "basket" }
+      ];
+
+      const scales = [
+        { name: "140% text", value: 1.4 },
+        { name: "100% text", value: 1 }
+      ];
+
+      const preview = document.querySelector("#preview");
+      const runnerFrames = [preview, document.querySelector(".fitment-runner")];
+      const shell = document.querySelector("#shell");
+      const runButton = document.querySelector("#run");
+      const failures = document.querySelector("#failures");
+      const status = document.querySelector("#status");
+      const progress = document.querySelector("#progress");
+      const deviceLabel = document.querySelector("#device");
+      const routeLabel = document.querySelector("#route");
+      const caseOutput = document.querySelector("#cases");
+      const passOutput = document.querySelector("#passed");
+      const failOutput = document.querySelector("#failed");
+      const percentOutput = document.querySelector("#percent");
+
+      let running = false;
+
+      const waitForReady = (frame, expectedView, timeout = 8000) => new Promise((resolve, reject) => {
+        const started = performance.now();
+        let stableDocument = null;
+        let stableChecks = 0;
+        const poll = () => {
+          try {
+            const doc = frame.contentDocument;
+            const activeView = doc?.querySelector(".buy-view.active")?.dataset.view;
+            const ready = Boolean(
+              doc?.documentElement &&
+              doc.body &&
+              doc.readyState === "complete" &&
+              doc.querySelector("[data-buy-app]") &&
+              doc.querySelector(".buy-dock") &&
+              activeView === expectedView
+            );
+            if (ready) {
+              if (stableDocument === doc) {
+                stableChecks += 1;
+              } else {
+                stableDocument = doc;
+                stableChecks = 1;
+              }
+              if (stableChecks >= 3) {
+                setTimeout(resolve, 80);
+                return;
+              }
+            } else {
+              stableDocument = null;
+              stableChecks = 0;
+            }
+          } catch (error) {
+            reject(error);
+            return;
+          }
+          if (performance.now() - started > timeout) {
+            reject(new Error("Timed out waiting for Buy state"));
+            return;
+          }
+          setTimeout(poll, 35);
+        };
+        poll();
+      });
+
+      const visible = (element, win) => {
+        const style = win.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) !== 0 && rect.width > 0 && rect.height > 0;
+      };
+
+      const checkCase = (frame, device, route, scale) => {
+        const win = frame.contentWindow;
+        const doc = frame.contentDocument;
+        const root = doc.documentElement;
+        const app = doc.querySelector("[data-buy-app]");
+        const dock = doc.querySelector(".buy-dock");
+        const activeView = doc.querySelector(".buy-view.active");
+        const issues = [];
+        const detail = {
+          clipped_text: [],
+          card_geometry: [],
+          icon_geometry: [],
+          row_geometry: [],
+          undersized_text: []
+        };
+
+        const overflowX = Math.max(root.scrollWidth, doc.body.scrollWidth) - win.innerWidth;
+        if (overflowX > 1) issues.push(`horizontal overflow ${Math.ceil(overflowX)}px`);
+
+        const appRect = app.getBoundingClientRect();
+        if (appRect.left < -1 || appRect.right > win.innerWidth + 1) issues.push("app extends outside viewport");
+
+        const dockRect = dock.getBoundingClientRect();
+        if (dockRect.left < -1 || dockRect.right > win.innerWidth + 1 || dockRect.bottom > win.innerHeight + 1) {
+          issues.push("bottom dock is outside viewport");
+        }
+
+        if (!activeView || activeView.dataset.view !== route.view) {
+          issues.push(`expected ${route.view} view`);
+        }
+
+        const visibleDockActions = [...doc.querySelectorAll(".dock-action")].filter((element) => visible(element, win));
+        if (visibleDockActions.length !== 4) {
+          issues.push(`expected 4 Buy dock actions, found ${visibleDockActions.length}`);
+        }
+
+        const prohibited = /founder|prototype|demo account|live screen|choose any state|commentary|implementation|developer/i;
+        const customerText = app.innerText.replace(/\s+/g, " ").trim();
+        const prohibitedMatch = customerText.match(prohibited);
+        if (prohibitedMatch) issues.push(`internal copy "${prohibitedMatch[0]}"`);
+
+        const visibleCrosses = [...doc.querySelectorAll(".sheet-heading button, [data-action='close-sheet']")]
+          .filter((element) => visible(element, win) && element.getBoundingClientRect().top > 0);
+        if (visibleCrosses.length) issues.push("visible sheet close control remains");
+
+        const clippedRailLabels = [...doc.querySelectorAll(
+          ".category-item > span, .category-more > span, .medicine-category-rail .category-item > span, .medicine-category-rail .category-more > span"
+        )].filter((element) => visible(element, win) && element.scrollWidth > element.clientWidth + 1);
+        if (clippedRailLabels.length) issues.push(`${clippedRailLabels.length} clipped category labels`);
+
+        const textSelectors = [
+          ".live-order-copy strong",
+          ".live-order-copy em",
+          ".product-badge",
+          ".product-card-body > small",
+          ".product-card-body > h2",
+          ".product-card-body > p",
+          ".card-price strong",
+          ".card-price em",
+          ".card-delivery",
+          ".card-fulfilment > b",
+          ".card-fulfilment > small",
+          ".card-route",
+          ".wholesale-glimpse span",
+          ".wholesale-glimpse small",
+          ".medicine-product-badge",
+          ".medicine-product-copy > small",
+          ".medicine-product-copy > strong",
+          ".medicine-product-copy > em",
+          ".medicine-product-copy > span",
+          ".medicine-price strong",
+          ".medicine-price del",
+          ".medicine-product-buy > small",
+          ".medicine-delivery > b",
+          ".medicine-delivery > small",
+          ".medicine-delivery > em",
+          ".basket-item-copy > strong",
+          ".basket-item-copy > span",
+          ".basket-item-copy > em",
+          ".basket-item-end > strong",
+          ".basket-item-end > span",
+          ".cart-order-heading strong",
+          ".cart-order-heading em",
+          ".supplier-order-group strong",
+          ".supplier-order-group em",
+          ".cart-choice strong",
+          ".cart-choice em",
+          ".order-card strong",
+          ".order-card em",
+          ".order-card p",
+          ".confirmation-order-card strong",
+          ".confirmation-order-card em",
+          ".tracking-view strong",
+          ".tracking-view p",
+          ".sheet-content h2",
+          ".sheet-content button strong",
+          ".sheet-content button small",
+          ".sheet-content button em",
+          ".sheet-content button b",
+          ".dock-action span",
+          ".dock-edge span",
+          ".category-item > b",
+          ".category-more > b",
+          ".catalogue-scope strong",
+          ".household-baskets h2",
+          ".household-baskets h3",
+          ".household-baskets strong",
+          ".household-baskets small",
+          "small",
+          "em"
+        ].join(",");
+
+        const clippedText = [...doc.querySelectorAll(textSelectors)]
+          .filter((element) => visible(element, win))
+          .filter((element) => {
+            const text = element.textContent.replace(/\s+/g, " ").trim();
+            if (!text) return false;
+            const style = win.getComputedStyle(element);
+            const horizontalClip = element.scrollWidth > element.clientWidth + 1;
+            const verticalClip = element.scrollHeight > element.clientHeight + 1;
+            const clipsOverflow = ["hidden", "clip"].includes(style.overflow) ||
+              ["hidden", "clip"].includes(style.overflowX) ||
+              ["hidden", "clip"].includes(style.overflowY) ||
+              style.textOverflow === "ellipsis" ||
+              style.webkitLineClamp !== "none";
+            return clipsOverflow && (horizontalClip || verticalClip);
+          })
+          .map((element) => `${element.className || element.tagName}: ${element.textContent.replace(/\s+/g, " ").trim().slice(0, 48)}`);
+        detail.clipped_text = clippedText;
+        if (clippedText.length) {
+          issues.push(`${clippedText.length} clipped text elements: ${clippedText.slice(0, 2).join(" | ")}`);
+        }
+
+        const cardSelector = [
+          ".product-card",
+          ".medicine-product-card",
+          ".basket-item",
+          ".order-card",
+          ".confirmation-order-card",
+          ".tracking-hero",
+          ".household-baskets"
+        ].join(",");
+        const cards = [...doc.querySelectorAll(cardSelector)].filter((element) => visible(element, win));
+        const cardGeometry = cards
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const parentRect = element.parentElement?.getBoundingClientRect();
+            return rect.width < 118 ||
+              rect.height < 44 ||
+              rect.left < appRect.left - 1 ||
+              rect.right > appRect.right + 1 ||
+              (parentRect && (rect.left < parentRect.left - 1 || rect.right > parentRect.right + 1));
+          })
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return `${element.className}: ${Math.round(rect.width)}×${Math.round(rect.height)}`;
+          });
+        detail.card_geometry = cardGeometry;
+        if (cardGeometry.length) issues.push(`${cardGeometry.length} product/order card geometry defects`);
+
+        const rows = [...doc.querySelectorAll([
+          ".card-price-row",
+          ".medicine-product-buy",
+          ".medicine-delivery",
+          ".basket-item",
+          ".cart-scope-tabs",
+          ".cart-choice-grid",
+          ".cart-payment-options",
+          ".combined-checkout-orders",
+          ".order-card-actions",
+          ".confirmation-actions",
+          ".tracking-actions",
+          ".assist-quick",
+          ".prescription-source-actions"
+        ].join(","))].filter((element) => visible(element, win));
+        const rowGeometry = rows
+          .filter((element) => {
+            const style = win.getComputedStyle(element);
+            const scrollable = ["auto", "scroll"].includes(style.overflowX);
+            return !scrollable && element.scrollWidth > element.clientWidth + 1;
+          })
+          .map((element) => `${element.className}: +${element.scrollWidth - element.clientWidth}px`);
+        detail.row_geometry = rowGeometry;
+        if (rowGeometry.length) issues.push(`${rowGeometry.length} overflowing rows`);
+
+        const icons = [...doc.querySelectorAll([
+          ".dock-action svg",
+          ".dock-edge svg",
+          ".header-actions svg",
+          ".location-row svg",
+          ".search-row svg",
+          ".live-order-icon svg",
+          ".category-item > span",
+          ".category-more > span",
+          ".product-visual svg",
+          ".medicine-product-card > svg",
+          ".medicine-product-photo",
+          ".cart-toolbar-icon svg",
+          ".medicine-care-actions svg"
+        ].join(","))].filter((element) => visible(element, win));
+        const iconGeometry = icons
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const owner = element.closest("button, a, .product-visual, .medicine-product-card, .cart-toolbar-icon, .live-order-icon") || element.parentElement;
+            const ownerRect = owner?.getBoundingClientRect();
+            return rect.width < 12 ||
+              rect.height < 12 ||
+              !ownerRect ||
+              rect.left < ownerRect.left - 1 ||
+              rect.right > ownerRect.right + 1 ||
+              rect.top < ownerRect.top - 1 ||
+              rect.bottom > ownerRect.bottom + 1;
+          })
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return `${element.closest("button, a")?.getAttribute("aria-label") || element.parentElement?.className || element.tagName}: ${Math.round(rect.width)}×${Math.round(rect.height)}`;
+          });
+        detail.icon_geometry = iconGeometry;
+        if (iconGeometry.length) issues.push(`${iconGeometry.length} icon containment defects`);
+
+        const meaningfulText = [...doc.querySelectorAll(textSelectors)]
+          .filter((element) => visible(element, win))
+          .filter((element) => element.textContent.replace(/\s+/g, " ").trim().length >= 3)
+          .filter((element) => Number.parseFloat(win.getComputedStyle(element).fontSize) < 8)
+          .map((element) => `${element.className || element.tagName}: ${win.getComputedStyle(element).fontSize} ${element.textContent.replace(/\s+/g, " ").trim().slice(0, 36)}`);
+        detail.undersized_text = meaningfulText;
+        if (meaningfulText.length) issues.push(`${meaningfulText.length} text elements below 8px`);
+
+        const undersized = [...doc.querySelectorAll("button, a[href], input, select, textarea, [role='button']")]
+          .filter((element) => visible(element, win))
+          .filter((element) => {
+            if (element.matches("input[type='checkbox'], input[type='radio']")) {
+              const label = element.closest("label");
+              if (label && visible(label, win)) {
+                const labelRect = label.getBoundingClientRect();
+                return labelRect.width < 40 || labelRect.height < 40;
+              }
+            }
+            const rect = element.getBoundingClientRect();
+            return rect.width < 40 || rect.height < 40;
+          })
+          .map((element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().slice(0, 36));
+        if (undersized.length) issues.push(`undersized targets: ${undersized.slice(0, 3).join(", ")}`);
+
+        const viewportMeta = doc.querySelector('meta[name="viewport"]')?.content || "";
+        if (!viewportMeta.includes("viewport-fit=cover")) issues.push("viewport-fit=cover missing");
+
+        return {
+          device: device.name,
+          width: device.width,
+          height: device.height,
+          route: route.name,
+          url: route.url,
+          text_scale: scale.value,
+          text_scale_label: scale.name,
+          active_view: activeView?.dataset.view || null,
+          horizontal_overflow_px: Math.max(0, Math.ceil(overflowX)),
+          undersized_target_count: undersized.length,
+          clipped_category_label_count: clippedRailLabels.length,
+          clipped_text_count: clippedText.length,
+          card_geometry_defect_count: cardGeometry.length,
+          icon_geometry_defect_count: iconGeometry.length,
+          row_geometry_defect_count: rowGeometry.length,
+          undersized_text_count: meaningfulText.length,
+          detail,
+          issues,
+          pass: issues.length === 0
+        };
+      };
+
+      const updateMetrics = (completed, total, passed, failed) => {
+        const percent = total ? Math.round((completed / total) * 100) : 0;
+        caseOutput.textContent = String(completed);
+        passOutput.textContent = String(passed);
+        failOutput.textContent = String(failed);
+        percentOutput.textContent = `${percent}%`;
+        progress.max = total || 1;
+        progress.value = completed;
+      };
+
+      const run = async () => {
+        if (running) return;
+        running = true;
+        runButton.disabled = true;
+        runButton.textContent = "Running…";
+        failures.replaceChildren();
+
+        const results = [];
+        const total = devices.length * routes.length * scales.length;
+        let passed = 0;
+        let failed = 0;
+        updateMetrics(0, total, 0, 0);
+
+        const cases = scales.flatMap((scale) => devices.flatMap((device) => routes.map((route) => ({ scale, device, route }))));
+        let nextCase = 0;
+
+        const recordFailure = (result) => {
+          const item = document.createElement("li");
+          item.textContent = `${result.device} ${result.width}×${result.height}, ${result.text_scale_label}, ${result.route}: ${result.issues.join("; ")}`;
+          failures.append(item);
+        };
+
+        const runWorker = async (frame, workerIndex) => {
+          while (nextCase < cases.length) {
+            const caseIndex = nextCase;
+            nextCase += 1;
+            const { scale, device, route } = cases[caseIndex];
+
+            if (workerIndex === 0) {
+              deviceLabel.textContent = `${device.name} · ${device.width}×${device.height} · ${scale.name}`;
+              routeLabel.textContent = route.name;
+              status.textContent = `Checking ${route.name} at ${device.width}×${device.height}, ${scale.name}.`;
+              shell.style.width = `${device.width + 16}px`;
+            }
+
+            frame.style.width = `${device.width}px`;
+            frame.style.height = `${device.height}px`;
+
+            let result;
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+              frame.src = `${route.url}${route.url.includes("?") ? "&" : "?"}fitment=${Date.now()}-${caseIndex}-${attempt}`;
+              try {
+                await waitForReady(frame, route.view);
+                const doc = frame.contentDocument;
+                if (!doc?.documentElement || !doc.body) throw new Error("Buy document changed before measurement");
+                doc.documentElement.style.fontSize = `${16 * scale.value}px`;
+                doc.documentElement.style.textSizeAdjust = `${scale.value * 100}%`;
+                doc.documentElement.style.webkitTextSizeAdjust = `${scale.value * 100}%`;
+                frame.contentWindow.dispatchEvent(new Event("resize"));
+                await new Promise((resolve) => setTimeout(resolve, 70));
+                if (frame.contentDocument !== doc) throw new Error("Buy document changed during measurement");
+                result = checkCase(frame, device, route, scale);
+                break;
+              } catch (error) {
+                if (attempt === 0) {
+                  await new Promise((resolve) => setTimeout(resolve, 40));
+                  continue;
+                }
+                result = {
+                  device: device.name,
+                  width: device.width,
+                  height: device.height,
+                  route: route.name,
+                  url: route.url,
+                  text_scale: scale.value,
+                  text_scale_label: scale.name,
+                  issues: [String(error.message || error)],
+                  pass: false
+                };
+              }
+            }
+
+            results.push(result);
+            window.fitmentPartialResults = results;
+            document.querySelector("#partial-json").textContent = JSON.stringify(results);
+            if (result.pass) {
+              passed += 1;
+            } else {
+              failed += 1;
+              recordFailure(result);
+            }
+
+            updateMetrics(results.length, total, passed, failed);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+          }
+        };
+
+        await Promise.all(runnerFrames.map((frame, index) => runWorker(frame, index)));
+
+        window.fitmentResults = {
+          artifact: "MoolSocial Buy HTML device fitment",
+          generated_at: new Date().toISOString(),
+          total,
+          passed,
+          failed,
+          devices,
+          routes,
+          scales,
+          contracts: {
+            viewport_fit_cover: true,
+            css_safe_area_header: true,
+            css_safe_area_bottom_dock: true,
+            native_flutter_and_physical_device_gate_separate: true
+          },
+          results
+        };
+
+        status.textContent = failed
+          ? `Matrix completed with ${failed} failed case${failed === 1 ? "" : "s"}.`
+          : `All ${total} browser-fitment cases passed.`;
+        runButton.disabled = false;
+        runButton.textContent = "Run again";
+        running = false;
+      };
+
+      window.showFitmentCase = async (deviceName, routeName, scaleName = "100% text") => {
+        const device = devices.find((item) => item.name === deviceName);
+        const route = routes.find((item) => item.name === routeName);
+        const scale = scales.find((item) => item.name === scaleName);
+        if (!device || !route || !scale) {
+          throw new Error(`Unknown manual fitment case: ${deviceName} / ${routeName} / ${scaleName}`);
+        }
+
+        deviceLabel.textContent = `${device.name} · ${device.width}×${device.height} · ${scale.name}`;
+        routeLabel.textContent = route.name;
+        status.textContent = `Opening ${route.name} at ${device.width}×${device.height}, ${scale.name}.`;
+        shell.style.width = `${device.width + 16}px`;
+        preview.style.width = `${device.width}px`;
+        preview.style.height = `${device.height}px`;
+        preview.src = `${route.url}${route.url.includes("?") ? "&" : "?"}manualFitment=${Date.now()}`;
+
+        await waitForReady(preview, route.view);
+        const doc = preview.contentDocument;
+        doc.documentElement.style.fontSize = `${16 * scale.value}px`;
+        doc.documentElement.style.textSizeAdjust = `${scale.value * 100}%`;
+        doc.documentElement.style.webkitTextSizeAdjust = `${scale.value * 100}%`;
+        preview.contentWindow.dispatchEvent(new Event("resize"));
+        await new Promise((resolve) => setTimeout(resolve, 120));
+
+        const result = checkCase(preview, device, route, scale);
+        failures.replaceChildren();
+        result.issues.forEach((issue) => {
+          const item = document.createElement("li");
+          item.textContent = `${route.name} · ${device.name} · ${scale.name}: ${issue}`;
+          failures.append(item);
+        });
+        status.textContent = result.pass
+          ? `Manual preview passed: ${route.name}, ${device.name}, ${scale.name}.`
+          : `Manual preview found ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"}.`;
+        return result;
+      };
+
+      runButton.addEventListener("click", run);
+      window.addEventListener("load", () => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("manual") === "1") {
+          window.showFitmentCase(
+            params.get("device") || "Compact phone",
+            params.get("route") || "Shop",
+            params.get("scale") || "100% text"
+          ).catch((error) => {
+            status.textContent = `Manual preview failed: ${error.message || error}`;
+          });
+          return;
+        }
+        run();
+      }, { once: true });
+    })();
+  </script>
+</body>
+</html>

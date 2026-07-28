@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-cart",
+  "version": "v1",
+  "status": "founder-approved-html-slice-gate-0",
+  "entry": {
+    "pathname": "/screens/09-buy.html",
+    "viewQuery": "view=basket",
+    "retailSeed": "seed=retail-cart&cart=retail",
+    "wholesaleSeed": "context=business&seed=1&cart=wholesale",
+    "combinedSeed": "seed=combined-cart&cart=all"
+  },
+  "branding": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineProportions": [
+      45,
+      14,
+      41
+    ],
+    "wordmark": "MoolSocial",
+    "moolIcon": "shared two-by-two grid launcher"
+  },
+  "modes": {
+    "Retail": {
+      "buyer": "personal customer",
+      "lines": [
+        "individual Retail product",
+        "retailer-created Household Basket"
+      ],
+      "quantity": "pack quantity or Household Basket member count",
+      "finalAction": "Pay securely"
+    },
+    "Wholesale": {
+      "buyer": "verified workspace",
+      "lines": [
+        "supplier-grouped Wholesale product"
+      ],
+      "quantity": "selected trade pack at or above MOQ",
+      "finalAction": "Place purchase order"
+    },
+    "All": {
+      "buyer": "customer with both Retail and verified Wholesale selections",
+      "groups": [
+        "Retail order",
+        "Wholesale order"
+      ],
+      "quantity": "Retail and Wholesale lines remain independently editable",
+      "finalAction": "Place both orders",
+      "confirmationRule": "Create and show separate Retail and Wholesale order identifiers."
+    }
+  },
+  "layout": {
+    "hierarchy": [
+      "concise Cart header",
+      "All, Retail and Wholesale switch",
+      "slim order headers",
+      "dense product lines",
+      "compact delivery and payment choices",
+      "compact total",
+      "two-action purchase bar"
+    ],
+    "standardLineHeightPxApprox": "109-111 at 390px review width",
+    "minimumEffectiveTapTargetPx": 44,
+    "horizontalOverflow": "Forbidden"
+  },
+  "lineInformation": [
+    "product or Household Basket name",
+    "selected pack and unit price",
+    "seller or supplier",
+    "origin and destination route",
+    "dated delivery commitment",
+    "quantity and net quantity",
+    "line total"
+  ],
+  "bottomRail": {
+    "destinations": [
+      "Mool",
+      "Buy",
+      "Orders",
+      "Chat"
+    ],
+    "activeDestination": "Buy",
+    "buyAccessibleName": "Return to Buy catalogue",
+    "moolTarget": "04-universal-focus-shell.html?openMool=1&world=buy&rail=capability",
+    "chatTarget": "23-chat-inbox-home.html?return=buy"
+  },
+  "nativeRules": [
+    "Implement with native Flutter widgets; never render this HTML in a WebView.",
+    "Do not change accepted Screens 01, 02 or 03.",
+    "Do not rebaseline the protected Social or YouTube slice.",
+    "Do not merge Retail and Wholesale fulfilment, payment, tax or order identifiers.",
+    "Do not start native Buy implementation until the remaining connected Buy HTML journey is founder approved and frozen.",
+    "Treat this version as immutable; any approved change requires a new version."
+  ]
+}

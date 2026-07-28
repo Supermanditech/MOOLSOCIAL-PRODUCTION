@@ -243,7 +243,7 @@ class BuyBottomDock extends StatelessWidget {
         keyName: 'buy-dock-mool',
         id: 'mool',
         label: 'Mool',
-        icon: Icons.blur_circular_rounded,
+        icon: MoolBrand.moolLauncherIcon,
         onPressed: () => context.go('/app/mool'),
       ),
       actions: [

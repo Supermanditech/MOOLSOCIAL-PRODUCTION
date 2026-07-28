@@ -2327,3 +2327,43 @@ or presentation changes beyond the already accepted Flutter contract. Any
 provider-observed presentation change still follows the editable HTML,
 founder `FINAL`, immutable freeze, native Flutter parity and OPPO acceptance
 sequence.
+
+## Founder lock — cross-surface brand integrity, 27 July 2026
+
+The durable authority is
+`docs/design/MOOLSOCIAL-BRAND-INTEGRITY-CONTRACT.md`, backed by
+`config/brand-integrity.json` and `scripts/check-brand-integrity.ps1`.
+
+- The product identity is the exact `MoolSocial` wordmark with the ordered
+  saffron, white and green identity line on the canonical navy system.
+- `Mool` is a service launcher, not a second logo. Its only app navigation
+  glyph is the two-by-two grid (`Icons.grid_view_rounded` in Flutter and four
+  rounded cells in HTML).
+- Custom M drawings, placeholder circles, module-specific marks and local
+  identity palettes are prohibited across HTML, Flutter and trial artifacts.
+- Cloud trial and later release evidence must identify the same reviewed source
+  and checksummed artifact that passed the brand gate.
+- Website alignment is explicitly pending. This lock does not authorize a
+  website edit, but the next website release must resolve that pending gate.
+
+## Founder FINAL — complete Buy HTML, 29 July 2026
+
+The complete Buy HTML module is permanently locked at
+`approved-references/screens/09-buy-complete/v1`. Its exact source HTML, CSS,
+JavaScript, review boards, route evidence, ten visual state captures,
+interaction contract, founder acceptance and SHA-256 checksums are the sole
+authority for native Buy V2 presentation.
+
+- Do not edit accepted Buy HTML or any file under the immutable reference.
+- Do not reinterpret the prototype as a merely similar commerce experience.
+- Do not mix legacy Buy widgets into the isolated V2 presentation.
+- Reuse existing Buy models, session, services and API adapters behind native
+  Flutter widgets.
+- Match layout, copy, density, typography, colours, motion, rails, product
+  cards, compact Cart, Cart scopes, destinations, medicine/Rx states, Orders,
+  tracking, reorder, assistance and recovery state by state.
+- Compare HTML and Flutter at identical route state, viewport and text scale.
+- Native acceptance requires automated parity, complete affected and two full
+  regressions, exact APK checksum verification on OPPO and founder review.
+- Any later presentation change requires explicit founder authorization, a new
+  immutable reference version and a new acceptance cycle.

@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-complete",
+  "version": "v1",
+  "status": "founder-final-html-locked",
+  "entry": {
+    "pathname": "/screens/09-buy.html",
+    "moolRoute": "/screens/04-universal-focus-shell.html?openMool=1&rail=capability",
+    "defaultSurface": "Shop"
+  },
+  "branding": {
+    "wordmark": "MoolSocial",
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "green": "#138808",
+    "identityLineOrder": ["saffron", "white", "green"],
+    "moolLauncher": "two-by-two rounded grid",
+    "moduleSpecificLogo": "forbidden"
+  },
+  "persistentBuyDock": {
+    "destinations": ["Shop", "Wholesale", "Medicine", "Orders"],
+    "sharedEdgeActions": ["Mool", "Chat"],
+    "visibilityRule": "All four Buy destinations remain simultaneously visible after every tap and throughout vertical scrolling.",
+    "pagingOrHiddenDestination": "forbidden"
+  },
+  "catalogues": {
+    "Shop": {
+      "packModel": "single and small packs",
+      "categoryCount": 34,
+      "searchScope": "Shop products and brands",
+      "filterPriorities": [
+        "Anytime",
+        "Fast delivery",
+        "Today",
+        "Lowest delivered",
+        "Nearby sellers",
+        "Easy returns"
+      ]
+    },
+    "Wholesale": {
+      "packModel": "MOQ, case packs and landed prices",
+      "categoryCount": 34,
+      "workspaceRule": "Prices are discoverable by all; a verified workspace is required to place a Wholesale order.",
+      "searchScope": "Wholesale products, packs and suppliers",
+      "filterPriorities": [
+        "Any schedule",
+        "Fastest delivery",
+        "Within 2 days",
+        "Lowest wholesale",
+        "Freight included",
+        "Flexible MOQ",
+        "Manufacturer"
+      ]
+    },
+    "Medicine": {
+      "categoryRail": "Medicine-specific categories",
+      "searchScope": "Medicines and health products",
+      "filterPriorities": [
+        "Anytime",
+        "Fast delivery",
+        "Today",
+        "Lowest delivered",
+        "Without Rx",
+        "Nearby pharmacy",
+        "Manufacturer"
+      ],
+      "prescriptionRule": "One saved or uploaded prescription is a parent record. A licensed pharmacist verifies each exact medicine line by identity, strength, form and quantity. Every approved listed line becomes addable without repeat upload; unrelated or mismatched medicines remain locked.",
+      "productDecisionFacts": [
+        "composition",
+        "strength and dosage form",
+        "pack",
+        "marketer or manufacturer",
+        "sale or prescription requirement",
+        "named licensed pharmacy or manufacturer",
+        "price",
+        "delivery commitment",
+        "storage",
+        "support"
+      ]
+    }
+  },
+  "productCards": {
+    "informationOrder": [
+      "identity",
+      "variant or composition",
+      "pack and unit",
+      "price",
+      "delivery commitment",
+      "named fulfilment partner and partner type",
+      "origin and destination",
+      "purchase action"
+    ],
+    "purchaseActionPosition": "final card element",
+    "actions": ["ADD", "Use Rx", "minus quantity plus"],
+    "minimumEffectiveTargetPx": 44,
+    "duplicateCanonicalProduct": "forbidden"
+  },
+  "cartIndicator": {
+    "position": "compact floating control above the Buy dock",
+    "restingSizePx": [154, 44],
+    "restingContent": ["Cart icon", "total quantity", "payable total"],
+    "addedSizePx": [270, 44],
+    "addedDurationMs": 2600,
+    "addedContent": ["added product name", "quantity", "payable total"],
+    "backgroundObstruction": "must remain compact and must not replace a Buy destination"
+  },
+  "cart": {
+    "visibleScopes": ["₹ Total", "Shop", "Wholesale", "Medicine"],
+    "singleAndMixedUse": true,
+    "groupingRule": "Shop, Wholesale and Medicine retain separate fulfilment, payment, compliance, tax and order identifiers even when placed from one Cart.",
+    "zeroItemRule": "Removing the final item returns immediately to the relevant catalogue and replaces the empty Cart history state. No empty Cart page or View products extra tap is allowed.",
+    "quantityRule": "Shop starts at one pack; Wholesale starts at the selected MOQ; verified prescription quantities never exceed pharmacist-approved medicine-line quantity."
+  },
+  "delivery": {
+    "destinationTypes": ["Home", "Work", "Third party", "Other place"],
+    "requiredFields": [
+      "receiving person or business",
+      "receiving contact",
+      "house, building or street",
+      "area",
+      "PIN",
+      "landmark"
+    ],
+    "locationChoices": ["current location", "map pin", "Google Maps", "manual correction"],
+    "requestChannels": ["WhatsApp", "MoolSocial", "device share surface"],
+    "confirmationRule": "One compact address confirmation appears before payment or purchase-order placement and returns directly after an address change."
+  },
+  "orders": {
+    "families": ["Shop", "Wholesale", "Medicine"],
+    "activeInformation": [
+      "status",
+      "promised date or time",
+      "named fulfilment partner",
+      "partner type",
+      "destination",
+      "progress"
+    ],
+    "trackingAction": "one tap",
+    "reorderAction": "one editable Reorder action; no Reorder plus add duplicate",
+    "support": "One centralized Mool Assist with contextual AI-assisted response, in-app chat and in-app call."
+  },
+  "recoveryStates": [
+    "price update",
+    "stock unavailable",
+    "service area unavailable",
+    "payment failed",
+    "network interruption",
+    "delivery delay"
+  ],
+  "motionAndScroll": {
+    "scrollbar": "narrow rounded mercury-manometer appearance",
+    "userScrollFeedback": "rate-limited low-volume detent tick and best-effort supported-device haptic",
+    "programmaticScrollSound": "forbidden",
+    "reducedMotionRule": "disable optional motion and scroll feedback"
+  },
+  "responsiveGate": {
+    "viewports": [
+      "320x568",
+      "320x780",
+      "344x882",
+      "360x800",
+      "390x844",
+      "412x915",
+      "430x932",
+      "540x720",
+      "568x320",
+      "768x1024",
+      "844x390",
+      "1024x768"
+    ],
+    "textScales": ["100%", "140%"],
+    "horizontalOverflow": "forbidden",
+    "clippedDecisionText": "forbidden",
+    "undersizedEffectiveTarget": "forbidden"
+  },
+  "nativeRules": [
+    "Build isolated native Flutter V2 presentation only.",
+    "Never render MoolSocial Buy HTML in a WebView.",
+    "Reuse existing models, session, services, API adapters, authentication and native configuration.",
+    "Keep the legacy Flutter Buy presentation read-only until founder acceptance.",
+    "Do not modify accepted Screens 01, 02 or 03.",
+    "Do not rebaseline accepted Social or YouTube presentation.",
+    "Compare HTML and Flutter at identical route state, viewport and text scale.",
+    "Treat this version as immutable; any approved change requires a new version."
+  ]
+}

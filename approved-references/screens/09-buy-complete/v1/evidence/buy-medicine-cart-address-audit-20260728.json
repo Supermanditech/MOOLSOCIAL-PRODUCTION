@@ -1,0 +1,107 @@
+{
+  "audit": "MoolSocial Buy Medicine, Cart and address targeted replay",
+  "date": "2026-07-28",
+  "candidate": {
+    "screen": "screens/09-buy.html",
+    "reviewBoard": "quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html",
+    "script": "shared/moolsocial-buy-v2.js",
+    "styles": "shared/moolsocial-buy-v2.css"
+  },
+  "medicinePrescriptionPath": {
+    "product": "Telmisartan 40 mg tablets",
+    "steps": [
+      "Open product-specific Use Rx",
+      "Select saved prescription",
+      "Open exact-medicine pharmacist review",
+      "View approval result",
+      "Open verified medicine detail",
+      "Add approved medicine to Cart"
+    ],
+    "result": "passed",
+    "verifiedSignals": [
+      "Exact medicine retained during review",
+      "Prescription verified state rendered",
+      "Add to Cart enabled only after approval",
+      "Medicine quantity control rendered after Add",
+      "Medicine Cart total updated"
+    ]
+  },
+  "cartScopes": {
+    "route": "screens/09-buy.html?seed=mixed-cart&view=basket&cart=all",
+    "all": {
+      "count": 4,
+      "total": "₹4,318"
+    },
+    "shop": {
+      "count": 1,
+      "total": "₹90",
+      "isolated": true
+    },
+    "wholesale": {
+      "count": 2,
+      "total": "₹4,200",
+      "isolated": true
+    },
+    "medicine": {
+      "count": 1,
+      "total": "₹52",
+      "isolated": true
+    },
+    "result": "passed"
+  },
+  "addressAndSharing": {
+    "recipientPhone": true,
+    "street": true,
+    "area": true,
+    "pin": true,
+    "landmark": true,
+    "currentLocation": true,
+    "mapPin": true,
+    "googleMaps": true,
+    "namedShareFallbacks": [
+      "Copy request",
+      "Email",
+      "Messages"
+    ],
+    "vagueAnyAppLabelPresent": false,
+    "result": "passed"
+  },
+  "fitment": [
+    {
+      "viewport": "320x568",
+      "medicineColumns": 2,
+      "horizontalOverflow": false,
+      "clippedDecisionText": 0
+    },
+    {
+      "viewport": "360x800",
+      "medicineColumns": 3,
+      "horizontalOverflow": false,
+      "clippedDecisionText": 0
+    },
+    {
+      "viewport": "390x844",
+      "medicineColumns": 3,
+      "horizontalOverflow": false,
+      "clippedDecisionText": 0
+    },
+    {
+      "viewport": "430x932",
+      "medicineColumns": 3,
+      "horizontalOverflow": false,
+      "clippedDecisionText": 0
+    }
+  ],
+  "browserConsoleErrors": 0,
+  "status": "passed",
+  "founderGate": "READY_FOR_MEDICINE_AND_UNIFIED_CART_FOUNDER_REVIEW",
+  "notAuthorized": [
+    "Complete Buy HTML FINAL",
+    "Immutable complete-Buy reference freeze",
+    "Flutter implementation",
+    "Firebase or GCP deployment",
+    "Git commit",
+    "Git push",
+    "Merge"
+  ]
+}

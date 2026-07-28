@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-cart",
+  "version": "v1",
+  "status": "founder-approved-html-slice-gate-0",
+  "founderDecision": "The professional unified Cart is approved. Preserve Retail-only, Wholesale-only and combined Retail plus Wholesale Cart states as founder approved.",
+  "founderApprovedAt": "2026-07-28",
+  "approvalSource": "Founder explicitly approved the professional compact Cart in the active Codex task, then clarified that Cart is one of the three approved Buy screen families.",
+  "approvalScope": [
+    "One unified Cart destination with All, Retail and Wholesale modes",
+    "Retail individual products and retailer-created Household Basket offers",
+    "Wholesale MOQ, trade-pack and supplier-grouped products",
+    "Combined Cart with separate Retail and Wholesale fulfilment commitments",
+    "Dense line items with inline quantity and accessible removal controls",
+    "Retail and Wholesale quantities editable independently in combined mode",
+    "Compact delivery, payment, purchase-order terms, totals and final purchase action",
+    "Combined purchase creates separate Retail and Wholesale order identifiers",
+    "Persistent Mool, Buy, Orders and Chat bottom navigation",
+    "Approved word-free return cue and contextual Buy destination treatment"
+  ],
+  "excludedFromApproval": [
+    "Product-detail content",
+    "Medicine specialist flow",
+    "Confirmation presentation",
+    "Orders and tracking presentation",
+    "Reorder journey",
+    "Native Flutter implementation",
+    "Trial or public deployment"
+  ],
+  "sourceHtmlSha256": "6b7c1ab6af7713c510faca0fc7bcf770ea2c1b833a92bba50bac589e58fd5414",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "This Cart slice may become native authority only after the complete connected Buy HTML journey receives founder FINAL and is frozen. Flutter remains blocked until that gate.",
+  "verification": {
+    "visibleCartModes": 3,
+    "modeNames": [
+      "Retail",
+      "Wholesale",
+      "All"
+    ],
+    "verifiedViewport": "390x844",
+    "horizontalOverflowPx": 0,
+    "minimumEffectiveTapTargetPx": 44,
+    "combinedPurchaseOrderCount": 2,
+    "protectedSocialBaselineFiles": 119,
+    "protectedSocialBaselineTree": "927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851"
+  }
+}

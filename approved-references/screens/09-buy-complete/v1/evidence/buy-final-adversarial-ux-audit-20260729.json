@@ -1,0 +1,183 @@
+{
+  "artifact": "MoolSocial Buy final adversarial HTML UX audit",
+  "audited_at": "2026-07-29T01:12:53+05:30",
+  "scope": "Founder-review HTML only. Screens 01-03, native Flutter, deployment and physical-device production gates were not changed.",
+  "candidate": "screens/09-buy.html cache generation 20260729-buy-mini-cart-71",
+  "source_sha256": {
+    "screens/09-buy.html": "408A095C038DD88113FBE2F901291A9BDFDCD4DC7A4C2414A27BC51B05172341",
+    "shared/moolsocial-buy-v2.css": "0B6167E2489DE016F4C90D4A2EF23CF83992EAFA0638353BE47CDE2B1B099FAE",
+    "shared/moolsocial-buy-v2.js": "D380A5E50F50346C999D12824649C10094AF10D3CEB6F9B2A749ABC223E38026",
+    "quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html": "DEB0034D3BE39B5BB2727E9EE40040D20E69A66324264105FA855D11219545CE",
+    "quality/BUY-DEVICE-FITMENT-20260728.html": "C87562EF39318417C6339A2EFE44976D996940419A9FB4D81429ADEC74D9411B"
+  },
+  "final_corrections": [
+    "Every scrollable surface uses the same narrow, rounded mercury-manometer scrollbar with a glass-like metallic highlight.",
+    "Deliberate scrolling emits a low-volume 21 ms detent tick and a 3 ms supported-device vibration at controlled intervals; programmatic scrolling stays silent.",
+    "Scroll feedback is rate-limited, requires recent user scroll intent and is disabled when reduced motion is requested.",
+    "The complete product-detail fulfilment-partner name wraps on 320 px screens.",
+    "Long Shop and Wholesale pack descriptions remain visible at 140 percent text.",
+    "Medicine brand, title, ingredient and pack text remain visible at 140 percent text.",
+    "Medicine continuation remains three-column on wider screens and adapts to two usable columns on compact screens.",
+    "Medicine rail width adapts on 360-419 px devices so adjacent product cards remain usable.",
+    "Mixed-cart scope text and counts remain at or above the 8 px compact-review minimum.",
+    "Shop, Wholesale and Medicine now render product facts, delivery and named fulfilment before the purchase control; Add, Use Rx or the quantity stepper is the final card element.",
+    "Shop, Wholesale and Medicine share one product-tile typography scale for kicker, title, detail, pack, price, delivery and fulfilment facts.",
+    "The delivery-address control now fits its content and keeps the chevron beside the saved address instead of consuming the full header width.",
+    "The generic single-choice ecommerce filter was replaced by a branded MoolSocial decision lens with simultaneous delivery, price and fulfilment priorities.",
+    "Shop, Wholesale and Medicine own isolated filter state, labels, search scope and product matching; switching surfaces preserves each surface without leaking another catalogue's rules.",
+    "Shop supports Anytime, Fast delivery, Today, Lowest delivered price, nearby sellers and return-eligible choices.",
+    "Wholesale supports Any schedule, Fastest delivery, Within two days, Lowest wholesale price, freight included, flexible MOQ and manufacturer supply.",
+    "Medicine supports Anytime, Fast delivery, Today, Lowest delivered price, non-prescription products, nearby licensed pharmacy and manufacturer supply.",
+    "Shop, Wholesale, Medicine and Orders remain visible together in the Buy dock after every tap and throughout vertical scrolling; no paging, horizontal swipe or hidden dock state remains.",
+    "Cart uses the prior compact floating position above the Buy dock. Its 154 x 44 px resting state keeps total quantity and payable total visible without replacing any Buy subaction.",
+    "After Shop, Wholesale or Medicine Add, Cart expands to 270 x 44 px for 2.6 seconds to identify the added product, then contracts to its compact resting state without disappearing."
+  ],
+  "focused_tile_alignment_checks": {
+    "generation": "20260729-buy-tile-alignment-66",
+    "device_cases": 9,
+    "devices": [
+      "Compact phone 320x568 at 100% text",
+      "Compact phone 320x568 at 140% text",
+      "iPhone current 390x844 at 100% text"
+    ],
+    "routes": [
+      "Shop",
+      "Wholesale",
+      "Medicine"
+    ],
+    "result": "9/9 passed with no reported overflow, clipping, undersized text or undersized effective targets",
+    "purchase_interactions": "Shop Add, Wholesale Add and Medicine Add each changed to a quantity stepper while remaining the final card element",
+    "address_geometry": "189 px control inside a 430 px app header; 8 px trailing chevron inset"
+  },
+  "context_filter_checks": {
+    "generation": "20260729-buy-context-filter-67",
+    "profiles": [
+      "Shop",
+      "Wholesale",
+      "Medicine"
+    ],
+    "state_isolation": "pass; Shop Fast delivery remained active after Wholesale Manufacturer was selected, and each surface restored only its own filter",
+    "scoped_search": "pass; Paracetamol returned no Shop result, Fresh tomatoes returned no Medicine result, and Wholesale manufacturer search returned only the Wholesale product scope",
+    "combined_selection": {
+      "Shop": "Fast delivery + Lowest delivered + Nearby sellers",
+      "Wholesale": "Within 2 days + Lowest wholesale + Manufacturer; 26 matching products",
+      "Medicine": "Fast delivery + Lowest delivered + Without Rx; 17 matching products"
+    },
+    "compact_fitment": "Shop, Wholesale and Medicine filter sheets passed at 320x568 with 140% text; zero horizontal overflow, zero clipped option controls and zero targets below 44 px",
+    "browser_console_errors_or_warnings": 0,
+    "result": "pass"
+  },
+  "compact_cart_indicator_checks": {
+    "generation": "20260729-buy-mini-cart-71",
+    "catalogues": [
+      "Shop",
+      "Wholesale",
+      "Medicine"
+    ],
+    "resting_geometry": "154 x 44 px floating above the Buy dock; Cart icon, quantity badge, item count and payable total",
+    "added_product_feedback": "270 x 44 px for 2.6 seconds; Added label, product name, quantity badge and payable total",
+    "post_feedback_state": "Cart contracts to 154 x 44 px and remains available while items exist",
+    "persistent_subactions": "Shop, Wholesale, Medicine and Orders remain simultaneously visible in the fixed Buy dock after switching surfaces and after scrolling",
+    "removed_behavior": "no centred Cart action, dock pager, hidden subaction, swipe page or keyboard page remains",
+    "mixed_cart": "4 items and ₹4,318 shown in the resting state; opening the control preserved Shop + Medicine + Wholesale scope and total",
+    "tested_fitment": [
+      "Shop · 320 x 568 · 140% text",
+      "Wholesale · 390 x 844 · 100% text",
+      "Medicine · 320 x 568 · 140% text",
+      "Shop · 430 x 932 · 100% text",
+      "Wholesale · 568 x 320 · 100% text"
+    ],
+    "maximum_transient_viewport_coverage": "6.54%",
+    "horizontal_page_overflow": 0,
+    "browser_console_errors_or_warnings": 0,
+    "result": "pass"
+  },
+  "responsive_geometry": {
+    "viewport_route_cases": 80,
+    "viewports": [
+      "320x780",
+      "360x800",
+      "390x844",
+      "430x932",
+      "540x720",
+      "768x1024",
+      "844x390",
+      "1024x768"
+    ],
+    "routes_per_viewport": [
+      "Shop",
+      "Wholesale",
+      "Medicine",
+      "Orders active",
+      "Orders delivered",
+      "Product detail",
+      "Mixed Cart",
+      "Checkout",
+      "Tracking",
+      "Confirmation"
+    ],
+    "horizontal_page_overflow": "0/80",
+    "offscreen_visible_elements": "0/80",
+    "undersized_effective_targets": "0/80; the 20 px consent checkbox is owned by a 44 px tappable label",
+    "result": "pass"
+  },
+  "large_text_checks": {
+    "scale": "140%",
+    "targeted_cases": 16,
+    "devices": [
+      "Compact phone 320x568",
+      "Foldable cover 344x882",
+      "iPhone current 390x844",
+      "Android large 412x915",
+      "Phone landscape 844x390"
+    ],
+    "states": [
+      "Shop",
+      "Wholesale",
+      "Shop product",
+      "Wholesale product",
+      "Medicine",
+      "Prescription review",
+      "Mixed Cart",
+      "Orders",
+      "Tracking",
+      "Confirmation"
+    ],
+    "initial_failures_corrected": [
+      "Long pack descriptions",
+      "Medicine metadata clipping",
+      "Compact Medicine card width",
+      "Mixed-cart labels below 8 px"
+    ],
+    "final_result": "16/16 targeted high-risk cases passed"
+  },
+  "real_user_tap_journeys": {
+    "Shop category to quantity to Cart": "pass",
+    "Wholesale More rail to category-specific products to Cart": "pass",
+    "Shop, Wholesale and Medicine bottom navigation": "pass",
+    "Mixed Medicine and Wholesale Cart grouping and scope tabs": "pass",
+    "Saved delivery addresses and third-party address request": "pass",
+    "Medicine card to regulatory details": "pass",
+    "Saved prescription to pharmacist review to verified medicine Cart": "pass",
+    "Orders active and delivered states": "pass",
+    "Mool Assist quick issue to contextual AI answer": "pass",
+    "In-app support chat": "pass",
+    "Zero-item Cart direct return behavior": "pass",
+    "Search, category expansion and direct category product results": "pass"
+  },
+  "static_and_regression_gates": {
+    "javascript_syntax": "pass",
+    "git_diff_check": "pass; line-ending notices only",
+    "browser_console_errors_or_warnings": "0",
+    "approved_ui_locks": "pass",
+    "protected_social_baseline": "pass; 119 files; tree 927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851",
+    "app_brand_integrity": "pass",
+    "public_copy_internal_terms": "0 matches",
+    "user_facing_copy_gate": "pass",
+    "interaction_contracts": "pass; 153 unique routes"
+  },
+  "approval_state": "READY_FOR_ALWAYS_VISIBLE_DOCK_AND_COMPACT_CART_FOUNDER_REVIEW",
+  "flutter_authorization": false,
+  "deployment_authorization": false,
+  "physical_device_gate_complete": false
+}

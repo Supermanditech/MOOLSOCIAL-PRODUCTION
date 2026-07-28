@@ -81,8 +81,19 @@
     identity, but their offers remain context-specific. Consumer UI cannot
     expose wholesale MOQ, trade credit or tax/freight terms, and Business UI
     cannot silently reuse consumer totals as landed wholesale price.
+26. Every app change passes `scripts/check-brand-integrity.ps1 -Surface App`.
+    The exact `MoolSocial` wordmark, navy/saffron/white/green identity, ordered
+    tricolour line and two-by-two-grid Mool launcher are mandatory. A module
+    cannot introduce a custom M, initial tile, placeholder circle or
+    module-specific logo.
 
 ## Buy module trial sequence
+
+The immutable Buy HTML authority is
+`approved-references/screens/09-buy-complete/v1`, founder FINAL on
+29 July 2026. It cannot be edited or replaced in place. The sequence below
+starts native implementation from that checksum-backed reference; passing a
+Flutter test or golden never replaces it as approval authority.
 
 1. Preserve the accepted HTML packages, current protected Social source tree,
    exact OPPO-installed trial APK and current Dev provider boundary in the
@@ -95,7 +106,7 @@
    prototype or substitute screenshots for production UI.
 5. Pass formatting, analysis, full Flutter tests, operational goldens,
    Android/iOS builds, Functions verification and the complete Social plus Buy
-   regression suite.
+   regression suite, including the brand-integrity gate.
 6. Install the exact built APK on the connected OPPO and replay clean,
    retained-data, interruption, Personal Buy and Business Buy journeys.
 7. Only then create a separately identified Dev deployment trial from the same
@@ -154,6 +165,59 @@
     size, unobscured controls and correct fullscreen/orientation behavior. A
     founder-approved support boundary is required for any excluded device
     class; HTML screenshots alone never satisfy this gate.
+22. The staged app artifact passes the brand-integrity gate from the same
+    reviewed source commit. No hotfix may alter the wordmark, core identity
+    colours, tricolour order or Mool launcher after founder review.
+23. The Buy zero-item Cart gate passes for Retail, Wholesale and Medicine:
+    Clear, final remove/trash, decrement below minimum and recovery removal
+    return directly to the relevant catalogue; direct/reloaded empty Cart
+    routes normalize; Back does not reopen the empty Cart; a mixed Cart remains
+    open while any order group still contains a product; and no `View products`
+    or equivalent extra-tap empty-state action is present.
+24. The Buy dock terminology gate renders `Shop` for the consumer single and
+    small-pack destination and `Wholesale` for MOQ/case-pack purchasing.
+    `Retail`, `Personal`, `Everyday` or explanatory quantity wording must not
+    reappear as the consumer dock label or its accessibility name.
+25. The Buy fulfilment and assistance gate passes across Shop, Wholesale and
+    Medicine. Every purchasable offer shows a seller- or supplier-confirmed
+    delivery commitment plus the named fulfilment partner and partner type
+    before Add. The compact Buy live-order surface opens the matching tracking
+    record without overlaying Social. Active Orders contain no repeated
+    `Get help` actions. One Mool Assist system provides contextual AI-assisted
+    answers and keeps human chat and calls inside MoolSocial; no generic
+    `See times`, external dialler/email handoff, internal screenbook
+    commentary or unrelated legacy support screen is reachable from it.
+26. The Buy reorder-and-address gate passes across Shop, Wholesale, Medicine
+    and a mixed Cart. Each delivered order has one Reorder action that opens an
+    editable Cart with quantity, remove and Add products; no `Reorder + add`
+    duplicate is present. Saved destination types are Home, Work, Third party
+    and Other place. Destination type never replaces the receiving person or
+    business and receiving contact, which are recorded for every type. Address
+    add/edit, automatic-area prefill with manual correction, and third-party
+    requests through WhatsApp, MoolSocial and the system share surface pass.
+    Shop/Medicine and Wholesale destinations remain independently selectable
+    in a mixed Cart. One compact pre-payment address confirmation appears,
+    changing either address returns directly to it, and address confirmation
+    is invalidated after destination changes or a new repeat purchase.
+    Production address requests additionally pass explicit consent,
+    data-minimization, deep-link, failure/retry and privacy-policy tests.
+27. The Buy Medicine and unified-Cart gate passes. Every Medicine product card
+    opens product-specific composition, pack, marketer, sale requirement,
+    fulfilment, delivery, storage and support facts. One saved/uploaded
+    prescription remains the parent record through pharmacist review. Each
+    medicine line is matched by medicine identity, strength, dosage form and
+    approved quantity; every verified listed line changes to Add-to-Cart
+    without another upload, while unrelated or mismatched medicines remain
+    locked. No direct route, restore, quantity or reorder path bypasses
+    validation. The visible Cart scopes are ₹ Total, Shop, Wholesale and
+    Medicine; each exposes its own count and total and isolates its order
+    groups. At supported phone widths, the Medicine grid has no horizontal
+    overflow or clipped decision text; a three-column layout is permitted only
+    from 360 logical pixels when every required field remains readable.
+    Address entry includes receiving contact, street, area, PIN and landmark
+    plus current-location, map-pin and Google Maps choices; third-party
+    sharing uses named channels or the device share surface and never exposes
+    `Any app`.
 
 ## Every production promotion
 
@@ -164,6 +228,9 @@
 5. No P0/P1 issue and no blocked core intent path.
 6. Founder completes the exact staging acceptance replay.
 7. Begin with a percentage rollout; stop automatically on guardrail breach.
+8. Record that the promoted source passed the brand-integrity gate. A website
+   promotion additionally remains blocked while
+   `config/brand-integrity.json` records `pending-alignment`.
 
 ## Non-negotiable command behavior
 

@@ -1,0 +1,113 @@
+{
+  "audit": "MoolSocial Buy editable reorder and delivery addresses",
+  "date": "2026-07-28",
+  "status": "READY_FOR_REORDER_AND_ADDRESS_FOUNDER_REVIEW",
+  "scope": {
+    "html_only": true,
+    "flutter_authorized": false,
+    "deployment_authorized": false,
+    "commit_or_push_authorized": false
+  },
+  "source_sha256": {
+    "screens/09-buy.html": "FCF334B27F697A47101C249AF1D10BBD6FD0BF78EDB5F8E22299B72A7105EA3F",
+    "shared/moolsocial-buy-v2.js": "84B824ADE68D1B65B2A9CC6701857F5FF626E1E2577A6E27FAF6F4C20EFA3799",
+    "shared/moolsocial-buy-v2.css": "CA1B1C3C7ECEB43E3594D41BECF3F1F19E86248EF1D0C99770350092570ED4A1",
+    "quality/BUY-END-TO-END-FOUNDER-REVIEW-20260728.html": "F0476A1D74F37F1897AB7ED7B5800ABF4C82A3AE1272746D2668F026AA9ABBC8",
+    "quality/BUY-DEVICE-FITMENT-20260728.html": "8581EF0C7323FDD765C4A20B83D53759AED810A9EB13F1BEE87D0FEC8798FF88"
+  },
+  "interaction_replay": [
+    {
+      "journey": "Delivered Orders",
+      "result": "pass",
+      "evidence": "Shop, Wholesale and Medicine each rendered View order plus exactly one Reorder action; no Reorder + add branch remained."
+    },
+    {
+      "journey": "Shop Reorder",
+      "result": "pass",
+      "evidence": "Reorder opened an editable Cart with quantity decrease/increase, remove and Add more products."
+    },
+    {
+      "journey": "Medicine Reorder",
+      "result": "pass",
+      "evidence": "Reorder opened an editable Medicine Cart; Add more products retained the order and returned to Medicine."
+    },
+    {
+      "journey": "Saved address",
+      "result": "pass",
+      "evidence": "Home, Work and recipient choices rendered; selecting Work updated the Cart destination."
+    },
+    {
+      "journey": "Automatic and editable address",
+      "result": "pass",
+      "evidence": "Current location populated recipient, full address, PIN and area while leaving every field editable before Save and deliver here."
+    },
+    {
+      "journey": "Third-party address request",
+      "result": "pass",
+      "evidence": "WhatsApp, MoolSocial, Any app and direct manual-entry choices rendered; the WhatsApp review action completed without an extra close step."
+    },
+    {
+      "journey": "Mixed Cart address confirmation",
+      "result": "pass",
+      "evidence": "Purchase-order consent preceded one personal/business address confirmation; Wholesale changed to Warehouse and returned directly to confirmation; Confirm and pay produced the two-order confirmation."
+    }
+  ],
+  "targeted_fitment": [
+    {
+      "device": "Compact phone",
+      "viewport": "320x568",
+      "scale": "140%",
+      "routes": [
+        "Saved addresses",
+        "New address",
+        "Address request",
+        "Address confirmation",
+        "Delivered reorder"
+      ],
+      "result": "pass"
+    },
+    {
+      "device": "iPhone current",
+      "viewport": "390x844",
+      "scale": "140%",
+      "routes": [
+        "Address confirmation"
+      ],
+      "result": "pass"
+    },
+    {
+      "device": "Android large",
+      "viewport": "412x915",
+      "scale": "100%",
+      "routes": [
+        "Saved addresses"
+      ],
+      "result": "pass"
+    },
+    {
+      "device": "Phone landscape",
+      "viewport": "844x390",
+      "scale": "140%",
+      "routes": [
+        "Address confirmation"
+      ],
+      "result": "pass"
+    },
+    {
+      "device": "Foldable unfolded",
+      "viewport": "673x841",
+      "scale": "140%",
+      "routes": [
+        "New address"
+      ],
+      "result": "pass"
+    }
+  ],
+  "static_gates": {
+    "javascript_syntax": "pass",
+    "html_container_balance": "pass",
+    "git_diff_check": "pass",
+    "duplicate_reorder_branch": "absent",
+    "approved_ui_reference_and_production_locks": "pass"
+  }
+}

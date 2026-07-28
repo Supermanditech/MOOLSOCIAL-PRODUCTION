@@ -239,7 +239,7 @@ class OperationsBottomDock extends StatelessWidget {
         keyName: 'operations-dock-mool',
         id: 'mool',
         label: 'Mool',
-        icon: Icons.blur_circular_rounded,
+        icon: MoolBrand.moolLauncherIcon,
         onPressed: () => open('/app/focus?return=$returnRoute'),
       ),
       actions: provider

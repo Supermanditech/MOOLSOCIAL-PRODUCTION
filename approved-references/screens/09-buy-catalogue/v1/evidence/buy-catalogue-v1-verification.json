@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-27",
+  "reference": "screens/09-buy-catalogue/v1",
+  "browserViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "results": {
+    "retailCompactRail": {
+      "category": "Meat & seafood",
+      "exactProducts": [
+        "Fresh boneless fish fillets",
+        "Fresh mutton curry cut"
+      ],
+      "complementaryProducts": [
+        "Fresh tomatoes",
+        "Toned fresh milk"
+      ],
+      "horizontalOverflowPx": 0
+    },
+    "retailExpandedRail": {
+      "choices": 35,
+      "categoryClientHeightPx": 420,
+      "categoryScrollHeightPx": 1642,
+      "railHeightPx": 544,
+      "visibleModalCount": 0,
+      "horizontalOverflowPx": 0
+    },
+    "wholesaleCompactRail": {
+      "category": "Retail supplies",
+      "exactProductCount": 4,
+      "quantityProduct": "POS thermal paper rolls",
+      "quantityAfterAdd": 2,
+      "moq": 2,
+      "bulkOrderPillVisible": true,
+      "railHeightPx": 356,
+      "horizontalOverflowPx": 0
+    },
+    "wholesaleExpandedRail": {
+      "choices": 35,
+      "categoryClientHeightPx": 420,
+      "categoryScrollHeightPx": 1642,
+      "railHeightPx": 544,
+      "visibleModalCount": 0,
+      "horizontalOverflowPx": 0
+    },
+    "productionGates": {
+      "approvedUiLocks": "passed",
+      "protectedSocialBaseline": "passed",
+      "protectedSocialFiles": 119,
+      "protectedSocialTree": "927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851",
+      "appBrandIntegrity": "passed"
+    }
+  }
+}

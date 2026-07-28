@@ -1329,7 +1329,7 @@ class _SharedDock extends StatelessWidget {
       keyName: 'shared-dock-mool',
       id: 'mool',
       label: 'Mool',
-      icon: Icons.circle,
+      icon: MoolBrand.moolLauncherIcon,
       onPressed: () => context.go('/app/social'),
     ),
     actions: [

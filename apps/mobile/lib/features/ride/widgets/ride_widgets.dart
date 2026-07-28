@@ -342,7 +342,7 @@ class RideBottomDock extends StatelessWidget {
         keyName: 'ride-dock-mool',
         id: 'mool',
         label: 'Mool',
-        icon: Icons.blur_circular_rounded,
+        icon: MoolBrand.moolLauncherIcon,
         onPressed: () {
           clear();
           context.go('/app/mool');

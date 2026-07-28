@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "screenNumber": 9,
+  "screenId": "buy-catalogue",
+  "version": "v1",
+  "status": "founder-approved-html-slice-gate-0",
+  "founderDecision": "Category rail, bottom rail and product grid are approved for Retail and Wholesale. Preserve this exact catalogue slice as founder approved and continue with the next Buy sub-tap screens.",
+  "founderApprovedAt": "2026-07-27",
+  "approvalSource": "Founder explicitly approved the Retail and Wholesale category rail, product grid and bottom rail in the active Codex task on 27 July 2026.",
+  "approvalScope": [
+    "Retail compact category rail with All, five context-priority or selected categories and More",
+    "Wholesale compact category rail with All, five context-priority or selected categories and More",
+    "In-rail More expansion with all 34 context categories plus Medicine",
+    "Same-screen exact product results and separately labelled complementary recommendations",
+    "Retail and Wholesale product-card grids with context-specific pack, price, seller and delivery information",
+    "Inline ADD to minus-quantity-plus controls",
+    "Retail quantity starts at one pack",
+    "Wholesale quantity starts at the selected pack MOQ",
+    "Fixed Mool, Buy, Orders and Chat bottom navigation"
+  ],
+  "excludedFromApproval": [
+    "Product detail",
+    "Pack selection",
+    "Seller comparison",
+    "Basket or bulk-order review",
+    "Checkout, payment, confirmation and tracking",
+    "Medicine specialist flow",
+    "Native Flutter implementation",
+    "Trial or public deployment"
+  ],
+  "sourceHtmlSha256": "7d73cdff4ec2e91f405837a3dd215b1f4ac52eb0573c5c444e0e5d57fd4e093f",
+  "nativeFlutterAccepted": false,
+  "nativeAcceptanceBoundary": "This slice may be used as immutable authority only after the remaining connected Buy HTML journey is approved. Flutter remains blocked until the founder approves the complete connected reference required for implementation.",
+  "verification": {
+    "catalogueProducts": 84,
+    "retailCategories": 34,
+    "wholesaleCategories": 34,
+    "expandedRailChoicesPerContext": 35,
+    "expandedRailClientHeightPx": 420,
+    "minimumProductCountPerCategory": 2,
+    "minimumTapTargetPx": 44,
+    "verifiedViewport": "390x844",
+    "horizontalOverflowPx": 0,
+    "visibleModalDuringRailExpansion": false,
+    "protectedSocialBaselineFiles": 119,
+    "protectedSocialBaselineTree": "927ba8662457d64640ef3a3a97b2b53120ca53e26e80f761a937ee35bad92851"
+  }
+}

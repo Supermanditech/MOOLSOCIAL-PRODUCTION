@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "founder-directed-mandatory",
+  "wordmark": "MoolSocial",
+  "colours": {
+    "navy": "#000080",
+    "saffron": "#FF9933",
+    "white": "#FFFFFF",
+    "green": "#138808"
+  },
+  "identityLineOrder": [
+    "saffron",
+    "white",
+    "green"
+  ],
+  "moolNavigation": {
+    "meaning": "service-launcher-not-logo",
+    "htmlGlyph": "four-rounded-squares",
+    "flutterGlyph": "Icons.grid_view_rounded",
+    "label": "Mool"
+  },
+  "forbiddenAppMarks": [
+    "M3 22 9 7l9 10L27 5l6 17",
+    "M2 20 7 7l7 9 7-11 5 15"
+  ],
+  "surfaces": {
+    "html": {
+      "status": "enforced",
+      "root": "../supermandi-uiux-screenbook"
+    },
+    "flutter": {
+      "status": "enforced",
+      "root": "apps/mobile/lib"
+    },
+    "cloudTrial": {
+      "status": "enforced",
+      "rule": "same-reviewed-source-and-checksummed-artifact"
+    },
+    "website": {
+      "status": "pending-alignment",
+      "root": "apps/web/public",
+      "blockNextWebsiteReleaseUntilAligned": true
+    }
+  }
+}

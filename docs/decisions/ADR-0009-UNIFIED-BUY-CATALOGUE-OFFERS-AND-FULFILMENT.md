@@ -225,10 +225,264 @@ flags.
 - Letting a delivery partner appear as the seller.
 - Showing wholesale commitments in the household product grid.
 
+## Founder terminology and navigation refinement — 27 July 2026
+
+The founder refined the customer-facing Buy hierarchy after reviewing the
+interactive HTML:
+
+- **Buy** remains the Universal main action.
+- The Buy bottom rail contains durable destinations: **Buy** and **Orders**.
+  Mool and Chat remain the shared edge actions.
+- **Retail** and **Wholesale** are in-page pack, price and quantity modes—not
+  bottom destinations and not user identities.
+- Retail and Wholesale modes use dedicated category and search indexes over the same
+  canonical product, pack and offer records.
+- Both indexes expose the full FMCG department taxonomy, including fresh,
+  dairy/bakery, meat/eggs, grains/pulses, oils/ghee, spices, instant and
+  packaged foods, snacks, beverages, frozen/chilled, personal/beauty/home/
+  laundry/baby/health/medicine/pet care and applicable kitchen, HoReCa, retail
+  and stationery supplies. Empty departments remain discoverable while
+  serviceable offers are being onboarded.
+- Retail product cards may reveal eligible Wholesale price and MOQ so any user can
+  discover the value. A verified workspace remains required before a Bulk
+  commitment is accepted.
+- Direct tap and horizontal swipe change between Retail and Wholesale. Haptic
+  feedback is best-effort on supported devices.
+- Retail uses **Basket**. Wholesale uses **Bulk order**, which becomes one or more
+  supplier-specific purchase orders at commitment.
+- **Buy again** belongs to saved and past-order controls and is not a persistent
+  bottom destination.
+- **Medicine** is a product category inside Buy, with its required specialist
+  search, prescription and pharmacist flow. It is not a Universal main action
+  or a bottom destination.
+
+This refinement changes customer terminology and navigation, not the canonical
+catalogue, offer, eligibility or fulfilment architecture in this ADR.
+
+## Consumer dock terminology refinement — 28 July 2026
+
+The founder replaced the customer-facing **Retail** label in the Buy bottom
+dock with **Shop**:
+
+- **Shop** is the familiar customer action for single and small-pack buying.
+- **Wholesale** remains the distinct destination for MOQ, case-pack and
+  verified-business purchasing.
+- The internal retail catalogue, offer, pricing, fulfilment and Cart model does
+  not change; only its customer-facing dock name and matching accessibility
+  wording change.
+- **Personal**, **Retail**, **Everyday** and explanatory quantity labels must
+  not reappear as the consumer dock destination.
+
+This terminology is part of the Buy interaction contract for the later native
+Flutter implementation.
+
+## Zero-item Cart exit rule — 28 July 2026
+
+The founder requires the Cart to remove the zero-item dead end across Retail,
+Wholesale and Medicine:
+
+- Clearing a Cart or removing/decrementing its final product immediately
+  returns the customer to the relevant Retail, Wholesale or Medicine catalogue.
+- The app must not render an empty Cart page, a `View products` call to action
+  or any equivalent extra-tap recovery step after the last product is removed.
+- A direct, reloaded or browser-history route to an empty Cart normalizes to
+  the relevant catalogue without displaying the empty Cart.
+- A mixed Cart remains open while at least one Retail/Medicine or Wholesale
+  order group still contains a product. If the selected group becomes empty,
+  the remaining group becomes active.
+- The zero-item transition replaces the empty Cart history entry so Back does
+  not reopen the dead end.
+- This rule applies equally to Clear, remove/trash, decrement below the minimum
+  quantity, recovery-dialog removal and future Cart mutation controls.
+
+This is a durable interaction contract for the approved Buy HTML and its later
+native Flutter implementation. It does not authorize Flutter implementation,
+deployment or promotion before the existing founder `FINAL` and release gates.
+
+## Live fulfilment and centralized assistance contract — 28 July 2026
+
+The founder requires delivery and support information to remain visible,
+specific and easy to act on across Shop, Wholesale and Medicine:
+
+- A compact live-order surface appears at the top of Buy catalogue and product
+  journeys. It shows the current state, promised date/time, named fulfilment
+  partner and partner type, and opens tracking in one tap.
+- The live-order surface remains inside Buy. It must not cover, interrupt or
+  duplicate the Social experience.
+- Every Shop, Wholesale and Medicine product offer shows its own expected
+  delivery commitment before Add, together with the named shop, retailer,
+  wholesaler, distributor, manufacturer or pharmacy responsible for
+  fulfilment.
+- Delivery commitments are derived from the selected offer, destination PIN,
+  supplier origin, cut-off, dispatch lead and the delivery policy accepted
+  during participant onboarding. A generic `See times` control cannot replace
+  the product-specific commitment.
+- Active Orders show the same named partner, partner type and promised
+  delivery. Shop, Wholesale and Medicine orders remain separately traceable
+  even when they were placed from one Cart.
+- Order support is centralized as **Mool Assist**. Repeated `Get help` buttons
+  are prohibited on individual active-order cards.
+- Mool Assist may use order context to provide an AI-assisted answer. Human
+  chat and calls remain inside MoolSocial; they must not expose an external
+  phone dialler, email handoff, legacy screenbook commentary or an unrelated
+  support destination.
+- Tracking remains a direct order action. Mool Assist is a shared support
+  system, not a second order-status surface.
+
+The HTML candidate demonstrates this contract. Native Flutter, backend
+orchestration, telephony/media signaling, production fulfilment policies and
+deployment remain unauthorized until the complete Buy founder `FINAL` and the
+app release gates pass.
+
+## Editable reorder and delivery-address contract — 28 July 2026
+
+The founder requires repeat purchase and delivery addressing to remain compact
+and consistent across Shop, Wholesale and Medicine:
+
+- A delivered order exposes one **Reorder** action. It opens the existing
+  editable Cart or Wholesale order with quantity increase/decrease, remove and
+  Add products already available.
+- `Reorder + add`, a separate add-products reorder branch or any equivalent
+  duplicate repeat-purchase action is prohibited.
+- Medicine repeat purchase follows the same editable Cart pattern and returns
+  Add products to Medicine rather than the Shop catalogue.
+- Customers can keep saved Home, Work, business, warehouse and recipient
+  addresses and can add or edit an address in every Cart type.
+- Automatic location capture may prefill the current area, but recipient,
+  street/landmark, area and PIN remain visibly editable before saving.
+- A customer can request a recipient's address through WhatsApp, MoolSocial or
+  the platform share surface, or enter the recipient address directly. The
+  recipient controls the address they return; production implementation must
+  not silently read or import another person's address book.
+- Shop and Medicine may share a personal delivery destination. Wholesale
+  retains its business delivery destination. A mixed Cart shows both and
+  permits either to be changed independently.
+- Immediately before payment or purchase-order placement, one compact
+  confirmation shows the applicable address or both mixed-Cart addresses.
+  Changing an address returns directly to this confirmation without restarting
+  checkout.
+- Address confirmation is invalidated when the destination changes or a new
+  repeat purchase begins. It must not become another persistent screen or an
+  additional navigation branch.
+
+This is a durable Buy interaction contract for the editable HTML candidate and
+its later native implementation. It does not authorize production messaging,
+location, address-book, Flutter or deployment work before complete Buy founder
+`FINAL` and the corresponding privacy, consent and release gates.
+
+## Medicine prescription-to-Cart contract — 28 July 2026
+
+The founder requires prescription products to remain tied to the exact
+medicine selected by the customer:
+
+- Tapping a prescription medicine opens its product-specific prescription
+  path. Selecting a saved prescription or adding a new prescription must not
+  discard or replace the requested medicine.
+- While a licensed pharmacist is checking the prescription, that product shows
+  a clear reviewing state and cannot be added as an unrestricted product.
+- Approval is scoped to the exact medicine, strength, pack, prescription and
+  current order. It must not unlock unrelated prescription products.
+- After approval, the same product detail and catalogue card expose a direct
+  Add-to-Cart action. The customer must not upload the prescription again or
+  traverse a generic quotation branch before adding the approved medicine.
+- The Medicine Cart retains the verified prescription association, named
+  licensed pharmacy, pack, price and promised delivery. Shop, Medicine and
+  Wholesale remain separately inspectable even when all three are present in
+  one Cart.
+- Prescription medicines cannot bypass pharmacist validation through product
+  detail, direct URL, Cart restore, quantity controls or reorder.
+- Production approval remains server-authoritative and auditable. The HTML
+  review state demonstrates the interaction contract only; it is not a
+  clinical decision system or a live pharmacy authorization.
+
+Medicine catalogue cards also remain real product-detail entry points. Their
+detail view carries the composition, pack, marketer, sale requirement,
+fulfilment partner, delivery, storage and customer support information needed
+for a purchase decision. At phone widths of 360 logical pixels and above the
+catalogue may use three compact columns when every decision field remains
+readable; smaller supported widths use a readable two-column fallback without
+horizontal overflow.
+
+## Unified Cart scope contract — 28 July 2026
+
+One Cart may contain any of these three purchase families independently or
+together:
+
+- **Shop** for single and small-pack consumer buying;
+- **Medicine** for health products and pharmacist-validated prescription
+  products; and
+- **Wholesale** for verified-workspace MOQ and case-pack purchasing.
+
+The Cart provides explicit ₹ Total, Shop, Wholesale and Medicine scopes. The
+implementation may retain `all` as the internal Total-scope identifier. Each
+available scope shows its own count and total, and selecting it displays only
+that purchase family. Total preserves separate order groups, delivery
+commitments, fulfilment partners, addresses, payments and wholesale purchase
+terms; it does not merge their legal or operational responsibilities.
+
+Saved delivery addresses include recipient phone, house/building/street, area,
+PIN and landmark. The customer can use the current location, choose a map pin,
+open Google Maps or edit every field manually. A third-party address request
+uses WhatsApp, MoolSocial or the device share surface; vague customer-facing
+labels such as `Any app` are prohibited.
+
+## Prescription-level coverage and destination-type refinement — 28 July 2026
+
+This refinement supersedes the earlier statement that approval is limited to
+one exact medicine. Product identity remains exact, but one prescription may
+authoritatively cover multiple medicine line items:
+
+- A saved or newly uploaded prescription is one parent record. The backend
+  parses or records its medicine lines by medicine/product identity, strength,
+  dosage form, quantity and permitted refill/order context.
+- A licensed pharmacist verifies the prescription once and approves, rejects
+  or corrects each matched line item. Every approved medicine listed on that
+  prescription may then expose Add-to-Cart without asking for the same
+  prescription again.
+- The approval never unlocks a whole category or the entire prescription
+  catalogue. A medicine that is absent from the verified prescription, has a
+  mismatched strength/form or exceeds the approved quantity remains locked.
+- The Cart and order retain both the parent prescription identifier and each
+  medicine-line approval. Production enforcement is server-authoritative,
+  auditable, expiry-aware and revalidated on reorder/refill.
+- Review feedback uses a compact linked/verified motion state and lists every
+  matched medicine, so the customer understands that one review is covering
+  the prescription rather than repeatedly uploading it.
+
+The customer-facing combined Cart scope is labelled **₹ Total**, not `All`.
+The internal scope identifier may remain `all`, but the visible tab shows the
+total product count and amount while Shop, Wholesale and Medicine remain
+independently inspectable.
+
+Delivery destination type and receiving contact are separate concepts:
+
+- **Home** and **Work** identify the customer's saved destinations.
+- **Third party** identifies a person, business or party receiving away from
+  the customer's own Home/Work.
+- **Other place** identifies a one-off site such as an event, hotel, hospital
+  or collection point.
+- Every type has a receiving person or business and a receiving contact. The
+  receiver may be the customer, the third party or an authorized person acting
+  for a business or location.
+
+This refinement is a durable contract for Flutter and backend implementation.
+It does not authorize clinical automation, deployment or promotion. Native
+Flutter V2 implementation is authorized only against the immutable complete
+Buy reference and still must pass every release gate.
+
 ## Founder decision gate
 
 The founder approved this ADR for the shared Buy HTML information architecture
-on 27 July 2026 and reserved final product approval until the complete
-interactive HTML is reviewed. Flutter changes, participant activation,
-payments, production data, cloud deployment and any live lowest-price claim
-remain unauthorized.
+on 27 July 2026 and declared the complete Buy HTML founder `FINAL` on
+29 July 2026.
+
+The immutable authority is:
+
+`approved-references/screens/09-buy-complete/v1`
+
+That reference must never be edited in place. A presentation change requires
+explicit founder authorization, a new immutable version and a new founder
+acceptance cycle. Founder `FINAL` authorizes isolated native Flutter V2
+implementation against the exact reference; it does not accept Flutter,
+authorize deployment, participant activation, payments, production data,
+clinical automation or any unsubstantiated live lowest-price claim.
