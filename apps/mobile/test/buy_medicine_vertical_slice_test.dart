@@ -36,6 +36,7 @@ void main() {
           session: journey,
           buySession: buy,
           initialLocation: '/app/buy/medicine',
+          legacyPresentationForTestsOnly: true,
         ),
       ),
     );

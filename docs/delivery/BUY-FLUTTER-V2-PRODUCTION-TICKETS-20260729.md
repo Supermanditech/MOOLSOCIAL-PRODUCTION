@@ -97,3 +97,39 @@ Completion of these tickets produces a review candidate only. Dev App
 Distribution, cloud trial, staging, Production, public release, participant
 activation, payment activation and live pharmacy decisions remain separately
 gated.
+
+## Candidate status — 29 July 2026
+
+The first native candidate is implemented without editing the frozen HTML or
+the legacy Buy presentation:
+
+- `BUY-FV2-000` is complete and committed. The 25-file founder-final reference
+  gate is green.
+- `BUY-FV2-002` through `BUY-FV2-018` have native candidate implementations
+  under `apps/mobile/lib/ui_v2/buy/`, with shared state under
+  `apps/mobile/lib/features/buy/buy_v2_*`.
+- production `/app/buy` and historical Buy deep links resolve to V2; the
+  untouched legacy presentation is available only behind
+  `legacyPresentationForTestsOnly`.
+- the automated V2 matrix covers 15 portrait, landscape and tablet viewports,
+  140% text, the persistent six-destination dock, product decisions, mixed
+  Cart, Checkout, Orders, tracking and Mool Assist.
+- Shop, Wholesale and Medicine categories remain separate; mixed Cart, saved
+  prescription reuse, direct empty-Cart return, delivery addresses, named
+  fulfilment, promised delivery and order tracking are state-owned outside
+  widgets.
+
+The following gates remain open and must not be reported as complete:
+
+- `BUY-FV2-001` and `BUY-FV2-019`: a screenshot-by-screenshot HTML-to-Flutter
+  parity registry and automated pixel tolerances are not yet complete.
+- `BUY-FV2-021`: OPPO journeys cover the primary candidate states, but the
+  complete interruption/process-death/offline/permission matrix remains open.
+- `BUY-FV2-022`: the exact final committed release candidate, two complete
+  regression runs and founder Flutter acceptance remain open.
+- the repository-wide Flutter suite has unrelated/stale legacy visual-golden
+  debt. Buy-owned functional, responsive, router and legacy behavior suites
+  are maintained separately; the global debt must not be hidden by updating
+  unrelated goldens during the Buy task.
+- live commerce catalogue, payment, fulfilment, pharmacy, address-request and
+  production backend activation remain separate integration/release gates.

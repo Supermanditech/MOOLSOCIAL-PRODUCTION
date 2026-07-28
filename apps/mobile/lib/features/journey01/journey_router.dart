@@ -7,6 +7,8 @@ import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
+import '../buy/buy_v2_models.dart';
+import '../buy/buy_v2_session.dart';
 import '../buy/screens/buy_basket_screen.dart';
 import '../buy/screens/buy_catalog_screen.dart';
 import '../buy/screens/buy_collection_completed_screen.dart';
@@ -93,6 +95,7 @@ import '../../ui_v2/social/social_v2_consumer.dart';
 import '../../ui_v2/social/social_v2_creator.dart';
 import '../../ui_v2/social/social_v2_plans_promotion.dart';
 import '../../ui_v2/social/social_v2_youtube_connect.dart';
+import '../../ui_v2/buy/buy_v2_screen.dart';
 import 'journey_session.dart';
 import 'screens/universal_shell.dart';
 
@@ -116,6 +119,7 @@ GoRouter createJourneyRouter(
   String initialLocation = '/boot',
   bool legacyPresentationForTestsOnly = false,
 }) {
+  final buyV2Session = BuyV2Session(core: buySession);
   late final GoRouter router;
   router = GoRouter(
     initialLocation: initialLocation,
@@ -188,34 +192,97 @@ GoRouter createJourneyRouter(
         builder: (context, state) => OtpScreenV2(session: session),
       ),
       GoRoute(
+        path: '/app/buy',
+        builder: (context, state) {
+          if (legacyPresentationForTestsOnly) {
+            return UniversalShell(
+              session: session,
+              section: 'buy',
+              initialSubAction: state.uri.queryParameters['sub'],
+            );
+          }
+          final destination = _buyV2Destination(
+            state.uri.queryParameters['sub'] ??
+                state.uri.queryParameters['view'] ??
+                state.uri.queryParameters['context'],
+          );
+          final view = _buyV2View(state.uri.queryParameters['view']);
+          return BuyV2Screen(
+            session: buyV2Session,
+            initialDestination: destination,
+            initialView: view,
+            productId: state.uri.queryParameters['product'],
+            orderId: state.uri.queryParameters['order'],
+          );
+        },
+      ),
+      GoRoute(
         path: '/app/buy/grocery',
-        builder: (context, state) => BuyCatalogScreen(session: buySession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyCatalogScreen(session: buySession)
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.shop,
+              ),
       ),
       GoRoute(
         path: '/app/buy/medicine',
-        builder: (context, state) => BuyMedicineScreen(session: buySession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyMedicineScreen(session: buySession)
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.medicine,
+              ),
       ),
       GoRoute(
         path: '/app/buy/product/:productId',
-        builder: (context, state) => BuyProductScreen(
-          session: buySession,
-          productId: state.pathParameters['productId'] ?? 'tomato',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyProductScreen(
+                session: buySession,
+                productId: state.pathParameters['productId'] ?? 'tomato',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.shop,
+                initialView: BuyV2View.product,
+                productId: state.pathParameters['productId'],
+              ),
       ),
       GoRoute(
         path: '/app/buy/basket',
-        builder: (context, state) => BuyBasketScreen(session: buySession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyBasketScreen(session: buySession)
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: _buyV2Destination(
+                  state.uri.queryParameters['scope'],
+                ),
+                initialView: BuyV2View.cart,
+              ),
       ),
       GoRoute(
         path: '/app/buy/review',
-        builder: (context, state) => BuyReviewScreen(session: buySession),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyReviewScreen(session: buySession)
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.shop,
+                initialView: BuyV2View.checkout,
+              ),
       ),
       GoRoute(
         path: '/app/buy/order/:orderId',
-        builder: (context, state) => BuyTrackingScreen(
-          session: buySession,
-          orderId: state.pathParameters['orderId'] ?? '',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyTrackingScreen(
+                session: buySession,
+                orderId: state.pathParameters['orderId'] ?? '',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.orders,
+                initialView: BuyV2View.tracking,
+                orderId: state.pathParameters['orderId'],
+              ),
       ),
       GoRoute(
         path: '/app/buy/order/:orderId/collection',
@@ -1245,4 +1312,20 @@ ChatThreadType? _chatFilter(String? value) => switch (value) {
   'order' || 'orders' => ChatThreadType.order,
   'support' => ChatThreadType.support,
   _ => null,
+};
+
+BuyV2Destination _buyV2Destination(String? value) => switch (value) {
+  'wholesale' || 'business' => BuyV2Destination.wholesale,
+  'medicine' || 'rx' => BuyV2Destination.medicine,
+  'orders' || 'tracking' => BuyV2Destination.orders,
+  _ => BuyV2Destination.shop,
+};
+
+BuyV2View _buyV2View(String? value) => switch (value) {
+  'product' => BuyV2View.product,
+  'basket' || 'cart' => BuyV2View.cart,
+  'review' || 'checkout' => BuyV2View.checkout,
+  'tracking' => BuyV2View.tracking,
+  'assist' || 'chat' => BuyV2View.assist,
+  _ => BuyV2View.catalogue,
 };

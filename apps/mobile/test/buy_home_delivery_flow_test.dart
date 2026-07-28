@@ -33,7 +33,12 @@ void main() {
   }) async {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
-      MoolSocialApp(session: journey, buySession: buy, initialLocation: route),
+      MoolSocialApp(
+        session: journey,
+        buySession: buy,
+        initialLocation: route,
+        legacyPresentationForTestsOnly: true,
+      ),
     );
     await tester.pumpAndSettle();
   }
