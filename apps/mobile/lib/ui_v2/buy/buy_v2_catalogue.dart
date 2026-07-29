@@ -798,7 +798,7 @@ class BuyV2ProductCard extends StatelessWidget {
         !session.isPrescriptionApproved(product.id);
     return Semantics(
       label:
-          '${product.title}, ${product.pack}, ₹${product.price}, ${product.deliveryPromise}, fulfilled by ${product.seller}',
+          '${product.title}, ${product.pack}, ${buyV2Money(product.price)}, ${product.deliveryPromise}, fulfilled by ${product.seller}',
       button: true,
       child: InkWell(
         onTap: () => session.openProduct(product.id),
@@ -862,7 +862,7 @@ class BuyV2ProductCard extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '₹${product.price}',
+                                  buyV2Money(product.price),
                                   style: const TextStyle(
                                     color: BuyV2Colors.navy,
                                     fontSize: 18,

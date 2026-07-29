@@ -425,7 +425,7 @@ Future<void> _showBuyV2SavedSheet(
                 product.title,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
-              subtitle: Text('${product.pack} · ₹${product.price}'),
+              subtitle: Text('${product.pack} · ${buyV2Money(product.price)}'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () {
                 Navigator.of(sheetContext).pop();
@@ -769,7 +769,7 @@ class _CompactCartIndicator extends StatelessWidget {
                 ),
               ),
               Text(
-                '₹${session.cartTotal}',
+                buyV2Money(session.cartTotal),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,

@@ -233,6 +233,19 @@ void main() {
     expect(find.textContaining('2 products ·'), findsOneWidget);
   });
 
+  testWidgets('Buy prices use locked Indian currency grouping', (tester) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    session.openOrders();
+    await tester.pumpAndSettle();
+
+    expect(find.text('₹4,839'), findsOneWidget);
+    expect(find.text('₹4,200'), findsOneWidget);
+    expect(find.text('₹4839'), findsNothing);
+    expect(find.text('₹4200'), findsNothing);
+  });
+
   testWidgets('Orders opens at the top after Checkout was scrolled', (
     tester,
   ) async {

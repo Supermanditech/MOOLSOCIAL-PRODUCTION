@@ -1,4 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+final NumberFormat _buyV2Currency = NumberFormat.currency(
+  locale: 'en_IN',
+  symbol: '₹',
+  decimalDigits: 0,
+);
+
+String buyV2Money(num value) => _buyV2Currency.format(value);
 
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);

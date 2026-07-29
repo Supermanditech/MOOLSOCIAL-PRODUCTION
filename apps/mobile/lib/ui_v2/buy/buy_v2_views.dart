@@ -137,7 +137,7 @@ class BuyV2ProductView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '₹${product.price}',
+              buyV2Money(product.price),
               style: const TextStyle(
                 color: BuyV2Colors.navy,
                 fontSize: 29,
@@ -315,7 +315,7 @@ class BuyV2CartView extends StatelessWidget {
                         style: context.buyTitle.copyWith(fontSize: 19),
                       ),
                       Text(
-                        '${_productCountLabel(session.itemCount)} · Shop + Wholesale + Medicine · ₹${session.cartTotal}',
+                        '${_productCountLabel(session.itemCount)} · Shop + Wholesale + Medicine · ${buyV2Money(session.cartTotal)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.buyMeta.copyWith(fontSize: 8),
@@ -383,7 +383,7 @@ class BuyV2CartView extends StatelessWidget {
                   children: [
                     Text('Total', style: context.buyMeta),
                     Text(
-                      '₹${session.cartTotal}',
+                      buyV2Money(session.cartTotal),
                       style: const TextStyle(
                         color: BuyV2Colors.navy,
                         fontSize: 22,
@@ -498,7 +498,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                     style: context.buyMeta,
                   ),
                   Text(
-                    '₹${session.cartTotal}',
+                    buyV2Money(session.cartTotal),
                     style: const TextStyle(
                       color: BuyV2Colors.navy,
                       fontSize: 25,
@@ -1524,7 +1524,7 @@ class _CartScopeBar extends StatelessWidget {
                         ),
                         Text(
                           scope == BuyV2CartScope.all
-                              ? '₹${session.cartTotal}'
+                              ? buyV2Money(session.cartTotal)
                               : '${session.countForDestination(switch (scope) {
                                   BuyV2CartScope.shop => BuyV2Destination.shop,
                                   BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
@@ -1691,7 +1691,7 @@ class _CartLine extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '₹${line.total}',
+                buyV2Money(line.total),
                 style: const TextStyle(
                   color: BuyV2Colors.navy,
                   fontSize: 14,
@@ -1900,7 +1900,7 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '₹${order.total}',
+                buyV2Money(order.total),
                 style: const TextStyle(
                   color: BuyV2Colors.navy,
                   fontSize: 15,
