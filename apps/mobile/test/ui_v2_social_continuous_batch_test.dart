@@ -58,9 +58,12 @@ void main() {
 
       await tester.tap(find.byKey(const Key('screen04-rail-videos')));
       await tester.pumpAndSettle();
-      expect(find.text('All'), findsOneWidget);
-      expect(find.text('Popular'), findsOneWidget);
-      expect(find.text('Business'), findsOneWidget);
+      expect(find.text('Videos'), findsWidgets);
+      expect(find.text('India'), findsOneWidget);
+      expect(find.text('Live'), findsNothing);
+      expect(find.text('Learning'), findsNothing);
+      expect(find.text('Local'), findsNothing);
+      expect(find.text('Business'), findsNothing);
       expect(find.text('5-minute morning mobility'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('screen04-rail-feed')));
@@ -257,26 +260,22 @@ void main() {
           find.byKey(const Key('social-v2-youtube-validate')),
         );
         expect(session.youtubeValidated, isTrue);
-        await _scrollToAndTap(
-          tester,
-          find.byKey(const Key('social-v2-youtube-source-next')),
-        );
         expect(session.youtubeStep, YouTubeConnectStep.action);
-        expect(find.text('What should the viewer accomplish?'), findsOneWidget);
+        expect(find.text('Add post details'), findsOneWidget);
 
         await _scrollToAndTap(tester, find.text('Buy'));
         await _scrollToAndTap(
           tester,
           find.widgetWithText(
             CheckboxListTile,
-            'I control the required rights',
+            'I have permission to share this video',
           ),
         );
         await _scrollToAndTap(
           tester,
           find.widgetWithText(
             CheckboxListTile,
-            'The attached action is accurate',
+            'The post information is accurate',
           ),
         );
         await _scrollToAndTap(
@@ -288,10 +287,7 @@ void main() {
           find.byKey(const Key('social-v2-youtube-publish')),
         );
         expect(session.youtubeConnectedPostId, isNotNull);
-        expect(
-          find.text('Your YouTube video now has a MoolSocial action.'),
-          findsOneWidget,
-        );
+        expect(find.text('Your YouTube post is live'), findsOneWidget);
       },
     );
 
@@ -327,7 +323,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(connect);
         await tester.pumpAndSettle();
-        expect(find.text('YouTube Connect'), findsOneWidget);
+        expect(find.text('Share from YouTube'), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('social-v2-tab-videos')));
         await tester.pumpAndSettle();

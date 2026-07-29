@@ -51,6 +51,22 @@ player is active.
 - metadata/actions use separate native space outside the player; and
 - no claim of YouTube's native Shorts recommendations.
 
+### Navigation and visual-identity decision
+
+- Keep the text labels `Shorts` and `Videos`.
+- Use the unaltered YouTube attribution icon beside YouTube-sourced items.
+- The source icon or attribution opens the corresponding YouTube
+  content/component.
+- MoolSocial may use a generic centred `Create` plus action, but the action is
+  MoolSocial-owned and must not imply that it uploads to YouTube.
+- YouTube upload is exposed only after the separately gated `videos.insert`
+  workflow is approved, implemented and explicitly selected by the user.
+- Do not reproduce the YouTube Shorts application pixel-for-pixel. The
+  vertical gesture is familiar interaction behaviour, while MoolSocial keeps
+  its own header, navigation, typography, actions and content hierarchy.
+- A screenshot of the native YouTube application is design-reference evidence
+  only and is excluded from the YouTube API client submission package.
+
 ## 4. Connected YouTube actions
 
 MoolSocial sign-in is not YouTube authorization. The first provider mutation

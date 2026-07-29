@@ -44,16 +44,14 @@ class ReviewCreatorGateway {
     counter: () => youtubeValidationCalls += 1,
     shouldFail: () => failYouTubeValidation,
     clearFailure: () => failYouTubeValidation = false,
-    message:
-        'YouTube could not validate this content. Check availability and retry.',
+    message: 'We could not open this YouTube video. Check the link and retry.',
   );
 
   Future<void> publishYouTubeConnection() => _run(
     counter: () => youtubePublishCalls += 1,
     shouldFail: () => failYouTubePublish,
     clearFailure: () => failYouTubePublish = false,
-    message:
-        'The connected post was not published. Your video and Mool action are saved.',
+    message: 'The post was not published. Your video and details are saved.',
   );
 
   Future<void> acceptCampaign() => _run(

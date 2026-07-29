@@ -3,6 +3,11 @@
 This matrix describes the recordable private-Dev client. It is not the
 broader locally typed endpoint inventory.
 
+The original quota-form method selection also included planned future
+capabilities. Those selections are not evidence that the current client calls
+the methods. The reviewer email and screencast therefore disclose the
+difference and request guidance before a later capability or quota submission.
+
 | Visible journey | Provider operation or surface | Current result | Screencast treatment |
 |---|---|---|---|
 | Videos starting library | `videos.list(chart=mostPopular, regionCode=IN)` | Live private-Dev public data | Demonstrate |

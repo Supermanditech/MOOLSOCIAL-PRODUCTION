@@ -20,6 +20,30 @@ void main() {
     );
   });
 
+  test('reviewer YouTube surfaces stay provider-clear and user initiated', () {
+    final source = File(
+      'lib/ui_v2/social/social_v2_consumer.dart',
+    ).readAsStringSync();
+    final liveShortStart = source.indexOf('Widget _buildLiveYouTubeShort(');
+    final liveShortEnd = source.indexOf(
+      'void _openYouTubeDetails(',
+      liveShortStart,
+    );
+    final liveShort = source.substring(liveShortStart, liveShortEnd);
+
+    expect(liveShortStart, greaterThanOrEqualTo(0));
+    expect(liveShortEnd, greaterThan(liveShortStart));
+    expect(liveShort, contains('_YouTubeSurfaceBar('));
+    expect(liveShort, isNot(contains("'Following'")));
+    expect(liveShort, isNot(contains("'Nearby'")));
+    expect(liveShort, isNot(contains("'Promoted'")));
+    expect(liveShort, isNot(contains('_ShortCommerceCard(')));
+    expect(liveShort, contains('_openShortDiscussion(reel)'));
+    expect(liveShort, isNot(contains('_openComments(reel.title)')));
+    expect(liveShort, contains('screen04-youtube-short-channel'));
+    expect(source, isNot(contains('attemptVerifiedShortAutoplay();')));
+  });
+
   test('maps only provider-returned public video and channel metadata', () {
     final video = YouTubeVideoSummary(
       videoId: 'abc123XYZ09',
@@ -35,6 +59,7 @@ void main() {
       ),
       tags: const ['India', '#Makers'],
       duration: 'PT5M4S',
+      captionAvailable: true,
       viewCount: '1234567',
       likeCount: '45678',
       commentCount: '321',
@@ -72,12 +97,20 @@ void main() {
     expect(mapped.description, 'Public description');
     expect(mapped.thumbnailUrl.host, 'i.ytimg.com');
     expect(mapped.duration, 'PT5M4S');
+    expect(mapped.captionAvailable, isTrue);
     expect(mapped.viewCount, '1234567');
     expect(mapped.subscriberCount, '654321');
     expect(mapped.channelDescription, 'Public channel description');
     expect(mapped.hashtags, ['#India', '#Makers']);
     expect(mapped.embeddable, isTrue);
     expect(mapped.hasKnownDeviceRegionExclusion, isFalse);
+  });
+
+  test('formats compact public counts without leaking regex groups', () {
+    expect(formatScreen04YouTubeCount('2100', 'comments'), '2.1K comments');
+    expect(formatScreen04YouTubeCount('21100', 'comments'), '21.1K comments');
+    expect(formatScreen04YouTubeCount('2100000', 'views'), '2.1M views');
+    expect(formatScreen04YouTubeCount(null, 'likes'), 'likes');
   });
 
   test('detects both blocked and allow-list region exclusions', () {

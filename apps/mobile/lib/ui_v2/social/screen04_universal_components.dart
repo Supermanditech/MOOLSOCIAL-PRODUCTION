@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'social_v2_design.dart';
 
 @immutable
 class Screen04Choice {
-  const Screen04Choice(this.id, this.label);
+  const Screen04Choice(this.id, this.label, {this.attributionAsset});
 
   final String id;
   final String label;
+  final String? attributionAsset;
 }
 
 @immutable
@@ -35,8 +37,16 @@ const screen04Worlds = <Screen04World>[
     tagline: 'Connect, create and earn',
     prompt: 'Search videos, reels, people or posts',
     choices: [
-      Screen04Choice('shorts', 'Shorts'),
-      Screen04Choice('videos', 'Videos'),
+      Screen04Choice(
+        'shorts',
+        'Shorts',
+        attributionAsset: 'assets/prototype/provider-youtube.svg',
+      ),
+      Screen04Choice(
+        'videos',
+        'Videos',
+        attributionAsset: 'assets/prototype/provider-youtube.svg',
+      ),
       Screen04Choice('feed', 'Feed'),
       Screen04Choice('create', 'Create'),
     ],
@@ -897,6 +907,7 @@ class _TrackingRailRibbonState extends State<_TrackingRailRibbon> {
                       child: _RailAction(
                         key: Key('screen04-rail-${item.id}'),
                         label: item.label,
+                        attributionAsset: item.attributionAsset,
                         active: item.id == widget.activeId,
                         root: false,
                         fillWidth: true,
@@ -926,6 +937,7 @@ class _TrackingRailRibbonState extends State<_TrackingRailRibbon> {
                       child: _RailAction(
                         key: Key('screen04-rail-${item.id}'),
                         label: item.label,
+                        attributionAsset: item.attributionAsset,
                         active: item.id == widget.activeId,
                         root: widget.root,
                         fillWidth: false,
@@ -1093,6 +1105,7 @@ class _RailEdge extends StatelessWidget {
 class _RailAction extends StatefulWidget {
   const _RailAction({
     required this.label,
+    required this.attributionAsset,
     required this.active,
     required this.root,
     required this.fillWidth,
@@ -1101,6 +1114,7 @@ class _RailAction extends StatefulWidget {
   });
 
   final String label;
+  final String? attributionAsset;
   final bool active;
   final bool root;
   final bool fillWidth;
@@ -1142,6 +1156,9 @@ class _RailActionState extends State<_RailAction>
     return Semantics(
       button: true,
       selected: widget.active,
+      label: widget.attributionAsset == null
+          ? widget.label
+          : 'YouTube ${widget.label}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1196,20 +1213,53 @@ class _RailActionState extends State<_RailAction>
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Text(
-                        widget.label,
-                        textAlign: TextAlign.center,
-                        maxLines: widget.fillWidth ? 1 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: !widget.fillWidth,
-                        style: TextStyle(
-                          color: widget.active
-                              ? Colors.white
-                              : const Color(0xFF56596D),
-                          fontSize: widget.fillWidth ? 8.8 : 10.8,
-                          height: 1.05,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      ExcludeSemantics(
+                        child: switch (widget.attributionAsset) {
+                          final asset? => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SvgPicture.asset(
+                                asset,
+                                width: 14,
+                                height: 10,
+                                fit: BoxFit.contain,
+                              ),
+                              const SizedBox(height: 1),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  widget.label,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    color: widget.active
+                                        ? Colors.white
+                                        : const Color(0xFF56596D),
+                                    fontSize: widget.fillWidth ? 8.4 : 10.2,
+                                    height: 1,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          null => Text(
+                            widget.label,
+                            textAlign: TextAlign.center,
+                            maxLines: widget.fillWidth ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: !widget.fillWidth,
+                            style: TextStyle(
+                              color: widget.active
+                                  ? Colors.white
+                                  : const Color(0xFF56596D),
+                              fontSize: widget.fillWidth ? 8.8 : 10.8,
+                              height: 1.05,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        },
                       ),
                       if (widget.active)
                         Positioned.fill(

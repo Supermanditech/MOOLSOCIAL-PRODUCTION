@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $baselinePath = Join-Path $root (
-  "artifacts\quality\social-protected-baseline-20260726-01\BASELINE.json"
+  "artifacts\quality\social-protected-baseline-20260729-02\BASELINE.json"
 )
 
 if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {

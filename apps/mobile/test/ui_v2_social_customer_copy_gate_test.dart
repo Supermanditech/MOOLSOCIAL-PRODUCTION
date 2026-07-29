@@ -51,6 +51,20 @@ void main() {
         _expectCustomerCopy(tester, 'Social $tab');
       }
 
+      await _mount(
+        tester,
+        SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'videos',
+          initialState: 'video-watch',
+        ),
+      );
+      _expectCustomerCopy(tester, 'YouTube video detail');
+      _expectNoMisleadingYouTubeMutationCopy(tester, 'YouTube video detail');
+
       for (final state in const <String>[
         'post',
         'reel-source',
@@ -123,12 +137,14 @@ void main() {
     addTearDown(session.dispose);
     await _mount(tester, SocialYouTubeConnectV2Screen(session: session));
     _expectCustomerCopy(tester, 'YouTube source');
+    _expectNoReviewerFacingYouTubeCopy(tester, 'YouTube source');
 
     session.setYouTubeUrl('https://youtube.com/watch?v=moolsocial');
     expect(await tester.runAsync(session.validateYouTubeSource), isTrue);
     expect(session.continueToYouTubeAction(), isTrue);
     await tester.pump();
     _expectCustomerCopy(tester, 'YouTube action');
+    _expectNoReviewerFacingYouTubeCopy(tester, 'YouTube action');
 
     session
       ..selectYouTubeAction('buy')
@@ -137,10 +153,12 @@ void main() {
     expect(session.continueToYouTubeReview(), isTrue);
     await tester.pump();
     _expectCustomerCopy(tester, 'YouTube check');
+    _expectNoReviewerFacingYouTubeCopy(tester, 'YouTube check');
 
     expect(await tester.runAsync(session.publishYouTubeConnection), isTrue);
     await tester.pump();
     _expectCustomerCopy(tester, 'YouTube complete');
+    _expectNoReviewerFacingYouTubeCopy(tester, 'YouTube complete');
   });
 
   testWidgets('plans and Social promotion use customer-ready copy', (
@@ -186,6 +204,42 @@ void main() {
       _expectCustomerCopy(tester, 'Social promotion $state');
     }
   });
+}
+
+void _expectNoMisleadingYouTubeMutationCopy(WidgetTester tester, String state) {
+  final forbidden = RegExp(
+    r'\bSubscribe\b|like,\s*comment\s*or\s*subscribe|'
+    r'Connect YouTube viewing actions',
+    caseSensitive: false,
+  );
+  final visibleCopy = tester
+      .widgetList<Text>(find.byType(Text))
+      .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? '')
+      .where((text) => text.trim().isNotEmpty)
+      .toList(growable: false);
+  expect(
+    visibleCopy.where(forbidden.hasMatch),
+    isEmpty,
+    reason: '$state implied unavailable YouTube mutations: $visibleCopy',
+  );
+}
+
+void _expectNoReviewerFacingYouTubeCopy(WidgetTester tester, String state) {
+  final forbidden = RegExp(
+    r'\b(?:embedding|attribution|API|quota|endpoint|validated|validation|'
+    r'outside (?:the )?player|Mool action|connected post)\b',
+    caseSensitive: false,
+  );
+  final visibleCopy = tester
+      .widgetList<Text>(find.byType(Text))
+      .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? '')
+      .where((text) => text.trim().isNotEmpty)
+      .toList(growable: false);
+  expect(
+    visibleCopy.where(forbidden.hasMatch),
+    isEmpty,
+    reason: '$state exposed reviewer-facing language: $visibleCopy',
+  );
 }
 
 Future<void> _mount(WidgetTester tester, Widget child) async {

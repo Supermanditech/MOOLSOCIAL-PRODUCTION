@@ -74,7 +74,9 @@ void main() {
         'screen04-v6-videos-description-390x844.png',
       );
 
-      await tester.tap(find.text('View channel'));
+      await tester.tap(
+        find.byKey(const Key('screen04-video-channel-details-sheet')),
+      );
       await tester.pumpAndSettle();
       await _captureOverlay(tester, 'screen04-v6-videos-channel-390x844.png');
 

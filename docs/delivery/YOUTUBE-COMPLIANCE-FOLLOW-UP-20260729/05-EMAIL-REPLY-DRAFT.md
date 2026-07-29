@@ -1,55 +1,37 @@
-# Email reply draft — send after the final recording is verified
+# Email reply — sent package
 
-Subject: Re: YouTube API Services: Thank you for your submission
+- Thread subject: `Re: YouTube API Services: Thank you for your submission`
+- Reply to message ID: `19faa69c18ea5991`
+- From: `hello@moolsocial.com`
+- To: `youtube-disputes+29b54lstcrn5h1n@google.com`
+- CC: none
+- Body:
+  `output/email/YOUTUBE-API-COMPLIANCE-REPLY-r20.txt`
+- Attachments:
+  - `output/video/MoolSocial-YouTube-API-Compliance-Walkthrough-r20.mp4`
+  - `output/pdf/MoolSocial-YouTube-API-Compliance-Reference-r20.pdf`
 
-Hello YouTube API Services Team,
+## Verified attachment identifiers
 
-Thank you for reviewing MoolSocial's request and for specifying the additional
-material required.
+- MP4 duration: `90.20 seconds`
+- MP4 size: `3.20 MiB`
+- MP4 SHA-256:
+  `735029A8D4D46669388283C4A6093E8181CBFF17748EA1E6694B8BBE428CD8A6`
+- PDF pages: `9`
+- PDF size: `1.56 MiB`
+- PDF SHA-256:
+  `09EA7347D0597C7733277307FEC857F6835EF6BF7BA85E70EDD7E2503F9B30CD`
+- APK SHA-256:
+  `641957A49AFC9F6A8D742CF71A4F22E65832F2443701BDB89F7C06BEE6EAC8FC`
 
-Please find below the requested step-by-step screencast of the actual
-MoolSocial private-Dev API client for project `moolsocial-dev-503018`, together
-with the supporting API-to-screen reference:
+The exact outgoing body is preserved as a plain-text artifact so the Gmail
+draft and repository evidence remain identical.
 
-- Screencast: `[ATTACHMENT OR REVIEWER-ACCESSIBLE LINK]`
-- Step/API-to-screen reference: `[ATTACHMENT OR LINK]`
-- Android package: `com.moolsocial.app`
-- Review build/version: `[INSERT EXACT VERSION]`
-- APK SHA-256: `[INSERT EXACT SHA-256]`
-- Physical review device: `[INSERT EXACT MODEL AND ANDROID VERSION]`
-- Recorded: `[INSERT DATE AND TIME WITH IST]`
+## Gmail delivery evidence
 
-The recording shows the complete visible flow and end results for the
-currently implemented review boundary:
-
-- eligible public YouTube video discovery and returned metadata;
-- official embedded YouTube playback with YouTube branding, controls,
-  advertising and links unobstructed;
-- the bounded YouTube Shorts discovery and playback flow;
-- the separate `youtube.readonly` channel-connection flow using the system
-  browser;
-- selection and backend reconciliation of our founder-controlled VetoNews
-  channel; and
-- return to the pending native MoolSocial screen after authorization.
-
-The recording distinguishes the currently working review boundary from
-separately gated future capabilities. Disabled upload, viewer-mutation,
-Analytics/Reporting and Live-management methods are not represented as live.
-
-MoolSocial uses the official YouTube player only for YouTube-hosted video and
-Shorts. MoolSocial does not download or proxy YouTube audiovisual content and
-does not place MoolSocial advertising or commerce inside or over the YouTube
-player. Any MoolSocial commerce appears as separate native application content
-outside the player and only where it provides independent value or has a real,
-disclosed creator/video/product campaign relationship.
-
-The preferred contact remains:
-
-Dharmendra Choudhary
-SUPERMANDI TECH PRIVATE LIMITED
-MoolSocial
-hello@moolsocial.com
-
-Regards,
-Dharmendra Choudhary
-Founder, MoolSocial
+- Sent from: `hello@moolsocial.com`
+- Sent to: `youtube-disputes+29b54lstcrn5h1n@google.com`
+- Gmail message ID: `19fae0e9620d9306`
+- Gmail thread ID: `19f9f78a25a287ee`
+- Gmail state: `SENT`
+- Attachments confirmed on sent message: MP4 and PDF listed above

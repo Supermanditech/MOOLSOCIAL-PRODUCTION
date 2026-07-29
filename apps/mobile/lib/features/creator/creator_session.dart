@@ -474,8 +474,7 @@ class CreatorSession extends ChangeNotifier {
 
   Future<bool> validateYouTubeSource() async {
     if (youtubeValidationId != null) {
-      noticeMessage =
-          '$youtubeValidationId already confirms this public video. It was not validated twice.';
+      noticeMessage = 'This video is ready to share.';
       notifyListeners();
       return true;
     }
@@ -491,15 +490,14 @@ class CreatorSession extends ChangeNotifier {
       success: () {
         youtubeValidated = true;
         youtubeValidationId = 'YT-VALID-166-0719';
-        noticeMessage =
-            'Public YouTube content validated. Choose its MoolSocial action.';
+        noticeMessage = 'Video ready. Add your MoolSocial post details.';
       },
     );
   }
 
   bool continueToYouTubeAction() {
     if (!youtubeValidated) {
-      return _validation('Validate one public YouTube video or Short first.');
+      return _validation('Add a public YouTube video or Short first.');
     }
     youtubeStep = YouTubeConnectStep.action;
     clearMessages();
@@ -569,10 +567,10 @@ class CreatorSession extends ChangeNotifier {
 
   bool continueToYouTubeReview() {
     if (youtubeAction.isEmpty) {
-      return _validation('Choose what the viewer should accomplish.');
+      return _validation('Choose what people can do from this post.');
     }
     if (youtubeContext.trim().length < 12) {
-      return _validation('Explain the exact user outcome.');
+      return _validation('Add a short description for your post.');
     }
     if (!youtubeRightsConfirmed || !youtubeActionTruthConfirmed) {
       return _validation(
@@ -598,21 +596,19 @@ class CreatorSession extends ChangeNotifier {
 
   Future<bool> publishYouTubeConnection() async {
     if (youtubeConnectedPostId != null) {
-      noticeMessage =
-          '$youtubeConnectedPostId is already published. No duplicate connection was created.';
+      noticeMessage = 'This post is already published.';
       notifyListeners();
       return true;
     }
     if (youtubeStep != YouTubeConnectStep.review) {
-      return _validation('Review the YouTube content and Mool action first.');
+      return _validation('Review your YouTube post first.');
     }
     return _protected(
       operation: gateway.publishYouTubeConnection,
       success: () {
         youtubeConnectedPostId = 'YT-POST-166-0719';
         youtubeStep = YouTubeConnectStep.complete;
-        noticeMessage =
-            'Connected post published. The video stays on YouTube and the Mool action stays separate.';
+        noticeMessage = 'Your YouTube post is live on MoolSocial.';
       },
     );
   }

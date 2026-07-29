@@ -16,6 +16,7 @@ class Screen04YouTubePublicVideo {
     required this.thumbnailUrl,
     required this.publishedAt,
     required this.duration,
+    required this.captionAvailable,
     required this.viewCount,
     required this.likeCount,
     required this.commentCount,
@@ -37,6 +38,7 @@ class Screen04YouTubePublicVideo {
   final Uri thumbnailUrl;
   final DateTime publishedAt;
   final String? duration;
+  final bool? captionAvailable;
   final String? viewCount;
   final String? likeCount;
   final String? commentCount;
@@ -183,6 +185,7 @@ Screen04YouTubePublicVideo mapScreen04YouTubePublicVideo(
     thumbnailUrl: item.thumbnail.url,
     publishedAt: item.publishedAt,
     duration: item.duration,
+    captionAvailable: item.captionAvailable,
     viewCount: item.viewCount,
     likeCount: item.likeCount,
     commentCount: item.commentCount,
@@ -203,6 +206,36 @@ Screen04YouTubePublicVideo mapScreen04YouTubePublicVideo(
     channelVideoCount: channel?.statistics.videoCount,
     channelViewCount: channel?.statistics.viewCount,
   );
+}
+
+String formatScreen04YouTubeCount(
+  String? raw,
+  String label, {
+  String? unavailable,
+}) {
+  if (raw == null || raw.trim().isEmpty) {
+    return unavailable ?? label;
+  }
+  final count = int.tryParse(raw);
+  if (count == null) return '${raw.trim()} $label';
+  final formatted = switch (count) {
+    >= 1000000000 => '${_compactScreen04YouTubeNumber(count / 1000000000)}B',
+    >= 1000000 => '${_compactScreen04YouTubeNumber(count / 1000000)}M',
+    >= 1000 => '${_compactScreen04YouTubeNumber(count / 1000)}K',
+    _ => '$count',
+  };
+  return '$formatted $label';
+}
+
+String _compactScreen04YouTubeNumber(double value) {
+  final precision = value >= 100 ? 0 : (value >= 10 ? 1 : 2);
+  return value
+      .toStringAsFixed(precision)
+      .replaceFirst(RegExp(r'\.0+$'), '')
+      .replaceFirstMapped(
+        RegExp(r'(\.\d*[1-9])0+$'),
+        (match) => match.group(1)!,
+      );
 }
 
 bool hasScreen04YouTubeRegionExclusion(

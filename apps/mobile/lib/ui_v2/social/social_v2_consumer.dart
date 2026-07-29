@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/youtube/youtube_embedded_player_android.dart';
 import '../../core/youtube/youtube_embedded_player_contract.dart';
@@ -57,8 +59,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late final Map<String, String> _choiceByWorld;
   bool _moolOpen = false;
 
-  String _shortMode = 'For You';
-  String _videoMode = 'All';
+  String _shortMode = youtubePrivateDevProofEnabled ? 'YouTube' : 'For You';
+  final String _videoMode = 'All';
   String _feedMode = 'For You';
   late String _createView;
   late bool _contentUnavailable;
@@ -194,7 +196,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           ? _videoForId(widget.initialItem)
           : null;
       _activeVideoSaved = false;
-      _shortMode = widget.initialState == 'promoted' ? 'Promoted' : 'For You';
+      _shortMode = widget.initialState == 'promoted'
+          ? 'Promoted'
+          : (youtubePrivateDevProofEnabled ? 'YouTube' : 'For You');
       _feedMode = widget.initialState == 'promoted' ? 'Promoted' : 'For You';
       _resetShorts();
     }
@@ -351,6 +355,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
 
   void _selectWorld(String worldId) {
     if (!screen04Worlds.any((world) => world.id == worldId)) return;
+    if (worldId == 'buy') {
+      HapticFeedback.selectionClick();
+      context.push('/app/buy');
+      return;
+    }
     setState(() {
       _world = worldId;
       _moolOpen = false;
@@ -990,9 +999,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       final filteredNative = nativeShorts
           .where((reel) => reel.modes.contains(modeId))
           .toList(growable: false);
-      if (mode == 'For You') {
-        return [..._liveYouTubeShorts, ...filteredNative];
-      }
       return filteredNative;
     }
     final modeId = switch (mode) {
@@ -1277,7 +1283,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
             constraints.maxHeight < 545 ||
             (textScale >= 1.25 && constraints.maxHeight < 700);
         final chrome = _shortChromeVisible;
-        final sponsored = reel.campaignDisclosure != null;
         return GestureDetector(
           key: Key('screen04-short-${reel.id}'),
           behavior: HitTestBehavior.opaque,
@@ -1318,17 +1323,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                     duration: const Duration(milliseconds: 180),
                     child: IgnorePointer(
                       ignoring: !chrome,
-                      child: _FilterRail(
-                        distribute: true,
-                        values: const [
-                          'For You',
-                          'Following',
-                          'Nearby',
-                          'Promoted',
-                          'YouTube',
-                        ],
-                        selected: _shortMode,
-                        onSelected: _selectShortMode,
+                      child: _YouTubeSurfaceBar(
+                        label: 'Shorts',
+                        trailing: '$position of $total',
+                        onTap: () => _openYouTubeShort(reel),
                       ),
                     ),
                   ),
@@ -1339,11 +1337,15 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                 right: 10,
                 top: 57,
                 child: AnimatedOpacity(
-                  opacity: chrome || sponsored ? 1 : 0,
+                  opacity: chrome ? 1 : 0,
                   duration: const Duration(milliseconds: 180),
                   child: Row(
                     children: [
-                      const _YouTubeAttribution(),
+                      _YouTubeAttribution(
+                        onTap: reel.providerVideoId == null
+                            ? null
+                            : () => _openYouTubeShort(reel),
+                      ),
                       const Spacer(),
                       if (chrome)
                         Text(
@@ -1396,10 +1398,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                             _ShortCreatorLine(
                               reel: reel,
                               followed: _followed,
-                              onFollow: () =>
-                                  setState(() => _followed = !_followed),
+                              onFollow: () => _openShortChannel(reel),
                               dark: true,
-                              subscribe: true,
+                              youtubeSource: true,
                             ),
                             const SizedBox(height: 5),
                             Text(
@@ -1460,29 +1461,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                                 ),
                               ),
                             ],
-                            if (reel.commerceLabel != null) ...[
-                              const SizedBox(height: 7),
-                              _ShortCommerceCard(
-                                title: reel.commerceLabel!,
-                                detail: reel.commerceMeta!,
-                                showDetail: !compact,
-                                onTap: () => context.push(reel.commerceRoute!),
-                              ),
-                            ],
-                            if (reel.campaignDisclosure != null &&
-                                !compact) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                reel.campaignDisclosure!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 7),
                             _ShortActionRow(
                               actions: [
@@ -1496,7 +1474,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                                 (
                                   Icons.chat_bubble_outline_rounded,
                                   'Discuss',
-                                  () => _openComments(reel.title),
+                                  () => _openShortDiscussion(reel),
                                 ),
                                 (Icons.share_outlined, 'Share', _openShare),
                                 (
@@ -1548,17 +1526,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         color: const Color(0xFF050514),
         child: Column(
           children: [
-            _FilterRail(
-              distribute: true,
-              values: const [
-                'For You',
-                'Following',
-                'Nearby',
-                'Promoted',
-                'YouTube',
-              ],
-              selected: _shortMode,
-              onSelected: _selectShortMode,
+            _YouTubeSurfaceBar(
+              label: 'Shorts',
+              trailing: '$position of $total',
+              onTap: () => _openYouTubeShort(reel),
             ),
             Expanded(
               child: LayoutBuilder(
@@ -1602,7 +1573,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                   children: [
                     Row(
                       children: [
-                        const _YouTubeAttribution(),
+                        _YouTubeAttribution(
+                          onTap: () => _openYouTubeShort(reel),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -1628,17 +1601,38 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      '${reel.creator} · ${reel.views} · ${reel.published}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
+                    InkWell(
+                      key: const Key('screen04-youtube-short-channel'),
+                      onTap: () => _openShortChannel(reel),
+                      borderRadius: BorderRadius.circular(8),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${reel.creator} · ${reel.views} · '
+                                '${reel.published}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.open_in_new_rounded,
+                              color: Colors.white70,
+                              size: 14,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
                     _ShortActionRow(
                       actions: [
                         (
@@ -1651,7 +1645,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                         (
                           Icons.chat_bubble_outline_rounded,
                           'Discuss',
-                          () => _openComments(reel.title),
+                          () => _openShortDiscussion(reel),
                         ),
                         (Icons.share_outlined, 'Share', _openShare),
                         (
@@ -1691,10 +1685,52 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           onTap: () => Navigator.of(context).pop(),
         ),
         SocialV2ListTile(
+          icon: Icons.person_outline_rounded,
+          title: reel.creator,
+          detail: 'Open this channel on YouTube',
+          onTap: () {
+            Navigator.of(context).pop();
+            unawaited(_openYouTubeChannel(reel.providerChannelId));
+          },
+        ),
+        SocialV2ListTile(
           icon: Icons.smart_display_outlined,
           title: 'Content from YouTube',
           detail: 'Playback uses the official YouTube player.',
-          onTap: () => Navigator.of(context).pop(),
+          onTap: () {
+            Navigator.of(context).pop();
+            unawaited(_openYouTubeShort(reel));
+          },
+        ),
+      ],
+    );
+  }
+
+  void _openShortDiscussion(_ShortData short) {
+    final controller = TextEditingController();
+    showSocialV2Sheet(
+      context,
+      title: 'MoolSocial discussion',
+      subtitle: short.title,
+      children: [
+        const SocialV2Notice(
+          title: 'No MoolSocial replies yet',
+          detail: 'Start a discussion about this Short.',
+        ),
+        TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Add to the discussion'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (controller.text.trim().isEmpty) {
+              showSocialV2Message(context, 'Write a comment first');
+              return;
+            }
+            Navigator.of(context).pop();
+            showSocialV2Message(context, 'Comment posted on MoolSocial');
+          },
+          child: const Text('Post comment'),
         ),
       ],
     );
@@ -1767,11 +1803,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           'YouTube playback is temporarily unavailable',
         ),
         onChannel: () => _openVideoChannel(video),
+        onOpenChannel: () => _openYouTubeChannel(video.providerChannelId),
         onDetails: () => _openVideoDetails(video),
         onSave: () => setState(() => _activeVideoSaved = !_activeVideoSaved),
         onDiscuss: () => _openVideoDiscussion(video),
         onShare: _openShare,
-        onConnect: _openYouTubeViewingConnection,
+        onOpenProvider: _openYouTubeVideo,
         onSelectVideo: (next) => setState(() {
           _activeVideo = next;
           _activeVideoSaved = false;
@@ -1803,21 +1840,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     final shownVideos = videos.take(_visibleVideoCount).toList(growable: false);
     return Column(
       children: [
-        _FilterRail(
-          values: const [
-            'All',
-            'Popular',
-            'Live',
-            'Learning',
-            'Local',
-            'Business',
-          ],
-          selected: _videoMode,
-          distribute: true,
-          onSelected: (value) => setState(() {
-            _videoMode = value;
-            _visibleVideoCount = 3;
-          }),
+        _YouTubeSurfaceBar(
+          label: 'Videos',
+          trailing: 'India',
+          onTap: _openYouTubeHome,
         ),
         Expanded(
           child: SocialV2PageList(
@@ -1834,6 +1860,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                   _VideoCard(
                     data: video,
                     onTap: () => _openVideoFromDiscovery(video),
+                    onProvider: () => _openYouTubeVideo(video),
                   ),
               if (shownVideos.length < videos.length)
                 OutlinedButton(
@@ -2262,7 +2289,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       title: video.channel,
       subtitle: video.subscribers,
       children: [
-        _VideoChannelIdentity(video: video),
+        _VideoChannelIdentity(
+          video: video,
+          onProvider: () => _openYouTubeChannel(video.providerChannelId),
+        ),
         SocialV2Notice(
           title: 'About ${video.channel}',
           detail: video.channelSummary,
@@ -2285,14 +2315,75 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
             const SizedBox(width: 8),
             Expanded(
               child: FilledButton(
-                onPressed: _openYouTubeViewingConnection,
-                child: const Text('Subscribe'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  unawaited(_openYouTubeChannel(video.providerChannelId));
+                },
+                child: const Text('Open YouTube channel'),
               ),
             ),
           ],
         ),
       ],
     );
+  }
+
+  void _openShortChannel(_ShortData short) {
+    unawaited(_openYouTubeChannel(short.providerChannelId));
+  }
+
+  Future<void> _openYouTubeHome() {
+    return _openYouTubeUri(
+      Uri.https('www.youtube.com', '/'),
+      unavailableMessage: 'YouTube could not be opened',
+    );
+  }
+
+  Future<void> _openYouTubeVideo(_VideoData video) {
+    final videoId = video.providerVideoId;
+    if (videoId == null) {
+      return _openYouTubeHome();
+    }
+    return _openYouTubeUri(
+      Uri.https('www.youtube.com', '/watch', <String, String>{'v': videoId}),
+      unavailableMessage: 'This video could not be opened on YouTube',
+    );
+  }
+
+  Future<void> _openYouTubeShort(_ShortData short) {
+    final videoId = short.providerVideoId;
+    if (videoId == null) {
+      return _openYouTubeHome();
+    }
+    return _openYouTubeUri(
+      Uri.https('www.youtube.com', '/shorts/$videoId'),
+      unavailableMessage: 'This Short could not be opened on YouTube',
+    );
+  }
+
+  Future<void> _openYouTubeChannel(String? channelId) {
+    if (channelId == null || channelId.trim().isEmpty) {
+      return _openYouTubeHome();
+    }
+    return _openYouTubeUri(
+      Uri.https('www.youtube.com', '/channel/${channelId.trim()}'),
+      unavailableMessage: 'This channel could not be opened on YouTube',
+    );
+  }
+
+  Future<void> _openYouTubeUri(
+    Uri uri, {
+    required String unavailableMessage,
+  }) async {
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Object {
+      opened = false;
+    }
+    if (!opened && mounted) {
+      showSocialV2Message(context, unavailableMessage);
+    }
   }
 
   String _channelMetricValue(String value) => value
@@ -2314,10 +2405,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         ),
         SocialV2Notice(title: video.summary, detail: video.hashtags.join('  ')),
         SocialV2ListTile(
+          key: const Key('screen04-video-channel-details-sheet'),
           icon: Icons.person_outline_rounded,
           title: video.channel,
           detail: video.subscribers,
-          badge: 'View channel',
+          badge: 'Details',
           onTap: () => _openVideoChannel(video),
         ),
         SocialV2ListTile(
@@ -2330,10 +2422,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           title: 'Duration',
           detail: video.duration,
         ),
-        const SocialV2ListTile(
+        SocialV2ListTile(
           icon: Icons.closed_caption_outlined,
           title: 'Captions',
-          detail: 'Available',
+          detail: video.captions,
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -2350,10 +2442,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       title: 'MoolSocial discussion',
       subtitle: video.title,
       children: [
-        const SocialV2ListTile(
-          icon: Icons.person_outline,
-          title: 'Nisha Patel',
-          detail: 'Saved this for the weekend. · 3 min',
+        const SocialV2Notice(
+          title: 'No MoolSocial replies yet',
+          detail: 'Start a discussion about this video.',
         ),
         TextField(
           controller: controller,
@@ -2369,36 +2460,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
             showSocialV2Message(context, 'Comment posted on MoolSocial');
           },
           child: const Text('Post comment'),
-        ),
-      ],
-    );
-  }
-
-  void _openYouTubeViewingConnection() {
-    showSocialV2Sheet(
-      context,
-      title: 'Connect YouTube viewing actions',
-      subtitle: 'Authorize eligible actions separately',
-      children: [
-        const SocialV2Notice(
-          title: 'Your YouTube identity stays provider-owned',
-          detail:
-              'Eligible Like, Comment and Subscribe actions use Google authorization and can be disconnected later.',
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            showSocialV2Message(
-              context,
-              'YouTube connection is temporarily unavailable. '
-              'Your MoolSocial activity is unchanged.',
-            );
-          },
-          child: const Text('Continue with Google'),
-        ),
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Not now'),
         ),
       ],
     );
@@ -2956,14 +3017,14 @@ class _ShortCreatorLine extends StatelessWidget {
     required this.followed,
     required this.onFollow,
     required this.dark,
-    this.subscribe = false,
+    this.youtubeSource = false,
   });
 
   final _ShortData reel;
   final bool followed;
   final VoidCallback onFollow;
   final bool dark;
-  final bool subscribe;
+  final bool youtubeSource;
 
   @override
   Widget build(BuildContext context) {
@@ -3021,9 +3082,7 @@ class _ShortCreatorLine extends StatelessWidget {
             visualDensity: VisualDensity.compact,
           ),
           child: Text(
-            followed
-                ? (subscribe ? 'Subscribed' : 'Following')
-                : (subscribe ? 'Subscribe' : 'Follow'),
+            youtubeSource ? 'Channel' : (followed ? 'Following' : 'Follow'),
             style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900),
           ),
         ),
@@ -3110,41 +3169,118 @@ class _ShortCommerceCard extends StatelessWidget {
   }
 }
 
-class _YouTubeAttribution extends StatelessWidget {
-  const _YouTubeAttribution({this.onDark = true});
+class _YouTubeSurfaceBar extends StatelessWidget {
+  const _YouTubeSurfaceBar({
+    required this.label,
+    required this.trailing,
+    required this.onTap,
+  });
 
-  final bool onDark;
+  final String label;
+  final String trailing;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF050047),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            children: [
+              _YouTubeAttribution(onTap: onTap),
+              const SizedBox(width: 8),
+              Container(width: 1, height: 20, color: const Color(0x66FFFFFF)),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                trailing,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _YouTubeAttribution extends StatelessWidget {
+  const _YouTubeAttribution({this.onDark = true, this.onTap});
+
+  final bool onDark;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = onDark ? Colors.white : SocialV2Colors.ink;
     return Semantics(
-      label: 'Content from YouTube',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 16,
-            height: 11,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: const Icon(
-              Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: 10,
+      button: true,
+      link: true,
+      label: 'Open this content on YouTube',
+      child: InkWell(
+        key: const Key('screen04-youtube-attribution'),
+        onTap:
+            onTap ??
+            () {
+              unawaited(() async {
+                try {
+                  await launchUrl(
+                    Uri.https('www.youtube.com', '/'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                } on Object {
+                  // The surrounding screen keeps the content available.
+                }
+              }());
+            },
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
+                  'assets/prototype/provider-youtube.svg',
+                  width: 18,
+                  height: 13,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'YouTube',
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.open_in_new_rounded,
+                  color: foreground.withValues(alpha: .72),
+                  size: 11,
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 4),
-          Text(
-            'YouTube',
-            style: TextStyle(
-              color: onDark ? Colors.white : SocialV2Colors.ink,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -3376,6 +3512,7 @@ class _VideoData {
     this.embeddable = false,
     this.hasKnownDeviceRegionExclusion = false,
     this.channelDateLabel = 'Latest video',
+    this.captions = 'Check on YouTube',
   });
   final String title;
   final String channel;
@@ -3399,6 +3536,7 @@ class _VideoData {
   final bool embeddable;
   final bool hasKnownDeviceRegionExclusion;
   final String channelDateLabel;
+  final String captions;
   String get id =>
       providerVideoId ??
       title
@@ -3415,14 +3553,14 @@ _VideoData _videoDataFromProvider(Screen04YouTubePublicVideo video) {
   return _VideoData(
     video.title,
     video.channelTitle,
-    _formatVideoCount(video.viewCount, 'views'),
+    formatScreen04YouTubeCount(video.viewCount, 'views'),
     _formatVideoDuration(video.duration),
     published: _formatPublishedAgo(video.publishedAt),
     publishedDate: publishedDate,
     summary: summary,
-    likes: _formatVideoCount(video.likeCount, 'likes'),
-    comments: _formatVideoCount(video.commentCount, 'comments'),
-    subscribers: _formatVideoCount(
+    likes: formatScreen04YouTubeCount(video.likeCount, 'likes'),
+    comments: formatScreen04YouTubeCount(video.commentCount, 'comments'),
+    subscribers: formatScreen04YouTubeCount(
       video.subscriberCount,
       'subscribers',
       unavailable: 'Subscriber count on YouTube',
@@ -3430,12 +3568,12 @@ _VideoData _videoDataFromProvider(Screen04YouTubePublicVideo video) {
     channelSummary: video.channelDescription?.trim().isNotEmpty == true
         ? video.channelDescription!.trim()
         : 'Public videos from ${video.channelTitle}.',
-    channelVideos: _formatVideoCount(
+    channelVideos: formatScreen04YouTubeCount(
       video.channelVideoCount,
       'videos',
       unavailable: 'Available on YouTube',
     ),
-    channelViews: _formatVideoCount(
+    channelViews: formatScreen04YouTubeCount(
       video.channelViewCount,
       'channel views',
       unavailable: 'Available on YouTube',
@@ -3449,6 +3587,11 @@ _VideoData _videoDataFromProvider(Screen04YouTubePublicVideo video) {
     embeddable: video.embeddable,
     hasKnownDeviceRegionExclusion: video.hasKnownDeviceRegionExclusion,
     channelDateLabel: 'This video',
+    captions: switch (video.captionAvailable) {
+      true => 'Available',
+      false => 'Not available',
+      null => 'Check on YouTube',
+    },
   );
 }
 
@@ -3467,14 +3610,14 @@ _ShortData _shortDataFromProvider(Screen04YouTubePublicVideo video) {
     meta: 'Creator-labelled Short on YouTube',
     modes: const {'for-you', 'youtube'},
     youtube: true,
-    subscribers: _formatVideoCount(
+    subscribers: formatScreen04YouTubeCount(
       video.subscriberCount,
       'subscribers',
       unavailable: 'Subscribers on YouTube',
     ),
-    views: _formatVideoCount(video.viewCount, 'views'),
-    likes: _formatVideoCount(video.likeCount, 'likes'),
-    comments: _formatVideoCount(video.commentCount, 'comments'),
+    views: formatScreen04YouTubeCount(video.viewCount, 'views'),
+    likes: formatScreen04YouTubeCount(video.likeCount, 'likes'),
+    comments: formatScreen04YouTubeCount(video.commentCount, 'comments'),
     published: _formatPublishedAgo(video.publishedAt),
     hashtags: hashtags,
     providerVideoId: video.videoId,
@@ -3520,29 +3663,6 @@ String _creatorMark(String channelTitle) {
   if (parts.isEmpty) return 'YT';
   if (parts.length == 1) return parts.first[0].toUpperCase();
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-}
-
-String _formatVideoCount(String? raw, String label, {String? unavailable}) {
-  if (raw == null || raw.trim().isEmpty) {
-    return unavailable ?? label;
-  }
-  final count = int.tryParse(raw);
-  if (count == null) return '${raw.trim()} $label';
-  final formatted = switch (count) {
-    >= 1000000000 => '${_compactNumber(count / 1000000000)}B',
-    >= 1000000 => '${_compactNumber(count / 1000000)}M',
-    >= 1000 => '${_compactNumber(count / 1000)}K',
-    _ => '$count',
-  };
-  return '$formatted $label';
-}
-
-String _compactNumber(double value) {
-  final precision = value >= 100 ? 0 : (value >= 10 ? 1 : 2);
-  return value
-      .toStringAsFixed(precision)
-      .replaceFirst(RegExp(r'\.0+$'), '')
-      .replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
 }
 
 String _formatVideoDuration(String? duration) {
@@ -3883,9 +4003,14 @@ _VideoData _videoForId(String? id) {
 }
 
 class _VideoCard extends StatelessWidget {
-  const _VideoCard({required this.data, required this.onTap});
+  const _VideoCard({
+    required this.data,
+    required this.onTap,
+    required this.onProvider,
+  });
   final _VideoData data;
   final VoidCallback onTap;
+  final VoidCallback onProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -3937,7 +4062,7 @@ class _VideoCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 7),
-                    const _YouTubeAttribution(onDark: false),
+                    _YouTubeAttribution(onDark: false, onTap: onProvider),
                   ],
                 ),
               ),
@@ -3957,11 +4082,12 @@ class _InlineVideoWatch extends StatelessWidget {
     required this.controller,
     required this.onPlay,
     required this.onChannel,
+    required this.onOpenChannel,
     required this.onDetails,
     required this.onSave,
     required this.onDiscuss,
     required this.onShare,
-    required this.onConnect,
+    required this.onOpenProvider,
     required this.onSelectVideo,
   });
 
@@ -3971,11 +4097,12 @@ class _InlineVideoWatch extends StatelessWidget {
   final ScrollController controller;
   final VoidCallback onPlay;
   final VoidCallback onChannel;
+  final VoidCallback onOpenChannel;
   final VoidCallback onDetails;
   final VoidCallback onSave;
   final VoidCallback onDiscuss;
   final VoidCallback onShare;
-  final VoidCallback onConnect;
+  final ValueChanged<_VideoData> onOpenProvider;
   final ValueChanged<_VideoData> onSelectVideo;
 
   @override
@@ -4025,7 +4152,10 @@ class _InlineVideoWatch extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _VideoProviderLine(data: data),
+              _VideoProviderLine(
+                data: data,
+                onProvider: () => onOpenProvider(data),
+              ),
               const SizedBox(height: 10),
               InkWell(
                 key: const Key('screen04-video-details-trigger'),
@@ -4075,7 +4205,11 @@ class _InlineVideoWatch extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _VideoCreatorRow(data: data, onChannel: onChannel),
+              _VideoCreatorRow(
+                data: data,
+                onChannel: onChannel,
+                onOpenChannel: onOpenChannel,
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -4103,52 +4237,7 @@ class _InlineVideoWatch extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              SocialV2Card(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Want to like, comment or subscribe?',
-                            style: TextStyle(
-                              color: SocialV2Colors.navy,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Connect your YouTube account and choose each action yourself.',
-                            style: TextStyle(
-                              color: SocialV2Colors.muted,
-                              fontSize: 9.5,
-                              height: 1.2,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: onConnect,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                      ),
-                      child: const Text(
-                        'Connect YouTube',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              _VideoCommentsPreview(data: data, onDiscuss: onDiscuss),
+              _VideoCommentsPreview(onDiscuss: onDiscuss),
             ],
           ),
         ),
@@ -4161,7 +4250,11 @@ class _InlineVideoWatch extends StatelessWidget {
             ),
           ),
           for (final video in moreVideos)
-            _VideoCard(data: video, onTap: () => onSelectVideo(video)),
+            _VideoCard(
+              data: video,
+              onTap: () => onSelectVideo(video),
+              onProvider: () => onOpenProvider(video),
+            ),
         ],
       ],
     );
@@ -4236,7 +4329,6 @@ class _Screen04OfficialYouTubePlayerState
   YouTubeEmbeddedPlayerController? _controller;
   YouTubeEmbeddedPlayerStatus _status = YouTubeEmbeddedPlayerStatus.mounting;
   bool _selectionFailed = false;
-  bool _shortAutoplayAttempted = false;
 
   @override
   void initState() {
@@ -4294,13 +4386,6 @@ class _Screen04OfficialYouTubePlayerState
                             snapshot.status ==
                             YouTubeEmbeddedPlayerStatus.failed;
                       });
-                      if (widget.isVerifiedVerticalShort &&
-                          (snapshot.status ==
-                                  YouTubeEmbeddedPlayerStatus.ready ||
-                              snapshot.status ==
-                                  YouTubeEmbeddedPlayerStatus.cued)) {
-                        unawaited(_attemptShortAutoplay());
-                      }
                     },
                   );
                   _controller = controller;
@@ -4364,30 +4449,19 @@ class _Screen04OfficialYouTubePlayerState
       if (mounted) setState(() => _selectionFailed = true);
     }
   }
-
-  Future<void> _attemptShortAutoplay() async {
-    if (_shortAutoplayAttempted) return;
-    final controller = _controller;
-    if (controller == null) return;
-    _shortAutoplayAttempted = true;
-    try {
-      await controller.attemptVerifiedShortAutoplay();
-    } on Object {
-      // The official player remains cued and available for an explicit tap.
-    }
-  }
 }
 
 class _VideoProviderLine extends StatelessWidget {
-  const _VideoProviderLine({required this.data});
+  const _VideoProviderLine({required this.data, required this.onProvider});
 
   final _VideoData data;
+  final VoidCallback onProvider;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const _YouTubeAttribution(onDark: false),
+        _YouTubeAttribution(onDark: false, onTap: onProvider),
         const Spacer(),
         Text(
           '${data.duration} · ${data.views} · ${data.published}',
@@ -4429,10 +4503,15 @@ class _VideoChannelAvatar extends StatelessWidget {
 }
 
 class _VideoCreatorRow extends StatelessWidget {
-  const _VideoCreatorRow({required this.data, required this.onChannel});
+  const _VideoCreatorRow({
+    required this.data,
+    required this.onChannel,
+    required this.onOpenChannel,
+  });
 
   final _VideoData data;
   final VoidCallback onChannel;
+  final VoidCallback onOpenChannel;
 
   @override
   Widget build(BuildContext context) {
@@ -4442,6 +4521,7 @@ class _VideoCreatorRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: InkWell(
+            key: const Key('screen04-video-channel-details'),
             onTap: onChannel,
             borderRadius: BorderRadius.circular(10),
             child: ConstrainedBox(
@@ -4472,9 +4552,10 @@ class _VideoCreatorRow extends StatelessWidget {
           ),
         ),
         OutlinedButton(
-          onPressed: onChannel,
+          key: const Key('screen04-video-channel'),
+          onPressed: onOpenChannel,
           style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-          child: const Text('Subscribe', style: TextStyle(fontSize: 10)),
+          child: const Text('View channel', style: TextStyle(fontSize: 10)),
         ),
       ],
     );
@@ -4524,9 +4605,8 @@ class _VideoActionButton extends StatelessWidget {
 }
 
 class _VideoCommentsPreview extends StatelessWidget {
-  const _VideoCommentsPreview({required this.data, required this.onDiscuss});
+  const _VideoCommentsPreview({required this.onDiscuss});
 
-  final _VideoData data;
   final VoidCallback onDiscuss;
 
   @override
@@ -4544,7 +4624,7 @@ class _VideoCommentsPreview extends StatelessWidget {
               Row(
                 children: [
                   const Text(
-                    'Comments',
+                    'MoolSocial discussion',
                     style: TextStyle(
                       color: SocialV2Colors.navy,
                       fontSize: 12,
@@ -4552,19 +4632,16 @@ class _VideoCommentsPreview extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    data.comments,
-                    style: const TextStyle(
-                      color: SocialV2Colors.muted,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: SocialV2Colors.muted,
+                    size: 17,
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               const Text(
-                'This routine is clear, calm and easy to follow before work.',
+                'Start a conversation about this video on MoolSocial.',
                 style: TextStyle(
                   color: SocialV2Colors.muted,
                   fontSize: 10,
@@ -4642,9 +4719,10 @@ class _VideoStatRow extends StatelessWidget {
 }
 
 class _VideoChannelIdentity extends StatelessWidget {
-  const _VideoChannelIdentity({required this.video});
+  const _VideoChannelIdentity({required this.video, required this.onProvider});
 
   final _VideoData video;
+  final VoidCallback onProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -4676,7 +4754,7 @@ class _VideoChannelIdentity extends StatelessWidget {
               ],
             ),
           ),
-          const _YouTubeAttribution(onDark: false),
+          _YouTubeAttribution(onDark: false, onTap: onProvider),
         ],
       ),
     );
@@ -4847,12 +4925,6 @@ class _VideoWatchScreenState extends State<_VideoWatchScreen> {
                   icon: const Icon(Icons.share_outlined),
                   label: const Text('Share'),
                 ),
-                FilledButton(
-                  onPressed: _openYouTubeConnection,
-                  child: const Text(
-                    'Connect YouTube for Like, Comment and Subscribe',
-                  ),
-                ),
               ],
             ),
           ),
@@ -4929,10 +5001,9 @@ class _VideoWatchScreenState extends State<_VideoWatchScreen> {
       title: 'MoolSocial discussion',
       subtitle: widget.data.title,
       children: [
-        const SocialV2ListTile(
-          icon: Icons.person_outline,
-          title: 'Nisha Patel',
-          detail: 'Saved this for the weekend. · 3 min',
+        const SocialV2Notice(
+          title: 'No MoolSocial replies yet',
+          detail: 'Start a discussion about this video.',
         ),
         TextField(
           controller: controller,
@@ -4948,36 +5019,6 @@ class _VideoWatchScreenState extends State<_VideoWatchScreen> {
             showSocialV2Message(context, 'Comment posted on MoolSocial');
           },
           child: const Text('Post comment'),
-        ),
-      ],
-    );
-  }
-
-  void _openYouTubeConnection() {
-    showSocialV2Sheet(
-      context,
-      title: 'Connect YouTube viewing actions',
-      subtitle: 'Authorize eligible actions separately',
-      children: [
-        const SocialV2Notice(
-          title: 'Your YouTube identity stays provider-owned',
-          detail:
-              'Eligible Like, Comment and Subscribe actions use Google authorization and can be disconnected later.',
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            showSocialV2Message(
-              context,
-              'YouTube connection is temporarily unavailable. '
-              'Your MoolSocial activity is unchanged.',
-            );
-          },
-          child: const Text('Continue with Google'),
-        ),
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Not now'),
         ),
       ],
     );

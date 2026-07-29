@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "social-protected-baseline-20260729-02",
+  "recordedAt": "2026-07-29",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "repositoryHeadBeforeBaselineCommit": "0aaa32bfd383b77a392b3426a49e6ef3744493dd",
+  "supersedesProtectedTreeOnly": "artifacts/quality/social-protected-baseline-20260726-01/BASELINE.json",
+  "protectedSource": {
+    "fileCount": 119,
+    "portableTreeSha256": "54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e",
+    "hashAlgorithm": "SHA-256",
+    "lineEndingPolicy": "UTF-8 text is normalized from CRLF to LF; binary files use raw bytes",
+    "gate": "scripts/check-social-protected-baseline.ps1"
+  },
+  "founderAuthority": {
+    "youtubeComplianceWalkthroughApprovedAt": "2026-07-29",
+    "latestSocialCommitRequestedAt": "2026-07-29",
+    "approvalManifest": "artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/APPROVAL-MANIFEST.md"
+  },
+  "youtubeComplianceReview": {
+    "candidate": "youtube-compliance-followup-20260729-20",
+    "googleCloudProject": "moolsocial-dev-503018",
+    "androidPackage": "com.moolsocial.app",
+    "reviewApk": "artifacts/quality/youtube-compliance-follow-up-20260729-01/moolsocial-youtube-compliance-review-private-dev-r20.apk",
+    "reviewApkSha256": "641957a49afc9f6a8d742cf71a4f22e65832f2443701bdb89f7c06bee6eac8fc",
+    "reviewApkCommitted": false,
+    "reviewApkRetention": "Retained locally as audit evidence; omitted from Git because it is approximately 216 MB.",
+    "device": "OPPO CPH2375, Android 13",
+    "submittedMp4": "output/video/MoolSocial-YouTube-API-Compliance-Walkthrough-r20.mp4",
+    "submittedMp4Sha256": "735029a8d4d46669388283c4a6093e8181cbff17748ea1e6694b8bbe428cd8a6",
+    "submittedPdf": "output/pdf/MoolSocial-YouTube-API-Compliance-Reference-r20.pdf",
+    "submittedPdfSha256": "09ea7347d0597c7733277307fec857f6835ef6bf7ba85e70edd7e2503f9b30cd",
+    "submittedEmailBody": "output/email/YOUTUBE-API-COMPLIANCE-REPLY-r20.txt",
+    "gmailMessageId": "19fae0e9620d9306",
+    "gmailThreadId": "19f9f78a25a287ee",
+    "submittedFrom": "hello@moolsocial.com",
+    "submittedAt": "2026-07-29"
+  },
+  "currentSourceBoundary": {
+    "youtubePublicDiscovery": [
+      "videos.list(chart=mostPopular, regionCode=IN)",
+      "channels.list enrichment",
+      "bounded search.list Shorts candidate discovery",
+      "videos.list metadata hydration"
+    ],
+    "playback": "Official YouTube embedded player, user initiated and unobscured",
+    "oauth": "Separate youtube.readonly owner-channel connection with server-side refresh credentials",
+    "notClaimedActive": [
+      "uploads",
+      "viewer mutations",
+      "playlist/channel/asset mutations",
+      "Analytics/Reporting",
+      "Live management",
+      "Production approval",
+      "unlimited or complete global YouTube catalogue"
+    ],
+    "postRecordingSourceFix": "Mool to Buy now pushes the native Buy V2 route so system Back restores the exact Social state. This does not change the recorded YouTube review flow."
+  },
+  "verification": {
+    "dartFormat": "passed; 15 files; 0 changed",
+    "flutterAnalyze": "passed; targeted Social/YouTube paths; no issues",
+    "affectedFlutterTestsPassed": 57,
+    "affectedFlutterTestsSkipped": 3,
+    "affectedFlutterTestsFailed": 0,
+    "approvedUiLocks": "passed",
+    "brandIntegrity": "passed for App",
+    "operationalGoldens": "regenerated for approved r20 state and visually inspected",
+    "gitDiffCheck": "passed before staging"
+  },
+  "historicalBoundary": {
+    "priorBaselinePreserved": true,
+    "buyApprovedReferencesPreserved": true,
+    "screens01To03Preserved": true,
+    "note": "Historical Buy evidence continues to record the 26 July Social tree that it was tested against. This new baseline is the protected Social authority for subsequent work."
+  }
+}

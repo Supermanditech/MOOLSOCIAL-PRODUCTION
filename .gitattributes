@@ -4,3 +4,8 @@ apps/mobile/lib/data/generated/** -whitespace
 
 # Preserve the upstream font license text exactly as distributed.
 apps/mobile/assets/fonts/OFL.txt -whitespace
+
+# Keep review collateral byte-exact and prevent global text conversion/diff
+# drivers from interpreting PDF and video binaries as source text.
+*.pdf binary
+*.mp4 binary

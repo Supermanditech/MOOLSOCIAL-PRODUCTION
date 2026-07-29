@@ -2,12 +2,14 @@
 
 ## Recording specification
 
-- Target duration: 6–8 minutes.
-- Minimum output: 1920×1080 landscape recording with the OPPO screen readable
-  at full size.
+- Target duration: 3–5 minutes.
+- Output: MP4 with the portrait OPPO screen centred and readable at full size.
 - Device: founder-authorized OPPO connected to the laptop.
-- Client: exact private-Dev reviewer APK; show its build label and SHA-256 on
-  the opening evidence card.
+- Client: `youtube-compliance-followup-20260729-20`.
+- APK SHA-256:
+  `641957A49AFC9F6A8D742CF71A4F22E65832F2443701BDB89F7C06BEE6EAC8FC`.
+- Repository commit:
+  `0aaa32bfd383b77a392b3426a49e6ef3744493dd`.
 - Project: `moolsocial-dev-503018`.
 - Do not edit the recording to imply that two separate runs are one continuous
   provider response. A cut or replay must receive a visible caption.
@@ -16,7 +18,7 @@
 - Do not expose Google credentials, OAuth codes/state, tokens, API keys,
   Firebase identifiers or personal data.
 
-## Opening card — 15 seconds
+## Opening card — 10 seconds
 
 Show:
 
@@ -36,7 +38,7 @@ Narration:
 > read-only channel connection. Playback is supplied by the official YouTube
 > embedded player. MoolSocial does not download or proxy YouTube video.
 
-## Step 1 — Open the real MoolSocial Videos library — 45 seconds
+## Step 1 — Open the real MoolSocial Videos library — 35 seconds
 
 1. Launch MoolSocial from a cold start.
 2. Enter `Mool`, then `Social`, then `Videos`.
@@ -62,7 +64,7 @@ Visible outcome:
 - no copied YouTube navigation;
 - no fabricated product link.
 
-## Step 2 — Select and play one video — 60 seconds
+## Step 2 — Select and play one video — 45 seconds
 
 1. Tap one eligible video card.
 2. Show the isolated official player mounting.
@@ -85,7 +87,7 @@ Visible outcome:
 - one active player;
 - direct return to the native MoolSocial library.
 
-## Step 3 — Open the real Shorts lane — 75 seconds
+## Step 3 — Open the real Shorts lane — 55 seconds
 
 1. Select `Shorts`.
 2. Select the recorded build's YouTube source/filter.
@@ -109,23 +111,19 @@ Visible outcome:
 - provider source remains visible;
 - no claim of access to YouTube's native Shorts recommendation feed.
 
-## Step 4 — Demonstrate the separate YouTube channel connection — 90 seconds
+## Step 4 — Show the separate YouTube channel connection — 45 seconds
 
-Record a fresh, supervised read-only connection only if the proof profile and
-provider session are deliberately authorized for the recording window.
+Use the clearly dated supervised proof. Do not disconnect or re-authorize the
+founder-controlled channel merely to make the recording appear continuous.
 
-1. Open the exact feature that requires the channel connection.
+1. Caption the segment `Dated supervised proof — 26 July 2026`.
 2. Show that MoolSocial sign-in and YouTube connection are separate.
-3. Open the system browser.
-4. Show Google account selection without exposing private account details
-   beyond the controlled reviewer identity.
-5. Select the VetoNews brand channel.
-6. Show the `youtube.readonly` consent purpose.
-7. Complete consent.
-8. Show automatic return to the exact native YouTube Connect screen.
-9. Show the temporary success message, then its non-blocking disappearance.
-10. Show the validated VetoNews channel identity if the current screen exposes
-    it without internal identifiers.
+3. Show the system-browser account/channel selection and read-only purpose
+   without exposing a credential, token, OAuth code or state.
+4. Show the exact native Share from YouTube screen.
+5. Show the automatic token-free return and temporary success confirmation.
+6. State the reconciled VetoNews channel ID in the accompanying reference,
+   not as an unverified claim on the app screen.
 
 Narration:
 
@@ -141,46 +139,26 @@ Visible outcome:
 - safe native return;
 - no token or internal user identifier in the return route.
 
-If a fresh connection cannot be safely replayed, caption the previously
-recorded OPPO evidence as an earlier dated proof and do not present it as a
-live segment.
+This dated proof is not presented as part of the current continuous playback
+run.
 
-## Step 5 — Show a truthful unavailable/recovery boundary — 35 seconds
+## Step 5 — Clarify the submitted endpoint scope — 20 seconds
 
-Use one real recorded condition such as an unavailable provider item or a
-disabled capability profile.
+Show a reviewer card stating:
 
-Narration:
-
-> MoolSocial fails closed. It does not replace unavailable YouTube data with
-> fabricated content or report a disabled capability as successful.
-
-Visible outcome:
-
-- customer-readable recovery;
-- MoolSocial-owned navigation remains usable;
-- no internal API, quota or adapter language.
-
-## Step 6 — Explain commerce separation — 40 seconds
-
-Show only a real MoolSocial-owned commerce card or a policy storyboard that is
-clearly captioned `planned — not part of the current API proof`.
+- `Demonstrated now: videos.list, channels.list, bounded search.list,
+  official embedded playback and youtube.readonly channel connection`;
+- `The original broad endpoint selection described a staged roadmap`; and
+- `Uploads, viewer mutations, Analytics/Reporting and Live management are not
+  represented as active`.
 
 Narration:
 
-> MoolSocial commerce is independent application content. It remains outside
-> the YouTube player. A product card appears only when a real campaign binds
-> the creator, video and eligible product, with the commercial relationship
-> disclosed. Unrelated public YouTube results do not receive fabricated
-> commerce.
-
-Do not show:
-
-- commerce over the player;
-- a forced purchase before playback;
-- a reward for watching, liking, commenting or subscribing;
-- MoolSocial pre-roll inside the player; or
-- language implying YouTube endorses the seller or product.
+> The original quota form included a broad future method inventory. This
+> screencast demonstrates only the currently implemented API Client boundary.
+> MoolSocial asks YouTube to assess this demonstrated boundary and advise
+> whether a corrected form is required before separately gated future
+> capabilities are reviewed.
 
 ## Closing card — 20 seconds
 
@@ -190,6 +168,7 @@ Show:
   owner connection and native return`;
 - `Not claimed live: uploads, viewer mutations, Analytics/Reporting, Live
   management or Production approval`;
+- `No MoolSocial advertising or commerce inside or over the YouTube player`;
 - monitored contact `hello@moolsocial.com`;
 - the exact APK and recording SHA-256.
 

@@ -85,7 +85,7 @@ void main() {
   });
 
   testWidgets(
-    'Screen 06 owns watch, channel, details, discussion and connect',
+    'Screen 06 owns watch, channel, details and MoolSocial discussion',
     (tester) async {
       final owners = _Owners();
       addTearDown(owners.dispose);
@@ -99,7 +99,10 @@ void main() {
       expect(find.text('Description'), findsOneWidget);
       expect(find.text('38K likes'), findsOneWidget);
 
-      await tester.tap(find.text('View channel'));
+      await _tapVisible(
+        tester,
+        find.byKey(const Key('screen04-video-channel-details-sheet')),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Move With Asha'), findsWidgets);
       expect(find.text('86M'), findsOneWidget);
@@ -119,12 +122,13 @@ void main() {
 
       await tester.tap(find.text('Discuss'));
       await tester.pumpAndSettle();
-      expect(find.text('MoolSocial discussion'), findsOneWidget);
+      expect(find.text('MoolSocial discussion'), findsWidgets);
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
 
-      await _tapVisible(tester, find.text('Connect YouTube'));
-      expect(find.text('Connect YouTube viewing actions'), findsOneWidget);
+      expect(find.text('Subscribe'), findsNothing);
+      expect(find.textContaining('like, comment or subscribe'), findsNothing);
+      expect(find.text('MoolSocial discussion'), findsOneWidget);
 
       await _pump(tester, owners.consumer(sub: 'videos', state: 'unavailable'));
       expect(find.text('This Video cannot be shown right now'), findsOneWidget);
@@ -310,10 +314,7 @@ void main() {
     final session = CreatorSession()..creatorWorkspaceActive = true;
     addTearDown(session.dispose);
     await _pump(tester, SocialYouTubeConnectV2Screen(session: session));
-    expect(
-      find.text('Keep the video on YouTube. Add one useful Mool action.'),
-      findsOneWidget,
-    );
+    expect(find.text('Share a YouTube video on MoolSocial'), findsOneWidget);
 
     await _tapVisible(
       tester,
@@ -330,7 +331,7 @@ void main() {
     expect(await tester.runAsync(session.validateYouTubeSource), isTrue);
     expect(session.continueToYouTubeAction(), isTrue);
     await tester.pump();
-    expect(find.text('What should the viewer accomplish?'), findsOneWidget);
+    expect(find.text('Add post details'), findsOneWidget);
 
     session
       ..selectYouTubeAction('buy')
@@ -338,10 +339,7 @@ void main() {
       ..confirmYouTubeActionTruth(true);
     expect(session.continueToYouTubeReview(), isTrue);
     await tester.pump();
-    expect(
-      find.text('Video and MoolSocial action stay separate.'),
-      findsOneWidget,
-    );
+    expect(find.text('Review your YouTube post'), findsOneWidget);
 
     session.setOnline(false);
     expect(await tester.runAsync(session.publishYouTubeConnection), isFalse);
@@ -350,10 +348,7 @@ void main() {
     session.setOnline(true);
     expect(await tester.runAsync(session.publishYouTubeConnection), isTrue);
     await tester.pump();
-    expect(
-      find.text('Your YouTube video now has a MoolSocial action.'),
-      findsOneWidget,
-    );
+    expect(find.text('Your YouTube post is live'), findsOneWidget);
   });
 }
 

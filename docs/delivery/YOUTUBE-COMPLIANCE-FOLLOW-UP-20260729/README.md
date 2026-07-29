@@ -9,9 +9,25 @@ received on 29 July 2026 for:
 > recording), of how YouTube API services are being used, along with the end
 > results.
 
-The internal target is to reply on 30 July 2026. The provider requested the
-material within seven business days. The founder sends the final email and
-attachments from the existing YouTube API Quota thread.
+The provider requested the material within seven business days. The founder
+sends the final email and attachments from the existing YouTube API Quota
+thread only after reviewing the finished reviewer copy.
+
+## Exact review candidate
+
+- Candidate: `youtube-compliance-followup-20260729-20`
+- Google Cloud project: `moolsocial-dev-503018`
+- Android package: `com.moolsocial.app`
+- APK:
+  `artifacts/quality/youtube-compliance-follow-up-20260729-01/moolsocial-youtube-compliance-review-private-dev-r20.apk`
+- APK SHA-256:
+  `641957A49AFC9F6A8D742CF71A4F22E65832F2443701BDB89F7C06BEE6EAC8FC`
+- Repository commit:
+  `0aaa32bfd383b77a392b3426a49e6ef3744493dd`
+- Physical device: OPPO CPH2375, Android 13
+- Verification date: 29 July 2026, Asia/Calcutta
+
+This is a private Dev review build. It is not a Production release.
 
 ## Truthful submitted-client boundary
 
@@ -51,6 +67,12 @@ If YouTube asks how the broader endpoint selection will be used, describe it as
 a staged roadmap behind independent capability, consent, quota and release
 gates. Do not depict a disabled endpoint as a completed feature.
 
+The original quota form selected a broad future method inventory. The follow-up
+must explicitly distinguish that roadmap from the currently implemented API
+Client. YouTube is asked to assess the demonstrated current boundary and to
+advise whether it wants a corrected form before any future mutation, upload,
+Analytics/Reporting or Live capability is reviewed.
+
 ## Package files
 
 - `01-SCREENCAST-SCRIPT.md` — exact recording order and visible outcomes.
@@ -67,10 +89,22 @@ gates. Do not depict a disabled endpoint as a completed feature.
 - `artifacts/quality/youtube-private-dev-oppo-public-viewing-20260725-01/PUBLIC-DATA-PLAYBACK-PROOF-10.md`
 - `artifacts/quality/youtube-api-submission-readiness-20260725-01/OWNER-CONNECT-PROOF-AND-APP-RETURN-20260726.md`
 
-The final recording must identify its exact APK SHA-256, commit, project,
-device, date and capability state. It must contain no credentials, tokens,
-Firebase UID, OAuth code/state, API key, notification content or private
-customer data.
+Current exact-candidate evidence is preserved in:
+
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/01-video-discovery.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/02-video-cued.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/03-video-playing.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/04-shorts-cued.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/05-shorts-playing.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/06-shorts-next-cued.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/07-short-discussion.png`
+- `artifacts/quality/youtube-compliance-follow-up-20260729-01/founder-approval-r20/08-short-details.png`
+
+The separate, supervised owner-connection evidence is dated proof and is
+captioned as such. The final recording identifies the APK SHA-256, commit,
+project, device, date and capability state. It contains no credentials,
+tokens, Firebase UID, OAuth code/state, API key, notification content or
+private customer data.
 
 ## Official policy boundary rechecked on 29 July 2026
 

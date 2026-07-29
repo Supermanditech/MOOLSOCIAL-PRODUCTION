@@ -104,8 +104,8 @@ class _SocialYouTubeConnectV2ScreenState
       builder: (context, _) => Stack(
         children: [
           SocialV2Scaffold(
-            title: 'YouTube Connect',
-            subtitle: 'Video on YouTube · outcome on MoolSocial',
+            title: 'Share from YouTube',
+            subtitle: 'Add a video or Short to your MoolSocial post',
             selectedTab: SocialV2Tab.create,
             onBack: () => Navigator.of(context).pop(),
             onTab: _onTab,
@@ -194,7 +194,7 @@ class _SocialYouTubeConnectV2ScreenState
       YouTubeConnectStep.action => 1,
       YouTubeConnectStep.review || YouTubeConnectStep.complete => 2,
     };
-    const labels = ['Source', 'Action', 'Check'];
+    const labels = ['Video', 'Details', 'Review'];
     return Row(
       children: List.generate(
         labels.length,
@@ -239,10 +239,10 @@ class _SocialYouTubeConnectV2ScreenState
       key: const ValueKey('youtube-connect-source'),
       children: [
         const SocialV2Hero(
-          eyebrow: 'YouTube-hosted video',
-          title: 'Keep the video on YouTube. Add one useful Mool action.',
+          eyebrow: 'YouTube video or Short',
+          title: 'Share a YouTube video on MoolSocial',
           detail:
-              'MoolSocial checks public availability and embedding before the post can continue.',
+              'Add a public link, write your post and review it before sharing.',
         ),
         _progress(YouTubeConnectStep.source),
         ..._status(),
@@ -251,8 +251,8 @@ class _SocialYouTubeConnectV2ScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SocialV2SectionTitle(
-                'Paste a public YouTube link',
-                detail: 'Use one eligible video or Short',
+                'Add a YouTube link',
+                detail: 'Choose a public video or Short',
               ),
               const SizedBox(height: 10),
               TextField(
@@ -270,8 +270,8 @@ class _SocialYouTubeConnectV2ScreenState
               FilledButton.icon(
                 key: const Key('social-v2-youtube-validate'),
                 onPressed: session.busy ? null : _validateLink,
-                icon: const Icon(Icons.verified_outlined),
-                label: Text(session.busy ? 'Checking…' : 'Check this video'),
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: Text(session.busy ? 'Opening…' : 'Continue'),
               ),
             ],
           ),
@@ -282,21 +282,8 @@ class _SocialYouTubeConnectV2ScreenState
           label: Text(
             session.youtubeChannelConnected
                 ? 'YouTube channel connected'
-                : 'Connect your YouTube channel',
+                : 'Connect YouTube',
           ),
-        ),
-        if (session.youtubeValidated)
-          SocialV2ListTile(
-            icon: Icons.play_circle_outline_rounded,
-            title: 'How local baskets save time',
-            detail: 'Public YouTube content · embedding allowed',
-            badge: 'Eligible',
-            onTap: _continueToAction,
-          ),
-        FilledButton(
-          key: const Key('social-v2-youtube-source-next'),
-          onPressed: session.youtubeValidated ? _continueToAction : null,
-          child: const Text('Attach a MoolSocial action'),
         ),
       ],
     );
@@ -304,28 +291,30 @@ class _SocialYouTubeConnectV2ScreenState
 
   Future<void> _validateLink() async {
     widget.session.setYouTubeUrl(_url.text);
-    await widget.session.validateYouTubeSource();
+    if (await widget.session.validateYouTubeSource() && mounted) {
+      _continueToAction();
+    }
   }
 
   Future<void> _explainChannelConnection() async {
     await showSocialV2Sheet(
       context,
-      title: 'Connect your YouTube channel',
-      subtitle: 'You choose whether to continue with Google',
+      title: 'Connect YouTube',
+      subtitle: 'Choose a Google account to find your channel videos',
       children: [
         const SocialV2ListTile(
           icon: Icons.person_search_outlined,
-          title: 'View channel identity and public content',
-          detail: 'Only the content you choose is connected',
+          title: 'Find your YouTube channel',
+          detail: 'Choose a public video or Short to share',
         ),
         const SocialV2ListTile(
           icon: Icons.verified_user_outlined,
-          title: 'Check availability and embedding',
-          detail: 'MoolSocial cannot edit or delete your YouTube videos',
+          title: 'Your videos stay on YouTube',
+          detail: 'MoolSocial cannot edit or delete them',
         ),
         const SocialV2Notice(
           title: 'You remain in control',
-          detail: 'Cancel now, revoke later or reconnect after access expires.',
+          detail: 'You can disconnect YouTube from MoolSocial at any time.',
           warning: true,
         ),
         FilledButton(
@@ -333,7 +322,9 @@ class _SocialYouTubeConnectV2ScreenState
           onPressed: () async {
             Navigator.of(context).pop();
             widget.session.setYouTubeChannelConnected(true);
-            await widget.session.validateYouTubeSource();
+            if (await widget.session.validateYouTubeSource() && mounted) {
+              _continueToAction();
+            }
           },
           child: const Text('Continue with Google'),
         ),
@@ -353,8 +344,8 @@ class _SocialYouTubeConnectV2ScreenState
         _progress(YouTubeConnectStep.action),
         ..._status(),
         const SocialV2SectionTitle(
-          'What should the viewer accomplish?',
-          detail: 'Attach one action outside the YouTube player',
+          'Add post details',
+          detail: 'Choose what people can do from your MoolSocial post',
         ),
         Wrap(
           spacing: 7,
@@ -421,10 +412,8 @@ class _SocialYouTubeConnectV2ScreenState
           value: session.youtubeCampaign != 'none',
           onChanged: (value) =>
               session.setYouTubeCampaign(value ? 'funded' : 'none'),
-          title: const Text('Add paid MoolSocial discovery'),
-          subtitle: const Text(
-            'The placement stays outside the YouTube player',
-          ),
+          title: const Text('Promote this MoolSocial post'),
+          subtitle: const Text('Reach more people for a fixed duration'),
         ),
         if (session.youtubeCampaign != 'none')
           Wrap(
@@ -443,14 +432,14 @@ class _SocialYouTubeConnectV2ScreenState
         CheckboxListTile(
           value: session.youtubeRightsConfirmed,
           onChanged: (value) => session.confirmYouTubeRights(value ?? false),
-          title: const Text('I control the required rights'),
-          subtitle: const Text('Video rights remain managed on YouTube'),
+          title: const Text('I have permission to share this video'),
+          subtitle: const Text('The video remains on its YouTube channel'),
         ),
         CheckboxListTile(
           value: session.youtubeActionTruthConfirmed,
           onChanged: (value) =>
               session.confirmYouTubeActionTruth(value ?? false),
-          title: const Text('The attached action is accurate'),
+          title: const Text('The post information is accurate'),
           subtitle: const Text(
             'Price, availability, refund and destination are current',
           ),
@@ -458,11 +447,11 @@ class _SocialYouTubeConnectV2ScreenState
         FilledButton(
           key: const Key('social-v2-youtube-action-next'),
           onPressed: _continueToCheck,
-          child: const Text('Check connected post'),
+          child: const Text('Review post'),
         ),
         OutlinedButton(
           onPressed: session.backYouTubeStep,
-          child: const Text('Back to video'),
+          child: const Text('Change video'),
         ),
       ],
     );
@@ -482,15 +471,15 @@ class _SocialYouTubeConnectV2ScreenState
         _progress(YouTubeConnectStep.review),
         ..._status(),
         const SocialV2Hero(
-          eyebrow: 'YouTube attribution',
-          title: 'Video and MoolSocial action stay separate.',
+          eyebrow: 'Ready to share',
+          title: 'Review your YouTube post',
           detail:
-              'YouTube controls playback. MoolSocial measures only the independent action.',
+              'Check the video, post details and disclosure before publishing.',
         ),
         SocialV2ListTile(
           icon: Icons.ondemand_video_outlined,
-          title: 'How local baskets save time',
-          detail: 'YouTube-hosted · public · embedding allowed',
+          title: 'Selected YouTube video',
+          detail: 'Public video or Short',
           badge: 'Video',
         ),
         SocialV2Card(
@@ -498,7 +487,7 @@ class _SocialYouTubeConnectV2ScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'MOOLSOCIAL ACTION · OUTSIDE PLAYER',
+                'MOOLSOCIAL POST',
                 style: TextStyle(
                   color: SocialV2Colors.green,
                   fontSize: 10,
@@ -519,26 +508,21 @@ class _SocialYouTubeConnectV2ScreenState
             ],
           ),
         ),
-        const SocialV2Notice(
-          title: 'Metrics stay clearly separated',
-          detail:
-              'YouTube provides video metrics. MoolSocial verifies opens, leads, orders or bookings.',
-        ),
         if (session.youtubeCampaign != 'none')
           SocialV2Notice(
-            title: '${session.youtubePlacementDays}-day MoolSocial placement',
+            title: '${session.youtubePlacementDays}-day promotion',
             detail:
-                '${session.youtubePlacementDays * 24} hours begin only after funding, approval and activation. Renewal is never automatic.',
+                'Promotion begins after payment and approval. It does not renew automatically.',
             warning: true,
           ),
         FilledButton(
           key: const Key('social-v2-youtube-publish'),
           onPressed: session.busy ? null : _publish,
-          child: Text(session.busy ? 'Publishing…' : 'Publish connected post'),
+          child: Text(session.busy ? 'Publishing…' : 'Publish on MoolSocial'),
         ),
         OutlinedButton(
           onPressed: session.backYouTubeStep,
-          child: const Text('Back to action'),
+          child: const Text('Edit post details'),
         ),
       ],
     );
@@ -554,15 +538,15 @@ class _SocialYouTubeConnectV2ScreenState
       key: const ValueKey('youtube-connect-complete'),
       children: [
         const SocialV2Hero(
-          eyebrow: 'Connected post published',
-          title: 'Your YouTube video now has a MoolSocial action.',
+          eyebrow: 'Published on MoolSocial',
+          title: 'Your YouTube post is live',
           detail:
-              'The video remains on YouTube and the independently governed action is live on MoolSocial.',
+              'People can now watch the video and use the details you added.',
         ),
         ..._status(),
         SocialV2ListTile(
           icon: Icons.verified_rounded,
-          title: session.youtubeConnectedPostId ?? 'Connected post',
+          title: 'YouTube video post',
           detail:
               '${creatorMoolActions[session.youtubeAction] ?? 'Action'} · ${session.youtubeReference}',
           badge: 'Published',
@@ -576,11 +560,11 @@ class _SocialYouTubeConnectV2ScreenState
           ),
         FilledButton(
           onPressed: () => context.go('/app/social'),
-          child: const Text('View connected post'),
+          child: const Text('View post'),
         ),
         OutlinedButton(
           onPressed: session.restartYouTubeConnect,
-          child: const Text('Connect another video'),
+          child: const Text('Share another YouTube video'),
         ),
       ],
     );

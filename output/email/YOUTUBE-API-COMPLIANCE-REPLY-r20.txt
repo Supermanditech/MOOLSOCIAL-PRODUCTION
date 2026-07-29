@@ -1,0 +1,84 @@
+Hello YouTube API Services Team,
+
+Thank you for specifying the additional material required to complete the review of MoolSocial's YouTube API Client.
+
+We have attached the requested step-by-step visual reference and a supporting endpoint reference:
+
+1. MoolSocial-YouTube-API-Compliance-Walkthrough-r20.mp4
+   - 90.20-second reviewer walkthrough
+   - recorded from a physical OPPO CPH2375 device running Android 13
+   - SHA-256: 735029A8D4D46669388283C4A6093E8181CBFF17748EA1E6694B8BBE428CD8A6
+
+2. MoolSocial-YouTube-API-Compliance-Reference-r20.pdf
+   - step-by-step visual results, exact API-to-screen mapping, separate dated OAuth evidence, policy boundaries and review identifiers
+   - SHA-256: 09EA7347D0597C7733277307FEC857F6835EF6BF7BA85E70EDD7E2503F9B30CD
+
+Review identifiers
+
+- Company: SUPERMANDI TECH PRIVATE LIMITED
+- API Client: MoolSocial
+- Google Cloud project: moolsocial-dev-503018
+- Android package: com.moolsocial.app
+- Review build: youtube-compliance-followup-20260729-20
+- Review APK SHA-256: 641957A49AFC9F6A8D742CF71A4F22E65832F2443701BDB89F7C06BEE6EAC8FC
+- Physical device: OPPO CPH2375, Android 13
+- Recording time: 29 July 2026, 18:15-18:16 IST
+
+Visible sequence and end results
+
+1. Public video discovery
+   The recording begins on MoolSocial's source-attributed Videos library. The current client uses videos.list with chart=mostPopular and regionCode=IN, followed by channels.list enrichment for returned channel IDs.
+   End result: genuine public titles, thumbnails, channels and metadata are visible with YouTube source attribution.
+
+2. Official video playback
+   A deliberate user tap mounts the official YouTube embedded player inside the OS-provided Android WebView.
+   End result: real YouTube-hosted playback occurs with YouTube branding, controls, advertising and links visible and unobstructed.
+
+3. Bounded Shorts discovery and playback
+   The current Shorts lane uses bounded, quota-sensitive search.list candidate discovery followed by videos.list metadata hydration and eligibility checks.
+   End result: an eligible public Short plays in the official YouTube player; a vertical user gesture changes to a distinct eligible item, and the returned public details remain source-attributed.
+
+4. Read-only owner-channel connection
+   The PDF separately identifies the dated supervised OAuth evidence for the founder-controlled VetoNews identity. This flow uses the system browser and the narrow youtube.readonly scope, followed by backend exact-channel reconciliation to VetoNews channel UC7rn0BIzhULpyw1NYXh-mWQ. Refresh credentials remain server-side.
+   End result: the selected owner channel is reconciled without placing an OAuth code, state, access token, refresh token or internal MoolSocial user ID in the app return route.
+
+Clarification of the endpoint inventory
+
+For precision, the broad method selections in our original quota form included MoolSocial's staged production roadmap as well as the implemented review slice. The API Client demonstrated in the attachments currently uses:
+
+- videos.list for eligible public video discovery, metadata and eligibility hydration;
+- channels.list for returned-channel enrichment;
+- bounded search.list candidate discovery for the Shorts lane, followed by videos.list hydration;
+- the official YouTube embedded player for playback; and
+- OAuth 2.0 with youtube.readonly for the separately supervised owner-channel connection and exact-channel reconciliation.
+
+Uploads, YouTube viewer mutations, playlist or channel/asset mutations, Analytics/Reporting and Live-management methods are not active in the submitted reviewer build and are not represented as working in the screencast.
+
+Please assess this demonstrated current boundary for compliance and the applicable quota decision. If the original method inventory must be replaced with a narrower current-method inventory before the review proceeds, please advise us and we will provide it. Future capabilities will be submitted for the applicable review only after they are implemented and available for inspection.
+
+Playback, commerce and customer-data boundaries
+
+- MoolSocial does not download, store, transcode or proxy YouTube audiovisual content.
+- Playback is initiated by a deliberate user tap through the official YouTube player.
+- MoolSocial does not obscure provider branding, controls, advertising, links or other standard player functionality.
+- MoolSocial advertising or commerce does not appear inside or over the YouTube player.
+- MoolSocial does not reward, coerce or compensate users for watching YouTube content.
+- YouTube-returned metadata remains source-attributed and is not converted into an invented cross-platform metric or suitability score.
+- MoolSocial is a broader AI-enabled social-commerce application; the YouTube surfaces are source-attributed provider experiences within that independent product, not a clone of YouTube.
+
+The preferred API contact remains:
+
+Dharmendra Choudhary
+Founder, MoolSocial
+SUPERMANDI TECH PRIVATE LIMITED
+hello@moolsocial.com
+https://moolsocial.com/
+
+No additional contact needs to be copied at this time.
+
+Please let us know if any additional test access, architecture material, quota calculation or supporting evidence is required.
+
+Regards,
+Dharmendra Choudhary
+Founder, MoolSocial
+SUPERMANDI TECH PRIVATE LIMITED

@@ -30,7 +30,7 @@ void main() {
     expect(find.byKey(const Key('screen04-capability-rail')), findsOneWidget);
     expect(find.text('MoolSocial'), findsOneWidget);
     expect(find.text('Shorts'), findsOneWidget);
-    expect(find.text('Videos'), findsOneWidget);
+    expect(find.text('Videos'), findsWidgets);
     expect(find.text('Feed'), findsOneWidget);
     expect(find.text('Create'), findsOneWidget);
     expect(find.text('Chat'), findsOneWidget);
@@ -38,33 +38,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Mool selection reveals the focused sub-action ribbon', (
+  testWidgets('Mool Buy opens the native Buy V2 route directly', (
     tester,
   ) async {
-    final owners = _Owners();
+    final owners = _AuthenticatedOwners();
     addTearDown(owners.dispose);
-    await _pump(tester, const Size(390, 844), 1, owners.consumer());
+    await owners.journey.start();
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: owners.journey,
+        creatorSession: owners.creator,
+        retailerSession: owners.retailer,
+        sharedSession: owners.shared,
+        initialLocation: '/app/social',
+      ),
+    );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('screen04-mool')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('screen04-rail-buy')));
     await tester.pumpAndSettle();
-    expect(find.text('Retail and wholesale, in one place'), findsOneWidget);
-    expect(find.text('Everyday essentials, nearby'), findsOneWidget);
-    expect(find.byKey(const Key('screen04-search')), findsOneWidget);
-    expect(find.byKey(const Key('screen04-choice-ribbon')), findsOneWidget);
-    expect(find.text('Grocery'), findsWidgets);
-    expect(find.text('Categories'), findsOneWidget);
-    expect(find.text('Medicine'), findsOneWidget);
-    expect(find.text('Basket'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    expect(find.text('Retail and wholesale, in one place'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('screen04-rail-categories')));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Find the right aisle faster'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('screen04-mool')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-world-ribbon')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-capability-rail')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -130,6 +135,7 @@ void main() {
     'every main action preserves its focused sub-action through Mool and Back',
     (tester) async {
       for (final world in screen04Worlds) {
+        if (world.id == 'buy') continue;
         final owners = _Owners();
         await _pump(
           tester,
@@ -239,21 +245,12 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('screen04-rail-buy')));
       await tester.tap(find.byKey(const Key('screen04-rail-buy')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('screen04-rail-medicine')),
-      );
-      await tester.tap(find.byKey(const Key('screen04-rail-medicine')));
-      await tester.pumpAndSettle();
-      expect(find.text('Health needs with clear steps'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('screen04-primary')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('buy-medicine-screen')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
-      expect(find.text('Health needs with clear steps'), findsOneWidget);
-      expect(find.byKey(const Key('screen04-choice-ribbon')), findsOneWidget);
+      expect(find.text('Build trust for better work'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -341,7 +338,9 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.text('View channel'));
+    await tester.tap(
+      find.byKey(const Key('screen04-video-channel-details-sheet')),
+    );
     await tester.pumpAndSettle();
     expect(
       find.text(
@@ -527,6 +526,7 @@ void main() {
       await _pump(tester, const Size(320, 568), 1.4, owners.consumer());
 
       for (final world in screen04Worlds) {
+        if (world.id == 'buy') continue;
         await tester.tap(find.byKey(const Key('screen04-mool')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(
