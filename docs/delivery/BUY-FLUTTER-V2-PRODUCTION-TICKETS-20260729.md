@@ -125,8 +125,13 @@ The following gates remain open and must not be reported as complete:
   parity registry and automated pixel tolerances are not yet complete.
 - `BUY-FV2-021`: OPPO journeys cover the primary candidate states, but the
   complete interruption/process-death/offline/permission matrix remains open.
-- `BUY-FV2-022`: the exact final committed release candidate, two complete
-  regression runs and founder Flutter acceptance remain open.
+- `BUY-FV2-022` is partially complete. Native source commit
+  `f1d13569c96c6a3e4ce1069bb2fa394d5192d971` produced release-review build
+  `2026072906`; its candidate and OPPO-installed APKs are byte-identical at
+  SHA-256
+  `0D9CD9CA1D38F41B6D4CD9CB58FFEA32F4D7F8063556E5C0A6A9BAF80D1651FD`.
+  Two independently logged 47-test affected regression runs pass. Founder
+  Flutter acceptance and the repository-wide legacy suite remain open.
 - the repository-wide Flutter suite has unrelated/stale legacy visual-golden
   debt. Buy-owned functional, responsive, router and legacy behavior suites
   are maintained separately; the global debt must not be hidden by updating
