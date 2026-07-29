@@ -45,11 +45,11 @@ disclosed creator/video/product campaign relationship.
 
 The preferred contact remains:
 
-Dharmendra Choudhary  
-SUPERMANDI TECH PRIVATE LIMITED  
-MoolSocial  
+Dharmendra Choudhary
+SUPERMANDI TECH PRIVATE LIMITED
+MoolSocial
 hello@moolsocial.com
 
-Regards,  
-Dharmendra Choudhary  
+Regards,
+Dharmendra Choudhary
 Founder, MoolSocial
