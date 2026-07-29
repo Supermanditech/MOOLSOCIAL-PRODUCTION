@@ -5,6 +5,9 @@ import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
 import 'buy_v2_design.dart';
 
+String _productCountLabel(int count) =>
+    '$count ${count == 1 ? 'product' : 'products'}';
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({super.key, required this.session});
 
@@ -312,7 +315,7 @@ class BuyV2CartView extends StatelessWidget {
                         style: context.buyTitle.copyWith(fontSize: 19),
                       ),
                       Text(
-                        '${session.itemCount} products · Shop + Wholesale + Medicine · ₹${session.cartTotal}',
+                        '${_productCountLabel(session.itemCount)} · Shop + Wholesale + Medicine · ₹${session.cartTotal}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.buyMeta.copyWith(fontSize: 8),
@@ -490,7 +493,10 @@ class BuyV2CheckoutView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${session.itemCount} products', style: context.buyMeta),
+                  Text(
+                    _productCountLabel(session.itemCount),
+                    style: context.buyMeta,
+                  ),
                   Text(
                     '₹${session.cartTotal}',
                     style: const TextStyle(

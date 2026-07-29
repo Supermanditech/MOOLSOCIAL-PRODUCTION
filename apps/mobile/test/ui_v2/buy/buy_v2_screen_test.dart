@@ -211,6 +211,28 @@ void main() {
     expect(find.text(session.notice!), findsOneWidget);
   });
 
+  testWidgets('cart item count uses correct singular and plural copy', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    final products = BuyV2Catalogue.products
+        .where((item) => item.destination == BuyV2Destination.shop)
+        .take(2)
+        .toList();
+    session.addProduct(products.first.id);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    session.openCart();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('1 product ·'), findsOneWidget);
+    expect(find.textContaining('1 products'), findsNothing);
+
+    session.addProduct(products.last.id);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 products ·'), findsOneWidget);
+  });
+
   testWidgets('Orders opens at the top after Checkout was scrolled', (
     tester,
   ) async {
