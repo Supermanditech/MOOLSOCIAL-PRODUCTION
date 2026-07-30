@@ -4136,3 +4136,27 @@ State: `COMPLETE_TEST_ONLY_DISCOVERY_HARDENING`. No runtime, backend, HTML,
 protected media or Social source changed, so no APK rebuild or reinstall was
 required. Push, deploy, publication and production release remain
 unauthorized.
+
+## Overnight autonomous close
+
+The protected R35.1 autonomous hardening period is complete. Tickets
+`BUY-FV2-107` through `BUY-FV2-116` are preserved as local test, gate and
+documentation commits. The final complete Buy suite passed `132/132` twice
+against one source state, and every protected/security/reference/copy gate
+passed.
+
+No further implementation ticket was started because the remaining identified
+session concerns require runtime/API policy: public mutable address/order
+collections and silent first-record fallback for stale selections. Backend and
+visual/motion work remain deferred under founder boundaries.
+
+Durable consolidated handoff:
+
+`docs/quality/BUY-V2-R35-1-OVERNIGHT-AUTONOMOUS-HANDOFF-20260731.md`
+
+Additive finalization evidence:
+
+`artifacts/quality/buy-r35-1-overnight-autonomous-handoff-20260731-38`
+
+State: `COMPLETE_PROTECTED_TEST_ONLY_HARDENING`. Push, deploy, publication and
+production release remain unauthorized.
