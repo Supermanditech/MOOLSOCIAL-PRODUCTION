@@ -3131,3 +3131,56 @@ Completion evidence:
     no APK rebuild or reinstall was required.
 - Durable handoff:
   `docs/quality/BUY-V2-R35-1-SESSION-COVERAGE-HANDOFF-20260731.md`.
+
+### `BUY-FV2-113` — Add deterministic mixed-operation state-machine coverage
+
+- Status: **COMPLETE — TEST-ONLY INTERLEAVING HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 commerce-state corruption protection**
+- Authority: founder direction to continue autonomous Buy regression
+  hardening without subjective UI work or invented backend behavior.
+- Scope:
+  - execute a fixed, reproducible sequence of mixed Buy session actions across
+    Shop, Wholesale, Medicine and all cart scopes;
+  - interleave add/increase/decrease/remove, destination/scope changes,
+    catalogue/cart/account/recovery navigation, checkout and confirmation;
+  - prove exact quantity, price, destination, scoped-cart, checkout and
+    fulfilment-group invariants after every action;
+  - change no Flutter runtime, UI, backend, HTML, Social or business rule.
+- Acceptance:
+  1. At least 2,000 deterministic mixed actions execute every action family,
+     every commerce destination and every cart scope.
+  2. After every action, total item count and value equal the exact sum of all
+     product quantities and prices, and no line falls below its minimum order.
+  3. Cart and checkout projections expose only their selected scope and their
+     destination sets, counts, totals and fulfilment groups remain exact.
+  4. Confirming a scoped checkout removes only those exact product IDs,
+     preserves every out-of-scope line and records exact confirmed totals.
+  5. The sequence has no wall-clock assertion and uses no randomness,
+     network, plugin, device, production identity or personal-data fixture.
+  6. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-state-machine-hardening-20260731-34`.
+- Completion:
+  - One fixed 2,400-step state-machine test exercises all 12 action families,
+    all three commerce destinations and all four cart scopes.
+  - Every step recomputes and verifies global/scoped/checkout quantities,
+    values, destination ownership and fulfilment grouping from the 172
+    unrestricted offer records; periodic scoped confirmations also prove
+    exact removal and confirmed-order projection.
+  - The focused test passed. Its first attempt exposed a low-bit LCG action
+    selection flaw; explicit round-robin action scheduling fixed the test
+    design, and the failed attempt remains preserved.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `123/123`; four opt-in capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy,
+    nine-state HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, backend, HTML, protected media or Social source changed, so
+    no APK rebuild or reinstall was required.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-STATE-MACHINE-HANDOFF-20260731.md`.

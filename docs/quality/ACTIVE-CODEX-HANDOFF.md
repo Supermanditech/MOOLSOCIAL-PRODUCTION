@@ -3935,3 +3935,56 @@ State: `COMPLETE_TEST_ONLY_SESSION_HARDENING`. No runtime, backend, HTML,
 protected media or Social source changed, so no APK rebuild or reinstall was
 required. Push, deploy, publication and production release remain
 unauthorized.
+
+## Latest nonvisual Buy checkpoint — deterministic state-machine coverage
+
+Ticket `BUY-FV2-113` adds one fixed, reproducible 2,400-step state-machine
+test. It exercises all 12 action families across Shop, Wholesale, Medicine and
+all four cart scopes while interleaving quantity mutations, scope/destination
+changes, catalogue/cart/account/recovery navigation, checkout and
+confirmation.
+
+After every action, the test independently reconstructs all active quantities
+from the 172 unrestricted offer records. It verifies exact global, scoped and
+checkout item counts and values, cart/checkout destination ownership,
+minimum-order floors and seller fulfilment grouping. Scoped confirmations
+must remove only their exact product IDs, preserve out-of-scope lines and
+record exact confirmed totals and destinations.
+
+The focused test passed. Its first attempt revealed that low LCG bits modulo
+12 reached only eight action families. The final test uses explicit
+round-robin action scheduling and deterministic generated products,
+destinations and scopes. The invalid first attempt remains in additive
+evidence.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`123/123`, with four opt-in capture generators skipped. Protected Buy,
+protected Social, backend-contract, data-egress, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The protected Social tree remains:
+
+`54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`
+
+Read-only OPPO verification again found approved `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-STATE-MACHINE-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-state-machine-hardening-20260731-34`
+
+State: `COMPLETE_TEST_ONLY_STATE_MACHINE_HARDENING`. No runtime, backend,
+HTML, protected media or Social source changed, so no APK rebuild or reinstall
+was required. Push, deploy, publication and production release remain
+unauthorized.
