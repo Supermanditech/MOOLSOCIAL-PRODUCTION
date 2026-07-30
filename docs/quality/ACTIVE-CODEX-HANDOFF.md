@@ -3880,3 +3880,58 @@ Additive evidence:
 State: `COMPLETE_TEST_ONLY_PERFORMANCE_HARDENING`. No runtime, HTML,
 protected media or Social source changed. Push, deploy, publication and
 production release remain unauthorized.
+
+## Latest nonvisual Buy checkpoint — deterministic session coverage
+
+Ticket `BUY-FV2-112` adds eight deterministic test-only guards for established
+Shop, Wholesale, Medicine and Orders session behavior. They cover
+category-neutral Orders state, vertical cart projections and clearing,
+empty-state normalization, account entry and repeat taps, wholesale and
+prescription fail-closed rules, Wholesale/Medicine reorder scope, navigation
+and recovery depth, explicit confirmed-order product IDs, final cart removal
+and a wholly synthetic address fixture.
+
+The focused suite passed `8/8`. Across the seven instrumented protected V2
+files, line coverage increased from `3595/4290` (`83.8%`) to `3665/4290`
+(`85.4%`). `buy_v2_session.dart` increased by 70 executed production lines,
+from `594/673` (`88.3%`) to `664/673` (`98.7%`), without changing production
+code.
+
+Nine session lines remain uncovered. They are short-circuit operands,
+unreachable Orders enum arms or the two silent selected-order/address fallback
+policies. Those fallback policies were deliberately not made permanent test
+contracts because changing or approving them requires product judgment.
+Camera/plugin and visual presentation paths were also outside this test-only
+ticket.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`122/122`, with four opt-in capture generators skipped. Protected Buy,
+protected Social, backend-contract, data-egress, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The protected Social tree remains:
+
+`54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`
+
+Read-only OPPO verification again found approved `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-SESSION-COVERAGE-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-coverage-gap-audit-20260731-33`
+
+State: `COMPLETE_TEST_ONLY_SESSION_HARDENING`. No runtime, backend, HTML,
+protected media or Social source changed, so no APK rebuild or reinstall was
+required. Push, deploy, publication and production release remain
+unauthorized.

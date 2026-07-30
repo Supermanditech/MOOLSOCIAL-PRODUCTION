@@ -3068,3 +3068,66 @@ Completion evidence:
   `docs/quality/BUY-V2-R35-1-PERFORMANCE-BUDGETS-HANDOFF-20260731.md`.
 - Additive evidence:
   `artifacts/quality/buy-r35-1-performance-budgets-20260731-32`.
+
+### `BUY-FV2-112` — Close deterministic Buy session coverage gaps
+
+- Status: **COMPLETE — TEST-ONLY SESSION HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 commerce-state regression protection**
+- Authority: founder direction to continue autonomous production hardening
+  without subjective UI changes, backend invention or changes to the approved
+  native runtime.
+- Scope:
+  - add focused tests for established Shop, Wholesale, Medicine and Orders
+    session behavior that the R35.1 coverage audit proved was not executed;
+  - cover vertical cart arithmetic and clearing, empty-state routing,
+    account-entry behavior, wholesale and prescription fail-closed guards,
+    navigation depth, recovery routing and explicit order-product projection;
+  - use only synthetic test fixtures and change no Flutter runtime, UI,
+    backend, HTML, Social or business rule;
+  - exclude camera/plugin paths, presentation branches and silent
+    selected-order/address fallbacks because those require device coverage or
+    product judgment rather than test-only contract hardening.
+- Acceptance:
+  1. Orders remain category-neutral and cannot mutate a saved commerce
+     category.
+  2. Scoped line, item and total projections remain exact for Shop,
+     Wholesale and Medicine, and clearing any established scope returns to
+     its own safe catalogue.
+  3. Empty cart and checkout entry points, direct account-child actions and
+     repeated account taps retain their established deterministic routes.
+  4. An unverified wholesale session and prescription quantities fail closed
+     without unauthorized cart mutation.
+  5. Cart, checkout, confirmation, order-items and recovery back/retry paths
+     retain the established depth and explicit confirmed-order product IDs.
+  6. The before/after report records protected Buy line coverage without
+     overstating uncovered camera/plugin or visual behavior.
+  7. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-coverage-gap-audit-20260731-33`.
+- Completion:
+  - Eight deterministic tests now protect category-neutral Orders behavior,
+    vertical cart arithmetic and clearing, empty-state normalization, direct
+    and repeated account actions, wholesale and prescription limits,
+    Wholesale/Medicine reorder scope, navigation/recovery depth, explicit
+    confirmed-order product IDs, final removal and synthetic-address state.
+  - The focused suite passed `8/8`. Protected Buy V2 line coverage increased
+    from `3595/4290` (`83.8%`) to `3665/4290` (`85.4%`); session coverage
+    increased from `594/673` (`88.3%`) to `664/673` (`98.7%`) without a
+    production-line change.
+  - The nine remaining uncovered session lines are short-circuit operands,
+    unreachable Orders enum arms or the two silent selected-order/address
+    fallback policies intentionally excluded from this test-only contract.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `122/122`; four opt-in capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy,
+    nine-state HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, backend, HTML, protected media or Social source changed, so
+    no APK rebuild or reinstall was required.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-SESSION-COVERAGE-HANDOFF-20260731.md`.
