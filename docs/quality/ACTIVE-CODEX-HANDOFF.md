@@ -3731,3 +3731,52 @@ Additive evidence:
 State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING`. Local commit is authorized
 under the founder's instruction to keep the approved work safe. Push, deploy,
 publication and production release remain unauthorized.
+
+## Latest nonvisual Buy checkpoint — backend-contract absence boundary
+
+Ticket `BUY-FV2-109` converts the established absence of an approved Buy
+backend contract into a machine-enforced release boundary. The new
+`scripts/check-buy-backend-contract-boundary.ps1` scans eight native Buy V2
+files, 72 backend files and the one existing contract. It rejects direct
+network/database clients, WebViews, commerce URL launchers, unapproved
+endpoints, review/mock/fake production gateways, fabricated delayed business
+completion and unapproved backend/contract owners.
+
+The established first-party address-request support URL remains explicitly
+allowed. Real scanner camera behavior, notice timers and Flutter image
+placeholder builders are not classified as backend behavior.
+
+The built-in adversarial self-test rejected all seven forbidden cases and
+accepted the approved support link. Gate SHA-256:
+
+`F223C823F12604B46F4EB29261D401F5522CA5EE4E166EFB1CDAAD48331251DB`
+
+The gate is wired into `scripts/check.ps1`, and the release policy requires it
+until identity, authorization, request/response and failure semantics are
+approved in a real contract package.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`111/111`, with four explicit capture generators skipped. Protected Buy,
+protected Social, approved UI locks, brand, founder-FINAL Buy reference,
+user-facing copy, nine-state HTML copy and 154 routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+Read-only OPPO verification again found `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-BACKEND-CONTRACT-BOUNDARY-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-backend-contract-boundary-20260731-30`
+
+State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING`. No mobile/backend runtime,
+approved HTML, protected media or Social source changed. Push, deploy,
+publication and production release remain unauthorized.

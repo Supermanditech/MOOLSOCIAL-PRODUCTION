@@ -2898,3 +2898,61 @@ Completion evidence:
   `docs/quality/BUY-V2-R35-1-STATE-INVARIANT-HARDENING-HANDOFF-20260731.md`.
 - Additive evidence:
   `artifacts/quality/buy-r35-1-state-invariant-hardening-20260731-29`.
+
+### `BUY-FV2-109` — Enforce the unapproved Buy backend-contract boundary
+
+- Status: **COMPLETE — NONVISUAL RELEASE-GATE HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 production-integrity and contract-governance protection**
+- Authority: founder direction not to invent backend behavior, business rules,
+  database fields or API contracts that have not been established.
+- Scope:
+  - machine-check the protected native Buy V2 surface for direct transport,
+    database, WebView, URL-launcher, endpoint, mock gateway and fabricated
+    delayed-completion paths;
+  - machine-check existing backend and contract trees for an unapproved Buy
+    owner;
+  - retain the one established first-party address-request support URL;
+  - change no Flutter runtime, backend implementation, approved HTML, Social
+    source or business rule.
+- Acceptance:
+  1. The current protected source passes and reports the scanned mobile,
+     backend and contract inventory.
+  2. A built-in adversarial self-test rejects direct HTTP/WebView imports,
+     delayed completion, review gateway use, endpoint paths, external URLs and
+     an invented backend service while accepting the established first-party
+     address-request URL.
+  3. The gate is part of the repository's main local quality command and the
+     release policy explains how a future approved contract replaces this
+     absence boundary.
+  4. The gate does not classify the real camera scanner, notice lifetime,
+     Flutter image placeholder builder or first-party address-request copy
+     action as backend behavior.
+  5. Full analysis, two same-source Buy regressions and all protected,
+     reference, copy and interaction gates pass. No APK rebuild or reinstall
+     is required because application runtime bytes remain unchanged.
+- Completion:
+  - The clean gate scanned eight native Buy V2 files, 72 existing backend
+    files and one contract file. No invented Buy transport, production double,
+    endpoint or backend owner was found.
+  - The built-in adversarial self-test rejected six forbidden mobile paths and
+    one invented backend owner, and accepted the established first-party
+    address-request support link.
+  - Gate SHA-256:
+    `F223C823F12604B46F4EB29261D401F5522CA5EE4E166EFB1CDAAD48331251DB`.
+  - The gate is wired into `scripts/check.ps1`; release policy now requires it
+    until an approved contract package replaces the absence boundary.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `111/111`; four explicit capture generators were skipped in each normal
+    run.
+  - Protected Buy, protected Social, approved UI locks, brand,
+    founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and
+    154-route interaction gates passed.
+  - Read-only OPPO verification again matched approved version
+    `1.0.0-r35.1` (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No mobile/backend runtime, approved HTML, protected media or Social file
+    changed.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-BACKEND-CONTRACT-BOUNDARY-HANDOFF-20260731.md`.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-backend-contract-boundary-20260731-30`.

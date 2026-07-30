@@ -92,6 +92,13 @@
     presentation, routing or protected media change requires explicit founder
     approval and a new additive baseline; the existing baseline is never
     overwritten.
+28. Until an approved Buy transport and authorization contract exists, every
+    task runs `scripts/check-buy-backend-contract-boundary.ps1`. Protected Buy
+    V2 production code cannot introduce a direct network/database client,
+    WebView, URL-launcher commerce path, unapproved endpoint, review/mock/fake
+    gateway or fabricated delayed completion. Backend and contract trees
+    cannot acquire a Buy owner until identity, authorization, request/response
+    and failure semantics are explicitly approved and recorded.
 
 ## Buy module trial sequence
 
