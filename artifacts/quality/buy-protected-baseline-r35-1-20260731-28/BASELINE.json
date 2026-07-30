@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "buy-protected-baseline-r35-1-20260731-28",
+  "recordedAt": "2026-07-31",
+  "state": "FOUNDER_APPROVED_PROTECTED_BUY_BASELINE",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "baselineCommit": "34045d33869e13ac17b03d59c2625f2d91a1fb92",
+  "protectedRuntime": {
+    "fileCount": 28,
+    "portableTreeSha256": "f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d",
+    "hashAlgorithm": "SHA-256",
+    "lineEndingPolicy": "UTF-8 text is normalized from CRLF to LF; binary files use raw bytes",
+    "gate": "scripts/check-buy-protected-baseline.ps1",
+    "scope": [
+      "apps/mobile/lib/features/buy/**",
+      "apps/mobile/lib/ui_v2/buy/**",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "five founder-approved Buy runtime media atlases"
+    ]
+  },
+  "candidate": {
+    "id": "BUY-R35-1-DENSE-FLAT-SEARCH-SUGGESTIONS-DEVICE",
+    "package": "com.moolsocial.app",
+    "versionName": "1.0.0-r35.1",
+    "versionCode": 2026073045,
+    "retainedApk": "artifacts/quality/buy-flutter-r35-1-dense-flat-search-suggestions-oppo-20260731-27/moolsocial-buy-r35-1-dense-flat-search-suggestions-device-review-debug.apk",
+    "retainedApkSha256": "10fc8c43626b7c2882a6340c6a3a4710c2092e4d45ab0a768ce7056f23bcb9c7",
+    "installedBaseExactMatch": true,
+    "device": "OPPO CPH2375, Android 13",
+    "serial": "2b3e0f71"
+  },
+  "founderAuthority": {
+    "approvedAt": "2026-07-31",
+    "approvalHandoff": "docs/quality/BUY-V2-R35-1-DENSE-FLAT-SEARCH-SUGGESTIONS-HANDOFF-20260731.md",
+    "baselineCommitAuthorized": true
+  },
+  "verification": {
+    "sourceFingerprintSha256": "2158c38b2f9905c0c76eb2c1528f654bcab1e25a7b090fb78837f9e749dd9a74",
+    "flutterAnalyze": "passed",
+    "regression1": "106 passed; 4 opt-in capture generators skipped",
+    "regression2": "106 passed; 4 opt-in capture generators skipped",
+    "responsiveCaptureCount": 12,
+    "interactionRoutes": 154,
+    "customerCopyFlutter": "passed",
+    "customerCopyHtml": "9/9 passed",
+    "approvedUiLocks": "passed",
+    "brandIntegrity": "passed",
+    "protectedSocialBaseline": "passed",
+    "runtimeDefectMatches": 0
+  },
+  "futureWorkBoundary": {
+    "testAndDocumentationHardeningMayAdvance": true,
+    "runtimeChangeRequiresFounderApprovedBaselineReplacement": true,
+    "backendContractsRemainDeferred": true,
+    "motionRequiresFounderReview": true
+  },
+  "historicalBoundary": {
+    "approvedHtmlModified": false,
+    "screens01To03Preserved": true,
+    "protectedSocialTreeSha256": "54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e",
+    "earlierBuyEvidencePreserved": true
+  }
+}

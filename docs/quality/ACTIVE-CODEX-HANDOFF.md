@@ -3613,6 +3613,37 @@ approved the checksum-matched R35.1 OPPO candidate and authorized a scoped
 local baseline commit. Push, deployment, publication and production release
 remain separate and unauthorized.
 
+## Latest nonvisual Buy checkpoint — R35.1 protected runtime gate
+
+Founder-approved R35.1 is committed locally at
+`34045d33869e13ac17b03d59c2625f2d91a1fb92`. Ticket `BUY-FV2-107`
+machine-protects its exact 28-file native Buy runtime tree:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The new `scripts/check-buy-protected-baseline.ps1` gate passes the real
+repository and an isolated exact copy, rejects an isolated source mutation,
+and rejects an added runtime file. It is wired into `scripts/check.ps1`
+alongside the existing protected Social gate.
+
+Full Flutter analysis, two `106/106` Buy regressions and all protected
+reference, copy, brand, Social, Buy and 154-route gates passed. Four opt-in
+capture generators were skipped in each normal regression run. No Flutter
+runtime, approved HTML or protected Social file changed, so no APK rebuild or
+OPPO reinstall was required.
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-PROTECTED-BASELINE-GATE-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-protected-baseline-r35-1-20260731-28`
+
+Future runtime, motion, UI, routing or protected-media changes require founder
+review and a new additive baseline. Tests, documentation and read-only
+analysis may advance while the protected runtime tree remains exact.
+
 ## Latest native Buy checkpoint — R35.1 dense flat autocomplete
 
 Ticket `BUY-FV2-106` is implemented and checksum-matched on OPPO. R35 removed

@@ -2796,3 +2796,52 @@ Completion evidence:
   approved as the protected native Buy baseline. A scoped local commit is
   authorized. Push, deployment, publication and production release remain
   separate decisions.
+
+### `BUY-FV2-107` — Machine-protect the founder-approved native Buy baseline
+
+- Status: **COMPLETE — PROTECTED BASELINE GATE VERIFIED 2026-07-31**
+- Severity: **P0 regression-prevention boundary**
+- Authority: founder approval of the checksum-matched R35.1 OPPO candidate and
+  direction to keep the accepted production state safe.
+- Scope:
+  - record an additive machine-readable baseline for the exact approved Buy
+    runtime tree and checksum-matched APK;
+  - add a deterministic PowerShell gate using the repository's established
+    portable SHA-256 and line-ending policy;
+  - protect Buy runtime source, routing and approved media while allowing
+    tests and documentation to advance independently;
+  - add the gate to release policy without modifying application behavior.
+- Acceptance:
+  1. The gate enumerates exactly the approved Buy runtime roots and explicit
+     files, rejects missing/added files and rejects any portable tree mismatch.
+  2. The retained APK checksum is verified when the local audit artifact is
+     present, while CI remains able to validate source without committing the
+     approximately 200 MB APK.
+  3. A clean baseline passes and an isolated copied-tree mutation fails with a
+     truthful founder-approval error.
+  4. The baseline records commit, candidate, installed checksum match,
+     protected Social tree, verification status and future-work boundary.
+  5. Existing Social, approved UI, brand, Buy reference, copy and interaction
+     gates remain green. No Flutter runtime file changes.
+- Completion:
+  - Founder-approved baseline commit:
+    `34045d33869e13ac17b03d59c2625f2d91a1fb92`.
+  - Protected runtime inventory: `28` files.
+  - Portable runtime tree:
+    `f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`.
+  - The clean repository and an isolated clean copy passed.
+  - An isolated copied-tree source mutation failed on tree checksum.
+  - An isolated added runtime file failed on inventory count.
+  - Full Flutter analysis passed.
+  - Two complete Buy regressions passed `106/106`; four opt-in capture
+    generators were skipped in each normal run.
+  - Protected Buy, protected Social, approved UI locks, brand,
+    founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and
+    154-route interaction gates passed.
+  - The repository's main local quality command now invokes both protected
+    Social and protected Buy baseline gates.
+  - No application runtime, approved HTML or protected Social file changed.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-PROTECTED-BASELINE-GATE-HANDOFF-20260731.md`.
+- Additive evidence:
+  `artifacts/quality/buy-protected-baseline-r35-1-20260731-28`.

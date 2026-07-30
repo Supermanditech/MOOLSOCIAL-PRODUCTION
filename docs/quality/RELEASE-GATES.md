@@ -86,6 +86,12 @@
     tricolour line and two-by-two-grid Mool launcher are mandatory. A module
     cannot introduce a custom M, initial tile, placeholder circle or
     module-specific logo.
+27. After the founder-approved R35.1 native Buy baseline, every task runs
+    `scripts/check-buy-protected-baseline.ps1`. Test and documentation
+    hardening may advance without changing its runtime tree. Any Buy runtime,
+    presentation, routing or protected media change requires explicit founder
+    approval and a new additive baseline; the existing baseline is never
+    overwritten.
 
 ## Buy module trial sequence
 
