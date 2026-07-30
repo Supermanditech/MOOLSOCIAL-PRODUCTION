@@ -3780,3 +3780,55 @@ Additive evidence:
 State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING`. No mobile/backend runtime,
 approved HTML, protected media or Social source changed. Push, deploy,
 publication and production release remain unauthorized.
+
+## Latest nonvisual Buy checkpoint — data-egress security boundary
+
+Ticket `BUY-FV2-110` adds
+`scripts/check-buy-data-egress-boundary.ps1`. It scans the eight protected
+native V2 files for direct diagnostic logging, analytics, crash-report detail,
+arbitrary clipboard/system-share egress, unapproved client storage and
+embedded credential-like material.
+
+The clean source has no such sink. The established first-party
+`https://moolsocial.com/address/request` clipboard action is the sole explicit
+allowlist entry. The built-in self-test rejected seven forbidden cases and
+accepted both the approved clipboard action and ordinary presentation. Gate
+SHA-256:
+
+`BE184CC9E49FA87587628501D2AF2EA86375A73A95A59B3D1093DED76C016F0D`
+
+The gate is wired into `scripts/check.ps1` and release policy item 29.
+
+Residual risk remains explicit: the protected `BuyV2Session` still contains
+hard-coded review recipient/contact/address fixture records. The data-egress
+gate does not turn them into an authenticated production identity source.
+Replacing them safely requires an approved identity/address adapter contract,
+founder authorization for the runtime change and an additive Buy baseline.
+Their values were intentionally omitted from new evidence.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`111/111`, with four explicit capture generators skipped. Protected Buy,
+protected Social, backend-contract boundary, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+Read-only OPPO verification again found the approved `1.0.0-r35.1`
+(`versionCode 2026073045`) and exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-DATA-EGRESS-BOUNDARY-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-data-egress-boundary-20260731-31`
+
+State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING_WITH_RECORDED_IDENTITY_FIXTURE_RISK`.
+No Flutter/backend runtime, HTML, protected media or Social source changed.
+Push, deploy, publication and production release remain unauthorized.

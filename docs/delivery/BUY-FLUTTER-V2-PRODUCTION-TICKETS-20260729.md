@@ -2956,3 +2956,61 @@ Completion evidence:
   `docs/quality/BUY-V2-R35-1-BACKEND-CONTRACT-BOUNDARY-HANDOFF-20260731.md`.
 - Additive evidence:
   `artifacts/quality/buy-r35-1-backend-contract-boundary-20260731-30`.
+
+### `BUY-FV2-110` — Enforce the Buy V2 data-egress security boundary
+
+- Status: **COMPLETE — NONVISUAL SECURITY HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 customer-data and credential exposure protection**
+- Authority: founder direction to continue security/observability work without
+  inventing backend behavior, fields or contracts.
+- Scope:
+  - machine-check the protected native Buy V2 surface for direct logging,
+    analytics, crash-report, arbitrary clipboard/system-share, local-storage
+    and embedded-credential sinks;
+  - retain only the established first-party address-request clipboard action;
+  - record—not conceal—the separate hard-coded review-identity fixture risk
+    that cannot be removed without replacing the approved runtime;
+  - change no Flutter runtime, backend, HTML, Social or business rule.
+- Acceptance:
+  1. The clean gate reports its exact protected V2 inventory and permits only
+     the established first-party address-request clipboard action.
+  2. Built-in adversarial tests reject diagnostic logging, analytics,
+     unapproved storage, system sharing, arbitrary clipboard read/write and
+     credential-like material while accepting approved clipboard and ordinary
+     presentation cases.
+  3. The gate is wired into the main quality command and release policy.
+  4. The handoff explicitly records that the current protected session still
+     contains hard-coded review recipient/contact/address fixture data. The
+     gate prevents egress but does not misrepresent that fixture as a
+     production identity source.
+  5. Full analysis, two same-source Buy regressions and all protected,
+     backend-boundary, reference, copy and interaction gates pass. Runtime is
+     unchanged, so no APK rebuild or reinstall is required.
+- Completion:
+  - The clean gate scanned eight native Buy V2 files. It found no direct
+    logging, analytics, crash-report detail, arbitrary system share,
+    unapproved local store or embedded credential sink.
+  - Seven adversarial egress cases were rejected; the established first-party
+    address-request clipboard action and ordinary presentation were accepted.
+  - Gate SHA-256:
+    `BE184CC9E49FA87587628501D2AF2EA86375A73A95A59B3D1093DED76C016F0D`.
+  - The gate is wired into `scripts/check.ps1` and item 29 of the release
+    policy.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `111/111`; four explicit capture generators were skipped in each normal
+    run.
+  - Protected Buy, protected Social, backend-contract boundary, approved UI
+    locks, brand, founder-FINAL Buy reference, user-facing copy, nine-state
+    HTML copy and 154-route interaction gates passed.
+  - The hard-coded review identity/contact/address fixture remains recorded as
+    a release risk. It was not changed, allowlisted as a production identity
+    source or copied into evidence.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No Flutter/backend runtime, HTML, protected media or Social source
+    changed.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-DATA-EGRESS-BOUNDARY-HANDOFF-20260731.md`.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-data-egress-boundary-20260731-31`.

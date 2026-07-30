@@ -99,6 +99,14 @@
     gateway or fabricated delayed completion. Backend and contract trees
     cannot acquire a Buy owner until identity, authorization, request/response
     and failure semantics are explicitly approved and recorded.
+29. Until Buy data classification, consent, redaction, retention and
+    observability contracts are approved, every task runs
+    `scripts/check-buy-data-egress-boundary.ps1`. Native Buy V2 cannot directly
+    send customer, order, address, prescription, payment or query state to
+    logs, analytics, crash-report details, arbitrary clipboard/system-share
+    channels or unapproved local stores, and cannot embed credential-like
+    material. The established first-party address-request URL is the sole
+    current clipboard allowlist entry.
 
 ## Buy module trial sequence
 
