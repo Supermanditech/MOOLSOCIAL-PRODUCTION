@@ -3014,3 +3014,57 @@ Completion evidence:
   `docs/quality/BUY-V2-R35-1-DATA-EGRESS-BOUNDARY-HANDOFF-20260731.md`.
 - Additive evidence:
   `artifacts/quality/buy-r35-1-data-egress-boundary-20260731-31`.
+
+### `BUY-FV2-111` — Add conservative Buy in-process performance budgets
+
+- Status: **COMPLETE — TEST-ONLY PERFORMANCE HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 deterministic performance-regression protection**
+- Authority: founder priority for Buy performance checks that remain useful
+  across later UI changes without inventing backend scale behavior.
+- Scope:
+  - measure the established native session/catalogue seam only;
+  - cover repeated vertical search/filter projection, a full current-seed
+    mixed cart and checkout grouping, and repeated vertical state traversal;
+  - use conservative deterministic budgets suitable for normal CI variance;
+  - change no Flutter runtime, UI, backend, HTML, Social or business rule.
+- Acceptance:
+  1. The current approved catalogue search/filter boundary completes a
+     deterministic Shop/Wholesale/Medicine workload under a conservative
+     budget and never returns a cross-vertical offer.
+  2. Adding every unrestricted current-seed offer and repeatedly projecting
+     checkout lines/groups stays under budget while preserving exact item and
+     total arithmetic.
+  3. Thousands of destination/query/filter transitions stay under budget and
+     preserve independently owned category state.
+  4. Test output records measured elapsed time; budgets are high enough to
+     catch catastrophic regressions without pretending to benchmark release
+     hardware.
+  5. Handoff explicitly states that this does not prove million-product scale,
+     ranking, pagination, cache or network latency. Those require approved
+     backend contracts and server-side performance tests.
+  6. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Completion:
+  - Three deterministic performance tests cover 1,200 search/filter
+    projections, a 172-offer mixed cart with 500 checkout projections, and
+    6,000 vertical transitions.
+  - Worst observed elapsed times across focused and full regression runs were
+    174 ms, 286 ms and 19 ms respectively, against independent conservative
+    8,000 ms guards.
+  - Performance-test SHA-256:
+    `A7F2E772BA96E1AC6BF3233887F8DC4410C4E5D2006444A4F0265655A4B07E62`.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `114/114`; four explicit capture generators were skipped in each normal
+    run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy, nine-state
+    HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, HTML, protected media or Social source changed.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-PERFORMANCE-BUDGETS-HANDOFF-20260731.md`.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-performance-budgets-20260731-32`.

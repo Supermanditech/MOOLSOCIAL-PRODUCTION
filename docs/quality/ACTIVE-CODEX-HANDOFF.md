@@ -3832,3 +3832,51 @@ Additive evidence:
 State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING_WITH_RECORDED_IDENTITY_FIXTURE_RISK`.
 No Flutter/backend runtime, HTML, protected media or Social source changed.
 Push, deploy, publication and production release remain unauthorized.
+
+## Latest nonvisual Buy checkpoint — conservative performance budgets
+
+Ticket `BUY-FV2-111` adds three deterministic test-only performance guards at
+the current in-process session/catalogue seam:
+
+- 1,200 Shop/Wholesale/Medicine search and filter projections;
+- all 172 unrestricted current-seed offers in one mixed cart plus 500 checkout
+  line/group projections;
+- 6,000 destination/query/filter transitions with category-isolation checks.
+
+Each workload has an independent conservative 8,000 ms budget. Worst observed
+times across focused and complete regression runs were 174 ms, 286 ms and
+19 ms respectively. Performance-test SHA-256:
+
+`A7F2E772BA96E1AC6BF3233887F8DC4410C4E5D2006444A4F0265655A4B07E62`
+
+These tests catch catastrophic local regressions only. They do not prove
+million-product scale, pagination, ranking, caching, network latency or
+server-side concurrency. Those remain blocked on approved backend contracts
+and require server/load tests against authoritative adapters.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`114/114`, with four opt-in capture generators skipped. Protected Buy,
+protected Social, backend-contract, data-egress, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+Read-only OPPO verification again found the approved `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-PERFORMANCE-BUDGETS-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-performance-budgets-20260731-32`
+
+State: `COMPLETE_TEST_ONLY_PERFORMANCE_HARDENING`. No runtime, HTML,
+protected media or Social source changed. Push, deploy, publication and
+production release remain unauthorized.
