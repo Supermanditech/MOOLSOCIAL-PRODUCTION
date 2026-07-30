@@ -3686,6 +3686,48 @@ Additive evidence:
 
 `artifacts/quality/buy-flutter-r35-1-dense-flat-search-suggestions-oppo-20260731-27`
 
-State: `DEVICE_VERIFIED_FOUNDER_REVIEW_CANDIDATE`. Founder visual acceptance,
-production baseline promotion, commit, push, deploy, publication and
-production release remain pending.
+State: `FOUNDER_APPROVED_PROTECTED_BUY_BASELINE`. The founder approved the
+checksum-matched R35.1 candidate on 31 July 2026 and authorized its scoped
+local baseline commit. Push, deploy, publication and production release remain
+separate and unauthorized.
+
+## Latest nonvisual Buy checkpoint — R35.1 state-invariant hardening
+
+Ticket `BUY-FV2-108` adds five deterministic session-boundary tests without
+changing the protected native Buy runtime. The tests exhaust every
+non-prescription offer's established minimum-order add/increment/decrement
+floor, prove every prescription offer fails closed before a matched approval,
+exercise invalid external identifiers and inputs, verify read-only checkout
+and confirmation projections, prevent repeated confirmation duplication and
+repeat vertical traversal to catch transient query/filter leakage.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`111/111`, with the four explicit screenshot capture generators skipped in
+each normal run. Protected Buy, protected Social, approved UI locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and the
+154-route interaction gate all passed.
+
+The protected Buy runtime remains exactly 28 files with tree:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+Read-only OPPO verification found the approved `1.0.0-r35.1`
+(`versionCode 2026073045`) installation. The on-device base APK SHA-256 still
+matches:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+No Flutter runtime, approved HTML, protected media or Social file changed, so
+no APK rebuild or reinstall was required.
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-STATE-INVARIANT-HARDENING-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-state-invariant-hardening-20260731-29`
+
+State: `COMPLETE_NONVISUAL_PRODUCTION_HARDENING`. Local commit is authorized
+under the founder's instruction to keep the approved work safe. Push, deploy,
+publication and production release remain unauthorized.

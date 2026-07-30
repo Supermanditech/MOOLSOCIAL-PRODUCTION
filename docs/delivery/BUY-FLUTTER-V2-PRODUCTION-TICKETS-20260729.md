@@ -2845,3 +2845,56 @@ Completion evidence:
   `docs/quality/BUY-V2-R35-1-PROTECTED-BASELINE-GATE-HANDOFF-20260731.md`.
 - Additive evidence:
   `artifacts/quality/buy-protected-baseline-r35-1-20260731-28`.
+
+### `BUY-FV2-108` — Harden deterministic Buy state and mutation invariants
+
+- Status: **COMPLETE — TEST-ONLY HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 regression, misuse and stale-identifier protection**
+- Authority: founder direction to continue independently only where work can
+  remain production-grade without subjective design or unapproved backend
+  decisions.
+- Scope:
+  - add deterministic tests at the existing native `BuyV2Session` boundary;
+  - exercise only established catalogue, cart, prescription, checkout,
+    vertical-isolation and invalid-identifier behavior;
+  - make no Flutter runtime, visual, approved-reference, Social, backend
+    contract or business-rule change.
+- Acceptance:
+  1. Every non-prescription offer proves its established minimum-order add,
+     increment, decrement and removal floor without negative quantity or total.
+  2. Every prescription offer proves that add/increment remains blocked before
+     a matched prescription and cannot silently enter the cart.
+  3. Unknown product, order, address and payment identifiers, and invalid
+     review/report inputs, fail closed without mutating unrelated valid state.
+  4. Checkout projections, fulfilment-group lines and confirmed-order
+     collections remain read-only; repeated confirmation cannot duplicate an
+     order after the scoped cart has been consumed.
+  5. A deterministic repeated vertical sequence proves Shop, Wholesale and
+     Medicine category ownership remains separate while transient query and
+     filter state cannot leak between destinations.
+  6. Focused tests, full Flutter analysis, two same-source Buy regressions and
+     all protected/reference/copy/interaction gates pass. Because this ticket
+     changes no runtime bytes, the checksum-matched approved OPPO installation
+     remains the exact device candidate and no rebuild is required.
+- Completion:
+  - Five focused invariant tests pass across every catalogue offer, including
+    minimum-order quantity floors, prescription fail-closed behavior, invalid
+    external identifiers, immutable checkout projections, single-use
+    confirmation and repeated vertical traversal.
+  - Full Flutter analysis passed.
+  - Two identical-source Buy regressions each passed `111/111`; four explicit
+    screenshot capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, approved UI locks, brand,
+    founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and
+    154-route interaction gates passed.
+  - Protected runtime remained exactly 28 files with tree
+    `f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`.
+  - Read-only OPPO verification found the approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) installation and exact on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No application runtime, approved HTML, protected media or Social file
+    changed; no APK rebuild or reinstall was necessary.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-STATE-INVARIANT-HARDENING-HANDOFF-20260731.md`.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-state-invariant-hardening-20260731-29`.
