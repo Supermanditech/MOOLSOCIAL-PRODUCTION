@@ -3286,3 +3286,61 @@ Completion evidence:
     no APK rebuild or reinstall was required.
 - Durable handoff:
   `docs/quality/BUY-V2-R35-1-ORDER-PROGRESS-HANDOFF-20260731.md`.
+
+### `BUY-FV2-116` — Exhaust independent vertical discovery contracts
+
+- Status: **COMPLETE — TEST-ONLY DISCOVERY HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 search and category isolation protection**
+- Authority: founder direction to keep Shop, Wholesale and Medicine
+  independently configurable, plus autonomous authorization for nonvisual Buy
+  regression hardening.
+- Scope:
+  - exhaustively search every established offer ID in Shop, Wholesale and
+    Medicine and prove it resolves only inside its owning vertical;
+  - validate every category projection, including empty categories and the
+    prescription aggregate, against exact ordered catalogue membership;
+  - prove category suggestions remain bounded, unique, truthful and confined
+    to the active destination/category projection;
+  - change no Flutter runtime, UI, backend, HTML, Social or business rule.
+- Acceptance:
+  1. All 176 offer IDs are discoverable in their owning vertical and return
+     zero results in each other vertical; additional same-vertical substring
+     matches remain allowed by the established search contract.
+  2. All 84 category selections across Shop, Wholesale and Medicine return
+     their exact ordered product projection; the established 18-item “All”
+     presentation bound remains explicit.
+  3. Every suggestion list contains at most four unique non-empty titles from
+     the active projection, and selecting a suggestion cannot escape its
+     active destination or category.
+  4. Orders exposes no product suggestions.
+  5. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-discovery-contract-hardening-20260731-37`.
+- Completion:
+  - Three focused tests execute all 176 established offer IDs against all
+    three commerce verticals, all 84 category selections and every resulting
+    category-suggestion state.
+  - Every offer ID remained discoverable in its owning vertical and returned
+    no result in either other vertical. Same-vertical substring matches remain
+    valid; the first overly strict singleton assertion exposed this search
+    nuance and its failed output remains preserved.
+  - Every category returned its exact ordered catalogue projection, including
+    empty categories, the Medicine prescription aggregate and the explicit
+    18-item “All” presentation bound.
+  - Suggestions remained unique, non-empty, limited to four, sourced from the
+    active projection and unable to cross destination or category ownership.
+    Orders exposed none.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `132/132`; four opt-in capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy,
+    nine-state HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, backend, HTML, protected media or Social source changed, so
+    no APK rebuild or reinstall was required.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-DISCOVERY-CONTRACT-HANDOFF-20260731.md`.
