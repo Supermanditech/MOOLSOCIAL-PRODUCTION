@@ -4037,3 +4037,51 @@ State: `COMPLETE_TEST_ONLY_LISTENER_LIVENESS_HARDENING`. No runtime, backend,
 HTML, protected media or Social source changed, so no APK rebuild or reinstall
 was required. Push, deploy, publication and production release remain
 unauthorized.
+
+## Latest nonvisual Buy checkpoint — order history and live progress
+
+Ticket `BUY-FV2-115` adds three test-only order-integrity guards. Every
+established order must have a unique non-empty ID, a real commerce
+destination, positive total, complete partner/delivery facts and progress in
+`(0, 1]`. Delivered records must be exactly `1.0`; active records must remain
+below completion.
+
+The Active and Delivered tabs are now proven to be a disjoint, lossless
+partition of complete order history. Exact order-ID search must return only
+the matching order inside its owning tab.
+
+A mixed Shop/Wholesale/Medicine checkout is also confirmed in one test. Its
+three generated live orders retain the correct prefixes, vertical product
+IDs, totals, non-complete progress, status and active-tab ownership.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`129/129`, with four opt-in capture generators skipped. Protected Buy,
+protected Social, backend-contract, data-egress, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The protected Social tree remains:
+
+`54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`
+
+Read-only OPPO verification again found approved `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-ORDER-PROGRESS-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-order-progress-hardening-20260731-36`
+
+State: `COMPLETE_TEST_ONLY_ORDER_PROGRESS_HARDENING`. No runtime, backend,
+HTML, protected media or Social source changed, so no APK rebuild or reinstall
+was required. Push, deploy, publication and production release remain
+unauthorized.

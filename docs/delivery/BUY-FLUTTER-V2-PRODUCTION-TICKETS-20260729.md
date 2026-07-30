@@ -3235,3 +3235,54 @@ Completion evidence:
     no APK rebuild or reinstall was required.
 - Durable handoff:
   `docs/quality/BUY-V2-R35-1-LISTENER-LIVENESS-HANDOFF-20260731.md`.
+
+### `BUY-FV2-115` — Protect order-history partition and live-progress integrity
+
+- Status: **COMPLETE — TEST-ONLY ORDER-INTEGRITY HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 order traceability and progress protection**
+- Authority: founder requirement that every order and tracking action show
+  truthful progress, plus autonomous authorization for nonvisual Buy tests.
+- Scope:
+  - validate completeness, identity, destination and progress bounds for every
+    established order record;
+  - prove Active and Delivered are a lossless, disjoint partition of order
+    history and exact order-ID search remains tab-scoped;
+  - confirm a mixed Shop/Wholesale/Medicine checkout creates traceable,
+    non-complete live orders with exact vertical product IDs and totals;
+  - change no Flutter runtime, UI, backend, HTML, Social or business rule.
+- Acceptance:
+  1. Every established order has a unique non-empty ID, valid commerce
+     destination, positive total, complete partner/delivery facts and progress
+     in `(0, 1]`.
+  2. Delivered orders are exactly `1.0`; active orders remain below `1.0`.
+  3. Active and Delivered tab IDs are disjoint and their union is the complete
+     order history; exact ID search returns only that order in its owning tab.
+  4. Mixed confirmation creates exact Shop/Wholesale/Medicine order IDs,
+     product IDs, totals, progress and active-tab ownership.
+  5. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-order-progress-hardening-20260731-36`.
+- Completion:
+  - Three focused tests validate every established order record, prove Active
+    and Delivered form a disjoint lossless history partition, and confirm
+    exact mixed-vertical live-order projection.
+  - All current and generated orders have valid commerce destinations,
+    complete delivery/partner facts and progress in `(0, 1]`; delivered
+    records are exactly `1.0` and active records remain below completion.
+  - Exact ID search stayed inside its owning tab. Mixed confirmation created
+    traceable Shop, Wholesale and Medicine orders with exact prefixes,
+    product IDs, totals, progress and active ownership.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `129/129`; four opt-in capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy,
+    nine-state HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, backend, HTML, protected media or Social source changed, so
+    no APK rebuild or reinstall was required.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-ORDER-PROGRESS-HANDOFF-20260731.md`.
