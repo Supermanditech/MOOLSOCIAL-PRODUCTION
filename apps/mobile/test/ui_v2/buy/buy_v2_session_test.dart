@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
@@ -15,6 +19,118 @@ void main() {
       expect(BuyV2Catalogue.shopCategories.length, 35);
       expect(BuyV2Catalogue.wholesaleCategories.length, 35);
       expect(BuyV2Catalogue.medicineCategories.length, 14);
+      expect(
+        sha256.convert(utf8.encode(buyV2CommerceSeedRows.trim())).toString(),
+        'bc099e5a1f27fc033259b94ccd0f4be5d40fedcca96bdc14be38b792ce16c0e0',
+      );
+
+      const approvedCommerceIds = <String>[
+        'tomato',
+        'atta',
+        'oil',
+        'rice',
+        'soap',
+        'notebook',
+        'onion',
+        'milk',
+        'bread',
+        'eggs',
+        'chicken',
+        'ghee',
+        'turmeric',
+        'cumin',
+        'poha',
+        'oats',
+        'noodles',
+        'pasta',
+        'biscuits',
+        'namkeen',
+        'tea',
+        'juice',
+        'peas',
+        'ice-cream',
+        'toothpaste',
+        'shampoo',
+        'face-wash',
+        'floor-cleaner',
+        'toilet-cleaner',
+        'detergent',
+        'dishwash',
+        'diapers',
+        'baby-wipes',
+        'chyawanprash',
+        'protein',
+        'dog-food',
+        'cat-food',
+        'foil',
+        'paper-cups',
+        'thermal-rolls',
+        'price-labels',
+        'pencils',
+        'banana',
+        'potato',
+        'curd',
+        'paneer',
+        'fish-fillet',
+        'mutton',
+        'toor-dal',
+        'sugar',
+        'mustard-oil',
+        'groundnut-oil',
+        'red-chilli',
+        'coriander-seeds',
+        'corn-flakes',
+        'idli-mix',
+        'ketchup',
+        'jam',
+        'potato-chips',
+        'chocolate',
+        'coffee',
+        'water',
+        'frozen-fries',
+        'cheese-slices',
+        'toothbrush',
+        'handwash',
+        'moisturizer',
+        'hair-oil',
+        'garbage-bags',
+        'air-freshener',
+        'fabric-conditioner',
+        'liquid-detergent',
+        'baby-lotion',
+        'baby-cereal',
+        'glucose',
+        'sanitary-pads',
+        'dog-treats',
+        'cat-litter',
+        'tissues',
+        'takeaway-containers',
+        'barcode-labels',
+        'carry-bags',
+        'printer-paper',
+        'ball-pens',
+      ];
+      final shopProducts = BuyV2Catalogue.products
+          .where((item) => item.destination == BuyV2Destination.shop)
+          .toList();
+      final wholesaleProducts = BuyV2Catalogue.products
+          .where((item) => item.destination == BuyV2Destination.wholesale)
+          .toList();
+      expect(shopProducts.map((item) => item.canonicalId), approvedCommerceIds);
+      expect(
+        wholesaleProducts.map((item) => item.canonicalId),
+        approvedCommerceIds,
+      );
+      for (final canonicalId in approvedCommerceIds) {
+        final offers = BuyV2Catalogue.products
+            .where((item) => item.canonicalId == canonicalId)
+            .toList();
+        expect(offers, hasLength(2), reason: canonicalId);
+        expect(offers.map((item) => item.destination).toSet(), {
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+        }, reason: canonicalId);
+      }
 
       final identities = BuyV2Catalogue.products
           .map((item) => item.id)
@@ -75,6 +191,70 @@ void main() {
       );
     });
 
+    test('maps every Buy offer to a customer-facing partner role', () {
+      for (final product in BuyV2Catalogue.products) {
+        expect(product.partnerRole, startsWith('Mool '), reason: product.id);
+        expect(
+          product.partnerRole.toLowerCase(),
+          isNot(contains('verified')),
+          reason: product.id,
+        );
+      }
+      expect(
+        BuyV2Catalogue.products
+            .firstWhere((item) => item.destination == BuyV2Destination.medicine)
+            .regulatoryTrustFact,
+        'Licensed pharmacy',
+      );
+    });
+
+    test('customer reviews and product reports validate and persist', () {
+      final product = BuyV2Catalogue.products.first;
+      expect(
+        session.submitProductReview(
+          productId: product.id,
+          rating: 0,
+          comment: '',
+        ),
+        isFalse,
+      );
+      expect(
+        session.submitProductReview(
+          productId: product.id,
+          rating: 5,
+          comment: '  Pack arrived in good condition.  ',
+        ),
+        isTrue,
+      );
+      expect(session.customerReviewFor(product.id)?.rating, 5);
+      expect(
+        session.customerReviewFor(product.id)?.comment,
+        'Pack arrived in good condition.',
+      );
+      expect(
+        session.reportProduct(
+          productId: product.id,
+          reason: 'Product image does not match',
+        ),
+        isTrue,
+      );
+      expect(session.hasReportedProduct(product.id), isTrue);
+    });
+
+    test('order items retain the exact return depth into product detail', () {
+      expect(session.openTracking('MS-240782'), isTrue);
+      expect(session.openOrderItems('MS-240782'), isTrue);
+      final item = session.productsForOrder(session.selectedOrder).first;
+
+      expect(session.openProduct(item.id), isTrue);
+      expect(session.view, BuyV2View.product);
+      session.goBack();
+
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.orderItems);
+      expect(session.selectedOrder.id, 'MS-240782');
+    });
+
     test('one saved prescription unlocks only its matched medicine lines', () {
       const telmisartan = 'm-telmisartan-40';
       const atorvastatin = 'm-atorvastatin-10';
@@ -89,6 +269,60 @@ void main() {
       expect(session.addProduct(atorvastatin), isTrue);
       expect(session.addProduct(metformin), isFalse);
       expect(session.pendingPrescriptionProductId, metformin);
+    });
+
+    test(
+      'unknown saved prescription IDs authorize nothing and preserve retry',
+      () {
+        const metformin = 'm-metformin-500';
+        expect(session.addProduct(metformin), isFalse);
+        expect(session.pendingPrescriptionProductId, metformin);
+
+        expect(
+          session.approveSavedPrescription('missing-prescription'),
+          isFalse,
+        );
+
+        expect(session.prescriptionAttached, isFalse);
+        expect(session.isPrescriptionApproved(metformin), isFalse);
+        expect(session.isPrescriptionApproved('m-pantoprazole-40'), isFalse);
+        expect(session.quantityFor(metformin), 0);
+        expect(session.pendingPrescriptionProductId, metformin);
+        expect(session.notice, 'This saved prescription could not be found.');
+
+        expect(session.approveSavedPrescription('arvind'), isTrue);
+        expect(session.prescriptionAttached, isTrue);
+        expect(session.pendingPrescriptionProductId, isNull);
+        expect(session.quantityFor(metformin), 1);
+      },
+    );
+
+    test('prescription quantity cannot exceed the approved medicine line', () {
+      const telmisartan = 'm-telmisartan-40';
+      session.approveSavedPrescription('meera');
+      expect(session.addProduct(telmisartan), isTrue);
+
+      session.increase(telmisartan);
+
+      expect(session.quantityFor(telmisartan), 1);
+      expect(session.notice, contains('Prescription quantity reached'));
+    });
+
+    test('new prescription never authorizes every prescription medicine', () {
+      session.attachNewPrescription();
+      final approved = BuyV2Catalogue.products
+          .where(
+            (product) =>
+                product.requiresPrescription &&
+                session.isPrescriptionApproved(product.id),
+          )
+          .length;
+      final allRx = BuyV2Catalogue.products
+          .where((product) => product.requiresPrescription)
+          .length;
+
+      expect(approved, greaterThan(0));
+      expect(approved, lessThan(allRx));
     });
 
     test('removing the final item returns directly to its catalogue', () {
@@ -118,5 +352,539 @@ void main() {
       expect(BuyV2Destination.values, contains(BuyV2Destination.medicine));
       expect(BuyV2Destination.values, contains(BuyV2Destination.orders));
     });
+
+    test(
+      'scope checkout confirms only that family and preserves other cart lines',
+      () {
+        final shop = BuyV2Catalogue.products.firstWhere(
+          (item) => item.destination == BuyV2Destination.shop,
+        );
+        final wholesale = BuyV2Catalogue.products.firstWhere(
+          (item) => item.destination == BuyV2Destination.wholesale,
+        );
+        session.addProduct(shop.id);
+        session.addProduct(wholesale.id);
+
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        session.openCheckout();
+        session.confirmOrder();
+
+        expect(session.confirmedDestinations, {BuyV2Destination.wholesale});
+        expect(session.quantityFor(wholesale.id), 0);
+        expect(session.quantityFor(shop.id), 1);
+      },
+    );
+
+    test(
+      'mixed checkout projects exact seller groups into traceable orders',
+      () {
+        final selected = <BuyV2Product>[
+          BuyV2Catalogue.products.firstWhere(
+            (item) => item.destination == BuyV2Destination.shop,
+          ),
+          BuyV2Catalogue.products.firstWhere(
+            (item) =>
+                item.destination == BuyV2Destination.shop &&
+                item.seller !=
+                    BuyV2Catalogue.products
+                        .firstWhere(
+                          (candidate) =>
+                              candidate.destination == BuyV2Destination.shop,
+                        )
+                        .seller,
+          ),
+          BuyV2Catalogue.products.firstWhere(
+            (item) => item.destination == BuyV2Destination.wholesale,
+          ),
+          BuyV2Catalogue.products.firstWhere(
+            (item) =>
+                item.destination == BuyV2Destination.medicine &&
+                !item.requiresPrescription,
+          ),
+        ];
+        for (final product in selected) {
+          expect(session.addProduct(product.id), isTrue);
+        }
+        session.openCart();
+        session.openCheckout();
+
+        final checkoutLines = session.checkoutLines;
+        final groups = session.checkoutFulfilmentGroups;
+        final checkoutItemCount = session.checkoutItemCount;
+        final checkoutTotal = session.checkoutTotal;
+        final expectedKeys = checkoutLines
+            .map(
+              (line) =>
+                  '${line.product.destination.name}|${line.product.seller}',
+            )
+            .toSet();
+
+        expect(
+          groups
+              .map((group) => '${group.destination.name}|${group.partner}')
+              .toSet(),
+          expectedKeys,
+        );
+        expect(
+          groups.fold<int>(0, (total, group) => total + group.itemCount),
+          checkoutItemCount,
+        );
+        expect(
+          groups.fold<int>(0, (total, group) => total + group.total),
+          checkoutTotal,
+        );
+        for (final group in groups) {
+          final expectedLines = checkoutLines
+              .where(
+                (line) =>
+                    line.product.destination == group.destination &&
+                    line.product.seller == group.partner,
+              )
+              .toList();
+          expect(
+            group.productIds,
+            expectedLines.map((line) => line.product.id).toList(),
+          );
+          expect(
+            group.itemCount,
+            expectedLines.fold<int>(0, (total, line) => total + line.quantity),
+          );
+          expect(
+            group.total,
+            expectedLines.fold<int>(0, (total, line) => total + line.total),
+          );
+          expect(group.partnerType, expectedLines.first.product.partnerRole);
+        }
+
+        session.confirmOrder();
+
+        expect(session.confirmedOrders, hasLength(groups.length));
+        expect(
+          session.confirmedOrders.map((order) => order.id).toSet(),
+          hasLength(groups.length),
+        );
+        expect(session.confirmedItemCount, checkoutItemCount);
+        expect(session.confirmedTotal, checkoutTotal);
+        expect(session.itemCount, 0);
+        for (final group in groups) {
+          final order = session.confirmedOrders.singleWhere(
+            (candidate) =>
+                candidate.destination == group.destination &&
+                candidate.partner == group.partner,
+          );
+          final prefix = switch (group.destination) {
+            BuyV2Destination.shop => 'MS-NEW-',
+            BuyV2Destination.wholesale => 'PO-NEW-',
+            BuyV2Destination.medicine => 'RX-NEW-',
+            BuyV2Destination.orders => 'MS-NEW-',
+          };
+          expect(order.id, startsWith(prefix));
+          expect(order.productIds, group.productIds);
+          expect(order.total, group.total);
+          expect(order.partnerType, group.partnerType);
+        }
+      },
+    );
+
+    test('confirmation creates traceable orders and exact reorder lines', () {
+      final shop = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.shop &&
+            item.canonicalId == 'onion',
+      );
+      final secondShop = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.shop &&
+            item.id != shop.id &&
+            item.seller == shop.seller,
+      );
+      session.addProduct(shop.id);
+      session.addProduct(secondShop.id);
+      session.openCart(scope: BuyV2CartScope.shop);
+      session.openCheckout();
+
+      session.confirmOrder();
+
+      final confirmed = session.confirmedOrders.single;
+      expect(confirmed.id, startsWith('MS-NEW-'));
+      expect(confirmed.productIds, {shop.id, secondShop.id});
+      expect(session.orders.first.id, confirmed.id);
+
+      session.reorder(confirmed);
+
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.shop);
+      expect(session.cartLines.map((line) => line.product.id).toSet(), {
+        shop.id,
+        secondShop.id,
+      });
+    });
+
+    test(
+      'reorder rejects stale or cross-vertical IDs before cart mutation',
+      () {
+        final medicine = BuyV2Catalogue.products.firstWhere(
+          (product) =>
+              product.destination == BuyV2Destination.medicine &&
+              !product.requiresPrescription,
+        );
+        final wholesale = BuyV2Catalogue.products.firstWhere(
+          (product) => product.destination == BuyV2Destination.wholesale,
+        );
+        session.addProduct(medicine.id);
+
+        final invalidOrder = BuyV2Order(
+          id: 'MS-INVALID',
+          destination: BuyV2Destination.shop,
+          title: 'Shop order',
+          itemSummary: 'Invalid restoration fixture',
+          total: wholesale.price,
+          partner: wholesale.seller,
+          partnerType: wholesale.sellerType,
+          promise: wholesale.deliveryPromise,
+          destinationLabel: 'Sardarpura · 342003',
+          progress: 1,
+          status: BuyV2OrderStatus.delivered,
+          productIds: [wholesale.id, 'missing-product'],
+        );
+
+        expect(session.reorder(invalidOrder), isFalse);
+
+        expect(session.destination, BuyV2Destination.shop);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.quantityFor(wholesale.id), 0);
+        expect(session.quantityFor(medicine.id), 1);
+        expect(session.itemCount, 1);
+        expect(session.notice, 'Products from this order could not be found.');
+      },
+    );
+
+    test('Saved follows canonical products across Shop and Wholesale', () {
+      final shop = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      final wholesale = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.wholesale &&
+            item.canonicalId == shop.canonicalId,
+      );
+
+      expect(session.isSaved(shop.id), isTrue);
+      expect(session.isSaved(wholesale.id), isTrue);
+      expect(session.savedCountFor(BuyV2Destination.medicine), 3);
+
+      session.toggleSaved(wholesale.id);
+      expect(session.isSaved(shop.id), isFalse);
+      expect(session.isSaved(wholesale.id), isFalse);
+
+      session.toggleSaved(shop.id);
+      expect(session.isSaved(shop.id), isTrue);
+      expect(session.isSaved(wholesale.id), isTrue);
+    });
+
+    test('scanned catalogue IDs resolve through production search', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+
+      session.updateQuery(product.id);
+
+      expect(session.visibleProducts, hasLength(1));
+      expect(session.visibleProducts.single.id, product.id);
+    });
+
+    test(
+      'search suggestions are read-only, truthful and vertical-specific',
+      () {
+        for (final destination in const [
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+          BuyV2Destination.medicine,
+        ]) {
+          session.openDestination(destination);
+          session.chooseCategory('all');
+
+          final suggestions = session.searchSuggestions;
+          expect(suggestions, hasLength(4), reason: destination.name);
+          expect(
+            () => suggestions.add('Unapproved search'),
+            throwsUnsupportedError,
+          );
+
+          for (final suggestion in suggestions) {
+            expect(
+              BuyV2Catalogue.products.any(
+                (product) =>
+                    product.destination == destination &&
+                    product.title == suggestion,
+              ),
+              isTrue,
+              reason: '${destination.name}: $suggestion',
+            );
+            session.updateQuery(suggestion);
+            expect(session.visibleProducts, isNotEmpty);
+            expect(
+              session.visibleProducts.every(
+                (product) => product.destination == destination,
+              ),
+              isTrue,
+              reason: '${destination.name}: $suggestion',
+            );
+            expect(session.searchSuggestions, isEmpty);
+            session.updateQuery('');
+          }
+        }
+
+        session.openDestination(BuyV2Destination.orders);
+        expect(session.searchSuggestions, isEmpty);
+      },
+    );
+
+    test('every destination filter returns a real matching catalogue', () {
+      const filters = {
+        BuyV2Destination.shop: ['fast', 'today', 'lowest', 'nearby', 'returns'],
+        BuyV2Destination.wholesale: [
+          'fast',
+          'two-days',
+          'lowest',
+          'freight',
+          'moq',
+          'manufacturer',
+        ],
+        BuyV2Destination.medicine: [
+          'fast',
+          'today',
+          'lowest',
+          'otc',
+          'nearby',
+          'manufacturer',
+        ],
+      };
+
+      for (final entry in filters.entries) {
+        session.openDestination(entry.key);
+        session.chooseCategory('all');
+        for (final filter in entry.value) {
+          session.chooseFilter(filter);
+          expect(
+            session.visibleProducts,
+            isNotEmpty,
+            reason: '${entry.key.name} filter $filter',
+          );
+        }
+      }
+    });
+
+    test('Buy account returns to the exact originating purchase depth', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.wholesale,
+      );
+      session.openProduct(product.id);
+
+      session.openAccount();
+      expect(session.view, BuyV2View.account);
+
+      session.closeAccount();
+      expect(session.destination, BuyV2Destination.wholesale);
+      expect(session.view, BuyV2View.product);
+      expect(session.selectedProductId, product.id);
+
+      session.openTracking('MS-240782');
+      session.openAccount();
+      session.goBack();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.tracking);
+      expect(session.selectedOrder.id, 'MS-240782');
+    });
+
+    test(
+      'Account child journeys return through Account to the exact origin',
+      () {
+        final origin = BuyV2Catalogue.products.firstWhere(
+          (item) => item.destination == BuyV2Destination.medicine,
+        );
+        session.openProduct(origin.id);
+        session.updateQuery('paracetamol');
+        session.chooseFilter('Under ₹100');
+        session.openAccount();
+
+        session.openOrdersFromAccount();
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.canReturnToAccount, isTrue);
+        expect(session.query, isEmpty);
+        expect(session.selectedFilter, isNull);
+
+        expect(session.openTracking('MS-240782'), isTrue);
+        session.goBack();
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.canReturnToAccount, isTrue);
+
+        session.goBack();
+        expect(session.view, BuyV2View.account);
+        expect(session.canReturnToAccount, isFalse);
+        expect(session.query, 'paracetamol');
+        expect(session.selectedFilter, 'Under ₹100');
+
+        session.openWholesaleFromAccount();
+        expect(session.destination, BuyV2Destination.wholesale);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.canReturnToAccount, isTrue);
+        session.goBack();
+        expect(session.view, BuyV2View.account);
+
+        session.closeAccount();
+        expect(session.destination, BuyV2Destination.medicine);
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, origin.id);
+      },
+    );
+
+    test('bottom Orders does not acquire an Account parent', () {
+      session.updateQuery('milk');
+      session.chooseFilter('Under ₹100');
+      session.openOrders();
+
+      expect(session.canReturnToAccount, isFalse);
+      expect(session.query, isEmpty);
+      expect(session.selectedFilter, isNull);
+      session.goBack();
+      expect(session.destination, BuyV2Destination.shop);
+      expect(session.view, BuyV2View.catalogue);
+    });
+
+    test('successful cart mutations use a dedicated Cart acknowledgement', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+
+      expect(session.addProduct(product.id), isTrue);
+      expect(session.notice, isNull);
+      expect(session.cartAcknowledgement, '${product.title} added · 1 item');
+
+      session.increase(product.id);
+      expect(session.notice, isNull);
+      expect(session.cartAcknowledgement, '${product.title} · 2 in cart');
+
+      session.clearCartAcknowledgement();
+      expect(session.cartAcknowledgement, isNull);
+    });
+
+    test('Buy assist returns to the exact originating purchase depth', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.wholesale,
+      );
+      session.openProduct(product.id);
+
+      session.openAssist();
+      expect(session.view, BuyV2View.assist);
+
+      session.closeAssist();
+      expect(session.destination, BuyV2Destination.wholesale);
+      expect(session.view, BuyV2View.product);
+      expect(session.selectedProductId, product.id);
+
+      session.openTracking('MS-240782');
+      session.openAssist();
+      session.goBack();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.tracking);
+      expect(session.selectedOrder.id, 'MS-240782');
+    });
+
+    test('saved address and payment selections change independently', () {
+      session.chooseAddress('work');
+      expect(session.selectedAddressId, 'work');
+      expect(session.selectedPayment, 'UPI');
+
+      expect(session.choosePayment('Bank transfer'), isTrue);
+      expect(session.selectedAddressId, 'work');
+      expect(session.selectedPayment, 'Bank transfer');
+
+      session.chooseAddress('home');
+      expect(session.selectedAddressId, 'home');
+      expect(session.selectedPayment, 'Bank transfer');
+    });
+
+    test('unsupported payment identifiers fail closed', () {
+      session.chooseAddress('work');
+      expect(session.choosePayment('Purchase order'), isTrue);
+
+      expect(session.choosePayment('Card<script>'), isFalse);
+
+      expect(session.selectedAddressId, 'work');
+      expect(session.selectedPayment, 'Purchase order');
+      expect(session.notice, 'This payment method is not available.');
+      expect(BuyV2Session.paymentMethods, {
+        'UPI',
+        'Bank transfer',
+        'Purchase order',
+      });
+    });
+
+    test('Orders search filters only the current order tab', () {
+      session.openDestination(BuyV2Destination.orders);
+
+      session.updateQuery('MS-240782');
+      expect(session.visibleOrders.map((order) => order.id), ['MS-240782']);
+
+      session.updateQuery('sardarpura');
+      expect(session.visibleOrders, isNotEmpty);
+      expect(
+        session.visibleOrders.every(
+          (order) =>
+              '${order.id} ${order.title} ${order.partner} '
+                      '${order.partnerType} ${order.itemSummary}'
+                  .toLowerCase()
+                  .contains('sardarpura'),
+        ),
+        isTrue,
+      );
+
+      session.updateQuery('MS-240782');
+      session.showOrdersTab(BuyV2OrdersTab.delivered);
+      expect(session.visibleOrders, isEmpty);
+
+      session.updateQuery('');
+      expect(
+        session.visibleOrders.every(
+          (order) => order.status == BuyV2OrderStatus.delivered,
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'unknown external identifiers fail closed without substituting data',
+      () {
+        final firstProduct = BuyV2Catalogue.products.first;
+        final firstProductWasSaved = session.isSaved(firstProduct.id);
+
+        expect(session.openProduct('missing-product'), isFalse);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.selectedProductId, isNull);
+        expect(session.notice, 'This product could not be found.');
+
+        expect(session.addProduct('missing-product'), isFalse);
+        expect(session.itemCount, 0);
+        expect(session.quantityFor(firstProduct.id), 0);
+
+        session.toggleSaved('missing-product');
+        expect(session.isSaved('missing-product'), isFalse);
+        expect(session.isSaved(firstProduct.id), firstProductWasSaved);
+
+        expect(session.openTracking('missing-order'), isFalse);
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.selectedOrderId, isNull);
+        expect(session.notice, 'This order could not be found.');
+
+        session.chooseAddress('work');
+        expect(session.chooseAddress('missing-address'), isFalse);
+        expect(session.selectedAddressId, 'work');
+        expect(session.notice, 'This saved address could not be found.');
+      },
+    );
   });
 }

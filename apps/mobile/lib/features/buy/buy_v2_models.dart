@@ -1,12 +1,36 @@
+import 'buy_v2_catalogue_data.dart';
+
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
-enum BuyV2View { catalogue, product, cart, checkout, tracking, assist }
+enum BuyV2View {
+  catalogue,
+  product,
+  cart,
+  checkout,
+  confirmation,
+  tracking,
+  orderItems,
+  assist,
+  account,
+  recovery,
+}
 
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
 enum BuyV2AddressKind { home, work, thirdParty, other }
 
 enum BuyV2OrderStatus { preparing, confirmed, dispatched, arriving, delivered }
+
+enum BuyV2OrdersTab { active, delivered }
+
+enum BuyV2RecoveryKind {
+  priceUpdate,
+  stockUnavailable,
+  serviceAreaUnavailable,
+  paymentFailed,
+  networkInterruption,
+  deliveryDelay,
+}
 
 class BuyV2Category {
   const BuyV2Category({
@@ -23,6 +47,7 @@ class BuyV2Category {
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
+    String? canonicalId,
     required this.destination,
     required this.categoryId,
     required this.brand,
@@ -44,9 +69,13 @@ class BuyV2Product {
     this.composition,
     this.regulatoryNote,
     this.minimumOrder = 1,
-  });
+    this.returnPolicy,
+    this.freightIncluded = false,
+    this.manufacturerVerified = false,
+  }) : canonicalId = canonicalId ?? id;
 
   final String id;
+  final String canonicalId;
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
@@ -68,6 +97,41 @@ class BuyV2Product {
   final String? composition;
   final String? regulatoryNote;
   final int minimumOrder;
+  final String? returnPolicy;
+  final bool freightIncluded;
+  final bool manufacturerVerified;
+
+  String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
+
+  String? get regulatoryTrustFact =>
+      destination == BuyV2Destination.medicine ? 'Licensed pharmacy' : null;
+}
+
+String buyV2PartnerRoleFor(BuyV2Destination destination, String sourceRole) {
+  final normalized = sourceRole.toLowerCase();
+  if (normalized.contains('manufacturer')) {
+    return 'Mool Manufacturer Partner';
+  }
+  return switch (destination) {
+    BuyV2Destination.shop => 'Mool Retail Partner',
+    BuyV2Destination.wholesale => 'Mool Trade Partner',
+    BuyV2Destination.medicine => 'Mool Pharmacy Partner',
+    BuyV2Destination.orders => 'Mool Fulfilment Partner',
+  };
+}
+
+class BuyV2CustomerReview {
+  const BuyV2CustomerReview({
+    required this.productCanonicalId,
+    required this.rating,
+    required this.comment,
+    required this.updatedLabel,
+  });
+
+  final String productCanonicalId;
+  final int rating;
+  final String comment;
+  final String updatedLabel;
 }
 
 class BuyV2CartLine {
@@ -80,6 +144,29 @@ class BuyV2CartLine {
 
   BuyV2CartLine copyWith({int? quantity}) =>
       BuyV2CartLine(product: product, quantity: quantity ?? this.quantity);
+}
+
+class BuyV2FulfilmentGroup {
+  const BuyV2FulfilmentGroup({
+    required this.destination,
+    required this.partner,
+    required this.partnerType,
+    required this.promise,
+    required this.lines,
+  });
+
+  final BuyV2Destination destination;
+  final String partner;
+  final String partnerType;
+  final String promise;
+  final List<BuyV2CartLine> lines;
+
+  int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
+
+  int get total => lines.fold(0, (total, line) => total + line.total);
+
+  List<String> get productIds =>
+      lines.map((line) => line.product.id).toList(growable: false);
 }
 
 class BuyV2Address {
@@ -106,6 +193,8 @@ class BuyV2Address {
   final String landmark;
 
   String get shortLine => '$area · $pinCode';
+
+  String get compactLine => '${area.split(',').first.trim()} · $pinCode';
 }
 
 class BuyV2Order {
@@ -121,6 +210,7 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.productIds = const [],
   });
 
   final String id;
@@ -134,6 +224,91 @@ class BuyV2Order {
   final String destinationLabel;
   final double progress;
   final BuyV2OrderStatus status;
+  final List<String> productIds;
+}
+
+class _BuyV2CommerceSeed {
+  const _BuyV2CommerceSeed({
+    required this.id,
+    required this.title,
+    required this.brand,
+    required this.shopCategory,
+    required this.wholesaleCategory,
+    required this.variant,
+    required this.shopPack,
+    required this.shopPrice,
+    required this.shopUnit,
+    required this.shopBadge,
+    required this.shopSeller,
+    required this.shopSellerType,
+    required this.shopDelivery,
+    required this.shopReturnPolicy,
+    required this.wholesalePack,
+    required this.wholesalePrice,
+    required this.wholesaleUnit,
+    required this.wholesaleBadge,
+    required this.wholesaleSeller,
+    required this.wholesaleSellerType,
+    required this.wholesaleDelivery,
+    required this.wholesaleReturnPolicy,
+  });
+
+  factory _BuyV2CommerceSeed.fromRow(String row) {
+    final values = row.split('|');
+    if (values.length != 22) {
+      throw FormatException(
+        'Buy V2 commerce seed ${values.firstOrNull ?? '<empty>'} '
+        'has ${values.length} fields; expected 22.',
+      );
+    }
+    return _BuyV2CommerceSeed(
+      id: values[0],
+      title: values[1],
+      brand: values[2],
+      shopCategory: values[3],
+      wholesaleCategory: values[4],
+      variant: values[5],
+      shopPack: values[6],
+      shopPrice: int.parse(values[7]),
+      shopUnit: values[8],
+      shopBadge: values[9],
+      shopSeller: values[10],
+      shopSellerType: values[11],
+      shopDelivery: values[12],
+      shopReturnPolicy: values[13],
+      wholesalePack: values[14],
+      wholesalePrice: int.parse(values[15]),
+      wholesaleUnit: values[16],
+      wholesaleBadge: values[17],
+      wholesaleSeller: values[18],
+      wholesaleSellerType: values[19],
+      wholesaleDelivery: values[20],
+      wholesaleReturnPolicy: values[21],
+    );
+  }
+
+  final String id;
+  final String title;
+  final String brand;
+  final String shopCategory;
+  final String wholesaleCategory;
+  final String variant;
+  final String shopPack;
+  final int shopPrice;
+  final String shopUnit;
+  final String shopBadge;
+  final String shopSeller;
+  final String shopSellerType;
+  final String shopDelivery;
+  final String shopReturnPolicy;
+  final String wholesalePack;
+  final int wholesalePrice;
+  final String wholesaleUnit;
+  final String wholesaleBadge;
+  final String wholesaleSeller;
+  final String wholesaleSellerType;
+  final String wholesaleDelivery;
+  final String wholesaleReturnPolicy;
 }
 
 abstract final class BuyV2Catalogue {
@@ -310,196 +485,161 @@ abstract final class BuyV2Catalogue {
     BuyV2Category(id: 'skin-care', label: 'Skin care', glyph: '◐'),
   ];
 
+  static final _commerceSeeds = buyV2CommerceSeedRows
+      .trim()
+      .split('\n')
+      .map((row) => _BuyV2CommerceSeed.fromRow(row.trim()))
+      .toList(growable: false);
+
   static final products = <BuyV2Product>[
-    ..._commerceProducts(
-      BuyV2Destination.shop,
-      shopCategories.skip(1).toList(),
-    ),
-    ..._commerceProducts(
-      BuyV2Destination.wholesale,
-      wholesaleCategories.skip(1).toList(),
-    ),
+    for (final seed in _commerceSeeds)
+      _commerceProduct(seed, BuyV2Destination.shop),
+    for (final seed in _commerceSeeds)
+      _commerceProduct(seed, BuyV2Destination.wholesale),
     ..._medicineProducts,
   ];
 
-  static List<BuyV2Product> _commerceProducts(
+  static BuyV2Product _commerceProduct(
+    _BuyV2CommerceSeed seed,
     BuyV2Destination destination,
-    List<BuyV2Category> categories,
   ) {
-    const identity = <String, List<String>>{
-      'fruits-vegetables': ['Fresh tomatoes', 'Red onions', 'Bananas'],
-      'dairy-bakery': ['Toned fresh milk', 'Fresh paneer', 'Whole wheat bread'],
-      'eggs-poultry': ['Farm eggs', 'Chicken curry cut', 'Free-range eggs'],
-      'meat-seafood': ['Fresh fish fillets', 'Mutton curry cut', 'Prawns'],
-      'flour-rice-grains': [
-        'Stone-ground wheat atta',
-        'Premium basmati rice',
-        'Brown rice',
-      ],
-      'dals-staples': ['Toor dal', 'Sugar', 'Iodised salt'],
-      'oils-ghee': ['Refined sunflower oil', 'Pure cow ghee', 'Mustard oil'],
-      'retail-supplies': [
-        'Thermal billing rolls',
-        'Barcode labels',
-        'Carry bags',
-      ],
-      'horeca-food-packs': [
-        'Meal containers',
-        'Aluminium foil',
-        'Food storage tubs',
-      ],
-      'horeca-tableware': ['Paper cups', 'Dinner napkins', 'Wooden cutlery'],
-      'stationery-office': [
-        'A4 copier paper',
-        'Smooth blue ball pens',
-        'A4 notebooks',
-      ],
-      'school-office': ['A4 ruled notebooks', 'Blue ball pens', 'Drawing book'],
-      'shop-supplies': [
-        'Thermal billing rolls',
-        'Price labels',
-        'Barcode labels',
-      ],
-      'ground-spices': [
-        'Ground turmeric',
-        'Red chilli powder',
-        'Coriander powder',
-      ],
-      'whole-spices': ['Cumin seeds', 'Black pepper', 'Whole cloves'],
-      'breakfast-cereals': ['Rolled oats', 'Poha', 'Corn flakes'],
-      'instant-foods': ['Instant noodles', 'Upma mix', 'Pasta'],
-      'sauces-spreads': [
-        'Tomato ketchup',
-        'Peanut butter',
-        'Green chilli sauce',
-      ],
-      'biscuits-chocolate': [
-        'Glucose biscuits',
-        'Dark chocolate',
-        'Cream biscuits',
-      ],
-      'namkeen-chips': [
-        'Classic bhujia namkeen',
-        'Salted potato chips',
-        'Roasted peanuts',
-      ],
-      'tea-coffee': ['Assam tea', 'Instant coffee', 'Masala tea'],
-      'juices-water': ['Packaged water', 'Orange juice', 'Coconut water'],
-      'frozen-foods': [
-        'Frozen green peas',
-        'Veg spring rolls',
-        'Frozen paratha',
-      ],
-      'icecream-cheese': [
-        'Vanilla ice cream',
-        'Cheddar cheese',
-        'Salted butter',
-      ],
-      'bath-hand-care': ['Herbal bathing soap', 'Hand wash', 'Body wash'],
-      'oral-care': ['Fluoride toothpaste', 'Soft toothbrush', 'Mouthwash'],
-      'hair-care': ['Daily care shampoo', 'Coconut hair oil', 'Conditioner'],
-      'skin-care': ['Moisturising lotion', 'Face wash', 'Sunscreen'],
-      'surface-cleaners': [
-        'Floor cleaner',
-        'Bathroom cleaner',
-        'Glass cleaner',
-      ],
-      'air-waste-care': ['Garbage bags', 'Air freshener', 'Kitchen bin liners'],
-      'laundry-dishwash': [
-        'Laundry detergent',
-        'Dishwash liquid',
-        'Fabric conditioner',
-      ],
-      'diapers-wipes': ['Baby diapers', 'Baby wipes', 'Adult care pants'],
-      'baby-care': ['Baby lotion', 'Baby cereal', 'Baby shampoo'],
-      'health-wellness': [
-        'ORS hydration salts',
-        'Protein powder',
-        'Herbal supplement',
-      ],
-      'dog-care': ['Adult dog food', 'Dog treats', 'Dog shampoo'],
-      'cat-care': ['Adult cat food', 'Cat litter', 'Cat treats'],
-      'food-storage-packs': [
-        'Food storage bags',
-        'Aluminium foil',
-        'Cling film',
-      ],
-      'cups-tissues': ['Paper cups', 'Facial tissues', 'Kitchen towels'],
-    };
     final wholesale = destination == BuyV2Destination.wholesale;
-    return [
-      for (
-        var categoryIndex = 0;
-        categoryIndex < categories.length;
-        categoryIndex++
-      )
-        for (var productIndex = 0; productIndex < 3; productIndex++)
-          BuyV2Product(
-            id: '${wholesale ? 'w' : 's'}-${categories[categoryIndex].id}-$productIndex',
-            destination: destination,
-            categoryId: categories[categoryIndex].id,
-            brand: wholesale ? 'TRADE ESSENTIALS' : 'DAILY ESSENTIALS',
-            title:
-                (identity[categories[categoryIndex].id] ??
-                [
-                  categories[categoryIndex].label,
-                  '${categories[categoryIndex].label} value pack',
-                  '${categories[categoryIndex].label} choice',
-                ])[productIndex],
-            variant: wholesale
-                ? 'Verified trade pack · landed price'
-                : 'Quality checked · sealed pack',
-            pack: wholesale
-                ? (productIndex == 0
-                      ? 'Case pack · MOQ 2'
-                      : 'Trade pack · MOQ 4')
-                : (productIndex == 0 ? '500 g pack' : '1 family pack'),
-            price: wholesale
-                ? 580 + (categoryIndex * 83) + (productIndex * 190)
-                : 37 + (categoryIndex * 9) + (productIndex * 28),
-            unitPrice: wholesale
-                ? 'Final landed unit price shown'
-                : 'Final delivered unit price shown',
-            badge: wholesale
-                ? (productIndex == 0
-                      ? 'Best landed cost'
-                      : 'Manufacturer offer')
-                : (productIndex == 0 ? 'Lowest delivered price' : 'Best value'),
-            seller: wholesale
-                ? (categoryIndex.isEven
-                      ? 'Marwar Foods Distribution'
-                      : 'Rajasthan Retail Supply')
-                : (categoryIndex.isEven
-                      ? 'Sardarpura Supermart'
-                      : 'Jodhpur Fresh Mart'),
-            sellerType: wholesale
-                ? (categoryIndex.isEven
-                      ? 'Verified distributor'
-                      : 'Verified manufacturer')
-                : 'Verified retailer',
-            deliveryPromise: wholesale
-                ? (categoryIndex.isEven
-                      ? 'Thu, 30 Jul · by 2:00 pm'
-                      : 'Fri, 31 Jul · by 5:00 pm')
-                : (categoryIndex.isEven
-                      ? 'Wed, 29 Jul · within 25 min'
-                      : 'Wed, 29 Jul · by 7:30 pm'),
-            origin: wholesale
-                ? 'Jodhpur → Jodhpur 342003'
-                : 'Jodhpur → Sardarpura 342003',
-            confirmedOn: 'Confirmed 29 Jul',
-            visualLabel: _visualLabel(
-              (identity[categories[categoryIndex].id] ??
-                  [
-                    categories[categoryIndex].label,
-                    categories[categoryIndex].label,
-                    categories[categoryIndex].label,
-                  ])[productIndex],
-            ),
-            visualKind: _visualKind(categories[categoryIndex].id),
-            minimumOrder: wholesale ? 2 : 1,
-          ),
-    ];
+    final seller = wholesale ? seed.wholesaleSeller : seed.shopSeller;
+    final sellerType = wholesale
+        ? seed.wholesaleSellerType
+        : seed.shopSellerType;
+    final originCity = _supplierOrigin(seller, sellerType);
+    return BuyV2Product(
+      id: '${wholesale ? 'w' : 's'}-${seed.id}',
+      canonicalId: seed.id,
+      destination: destination,
+      categoryId: wholesale ? seed.wholesaleCategory : seed.shopCategory,
+      brand: seed.brand.toUpperCase(),
+      title: seed.title,
+      variant: _catalogueVariant(seed),
+      pack: wholesale ? seed.wholesalePack : seed.shopPack,
+      price: wholesale ? seed.wholesalePrice : seed.shopPrice,
+      unitPrice: wholesale ? seed.wholesaleUnit : seed.shopUnit,
+      badge: wholesale ? seed.wholesaleBadge : seed.shopBadge,
+      seller: seller,
+      sellerType: sellerType,
+      deliveryPromise: wholesale
+          ? _wholesalePromise(originCity)
+          : _shopPromise(seed.shopDelivery),
+      origin: wholesale
+          ? '$originCity → Jodhpur 342003'
+          : 'Jodhpur → Sardarpura 342003',
+      confirmedOn: 'Confirmed 29 Jul',
+      visualLabel: _visualLabel(seed.id.replaceAll('-', ' ')),
+      visualKind: _visualKind(
+        wholesale ? seed.wholesaleCategory : seed.shopCategory,
+      ),
+      minimumOrder: wholesale ? _minimumOrder(seed.id) : 1,
+      returnPolicy: wholesale
+          ? seed.wholesaleReturnPolicy
+          : seed.shopReturnPolicy,
+      freightIncluded: wholesale,
+      manufacturerVerified:
+          wholesale && sellerType.toLowerCase().contains('manufacturer'),
+    );
+  }
+
+  static String _shopPromise(String source) {
+    final minutes = RegExp(
+      r'(\d+)\s+minutes',
+      caseSensitive: false,
+    ).firstMatch(source);
+    if (minutes != null) {
+      return 'Wed, 29 Jul · within ${minutes.group(1)} min';
+    }
+    final by = RegExp(r'by\s+(.+)$', caseSensitive: false).firstMatch(source);
+    return 'Wed, 29 Jul · by ${by?.group(1) ?? '8:00 pm'}';
+  }
+
+  static String _wholesalePromise(String originCity) => switch (originCity) {
+    'Delhi' => 'Sat, 1 Aug – Sun, 2 Aug',
+    'Jaipur' => 'Fri, 31 Jul – Sat, 1 Aug',
+    _ => 'Thu, 30 Jul',
+  };
+
+  static String _supplierOrigin(String seller, String sellerType) {
+    final name = seller.toLowerCase();
+    final type = sellerType.toLowerCase();
+    if (const [
+      'jodhpur',
+      'sardarpura',
+      'shree balaji',
+      'ghar bazaar',
+      'marwar',
+      'thar',
+      'family stationery',
+      'school bazaar',
+      'rajasthan mart',
+    ].any(name.contains)) {
+      return 'Jodhpur';
+    }
+    if (const [
+          'surya oils',
+          'care products',
+          'herbal brands',
+          'india',
+          'national',
+        ].any(name.contains) ||
+        (type.contains('manufacturer') &&
+            !name.contains('rajasthan') &&
+            !name.contains('aravali'))) {
+      return 'Delhi';
+    }
+    if (const ['rajasthan', 'aravali', 'kisan', 'jaipur'].any(name.contains)) {
+      return 'Jaipur';
+    }
+    return 'Jodhpur';
+  }
+
+  static int _minimumOrder(String canonicalId) => switch (canonicalId) {
+    'rice' => 4,
+    'notebook' => 1,
+    _ => 2,
+  };
+
+  static String _catalogueVariant(_BuyV2CommerceSeed seed) {
+    const explicitVariants = {
+      'tomato',
+      'atta',
+      'oil',
+      'rice',
+      'soap',
+      'notebook',
+      'banana',
+      'potato',
+      'curd',
+      'paneer',
+      'fish-fillet',
+      'mutton',
+      'toor-dal',
+      'mustard-oil',
+      'groundnut-oil',
+      'red-chilli',
+      'coriander-seeds',
+      'thermal-rolls',
+      'barcode-labels',
+      'carry-bags',
+      'printer-paper',
+      'ball-pens',
+    };
+    if (explicitVariants.contains(seed.id)) return seed.variant;
+    final separator = seed.variant.indexOf(' · ');
+    if (separator < 0) return seed.variant;
+    final descriptor = seed.variant.substring(0, separator);
+    final titleCase = descriptor
+        .split(' ')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
+        .join(' ');
+    return '$titleCase${seed.variant.substring(separator)}';
   }
 
   static String _visualLabel(String value) {
@@ -549,6 +689,7 @@ abstract final class BuyV2Catalogue {
       visualKind: 'medicine-box',
       composition: 'Paracetamol 500 mg',
       regulatoryNote: 'Use only as directed on the pack or by a clinician.',
+      manufacturerVerified: true,
     ),
     BuyV2Product(
       id: 'm-pain-relief-gel',
@@ -616,6 +757,7 @@ abstract final class BuyV2Catalogue {
       visualKind: 'bottle',
       composition: 'Capillary blood glucose test strips',
       regulatoryNote: 'Match the meter model before purchase.',
+      manufacturerVerified: true,
     ),
     BuyV2Product(
       id: 'm-telmisartan-40',
@@ -707,6 +849,7 @@ abstract final class BuyV2Catalogue {
       visualKind: 'tube',
       composition: 'Oral rehydration salts',
       regulatoryNote: 'Prepare with the stated amount of clean water.',
+      manufacturerVerified: true,
     ),
   ];
 }

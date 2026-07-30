@@ -207,12 +207,19 @@ GoRouter createJourneyRouter(
                 state.uri.queryParameters['context'],
           );
           final view = _buyV2View(state.uri.queryParameters['view']);
+          final cartScope = _buyV2CartScope(
+            state.uri.queryParameters['scope'] ??
+                state.uri.queryParameters['sub'] ??
+                state.uri.queryParameters['context'],
+          );
           return BuyV2Screen(
             session: buyV2Session,
             initialDestination: destination,
             initialView: view,
+            initialCartScope: cartScope,
             productId: state.uri.queryParameters['product'],
             orderId: state.uri.queryParameters['order'],
+            recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
           );
         },
       ),
@@ -258,6 +265,9 @@ GoRouter createJourneyRouter(
                   state.uri.queryParameters['scope'],
                 ),
                 initialView: BuyV2View.cart,
+                initialCartScope: _buyV2CartScope(
+                  state.uri.queryParameters['scope'],
+                ),
               ),
       ),
       GoRoute(
@@ -286,31 +296,55 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/buy/order/:orderId/collection',
-        builder: (context, state) => BuyCollectionScreen(
-          session: buySession,
-          orderId: state.pathParameters['orderId'] ?? '',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyCollectionScreen(
+                session: buySession,
+                orderId: state.pathParameters['orderId'] ?? '',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.orders,
+                initialView: BuyV2View.tracking,
+                orderId: state.pathParameters['orderId'],
+              ),
       ),
       GoRoute(
         path: '/app/buy/order/:orderId/collection-completed',
-        builder: (context, state) => BuyCollectionCompletedScreen(
-          session: buySession,
-          orderId: state.pathParameters['orderId'] ?? '',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyCollectionCompletedScreen(
+                session: buySession,
+                orderId: state.pathParameters['orderId'] ?? '',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.orders,
+              ),
       ),
       GoRoute(
         path: '/app/buy/order/:orderId/completed',
-        builder: (context, state) => BuyCompletedScreen(
-          session: buySession,
-          orderId: state.pathParameters['orderId'] ?? '',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyCompletedScreen(
+                session: buySession,
+                orderId: state.pathParameters['orderId'] ?? '',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.orders,
+              ),
       ),
       GoRoute(
         path: '/app/buy/order/:orderId/problem',
-        builder: (context, state) => BuyProblemScreen(
-          session: buySession,
-          orderId: state.pathParameters['orderId'] ?? '',
-        ),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? BuyProblemScreen(
+                session: buySession,
+                orderId: state.pathParameters['orderId'] ?? '',
+              )
+            : BuyV2Screen(
+                session: buyV2Session,
+                initialDestination: BuyV2Destination.orders,
+                initialView: BuyV2View.assist,
+                orderId: state.pathParameters['orderId'],
+              ),
       ),
       GoRoute(
         path: '/app/eat/home',
@@ -1325,7 +1359,26 @@ BuyV2View _buyV2View(String? value) => switch (value) {
   'product' => BuyV2View.product,
   'basket' || 'cart' => BuyV2View.cart,
   'review' || 'checkout' => BuyV2View.checkout,
+  'confirmation' || 'confirmed' => BuyV2View.confirmation,
   'tracking' => BuyV2View.tracking,
   'assist' || 'chat' => BuyV2View.assist,
+  'recovery' => BuyV2View.recovery,
   _ => BuyV2View.catalogue,
+};
+
+BuyV2RecoveryKind? _buyV2Recovery(String? value) => switch (value) {
+  'price' || 'price-update' => BuyV2RecoveryKind.priceUpdate,
+  'stock' || 'stock-unavailable' => BuyV2RecoveryKind.stockUnavailable,
+  'service' || 'service-area' => BuyV2RecoveryKind.serviceAreaUnavailable,
+  'payment' || 'payment-failed' => BuyV2RecoveryKind.paymentFailed,
+  'network' || 'offline' => BuyV2RecoveryKind.networkInterruption,
+  'delay' || 'delivery-delay' => BuyV2RecoveryKind.deliveryDelay,
+  _ => null,
+};
+
+BuyV2CartScope _buyV2CartScope(String? value) => switch (value) {
+  'shop' || 'retail' => BuyV2CartScope.shop,
+  'wholesale' || 'business' => BuyV2CartScope.wholesale,
+  'medicine' || 'rx' => BuyV2CartScope.medicine,
+  _ => BuyV2CartScope.all,
 };
