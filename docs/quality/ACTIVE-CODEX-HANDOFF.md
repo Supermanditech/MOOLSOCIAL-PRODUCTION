@@ -3988,3 +3988,52 @@ State: `COMPLETE_TEST_ONLY_STATE_MACHINE_HARDENING`. No runtime, backend,
 HTML, protected media or Social source changed, so no APK rebuild or reinstall
 was required. Push, deploy, publication and production release remain
 unauthorized.
+
+## Latest nonvisual Buy checkpoint — listener liveness and honest no-ops
+
+Ticket `BUY-FV2-114` protects the native state-to-UI notification boundary.
+Three focused tests cover 60 customer-visible/state-changing or fail-closed
+action cases and five deliberate true no-ops.
+
+The emitting cases span catalogue, product, cart, checkout, Orders, Account,
+assistance, recovery, address, payment, review, report, prescription,
+tracking, reorder and notice actions. Each must notify at least once when it
+changes customer-visible state or creates an established fail-closed notice.
+The tests intentionally avoid exact callback counts so compound actions remain
+free to preserve their established internal composition.
+
+Missing-line decrease/removal, inactive Account return and empty
+notice/acknowledgement clearing must remain silent. This avoids manufacturing
+fake work or progress for an operation that made no change.
+
+Full Flutter analysis passed. Two same-source Buy regressions each passed
+`126/126`, with four opt-in capture generators skipped. Protected Buy,
+protected Social, backend-contract, data-egress, approved locks, brand,
+founder-FINAL Buy reference, user-facing copy, nine-state HTML copy and 154
+routes all passed.
+
+The protected Buy tree remains:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The protected Social tree remains:
+
+`54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`
+
+Read-only OPPO verification again found approved `1.0.0-r35.1`
+(`versionCode 2026073045`) with exact on-device APK SHA-256:
+
+`10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R35-1-LISTENER-LIVENESS-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-r35-1-listener-liveness-hardening-20260731-35`
+
+State: `COMPLETE_TEST_ONLY_LISTENER_LIVENESS_HARDENING`. No runtime, backend,
+HTML, protected media or Social source changed, so no APK rebuild or reinstall
+was required. Push, deploy, publication and production release remain
+unauthorized.

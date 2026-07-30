@@ -3184,3 +3184,54 @@ Completion evidence:
     no APK rebuild or reinstall was required.
 - Durable handoff:
   `docs/quality/BUY-V2-R35-1-STATE-MACHINE-HANDOFF-20260731.md`.
+
+### `BUY-FV2-114` — Protect Buy listener liveness and no-op semantics
+
+- Status: **COMPLETE — TEST-ONLY ACTION-LIVENESS HARDENING VERIFIED 2026-07-31**
+- Severity: **P1 silent-action regression protection**
+- Authority: founder requirement that every meaningful action acknowledge the
+  customer and autonomous authorization for nonvisual Buy test hardening.
+- Scope:
+  - prove that established state-changing, navigation and fail-closed session
+    actions notify their native Flutter listeners;
+  - prove that true missing-target/no-state-change operations remain silent;
+  - validate notification liveness only, not exact callback counts, timing,
+    animation, visual design or unapproved backend progress;
+  - change no Flutter runtime, UI, backend, HTML, Social or business rule.
+- Acceptance:
+  1. Critical catalogue, cart, checkout, Orders, Account, assistance, recovery,
+     address, payment, review, report, prescription and notice actions each
+     emit at least one listener notification when they change customer-visible
+     state.
+  2. Invalid customer inputs that produce an established notice also notify,
+     so the UI cannot silently retain stale state.
+  3. Missing-line removal/decrease and empty acknowledgement clearing remain
+     silent because they change no state and create no customer message.
+  4. Tests avoid exact notification counts so compound actions may retain
+     their established internal composition.
+  5. Focused tests, full analysis, two same-source Buy regressions and every
+     protected/security/reference/copy/interaction gate pass. Runtime remains
+     unchanged, so no APK rebuild or reinstall is required.
+- Additive evidence:
+  `artifacts/quality/buy-r35-1-listener-liveness-hardening-20260731-35`.
+- Completion:
+  - Three focused tests cover 60 customer-visible/state-changing or
+    fail-closed action cases and five deliberate true no-ops.
+  - Every catalogue, cart, checkout, Orders, Account, assistance, recovery,
+    address, payment, review, report, prescription and notice case emitted at
+    least one listener notification when it changed visible state or produced
+    an established customer notice.
+  - Missing-line decrease/removal, inactive Account return and empty
+    notice/acknowledgement clearing emitted no synthetic progress.
+  - Full Flutter analysis passed. Two same-source Buy regressions each passed
+    `126/126`; four opt-in capture generators were skipped in each normal run.
+  - Protected Buy, protected Social, backend-contract, data-egress, approved
+    UI locks, brand, founder-FINAL Buy reference, user-facing copy,
+    nine-state HTML copy and 154-route interaction gates passed.
+  - Read-only OPPO verification matched approved `1.0.0-r35.1`
+    (`versionCode 2026073045`) and on-device APK SHA-256
+    `10FC8C43626B7C2882A6340C6A3A4710C2092E4D45AB0A768CE7056F23BCB9C7`.
+  - No runtime, backend, HTML, protected media or Social source changed, so
+    no APK rebuild or reinstall was required.
+- Durable handoff:
+  `docs/quality/BUY-V2-R35-1-LISTENER-LIVENESS-HANDOFF-20260731.md`.
