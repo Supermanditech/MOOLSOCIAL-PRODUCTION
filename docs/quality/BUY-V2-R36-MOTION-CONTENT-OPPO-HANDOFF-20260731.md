@@ -15,6 +15,8 @@ Buy baseline has been recorded.
 - Branch: `remediation/prototype-conformance-2026-07-20`
 - Starting and tested HEAD:
   `d5cdfd03543f5d61dcdefba06957c9befee27e8c`
+- Local R36 implementation preservation commit:
+  `3aa58d13a2384c89567d5c5f5266818dfdc1b5a4`
 - R36 app/test source fingerprint:
   `006139205BA4A635EE7AB5FCDFAC8AADFAB97B209E2A0F3AE6267304325C2B0E`
 - Existing protected Buy R35.1 tree:

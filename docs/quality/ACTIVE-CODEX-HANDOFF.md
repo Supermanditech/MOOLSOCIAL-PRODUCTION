@@ -4178,6 +4178,10 @@ The tested R36 app/test source fingerprint is:
 
 `006139205BA4A635EE7AB5FCDFAC8AADFAB97B209E2A0F3AE6267304325C2B0E`
 
+The local R36 implementation preservation commit is:
+
+`3aa58d13a2384c89567d5c5f5266818dfdc1b5a4`
+
 The protected Social tree remains:
 
 `54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`

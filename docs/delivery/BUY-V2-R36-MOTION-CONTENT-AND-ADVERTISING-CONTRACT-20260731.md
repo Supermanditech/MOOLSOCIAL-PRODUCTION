@@ -1,9 +1,9 @@
 # Buy V2 R36 motion, content and advertising contract
 
-Date: 31 July 2026  
+Date: 31 July 2026
 Candidate scope: `BUY-FV2-074` through `BUY-FV2-085` and
-`BUY-FV2-117`  
-Authority: founder-supervised Buy implementation tranche  
+`BUY-FV2-117`
+Authority: founder-supervised Buy implementation tranche
 Baseline entering the tranche: protected R35.1 Buy and protected Social
 
 ## Non-negotiable boundaries
