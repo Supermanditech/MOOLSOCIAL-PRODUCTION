@@ -4160,3 +4160,66 @@ Additive finalization evidence:
 
 State: `COMPLETE_PROTECTED_TEST_ONLY_HARDENING`. Push, deploy, publication and
 production release remain unauthorized.
+
+## Latest Buy checkpoint — R36 connected founder-review candidate
+
+The supervised R36 tranche combines Tickets `BUY-FV2-074` through
+`BUY-FV2-085`, fail-closed address/order ownership in `BUY-FV2-117`, and the
+new review-build provenance regression `BUY-FV2-118`.
+
+Full Flutter analysis passed. Focused session/selection/content/motion tests
+passed `41/41`; screen tests passed `66/66`. Two complete same-source Buy
+regressions each passed `148/148`, with four opt-in evidence generators
+skipped. Approved locks, brand, founder-FINAL Buy reference, customer copy,
+nine-state HTML copy, interactions, backend boundary, data-egress boundary and
+the protected Social tree passed.
+
+The tested R36 app/test source fingerprint is:
+
+`006139205BA4A635EE7AB5FCDFAC8AADFAB97B209E2A0F3AE6267304325C2B0E`
+
+The protected Social tree remains:
+
+`54851b4769c6a0087f586ce6c9325bbee1d7c790e06488eccae3a62ca953332e`
+
+The prior protected R35.1 Buy gate correctly rejects the authorized R36
+runtime delta and was not rewritten:
+
+`f712b5b8ce10dd92b64babc4703379a24918fef5cef9417afe9c6679db79bc5d`
+
+The guarded clean APK is installed on OPPO `2b3e0f71`:
+
+- candidate ID: `BUY-R36-MOTION-CONTENT-DEVICE`;
+- version: `1.0.0-r36`;
+- version code: `2026073146`;
+- bytes: `200162740`; and
+- candidate and pulled installed SHA-256:
+  `61797EA0531B5B9AF6C21E684632A9E33095CAAEA678EA26599FC91D9EDD40B5`.
+
+Connected replay passed Shop/Wholesale/Medicine search isolation, categories,
+product detail, aggregate Cart, prescription acknowledgement, separated
+address/payment review, independently owned orders, live tracking, Items,
+Account, Assist, repeat-tap returns, Mool bottom-rail behavior and hot resume.
+No crash, Flutter exception or ANR was found.
+
+Two founder-supplied current Zepto screenshots are preserved read-only for
+future video-ad placement analysis. They do not authorize a player, provider,
+campaign, autoplay, measurement or click-through.
+
+Debug `gfxinfo` is diagnostic only: one automation-contaminated sample
+reported 13.41% jank, while a controlled reset exposed zero Flutter SurfaceView
+frames. Ticket `BUY-FV2-084` therefore remains open for profile/release-mode
+performance qualification. Ticket `BUY-FV2-085` remains open until explicit
+founder review and acceptance. No new protected Buy baseline exists.
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R36-MOTION-CONTENT-OPPO-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-flutter-r36-motion-content-oppo-20260731-39`
+
+State: `CHECKSUM_MATCHED_FOUNDER_REVIEW_CANDIDATE`. Backend start, push,
+deploy, publication and production release remain unauthorized. A local
+preservation commit does not imply founder acceptance.

@@ -40,6 +40,7 @@ class BuyV2Screen extends StatefulWidget {
 class _BuyV2ScreenState extends State<BuyV2Screen> {
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
+  Timer? _brandRevealTimer;
   int _surfaceTransitionPhase = 0;
   int _surfaceTransitionToken = 0;
   bool _scannerBusy = false;
@@ -48,6 +49,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   late BuyV2Destination _lastHeaderDestination;
   late BuyV2View _lastHeaderView;
   int _headerPaintGeneration = 0;
+  bool _brandRevealInitialized = false;
+  bool _brandExpanded = false;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
   );
@@ -80,6 +83,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         oldWidget.recoveryKind != widget.recoveryKind) {
       _applyInitialState();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_brandRevealInitialized) return;
+    _brandRevealInitialized = true;
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _brandExpanded = true;
+    _brandRevealTimer = Timer(const Duration(milliseconds: 1700), () {
+      if (mounted) setState(() => _brandExpanded = false);
+    });
   }
 
   void _applyInitialState() {
@@ -188,6 +203,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void dispose() {
     _noticeTimer?.cancel();
     _cartAcknowledgementTimer?.cancel();
+    _brandRevealTimer?.cancel();
     widget.session.removeListener(_sessionChanged);
     _searchController.dispose();
     super.dispose();
@@ -196,101 +212,110 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    return PopScope<Object?>(
-      canPop: !_searchOpen && !session.canHandleBack,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          HapticFeedback.selectionClick();
-          if (_searchOpen) {
-            FocusScope.of(context).unfocus();
-            setState(() => _searchOpen = false);
-          } else {
-            session.goBack();
+    final surfaceTheme = BuyV2ThemeSpec.resolve(
+      session.destination,
+      session.view,
+    );
+    return BuyV2ThemeScope(
+      spec: surfaceTheme,
+      child: PopScope<Object?>(
+        canPop: !_searchOpen && !session.canHandleBack,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            HapticFeedback.selectionClick();
+            if (_searchOpen) {
+              FocusScope.of(context).unfocus();
+              setState(() => _searchOpen = false);
+            } else {
+              session.goBack();
+            }
           }
-        }
-      },
-      child: Scaffold(
-        key: const ValueKey('buy-v2-screen'),
-        backgroundColor: BuyV2Colors.canvas,
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: BuyV2Metrics.maxWidth,
-              ),
-              child: DecoratedBox(
-                decoration: const BoxDecoration(color: BuyV2Colors.canvas),
-                child: Column(
-                  children: [
-                    RepaintBoundary(
-                      key: ValueKey(
-                        'buy-header-boundary-${session.destination.name}-'
-                        '${session.view.name}-$_headerPaintGeneration',
+        },
+        child: Scaffold(
+          key: const ValueKey('buy-v2-screen'),
+          backgroundColor: surfaceTheme.canvas,
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: BuyV2Metrics.maxWidth,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(color: surfaceTheme.canvas),
+                  child: Column(
+                    children: [
+                      RepaintBoundary(
+                        key: ValueKey(
+                          'buy-header-boundary-${session.destination.name}-'
+                          '${session.view.name}-$_headerPaintGeneration',
+                        ),
+                        child: _BuyHeader(
+                          session: session,
+                          revealBrand: _brandExpanded,
+                          onAddress: () =>
+                              showBuyV2AddressSheet(context, session),
+                        ),
                       ),
-                      child: _BuyHeader(
-                        session: session,
-                        onAddress: () =>
-                            showBuyV2AddressSheet(context, session),
-                      ),
-                    ),
-                    if (session.view == BuyV2View.catalogue)
-                      _BuySearchBand(
-                        session: session,
-                        controller: _searchController,
-                        open: _searchOpen,
-                        onOpenChanged: (value) =>
-                            setState(() => _searchOpen = value),
-                        onScan: _scanProduct,
-                        scannerBusy: _scannerBusy,
-                      ),
-                    Expanded(
-                      child: _surfaceTransitionPhase == 1
-                          ? _BuySurfaceProgress(
-                              label: _transitionLabel(session),
-                            )
-                          : Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    ignoring: _surfaceTransitionPhase != 0,
-                                    child: Opacity(
-                                      opacity: _surfaceTransitionPhase == 2
-                                          ? 0
-                                          : 1,
-                                      child: TickerMode(
-                                        enabled: _surfaceTransitionPhase == 0,
-                                        child:
-                                            _searchOpen &&
-                                                session.destination !=
-                                                    BuyV2Destination.orders
-                                            ? BuyV2SearchResultsView(
-                                                session: session,
-                                              )
-                                            : _currentView(session),
+                      if (session.view == BuyV2View.catalogue)
+                        _BuySearchBand(
+                          session: session,
+                          controller: _searchController,
+                          open: _searchOpen,
+                          onOpenChanged: (value) =>
+                              setState(() => _searchOpen = value),
+                          onScan: _scanProduct,
+                          scannerBusy: _scannerBusy,
+                        ),
+                      Expanded(
+                        child: _surfaceTransitionPhase == 1
+                            ? _BuySurfaceProgress(
+                                label: _transitionLabel(session),
+                              )
+                            : Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      ignoring: _surfaceTransitionPhase != 0,
+                                      child: Opacity(
+                                        opacity: _surfaceTransitionPhase == 2
+                                            ? 0
+                                            : 1,
+                                        child: TickerMode(
+                                          enabled: _surfaceTransitionPhase == 0,
+                                          child:
+                                              _searchOpen &&
+                                                  session.destination !=
+                                                      BuyV2Destination.orders
+                                              ? BuyV2SearchResultsView(
+                                                  session: session,
+                                                )
+                                              : _currentView(session),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (_surfaceTransitionPhase == 2)
-                                  Positioned.fill(
-                                    child: _BuySurfaceProgress(
-                                      label: _transitionLabel(session),
+                                  if (_surfaceTransitionPhase == 2)
+                                    Positioned.fill(
+                                      child: _BuySurfaceProgress(
+                                        label: _transitionLabel(session),
+                                      ),
                                     ),
-                                  ),
-                                if (_surfaceTransitionPhase == 0)
-                                  if (session.notice case final message?)
-                                    Positioned(
-                                      right: 8,
-                                      top: 8,
-                                      child: _BuyNotice(message: message),
-                                    ),
-                              ],
-                            ),
-                    ),
-                    if (_surfaceTransitionPhase == 0 && _showsMiniCart(session))
-                      _BuyMiniCartBar(session: session),
-                    _BuyDock(session: session),
-                  ],
+                                  if (_surfaceTransitionPhase == 0)
+                                    if (session.notice case final message?)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: _BuyNotice(message: message),
+                                      ),
+                                ],
+                              ),
+                      ),
+                      if (_surfaceTransitionPhase == 0 &&
+                          _showsMiniCart(session))
+                        _BuyMiniCartBar(session: session),
+                      _BuyDock(session: session),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -346,9 +371,10 @@ class _BuySurfaceProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final theme = BuyV2ThemeScope.of(context);
     return Semantics(
       key: const ValueKey('buy-destination-progress'),
-      label: 'Loading $label',
+      label: '$label selected',
       liveRegion: true,
       child: Center(
         child: Container(
@@ -361,23 +387,20 @@ class _BuySurfaceProgress extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (reduceMotion)
-                const Icon(
-                  Icons.hourglass_top_rounded,
-                  color: BuyV2Colors.royal,
-                  size: 20,
-                )
-              else
-                const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: BuyV2Colors.royal,
-                  ),
-                ),
+              Icon(
+                reduceMotion
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.auto_awesome_rounded,
+                color: theme.accent,
+                size: 20,
+              ),
+              if (!reduceMotion) ...[
+                const SizedBox(width: 7),
+                SizedBox(width: 28, child: BuyV2TricolourLine(height: 3)),
+              ],
               const SizedBox(width: 10),
               Text(
-                'Opening $label',
+                label,
                 style: const TextStyle(
                   color: BuyV2Colors.ink,
                   fontSize: 11,
@@ -393,18 +416,24 @@ class _BuySurfaceProgress extends StatelessWidget {
 }
 
 class _BuyHeader extends StatelessWidget {
-  const _BuyHeader({required this.session, required this.onAddress});
+  const _BuyHeader({
+    required this.session,
+    required this.onAddress,
+    required this.revealBrand,
+  });
 
   final BuyV2Session session;
   final VoidCallback onAddress;
+  final bool revealBrand;
 
   @override
   Widget build(BuildContext context) {
+    final theme = BuyV2ThemeScope.of(context);
     return DecoratedBox(
       key: const ValueKey('buy-shared-header'),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0A064D), BuyV2Colors.navy],
+          colors: [theme.headerStart, theme.headerEnd],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -415,17 +444,22 @@ class _BuyHeader extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
             child: Row(
               children: [
-                Container(
+                AnimatedContainer(
                   key: const ValueKey('buy-brand-tile'),
-                  width: 50,
+                  width: revealBrand ? 118 : 50,
                   height: 44,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
+                  duration: BuyV2Motion.resolved(
+                    context,
+                    BuyV2Motion.brandReveal,
+                  ),
+                  curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(13),
                     border: Border.all(color: Colors.white70),
                   ),
-                  child: const _MoolSocialWordmark(),
+                  child: _MoolSocialWordmark(expanded: revealBrand),
                 ),
                 Container(
                   width: 1,
@@ -547,6 +581,7 @@ class _BuySearchBand extends StatelessWidget {
     };
     final showScanner = session.destination != BuyV2Destination.orders;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final theme = BuyV2ThemeScope.of(context);
     return AnimatedContainer(
       key: const ValueKey('buy-search-band'),
       duration: reduceMotion
@@ -555,9 +590,9 @@ class _BuySearchBand extends StatelessWidget {
       curve: Curves.easeOutCubic,
       height: open ? 60 : 56,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: const BoxDecoration(
-        color: BuyV2Colors.canvas,
-        border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+      decoration: BoxDecoration(
+        color: theme.canvas,
+        border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
       ),
       child: Row(
         children: [
@@ -573,7 +608,7 @@ class _BuySearchBand extends StatelessWidget {
                 color: open ? const Color(0xFFF7F8FF) : Colors.white,
                 borderRadius: BorderRadius.circular(open ? 24 : 14),
                 border: Border.all(
-                  color: open ? const Color(0xFFBAC6EB) : BuyV2Colors.line,
+                  color: open ? theme.accent : BuyV2Colors.line,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -912,7 +947,8 @@ class _HeaderContextButton extends StatelessWidget {
             BuyV2Destination.shop => (
               Icons.location_on_outlined,
               'MoolSocial · Deliver to',
-              session.selectedAddress.compactLine,
+              session.selectedAddressOrNull?.compactLine ??
+                  'Choose delivery address',
             ),
             BuyV2Destination.wholesale => (
               Icons.storefront_outlined,
@@ -922,7 +958,8 @@ class _HeaderContextButton extends StatelessWidget {
             BuyV2Destination.medicine => (
               Icons.local_pharmacy_outlined,
               'MoolSocial · Licensed pharmacy',
-              session.selectedAddress.compactLine,
+              session.selectedAddressOrNull?.compactLine ??
+                  'Choose delivery address',
             ),
             BuyV2Destination.orders => (
               Icons.local_shipping_outlined,
@@ -994,7 +1031,9 @@ class _HeaderContextButton extends StatelessWidget {
 }
 
 class _MoolSocialWordmark extends StatelessWidget {
-  const _MoolSocialWordmark();
+  const _MoolSocialWordmark({required this.expanded});
+
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -1002,13 +1041,33 @@ class _MoolSocialWordmark extends StatelessWidget {
       label: 'MoolSocial',
       header: true,
       child: ExcludeSemantics(
-        child: const Center(
-          child: SizedBox(
-            key: ValueKey('buy-brand-mark'),
-            width: 32,
-            height: 24,
-            child: CustomPaint(painter: _MoolSocialMarkPainter()),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              key: ValueKey('buy-brand-mark'),
+              width: 32,
+              height: 24,
+              child: CustomPaint(painter: _MoolSocialMarkPainter()),
+            ),
+            if (expanded) ...[
+              const SizedBox(width: 5),
+              const Flexible(
+                child: Text(
+                  'MoolSocial',
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: BuyV2Colors.navy,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.2,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1024,13 +1083,13 @@ class _MoolSocialMarkPainter extends CustomPainter {
     final centre = Offset(size.width * .5, size.height * .76);
     final rightPeak = Offset(size.width * .72, size.height * .29);
     final left = Paint()
-      ..color = BuyV2Colors.royal
+      ..color = BuyV2Colors.orange
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.2
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final right = Paint()
-      ..color = BuyV2Colors.orange
+      ..color = BuyV2Colors.green
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.2
       ..strokeCap = StrokeCap.round
@@ -1049,12 +1108,12 @@ class _MoolSocialMarkPainter extends CustomPainter {
       ..drawCircle(
         Offset(leftPeak.dx, size.height * .14),
         2.3,
-        Paint()..color = BuyV2Colors.green,
+        Paint()..color = BuyV2Colors.navy,
       )
       ..drawCircle(
         Offset(rightPeak.dx, size.height * .14),
         2.3,
-        Paint()..color = const Color(0xFF4F73FF),
+        Paint()..color = BuyV2Colors.navy,
       );
   }
 
@@ -1077,6 +1136,7 @@ class _BuyDockState extends State<_BuyDock> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    final theme = BuyV2ThemeScope.of(context);
     final items = _showPrimaryActions
         ? <({String label, IconData icon, VoidCallback onTap, bool active})>[
             (
@@ -1198,7 +1258,7 @@ class _BuyDockState extends State<_BuyDock> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: item.active
-                                ? BuyV2Colors.softOrange
+                                ? theme.softAccent
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             border: item.active
@@ -1217,7 +1277,7 @@ class _BuyDockState extends State<_BuyDock> {
                                 height: 2,
                                 decoration: BoxDecoration(
                                   color: item.active
-                                      ? BuyV2Colors.orange
+                                      ? theme.accent
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(2),
                                 ),

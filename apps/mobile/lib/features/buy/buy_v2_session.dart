@@ -1,24 +1,34 @@
 import 'package:flutter/foundation.dart';
 
 import 'buy_session.dart';
+import 'buy_v2_content_contracts.dart';
 import 'buy_v2_models.dart';
 
 class BuyV2Session extends ChangeNotifier {
-  BuyV2Session({required this.core})
-    : _savedCanonicalIds = {
-        ...BuyV2Catalogue.products
-            .where((product) => product.destination == BuyV2Destination.shop)
-            .take(3)
-            .map((product) => product.canonicalId),
-        ...BuyV2Catalogue.products
-            .where(
-              (product) => product.destination == BuyV2Destination.medicine,
-            )
-            .take(3)
-            .map((product) => product.canonicalId),
-      };
+  BuyV2Session({
+    required this.core,
+    this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
+    this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
+  }) : _savedCanonicalIds = {
+         ...BuyV2Catalogue.products
+             .where((product) => product.destination == BuyV2Destination.shop)
+             .take(3)
+             .map((product) => product.canonicalId),
+         ...BuyV2Catalogue.products
+             .where(
+               (product) => product.destination == BuyV2Destination.medicine,
+             )
+             .take(3)
+             .map((product) => product.canonicalId),
+       };
 
   final BuySession core;
+  final BuyV2ProductFactsAdapter productFactsAdapter;
+  final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
+
+  static const bool sponsoredContentActivationApproved = false;
+  static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
+      BuyV2CatalogueProductFactsAdapter();
 
   static const Set<String> paymentMethods = {
     'UPI',
@@ -36,7 +46,6 @@ class BuyV2Session extends ChangeNotifier {
   String medicineCategoryId = 'all';
   String query = '';
   String? selectedProductId;
-  String? selectedOrderId;
   String? pendingPrescriptionProductId;
   BuyV2RecoveryKind? recoveryKind;
   String? notice;
@@ -45,8 +54,10 @@ class BuyV2Session extends ChangeNotifier {
   bool businessVerified = true;
   bool prescriptionAttached = false;
   bool trackingAlertsEnabled = true;
-  String selectedAddressId = 'home';
   String selectedPayment = 'UPI';
+
+  String? _selectedOrderId;
+  String? _selectedAddressId = 'home';
 
   BuyV2Destination _accountReturnDestination = BuyV2Destination.shop;
   BuyV2View _accountReturnView = BuyV2View.catalogue;
@@ -61,6 +72,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View _productReturnView = BuyV2View.catalogue;
 
   final Map<String, BuyV2CartLine> _cart = {};
+  final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
   final Map<String, String> _reportedProductReasons = {};
@@ -71,7 +83,7 @@ class BuyV2Session extends ChangeNotifier {
   int _confirmedTotal = 0;
   int _orderSequence = 1;
 
-  final List<BuyV2Address> addresses = [
+  final List<BuyV2Address> _addresses = [
     const BuyV2Address(
       id: 'home',
       kind: BuyV2AddressKind.home,
@@ -96,7 +108,7 @@ class BuyV2Session extends ChangeNotifier {
     ),
   ];
 
-  final List<BuyV2Order> orders = [
+  final List<BuyV2Order> _orders = [
     const BuyV2Order(
       id: 'MS-240782',
       destination: BuyV2Destination.shop,
@@ -176,6 +188,14 @@ class BuyV2Session extends ChangeNotifier {
       status: BuyV2OrderStatus.delivered,
     ),
   ];
+
+  List<BuyV2Address> get addresses => List.unmodifiable(_addresses);
+
+  List<BuyV2Order> get orders => List.unmodifiable(_orders);
+
+  String? get selectedOrderId => _selectedOrderId;
+
+  String? get selectedAddressId => _selectedAddressId;
 
   List<BuyV2Category> get categories => switch (destination) {
     BuyV2Destination.shop => BuyV2Catalogue.shopCategories,
@@ -400,7 +420,7 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2Order> get visibleOrders {
     final normalizedQuery = query.trim().toLowerCase();
-    return orders
+    return _orders
         .where(
           (order) => ordersTab == BuyV2OrdersTab.delivered
               ? order.status == BuyV2OrderStatus.delivered
@@ -421,11 +441,11 @@ class BuyV2Session extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  int get activeOrderCount => orders
+  int get activeOrderCount => _orders
       .where((order) => order.status != BuyV2OrderStatus.delivered)
       .length;
 
-  int get deliveredOrderCount => orders
+  int get deliveredOrderCount => _orders
       .where((order) => order.status == BuyV2OrderStatus.delivered)
       .length;
 
@@ -442,23 +462,113 @@ class BuyV2Session extends ChangeNotifier {
     throw ArgumentError.value(id, 'id', 'Unknown Buy product');
   }
 
+  BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) {
+    return _productFacts.putIfAbsent(product.id, () {
+      final next = productFactsAdapter.snapshotFor(product);
+      return _validProductFacts(product, next)
+          ? next
+          : _catalogueFactsFallback.snapshotFor(product);
+    });
+  }
+
+  bool refreshProductFacts(String productId) {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = productFactsAdapter.snapshotFor(product);
+    if (!_validProductFacts(product, next)) {
+      notice = 'Product information could not be refreshed.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _productFacts[product.id];
+    _productFacts[product.id] = next;
+    if (previous != next) {
+      notifyListeners();
+    }
+    return true;
+  }
+
+  bool _validProductFacts(
+    BuyV2Product product,
+    BuyV2ProductFactsSnapshot snapshot,
+  ) {
+    return snapshot.productId == product.id &&
+        snapshot.price > 0 &&
+        snapshot.deliveryPromise.trim().isNotEmpty &&
+        snapshot.partner.trim().isNotEmpty &&
+        snapshot.orderabilityLabel.trim().isNotEmpty &&
+        snapshot.sourceId.trim().isNotEmpty;
+  }
+
+  BuyV2SponsoredContent? sponsoredContentFor(
+    BuyV2SponsoredPlacement placement,
+  ) {
+    if (!sponsoredContentActivationApproved) return null;
+    final content = sponsoredContentAdapter.contentFor(placement);
+    return content?.placement == placement ? content : null;
+  }
+
   BuyV2Product? get selectedProduct {
     final id = selectedProductId;
     return id == null ? null : findProduct(id);
   }
 
-  BuyV2Order get selectedOrder {
-    final id = selectedOrderId;
-    return orders.firstWhere(
-      (order) => order.id == id,
-      orElse: () => orders.first,
-    );
+  BuyV2Order? get selectedOrderOrNull {
+    final id = _selectedOrderId;
+    if (id == null) return null;
+    return _orders.where((order) => order.id == id).firstOrNull;
   }
 
-  BuyV2Address get selectedAddress => addresses.firstWhere(
-    (address) => address.id == selectedAddressId,
-    orElse: () => addresses.first,
-  );
+  BuyV2Order get selectedOrder =>
+      selectedOrderOrNull ??
+      (throw StateError('No valid Buy order is selected.'));
+
+  BuyV2Address? get selectedAddressOrNull {
+    final id = _selectedAddressId;
+    if (id == null) return null;
+    return _addresses.where((address) => address.id == id).firstOrNull;
+  }
+
+  BuyV2Address get selectedAddress =>
+      selectedAddressOrNull ??
+      (throw StateError('No valid Buy address is selected.'));
+
+  bool restoreSelectedOrderId(String? id) {
+    if (id == null || !_orders.any((order) => order.id == id)) {
+      _selectedOrderId = null;
+      destination = BuyV2Destination.orders;
+      view = BuyV2View.catalogue;
+      query = '';
+      selectedFilter = null;
+      notice = 'This order could not be found.';
+      notifyListeners();
+      return false;
+    }
+    _selectedOrderId = id;
+    notice = null;
+    notifyListeners();
+    return true;
+  }
+
+  bool restoreSelectedAddressId(String? id) {
+    if (id == null || !_addresses.any((address) => address.id == id)) {
+      _selectedAddressId = null;
+      if (view == BuyV2View.checkout || view == BuyV2View.confirmation) {
+        view = BuyV2View.cart;
+      }
+      notice = 'Choose a delivery address to continue.';
+      notifyListeners();
+      return false;
+    }
+    _selectedAddressId = id;
+    notice = null;
+    notifyListeners();
+    return true;
+  }
 
   void openDestination(BuyV2Destination value) {
     _accountChildReturnActive = false;
@@ -521,16 +631,25 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  void openCheckout() {
+  bool openCheckout() {
     if (cartLines.isEmpty) {
       view = BuyV2View.catalogue;
       notice = 'Choose a product to continue.';
+      notifyListeners();
+      return false;
+    }
+    if (selectedAddressOrNull == null) {
+      view = BuyV2View.cart;
+      notice = 'Choose a delivery address to continue.';
+      notifyListeners();
+      return false;
     } else {
       checkoutScope = cartScope;
       view = BuyV2View.checkout;
       notice = null;
     }
     notifyListeners();
+    return true;
   }
 
   void openOrders() {
@@ -575,15 +694,15 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openTracking(String orderId) {
     destination = BuyV2Destination.orders;
-    final orderExists = orders.any((order) => order.id == orderId);
+    final orderExists = _orders.any((order) => order.id == orderId);
     if (!orderExists) {
-      selectedOrderId = null;
+      _selectedOrderId = null;
       view = BuyV2View.catalogue;
       notice = 'This order could not be found.';
       notifyListeners();
       return false;
     }
-    selectedOrderId = orderId;
+    _selectedOrderId = orderId;
     view = BuyV2View.tracking;
     notice = null;
     notifyListeners();
@@ -591,7 +710,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool openOrderItems(String orderId) {
-    final order = orders
+    final order = _orders
         .where((candidate) => candidate.id == orderId)
         .firstOrNull;
     if (order == null) {
@@ -599,7 +718,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    selectedOrderId = order.id;
+    _selectedOrderId = order.id;
     destination = BuyV2Destination.orders;
     view = BuyV2View.orderItems;
     notice = null;
@@ -659,7 +778,7 @@ class BuyV2Session extends ChangeNotifier {
       _accountReturnDestination = destination;
       _accountReturnView = view;
       _accountReturnProductId = selectedProductId;
-      _accountReturnOrderId = selectedOrderId;
+      _accountReturnOrderId = _selectedOrderId;
       _accountReturnQuery = query;
       _accountReturnFilter = selectedFilter;
     }
@@ -673,7 +792,16 @@ class BuyV2Session extends ChangeNotifier {
     destination = _accountReturnDestination;
     view = _accountReturnView;
     selectedProductId = _accountReturnProductId;
-    selectedOrderId = _accountReturnOrderId;
+    _selectedOrderId = _accountReturnOrderId;
+    if ((_accountReturnView == BuyV2View.tracking ||
+            _accountReturnView == BuyV2View.orderItems) &&
+        selectedOrderOrNull == null) {
+      _accountChildReturnActive = false;
+      _openOrdersRoot();
+      notice = 'This order could not be found.';
+      notifyListeners();
+      return;
+    }
     query = _accountReturnQuery;
     selectedFilter = _accountReturnFilter;
     notice = null;
@@ -714,7 +842,14 @@ class BuyV2Session extends ChangeNotifier {
       case BuyV2View.tracking:
         _openOrdersRoot();
       case BuyV2View.orderItems:
-        openTracking(selectedOrder.id);
+        final order = selectedOrderOrNull;
+        if (order == null) {
+          _openOrdersRoot();
+          notice = 'This order could not be found.';
+          notifyListeners();
+        } else {
+          openTracking(order.id);
+        }
       case BuyV2View.assist:
         closeAssist();
       case BuyV2View.recovery:
@@ -996,20 +1131,20 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool chooseAddress(String id) {
-    if (!addresses.any((address) => address.id == id)) {
+    if (!_addresses.any((address) => address.id == id)) {
       notice = 'This saved address could not be found.';
       notifyListeners();
       return false;
     }
-    selectedAddressId = id;
+    _selectedAddressId = id;
     notice = 'Delivering to ${selectedAddress.shortLine}';
     notifyListeners();
     return true;
   }
 
   void addAddress(BuyV2Address address) {
-    addresses.add(address);
-    selectedAddressId = address.id;
+    _addresses.add(address);
+    _selectedAddressId = address.id;
     notice = 'Delivering to ${address.shortLine}';
     notifyListeners();
   }
@@ -1026,15 +1161,24 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  void confirmOrder() {
+  bool confirmOrder() {
     final lines = checkoutLines;
     if (lines.isEmpty) {
       returnToCatalogue();
-      return;
+      return false;
+    }
+    final address = selectedAddressOrNull;
+    if (address == null) {
+      view = BuyV2View.cart;
+      notice = 'Choose a delivery address to continue.';
+      notifyListeners();
+      return false;
     }
     final groups = checkoutFulfilmentGroups;
-    _confirmedOrders = groups.map(_createOrderForGroup).toList(growable: false);
-    orders.insertAll(0, _confirmedOrders);
+    _confirmedOrders = groups
+        .map((group) => _createOrderForGroup(group, address))
+        .toList(growable: false);
+    _orders.insertAll(0, _confirmedOrders);
     _confirmedDestinations = _confirmedOrders
         .map((order) => order.destination)
         .toSet();
@@ -1049,9 +1193,13 @@ class BuyV2Session extends ChangeNotifier {
     view = BuyV2View.confirmation;
     notice = null;
     notifyListeners();
+    return true;
   }
 
-  BuyV2Order _createOrderForGroup(BuyV2FulfilmentGroup group) {
+  BuyV2Order _createOrderForGroup(
+    BuyV2FulfilmentGroup group,
+    BuyV2Address address,
+  ) {
     final sequence = _orderSequence++;
     final prefix = switch (group.destination) {
       BuyV2Destination.shop => 'MS',
@@ -1075,12 +1223,12 @@ class BuyV2Session extends ChangeNotifier {
       destination: group.destination,
       title: '${group.destination.label} order',
       itemSummary:
-          '${group.itemCount} $itemName · ${selectedAddress.label} · ${selectedAddress.area}',
+          '${group.itemCount} $itemName · ${address.label} · ${address.area}',
       total: group.total,
       partner: group.partner,
       partnerType: group.partnerType,
       promise: group.promise,
-      destinationLabel: selectedAddress.shortLine,
+      destinationLabel: address.shortLine,
       progress: status == BuyV2OrderStatus.confirmed ? .34 : .2,
       status: status,
       productIds: group.productIds,

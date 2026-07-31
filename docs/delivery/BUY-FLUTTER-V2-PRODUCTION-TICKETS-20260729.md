@@ -1923,7 +1923,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-074` — Make Cart entry aggregate and consistent across all Buy verticals
 
-- Status: **REGISTERED — P0 FOUNDER-PROVEN OPPO DEFECT; IMPLEMENTATION DEFERRED**
+- Status: **R36 CHECKSUM-MATCHED OPPO VERIFIED — FOUNDER COMBINED REVIEW
+  PENDING 2026-07-31**
 - Severity: **P0 purchase-state consistency defect**
 - Founder finding: adding from Shop appears to behave as a separate Cart path
   from Wholesale and Medicine.
@@ -1950,7 +1951,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-075` — Replace customer-visible `Verified` with a role-based Mool partner language
 
-- Status: **REGISTERED — P0 FOUNDER COPY DIRECTION; GLOSSARY DECISION REQUIRED**
+- Status: **R36 ROLE GLOSSARY IMPLEMENTED AND OPPO VERIFIED — FOUNDER
+  COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P0 trust-language and brand-positioning defect**
 - Founder finding: repeated `Verified retailer/shop/wholesaler/manufacturer`
   wording feels cheap and less trustworthy. The customer should understand
@@ -1984,8 +1986,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-076` — Establish the shared R30 Buy motion and state-acknowledgement system
 
-- Status: **R32 FOUNDATION DEVICE VERIFIED — FULL MOTION TICKET REMAINS OPEN
-  FOR FOUNDER DIRECTION 2026-07-30**
+- Status: **R36 FINITE MOTION SYSTEM CHECKSUM-MATCHED OPPO VERIFIED —
+  FOUNDER COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P0 cross-surface interaction-language requirement**
 - Founder direction: every Buy state and action should feel live, responsive
   and visibly acknowledged.
@@ -2005,7 +2007,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-077` — Create responsive screen-type and vertical themes under the Indian tricolour
 
-- Status: **REGISTERED — R30 NEXT-SESSION UI/UX; DO NOT IMPLEMENT NOW**
+- Status: **R36 RESPONSIVE THEME SYSTEM CHECKSUM-MATCHED OPPO VERIFIED —
+  FOUNDER COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P1 thematic hierarchy requirement**
 - Founder direction: screen themes should change meaningfully based on the Buy
   screen or vertical while remaining recognisably MoolSocial.
@@ -2025,7 +2028,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-078` — Build an unmistakable animated MoolSocial identity
 
-- Status: **REGISTERED — R30 NEXT-SESSION UI/UX; DO NOT IMPLEMENT NOW**
+- Status: **R36 CODE-NATIVE IDENTITY CHECKSUM-MATCHED OPPO VERIFIED —
+  FOUNDER COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P0 brand-recognition requirement**
 - Founder finding: the current M mark does not read as a convincing tricolour
   identity and does not always tell the customer that the product is
@@ -2047,8 +2051,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-079` — Introduce a restrained 3D commerce interaction language
 
-- Status: **R32 PRODUCT-CARD FOUNDATION DEVICE VERIFIED — RESTRAINED 3D
-  TICKET REMAINS OPEN FOR FOUNDER DIRECTION 2026-07-30**
+- Status: **R36 RESTRAINED DEPTH SYSTEM CHECKSUM-MATCHED OPPO VERIFIED —
+  FOUNDER COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P1 depth, touch and product-presence requirement**
 - Founder direction: Buy should gain professional 3D motion, liveliness and a
   more happening product experience.
@@ -2068,7 +2072,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-080` — Keep live product information active inside stable product tiles
 
-- Status: **REGISTERED — R30 NEXT-SESSION UI/UX; DATA CONTRACT REQUIRED**
+- Status: **R36 REPLACEABLE FACTS CONTRACT AND FALLBACK VERIFIED — REAL
+  PROVIDER SELECTION REMAINS DEFERRED 2026-07-31**
 - Severity: **P0 live-commerce information requirement**
 - Founder direction: product tiles should stay alive by presenting changing
   product information within the grid.
@@ -2088,7 +2093,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-081` — Add first-party MoolSocial promotion modules
 
-- Status: **REGISTERED — R30 NEXT-SESSION UI/UX; DO NOT IMPLEMENT NOW**
+- Status: **R36 FIRST-PARTY PROMOTION FOUNDATION OPPO VERIFIED — FOUNDER
+  COMBINED REVIEW PENDING 2026-07-31**
 - Severity: **P1 discovery and first-party merchandising requirement**
 - Founder direction: reclaimed commerce space should promote useful
   MoolSocial products, services and established Buy features.
@@ -2106,7 +2112,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-082` — Define transparent sponsored and other advertisement placements
 
-- Status: **REGISTERED — R30 CONTRACT/DESIGN TICKET; DO NOT IMPLEMENT NOW**
+- Status: **R36 FAIL-CLOSED SPONSORED-CONTENT CONTRACT VERIFIED — ACTIVATION
+  REMAINS UNAUTHORIZED 2026-07-31**
 - Severity: **P0 advertising trust and layout requirement**
 - Founder direction: Buy should support advertisement cards and other
   advertising formats without losing healthy product space.
@@ -2126,7 +2133,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-083` — Design safe, performant inline video advertisements
 
-- Status: **REGISTERED — R30 CONTRACT/DESIGN TICKET; DO NOT IMPLEMENT NOW**
+- Status: **R36 VIDEO-AD CONTRACT VERIFIED — NO PLAYER OR PROVIDER ACTIVATED
+  2026-07-31**
 - Severity: **P0 video-ad accessibility and performance requirement**
 - Founder direction: Buy should support video advertising as part of the more
   lively commerce experience.
@@ -2146,8 +2154,9 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-084` — Gate R30 motion, theme and advertising for accessibility and performance
 
-- Status: **R32 MOTION-FOUNDATION QUALITY GATE PASSED — FULL MOTION, THEME
-  AND ADVERTISING GATE REMAINS OPEN 2026-07-30**
+- Status: **R36 AUTOMATED AND CHECKSUM-MATCHED DEVICE GATES RECORDED —
+  RELEASE-HARDWARE FRAME PROFILING AND FOUNDER REVIEW REMAIN OPEN
+  2026-07-31**
 - Severity: **P0 production-readiness gate**
 - Scope: every R30 motion, 3D, theme, dynamic tile, promotion and advertisement
   ticket.
@@ -2165,7 +2174,8 @@ Founder decision recorded 30 July 2026:
 
 ### `BUY-FV2-085` — Complete R30 cross-surface founder review before Buy backend start
 
-- Status: **REGISTERED — R30 SEQUENCE AND ACCEPTANCE GATE**
+- Status: **R36 CONNECTED CANDIDATE READY — FOUNDER REVIEW REQUIRED; DO NOT
+  CLOSE 2026-07-31**
 - Severity: **P0 founder-review and sequencing requirement**
 - Scope: Tickets `BUY-FV2-074` through `BUY-FV2-084`.
 - Acceptance:
@@ -3344,3 +3354,73 @@ Completion evidence:
     no APK rebuild or reinstall was required.
 - Durable handoff:
   `docs/quality/BUY-V2-R35-1-DISCOVERY-CONTRACT-HANDOFF-20260731.md`.
+
+### `BUY-FV2-117` — Fail closed on stale Buy address and order ownership
+
+- Status: **R36 CHECKSUM-MATCHED OPPO VERIFIED — FOUNDER COMBINED REVIEW
+  PENDING 2026-07-31**
+- Severity: **P0 checkout-address and order-identity integrity**
+- Authority: founder direction on 31 July 2026 to execute Ticket 117 together
+  with Tickets 076 through 085 against the protected R35.1 baseline.
+- Existing risk:
+  - `BuyV2Session.addresses` and `BuyV2Session.orders` expose live mutable
+    lists; and
+  - selected-address and selected-order lookup silently substitutes the first
+    record when the selected identifier is missing or stale.
+- Scope:
+  - native Buy V2 session ownership, read-only projections and fail-closed
+    customer recovery only;
+  - no backend, identity, persistence, API, database or business-rule
+    invention;
+  - preserve valid Shop, Wholesale, Medicine, Cart, Checkout, Orders,
+    tracking, Account and reorder behavior.
+- Acceptance:
+  1. Public address and order collections are unmodifiable projections; only
+     named session operations may change the owned records.
+  2. Missing or stale selected identifiers never silently select a different
+     address or order.
+  3. Checkout and confirmation stop before order creation when no valid saved
+     address is selected, retain the cart and expose concise address recovery.
+  4. Tracking, order items, Back and Account restoration recover to Orders
+     with `This order could not be found.` when their selected order is stale.
+  5. Choosing or adding a valid address and opening a valid order retain the
+     established result, listener acknowledgement and navigation behavior.
+  6. Focused tests cover attempted public mutation, stale/missing address and
+     order recovery, no silent substitution and unchanged valid journeys.
+  7. Full analysis, two same-source Buy regressions, protected reference,
+     copy, brand, Social, security and connected-OPPO gates pass before the
+     combined R36 candidate is offered for founder review.
+
+### `BUY-FV2-118` — Make OPPO review-build provenance fail closed
+
+- Status: **COMPLETE — R36 GUARDED BUILD, RUNTIME MARKER AND INSTALLED
+  CHECKSUM VERIFIED 2026-07-31**
+- Severity: **P0 candidate-identity and device-replay integrity**
+- Founder finding: review builds repeatedly lose time to configuration mistakes
+  that are visible only after installation.
+- Proven R36 reproduction:
+  - a direct `flutter build apk` produced the correct source and version but
+    omitted `MOOLSOCIAL_DEVICE_REVIEW` and `MOOLSOCIAL_CANDIDATE_ID`;
+  - the checksum-matched OPPO installation therefore opened real sign-in and
+    logged candidate ID `unidentified`; and
+  - version name, version code and APK checksum alone could not prove that the
+    intended runtime mode was present.
+- Scope:
+  - guarded local device-review build entry point;
+  - explicit candidate ID, device-review and emulator-isolation defines;
+  - clean deterministic final build;
+  - installed runtime-marker verification;
+  - additive rejected-build evidence.
+- Acceptance:
+  1. The supported Buy device-review build command requires a non-empty
+     candidate ID, version, version code, source fingerprint and additive
+     artifact directory.
+  2. The command always supplies `MOOLSOCIAL_DEVICE_REVIEW=true`,
+     `MOOLSOCIAL_USE_EMULATORS=true` and the exact
+     `MOOLSOCIAL_CANDIDATE_ID`.
+  3. Final candidate creation uses a clean generated build and refuses to
+     overwrite an existing evidence APK or manifest.
+  4. Post-install verification fails unless logcat exposes the exact candidate
+     marker and a ready authenticated review state.
+  5. Every rejected APK, checksum, screenshot and diagnosis remains preserved
+     and is explicitly ineligible for founder acceptance.

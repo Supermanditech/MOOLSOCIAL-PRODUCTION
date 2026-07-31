@@ -102,7 +102,14 @@ void main() {
       find.byKey(const ValueKey('buy-destination-progress')),
       findsOneWidget,
     );
-    expect(find.text('Opening Medicine'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-destination-progress')),
+        matching: find.text('Medicine'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Opening Medicine'), findsNothing);
 
     await tester.pump();
     expect(
@@ -127,7 +134,14 @@ void main() {
       find.byKey(const ValueKey('buy-destination-progress')),
       findsOneWidget,
     );
-    expect(find.text('Opening MoolSocial Assist'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-destination-progress')),
+        matching: find.text('MoolSocial Assist'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Opening MoolSocial Assist'), findsNothing);
 
     await tester.pump();
     expect(
@@ -744,7 +758,7 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    final tile = tester.widget<Container>(
+    final tile = tester.widget<AnimatedContainer>(
       find.byKey(const ValueKey('buy-brand-tile')),
     );
     final decoration = tile.decoration! as BoxDecoration;
@@ -753,6 +767,78 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))).height,
       44,
     );
+  });
+
+  testWidgets(
+    'MoolSocial identity reveals once then returns to compact width',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      await tester.pumpWidget(app(session));
+      await tester.pump();
+
+      final brandTile = find.byKey(const ValueKey('buy-brand-tile'));
+      expect(tester.getSize(brandTile).width, 118);
+      expect(
+        find.descendant(of: brandTile, matching: find.text('MoolSocial')),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(milliseconds: 1700));
+      await tester.pump(BuyV2Motion.brandReveal);
+      expect(tester.getSize(brandTile).width, 50);
+      expect(
+        find.descendant(of: brandTile, matching: find.text('MoolSocial')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shared-header')),
+          matching: find.textContaining('MoolSocial ·'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('reduced motion uses the compact static MoolSocial identity', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session, disableAnimations: true));
+    await tester.pump();
+
+    final brandTile = find.byKey(const ValueKey('buy-brand-tile'));
+    expect(tester.getSize(brandTile).width, 50);
+    expect(tester.widget<AnimatedContainer>(brandTile).duration, Duration.zero);
+    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+  });
+
+  testWidgets('inactive sponsored placement consumes no catalogue height', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: const Scaffold(
+          body: Column(
+            children: [
+              BuyV2SponsoredSlot(
+                key: ValueKey('inactive-sponsored-slot'),
+                content: null,
+              ),
+              Text('Products continue'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final slot = find.byKey(const ValueKey('inactive-sponsored-slot'));
+    expect(slot, findsOneWidget);
+    expect(tester.getSize(slot).height, 0);
+    expect(find.text('Products continue'), findsOneWidget);
+    expect(find.text('Sponsored'), findsNothing);
+    expect(find.text('Advertisement'), findsNothing);
   });
 
   testWidgets(

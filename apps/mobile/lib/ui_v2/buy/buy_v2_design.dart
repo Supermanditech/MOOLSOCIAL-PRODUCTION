@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 
 final NumberFormat _buyV2Currency = NumberFormat.currency(
@@ -37,12 +38,159 @@ abstract final class BuyV2Metrics {
 
 abstract final class BuyV2Motion {
   static const press = Duration(milliseconds: 110);
+  static const selection = Duration(milliseconds: 150);
   static const stateChange = Duration(milliseconds: 180);
   static const contentChange = Duration(milliseconds: 240);
+  static const expandCollapse = Duration(milliseconds: 260);
+  static const routeChange = Duration(milliseconds: 280);
+  static const success = Duration(milliseconds: 360);
+  static const recovery = Duration(milliseconds: 220);
+  static const brandReveal = Duration(milliseconds: 420);
   static const pressScale = .985;
 
   static Duration resolved(BuildContext context, Duration duration) {
     return MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+  }
+}
+
+@immutable
+class BuyV2ThemeSpec {
+  const BuyV2ThemeSpec({
+    required this.accent,
+    required this.softAccent,
+    required this.canvas,
+    required this.headerStart,
+    required this.headerEnd,
+  });
+
+  final Color accent;
+  final Color softAccent;
+  final Color canvas;
+  final Color headerStart;
+  final Color headerEnd;
+
+  static BuyV2ThemeSpec resolve(BuyV2Destination destination, BuyV2View view) {
+    final vertical = switch (destination) {
+      BuyV2Destination.shop => const BuyV2ThemeSpec(
+        accent: BuyV2Colors.orange,
+        softAccent: Color(0xFFFFF0DE),
+        canvas: Color(0xFFF7F5F1),
+        headerStart: Color(0xFF0B075D),
+        headerEnd: BuyV2Colors.navy,
+      ),
+      BuyV2Destination.wholesale => const BuyV2ThemeSpec(
+        accent: BuyV2Colors.green,
+        softAccent: Color(0xFFEAF7E8),
+        canvas: Color(0xFFF2F7F3),
+        headerStart: Color(0xFF071B45),
+        headerEnd: Color(0xFF003E48),
+      ),
+      BuyV2Destination.medicine => const BuyV2ThemeSpec(
+        accent: Color(0xFF287C69),
+        softAccent: Color(0xFFE8F5F0),
+        canvas: Color(0xFFF2F7F8),
+        headerStart: Color(0xFF11104F),
+        headerEnd: Color(0xFF064C52),
+      ),
+      BuyV2Destination.orders => const BuyV2ThemeSpec(
+        accent: BuyV2Colors.royal,
+        softAccent: Color(0xFFEDECFF),
+        canvas: Color(0xFFF4F4FA),
+        headerStart: Color(0xFF09194B),
+        headerEnd: Color(0xFF25105D),
+      ),
+    };
+    return switch (view) {
+      BuyV2View.cart ||
+      BuyV2View.checkout ||
+      BuyV2View.confirmation => BuyV2ThemeSpec(
+        accent: BuyV2Colors.orange,
+        softAccent: BuyV2Colors.softOrange,
+        canvas: const Color(0xFFF5F3F8),
+        headerStart: vertical.headerStart,
+        headerEnd: BuyV2Colors.navy,
+      ),
+      BuyV2View.tracking || BuyV2View.orderItems => BuyV2ThemeSpec(
+        accent: BuyV2Colors.green,
+        softAccent: BuyV2Colors.softGreen,
+        canvas: const Color(0xFFF2F5F8),
+        headerStart: vertical.headerStart,
+        headerEnd: vertical.headerEnd,
+      ),
+      BuyV2View.account || BuyV2View.assist => BuyV2ThemeSpec(
+        accent: BuyV2Colors.royal,
+        softAccent: BuyV2Colors.softBlue,
+        canvas: const Color(0xFFF3F5FA),
+        headerStart: const Color(0xFF0B075D),
+        headerEnd: BuyV2Colors.navy,
+      ),
+      BuyV2View.catalogue ||
+      BuyV2View.product ||
+      BuyV2View.recovery => vertical,
+    };
+  }
+}
+
+class BuyV2ThemeScope extends InheritedWidget {
+  const BuyV2ThemeScope({super.key, required this.spec, required super.child});
+
+  final BuyV2ThemeSpec spec;
+
+  static BuyV2ThemeSpec of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<BuyV2ThemeScope>()
+            ?.spec ??
+        BuyV2ThemeSpec.resolve(BuyV2Destination.shop, BuyV2View.catalogue);
+  }
+
+  @override
+  bool updateShouldNotify(BuyV2ThemeScope oldWidget) => spec != oldWidget.spec;
+}
+
+class BuyV2IntentDepth extends StatefulWidget {
+  const BuyV2IntentDepth({super.key, required this.child, this.enabled = true});
+
+  final Widget child;
+  final bool enabled;
+
+  @override
+  State<BuyV2IntentDepth> createState() => _BuyV2IntentDepthState();
+}
+
+class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final enabled = widget.enabled && !reduceMotion;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: enabled ? (_) => _setPressed(true) : null,
+      onPointerUp: enabled ? (_) => _setPressed(false) : null,
+      onPointerCancel: enabled ? (_) => _setPressed(false) : null,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: enabled && _pressed ? 1 : 0),
+        duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) {
+          final transform = Matrix4.translationValues(0, value * .8, 0)
+            ..setEntry(3, 2, .0007)
+            ..rotateX(value * .008);
+          return Transform(
+            alignment: Alignment.center,
+            transform: transform,
+            child: child,
+          );
+        },
+        child: widget.child,
+      ),
+    );
   }
 }
 
@@ -419,82 +567,173 @@ class BuyV2PromotionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = BuyV2ThemeScope.of(context);
     return Semantics(
       label: '$title. $detail',
       button: true,
-      child: SizedBox(
-        width: width,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Ink(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: .15),
-                    Colors.white,
-                    BuyV2Colors.softGreen.withValues(alpha: .72),
+      child: BuyV2IntentDepth(
+        child: SizedBox(
+          width: width,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      accent.withValues(alpha: .15),
+                      Colors.white,
+                      BuyV2Colors.softGreen.withValues(alpha: .72),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: BuyV2Colors.line),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: accent.withValues(alpha: .4)),
+                      ),
+                      child: Icon(icon, color: theme.headerEnd, size: 21),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: BuyV2Colors.ink,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            detail,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: BuyV2Colors.muted,
+                              fontSize: 8,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_rounded, color: accent, size: 18),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: BuyV2Colors.line),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accent.withValues(alpha: .4)),
-                    ),
-                    child: Icon(icon, color: BuyV2Colors.navy, size: 21),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BuyV2Colors.ink,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          detail,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BuyV2Colors.muted,
-                            fontSize: 8,
-                            height: 1.15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, color: accent, size: 18),
-                ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class BuyV2SponsoredSlot extends StatelessWidget {
+  const BuyV2SponsoredSlot({super.key, required this.content});
+
+  final BuyV2SponsoredContent? content;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = this.content;
+    if (content == null) {
+      return const SizedBox.shrink();
+    }
+    final video = content.format == BuyV2SponsoredFormat.inlineVideo;
+    return Semantics(
+      key: ValueKey('buy-sponsored-${content.id}'),
+      container: true,
+      label:
+          '${content.disclosure}. ${content.title}. ${content.detail}'
+          '${video ? '. Video is paused.' : ''}',
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 72),
+        margin: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+        padding: const EdgeInsets.all(9),
+        decoration: buyV2CardDecoration(
+          color: const Color(0xFFF8F8FB),
+          border: const Color(0x33000080),
+          radius: 15,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                video ? Icons.play_circle_outline_rounded : Icons.campaign,
+                color: BuyV2Colors.navy,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    content.disclosure,
+                    style: context.buyEyebrow.copyWith(fontSize: 8),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    content.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    content.detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(fontSize: 8),
+                  ),
+                ],
+              ),
+            ),
+            if (video)
+              const Tooltip(
+                message: 'Video playback unavailable',
+                child: Icon(
+                  Icons.pause_circle_outline_rounded,
+                  color: BuyV2Colors.muted,
+                  size: 22,
+                ),
+              ),
+          ],
         ),
       ),
     );
