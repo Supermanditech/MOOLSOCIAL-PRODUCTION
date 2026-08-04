@@ -6,6 +6,12 @@ Production content commit:
 `da656725c33bff7be42c190761892dc1d6a816bb`; tree
 `512abcadf3d214fea65857aaeea2326edf0d4510`.
 
+Recoverability repair commit:
+`4c1f41a71f96b4ecce40e5352dd2e70b6900dca2`; tree
+`39e4f28471f5cc3827a0e7320b1617c844586f20`. It adds exactly 384
+`apps/mobile/test/failures` images already hashed by the approved source
+manifest but previously excluded by `.gitignore`.
+
 Use Git branch `checkpoint/moolsocial-20260805-0055-ist-sealed` as the immutable
 resume pointer. It points to the same sealed commit as the required working
 branch `remediation/prototype-conformance-2026-07-20`; no branch switch was used
@@ -54,7 +60,30 @@ and splash changes; release/machine gates; delivery/design/quality memory; new
 commerce participant, canonical catalogue and wholesale pack/logistics backend
 contracts plus tests; non-secret fail-closed Dev flags; and the exact current
 review APK through Git LFS. Backend verification passed 317/317 tests. R58.8.8
-passed two 359-active Buy regressions plus all registered release gates.
+passed two 359-active Buy regressions plus all registered release gates. The
+checkpoint also contains all 384 golden-comparison outputs required by the
+approved 2,466-file source manifest.
+
+## Remote recovery verification
+
+The first fresh GitHub clone correctly failed closed because the source
+manifest referenced 384 ignored golden-failure images that were still only in
+the original workspace. Commit
+`4c1f41a71f96b4ecce40e5352dd2e70b6900dca2` added exactly those 31,134,237
+bytes without changing the source manifest, runtime source or approved APK.
+After both authorized refs were fast-forwarded, the independent clone passed:
+
+- exact remediation and checkpoint ref identity;
+- exact commit/tree identity;
+- all 2,466 source-manifest paths and hashes;
+- both approved APK copies and SHA-256;
+- `git lfs fsck` and `git fsck --full`;
+- 384 tracked manifest artifacts; and
+- zero tracked or untracked clone drift.
+
+Evidence is in checkpoint folder `176`, records `13` and `14`. The retained
+verification clone is
+`C:\GUARANTEED OUTCOME\MOOLSOCIAL-GIT-RECOVERY-VERIFY-20260805`.
 
 ## Resume procedure after laptop loss
 
@@ -66,7 +95,9 @@ passed two 359-active Buy regressions plus all registered release gates.
    `F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9`.
 5. Verify `config/apk-regression-gate-state.json` reports the exact approved
    candidate and consumed build authorization.
-6. Re-run focused formatting/analysis/tests and the required release gates
+6. Run `scripts/verify-moolsocial-resume-checkpoint.ps1`; it must report all
+   2,466 source files and the approved APK identity as passing.
+7. Re-run focused formatting/analysis/tests and the required release gates
    before any new ticket write. Register a unique successor before another APK.
 
 ## Next work boundary

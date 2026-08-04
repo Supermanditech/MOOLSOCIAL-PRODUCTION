@@ -2,7 +2,7 @@
 
 ## Repository recovery seal — 5 August 2026
 
-State: `MOOLSOCIAL_GIT_CHECKPOINT_SEALED_FOR_REMOTE_REPLICATION_AFTER_R58_8_8_FIX7_APPROVAL`.
+State: `MOOLSOCIAL_GIT_CHECKPOINT_REMOTE_RECOVERY_VERIFIED_AFTER_R58_8_8_FIX7_APPROVAL`.
 
 The founder authorized a recoverable Git checkpoint after the active ticket,
 including a separate checkpoint branch pointer and all production source,
@@ -13,8 +13,14 @@ is folder `176`; exact FIX7 approval is folder `177`. Large historical binaries
 and browser-session profiles remain preserved locally and are not published;
 the current r58.23 APK is carried by Git LFS. Production content commit is
 `da656725c33bff7be42c190761892dc1d6a816bb`, tree
-`512abcadf3d214fea65857aaeea2326edf0d4510`. No GCP/Firebase promotion is
-authorized by the repository seal.
+`512abcadf3d214fea65857aaeea2326edf0d4510`. Recoverability repair commit
+`4c1f41a71f96b4ecce40e5352dd2e70b6900dca2`, tree
+`39e4f28471f5cc3827a0e7320b1617c844586f20`, adds the exact 384 ignored
+golden-failure images already present in the approved 2,466-file source
+manifest. A clean GitHub clone at
+`C:\GUARANTEED OUTCOME\MOOLSOCIAL-GIT-RECOVERY-VERIFY-20260805` passed the
+source, APK, LFS, Git-object and remote-ref recovery gates. No GCP/Firebase
+promotion is authorized by the repository seal.
 
 ## Live 5 August 2026 — R58.8.8 FIX7 founder approved/protected
 

@@ -1,0 +1,19 @@
+{
+  "initialSealCommit": "e866b7149a32e9f7a3cd1144aaa9e5d846561498",
+  "initialCloneResult": "failed_closed_missing_manifest_path",
+  "rootCause": "approved_source_manifest_included_gitignored_test_failure_images",
+  "missingPathCount": 384,
+  "missingNonFailurePathCount": 0,
+  "repairedBytes": 31134237,
+  "repairCommit": "4c1f41a71f96b4ecce40e5352dd2e70b6900dca2",
+  "repairTree": "39e4f28471f5cc3827a0e7320b1617c844586f20",
+  "recoveryClone": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-GIT-RECOVERY-VERIFY-20260805",
+  "sourceManifestEntries": 2466,
+  "sourceManifestSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+  "apkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+  "gitLfsFsck": "passed",
+  "gitFsckFull": "passed",
+  "remoteRefs": "matched_repair_commit_after_full_fetch",
+  "cloneStatusCount": 0,
+  "finalResult": "passed"
+}
