@@ -2,6 +2,10 @@
 
 ## Recovery target
 
+Production content commit:
+`da656725c33bff7be42c190761892dc1d6a816bb`; tree
+`512abcadf3d214fea65857aaeea2326edf0d4510`.
+
 Use Git branch `checkpoint/moolsocial-20260805-0055-ist-sealed` as the immutable
 resume pointer. It points to the same sealed commit as the required working
 branch `remediation/prototype-conformance-2026-07-20`; no branch switch was used
@@ -73,4 +77,3 @@ stock, serviceability, personalization, payment/order/provider outcomes and the
 broader production-foundation backlog remain governed by their own tickets and
 environment gates. No GCP/Firebase deployment or environment promotion is part
 of this seal.
-

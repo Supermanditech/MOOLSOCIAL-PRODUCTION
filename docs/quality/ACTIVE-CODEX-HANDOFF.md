@@ -2,7 +2,7 @@
 
 ## Repository recovery seal — 5 August 2026
 
-State: `MOOLSOCIAL_GIT_CHECKPOINT_SEAL_IN_PROGRESS_AFTER_R58_8_8_FIX7_APPROVAL`.
+State: `MOOLSOCIAL_GIT_CHECKPOINT_SEALED_FOR_REMOTE_REPLICATION_AFTER_R58_8_8_FIX7_APPROVAL`.
 
 The founder authorized a recoverable Git checkpoint after the active ticket,
 including a separate checkpoint branch pointer and all production source,
@@ -11,7 +11,9 @@ Exact resume authority is
 `docs/quality/MOOLSOCIAL-RESUME-CHECKPOINT-20260805.md`; local evidence inventory
 is folder `176`; exact FIX7 approval is folder `177`. Large historical binaries
 and browser-session profiles remain preserved locally and are not published;
-the current r58.23 APK is carried by Git LFS. No GCP/Firebase promotion is
+the current r58.23 APK is carried by Git LFS. Production content commit is
+`da656725c33bff7be42c190761892dc1d6a816bb`, tree
+`512abcadf3d214fea65857aaeea2326edf0d4510`. No GCP/Firebase promotion is
 authorized by the repository seal.
 
 ## Live 5 August 2026 — R58.8.8 FIX7 founder approved/protected
