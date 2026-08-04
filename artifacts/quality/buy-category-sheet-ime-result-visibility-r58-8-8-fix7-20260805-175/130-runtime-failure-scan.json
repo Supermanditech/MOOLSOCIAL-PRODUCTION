@@ -1,0 +1,150 @@
+{
+  "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "device": "OPPO CPH2375 2b3e0f71",
+  "profile": "1.0.0-r58.23 (2026080419)",
+  "pid": 15422,
+  "currentProcessLogBytes": 34973,
+  "performanceLogBytes": 183821,
+  "counts": {
+    "fatalException": 0,
+    "flutterError": 0,
+    "nativeFatalSignal": 0,
+    "appAnr": 0,
+    "lostDeviceConnection": 0
+  },
+  "totalRuntimeFailures": 0.0,
+  "postInstallExitCount": 16,
+  "postInstallExits": [
+    {
+      "timestamp": "2026-08-05 01:05:06.440",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 15398|J:700 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 01:03:45.059",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 13932|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 01:00:32.382",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 11062|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:57:04.710",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 9141|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:56:33.146",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 8367|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:56:01.216",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 8027|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:55:29.295",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 7495|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:52:40.657",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 5677|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:50:40.593",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 4940|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:48:45.598",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 22,
+      "subreasonName": "REMOVE TASK",
+      "description": "remove task|J:905 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:40:41.210",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to installPackageLI|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-05 00:16:52.116",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to installPackageLI|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-04 23:39:09.578",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 11667|J:700 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-04 23:37:52.673",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 10739|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-04 23:34:49.180",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 8176|J:0 state=empty trace=null"
+    },
+    {
+      "timestamp": "2026-08-04 23:34:27.400",
+      "reason": 10,
+      "reasonName": "USER REQUESTED",
+      "subreason": 21,
+      "subreasonName": "FORCE STOP",
+      "description": "stop com.moolsocial.app due to from pid 7884|J:0 state=empty trace=null"
+    }
+  ],
+  "unexpectedPostInstallExitCount": 0,
+  "exitClassification": "all post-install exits are explicit install, force-stop, or remove-task harness actions",
+  "classification": "passed"
+}

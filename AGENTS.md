@@ -141,6 +141,24 @@ touch their dependency graph.
 - Run affected journeys and two full regressions before candidate promotion.
 - Never describe a route into an unapproved legacy screen as production grade.
 
+## Mandatory APK regression machine gate
+
+- Before any Android APK build, update
+  `config/apk-regression-gate-state.json` for exactly one candidate and run
+  `scripts/check-apk-regression-gate-state.ps1` with the exact candidate,
+  version, mode, source fingerprint and complete runtime-define allowlist.
+- A raw `flutter build apk` is not an authorized MoolSocial review build.
+  Use `scripts/build-buy-device-review.ps1` for Buy candidates; it invokes the
+  machine gate before Flutter and refuses stale, missing, failed or mismatched
+  state.
+- The machine state must list every required pre-build regression with existing
+  evidence and every post-build/device gate as pending, passed or failed.
+  Missing state fails closed. A narrative handoff cannot substitute for it.
+- Each candidate receives a unique id, version, evidence directory and APK
+  path. Rejected APKs, startup frames, logs and checksums remain immutable.
+- A build consumes only its recorded one-build authorization. Update the
+  machine state before another build; never reuse it silently for a successor.
+
 ## Customer-copy machine rule
 
 Customer screens must contain finished, benefit-led product language only.

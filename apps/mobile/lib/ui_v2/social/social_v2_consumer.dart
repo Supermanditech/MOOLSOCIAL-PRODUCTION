@@ -35,6 +35,7 @@ class SocialUniversalV2 extends StatefulWidget {
     this.initialState,
     this.initialItem,
     this.initialWorld = 'social',
+    this.initialMoolOpen = false,
     this.mediaPicker,
     super.key,
   });
@@ -47,6 +48,7 @@ class SocialUniversalV2 extends StatefulWidget {
   final String? initialState;
   final String? initialItem;
   final String initialWorld;
+  final bool initialMoolOpen;
   final SocialMediaPicker? mediaPicker;
 
   @override
@@ -57,7 +59,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late SocialV2Tab _tab;
   late String _world;
   late final Map<String, String> _choiceByWorld;
-  bool _moolOpen = false;
+  late bool _moolOpen;
 
   String _shortMode = youtubePrivateDevProofEnabled ? 'YouTube' : 'For You';
   final String _videoMode = 'All';
@@ -121,6 +123,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     _videoHomeController = ScrollController();
     _videoWatchController = ScrollController();
     _mediaPicker = widget.mediaPicker ?? NativeSocialMediaPicker();
+    _moolOpen = widget.initialMoolOpen;
     _world = screen04Worlds.any((world) => world.id == widget.initialWorld)
         ? widget.initialWorld
         : 'social';
@@ -170,6 +173,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   @override
   void didUpdateWidget(covariant SocialUniversalV2 oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!oldWidget.initialMoolOpen && widget.initialMoolOpen) {
+      _moolOpen = true;
+    }
     if (oldWidget.initialSubAction != widget.initialSubAction ||
         oldWidget.initialState != widget.initialState ||
         oldWidget.initialItem != widget.initialItem ||
@@ -357,7 +363,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     if (!screen04Worlds.any((world) => world.id == worldId)) return;
     if (worldId == 'buy') {
       HapticFeedback.selectionClick();
-      context.push('/app/buy');
+      context.go('/app/buy');
       return;
     }
     setState(() {

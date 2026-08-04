@@ -5,6 +5,7 @@ import 'mool_colors.dart';
 import 'mool_design_system.dart';
 
 export 'mool_colors.dart';
+export 'mool_motion_primitives.dart';
 
 abstract final class MoolTheme {
   static ThemeData light() {

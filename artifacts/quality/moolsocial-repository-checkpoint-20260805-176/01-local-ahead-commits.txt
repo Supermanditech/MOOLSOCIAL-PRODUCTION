@@ -1,0 +1,23 @@
+f1ac83d docs(buy): record R36 preservation state
+3aa58d1 feat(buy): preserve R36 motion and content candidate
+d5cdfd0 docs(buy): close R35.1 autonomous hardening
+c5e0766 test(buy): exhaust vertical discovery contracts
+b9b4d4f test(buy): protect order progress integrity
+a8f0d67 test(buy): protect action listener liveness
+9fdf232 test(buy): stress mixed session transitions
+04aa46a test(buy): harden deterministic session coverage
+13b1847 test(buy): add conservative performance budgets
+9be6e1f test(buy): enforce data egress boundary
+26f3667 test(buy): enforce backend contract boundary
+d2368eb test(buy): harden deterministic state invariants
+456b482 test(buy): protect founder-approved R35.1 runtime
+34045d3 feat(buy): freeze founder-approved R35.1 baseline
+5225bb8 feat(social): freeze YouTube compliance review baseline
+0aaa32b docs(youtube): clean reply draft formatting
+944b835 docs(youtube): prepare compliance screencast follow-up
+4c44f17 docs(buy): record final OPPO candidate evidence
+f1d1356 fix(buy): match locked Indian currency formatting
+326e698 fix(buy): correct cart item count copy
+c557a25 feat(buy): add founder-locked native V2 candidate
+ffcb4fe Lock founder-final Buy HTML and conformance gates
+2b8a45b docs(buy): record HTML founder review gate

@@ -1,5 +1,43 @@
 # Release gates
 
+## Before every Android APK build
+
+1. Register the exact candidate in
+   `config/apk-regression-gate-state.json`, including branch, HEAD, unique
+   version, build mode, source-manifest path/checksum/count and the exact
+   non-secret runtime-define allowlist.
+2. Mark every required pre-build regression `passed` only with an existing
+   immutable evidence path. Record all post-build, install, cold-start,
+   journey, lifecycle, accessibility, failure-scan, performance and founder
+   gates as explicit pending/passed/failed machine states.
+3. Run `scripts/check-windows-powershell-compatibility.ps1`. All mandatory
+   PowerShell release gates must work under both current PowerShell and legacy
+   Windows PowerShell 5.1. Modern-only .NET helpers such as
+   `Path.GetRelativePath` and `Convert.ToHexString` are forbidden in gate
+   scripts; a runtime/version mismatch is a release-gate defect, not an
+   acceptable rerun instruction.
+   The compatibility gate itself must pass when invoked from either host.
+   Expected fail-closed protected-boundary stderr is classified by exit code
+   and contract text; it must not become an unclassified terminating
+   `NativeCommandError` merely because the invoking host is PowerShell 5.1.
+   Resolve every piped evidence sink to an absolute path before invoking a
+   script that may call `Push-Location`. When `Start-Process` launches helpers
+   from this spaced workspace, explicitly quote each absolute argument; archived
+   Dart helpers must also receive the exact mobile `.dart_tool/package_config.json`
+   through `--packages` rather than relying on their archive directory.
+4. Run `scripts/check-apk-regression-gate-state.ps1`. Any missing evidence,
+   stale branch/HEAD/source identity, missing or additional runtime define,
+   failed gate, reused candidate identity or unapproved build state rejects the
+   build before Flutter starts.
+4. Build Buy review APKs only through
+   `scripts/build-buy-device-review.ps1`, which re-runs the machine gate. A
+   passing pre-build gate authorizes one build, not installation,
+   qualification, founder acceptance or promotion.
+5. Preserve rejected APKs and their startup/log/checksum evidence. A candidate
+   that remains on the native launch background, throws before `runApp`, or
+   omits its sanctioned runtime mode is a failed APK even when source tests
+   pass.
+
 ## Every pull request
 
 1. Dart formatting, static analysis and unit/widget tests.
@@ -86,12 +124,14 @@
     tricolour line and two-by-two-grid Mool launcher are mandatory. A module
     cannot introduce a custom M, initial tile, placeholder circle or
     module-specific logo.
-27. After the founder-approved R35.1 native Buy baseline, every task runs
+27. After the founder-approved R40.3 native Buy motion baseline, every task runs
     `scripts/check-buy-protected-baseline.ps1`. Test and documentation
     hardening may advance without changing its runtime tree. Any Buy runtime,
     presentation, routing or protected media change requires explicit founder
-    approval and a new additive baseline; the existing baseline is never
-    overwritten.
+    approval and a new additive baseline; the existing R35.1, R38 and R40.3
+    baselines are never overwritten. Logo motion and route-continuity changes
+    are outside R40.3 and require a new checksum-matched candidate and founder
+    review.
 28. Until an approved Buy transport and authorization contract exists, every
     task runs `scripts/check-buy-backend-contract-boundary.ps1`. Protected Buy
     V2 production code cannot introduce a direct network/database client,
@@ -107,6 +147,28 @@
     channels or unapproved local stores, and cannot embed credential-like
     material. The established first-party address-request URL is the sole
     current clipboard allowlist entry.
+30. The 2 August 2026 cumulative R55.4 OPPO review founder-approved only the
+    scoped R43/DES-001, R45, R46, R47, R48, R52.1, R53, R54 and R55 owners.
+    R51 FIX16 remains not approved and open for later enhancement. A future
+    ticket must preserve every approved owner through its focused contracts,
+    two complete Buy regressions and all protected gates; it cannot relabel the
+    full cumulative R55.4 tree as approved or alter an accepted owner
+    incidentally. The authoritative decision is
+    `artifacts/quality/buy-motion-founder-decisions-20260802-88`.
+31. Every pending or future Buy runtime ticket must pass a prewrite premium-
+    motion applicability audit against
+    `config/buy-premium-motion-policy.json` and
+    `docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md`. It records
+    which requested effects are reused, newly applied, dependency-held or
+    inapplicable. No ticket may fabricate loading/liveness/business state,
+    add a perpetual decorative loop, move semantic/hit ownership, bypass
+    reduced motion or create a duplicate owner merely to display an effect.
+    The mandatory APK pre-build machine invokes
+    `scripts/check-buy-premium-motion-policy-state.ps1` and fails closed when
+    the candidate state omits the canonical policy, coverage/contract/
+    disposition evidence, any of the four effect-disposition categories or an
+    enabled required rule. `scripts/test-buy-premium-motion-policy-state.ps1`
+    is the deterministic positive/negative self-test.
 
 ## Buy module trial sequence
 

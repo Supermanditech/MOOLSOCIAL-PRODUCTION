@@ -11,6 +11,31 @@ if (-not $RepositoryRoot) {
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 
+function Get-PortableRelativePath {
+  param(
+    [Parameter(Mandatory)]
+    [string]$BasePath,
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
+
+  $base = [System.IO.Path]::GetFullPath($BasePath).TrimEnd(
+    [char[]]@('\', '/')
+  )
+  $target = [System.IO.Path]::GetFullPath($Path)
+  if ($target.Equals($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+    return "."
+  }
+  $prefix = $base + [System.IO.Path]::DirectorySeparatorChar
+  if (-not $target.StartsWith(
+    $prefix,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )) {
+    throw "Path escaped the repository root: $target"
+  }
+  return $target.Substring($prefix.Length)
+}
+
 $approvedClipboardPattern = (
   "(?s)Clipboard\.setData\s*\(\s*const\s+ClipboardData\s*\(\s*" +
   "text:\s*'https://moolsocial\.com/address/request'\s*\)\s*,?\s*\)"
@@ -202,10 +227,9 @@ if ($mobileFiles.Count -eq 0) {
 
 $violations = [System.Collections.Generic.List[string]]::new()
 foreach ($file in $mobileFiles) {
-  $relative = [System.IO.Path]::GetRelativePath(
-    $RepositoryRoot,
-    $file.FullName
-  )
+  $relative = Get-PortableRelativePath `
+    -BasePath $RepositoryRoot `
+    -Path $file.FullName
   $content = Get-Content -LiteralPath $file.FullName -Raw
   foreach ($finding in Get-BuyDataEgressViolations `
     -Label $relative `

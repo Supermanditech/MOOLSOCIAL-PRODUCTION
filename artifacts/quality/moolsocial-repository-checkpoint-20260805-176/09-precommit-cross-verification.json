@@ -1,0 +1,21 @@
+{
+  "verifiedAtIst": "2026-08-05T01:41:38.585+05:30",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "preSealHead": "f1ac83dea2047f40b39d772696bd0d1224edce8e",
+  "remoteRemediationHead": "646cf6ffb69802ec3986c6ed5dc467183192e353",
+  "stagedPathCount": 2085,
+  "unstagedTrackedCount": 0,
+  "remainingDurableUntrackedCount": 0,
+  "lfsPathCount": 2,
+  "lfsObjectSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+  "lfsObjectBytes": 134214109,
+  "ordinaryBlobsOver95MiB": 0,
+  "largestOrdinaryBlobBytes": 9528717,
+  "sourceBackendScriptDiffCheck": "passed",
+  "stagedCredentialSignatureScan": "passed",
+  "devEnvAllowlist": "passed",
+  "indexJsonIdentity": "passed",
+  "lfsFsck": "passed",
+  "explicitSessionAndRawTraceExclusion": "passed",
+  "resumeVerifier": "passed_2466_source_entries_and_apk"
+}

@@ -1,0 +1,7 @@
+AUDIT15 requires the checksum-matched R58.8.8 FIX7 OPPO profile.
+At line:353 char:3
++   throw 'AUDIT15 requires the checksum-matched R58.8.8 FIX7 OPPO prof ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (AUDIT15 require...7 OPPO profile.:String) [], RuntimeException
+    + FullyQualifiedErrorId : AUDIT15 requires the checksum-matched R58.8.8 FIX7 OPPO profile.
+ 

@@ -18,7 +18,15 @@ param(
 
   [Parameter(Mandatory)]
   [ValidateNotNullOrEmpty()]
-  [string]$ArtifactDirectory
+  [string]$ArtifactDirectory,
+
+  [Parameter(Mandatory)]
+  [ValidateSet('debug', 'profile')]
+  [string]$BuildMode,
+
+  [Parameter(Mandatory)]
+  [ValidateNotNullOrEmpty()]
+  [string]$MachineStatePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,7 +58,7 @@ if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) {
 
 $artifactName = (
   $CandidateId.ToLowerInvariant() -replace '[^a-z0-9.-]', '-'
-) + '-device-review-debug.apk'
+) + "-device-review-$BuildMode.apk"
 $artifactPath = Join-Path $artifactRoot $artifactName
 $manifestPath = Join-Path $artifactRoot (
   $CandidateId.ToLowerInvariant() + '-build-provenance.txt'
@@ -64,20 +72,31 @@ foreach ($reservedPath in @($artifactPath, $manifestPath)) {
 
 Push-Location $mobileRoot
 try {
-  & flutter clean
+  $runtimeDefines = @(
+    'MOOLSOCIAL_DEVICE_REVIEW=true',
+    'MOOLSOCIAL_USE_EMULATORS=true',
+    "MOOLSOCIAL_CANDIDATE_ID=$CandidateId"
+  )
+  $gateScript = Join-Path $repositoryRoot (
+    'scripts\check-apk-regression-gate-state.ps1'
+  )
+  & $gateScript `
+    -StatePath $MachineStatePath `
+    -CandidateId $CandidateId `
+    -BuildName $BuildName `
+    -BuildNumber $BuildNumber `
+    -BuildMode $BuildMode `
+    -SourceFingerprint $SourceFingerprint `
+    -RuntimeDefine $runtimeDefines
   if ($LASTEXITCODE -ne 0) {
-    throw 'flutter clean failed.'
-  }
-
-  & flutter pub get
-  if ($LASTEXITCODE -ne 0) {
-    throw 'flutter pub get failed.'
+    throw 'APK regression pre-build machine gate failed.'
   }
 
   $buildArguments = @(
     'build',
     'apk',
-    '--debug',
+    "--$BuildMode",
+    '--no-pub',
     '--build-name',
     $BuildName,
     '--build-number',
@@ -95,7 +114,7 @@ try {
   }
 
   $generatedApk = Join-Path $mobileRoot (
-    'build\app\outputs\flutter-apk\app-debug.apk'
+    "build\app\outputs\flutter-apk\app-$BuildMode.apk"
   )
   if (-not (Test-Path -LiteralPath $generatedApk -PathType Leaf)) {
     throw "Expected Flutter APK is missing: $generatedApk"
@@ -122,6 +141,8 @@ $runtimeDefines = (
   "RuntimeDefines=$runtimeDefines",
   "Version=$BuildName",
   "VersionCode=$BuildNumber",
+  "BuildMode=$BuildMode",
+  "MachineState=$([IO.Path]::GetFullPath($MachineStatePath))",
   "Branch=$($branch.Trim())",
   "HEAD=$($head.Trim())",
   "SourceFingerprint=$SourceFingerprint",

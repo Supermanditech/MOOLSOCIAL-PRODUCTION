@@ -1,0 +1,15 @@
+state=passed
+candidate=BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7
+profile=1.0.0-r58.23 (2026080419)
+scales=1/1/1
+focusedTargetBottom=592
+focusedImeTop=1014
+focusedClearance=422
+keyboardHideSameSheet=passed
+queryPreservedAfterKeyboardHide=passed
+refocusedTargetBottom=592
+refocusedImeTop=1014
+refocusedClearance=422
+explicitClose=passed
+androidBack=passed
+finalState=clean Shop root

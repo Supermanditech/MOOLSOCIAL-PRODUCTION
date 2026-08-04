@@ -2,6 +2,11 @@
 # whitespace style. Keep diffs reproducible instead of rewriting generated SDKs.
 apps/mobile/lib/data/generated/** -whitespace
 
+# Source-manifest identities are byte-exact across Windows/macOS/Linux clones.
+# `text=auto` leaves binary goldens/captures untouched while normalizing text.
+apps/mobile/lib/** text=auto eol=lf
+apps/mobile/test/** text=auto eol=lf
+
 # Preserve the upstream font license text exactly as distributed.
 apps/mobile/assets/fonts/OFL.txt -whitespace
 
@@ -9,3 +14,7 @@ apps/mobile/assets/fonts/OFL.txt -whitespace
 # drivers from interpreting PDF and video binaries as source text.
 *.pdf binary
 *.mp4 binary
+
+# Review APKs exceed GitHub's ordinary-blob limit. Keep checksum-addressed
+# binaries recoverable through Git LFS while source and evidence stay in Git.
+*.apk filter=lfs diff=lfs merge=lfs -text

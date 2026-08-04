@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import 'buy_v2_address_form_sheet_motion.dart';
+import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_design.dart';
+import 'buy_v2_filter_sheet_motion.dart';
+import 'buy_v2_payment_sheet_motion.dart';
+import 'buy_v2_prescription_sheet_motion.dart';
+import 'buy_v2_product_feedback_sheet_motion.dart';
+import 'buy_v2_supplier_sheet_motion.dart';
 
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
@@ -35,6 +43,36 @@ class BuyV2ProductView extends StatelessWidget {
     }
     final quantity = session.quantityFor(product.id);
     final review = session.customerReviewFor(product.id);
+    final partnerProducts = product.destination == BuyV2Destination.wholesale
+        ? session.supplierContinuationsFor(product)
+        : session.sellerContinuationsFor(product);
+    final partnerActionKey = switch (product.destination) {
+      BuyV2Destination.shop => 'buy-shop-seller-action-${product.id}',
+      BuyV2Destination.wholesale =>
+        'buy-wholesale-supplier-action-${product.id}',
+      BuyV2Destination.medicine => 'buy-medicine-pharmacy-action-${product.id}',
+      BuyV2Destination.orders => 'buy-order-partner-action-${product.id}',
+    };
+    final partnerActionDetail = switch (product.destination) {
+      BuyV2Destination.wholesale =>
+        '${partnerProducts.length} other current '
+            '${partnerProducts.length == 1 ? 'pack' : 'packs'}',
+      BuyV2Destination.medicine =>
+        '${partnerProducts.length} other current products · Not medical advice',
+      _ => '${partnerProducts.length} other current products',
+    };
+    final partnerSemanticLabel = switch (product.destination) {
+      BuyV2Destination.wholesale =>
+        'View ${partnerProducts.length} more '
+            '${partnerProducts.length == 1 ? 'product' : 'products'} '
+            'from ${product.seller} in the current Wholesale catalogue',
+      BuyV2Destination.medicine =>
+        'View ${partnerProducts.length} more products from ${product.seller} '
+            'in the current Medicine catalogue. Not medical advice',
+      _ =>
+        'View ${partnerProducts.length} more products from ${product.seller} '
+            'in the current Shop catalogue',
+    };
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
@@ -58,39 +96,67 @@ class BuyV2ProductView extends StatelessWidget {
                 onTap: session.closeProduct,
               ),
               const SizedBox(height: 7),
-              _BuyV2ProductGallery(
-                key: ValueKey('buy-product-packshot-${product.id}'),
-                product: product,
-                media: [
-                  _BuyV2ProductMediaItem(
-                    label: 'Product visual',
-                    child: BuyV2ProductPackshot(
-                      key: const ValueKey('buy-product-gallery-image-0'),
-                      product: product,
-                      borderRadius: 17,
+              BuyV2FiniteDepthReveal(
+                key: ValueKey('buy-product-media-reveal-${product.id}'),
+                stateKey: 'buy-product-media-${product.id}',
+                child: _BuyV2ProductGallery(
+                  key: ValueKey('buy-product-packshot-${product.id}'),
+                  product: product,
+                  media: [
+                    _BuyV2ProductMediaItem(
+                      label: 'Product visual',
+                      child: BuyV2ProductPackshot(
+                        key: const ValueKey('buy-product-gallery-image-0'),
+                        product: product,
+                        borderRadius: 17,
+                        animateFirstFrame: true,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
-              Text(
-                product.brand,
-                style: context.buyEyebrow.copyWith(fontSize: 8),
+              BuyV2FiniteIncomingTransition(
+                key: ValueKey('buy-product-title-reveal-${product.id}'),
+                stateKey: 'buy-product-title-${product.id}',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.brand,
+                      style: context.buyEyebrow.copyWith(fontSize: 8),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      product.title,
+                      key: ValueKey('buy-product-title-${product.id}'),
+                      style: context.buyTitle.copyWith(fontSize: 18),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.composition ?? product.variant,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody.copyWith(fontSize: 10),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      product.pack,
+                      style: context.buyMeta.copyWith(fontSize: 9),
+                    ),
+                    const SizedBox(height: 8),
+                    _ProductOwnedActionPanel(
+                      key: ValueKey('buy-product-inline-action-${product.id}'),
+                      product: product,
+                      quantity: quantity,
+                      rxBlocked: rxBlocked,
+                      onAdd: addProduct,
+                      onDecrease: () => session.decrease(product.id),
+                      onIncrease: () => session.increase(product.id),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                product.title,
-                style: context.buyTitle.copyWith(fontSize: 18),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                product.composition ?? product.variant,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: context.buyBody.copyWith(fontSize: 10),
-              ),
-              const SizedBox(height: 2),
-              Text(product.pack, style: context.buyMeta.copyWith(fontSize: 9)),
               const SizedBox(height: 7),
               Wrap(
                 spacing: 6,
@@ -116,50 +182,6 @@ class BuyV2ProductView extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 7),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.end,
-                      spacing: 7,
-                      children: [
-                        Text(
-                          buyV2Money(product.price),
-                          style: const TextStyle(
-                            color: BuyV2Colors.navy,
-                            fontSize: 22,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        if (product.mrp case final mrp?)
-                          Text(
-                            '₹$mrp',
-                            style: const TextStyle(
-                              color: BuyV2Colors.muted,
-                              fontSize: 10,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      product.unitPrice,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: context.buyMeta.copyWith(fontSize: 9),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 8),
               _DecisionPanel(
                 title: 'Pack, delivery and seller',
@@ -175,11 +197,27 @@ class BuyV2ProductView extends StatelessWidget {
                     value: product.deliveryPromise,
                     valueColor: BuyV2Colors.green,
                   ),
-                  _DecisionRow(
-                    icon: Icons.storefront_outlined,
-                    label: product.partnerRole,
-                    value: product.seller,
-                  ),
+                  if (partnerProducts.isEmpty)
+                    _DecisionRow(
+                      icon: Icons.storefront_outlined,
+                      label: product.partnerRole,
+                      value: product.seller,
+                    )
+                  else
+                    _DecisionActionRow(
+                      key: ValueKey(partnerActionKey),
+                      icon: Icons.storefront_outlined,
+                      label: product.partnerRole,
+                      value: product.seller,
+                      detail: partnerActionDetail,
+                      semanticLabel: partnerSemanticLabel,
+                      onTap: () => _showPartnerProductsSheet(
+                        context,
+                        session,
+                        product,
+                        partnerProducts,
+                      ),
+                    ),
                   _DecisionRow(
                     icon: Icons.route_outlined,
                     label: 'Delivery path',
@@ -306,49 +344,436 @@ class BuyV2ProductView extends StatelessWidget {
                     _showProductReportSheet(context, session, product),
                 reported: session.hasReportedProduct(product.id),
               ),
+              const SizedBox(height: 10),
+              _ProductContinuationSection(session: session, product: product),
               const SizedBox(height: 8),
             ],
           ),
         ),
-        Container(
-          key: const ValueKey('buy-product-action-bar'),
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
-          ),
-          child: AnimatedSwitcher(
-            duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: quantity > 0
-                ? _LargeStepper(
-                    key: ValueKey('buy-product-quantity-${product.id}'),
-                    quantity: quantity,
-                    onDecrease: () => session.decrease(product.id),
-                    onIncrease: () => session.increase(product.id),
-                  )
-                : SizedBox(
-                    key: ValueKey('buy-product-add-shell-${product.id}'),
-                    width: double.infinity,
-                    height: 44,
-                    child: Semantics(
-                      label: rxBlocked
-                          ? 'Use prescription for ${product.title}'
-                          : 'Add ${product.title} to cart',
-                      button: true,
-                      child: FilledButton(
-                        key: ValueKey('buy-product-primary-${product.id}'),
-                        onPressed: addProduct,
-                        child: rxBlocked
-                            ? const Text('Use prescription')
-                            : const Icon(Icons.add_rounded),
+      ],
+    );
+  }
+}
+
+class _ProductContinuationSection extends StatelessWidget {
+  const _ProductContinuationSection({
+    required this.session,
+    required this.product,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final products = session.productContinuationsFor(product);
+    if (products.isEmpty) return const SizedBox.shrink();
+
+    final (title, detail) = switch (product.destination) {
+      BuyV2Destination.shop => (
+        'You may also like',
+        'More from the current Shop catalogue',
+      ),
+      BuyV2Destination.wholesale => (
+        'More for business restocking',
+        'Trade packs from the current Wholesale catalogue',
+      ),
+      BuyV2Destination.medicine => (
+        'More Medicine essentials',
+        'From the Medicine catalogue · not medical advice',
+      ),
+      BuyV2Destination.orders => ('', ''),
+    };
+
+    return BuyV2FiniteIncomingTransition(
+      stateKey: 'buy-product-continuation-motion-${product.id}',
+      child: Container(
+        key: ValueKey('buy-product-continuations-${product.id}'),
+        padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
+            const SizedBox(height: 7),
+            Semantics(
+              container: true,
+              label: '$title. $detail. Swipe horizontally for more products.',
+              child: SizedBox(
+                height: 174,
+                child: ListView.separated(
+                  key: ValueKey('buy-product-continuation-lane-${product.id}'),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: products.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 7),
+                  itemBuilder: (context, index) => _ProductContinuationCard(
+                    session: session,
+                    product: products[index],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductContinuationCard extends StatelessWidget {
+  const _ProductContinuationCard({
+    required this.session,
+    required this.product,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 132,
+      child: Semantics(
+        key: ValueKey('buy-product-continuation-${product.id}'),
+        container: true,
+        button: true,
+        label: 'View ${product.title} product details',
+        onTap: () => session.openProduct(product.id),
+        child: ExcludeSemantics(
+          child: Material(
+            color: BuyV2Colors.canvas,
+            borderRadius: BorderRadius.circular(13),
+            child: InkWell(
+              onTap: () => session.openProduct(product.id),
+              borderRadius: BorderRadius.circular(13),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 82,
+                      width: double.infinity,
+                      child: BuyV2ProductPackshot(
+                        product: product,
+                        borderRadius: 10,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 5),
+                    Text(
+                      product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody.copyWith(
+                        fontSize: 9,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      product.pack,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(fontSize: 7.5),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            buyV2Money(product.price),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: BuyV2Colors.navy,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+Future<void> _showPartnerProductsSheet(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Product current,
+  List<BuyV2Product> products,
+) async {
+  final supportedDestination =
+      current.destination == BuyV2Destination.shop ||
+      current.destination == BuyV2Destination.wholesale ||
+      current.destination == BuyV2Destination.medicine;
+  final exactProducts = products.every(
+    (product) =>
+        product.id != current.id &&
+        product.destination == current.destination &&
+        product.seller == current.seller,
+  );
+  if (!supportedDestination || products.isEmpty || !exactProducts) {
+    return;
+  }
+  final ownerPrefix = switch (current.destination) {
+    BuyV2Destination.shop => 'buy-shop-seller',
+    BuyV2Destination.wholesale => 'buy-wholesale-supplier',
+    BuyV2Destination.medicine => 'buy-medicine-pharmacy',
+    BuyV2Destination.orders => 'buy-order-partner',
+  };
+  final catalogueFactCopy = switch (current.destination) {
+    BuyV2Destination.wholesale =>
+      'Current Wholesale catalogue · listed pack, MOQ and price facts only',
+    BuyV2Destination.medicine =>
+      'Current Medicine catalogue · listed pack and price facts only · '
+          'Not medical advice',
+    _ => 'Current Shop catalogue · listed pack and price facts only',
+  };
+  final closeTooltip = switch (current.destination) {
+    BuyV2Destination.wholesale => 'Close supplier products',
+    BuyV2Destination.medicine => 'Close pharmacy products',
+    _ => 'Close seller products',
+  };
+  final motion = BuyV2SupplierSheetMotion.resolve(context);
+  final transitionController = AnimationController(
+    vsync: Navigator.of(context),
+    duration: motion.duration ?? Duration.zero,
+    reverseDuration: motion.reverseDuration ?? Duration.zero,
+  );
+  try {
+    final selectedProductId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(
+        maxWidth: BuyV2SupplierSheetMotion.maxWidth,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      transitionAnimationController: transitionController,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: BuyV2SupplierSheetMotion.heightFactor,
+        child: SafeArea(
+          top: false,
+          child: Semantics(
+            key: ValueKey('$ownerPrefix-sheet-${current.id}'),
+            container: true,
+            scopesRoute: true,
+            namesRoute: true,
+            explicitChildNodes: true,
+            label: 'More from ${current.seller}',
+            child: ListView(
+              key: ValueKey('$ownerPrefix-sheet-list'),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.softOrange,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: const Icon(
+                        Icons.storefront_outlined,
+                        color: BuyV2Colors.navy,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'More from ${current.seller}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: sheetContext.buyTitle.copyWith(fontSize: 17),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(catalogueFactCopy, style: sheetContext.buyMeta),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.outlined(
+                      key: ValueKey('$ownerPrefix-sheet-close'),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      tooltip: closeTooltip,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(BuyV2Metrics.minimumTap),
+                        side: const BorderSide(color: BuyV2Colors.line),
+                      ),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                for (final product in products) ...[
+                  _PartnerProductAction(
+                    product: product,
+                    ownerPrefix: ownerPrefix,
+                  ),
+                  if (product != products.last) const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!transitionController.isDismissed) {
+      await transitionController.reverse();
+    }
+    if (selectedProductId != null) {
+      if (!context.mounted) return;
+      session.openProduct(selectedProductId);
+    }
+  } finally {
+    transitionController.dispose();
+  }
+}
+
+class _PartnerProductAction extends StatelessWidget {
+  const _PartnerProductAction({
+    required this.product,
+    required this.ownerPrefix,
+  });
+
+  final BuyV2Product product;
+  final String ownerPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    void selectProduct() {
+      HapticFeedback.selectionClick();
+      Navigator.of(context).pop(product.id);
+    }
+
+    final packFact = switch (product.destination) {
+      BuyV2Destination.wholesale =>
+        '${product.pack} · MOQ ${product.minimumOrder}',
+      BuyV2Destination.medicine =>
+        product.requiresPrescription
+            ? '${product.pack} · Prescription and pharmacist review required'
+            : '${product.pack} · No prescription required for this listed pack',
+      _ => product.pack,
+    };
+    final semanticLabel = switch (product.destination) {
+      BuyV2Destination.wholesale =>
+        'View ${product.title} from ${product.seller}. ${product.pack}. '
+            'MOQ ${product.minimumOrder}. ${buyV2Money(product.price)}. '
+            '${product.unitPrice}. Current Wholesale catalogue.',
+      BuyV2Destination.medicine =>
+        'View ${product.title} from ${product.seller}. $packFact. '
+            '${buyV2Money(product.price)}. ${product.unitPrice}. '
+            'Current Medicine catalogue. Not medical advice.',
+      _ =>
+        'View ${product.title} from ${product.seller}. ${product.pack}. '
+            '${buyV2Money(product.price)}. ${product.unitPrice}. '
+            'Current Shop catalogue.',
+    };
+
+    return BuyV2IntentDepth(
+      key: ValueKey('$ownerPrefix-depth-${product.id}'),
+      child: Semantics(
+        key: ValueKey('$ownerPrefix-product-${product.id}'),
+        container: true,
+        button: true,
+        label: semanticLabel,
+        onTap: selectProduct,
+        child: ExcludeSemantics(
+          child: Material(
+            color: BuyV2Colors.canvas,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: selectProduct,
+              borderRadius: BorderRadius.circular(14),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 68),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(color: BuyV2Colors.line),
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyBody.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              packFact,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyMeta,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${buyV2Money(product.price)} · '
+                              '${product.unitPrice}',
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.green,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: BuyV2Colors.navy,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -358,6 +783,144 @@ class _BuyV2ProductMediaItem {
 
   final String label;
   final Widget child;
+}
+
+class _BuyV2ZoomableMedia extends StatefulWidget {
+  const _BuyV2ZoomableMedia({
+    super.key,
+    required this.product,
+    required this.label,
+    required this.child,
+  });
+
+  final BuyV2Product product;
+  final String label;
+  final Widget child;
+
+  @override
+  State<_BuyV2ZoomableMedia> createState() => _BuyV2ZoomableMediaState();
+}
+
+class _BuyV2ZoomableMediaState extends State<_BuyV2ZoomableMedia>
+    with SingleTickerProviderStateMixin {
+  late final TransformationController _transform;
+  late final AnimationController _resetController;
+  Matrix4Tween? _resetTween;
+  bool _zoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _transform = TransformationController()..addListener(_syncZoomState);
+    _resetController = AnimationController(
+      vsync: this,
+      duration: BuyV2Motion.stateChange,
+    )..addListener(_applyResetFrame);
+  }
+
+  @override
+  void dispose() {
+    _resetController
+      ..removeListener(_applyResetFrame)
+      ..dispose();
+    _transform
+      ..removeListener(_syncZoomState)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _syncZoomState() {
+    final zoomed = _transform.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomed != _zoomed && mounted) {
+      setState(() => _zoomed = zoomed);
+    }
+  }
+
+  void _applyResetFrame() {
+    final tween = _resetTween;
+    if (tween == null) {
+      return;
+    }
+    _transform.value = tween.transform(
+      Curves.easeOutCubic.transform(_resetController.value),
+    );
+  }
+
+  void _resetMedia() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _resetController.stop();
+      _resetTween = null;
+      _transform.value = Matrix4.identity();
+      return;
+    }
+    _resetTween = Matrix4Tween(
+      begin: _transform.value.clone(),
+      end: Matrix4.identity(),
+    );
+    _resetController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: '${widget.label}. Pinch to zoom ${widget.product.title}.',
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          Positioned.fill(
+            child: InteractiveViewer(
+              key: ValueKey('buy-product-media-zoom-${widget.product.id}'),
+              transformationController: _transform,
+              minScale: 1,
+              maxScale: 2.5,
+              panEnabled: _zoomed,
+              scaleEnabled: true,
+              boundaryMargin: EdgeInsets.zero,
+              clipBehavior: Clip.hardEdge,
+              onInteractionEnd: (_) {
+                if (_transform.value.getMaxScaleOnAxis() <= 1.01) {
+                  _resetMedia();
+                }
+              },
+              child: ExcludeSemantics(child: widget.child),
+            ),
+          ),
+          if (_zoomed)
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: Semantics(
+                button: true,
+                label: 'Reset zoom for ${widget.product.title}',
+                child: Material(
+                  color: BuyV2Colors.navy.withValues(alpha: .92),
+                  elevation: 2,
+                  shadowColor: const Color(0x33000040),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    key: ValueKey(
+                      'buy-product-media-reset-${widget.product.id}',
+                    ),
+                    onTap: _resetMedia,
+                    borderRadius: BorderRadius.circular(12),
+                    child: const SizedBox(
+                      width: BuyV2Metrics.minimumTap,
+                      height: BuyV2Metrics.minimumTap,
+                      child: Icon(
+                        Icons.fit_screen_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BuyV2ProductGallery extends StatefulWidget {
@@ -463,7 +1026,12 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(3),
-                      child: Semantics(
+                      child: _BuyV2ZoomableMedia(
+                        key: ValueKey(
+                          'buy-product-media-zoom-owner-'
+                          '${product.id}-$index',
+                        ),
+                        product: product,
                         label: widget.media[index].label,
                         child: widget.media[index].child,
                       ),
@@ -730,97 +1298,29 @@ Future<void> _showProductReviewSheet(
   BuyV2Product product,
 ) async {
   final existing = session.customerReviewFor(product.id);
-  var rating = existing?.rating ?? 0;
-  var comment = existing?.comment ?? '';
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
     backgroundColor: Colors.white,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            4,
-            16,
-            16 + MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Review ${product.title}', style: context.buyTitle),
-                const SizedBox(height: 4),
-                Text(
-                  'Rate the product you received. Keep personal or medical information out of your review.',
-                  style: context.buyMeta,
-                ),
-                const SizedBox(height: 12),
-                Semantics(
-                  label: rating == 0
-                      ? 'No rating selected'
-                      : '$rating star rating selected',
-                  liveRegion: true,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (var value = 1; value <= 5; value++)
-                        IconButton(
-                          key: ValueKey(
-                            'buy-review-rating-${product.id}-$value',
-                          ),
-                          tooltip: '$value stars',
-                          onPressed: () => setSheetState(() => rating = value),
-                          icon: Icon(
-                            value <= rating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            color: BuyV2Colors.orange,
-                            size: 30,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  key: ValueKey('buy-review-comment-${product.id}'),
-                  initialValue: comment,
-                  onChanged: (value) => comment = value,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 500,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Your review',
-                    hintText: 'What was useful, good or needs improvement?',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    key: ValueKey('buy-submit-review-${product.id}'),
-                    onPressed: () {
-                      if (session.submitProductReview(
-                        productId: product.id,
-                        rating: rating,
-                        comment: comment,
-                      )) {
-                        Navigator.of(sheetContext).pop();
-                      }
-                    },
-                    child: const Text('Save review'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
+    builder: (sheetContext) => AnimatedPadding(
+      duration: BuyV2ProductFeedbackSheetMotion.resolveKeyboardInsetDuration(
+        sheetContext,
+      ),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: _ProductReviewSheet(
+        session: session,
+        product: product,
+        existing: existing,
       ),
     ),
   );
@@ -837,72 +1337,539 @@ Future<void> _showProductReportSheet(
     'Product image does not match',
     'Partner information needs attention',
   ];
-  String? selectedReason;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
     backgroundColor: Colors.white,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
+    builder: (sheetContext) => _ProductReportSheet(
+      session: session,
+      product: product,
+      reasons: reasons,
+    ),
+  );
+}
+
+class _ProductFeedbackSheetHeader extends StatelessWidget {
+  const _ProductFeedbackSheetHeader({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.closeKey,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final Key closeKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: BuyV2Colors.softOrange,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, color: BuyV2Colors.navy, size: 22),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Report a product issue', style: context.buyTitle),
-              const SizedBox(height: 4),
               Text(
-                'Tell us which listing detail needs attention.',
-                style: context.buyMeta,
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyTitle.copyWith(fontSize: 17),
               ),
-              const SizedBox(height: 9),
-              for (final reason in reasons)
+              const SizedBox(height: 2),
+              Text(detail, style: context.buyMeta),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.outlined(
+          key: closeKey,
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Close $title',
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(BuyV2Metrics.minimumTap),
+            side: const BorderSide(color: BuyV2Colors.line),
+          ),
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductReviewSheet extends StatefulWidget {
+  const _ProductReviewSheet({
+    required this.session,
+    required this.product,
+    required this.existing,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2CustomerReview? existing;
+
+  @override
+  State<_ProductReviewSheet> createState() => _ProductReviewSheetState();
+}
+
+class _ProductReviewSheetState extends State<_ProductReviewSheet> {
+  late final TextEditingController _commentController;
+  late final FocusNode _commentFocus;
+  late int _rating;
+  bool _submissionRejected = false;
+
+  bool get _isValid =>
+      _rating >= 1 && _rating <= 5 && _commentController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = widget.existing?.rating ?? 0;
+    _commentController = TextEditingController(
+      text: widget.existing?.comment ?? '',
+    );
+    _commentFocus = FocusNode()..addListener(_focusChanged);
+  }
+
+  void _focusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _submit() {
+    if (!_isValid) return;
+    final saved = widget.session.submitProductReview(
+      productId: widget.product.id,
+      rating: _rating,
+      comment: _commentController.text,
+    );
+    if (saved) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _submissionRejected = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentFocus
+      ..removeListener(_focusChanged)
+      ..dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stateDuration =
+        BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
+    final title = 'Review ${widget.product.title}';
+    return PopScope<void>(
+      canPop: !_commentFocus.hasFocus,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _commentFocus.unfocus();
+      },
+      child: Semantics(
+        container: true,
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: '$title form',
+        child: ConstrainedBox(
+          key: const ValueKey('buy-product-review-sheet'),
+          constraints: const BoxConstraints(maxHeight: 620),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProductFeedbackSheetHeader(
+                  icon: Icons.rate_review_outlined,
+                  title: title,
+                  detail:
+                      'Rate what you received. Keep personal or medical information out.',
+                  closeKey: const ValueKey('buy-close-product-review'),
+                ),
+                const SizedBox(height: 12),
+                Semantics(
+                  label: _rating == 0
+                      ? 'No rating selected'
+                      : '$_rating star rating selected',
+                  liveRegion: true,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      for (var value = 1; value <= 5; value++)
+                        AnimatedContainer(
+                          duration: stateDuration,
+                          curve: Curves.easeOut,
+                          decoration: BoxDecoration(
+                            color: value <= _rating
+                                ? BuyV2Colors.softOrange
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: IconButton(
+                            key: ValueKey(
+                              'buy-review-rating-${widget.product.id}-$value',
+                            ),
+                            tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
+                            onPressed: () => setState(() {
+                              _rating = value;
+                              _submissionRejected = false;
+                            }),
+                            icon: Icon(
+                              value <= _rating
+                                  ? Icons.star_rounded
+                                  : Icons.star_border_rounded,
+                              color: BuyV2Colors.orange,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Semantics(
+                  container: true,
+                  excludeSemantics: true,
+                  textField: true,
+                  multiline: true,
+                  focusable: true,
+                  focused: _commentFocus.hasFocus,
+                  isRequired: true,
+                  maxValueLength: 500,
+                  currentValueLength: _commentController.text.characters.length,
+                  label: 'Your review',
+                  value: _commentController.text,
+                  hint: 'Required. Up to 500 characters.',
+                  onTap: _commentFocus.requestFocus,
+                  onFocus: _commentFocus.requestFocus,
+                  onSetText: (value) {
+                    final nextValue =
+                        LengthLimitingTextInputFormatter(
+                          500,
+                          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                        ).formatEditUpdate(
+                          _commentController.value,
+                          TextEditingValue(
+                            text: value,
+                            selection: TextSelection.collapsed(
+                              offset: value.length,
+                            ),
+                          ),
+                        );
+                    _commentFocus.requestFocus();
+                    _commentController.value = nextValue;
+                    setState(() => _submissionRejected = false);
+                  },
+                  child: TextFormField(
+                    key: ValueKey('buy-review-comment-${widget.product.id}'),
+                    controller: _commentController,
+                    focusNode: _commentFocus,
+                    autofocus: false,
+                    onChanged: (_) => setState(() {
+                      _submissionRejected = false;
+                    }),
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 500,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Your review',
+                      hintText: 'What was useful, good or needs improvement?',
+                      counterText: '',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ChoiceChip(
-                      key: ValueKey(
-                        'buy-report-reason-${reasons.indexOf(reason)}',
+                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Required · up to 500 characters',
+                          style: context.buyMeta.copyWith(fontSize: 9),
+                        ),
                       ),
-                      selected: selectedReason == reason,
-                      onSelected: (_) =>
-                          setSheetState(() => selectedReason = reason),
-                      showCheckmark: true,
-                      label: SizedBox(
-                        width: double.infinity,
-                        child: Text(reason, style: context.buyBody),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_commentController.text.characters.length}/500',
+                        style: context.buyMeta.copyWith(fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+                AnimatedSwitcher(
+                  duration: stateDuration,
+                  child: Semantics(
+                    key: ValueKey(
+                      _submissionRejected
+                          ? 'review-submit-rejected'
+                          : _isValid
+                          ? 'review-ready'
+                          : 'review-incomplete',
+                    ),
+                    liveRegion: true,
+                    child: Text(
+                      _submissionRejected
+                          ? (widget.session.notice ??
+                                'This review could not be saved.')
+                          : _isValid
+                          ? 'Ready to save to this product.'
+                          : 'Choose a rating and write a review to enable Save.',
+                      style: context.buyMeta.copyWith(
+                        color: _submissionRejected
+                            ? BuyV2Colors.orange
+                            : _isValid
+                            ? BuyV2Colors.green
+                            : BuyV2Colors.muted,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                 ),
-              const SizedBox(height: 5),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  key: ValueKey('buy-submit-report-${product.id}'),
-                  onPressed: selectedReason == null
-                      ? null
-                      : () {
-                          if (session.reportProduct(
-                            productId: product.id,
-                            reason: selectedReason!,
-                          )) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
-                  child: const Text('Send report'),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        key: const ValueKey('buy-cancel-product-review'),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 48,
+                        child: FilledButton.icon(
+                          key: ValueKey(
+                            'buy-submit-review-${widget.product.id}',
+                          ),
+                          onPressed: _isValid ? _submit : null,
+                          icon: const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Save review'),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductReportSheet extends StatefulWidget {
+  const _ProductReportSheet({
+    required this.session,
+    required this.product,
+    required this.reasons,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final List<String> reasons;
+
+  @override
+  State<_ProductReportSheet> createState() => _ProductReportSheetState();
+}
+
+class _ProductReportSheetState extends State<_ProductReportSheet> {
+  String? _selectedReason;
+  bool _submissionRejected = false;
+
+  void _submit() {
+    final reason = _selectedReason;
+    if (reason == null) return;
+    final reported = widget.session.reportProduct(
+      productId: widget.product.id,
+      reason: reason,
+    );
+    if (reported) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _submissionRejected = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stateDuration =
+        BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
+    const title = 'Report a product issue';
+    return Semantics(
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: '$title form',
+      child: ConstrainedBox(
+        key: const ValueKey('buy-product-report-sheet'),
+        constraints: const BoxConstraints(maxHeight: 620),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _ProductFeedbackSheetHeader(
+                icon: Icons.flag_outlined,
+                title: title,
+                detail: 'Choose the one listing detail that needs attention.',
+                closeKey: ValueKey('buy-close-product-report'),
+              ),
+              const SizedBox(height: 11),
+              for (var index = 0; index < widget.reasons.length; index++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Semantics(
+                    button: true,
+                    selected: _selectedReason == widget.reasons[index],
+                    label: widget.reasons[index],
+                    child: AnimatedContainer(
+                      duration: stateDuration,
+                      curve: Curves.easeOut,
+                      decoration: BoxDecoration(
+                        color: _selectedReason == widget.reasons[index]
+                            ? BuyV2Colors.softOrange
+                            : BuyV2Colors.canvas,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _selectedReason == widget.reasons[index]
+                              ? BuyV2Colors.orange
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          key: ValueKey('buy-report-reason-$index'),
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => setState(() {
+                            _selectedReason = widget.reasons[index];
+                            _submissionRejected = false;
+                          }),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.reasons[index],
+                                    style: context.buyBody.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  _selectedReason == widget.reasons[index]
+                                      ? Icons.check_circle_rounded
+                                      : Icons.circle_outlined,
+                                  color:
+                                      _selectedReason == widget.reasons[index]
+                                      ? BuyV2Colors.orange
+                                      : BuyV2Colors.muted,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              AnimatedSwitcher(
+                duration: stateDuration,
+                child: Semantics(
+                  key: ValueKey(
+                    _submissionRejected
+                        ? 'report-submit-rejected'
+                        : _selectedReason == null
+                        ? 'report-incomplete'
+                        : 'report-ready',
+                  ),
+                  liveRegion: true,
+                  child: Text(
+                    _submissionRejected
+                        ? (widget.session.notice ??
+                              'This report could not be sent.')
+                        : _selectedReason == null
+                        ? 'Choose one reason to enable Send.'
+                        : 'Ready to send this listing issue.',
+                    style: context.buyMeta.copyWith(
+                      color: _submissionRejected
+                          ? BuyV2Colors.orange
+                          : _selectedReason == null
+                          ? BuyV2Colors.muted
+                          : BuyV2Colors.green,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      key: const ValueKey('buy-cancel-product-report'),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 48,
+                      child: FilledButton.icon(
+                        key: ValueKey('buy-submit-report-${widget.product.id}'),
+                        onPressed: _selectedReason == null ? null : _submit,
+                        icon: const Icon(Icons.send_outlined, size: 18),
+                        label: const Text('Send report'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _AddressSelectionRequired extends StatelessWidget {
@@ -1018,14 +1985,76 @@ class _MissingOrderSelection extends StatelessWidget {
   }
 }
 
-class BuyV2CartView extends StatelessWidget {
+class BuyV2CartView extends StatefulWidget {
   const BuyV2CartView({super.key, required this.session});
 
   final BuyV2Session session;
 
   @override
+  State<BuyV2CartView> createState() => _BuyV2CartViewState();
+}
+
+class _BuyV2CartViewState extends State<BuyV2CartView> {
+  late BuyV2CartScope _scope;
+  late ScrollController _scrollController;
+
+  BuyV2Session get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    _scope = session.cartScope;
+    _scrollController = _controllerFor(_scope);
+  }
+
+  ScrollController _controllerFor(BuyV2CartScope scope) {
+    final controller = ScrollController(
+      initialScrollOffset: session.cartScrollOffsetFor(scope),
+      keepScrollOffset: false,
+    );
+    controller.addListener(() {
+      session.rememberCartScrollOffset(scope, controller.offset);
+    });
+    return controller;
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2CartView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextScope = session.cartScope;
+    if (_scope == nextScope && oldWidget.session == session) return;
+    if (_scrollController.hasClients) {
+      oldWidget.session.rememberCartScrollOffset(
+        _scope,
+        _scrollController.offset,
+      );
+    }
+    _scrollController.dispose();
+    _scope = nextScope;
+    _scrollController = _controllerFor(_scope);
+  }
+
+  @override
+  void dispose() {
+    if (_scrollController.hasClients) {
+      session.rememberCartScrollOffset(_scope, _scrollController.offset);
+    }
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final lines = session.cartLines;
+    final destinations =
+        const [
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+          BuyV2Destination.medicine,
+        ].where(
+          (destination) =>
+              lines.any((line) => line.product.destination == destination),
+        );
     return Column(
       children: [
         Padding(
@@ -1056,11 +2085,21 @@ class BuyV2CartView extends StatelessWidget {
                         'Cart',
                         style: context.buyTitle.copyWith(fontSize: 17),
                       ),
-                      Text(
-                        '${_productCountLabel(session.itemCount)} · ${_destinationSummary(session.cartDestinations)} · ${buyV2Money(session.cartTotal)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(fontSize: 8),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final summary =
+                              '${_productCountLabel(session.itemCount)} · '
+                              '${_destinationSummary(session.cartDestinations)} · '
+                              '${buyV2Money(session.cartTotal)}';
+                          return BuyV2FiniteValueTransition(
+                            key: const ValueKey('buy-cart-header-value-motion'),
+                            stateKey: summary,
+                            text: summary,
+                            ownerSize: Size(constraints.maxWidth, 14),
+                            textAlign: TextAlign.start,
+                            style: context.buyMeta.copyWith(fontSize: 8),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1082,39 +2121,37 @@ class BuyV2CartView extends StatelessWidget {
           child: lines.isEmpty
               ? const SizedBox.shrink()
               : ListView(
+                  controller: _scrollController,
                   key: PageStorageKey('buy-cart-${session.cartScope.name}'),
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   children: [
-                    for (final destination in const [
-                      BuyV2Destination.shop,
-                      BuyV2Destination.medicine,
-                      BuyV2Destination.wholesale,
-                    ])
-                      if (lines.any(
-                        (line) => line.product.destination == destination,
-                      )) ...[
-                        _CartGroupHeader(
-                          destination: destination,
-                          total: lines
-                              .where(
-                                (line) =>
-                                    line.product.destination == destination,
-                              )
-                              .fold(0, (sum, line) => sum + line.total),
-                        ),
-                        for (final line in lines.where(
-                          (line) => line.product.destination == destination,
-                        ))
-                          _CartLine(session: session, line: line),
-                        const SizedBox(height: 8),
-                      ],
+                    for (final line in lines)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 7),
+                        child: _CartLine(session: session, line: line),
+                      ),
+                    const SizedBox(height: 2),
+                    _CartBenefitPanel(session: session),
+                    const SizedBox(height: 10),
+                    _CartDiscoverySections(
+                      session: session,
+                      destinations: destinations.toList(growable: false),
+                    ),
+                    _CartDeliveryInstructionSections(
+                      session: session,
+                      destinations: destinations.toList(growable: false),
+                    ),
+                    _CartTipSections(session: session),
+                    _CartBillSummary(session: session),
+                    const SizedBox(height: 8),
+                    _CartSavingsSummary(session: session),
+                    BuyV2SponsoredSlot(
+                      content: session.sponsoredContentFor(
+                        BuyV2SponsoredPlacement.cartBeforeSummary,
+                      ),
+                    ),
                   ],
                 ),
-        ),
-        BuyV2SponsoredSlot(
-          content: session.sponsoredContentFor(
-            BuyV2SponsoredPlacement.cartBeforeSummary,
-          ),
         ),
         Container(
           key: const ValueKey('buy-cart-action-bar'),
@@ -1135,18 +2172,22 @@ class BuyV2CartView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total', style: context.buyMeta),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            buyV2Money(session.scopedCartTotal),
-                            maxLines: 1,
-                            style: const TextStyle(
-                              color: BuyV2Colors.navy,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        Text(
+                          session.scopedTipTotal > 0
+                              ? 'Items + delivery tip'
+                              : 'Cart total',
+                          style: context.buyMeta,
+                        ),
+                        BuyV2FiniteValueTransition(
+                          key: const ValueKey('buy-cart-payable-total-motion'),
+                          stateKey: session.scopedPayableTotal,
+                          text: buyV2Money(session.scopedPayableTotal),
+                          ownerSize: const Size(112, 30),
+                          textAlign: TextAlign.start,
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -1199,7 +2240,13 @@ class BuyV2CheckoutView extends StatelessWidget {
             key: const PageStorageKey('buy-checkout'),
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
             children: [
-              _ReturnAffordance(label: 'Cart', onTap: session.openCart),
+              _ReturnAffordance(
+                label: 'Cart',
+                onTap: () => session.openCart(scope: session.checkoutScope),
+                tightHitOwner: true,
+                hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
+                minimumHeight: 44,
+              ),
               const SizedBox(height: 7),
               Text(
                 'Review order',
@@ -1221,8 +2268,45 @@ class BuyV2CheckoutView extends StatelessWidget {
                   },
                   title:
                       '${group.destination.label} fulfilment · ${group.partner}',
+                  detail: [
+                    '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
+                    group.promise,
+                    if (session.selectedDeliveryInstructionFor(
+                          group.destination,
+                        )
+                        case final instruction?)
+                      '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
+                    if (session.tipForGroup(group) > 0)
+                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
+                  ].join('\n'),
+                ),
+                const SizedBox(height: 7),
+              ],
+              for (final benefit in session.selectedCartBenefitsFor(
+                destinations,
+              )) ...[
+                _CheckoutCard(
+                  key: ValueKey(
+                    'buy-checkout-benefit-${benefit.destination.name}-'
+                    '${benefit.kind.name}',
+                  ),
+                  icon: benefit.kind == BuyV2CartBenefitKind.coupon
+                      ? Icons.local_offer_outlined
+                      : Icons.account_balance_wallet_outlined,
+                  title:
+                      '${benefit.destination.label} '
+                      '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
                   detail:
-                      '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}\n${group.promise}',
+                      '${benefit.title}\nEligibility and any saving will be '
+                      'confirmed before payment. No amount has been deducted '
+                      'from this review total.',
+                  action: 'Review',
+                  onTap: () => _openCartBenefitsPage(
+                    context,
+                    session: session,
+                    kind: benefit.kind,
+                    destination: benefit.destination,
+                  ),
                 ),
                 const SizedBox(height: 7),
               ],
@@ -1234,7 +2318,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                     ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
                     : 'Selected payment method for this order.',
                 action: 'Change',
-                onTap: () => _showPaymentSheet(context, session),
+                onTap: () => showBuyV2PaymentSheet(context, session),
               ),
               const SizedBox(height: 8),
             ],
@@ -1258,7 +2342,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                     Text(
-                      buyV2Money(session.checkoutTotal),
+                      buyV2Money(session.checkoutPayableTotal),
                       style: const TextStyle(
                         color: BuyV2Colors.navy,
                         fontSize: 19,
@@ -1341,7 +2425,13 @@ class BuyV2ConfirmationView extends StatelessWidget {
               BuyV2Destination.orders => Icons.receipt_long_outlined,
             },
             title: '${order.destination.label} order confirmed',
-            detail: '${order.id} · ${order.partner}\n${order.promise}',
+            detail: [
+              '${order.id} · ${order.partner}',
+              order.promise,
+              if (order.deliveryInstruction != null)
+                '${_deliveryInstructionOwner(order.destination)} · ${order.deliveryInstruction}',
+              if (order.tip > 0) 'Delivery tip · ${buyV2Money(order.tip)}',
+            ].join('\n'),
           ),
           const SizedBox(height: 8),
         ],
@@ -1371,39 +2461,33 @@ class BuyV2RecoveryView extends StatelessWidget {
     final content = switch (kind) {
       BuyV2RecoveryKind.priceUpdate => (
         Icons.price_change_outlined,
-        'Price updated',
-        'The latest delivered price is shown. Review it before continuing.',
-        'Review updated price',
+        'Price needs review',
+        'Return to where you were and review the current price before continuing. No order has been changed.',
       ),
       BuyV2RecoveryKind.stockUnavailable => (
         Icons.inventory_2_outlined,
-        'Stock changed',
-        'One product is unavailable. Available alternatives keep the same category and delivery area.',
-        'See alternatives',
+        'Availability needs review',
+        'Return to where you were to review current availability. No replacement has been selected.',
       ),
       BuyV2RecoveryKind.serviceAreaUnavailable => (
         Icons.location_off_outlined,
-        'Delivery area unavailable',
-        'This product cannot be delivered to the selected PIN code. Change the address or choose a nearby listing.',
-        'Change delivery area',
+        'Delivery availability needs review',
+        'Return to review the address and product. No address or product has been changed.',
       ),
       BuyV2RecoveryKind.paymentFailed => (
         Icons.payment_outlined,
-        'Payment not completed',
-        'No amount was charged. Your Cart and delivery choices are unchanged.',
-        'Try payment again',
+        'Payment status needs review',
+        'This screen cannot confirm whether money was debited. Check your payment and order status before trying again.',
       ),
       BuyV2RecoveryKind.networkInterruption => (
         Icons.wifi_off_rounded,
         'Connection interrupted',
-        'Your Cart is safe. Reconnect to refresh prices, stock and delivery commitments.',
-        'Try again',
+        'Reconnect, then return to where you were and confirm the latest details before continuing.',
       ),
       BuyV2RecoveryKind.deliveryDelay => (
         Icons.schedule_rounded,
-        'Delivery time changed',
-        'The fulfilment partner has shared a new delivery commitment. You can track it or get help.',
-        'View latest update',
+        'Delivery update needs review',
+        'Return to the exact order to review tracking. No new delivery commitment is confirmed here.',
       ),
     };
     return ListView(
@@ -1442,15 +2526,15 @@ class BuyV2RecoveryView extends StatelessWidget {
                 child: FilledButton(
                   key: const ValueKey('buy-recovery-primary'),
                   onPressed: session.retryRecovery,
-                  child: Text(content.$4),
+                  child: Text(session.recoveryReturnLabel),
                 ),
               ),
-              if (kind == BuyV2RecoveryKind.deliveryDelay) ...[
+              if (session.canOpenRecoveryOrderHelp) ...[
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: session.openAssist,
+                    onPressed: session.openRecoveryOrderHelp,
                     child: const Text('Get help'),
                   ),
                 ),
@@ -1549,44 +2633,32 @@ class BuyV2OrdersView extends StatelessWidget {
             children: [
               for (final tab in BuyV2OrdersTab.values)
                 Expanded(
-                  child: InkWell(
-                    key: ValueKey('buy-orders-tab-${tab.name}'),
+                  child: _OrdersTabButton(
+                    tab: tab,
+                    selected: session.ordersTab == tab,
                     onTap: () => session.showOrdersTab(tab),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: session.ordersTab == tab
-                            ? Colors.white
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        tab == BuyV2OrdersTab.active ? 'Active' : 'Delivered',
-                        style: TextStyle(
-                          color: session.ordersTab == tab
-                              ? BuyV2Colors.navy
-                              : BuyV2Colors.muted,
-                          fontWeight: session.ordersTab == tab
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                    ),
                   ),
                 ),
             ],
           ),
         ),
         const SizedBox(height: 7),
-        if (session.visibleOrders.isEmpty)
-          _OrdersEmptyState(query: session.query, tab: session.ordersTab)
-        else
-          for (final order in session.visibleOrders)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: _OrderCard(session: session, order: order),
-            ),
+        BuyV2FiniteIncomingTransition(
+          stateKey: session.ordersTab,
+          child: session.visibleOrders.isEmpty
+              ? _OrdersEmptyState(query: session.query, tab: session.ordersTab)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final order in session.visibleOrders)
+                      Padding(
+                        key: ValueKey('buy-order-row-${order.id}'),
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _OrderCard(session: session, order: order),
+                      ),
+                  ],
+                ),
+        ),
         BuyV2SponsoredSlot(
           content: session.sponsoredContentFor(
             BuyV2SponsoredPlacement.ordersAfterHistory,
@@ -1595,6 +2667,52 @@ class BuyV2OrdersView extends StatelessWidget {
         const SizedBox(height: 2),
         _OrdersContinuationRail(session: session),
       ],
+    );
+  }
+}
+
+class _OrdersTabButton extends StatelessWidget {
+  const _OrdersTabButton({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BuyV2OrdersTab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = tab == BuyV2OrdersTab.active ? 'Active' : 'Delivered';
+    final duration = BuyV2Motion.resolved(context, BuyV2Motion.selection);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label orders',
+      child: InkWell(
+        key: ValueKey('buy-orders-tab-${tab.name}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: duration,
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: AnimatedDefaultTextStyle(
+            duration: duration,
+            curve: Curves.easeInOutCubic,
+            style: TextStyle(
+              color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+            child: Text(label),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1773,6 +2891,7 @@ class _OrdersContinuationRail extends StatelessWidget {
         title: 'Continue shopping',
         detail: 'Browse retail products in Shop',
         icon: Icons.shopping_bag_outlined,
+        sequenceIndex: 0,
         onTap: () => session.openDestination(BuyV2Destination.shop),
       ),
       BuyV2PromotionCard(
@@ -1781,6 +2900,7 @@ class _OrdersContinuationRail extends StatelessWidget {
         detail: 'Open independent Wholesale discovery',
         icon: Icons.storefront_outlined,
         accent: BuyV2Colors.green,
+        sequenceIndex: 1,
         onTap: () => session.openDestination(BuyV2Destination.wholesale),
       ),
       BuyV2PromotionCard(
@@ -1789,6 +2909,7 @@ class _OrdersContinuationRail extends StatelessWidget {
         detail: 'Browse the licensed pharmacy catalogue',
         icon: Icons.local_pharmacy_outlined,
         accent: BuyV2Colors.royal,
+        sequenceIndex: 2,
         onTap: () => session.openDestination(BuyV2Destination.medicine),
       ),
     ];
@@ -1826,52 +2947,198 @@ String _trackingNextStep(BuyV2OrderStatus status) => switch (status) {
     'Delivery is complete. Reorder if you need the same products again.',
 };
 
-class _LiveTrackingDot extends StatefulWidget {
-  const _LiveTrackingDot();
-
-  @override
-  State<_LiveTrackingDot> createState() => _LiveTrackingDotState();
-}
-
-class _LiveTrackingDotState extends State<_LiveTrackingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-    lowerBound: .45,
-    upperBound: 1,
+Future<void> _showBuyV2OrderDeliveryContextSheet(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Order order,
+) async {
+  final destination = session.destination;
+  final view = session.view;
+  final orderId = order.id;
+  final bottomViewPadding = BuyV2AddressSheetMotion.resolveBottomSafeInset(
+    context,
   );
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.stop();
-      _controller.value = 1;
-    } else if (!_controller.isCompleted && !_controller.isAnimating) {
-      _controller.forward();
+  Future<void> continueAfterReverse(
+    BuildContext sheetContext,
+    Future<void> Function() continuation,
+  ) async {
+    HapticFeedback.selectionClick();
+    final routeCompleted = ModalRoute.of(sheetContext)?.completed;
+    Navigator.of(sheetContext).pop();
+    if (routeCompleted != null) await routeCompleted;
+    if (!context.mounted ||
+        session.destination != destination ||
+        session.view != view ||
+        session.selectedOrderId != orderId) {
+      return;
     }
+    await continuation();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller,
-      child: const DecoratedBox(
-        decoration: BoxDecoration(
-          color: BuyV2Colors.green,
-          shape: BoxShape.circle,
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2AddressSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2AddressSheetMotion.resolve(context),
+    builder: (sheetContext) => Semantics(
+      key: const ValueKey('buy-order-delivery-sheet'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Delivery address for order $orderId',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-order-delivery-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(sheetContext).height *
+                BuyV2AddressSheetMotion.maxHeightFactor,
+          ),
+          child: ListView(
+            key: const ValueKey('buy-order-delivery-list'),
+            shrinkWrap: true,
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomViewPadding),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'This order’s delivery',
+                          key: const ValueKey('buy-order-delivery-title'),
+                          style: sheetContext.buyTitle,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${order.destination.label} · $orderId',
+                          key: const ValueKey('buy-order-delivery-id'),
+                          style: sheetContext.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const ValueKey('buy-order-delivery-close'),
+                    tooltip: 'Close order delivery details',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      maximumSize: const Size(44, 44),
+                      foregroundColor: BuyV2Colors.navy,
+                      backgroundColor: BuyV2Colors.softBlue,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                key: const ValueKey('buy-order-delivery-facts'),
+                padding: const EdgeInsets.all(12),
+                decoration: buyV2CardDecoration(radius: 16),
+                child: Column(
+                  children: [
+                    _OrderDeliveryFact(
+                      icon: Icons.location_on_outlined,
+                      label: 'Delivering to',
+                      value: order.destinationLabel,
+                    ),
+                    _OrderDeliveryFact(
+                      icon: Icons.schedule_outlined,
+                      label: 'Delivery window',
+                      value: order.promise,
+                    ),
+                    _OrderDeliveryFact(
+                      icon: Icons.assignment_turned_in_outlined,
+                      label: 'Recorded instruction',
+                      value:
+                          order.deliveryInstruction ??
+                          'No delivery instruction was recorded for this order.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                key: const ValueKey('buy-order-delivery-boundary'),
+                padding: const EdgeInsets.all(12),
+                decoration: buyV2CardDecoration(
+                  color: BuyV2Colors.softOrange,
+                  border: const Color(0x33FF9933),
+                  radius: 16,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: BuyV2Colors.navy,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'This order stays unchanged',
+                            style: sheetContext.buyBody,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Changing a saved address applies to future checkout only. '
+                            'It does not change this order.',
+                            style: sheetContext.buyMeta,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              _OrderDeliveryContinuation(
+                key: const ValueKey('buy-order-delivery-manage-future'),
+                icon: Icons.edit_location_alt_outlined,
+                title: 'Manage addresses for future checkout',
+                detail: 'View, add or choose a saved checkout address',
+                onTap: () => continueAfterReverse(
+                  sheetContext,
+                  () => showBuyV2AddressSheet(context, session),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _OrderDeliveryContinuation(
+                key: const ValueKey('buy-order-delivery-help'),
+                icon: Icons.chat_outlined,
+                title: 'Get help with this order',
+                detail: '$orderId stays attached to Assist',
+                primary: true,
+                onTap: () => continueAfterReverse(sheetContext, () async {
+                  session.openAssist();
+                }),
+              ),
+            ],
+          ),
         ),
-        child: SizedBox(width: 8, height: 8),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class BuyV2TrackingView extends StatelessWidget {
@@ -1891,7 +3158,11 @@ class BuyV2TrackingView extends StatelessWidget {
       children: [
         Row(
           children: [
-            _ReturnAffordance(label: 'Orders', onTap: session.openOrders),
+            _ReturnAffordance(
+              key: const ValueKey('buy-tracking-return-orders'),
+              label: 'Orders',
+              onTap: session.returnToOrders,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -1907,26 +3178,37 @@ class BuyV2TrackingView extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: BuyV2Colors.softGreen,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _LiveTrackingDot(),
-                  SizedBox(width: 5),
-                  Text(
-                    'LIVE',
-                    style: TextStyle(
-                      color: BuyV2Colors.green,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
+            Semantics(
+              label:
+                  'Current order status: ${_trackingStatusLabel(order.status)}',
+              excludeSemantics: true,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.softGreen,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(width: 8, height: 8),
                     ),
-                  ),
-                ],
+                    SizedBox(width: 5),
+                    Text(
+                      'CURRENT',
+                      style: TextStyle(
+                        color: BuyV2Colors.green,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -1979,19 +3261,15 @@ class BuyV2TrackingView extends StatelessWidget {
               const SizedBox(height: 7),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: order.progress),
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 650),
-                  builder: (context, value, _) => LinearProgressIndicator(
-                    minHeight: 6,
-                    value: value,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation(
-                      BuyV2Colors.orange,
-                    ),
-                  ),
+                child: BuyV2HonestProgressIndicator(
+                  ownerId: order.id,
+                  progress: order.progress,
+                  statusLabel: _trackingStatusLabel(order.status),
+                  isComplete: order.status == BuyV2OrderStatus.delivered,
+                  minHeight: 6,
+                  backgroundColor: Colors.white24,
+                  valueColor: BuyV2Colors.orange,
+                  indicatorKey: const ValueKey('buy-tracking-progress'),
                 ),
               ),
               const SizedBox(height: 6),
@@ -2025,6 +3303,18 @@ class BuyV2TrackingView extends StatelessWidget {
               label: 'Products',
               value: order.itemSummary,
             ),
+            if (order.deliveryInstruction != null)
+              _DecisionRow(
+                icon: Icons.assignment_turned_in_outlined,
+                label: _deliveryInstructionOwner(order.destination),
+                value: order.deliveryInstruction!,
+              ),
+            if (order.tip > 0)
+              _DecisionRow(
+                icon: Icons.volunteer_activism_outlined,
+                label: 'Delivery tip',
+                value: buyV2Money(order.tip),
+              ),
           ],
         ),
         const SizedBox(height: 6),
@@ -2085,12 +3375,16 @@ class BuyV2TrackingView extends StatelessWidget {
                   color: BuyV2Colors.softBlue,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  session.trackingAlertsEnabled
-                      ? Icons.notifications_active_outlined
-                      : Icons.notifications_off_outlined,
-                  color: BuyV2Colors.navy,
-                  size: 18,
+                child: BuyV2FiniteVisualTransition(
+                  stateKey: session.trackingAlertsEnabled,
+                  ownerSize: const Size.square(34),
+                  child: Icon(
+                    session.trackingAlertsEnabled
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    color: BuyV2Colors.navy,
+                    size: 18,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -2101,8 +3395,8 @@ class BuyV2TrackingView extends StatelessWidget {
                     Text('Order updates', style: context.buyBody),
                     Text(
                       session.trackingAlertsEnabled
-                          ? 'Live status alerts are on'
-                          : 'Live status alerts are paused',
+                          ? 'Order alerts are on'
+                          : 'Order alerts are paused',
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                   ],
@@ -2125,7 +3419,12 @@ class BuyV2TrackingView extends StatelessWidget {
           children: [
             Expanded(
               child: _TrackingAction(
-                onPressed: () => showBuyV2AddressSheet(context, session),
+                key: const ValueKey('buy-tracking-address'),
+                onPressed: () => _showBuyV2OrderDeliveryContextSheet(
+                  context,
+                  session,
+                  order,
+                ),
                 icon: Icons.location_on_outlined,
                 label: 'Address',
               ),
@@ -2155,6 +3454,16 @@ class BuyV2TrackingView extends StatelessWidget {
             ),
           ],
         ),
+        if (order.status == BuyV2OrderStatus.delivered) ...[
+          const SizedBox(height: 6),
+          _OrderDeliveryContinuation(
+            key: const ValueKey('buy-tracking-delivered-help'),
+            icon: Icons.support_agent_outlined,
+            title: 'Get help with this order',
+            detail: 'Prepare a return, replacement or refund question',
+            onTap: session.openAssist,
+          ),
+        ],
       ],
     );
   }
@@ -2213,22 +3522,17 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final order = session.orders.firstWhere(
-      (item) => item.status != BuyV2OrderStatus.delivered,
-      orElse: () => session.orders.first,
-    );
+    final order = session.assistOrder;
     final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     return ListView(
       key: const PageStorageKey('buy-assist'),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 14),
       children: [
         _ReturnAffordance(
-          label: session.destination == BuyV2Destination.orders
-              ? 'Orders'
-              : session.destination.label,
-          onTap: session.destination == BuyV2Destination.orders
-              ? session.openOrders
-              : session.returnToCatalogue,
+          label: 'Back',
+          onTap: session.closeAssist,
+          tightHitOwner: true,
+          hitOwnerKey: const ValueKey('buy-assist-return'),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2285,7 +3589,8 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Order help, chat and calls in one secure place.',
+                      'Topics prepare support; no order changes happen here.',
+                      key: const ValueKey('buy-assist-order-change-boundary'),
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: .78),
                         fontSize: 9,
@@ -2304,7 +3609,7 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: const Text(
-                        'Private in-app support',
+                        'Cancellation · return · refund help',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 7.5,
@@ -2393,19 +3698,15 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(99),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: order.progress),
-                      duration: BuyV2Motion.resolved(
-                        context,
-                        BuyV2Motion.contentChange,
-                      ),
-                      builder: (context, value, _) => LinearProgressIndicator(
-                        key: const ValueKey('buy-assist-order-progress'),
-                        minHeight: 5,
-                        value: value,
-                        backgroundColor: BuyV2Colors.softBlue,
-                        color: BuyV2Colors.green,
-                      ),
+                    child: BuyV2HonestProgressIndicator(
+                      ownerId: order.id,
+                      progress: order.progress,
+                      statusLabel: _trackingStatusLabel(order.status),
+                      isComplete: order.status == BuyV2OrderStatus.delivered,
+                      minHeight: 5,
+                      backgroundColor: BuyV2Colors.softBlue,
+                      valueColor: BuyV2Colors.green,
+                      indicatorKey: const ValueKey('buy-assist-order-progress'),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -2448,11 +3749,22 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
             final itemWidth = singleColumn
                 ? constraints.maxWidth
                 : (constraints.maxWidth - 7) / 2;
-            const intents = [
-              ('Where is my order?', Icons.local_shipping_outlined),
-              ('Change delivery', Icons.location_on_outlined),
-              ('Problem with an item', Icons.inventory_2_outlined),
-              ('Medicine support', Icons.local_pharmacy_outlined),
+            final intents = [
+              if (order.status == BuyV2OrderStatus.delivered) ...[
+                (
+                  'Return, replacement or refund',
+                  Icons.assignment_return_outlined,
+                ),
+                ('Problem with an item', Icons.inventory_2_outlined),
+                ('Report a delivery issue', Icons.local_shipping_outlined),
+              ] else ...[
+                ('Where is my order?', Icons.local_shipping_outlined),
+                ('Cancel or change order', Icons.cancel_outlined),
+                ('Change delivery', Icons.location_on_outlined),
+                ('Problem with an item', Icons.inventory_2_outlined),
+              ],
+              if (order.destination == BuyV2Destination.medicine)
+                ('Medicine support', Icons.local_pharmacy_outlined),
             ];
             return Wrap(
               spacing: 7,
@@ -2715,7 +4027,7 @@ class BuyV2AccountView extends StatelessWidget {
           icon: Icons.account_balance_wallet_outlined,
           title: 'Payment',
           detail: session.selectedPayment,
-          onTap: () => _showPaymentSheet(context, session),
+          onTap: () => showBuyV2PaymentSheet(context, session),
         ),
         _AccountActionRow(
           key: const ValueKey('buy-account-orders'),
@@ -2832,8 +4144,33 @@ class _AccountActionRow extends StatelessWidget {
   }
 }
 
-Future<void> showBuyV2FilterSheet(BuildContext context, BuyV2Session session) {
-  final options = switch (session.destination) {
+class BuyV2FilterSheetAction {
+  const BuyV2FilterSheetAction({
+    required this.keyName,
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+}
+
+Future<void> showBuyV2FilterSheet(
+  BuildContext context,
+  BuyV2Session session, {
+  List<BuyV2FilterSheetAction> actions = const [],
+}) async {
+  final destination = session.destination;
+  final selectedFilter = session.selectedFilter;
+  final routeLabel = actions.isEmpty
+      ? '${destination.label} filters'
+      : '${destination.label} tools and filters';
+  final options = switch (destination) {
     BuyV2Destination.shop => const [
       ('any', 'Any delivery time', 'Show every available product'),
       ('fast', 'Fast delivery', 'Nearby fulfilment first'),
@@ -2866,337 +4203,919 @@ Future<void> showBuyV2FilterSheet(BuildContext context, BuyV2Session session) {
     ],
     BuyV2Destination.orders => const <(String, String, String)>[],
   };
-  return showModalBottomSheet<void>(
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: .78,
-      minChildSize: .45,
-      maxChildSize: .92,
-      builder: (context, controller) => SafeArea(
-        top: false,
-        child: ListView(
-          key: const ValueKey('buy-filter-list'),
-          controller: controller,
-          padding: const EdgeInsets.fromLTRB(16, 5, 16, 18),
-          children: [
-            Text(
-              '${session.destination.label} filters',
-              style: context.buyTitle,
-            ),
-            const SizedBox(height: 10),
-            for (final option in options)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: InkWell(
-                  key: ValueKey('buy-filter-${option.$1}'),
-                  onTap: () {
-                    session.chooseFilter(option.$1 == 'any' ? null : option.$1);
-                    Navigator.of(context).pop();
-                  },
-                  borderRadius: BorderRadius.circular(15),
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 52),
-                    padding: const EdgeInsets.all(12),
-                    decoration: buyV2CardDecoration(radius: 15),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color:
-                                (option.$1 == 'any' &&
-                                        session.selectedFilter == null) ||
-                                    session.selectedFilter == option.$1
-                                ? BuyV2Colors.navy
-                                : BuyV2Colors.softBlue,
-                            borderRadius: BorderRadius.circular(11),
-                          ),
-                          child: Icon(
-                            Icons.tune_rounded,
-                            color:
-                                (option.$1 == 'any' &&
-                                        session.selectedFilter == null) ||
-                                    session.selectedFilter == option.$1
-                                ? Colors.white
-                                : BuyV2Colors.navy,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(option.$2, style: context.buyBody),
-                              Text(option.$3, style: context.buyMeta),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: BuyV2Colors.navy,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Future<void> _showPaymentSheet(BuildContext context, BuyV2Session session) {
-  const choices = [
-    ('UPI', Icons.qr_code_rounded, 'Pay securely in MoolSocial'),
-    ('Bank transfer', Icons.account_balance_outlined, 'Account details'),
-    ('Purchase order', Icons.receipt_long_outlined, 'For business workspaces'),
-  ];
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
     useSafeArea: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Payment method', style: context.buyTitle),
-          const SizedBox(height: 10),
-          for (final choice in choices)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: ListTile(
-                minTileHeight: 56,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  side: const BorderSide(color: BuyV2Colors.line),
-                ),
-                leading: Icon(choice.$2, color: BuyV2Colors.navy),
-                title: Text(
-                  choice.$1,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Text(choice.$3),
-                trailing: session.selectedPayment == choice.$1
-                    ? const Icon(
-                        Icons.check_circle_rounded,
-                        color: BuyV2Colors.green,
-                      )
-                    : null,
-                onTap: () {
-                  session.choosePayment(choice.$1);
-                  Navigator.of(sheetContext).pop();
-                },
-              ),
-            ),
-        ],
-      ),
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2FilterSheetMotion.maxWidth,
     ),
-  );
-}
-
-Future<void> showBuyV2PrescriptionSheet(
-  BuildContext context,
-  BuyV2Session session,
-) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          5,
-          16,
-          14 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Add your prescription', style: context.buyTitle),
-            const SizedBox(height: 4),
-            Text(
-              'Choose a saved prescription or add a new one. A pharmacist verifies each matched medicine before payment.',
-              style: context.buyMeta,
-            ),
-            const SizedBox(height: 11),
-            _PrescriptionChoice(
-              doctor: 'Dr Meera Sharma',
-              detail: 'Heart & BP · issued 08 July 2026',
-              onTap: () {
-                session.approveSavedPrescription('meera');
-                Navigator.of(context).pop();
-              },
-            ),
-            const SizedBox(height: 7),
-            _PrescriptionChoice(
-              doctor: 'Dr Arvind Joshi',
-              detail: 'Diabetes · issued 19 June 2026',
-              onTap: () {
-                session.approveSavedPrescription('arvind');
-                Navigator.of(context).pop();
-              },
-            ),
-            const SizedBox(height: 7),
-            InkWell(
-              key: const ValueKey('buy-prescription-add-new'),
-              onTap: () {
-                session.attachNewPrescription();
-                Navigator.of(context).pop();
-              },
-              borderRadius: BorderRadius.circular(15),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 58),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: buyV2CardDecoration(radius: 15),
-                child: Row(
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
+    builder: (sheetContext) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: BuyV2FilterSheetMotion.initialChildSize,
+      minChildSize: BuyV2FilterSheetMotion.minChildSize,
+      maxChildSize: BuyV2FilterSheetMotion.maxChildSize,
+      builder: (sheetContext, controller) => SafeArea(
+        top: false,
+        child: Semantics(
+          key: const ValueKey('buy-filter-sheet-route'),
+          container: true,
+          scopesRoute: true,
+          namesRoute: true,
+          label: routeLabel,
+          explicitChildNodes: true,
+          child: RepaintBoundary(
+            key: const ValueKey('buy-filter-sheet-repaint-boundary'),
+            child: ListView(
+              key: const ValueKey('buy-filter-list'),
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              children: [
+                Row(
                   children: [
-                    const Icon(
-                      Icons.camera_alt_outlined,
-                      color: BuyV2Colors.navy,
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Add a new prescription',
-                            style: context.buyBody,
+                            routeLabel,
+                            key: const ValueKey('buy-filter-sheet-title'),
+                            style: sheetContext.buyTitle,
                           ),
+                          const SizedBox(height: 2),
                           Text(
-                            'Match medicines for review in this session',
-                            style: context.buyMeta,
+                            actions.isEmpty
+                                ? 'Choose one filter for this catalogue.'
+                                : 'Use one tool or choose one catalogue filter.',
+                            style: sheetContext.buyMeta,
                           ),
                         ],
                       ),
                     ),
-                    const Text(
-                      'Add',
-                      style: TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontWeight: FontWeight.w900,
+                    const SizedBox(width: 8),
+                    IconButton(
+                      key: const ValueKey('buy-filter-close'),
+                      tooltip: 'Close filters',
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        maximumSize: const Size(44, 44),
+                        foregroundColor: BuyV2Colors.navy,
+                        backgroundColor: BuyV2Colors.softBlue,
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                if (actions.isNotEmpty) ...[
+                  Text('Tools', style: sheetContext.buyEyebrow),
+                  const SizedBox(height: 8),
+                  for (final action in actions)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _BuyV2FilterToolAction(
+                        action: action,
+                        onTap: () async {
+                          final routeCompleted = ModalRoute.of(
+                            sheetContext,
+                          )?.completed;
+                          Navigator.of(sheetContext).pop();
+                          if (routeCompleted != null) await routeCompleted;
+                          if (session.destination != destination) return;
+                          action.onTap();
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  const Divider(height: 1, color: BuyV2Colors.line),
+                  const SizedBox(height: 12),
+                  Text('Catalogue filters', style: sheetContext.buyEyebrow),
+                  const SizedBox(height: 8),
+                ],
+                for (final option in options)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BuyV2FilterOption(
+                      option: option,
+                      selected:
+                          (option.$1 == 'any' && selectedFilter == null) ||
+                          selectedFilter == option.$1,
+                      onTap: () async {
+                        final routeCompleted = ModalRoute.of(
+                          sheetContext,
+                        )?.completed;
+                        Navigator.of(sheetContext).pop();
+                        if (routeCompleted != null) await routeCompleted;
+                        if (session.destination != destination) return;
+                        session.chooseFilter(
+                          option.$1 == 'any' ? null : option.$1,
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     ),
   );
 }
 
-Future<void> showBuyV2AddressSheet(BuildContext context, BuyV2Session session) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          5,
-          16,
-          14 + MediaQuery.viewInsetsOf(context).bottom,
+class _BuyV2FilterToolAction extends StatelessWidget {
+  const _BuyV2FilterToolAction({required this.action, required this.onTap});
+
+  final BuyV2FilterSheetAction action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey(action.keyName),
+      container: true,
+      button: true,
+      label: '${action.title}, ${action.detail}',
+      excludeSemantics: true,
+      onTap: onTap,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: BuyV2Colors.line),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Delivery address', style: context.buyTitle),
-            const SizedBox(height: 4),
-            Text(
-              'Choose a saved address or send an address request.',
-              style: context.buyMeta,
-            ),
-            const SizedBox(height: 10),
-            for (final address in session.addresses)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: InkWell(
-                  onTap: () {
-                    session.chooseAddress(address.id);
-                    Navigator.of(context).pop();
-                  },
-                  borderRadius: BorderRadius.circular(15),
-                  child: Container(
-                    padding: const EdgeInsets.all(11),
-                    decoration: buyV2CardDecoration(
-                      radius: 15,
-                      color: session.selectedAddressId == address.id
-                          ? BuyV2Colors.softOrange
-                          : Colors.white,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 58),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: BuyV2Colors.softBlue,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
+                    child: Icon(action.icon, size: 20, color: BuyV2Colors.navy),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          address.kind == BuyV2AddressKind.home
-                              ? Icons.home_outlined
-                              : Icons.work_outline_rounded,
-                          color: BuyV2Colors.navy,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(address.label, style: context.buyBody),
-                              Text(
-                                '${address.recipient} · ${address.phone}\n${address.line}, ${address.shortLine} · ${address.landmark}',
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.buyMeta,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (session.selectedAddressId == address.id)
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: BuyV2Colors.green,
-                          ),
+                        Text(action.title, style: context.buyBody),
+                        const SizedBox(height: 2),
+                        Text(action.detail, style: context.buyMeta),
                       ],
                     ),
                   ),
-                ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: BuyV2Colors.muted,
+                  ),
+                ],
               ),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showAddressRequestSheet(context, session),
-                    icon: const Icon(Icons.ios_share_outlined, size: 18),
-                    label: const Text('Request address'),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _showAddAddressSheet(context, session),
-                    icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                    label: const Text('Add address'),
-                  ),
-                ),
-              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BuyV2FilterOption extends StatelessWidget {
+  const _BuyV2FilterOption({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final (String, String, String) option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-filter-semantics-${option.$1}'),
+      container: true,
+      button: true,
+      selected: selected,
+      label: '${option.$2}${selected ? ', selected' : ''}',
+      hint: option.$3,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: Material(
+        color: selected ? BuyV2Colors.softBlue : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('buy-filter-${option.$1}'),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 58),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: selected ? BuyV2Colors.navy : BuyV2Colors.softBlue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      selected ? Icons.check_rounded : Icons.tune_rounded,
+                      color: selected ? Colors.white : BuyV2Colors.navy,
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(option.$2, style: context.buyBody),
+                        const SizedBox(height: 2),
+                        Text(option.$3, style: context.buyMeta),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> showBuyV2PaymentSheet(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final destination = session.destination;
+  final view = session.view;
+  final selectedPayment = session.selectedPayment;
+  const choices = [
+    (
+      'UPI',
+      Icons.qr_code_rounded,
+      'Use your preferred UPI app when you are ready to pay',
+    ),
+    (
+      'Bank transfer',
+      Icons.account_balance_outlined,
+      'View transfer details during payment',
+    ),
+    (
+      'Purchase order',
+      Icons.receipt_long_outlined,
+      'Choose for an eligible business workspace',
+    ),
+  ];
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2PaymentSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2PaymentSheetMotion.resolve(context),
+    builder: (sheetContext) => Semantics(
+      key: const ValueKey('buy-payment-sheet-route'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Payment methods',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-payment-sheet-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(sheetContext).height *
+                BuyV2PaymentSheetMotion.maxHeightFactor,
+          ),
+          child: ListView(
+            key: const ValueKey('buy-payment-sheet-list'),
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Payment methods',
+                          key: const ValueKey('buy-payment-sheet-title'),
+                          style: sheetContext.buyTitle,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Choose how you want to pay. No payment is started here.',
+                          style: sheetContext.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const ValueKey('buy-payment-close'),
+                    tooltip: 'Close payment methods',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      maximumSize: const Size(44, 44),
+                      foregroundColor: BuyV2Colors.navy,
+                      backgroundColor: BuyV2Colors.softBlue,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              for (final choice in choices)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _BuyV2PaymentChoice(
+                    choice: choice,
+                    selected: selectedPayment == choice.$1,
+                    onTap: () async {
+                      HapticFeedback.selectionClick();
+                      final routeCompleted = ModalRoute.of(
+                        sheetContext,
+                      )?.completed;
+                      Navigator.of(sheetContext).pop();
+                      if (routeCompleted != null) await routeCompleted;
+                      if (session.destination != destination ||
+                          session.view != view) {
+                        return;
+                      }
+                      session.choosePayment(choice.$1);
+                    },
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     ),
   );
+}
+
+class _BuyV2PaymentChoice extends StatelessWidget {
+  const _BuyV2PaymentChoice({
+    required this.choice,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final (String, IconData, String) choice;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selected
+        ? '${choice.$1}, selected, ${choice.$3}'
+        : '${choice.$1}, ${choice.$3}';
+    return Semantics(
+      key: ValueKey('buy-payment-semantics-${choice.$1}'),
+      container: true,
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('buy-payment-${choice.$1}'),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 58),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? BuyV2Colors.navy
+                            : BuyV2Colors.softBlue,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        choice.$2,
+                        color: selected ? Colors.white : BuyV2Colors.navy,
+                        size: 21,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            choice.$1,
+                            style: const TextStyle(
+                              color: BuyV2Colors.navy,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(choice.$3, style: context.buyMeta),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      selected
+                          ? Icons.check_circle_rounded
+                          : Icons.chevron_right_rounded,
+                      color: selected ? BuyV2Colors.green : BuyV2Colors.navy,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> showBuyV2PrescriptionSheet(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final destination = session.destination;
+  final view = session.view;
+  final pendingProductId = session.pendingPrescriptionProductId;
+
+  Future<void> finishAfterReverse(
+    BuildContext sheetContext,
+    VoidCallback action,
+  ) async {
+    HapticFeedback.selectionClick();
+    final routeCompleted = ModalRoute.of(sheetContext)?.completed;
+    Navigator.of(sheetContext).pop();
+    if (routeCompleted != null) await routeCompleted;
+    if (session.destination != destination ||
+        session.view != view ||
+        session.pendingPrescriptionProductId != pendingProductId) {
+      return;
+    }
+    action();
+  }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2PrescriptionSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2PrescriptionSheetMotion.resolve(context),
+    builder: (sheetContext) => Semantics(
+      key: const ValueKey('buy-prescription-sheet-route'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Prescription centre',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-prescription-sheet-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(sheetContext).height *
+                BuyV2PrescriptionSheetMotion.maxHeightFactor,
+          ),
+          child: ListView(
+            key: const ValueKey('buy-prescription-sheet-list'),
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Add your prescription',
+                          key: const ValueKey('buy-prescription-sheet-title'),
+                          style: sheetContext.buyTitle,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Use a saved prescription or add one for medicine matching in this session. Pharmacist review is still required before payment.',
+                          style: sheetContext.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const ValueKey('buy-prescription-close'),
+                    tooltip: 'Close prescription centre',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      maximumSize: const Size(44, 44),
+                      foregroundColor: BuyV2Colors.navy,
+                      backgroundColor: BuyV2Colors.softBlue,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _PrescriptionChoice(
+                keyName: 'meera',
+                doctor: 'Dr Meera Sharma',
+                detail: 'Heart & BP · issued 08 July 2026',
+                onTap: () => finishAfterReverse(
+                  sheetContext,
+                  () => session.approveSavedPrescription('meera'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PrescriptionChoice(
+                keyName: 'arvind',
+                doctor: 'Dr Arvind Joshi',
+                detail: 'Diabetes · issued 19 June 2026',
+                onTap: () => finishAfterReverse(
+                  sheetContext,
+                  () => session.approveSavedPrescription('arvind'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _AddPrescriptionChoice(
+                onTap: () => finishAfterReverse(
+                  sheetContext,
+                  session.attachNewPrescription,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> showBuyV2AddressSheet(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final destination = session.destination;
+  final view = session.view;
+  final selectedAddressId = session.selectedAddressId;
+  final addresses = session.addresses;
+  final bottomViewPadding = BuyV2AddressSheetMotion.resolveBottomSafeInset(
+    context,
+  );
+
+  Future<void> chooseAfterReverse(
+    BuildContext sheetContext,
+    String addressId,
+  ) async {
+    HapticFeedback.selectionClick();
+    final routeCompleted = ModalRoute.of(sheetContext)?.completed;
+    Navigator.of(sheetContext).pop();
+    if (routeCompleted != null) await routeCompleted;
+    if (session.destination != destination ||
+        session.view != view ||
+        session.selectedAddressId != selectedAddressId ||
+        !session.addresses.any((address) => address.id == addressId)) {
+      return;
+    }
+    session.chooseAddress(addressId);
+  }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2AddressSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2AddressSheetMotion.resolve(context),
+    builder: (sheetContext) => Semantics(
+      key: const ValueKey('buy-address-sheet-route'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Delivery addresses',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-address-sheet-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(sheetContext).height *
+                BuyV2AddressSheetMotion.maxHeightFactor,
+          ),
+          child: ListView(
+            key: const ValueKey('buy-address-sheet-list'),
+            shrinkWrap: true,
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomViewPadding),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Delivery address',
+                          key: const ValueKey('buy-address-sheet-title'),
+                          style: sheetContext.buyTitle,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Choose a saved address, request one, or add it yourself.',
+                          style: sheetContext.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const ValueKey('buy-address-close'),
+                    tooltip: 'Close delivery addresses',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      maximumSize: const Size(44, 44),
+                      foregroundColor: BuyV2Colors.navy,
+                      backgroundColor: BuyV2Colors.softBlue,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (addresses.isEmpty)
+                Container(
+                  key: const ValueKey('buy-address-empty'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softBlue,
+                    radius: 16,
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.location_off_outlined,
+                        color: BuyV2Colors.navy,
+                        size: 26,
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        'No saved addresses',
+                        textAlign: TextAlign.center,
+                        style: sheetContext.buyBody,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Request an address or add one manually to continue.',
+                        textAlign: TextAlign.center,
+                        style: sheetContext.buyMeta,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                for (final address in addresses)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BuyV2AddressChoice(
+                      address: address,
+                      selected: selectedAddressId == address.id,
+                      onTap: () => chooseAfterReverse(sheetContext, address.id),
+                    ),
+                  ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('buy-address-request'),
+                  onPressed: () =>
+                      _showAddressRequestSheet(sheetContext, session),
+                  icon: const Icon(Icons.ios_share_outlined, size: 18),
+                  label: const Text('Request address'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: BuyV2Metrics.minimumTap,
+                child: FilledButton.icon(
+                  key: const ValueKey('buy-address-add'),
+                  onPressed: () => _showAddAddressSheet(sheetContext, session),
+                  icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                  label: const Text('Add address'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _BuyV2AddressChoice extends StatelessWidget {
+  const _BuyV2AddressChoice({
+    required this.address,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BuyV2Address address;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail =
+        '${address.recipient}, ${address.phone}, ${address.line}, '
+        '${address.shortLine}, ${address.landmark}';
+    final semanticsLabel = selected
+        ? '${address.label}, selected, $detail'
+        : '${address.label}, $detail';
+    final icon = switch (address.kind) {
+      BuyV2AddressKind.home => Icons.home_outlined,
+      BuyV2AddressKind.work => Icons.work_outline_rounded,
+      BuyV2AddressKind.thirdParty => Icons.group_outlined,
+      BuyV2AddressKind.other => Icons.location_on_outlined,
+    };
+    return Semantics(
+      key: ValueKey('buy-address-semantics-${address.id}'),
+      container: true,
+      button: true,
+      selected: selected,
+      label: semanticsLabel,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('buy-address-${address.id}'),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 76),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? BuyV2Colors.navy
+                            : BuyV2Colors.softBlue,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: selected ? Colors.white : BuyV2Colors.navy,
+                        size: 21,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            address.label,
+                            style: const TextStyle(
+                              color: BuyV2Colors.navy,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${address.recipient} · ${address.phone}',
+                            style: context.buyMeta.copyWith(
+                              color: BuyV2Colors.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${address.line}, ${address.shortLine} · ${address.landmark}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.buyMeta,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      selected
+                          ? Icons.check_circle_rounded
+                          : Icons.chevron_right_rounded,
+                      color: selected ? BuyV2Colors.green : BuyV2Colors.navy,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> _showAddressRequestSheet(
@@ -3206,81 +5125,296 @@ Future<void> _showAddressRequestSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 5, 16, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Request their address', style: context.buyTitle),
-            const SizedBox(height: 9),
-            const TextField(
-              decoration: InputDecoration(labelText: 'Recipient name or phone'),
-            ),
-            const SizedBox(height: 9),
-            Row(
-              children: [
-                _ShareChoice(
-                  label: 'WhatsApp',
-                  icon: Icons.call_outlined,
-                  onTap: () => _copyAddressRequest(context, 'WhatsApp'),
-                ),
-                const SizedBox(width: 7),
-                _ShareChoice(
-                  label: 'MoolSocial',
-                  icon: Icons.chat_outlined,
-                  onTap: () => _copyAddressRequest(context, 'MoolSocial'),
-                ),
-                const SizedBox(width: 7),
-                _ShareChoice(
-                  label: 'Device share',
-                  icon: Icons.ios_share_outlined,
-                  onTap: () => _copyAddressRequest(context, 'Device share'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => _showAddAddressSheet(context, session),
-                child: const Text('Enter address yourself'),
-              ),
-            ),
-          ],
-        ),
-      ),
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2AddressFormSheetMotion.maxWidth,
     ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
+    routeSettings: const RouteSettings(name: 'buy-address-request-form'),
+    builder: (sheetContext) => _BuyV2AddressRequestForm(session: session),
   );
 }
 
 Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
+  final destination = session.destination;
+  final view = session.view;
+  final selectedAddressId = session.selectedAddressId;
+
+  bool addToExistingOwner(BuyV2Address address) {
+    if (session.destination != destination ||
+        session.view != view ||
+        session.selectedAddressId != selectedAddressId) {
+      return false;
+    }
+    session.addAddress(address);
+    return true;
+  }
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2AddressFormSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
+    routeSettings: const RouteSettings(name: 'buy-address-add-form'),
+    builder: (sheetContext) =>
+        _BuyV2AddAddressForm(onSubmit: addToExistingOwner),
+  );
+}
+
+class _BuyV2AddressRequestForm extends StatefulWidget {
+  const _BuyV2AddressRequestForm({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  State<_BuyV2AddressRequestForm> createState() =>
+      _BuyV2AddressRequestFormState();
+}
+
+class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
+  final recipientController = TextEditingController();
+
+  @override
+  void dispose() {
+    recipientController.dispose();
+    super.dispose();
+  }
+
+  Future<void> copyRequest(String channel) async {
+    await _copyAddressRequest(
+      context,
+      channel,
+      recipient: recipientController.text.trim(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding =
+        18 +
+        BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
+        MediaQuery.viewInsetsOf(context).bottom;
+    return Semantics(
+      key: const ValueKey('buy-address-request-form-route'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Request their address',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-address-request-form-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(context).height *
+                BuyV2AddressFormSheetMotion.requestMaxHeightFactor,
+          ),
+          child: ListView(
+            key: const ValueKey('buy-address-request-form-list'),
+            shrinkWrap: true,
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+            children: [
+              _AddressFormHeader(
+                title: 'Request their address',
+                body:
+                    'Copy the MoolSocial request link, then send it with your chosen app.',
+                closeKey: const ValueKey('buy-address-request-form-close'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const ValueKey('buy-address-request-recipient'),
+                controller: recipientController,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Recipient name or phone (optional)',
+                  helperText: 'Kept on this sheet; not added to the link.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _ShareChoice(
+                    key: const ValueKey('buy-address-request-whatsapp'),
+                    label: 'WhatsApp',
+                    icon: Icons.call_outlined,
+                    onTap: () => copyRequest('WhatsApp'),
+                  ),
+                  const SizedBox(width: 7),
+                  _ShareChoice(
+                    key: const ValueKey('buy-address-request-moolsocial'),
+                    label: 'MoolSocial',
+                    icon: Icons.chat_outlined,
+                    onTap: () => copyRequest('MoolSocial'),
+                  ),
+                  const SizedBox(width: 7),
+                  _ShareChoice(
+                    key: const ValueKey('buy-address-request-device-share'),
+                    label: 'Device share',
+                    icon: Icons.ios_share_outlined,
+                    onTap: () => copyRequest('Device share'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton(
+                  key: const ValueKey('buy-address-request-enter-manually'),
+                  onPressed: () =>
+                      _showAddAddressSheet(context, widget.session),
+                  child: const Text('Enter address yourself'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BuyV2AddAddressForm extends StatefulWidget {
+  const _BuyV2AddAddressForm({required this.onSubmit});
+
+  final bool Function(BuyV2Address address) onSubmit;
+
+  @override
+  State<_BuyV2AddAddressForm> createState() => _BuyV2AddAddressFormState();
+}
+
+class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
   final recipientController = TextEditingController();
   final phoneController = TextEditingController();
   final lineController = TextEditingController();
   final pinController = TextEditingController();
   final areaController = TextEditingController();
   final landmarkController = TextEditingController();
-  var kind = BuyV2AddressKind.home;
-  var locationChoice = 'Manual';
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setSheetState) => SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            5,
-            16,
-            18 + MediaQuery.viewInsetsOf(context).bottom,
+
+  BuyV2AddressKind kind = BuyV2AddressKind.home;
+  String? locationChoice;
+  String? locationNotice;
+  String? validationMessage;
+
+  @override
+  void dispose() {
+    recipientController.dispose();
+    phoneController.dispose();
+    lineController.dispose();
+    pinController.dispose();
+    areaController.dispose();
+    landmarkController.dispose();
+    super.dispose();
+  }
+
+  void chooseLocationIntent(String choice) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      locationChoice = choice;
+      locationNotice = switch (choice) {
+        'Current' =>
+          'Current-location lookup is not connected in this session. Enter the delivery details manually.',
+        'Map pin' =>
+          'Map-pin lookup is not connected in this session. Enter the delivery details manually.',
+        _ =>
+          'Google address lookup is not connected in this session. Enter the delivery details manually.',
+      };
+    });
+  }
+
+  void submit() {
+    FocusScope.of(context).unfocus();
+    final recipient = recipientController.text.trim();
+    final phone = phoneController.text.trim();
+    final line = lineController.text.trim();
+    final pin = pinController.text.trim();
+    final area = areaController.text.trim();
+    final landmark = landmarkController.text.trim();
+    if (recipient.isEmpty ||
+        phone.isEmpty ||
+        line.isEmpty ||
+        pin.length != 6 ||
+        area.isEmpty ||
+        landmark.isEmpty) {
+      setState(() => validationMessage = 'Complete every delivery detail');
+      return;
+    }
+    final label = switch (kind) {
+      BuyV2AddressKind.home => 'Home',
+      BuyV2AddressKind.work => 'Work',
+      BuyV2AddressKind.thirdParty => 'Third party',
+      BuyV2AddressKind.other => 'Other place',
+    };
+    final added = widget.onSubmit(
+      BuyV2Address(
+        id: 'saved-${DateTime.now().microsecondsSinceEpoch}',
+        kind: kind,
+        label: label,
+        recipient: recipient,
+        phone: phone,
+        line: line,
+        area: area,
+        pinCode: pin,
+        landmark: landmark,
+      ),
+    );
+    if (!added) {
+      setState(() {
+        validationMessage =
+            'The delivery session changed. Review the address before saving.';
+      });
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route is PageRoute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding =
+        18 +
+        BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
+        MediaQuery.viewInsetsOf(context).bottom;
+    return Semantics(
+      key: const ValueKey('buy-address-add-form-route'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Add address',
+      child: RepaintBoundary(
+        key: const ValueKey('buy-address-add-form-repaint-boundary'),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(context).height *
+                BuyV2AddressFormSheetMotion.addMaxHeightFactor,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ListView(
+            key: const ValueKey('buy-address-add-form-list'),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             children: [
-              Text('Add address', style: context.buyTitle),
-              const SizedBox(height: 9),
+              _AddressFormHeader(
+                title: 'Add address',
+                body:
+                    'Enter the delivery details. Availability is confirmed only by the real order flow.',
+                closeKey: const ValueKey('buy-address-add-form-close'),
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -3292,135 +5426,124 @@ Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
                     (BuyV2AddressKind.other, 'Other place'),
                   ])
                     ChoiceChip(
+                      key: ValueKey('buy-address-add-kind-${option.$2}'),
                       label: Text(option.$2),
                       selected: kind == option.$1,
-                      onSelected: (_) => setSheetState(() => kind = option.$1),
+                      onSelected: (_) => setState(() => kind = option.$1),
                     ),
                 ],
               ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   _LocationChoice(
+                    key: const ValueKey('buy-address-add-current'),
                     label: 'Current',
                     icon: Icons.my_location_rounded,
                     selected: locationChoice == 'Current',
-                    onTap: () {
-                      setSheetState(() => locationChoice = 'Current');
-                      areaController.text = 'Sardarpura, Jodhpur';
-                      pinController.text = '342003';
-                    },
+                    onTap: () => chooseLocationIntent('Current'),
                   ),
                   const SizedBox(width: 6),
                   _LocationChoice(
+                    key: const ValueKey('buy-address-add-map-pin'),
                     label: 'Map pin',
                     icon: Icons.map_outlined,
                     selected: locationChoice == 'Map pin',
-                    onTap: () =>
-                        setSheetState(() => locationChoice = 'Map pin'),
+                    onTap: () => chooseLocationIntent('Map pin'),
                   ),
                   const SizedBox(width: 6),
                   _LocationChoice(
+                    key: const ValueKey('buy-address-add-google'),
                     label: 'Google',
                     icon: Icons.place_outlined,
                     selected: locationChoice == 'Google',
-                    onTap: () => setSheetState(() => locationChoice = 'Google'),
+                    onTap: () => chooseLocationIntent('Google'),
                   ),
                 ],
               ),
-              const SizedBox(height: 9),
+              if (locationNotice != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  key: const ValueKey('buy-address-location-notice'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    border: BuyV2Colors.orange,
+                    radius: 14,
+                  ),
+                  child: Text(locationNotice!, style: context.buyMeta),
+                ),
+              ],
+              const SizedBox(height: 12),
               TextField(
+                key: const ValueKey('buy-address-add-recipient'),
                 controller: recipientController,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Recipient name'),
               ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 9),
               TextField(
+                key: const ValueKey('buy-address-add-phone'),
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Recipient phone'),
               ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 9),
               TextField(
+                key: const ValueKey('buy-address-add-line'),
                 controller: lineController,
                 minLines: 2,
                 maxLines: 3,
+                textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
                   labelText: 'House, street and full address',
                 ),
               ),
-              const SizedBox(height: 7),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: pinController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'PIN code'),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: TextField(
-                      controller: areaController,
-                      decoration: const InputDecoration(
-                        labelText: 'Area or locality',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 9),
               TextField(
+                key: const ValueKey('buy-address-add-pin'),
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'PIN code'),
+              ),
+              const SizedBox(height: 9),
+              TextField(
+                key: const ValueKey('buy-address-add-area'),
+                controller: areaController,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Area or locality',
+                ),
+              ),
+              const SizedBox(height: 9),
+              TextField(
+                key: const ValueKey('buy-address-add-landmark'),
                 controller: landmarkController,
+                textInputAction: TextInputAction.done,
                 decoration: const InputDecoration(labelText: 'Landmark'),
               ),
-              const SizedBox(height: 10),
+              if (validationMessage != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  key: const ValueKey('buy-address-add-validation'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    border: BuyV2Colors.orange,
+                    radius: 14,
+                  ),
+                  child: Text(validationMessage!, style: context.buyMeta),
+                ),
+              ],
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
+                height: BuyV2Metrics.minimumTap,
                 child: FilledButton(
-                  onPressed: () {
-                    final recipient = recipientController.text.trim();
-                    final phone = phoneController.text.trim();
-                    final line = lineController.text.trim();
-                    final pin = pinController.text.trim();
-                    final area = areaController.text.trim();
-                    final landmark = landmarkController.text.trim();
-                    if (recipient.isEmpty ||
-                        phone.isEmpty ||
-                        line.isEmpty ||
-                        pin.length != 6 ||
-                        area.isEmpty ||
-                        landmark.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Complete every delivery detail'),
-                        ),
-                      );
-                      return;
-                    }
-                    final label = switch (kind) {
-                      BuyV2AddressKind.home => 'Home',
-                      BuyV2AddressKind.work => 'Work',
-                      BuyV2AddressKind.thirdParty => 'Third party',
-                      BuyV2AddressKind.other => 'Other place',
-                    };
-                    session.addAddress(
-                      BuyV2Address(
-                        id: 'saved-${DateTime.now().microsecondsSinceEpoch}',
-                        kind: kind,
-                        label: label,
-                        recipient: recipient,
-                        phone: phone,
-                        line: line,
-                        area: area,
-                        pinCode: pin,
-                        landmark: landmark,
-                      ),
-                    );
-                    Navigator.of(
-                      context,
-                    ).popUntil((route) => route is PageRoute);
-                  },
+                  key: const ValueKey('buy-address-add-submit'),
+                  onPressed: submit,
                   child: const Text('Save and deliver here'),
                 ),
               ),
@@ -3428,8 +5551,52 @@ Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _AddressFormHeader extends StatelessWidget {
+  const _AddressFormHeader({
+    required this.title,
+    required this.body,
+    required this.closeKey,
+  });
+
+  final String title;
+  final String body;
+  final Key closeKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: context.buyTitle),
+              const SizedBox(height: 3),
+              Text(body, style: context.buyMeta),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          key: closeKey,
+          tooltip: 'Close $title',
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close_rounded),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            maximumSize: const Size(44, 44),
+            foregroundColor: BuyV2Colors.navy,
+            backgroundColor: BuyV2Colors.softBlue,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ReturnAffordance extends StatelessWidget {
@@ -3437,48 +5604,66 @@ class _ReturnAffordance extends StatelessWidget {
     super.key,
     required this.label,
     required this.onTap,
+    this.tightHitOwner = false,
+    this.hitOwnerKey,
+    this.minimumHeight = 40,
   });
 
   final String label;
   final VoidCallback onTap;
+  final bool tightHitOwner;
+  final Key? hitOwnerKey;
+  final double minimumHeight;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 40),
-          padding: const EdgeInsets.symmetric(horizontal: 11),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: BuyV2Colors.line),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.chevron_left_rounded,
+    final affordance = InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        constraints: BoxConstraints(minHeight: minimumHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: BuyV2Colors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.chevron_left_rounded,
+              color: BuyV2Colors.navy,
+              size: 19,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: const TextStyle(
                 color: BuyV2Colors.navy,
-                size: 19,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(width: 3),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+    if (tightHitOwner) {
+      return Row(
+        children: [
+          Semantics(
+            key: hitOwnerKey,
+            container: true,
+            button: true,
+            label: label,
+            onTap: onTap,
+            child: ExcludeSemantics(child: affordance),
+          ),
+        ],
+      );
+    }
+    return Align(alignment: Alignment.centerLeft, child: affordance);
   }
 }
 
@@ -3548,8 +5733,272 @@ class _DecisionRow extends StatelessWidget {
   }
 }
 
-class _LargeStepper extends StatelessWidget {
-  const _LargeStepper({
+class _DecisionActionRow extends StatelessWidget {
+  const _DecisionActionRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.detail,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String detail;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return BuyV2IntentDepth(
+      child: Semantics(
+        container: true,
+        button: true,
+        label: semanticLabel,
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: BuyV2Metrics.minimumTap,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: BuyV2Colors.navy, size: 16),
+                      const SizedBox(width: 7),
+                      SizedBox(
+                        width: 72,
+                        child: Text(
+                          label,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              value,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: BuyV2Colors.ink,
+                                fontSize: 9,
+                                height: 1.2,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              detail,
+                              style: context.buyMeta.copyWith(fontSize: 7.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: BuyV2Colors.navy,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductOwnedActionPanel extends StatelessWidget {
+  const _ProductOwnedActionPanel({
+    super.key,
+    required this.product,
+    required this.quantity,
+    required this.rxBlocked,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Product product;
+  final int quantity;
+  final bool rxBlocked;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = SizedBox(
+      key: ValueKey('buy-product-action-slot-${product.id}'),
+      width: 148,
+      height: 44,
+      child: AnimatedSwitcher(
+        duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+        reverseDuration: Duration.zero,
+        switchInCurve: Curves.easeOutCubic,
+        transitionBuilder: (child, animation) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(.025, 0),
+            end: Offset.zero,
+          ).animate(animation),
+          transformHitTests: false,
+          textDirection: Directionality.of(context),
+          child: child,
+        ),
+        layoutBuilder: (currentChild, _) =>
+            Align(alignment: Alignment.centerRight, child: currentChild),
+        child: quantity > 0
+            ? _CompactProductStepper(
+                key: ValueKey('buy-product-quantity-${product.id}'),
+                quantity: quantity,
+                onDecrease: onDecrease,
+                onIncrease: onIncrease,
+              )
+            : SizedBox(
+                key: ValueKey('buy-product-add-shell-${product.id}'),
+                width: rxBlocked ? 148 : 88,
+                height: 44,
+                child: Semantics(
+                  container: true,
+                  label: rxBlocked
+                      ? 'Use prescription for ${product.title}'
+                      : 'Add ${product.title} to cart',
+                  button: true,
+                  onTap: onAdd,
+                  excludeSemantics: true,
+                  child: FilledButton(
+                    key: ValueKey('buy-product-primary-${product.id}'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size(rxBlocked ? 148 : 88, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    onPressed: onAdd,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          rxBlocked
+                              ? Icons.description_outlined
+                              : Icons.add_rounded,
+                          size: 17,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            rxBlocked ? 'Use prescription' : 'Add',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+
+    final price = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: 7,
+          runSpacing: 2,
+          children: [
+            Text(
+              buyV2Money(product.price),
+              style: const TextStyle(
+                color: BuyV2Colors.navy,
+                fontSize: 22,
+                height: 1,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (product.mrp case final mrp?)
+              Text(
+                '₹$mrp',
+                style: const TextStyle(
+                  color: BuyV2Colors.muted,
+                  fontSize: 10,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          product.unitPrice,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyMeta.copyWith(fontSize: 9),
+        ),
+      ],
+    );
+
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .42),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: const Color(0x24000080)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+            final stack = largeText || constraints.maxWidth < 276;
+            if (stack) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  price,
+                  const SizedBox(height: 8),
+                  Align(alignment: Alignment.centerRight, child: action),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: price),
+                const SizedBox(width: 8),
+                action,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactProductStepper extends StatelessWidget {
+  const _CompactProductStepper({
     super.key,
     required this.quantity,
     required this.onDecrease,
@@ -3562,37 +6011,62 @@ class _LargeStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: BuyV2Colors.softBlue,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0x28000080)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: IconButton(
-              tooltip: 'Remove one',
-              onPressed: onDecrease,
-              icon: const Icon(Icons.remove),
+    return SizedBox(
+      width: 148,
+      height: 44,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softBlue,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x28000080)),
+        ),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 44,
+              child: IconButton(
+                tooltip: 'Remove one',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+                onPressed: onDecrease,
+                icon: const Icon(Icons.remove, size: 20),
+              ),
             ),
-          ),
-          Text(
-            '$quantity in cart',
-            style: const TextStyle(
-              color: BuyV2Colors.navy,
-              fontWeight: FontWeight.w900,
+            Expanded(
+              child: Semantics(
+                label: '$quantity in cart',
+                liveRegion: true,
+                excludeSemantics: true,
+                child: BuyV2FiniteValueTransition(
+                  key: const ValueKey('buy-product-quantity-value-motion'),
+                  stateKey: quantity,
+                  text: '$quantity',
+                  ownerSize: const Size(58, 28),
+                  style: const TextStyle(
+                    color: BuyV2Colors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
-          ),
-          Expanded(
-            child: IconButton(
-              tooltip: 'Add one',
-              onPressed: onIncrease,
-              icon: const Icon(Icons.add),
+            SizedBox.square(
+              dimension: 44,
+              child: IconButton(
+                tooltip: 'Add one',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+                onPressed: onIncrease,
+                icon: const Icon(Icons.add, size: 20),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -3649,8 +6123,21 @@ class _CartScopeBar extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Text(
-                          scope == BuyV2CartScope.all
+                        BuyV2FiniteValueTransition(
+                          key: ValueKey(
+                            'buy-cart-scope-value-motion-${scope.name}',
+                          ),
+                          stateKey: scope == BuyV2CartScope.all
+                              ? session.cartTotal
+                              : session.countForDestination(switch (scope) {
+                                  BuyV2CartScope.shop => BuyV2Destination.shop,
+                                  BuyV2CartScope.wholesale =>
+                                    BuyV2Destination.wholesale,
+                                  BuyV2CartScope.medicine =>
+                                    BuyV2Destination.medicine,
+                                  BuyV2CartScope.all => BuyV2Destination.shop,
+                                }),
+                          text: scope == BuyV2CartScope.all
                               ? buyV2Money(session.cartTotal)
                               : '${session.countForDestination(switch (scope) {
                                   BuyV2CartScope.shop => BuyV2Destination.shop,
@@ -3658,6 +6145,7 @@ class _CartScopeBar extends StatelessWidget {
                                   BuyV2CartScope.medicine => BuyV2Destination.medicine,
                                   BuyV2CartScope.all => BuyV2Destination.shop,
                                 })}',
+                          ownerSize: const Size(60, 14),
                           style: TextStyle(
                             color: session.cartScope == scope
                                 ? Colors.white
@@ -3678,63 +6166,1609 @@ class _CartScopeBar extends StatelessWidget {
   }
 }
 
-class _CartGroupHeader extends StatelessWidget {
-  const _CartGroupHeader({required this.destination, required this.total});
+BuyV2Destination? _destinationForCartScope(BuyV2CartScope scope) =>
+    switch (scope) {
+      BuyV2CartScope.all => null,
+      BuyV2CartScope.shop => BuyV2Destination.shop,
+      BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
+      BuyV2CartScope.medicine => BuyV2Destination.medicine,
+    };
 
-  final BuyV2Destination destination;
-  final int total;
+String _cartFamilyLabel(BuyV2Destination destination) => switch (destination) {
+  BuyV2Destination.shop => 'Shop basket',
+  BuyV2Destination.wholesale => 'Trade order',
+  BuyV2Destination.medicine => 'Medicine order',
+  BuyV2Destination.orders => 'Order',
+};
+
+String _cartItemFamilyLabel(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop => 'Products',
+      BuyV2Destination.wholesale => 'Trade packs',
+      BuyV2Destination.medicine => 'Medicines',
+      BuyV2Destination.orders => 'Products',
+    };
+
+String _cartRelatedTitle(BuyV2Destination destination) => switch (destination) {
+  BuyV2Destination.shop => 'Complete your Shop basket',
+  BuyV2Destination.wholesale => 'Complete this trade order',
+  BuyV2Destination.medicine => 'More from this care category',
+  BuyV2Destination.orders => 'More products',
+};
+
+String _cartSpecialTitle(BuyV2Destination destination) => switch (destination) {
+  BuyV2Destination.shop => 'Special Shop offers',
+  BuyV2Destination.wholesale => 'Trade offers for this order',
+  BuyV2Destination.medicine => 'Medicine savings available',
+  BuyV2Destination.orders => 'Special offers',
+};
+
+String _cartMoreTitle(BuyV2Destination destination) => switch (destination) {
+  BuyV2Destination.shop => 'You may also like in Shop',
+  BuyV2Destination.wholesale => 'More for business restocking',
+  BuyV2Destination.medicine => 'More Medicine essentials',
+  BuyV2Destination.orders => 'You may also like',
+};
+
+String _deliveryInstructionOwner(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop => 'Shop delivery',
+      BuyV2Destination.wholesale => 'Trade receiving',
+      BuyV2Destination.medicine => 'Medicine handover',
+      BuyV2Destination.orders => 'Delivery instruction',
+    };
+
+class _CartBenefitPanel extends StatelessWidget {
+  const _CartBenefitPanel({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final destination = _destinationForCartScope(session.cartScope);
+    final coupons = session.cartBenefits(
+      kind: BuyV2CartBenefitKind.coupon,
+      destination: destination,
+    );
+    final paymentOffers = session.cartBenefits(
+      kind: BuyV2CartBenefitKind.paymentOffer,
+      destination: destination,
+    );
+    final selectedBenefits = session.selectedCartBenefitsFor(
+      destination == null ? session.cartDestinations : {destination},
+    );
+    final selectedCoupons = selectedBenefits
+        .where((benefit) => benefit.kind == BuyV2CartBenefitKind.coupon)
+        .length;
+    final selectedPaymentOffers = selectedBenefits
+        .where((benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer)
+        .length;
+    return Container(
+      key: const ValueKey('buy-cart-benefits'),
+      padding: const EdgeInsets.all(9),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Coupons and offers',
+            style: context.buyTitle.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Coupons and payment offers stay separate.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 7),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final entries = [
+                _CartBenefitEntry(
+                  key: const ValueKey('buy-cart-coupons'),
+                  icon: Icons.local_offer_outlined,
+                  title: 'Coupons',
+                  detail: selectedCoupons > 0
+                      ? '$selectedCoupons selected for review'
+                      : coupons.isEmpty
+                      ? destination == null
+                            ? 'Open by Cart segment'
+                            : 'No eligible ${destination.label} coupon'
+                      : '${coupons.length} available',
+                  onTap: () => _openCartBenefitsPage(
+                    context,
+                    session: session,
+                    kind: BuyV2CartBenefitKind.coupon,
+                    destination: destination,
+                  ),
+                ),
+                _CartBenefitEntry(
+                  key: const ValueKey('buy-cart-payment-offers'),
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Payment offers',
+                  detail: selectedPaymentOffers > 0
+                      ? '$selectedPaymentOffers selected for review'
+                      : paymentOffers.isEmpty
+                      ? destination == null
+                            ? 'Open by Cart segment'
+                            : 'No ${destination.label} payment offer'
+                      : '${paymentOffers.length} available',
+                  onTap: () => _openCartBenefitsPage(
+                    context,
+                    session: session,
+                    kind: BuyV2CartBenefitKind.paymentOffer,
+                    destination: destination,
+                  ),
+                ),
+              ];
+              if (constraints.maxWidth < 400) {
+                return Column(
+                  children: [
+                    entries.first,
+                    const SizedBox(height: 6),
+                    entries.last,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: entries.first),
+                  const SizedBox(width: 7),
+                  Expanded(child: entries.last),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartBenefitEntry extends StatelessWidget {
+  const _CartBenefitEntry({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: BuyV2Colors.softBlue,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 58),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: BuyV2Colors.navy, size: 19),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: context.buyBody.copyWith(fontSize: 10)),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return BuyV2FiniteValueTransition(
+                          key: ValueKey('buy-cart-benefit-entry-$title-motion'),
+                          stateKey: detail,
+                          text: detail,
+                          ownerSize: Size(constraints.maxWidth, 14),
+                          textAlign: TextAlign.start,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: BuyV2Colors.navy,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _openCartBenefitsPage(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2CartBenefitKind kind,
+  required BuyV2Destination? destination,
+}) {
+  final destinations = const [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+    BuyV2Destination.medicine,
+  ].where(session.cartDestinations.contains).toList(growable: false);
+  if (destinations.isEmpty) return Future.value();
+  final initialDestination =
+      destination != null && destinations.contains(destination)
+      ? destination
+      : destinations.first;
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (context) => _CartBenefitsPage(
+        session: session,
+        destinations: destinations,
+        initialDestination: initialDestination,
+        initialKind: kind,
+      ),
+    ),
+  );
+}
+
+String _cartBenefitContextLabel(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop => 'Shop',
+      BuyV2Destination.wholesale => 'Wholesale',
+      BuyV2Destination.medicine => 'Medicine',
+      BuyV2Destination.orders => 'Orders',
+    };
+
+String _cartBenefitEmptyTitle(
+  BuyV2Destination destination,
+  BuyV2CartBenefitKind kind,
+) {
+  final owner = switch (destination) {
+    BuyV2Destination.shop => 'Shop',
+    BuyV2Destination.wholesale => 'trade',
+    BuyV2Destination.medicine => 'Medicine',
+    BuyV2Destination.orders => 'order',
+  };
+  return kind == BuyV2CartBenefitKind.coupon
+      ? 'No $owner coupons right now'
+      : 'No $owner payment offers right now';
+}
+
+String _cartBenefitEmptyDetail(
+  BuyV2Destination destination,
+  BuyV2CartBenefitKind kind,
+) {
+  final family = _cartFamilyLabel(destination);
+  return kind == BuyV2CartBenefitKind.coupon
+      ? 'Nothing eligible for the current $family.'
+      : 'Nothing compatible with the current $family.';
+}
+
+class _CartBenefitsPage extends StatefulWidget {
+  const _CartBenefitsPage({
+    required this.session,
+    required this.destinations,
+    required this.initialDestination,
+    required this.initialKind,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Destination> destinations;
+  final BuyV2Destination initialDestination;
+  final BuyV2CartBenefitKind initialKind;
+
+  @override
+  State<_CartBenefitsPage> createState() => _CartBenefitsPageState();
+}
+
+class _CartBenefitsPageState extends State<_CartBenefitsPage> {
+  late BuyV2Destination _destination = widget.initialDestination;
+  late BuyV2CartBenefitKind _kind = widget.initialKind;
+
+  void _completeToCart() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).pop();
+  }
+
+  void _selectDestination(BuyV2Destination destination) {
+    if (_destination == destination) return;
+    HapticFeedback.selectionClick();
+    setState(() => _destination = destination);
+  }
+
+  void _selectKind(BuyV2CartBenefitKind kind) {
+    if (_kind == kind) return;
+    HapticFeedback.selectionClick();
+    setState(() => _kind = kind);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = BuyV2ThemeSpec.resolve(_destination, BuyV2View.cart);
+    final coupons = widget.session.cartBenefits(
+      kind: BuyV2CartBenefitKind.coupon,
+      destination: _destination,
+    );
+    final paymentOffers = widget.session.cartBenefits(
+      kind: BuyV2CartBenefitKind.paymentOffer,
+      destination: _destination,
+    );
+    final benefits = _kind == BuyV2CartBenefitKind.coupon
+        ? coupons
+        : paymentOffers;
+    final selected = widget.session.selectedCartBenefit(
+      kind: _kind,
+      destination: _destination,
+    );
+    final selectedCount = widget.session
+        .selectedCartBenefitsFor(widget.destinations.toSet())
+        .length;
+    final completionLabel = selectedCount == 0
+        ? 'Return to Cart'
+        : 'Review $selectedCount '
+              '${selectedCount == 1 ? 'selection' : 'selections'} in Cart';
+    return BuyV2ThemeScope(
+      spec: spec,
+      child: Scaffold(
+        key: const ValueKey('buy-cart-benefits-page'),
+        backgroundColor: spec.canvas,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: BuyV2Colors.ink,
+          elevation: 0,
+          leading: IconButton(
+            key: const ValueKey('buy-cart-benefits-back'),
+            tooltip: 'Back to Cart',
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          titleSpacing: 0,
+          title: const Text(
+            'Coupons & offers',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(3),
+            child: BuyV2TricolourLine(height: 3),
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: BuyV2Metrics.maxWidth,
+              ),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      key: ValueKey(
+                        'buy-cart-benefits-list-${_destination.name}-'
+                        '${_kind.name}',
+                      ),
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 20),
+                      children: [
+                        _CartBenefitDestinationSelector(
+                          session: widget.session,
+                          destinations: widget.destinations,
+                          selected: _destination,
+                          onChanged: _selectDestination,
+                        ),
+                        const SizedBox(height: 5),
+                        _CartBenefitKindSelector(
+                          kind: _kind,
+                          couponCount: coupons.length,
+                          paymentOfferCount: paymentOffers.length,
+                          onChanged: _selectKind,
+                        ),
+                        const SizedBox(height: 9),
+                        if (benefits.isEmpty)
+                          BuyV2FiniteIncomingTransition(
+                            key: const ValueKey(
+                              'buy-cart-benefit-empty-motion',
+                            ),
+                            stateKey:
+                                '${_destination.name}|${_kind.name}|empty',
+                            child: _CartBenefitEmptyState(
+                              destination: _destination,
+                              kind: _kind,
+                            ),
+                          )
+                        else ...[
+                          Row(
+                            key: const ValueKey(
+                              'buy-cart-benefit-section-heading',
+                            ),
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _kind == BuyV2CartBenefitKind.coupon
+                                      ? 'Available coupons'
+                                      : 'Available payment offers',
+                                  style: context.buyTitle.copyWith(
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${benefits.length} for '
+                                '${_cartBenefitContextLabel(_destination)}',
+                                style: context.buyMeta.copyWith(fontSize: 8),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          for (final benefit in benefits)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 7),
+                              child: BuyV2FiniteIncomingTransition(
+                                key: ValueKey(
+                                  'buy-cart-benefit-entry-motion-'
+                                  '${benefit.id}',
+                                ),
+                                stateKey:
+                                    '${_destination.name}|${_kind.name}|'
+                                    '${benefit.id}',
+                                child: _CartBenefitCard(
+                                  benefit: benefit,
+                                  selected:
+                                      selected?.id == benefit.id &&
+                                      selected?.sourceId == benefit.sourceId,
+                                  onSelect: () {
+                                    HapticFeedback.selectionClick();
+                                    widget.session.chooseCartBenefit(benefit);
+                                    setState(() {});
+                                  },
+                                  onRemove: () {
+                                    HapticFeedback.selectionClick();
+                                    widget.session.removeCartBenefit(
+                                      kind: benefit.kind,
+                                      destination: benefit.destination,
+                                    );
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Container(
+            key: const ValueKey('buy-cart-benefit-completion-bar'),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: BuyV2Colors.line)),
+            ),
+            child: SizedBox(
+              height: BuyV2Metrics.minimumTap,
+              child: BuyV2IntentDepth(
+                key: const ValueKey('buy-cart-benefit-completion-depth'),
+                spatial: true,
+                child: FilledButton(
+                  key: const ValueKey('buy-cart-benefit-completion'),
+                  onPressed: _completeToCart,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: BuyV2Colors.navy,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: AnimatedSwitcher(
+                    key: const ValueKey(
+                      'buy-cart-benefit-completion-label-motion',
+                    ),
+                    duration: BuyV2Motion.resolved(
+                      context,
+                      BuyV2Motion.selection,
+                    ),
+                    child: FittedBox(
+                      key: ValueKey(
+                        'buy-cart-benefit-completion-label-$selectedCount',
+                      ),
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        completionLabel,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CartBenefitDestinationSelector extends StatelessWidget {
+  const _CartBenefitDestinationSelector({
+    required this.session,
+    required this.destinations,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Destination> destinations;
+  final BuyV2Destination selected;
+  final ValueChanged<BuyV2Destination> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      for (final destination in destinations)
+        Expanded(
+          child: Semantics(
+            button: true,
+            selected: selected == destination,
+            label:
+                '${_cartBenefitContextLabel(destination)} offers, '
+                '${_productCountLabel(session.countForDestination(destination))}, '
+                '${buyV2Money(session.totalForDestination(destination))}',
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                key: ValueKey(
+                  'buy-cart-benefit-destination-${destination.name}',
+                ),
+                onTap: () => onChanged(destination),
+                borderRadius: BorderRadius.circular(12),
+                child: AnimatedContainer(
+                  duration: BuyV2Motion.resolved(
+                    context,
+                    BuyV2Motion.selection,
+                  ),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected == destination
+                        ? Colors.white
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected == destination
+                          ? BuyV2Colors.navy.withValues(alpha: .32)
+                          : BuyV2Colors.line,
+                    ),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${_cartBenefitContextLabel(destination)} · '
+                      '${buyV2Money(session.totalForDestination(destination))}',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: selected == destination
+                            ? BuyV2Colors.navy
+                            : BuyV2Colors.muted,
+                        fontSize: 9,
+                        fontWeight: selected == destination
+                            ? FontWeight.w900
+                            : FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
+    final row = Row(
+      children: [
+        for (var index = 0; index < chips.length; index++) ...[
+          if (index > 0) const SizedBox(width: 4),
+          chips[index],
+        ],
+      ],
+    );
+    return SizedBox(
+      key: const ValueKey('buy-cart-benefit-destination-selector'),
+      height: BuyV2Metrics.minimumTap,
+      child: destinations.length == 1
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(width: 184, child: row),
+            )
+          : row,
+    );
+  }
+}
+
+class _CartBenefitKindSelector extends StatelessWidget {
+  const _CartBenefitKindSelector({
+    required this.kind,
+    required this.couponCount,
+    required this.paymentOfferCount,
+    required this.onChanged,
+  });
+
+  final BuyV2CartBenefitKind kind;
+  final int couponCount;
+  final int paymentOfferCount;
+  final ValueChanged<BuyV2CartBenefitKind> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      key: const ValueKey('buy-cart-benefit-kind-selector'),
+      height: BuyV2Metrics.minimumTap,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [BuyV2Colors.softOrange, Colors.white, BuyV2Colors.softGreen],
-        ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-        border: Border.all(color: BuyV2Colors.line),
+        color: const Color(0xFFE9EAF3),
+        borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: destination == BuyV2Destination.wholesale
-                  ? BuyV2Colors.navy
-                  : BuyV2Colors.orange,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              switch (destination) {
-                BuyV2Destination.shop => Icons.shopping_bag_outlined,
-                BuyV2Destination.wholesale => Icons.inventory_2_outlined,
-                BuyV2Destination.medicine => Icons.medication_outlined,
-                BuyV2Destination.orders => Icons.receipt_long_outlined,
-              },
-              color: Colors.white,
-              size: 18,
+          Expanded(
+            child: _CartBenefitKindButton(
+              key: const ValueKey('buy-cart-benefit-kind-coupon'),
+              selected: kind == BuyV2CartBenefitKind.coupon,
+              label: 'Coupons',
+              count: couponCount,
+              onTap: () => onChanged(BuyV2CartBenefitKind.coupon),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 3),
           Expanded(
+            child: _CartBenefitKindButton(
+              key: const ValueKey('buy-cart-benefit-kind-payment'),
+              selected: kind == BuyV2CartBenefitKind.paymentOffer,
+              label: 'Payment offers',
+              count: paymentOfferCount,
+              onTap: () => onChanged(BuyV2CartBenefitKind.paymentOffer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartBenefitKindButton extends StatelessWidget {
+  const _CartBenefitKindButton({
+    super.key,
+    required this.selected,
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? Colors.white : Colors.transparent,
+      animationDuration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: BuyV2Metrics.minimumTap,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              '${destination.label} order',
-              style: const TextStyle(
-                color: BuyV2Colors.navy,
-                fontSize: 13,
+              count == 0 ? label : '$label ($count)',
+              maxLines: 1,
+              style: TextStyle(
+                color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
+                fontSize: 10,
                 fontWeight: FontWeight.w900,
               ),
             ),
           ),
-          Text(
-            buyV2Money(total),
-            style: const TextStyle(
+        ),
+      ),
+    );
+  }
+}
+
+class _CartBenefitEmptyState extends StatelessWidget {
+  const _CartBenefitEmptyState({required this.destination, required this.kind});
+
+  final BuyV2Destination destination;
+  final BuyV2CartBenefitKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = BuyV2ThemeScope.of(context);
+    return Container(
+      key: ValueKey('buy-cart-${kind.name}-empty-${destination.name}'),
+      constraints: const BoxConstraints(maxHeight: 100),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: spec.softAccent,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              kind == BuyV2CartBenefitKind.coupon
+                  ? Icons.local_offer_outlined
+                  : Icons.account_balance_wallet_outlined,
               color: BuyV2Colors.navy,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _cartBenefitEmptyTitle(destination, kind),
+                  style: context.buyTitle.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _cartBenefitEmptyDetail(destination, kind),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.buyMeta.copyWith(fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartBenefitCard extends StatelessWidget {
+  const _CartBenefitCard({
+    required this.benefit,
+    required this.selected,
+    required this.onSelect,
+    required this.onRemove,
+  });
+
+  final BuyV2CartBenefit benefit;
+  final bool selected;
+  final VoidCallback onSelect;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = BuyV2ThemeScope.of(context);
+    void activate() => selected ? onRemove() : onSelect();
+
+    return AnimatedContainer(
+      key: ValueKey('buy-cart-benefit-${benefit.id}'),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.fromLTRB(10, 9, 8, 8),
+      decoration: buyV2CardDecoration(radius: 14).copyWith(
+        border: Border.all(
+          color: selected
+              ? BuyV2Colors.green.withValues(alpha: .45)
+              : BuyV2Colors.line,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: spec.softAccent,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  benefit.kind == BuyV2CartBenefitKind.coupon
+                      ? Icons.local_offer_outlined
+                      : Icons.account_balance_wallet_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      benefit.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      benefit.detail,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(fontSize: 8.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 72,
+                height: BuyV2Metrics.minimumTap,
+                child: Semantics(
+                  key: ValueKey(
+                    'buy-cart-benefit-'
+                    '${selected ? 'remove' : 'select'}-${benefit.id}',
+                  ),
+                  label: '${selected ? 'Remove' : 'Select'} ${benefit.title}',
+                  button: true,
+                  container: true,
+                  excludeSemantics: true,
+                  onTap: activate,
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: activate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: AnimatedContainer(
+                        key: ValueKey(
+                          'buy-cart-benefit-action-motion-${benefit.id}',
+                        ),
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.selection,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? Colors.transparent
+                                : BuyV2Colors.navy.withValues(alpha: .38),
+                          ),
+                        ),
+                        child: BuyV2FiniteIncomingTransition(
+                          key: ValueKey(
+                            'buy-cart-benefit-action-visual-${benefit.id}',
+                          ),
+                          stateKey: selected,
+                          duration: BuyV2Motion.stateChange,
+                          child: Text(
+                            selected ? 'Remove' : 'Select',
+                            style: TextStyle(
+                              color: selected
+                                  ? BuyV2Colors.muted
+                                  : BuyV2Colors.navy,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final visual = BuyV2FiniteVisualTransition(
+                key: ValueKey('buy-cart-benefit-status-motion-${benefit.id}'),
+                stateKey: selected,
+                ownerSize: Size(constraints.maxWidth, 20),
+                alignment: Alignment.centerLeft,
+                child: ExcludeSemantics(
+                  child: selected
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 47),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: BuyV2Colors.green,
+                                size: 15,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Selected for Checkout review',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.green,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.expand(),
+                ),
+              );
+              if (!selected) return ExcludeSemantics(child: visual);
+              return Semantics(
+                label: 'Selected for Checkout review',
+                excludeSemantics: true,
+                child: visual,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartDiscoverySections extends StatelessWidget {
+  const _CartDiscoverySections({
+    required this.session,
+    required this.destinations,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Destination> destinations;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = <Widget>[];
+    for (final destination in destinations) {
+      final special = session.cartRecommendationsFor(
+        destination,
+        specialOffersOnly: true,
+      );
+      final specialIds = special.map((product) => product.id).toSet();
+      final related = session.cartRecommendationsFor(
+        destination,
+        excludedProductIds: specialIds,
+      );
+      final usedIds = {...specialIds, ...related.map((product) => product.id)};
+      final more = session.cartRecommendationsFor(
+        destination,
+        excludedProductIds: usedIds,
+      );
+      if (related.isNotEmpty) {
+        sections.add(
+          _CartProductLane(
+            session: session,
+            destination: destination,
+            laneId: 'related',
+            title: _cartRelatedTitle(destination),
+            detail:
+                'Deals from ${buyV2Money(related.map((product) => product.price).reduce((left, right) => left < right ? left : right))}',
+            products: related,
+          ),
+        );
+      }
+      if (special.isNotEmpty) {
+        sections.add(
+          _CartProductLane(
+            session: session,
+            destination: destination,
+            laneId: 'special',
+            title: _cartSpecialTitle(destination),
+            detail:
+                'Current catalogue offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
+            products: special,
+          ),
+        );
+      }
+      if (more.isNotEmpty) {
+        sections.add(
+          _CartProductLane(
+            session: session,
+            destination: destination,
+            laneId: 'more',
+            title: _cartMoreTitle(destination),
+            detail: destination == BuyV2Destination.medicine
+                ? 'From the Medicine catalogue · not medical advice'
+                : 'More from the ${destination.label} catalogue',
+            products: more,
+          ),
+        );
+      }
+    }
+    if (sections.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        for (final section in sections) ...[
+          section,
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _CartProductLane extends StatelessWidget {
+  const _CartProductLane({
+    required this.session,
+    required this.destination,
+    required this.laneId,
+    required this.title,
+    required this.detail,
+    required this.products,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Destination destination;
+  final String laneId;
+  final String title;
+  final String detail;
+  final List<BuyV2Product> products;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey('buy-cart-$laneId-${destination.name}'),
+      padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+          const SizedBox(height: 2),
+          Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
+          const SizedBox(height: 7),
+          SizedBox(
+            height: 190,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: products.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 7),
+              itemBuilder: (context, index) => _CartRecommendationCard(
+                session: session,
+                product: products[index],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartRecommendationCard extends StatelessWidget {
+  const _CartRecommendationCard({required this.session, required this.product});
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSaving = product.mrp != null && product.mrp! > product.price;
+    return SizedBox(
+      width: 132,
+      child: Material(
+        color: BuyV2Colors.canvas,
+        borderRadius: BorderRadius.circular(13),
+        child: InkWell(
+          key: ValueKey('buy-cart-recommendation-${product.id}'),
+          onTap: () => session.openProduct(product.id),
+          borderRadius: BorderRadius.circular(13),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 82,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: BuyV2ProductPackshot(
+                          product: product,
+                          borderRadius: 10,
+                        ),
+                      ),
+                      Positioned(
+                        left: 4,
+                        top: 4,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 92),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BuyV2Colors.green,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Text(
+                            product.badge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  product.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.buyBody.copyWith(fontSize: 9, height: 1.05),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  product.pack,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.buyMeta.copyWith(fontSize: 7.5),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            buyV2Money(product.price),
+                            style: const TextStyle(
+                              color: BuyV2Colors.navy,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          if (hasSaving)
+                            Text(
+                              buyV2Money(product.mrp!),
+                              style: context.buyMeta.copyWith(
+                                fontSize: 7,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: IconButton.outlined(
+                        key: ValueKey('buy-cart-add-${product.id}'),
+                        tooltip: 'Add ${product.title}',
+                        onPressed: () {
+                          final added = session.addProduct(product.id);
+                          if (!added &&
+                              session.pendingPrescriptionProductId ==
+                                  product.id) {
+                            showBuyV2PrescriptionSheet(context, session);
+                          }
+                        },
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.add_rounded, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CartDeliveryInstructionSections extends StatelessWidget {
+  const _CartDeliveryInstructionSections({
+    required this.session,
+    required this.destinations,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Destination> destinations;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final destination in destinations) ...[
+          _CartDeliveryInstructionCard(
+            session: session,
+            destination: destination,
+          ),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _CartDeliveryInstructionCard extends StatelessWidget {
+  const _CartDeliveryInstructionCard({
+    required this.session,
+    required this.destination,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Destination destination;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = session.deliveryInstructionsFor(destination);
+    final selected = session.selectedDeliveryInstructionFor(destination);
+    return Container(
+      key: ValueKey('buy-cart-delivery-instructions-${destination.name}'),
+      padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
+      decoration: buyV2CardDecoration(
+        color: destination == BuyV2Destination.wholesale
+            ? const Color(0xFFF0F8F3)
+            : BuyV2Colors.softBlue,
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _deliveryInstructionOwner(destination),
+            style: context.buyTitle.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            destination == BuyV2Destination.wholesale
+                ? 'Choose one instruction for business receiving.'
+                : 'Choose one instruction for this delivery.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 7),
+          SizedBox(
+            height: 82,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: options.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 7),
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final isSelected = selected?.id == option.id;
+                return Material(
+                  color: isSelected ? BuyV2Colors.navy : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    key: ValueKey(
+                      'buy-cart-instruction-${destination.name}-${option.id}',
+                    ),
+                    onTap: () => session.chooseDeliveryInstruction(
+                      destination: destination,
+                      instructionId: isSelected ? null : option.id,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 138,
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _deliveryInstructionIcon(option.id),
+                            color: isSelected ? Colors.white : BuyV2Colors.navy,
+                            size: 18,
+                          ),
+                          const Spacer(),
+                          Text(
+                            option.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : BuyV2Colors.ink,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _deliveryInstructionIcon(String id) {
+  if (id.contains('security')) return Icons.shield_outlined;
+  if (id.contains('door')) return Icons.door_front_door_outlined;
+  if (id.contains('bell')) return Icons.notifications_off_outlined;
+  if (id.contains('loading')) return Icons.local_shipping_outlined;
+  if (id.contains('cartons')) return Icons.inventory_2_outlined;
+  if (id.contains('receiving')) return Icons.store_mall_directory_outlined;
+  if (id.contains('hand') || id.contains('unattended')) {
+    return Icons.person_pin_circle_outlined;
+  }
+  return Icons.phone_in_talk_outlined;
+}
+
+class _CartTipSections extends StatelessWidget {
+  const _CartTipSections({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final eligible = session.scopedCartFulfilmentGroups
+        .where((group) => session.tipOptionsFor(group.destination).isNotEmpty)
+        .toList(growable: false);
+    if (eligible.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        for (final group in eligible) ...[
+          _CartTipCard(session: session, group: group),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _CartTipCard extends StatelessWidget {
+  const _CartTipCard({required this.session, required this.group});
+
+  final BuyV2Session session;
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = session.tipForGroup(group);
+    final options = session.tipOptionsFor(group.destination);
+    final title = group.destination == BuyV2Destination.medicine
+        ? 'Tip pharmacy delivery partner'
+        : 'Tip Shop delivery partner';
+    return Container(
+      key: ValueKey('buy-cart-tip-${group.key}'),
+      padding: const EdgeInsets.all(9),
+      decoration: buyV2CardDecoration(
+        color: BuyV2Colors.softGreen,
+        border: const Color(0x33138808),
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+          const SizedBox(height: 2),
+          Text(
+            '${group.partner} · optional for this delivery only',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                key: ValueKey('buy-cart-tip-${group.key}-0'),
+                label: const Text('No tip'),
+                selected: selected == 0,
+                onSelected: (_) => session.chooseTip(
+                  fulfilmentKey: group.key,
+                  destination: group.destination,
+                  amount: 0,
+                ),
+              ),
+              for (final option in options)
+                ChoiceChip(
+                  key: ValueKey('buy-cart-tip-${group.key}-${option.amount}'),
+                  label: Text(buyV2Money(option.amount)),
+                  selected: selected == option.amount,
+                  onSelected: (_) => session.chooseTip(
+                    fulfilmentKey: group.key,
+                    destination: group.destination,
+                    amount: option.amount,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartBillSummary extends StatelessWidget {
+  const _CartBillSummary({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final familyTotals = session.scopedCartFamilyTotals;
+    return Container(
+      key: const ValueKey('buy-cart-bill-summary'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.receipt_long_outlined,
+                color: BuyV2Colors.navy,
+                size: 20,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'Bill summary',
+                style: context.buyTitle.copyWith(fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          for (final entry in familyTotals.entries)
+            _CartAmountRow(
+              label:
+                  '${entry.key.label} ${_cartItemFamilyLabel(entry.key).toLowerCase()}',
+              value: buyV2Money(entry.value),
+            ),
+          if (session.scopedCartSavings > 0)
+            _CartAmountRow(
+              label: 'Product savings',
+              value: '−${buyV2Money(session.scopedCartSavings)}',
+              valueColor: BuyV2Colors.green,
+            ),
+          if (session.scopedTipTotal > 0)
+            _CartAmountRow(
+              label: 'Optional delivery tips',
+              value: buyV2Money(session.scopedTipTotal),
+            ),
+          const Divider(height: 16),
+          _CartAmountRow(
+            label: 'Cart total',
+            value: buyV2Money(session.scopedPayableTotal),
+            strong: true,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Delivery charges, if any, are confirmed separately at order review.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartAmountRow extends StatelessWidget {
+  const _CartAmountRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.strong = false,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: strong ? context.buyBody : context.buyMeta,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? BuyV2Colors.navy,
+              fontSize: strong ? 13 : 10,
+              fontWeight: strong ? FontWeight.w900 : FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartSavingsSummary extends StatelessWidget {
+  const _CartSavingsSummary({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final savings = session.scopedCartSavings;
+    return Container(
+      key: const ValueKey('buy-cart-savings-summary'),
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(
+        color: savings > 0 ? BuyV2Colors.softGreen : BuyV2Colors.softBlue,
+        border: savings > 0 ? const Color(0x33138808) : BuyV2Colors.line,
+        radius: 15,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            savings > 0 ? Icons.savings_outlined : Icons.price_check_outlined,
+            color: savings > 0 ? BuyV2Colors.green : BuyV2Colors.navy,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  savings > 0
+                      ? 'You save ${buyV2Money(savings)}'
+                      : 'Current catalogue prices',
+                  style: context.buyBody.copyWith(fontSize: 10),
+                ),
+                Text(
+                  savings > 0
+                      ? 'Calculated only from listed MRP and current product price.'
+                      : 'No additional product saving is shown for these items.',
+                  style: context.buyMeta.copyWith(fontSize: 8),
+                ),
+              ],
             ),
           ),
         ],
@@ -3752,80 +7786,120 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = line.product;
+    void openProductDetails() {
+      HapticFeedback.selectionClick();
+      session.openProduct(product.id);
+    }
+
     return Container(
       key: ValueKey('buy-cart-line-${product.id}'),
       padding: const EdgeInsets.fromLTRB(10, 9, 9, 9),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          left: BorderSide(color: BuyV2Colors.line),
-          right: BorderSide(color: BuyV2Colors.line),
-          bottom: BorderSide(color: BuyV2Colors.line),
-        ),
-      ),
+      decoration: buyV2CardDecoration(radius: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: BuyV2Colors.softBlue,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Text(
-              product.visualLabel,
-              style: const TextStyle(
-                color: BuyV2Colors.navy,
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.buyBody,
-                ),
-                Text(
-                  '${product.variant} · ${product.pack}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.buyMeta.copyWith(fontSize: 8),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${product.deliveryPromise} · ${product.seller}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: BuyV2Colors.green,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
+            child: BuyV2IntentDepth(
+              key: ValueKey('buy-cart-product-depth-${product.id}'),
+              spatial: true,
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'View ${product.title} product details',
+                excludeSemantics: true,
+                onTap: openProductDetails,
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(11),
+                  child: InkWell(
+                    key: ValueKey('buy-cart-product-details-${product.id}'),
+                    onTap: openProductDetails,
+                    borderRadius: BorderRadius.circular(11),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 60),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            key: ValueKey('buy-cart-packshot-${product.id}'),
+                            width: 60,
+                            height: 60,
+                            child: BuyV2ProductPackshot(
+                              product: product,
+                              borderRadius: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyBody,
+                                ),
+                                Text(
+                                  '${product.variant} · ${product.pack}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyMeta.copyWith(fontSize: 8),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${product.deliveryPromise} · ${product.seller}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: BuyV2Colors.green,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 20, right: 2),
+                            child: Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: BuyV2Colors.navy,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                buyV2Money(line.total),
+              BuyV2FiniteValueTransition(
+                key: ValueKey('buy-cart-line-total-motion-${product.id}'),
+                stateKey: line.total,
+                text: buyV2Money(line.total),
+                ownerSize: const Size(78, 22),
+                textAlign: TextAlign.end,
                 style: const TextStyle(
                   color: BuyV2Colors.navy,
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              if (product.mrp != null && product.mrp! > product.price)
+                Text(
+                  buyV2Money(product.mrp! * line.quantity),
+                  style: context.buyMeta.copyWith(
+                    fontSize: 8,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
               const SizedBox(height: 5),
               Container(
                 height: 44,
@@ -3847,8 +7921,13 @@ class _CartLine extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.remove, size: 15),
                     ),
-                    Text(
-                      '${line.quantity}',
+                    BuyV2FiniteValueTransition(
+                      key: ValueKey(
+                        'buy-cart-line-quantity-motion-${product.id}',
+                      ),
+                      stateKey: line.quantity,
+                      text: '${line.quantity}',
+                      ownerSize: const Size(24, 28),
                       style: const TextStyle(
                         color: BuyV2Colors.navy,
                         fontSize: 10,
@@ -3947,6 +8026,7 @@ class _SavedAddressReminder extends StatelessWidget {
 
 class _CheckoutCard extends StatelessWidget {
   const _CheckoutCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.detail,
@@ -4017,11 +8097,7 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     void activatePrimaryAction() {
       HapticFeedback.selectionClick();
-      if (order.status == BuyV2OrderStatus.delivered) {
-        session.reorder(order);
-      } else {
-        session.openTracking(order.id);
-      }
+      session.openTracking(order.id);
     }
 
     return BuyV2IntentDepth(
@@ -4120,19 +8196,15 @@ class _OrderCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(5),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: order.progress),
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : const Duration(milliseconds: 500),
-                    builder: (context, value, _) => LinearProgressIndicator(
-                      value: value,
-                      minHeight: 4,
-                      backgroundColor: const Color(0xFFE3E5EE),
-                      valueColor: const AlwaysStoppedAnimation(
-                        BuyV2Colors.green,
-                      ),
-                    ),
+                  child: BuyV2HonestProgressIndicator(
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _trackingStatusLabel(order.status),
+                    isComplete: order.status == BuyV2OrderStatus.delivered,
+                    minHeight: 4,
+                    backgroundColor: const Color(0xFFE3E5EE),
+                    valueColor: BuyV2Colors.green,
+                    indicatorKey: ValueKey('buy-order-progress-${order.id}'),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -4146,6 +8218,7 @@ class _OrderCard extends StatelessWidget {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
+                      key: ValueKey('buy-order-primary-${order.id}'),
                       excludeFromSemantics: true,
                       onTap: activatePrimaryAction,
                       borderRadius: BorderRadius.circular(10),
@@ -4160,7 +8233,7 @@ class _OrderCard extends StatelessWidget {
                           ),
                           child: Text(
                             order.status == BuyV2OrderStatus.delivered
-                                ? 'Reorder'
+                                ? 'View order'
                                 : 'Track order',
                             style: const TextStyle(
                               color: Colors.white,
@@ -4209,19 +8282,15 @@ class _TrackingRoute extends StatelessWidget {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: order.progress),
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : const Duration(milliseconds: 650),
-                    builder: (context, value, _) => LinearProgressIndicator(
-                      value: value,
-                      minHeight: 5,
-                      backgroundColor: BuyV2Colors.softBlue,
-                      valueColor: const AlwaysStoppedAnimation(
-                        BuyV2Colors.orange,
-                      ),
-                    ),
+                  child: BuyV2HonestProgressIndicator(
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _trackingStatusLabel(order.status),
+                    isComplete: order.status == BuyV2OrderStatus.delivered,
+                    minHeight: 5,
+                    backgroundColor: BuyV2Colors.softBlue,
+                    valueColor: BuyV2Colors.orange,
+                    indicatorKey: const ValueKey('buy-tracking-route-progress'),
                   ),
                 ),
               ),
@@ -4260,6 +8329,7 @@ class _TrackingRoute extends StatelessWidget {
 
 class _TrackingAction extends StatelessWidget {
   const _TrackingAction({
+    super.key,
     required this.onPressed,
     required this.icon,
     required this.label,
@@ -4320,6 +8390,129 @@ class _TrackingAction extends StatelessWidget {
   }
 }
 
+class _OrderDeliveryContinuation extends StatelessWidget {
+  const _OrderDeliveryContinuation({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = primary ? Colors.white : BuyV2Colors.navy;
+    final detailColor = primary ? Colors.white70 : context.buyMeta.color;
+    return Semantics(
+      button: true,
+      label: '$title. $detail',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: primary ? BuyV2Colors.navy : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: primary ? BuyV2Colors.navy : const Color(0x33000080),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Icon(icon, color: foreground, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            color: foreground,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          detail,
+                          style: context.buyMeta.copyWith(color: detailColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: foreground,
+                    size: 15,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderDeliveryFact extends StatelessWidget {
+  const _OrderDeliveryFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: BuyV2Colors.navy, size: 16),
+          const SizedBox(width: 7),
+          SizedBox(
+            width: 72,
+            child: Text(label, style: context.buyMeta.copyWith(fontSize: 8)),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: BuyV2Colors.ink,
+                fontSize: 9,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TrackingTimeline extends StatelessWidget {
   const _TrackingTimeline({required this.order});
 
@@ -4349,63 +8542,87 @@ class _TrackingTimeline extends StatelessWidget {
               padding: EdgeInsets.only(
                 bottom: indexed.$1 == steps.length - 1 ? 0 : 5,
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 21,
-                    height: 21,
-                    decoration: BoxDecoration(
-                      color: indexed.$1 < completedSteps
-                          ? BuyV2Colors.green
-                          : indexed.$1 == completedSteps
-                          ? BuyV2Colors.softOrange
-                          : BuyV2Colors.softBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      indexed.$1 < completedSteps
-                          ? Icons.check
-                          : indexed.$1 == completedSteps
-                          ? Icons.radio_button_checked_rounded
-                          : Icons.circle_outlined,
-                      size: 13,
-                      color: indexed.$1 < completedSteps
-                          ? Colors.white
-                          : indexed.$1 == completedSteps
-                          ? BuyV2Colors.orange
-                          : BuyV2Colors.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(indexed.$2.$1, style: context.buyBody),
-                        Text(indexed.$2.$2, style: context.buyMeta),
-                      ],
-                    ),
-                  ),
-                  if (indexed.$1 == completedSteps)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
+              child: Semantics(
+                label:
+                    '${indexed.$2.$1}. ${indexed.$2.$2}. '
+                    '${indexed.$1 < completedSteps
+                        ? 'Complete'
+                        : indexed.$1 == completedSteps
+                        ? 'Current'
+                        : 'Upcoming'}',
+                excludeSemantics: true,
+                child: Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: BuyV2Motion.resolved(
+                        context,
+                        BuyV2Motion.stateChange,
                       ),
+                      curve: Curves.easeInOutCubic,
+                      width: 21,
+                      height: 21,
                       decoration: BoxDecoration(
-                        color: BuyV2Colors.softOrange,
-                        borderRadius: BorderRadius.circular(7),
+                        color: indexed.$1 < completedSteps
+                            ? BuyV2Colors.green
+                            : indexed.$1 == completedSteps
+                            ? BuyV2Colors.softOrange
+                            : BuyV2Colors.softBlue,
+                        shape: BoxShape.circle,
                       ),
-                      child: const Text(
-                        'NOW',
-                        style: TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontSize: 7,
-                          fontWeight: FontWeight.w900,
+                      child: AnimatedSwitcher(
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.stateChange,
+                        ),
+                        child: Icon(
+                          key: ValueKey(
+                            'tracking-step-${indexed.$1}-$completedSteps',
+                          ),
+                          indexed.$1 < completedSteps
+                              ? Icons.check
+                              : indexed.$1 == completedSteps
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.circle_outlined,
+                          size: 13,
+                          color: indexed.$1 < completedSteps
+                              ? Colors.white
+                              : indexed.$1 == completedSteps
+                              ? BuyV2Colors.orange
+                              : BuyV2Colors.muted,
                         ),
                       ),
                     ),
-                ],
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(indexed.$2.$1, style: context.buyBody),
+                          Text(indexed.$2.$2, style: context.buyMeta),
+                        ],
+                      ),
+                    ),
+                    if (indexed.$1 == completedSteps)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.softOrange,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: const Text(
+                          'NOW',
+                          style: TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -4568,62 +8785,160 @@ class _AssistChannelState extends State<_AssistChannel> {
 
 class _PrescriptionChoice extends StatelessWidget {
   const _PrescriptionChoice({
+    required this.keyName,
     required this.doctor,
     required this.detail,
     required this.onTap,
   });
 
+  final String keyName;
   final String doctor;
   final String detail;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final label = '$doctor, $detail, Saved prescription';
+    return Semantics(
+      key: ValueKey('buy-prescription-semantics-$keyName'),
+      container: true,
+      button: true,
+      label: label,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 58),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: buyV2CardDecoration(radius: 15),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: BuyV2Colors.navy,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Rx',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: BuyV2Colors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('buy-prescription-$keyName'),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 58),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.navy,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Rx',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(doctor, style: context.buyBody),
+                          Text(detail, style: context.buyMeta),
+                          Text('Saved prescription', style: context.buyMeta),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(doctor, style: context.buyBody),
-                  Text(detail, style: context.buyMeta),
-                  Text('Valid prescription', style: context.buyMeta),
-                ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddPrescriptionChoice extends StatelessWidget {
+  const _AddPrescriptionChoice({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const label =
+        'Add a new prescription, Match medicines for review in this session';
+    return Semantics(
+      key: const ValueKey('buy-prescription-add-new-semantics'),
+      container: true,
+      button: true,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: BuyV2Colors.softBlue,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: BuyV2Colors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const ValueKey('buy-prescription-add-new'),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 58),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.navy,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.note_add_outlined,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add a new prescription',
+                            style: context.buyBody,
+                          ),
+                          Text(
+                            'Match medicines for review in this session',
+                            style: context.buyMeta,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const Text(
-              'Use',
-              style: TextStyle(
-                color: BuyV2Colors.green,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -4632,6 +8947,7 @@ class _PrescriptionChoice extends StatelessWidget {
 
 class _ShareChoice extends StatelessWidget {
   const _ShareChoice({
+    super.key,
     required this.label,
     required this.icon,
     required this.onTap,
@@ -4644,28 +8960,39 @@ class _ShareChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: InkWell(
+      child: Semantics(
+        container: true,
+        button: true,
+        label: label,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          height: 66,
-          alignment: Alignment.center,
-          decoration: buyV2CardDecoration(radius: 14),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: BuyV2Colors.navy),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
+        child: ExcludeSemantics(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 66),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              alignment: Alignment.center,
+              decoration: buyV2CardDecoration(radius: 14),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: BuyV2Colors.navy),
+                  const SizedBox(height: 3),
+                  Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: BuyV2Colors.navy,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -4673,19 +9000,29 @@ class _ShareChoice extends StatelessWidget {
   }
 }
 
-Future<void> _copyAddressRequest(BuildContext context, String channel) async {
+Future<void> _copyAddressRequest(
+  BuildContext context,
+  String channel, {
+  String recipient = '',
+}) async {
   await Clipboard.setData(
     const ClipboardData(text: 'https://moolsocial.com/address/request'),
   );
   if (!context.mounted) return;
-  Navigator.of(context).pop();
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Address request copied for $channel')),
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final recipientCopy = recipient.isEmpty ? '' : ' for $recipient';
+  navigator.pop();
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text('Address request link copied$recipientCopy via $channel'),
+    ),
   );
 }
 
 class _LocationChoice extends StatelessWidget {
   const _LocationChoice({
+    super.key,
     required this.label,
     required this.icon,
     required this.selected,
@@ -4700,30 +9037,39 @@ class _LocationChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: InkWell(
+      child: Semantics(
+        container: true,
+        button: true,
+        selected: selected,
+        label: label,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          height: 54,
-          alignment: Alignment.center,
-          decoration: buyV2CardDecoration(
-            radius: 14,
-            color: selected ? BuyV2Colors.softOrange : Colors.white,
-            border: selected ? BuyV2Colors.orange : BuyV2Colors.line,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: BuyV2Colors.navy, size: 19),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
+        child: ExcludeSemantics(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              height: 54,
+              alignment: Alignment.center,
+              decoration: buyV2CardDecoration(
+                radius: 14,
+                color: selected ? BuyV2Colors.softOrange : Colors.white,
+                border: selected ? BuyV2Colors.orange : BuyV2Colors.line,
               ),
-            ],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: BuyV2Colors.navy, size: 19),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: BuyV2Colors.navy,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

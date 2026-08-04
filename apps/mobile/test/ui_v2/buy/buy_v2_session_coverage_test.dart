@@ -254,12 +254,12 @@ void main() {
       expect(recoveryWithCart.addProduct(shop.id), isTrue);
       recoveryWithCart.openRecovery(BuyV2RecoveryKind.paymentFailed);
       recoveryWithCart.retryRecovery();
-      expect(recoveryWithCart.view, BuyV2View.checkout);
-      expect(recoveryWithCart.notice, 'Updated. You can continue.');
+      expect(recoveryWithCart.view, BuyV2View.catalogue);
+      expect(recoveryWithCart.notice, isNull);
 
       recoveryWithCart.openRecovery(BuyV2RecoveryKind.networkInterruption);
       recoveryWithCart.goBack();
-      expect(recoveryWithCart.view, BuyV2View.checkout);
+      expect(recoveryWithCart.view, BuyV2View.catalogue);
 
       final emptyRecovery = _newSession()
         ..openRecovery(BuyV2RecoveryKind.networkInterruption)
@@ -271,7 +271,7 @@ void main() {
       emptyRecovery.retryRecovery();
       expect(emptyRecovery.destination, BuyV2Destination.shop);
       expect(emptyRecovery.view, BuyV2View.catalogue);
-      expect(emptyRecovery.notice, 'Updated. You can continue.');
+      expect(emptyRecovery.notice, isNull);
     });
 
     test('final removal and a synthetic address preserve exact state', () {

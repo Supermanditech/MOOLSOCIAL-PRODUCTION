@@ -187,21 +187,9 @@ class Screen04Header extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: 'Open Social',
-                    child: InkWell(
-                      key: const Key('screen04-home'),
-                      onTap: onHome,
-                      borderRadius: BorderRadius.circular(12),
-                      child: const SizedBox(
-                        height: 44,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: SocialV2Wordmark(),
-                        ),
-                      ),
-                    ),
+                  child: SocialV2Wordmark(
+                    key: const Key('screen04-home'),
+                    onPressed: onHome,
                   ),
                 ),
                 _HeaderRoundButton(
@@ -431,21 +419,10 @@ class _Screen04VideoHeaderState extends State<Screen04VideoHeader> {
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: 'Open Social',
-                    child: InkWell(
-                      key: const Key('screen04-video-home'),
-                      onTap: widget.onHome,
-                      borderRadius: BorderRadius.circular(12),
-                      child: const SizedBox(
-                        height: 44,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: SocialV2Wordmark(compact: true),
-                        ),
-                      ),
-                    ),
+                  child: SocialV2Wordmark(
+                    key: const Key('screen04-video-home'),
+                    compact: true,
+                    onPressed: widget.onHome,
                   ),
                 ),
                 _HeaderRoundButton(

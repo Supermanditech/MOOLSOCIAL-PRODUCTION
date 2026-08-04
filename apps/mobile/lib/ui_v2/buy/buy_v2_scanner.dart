@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'buy_v2_design.dart';
+import 'buy_v2_manual_code_sheet_motion.dart';
 
 typedef BuyV2ScannerLauncher = Future<String?> Function(BuildContext context);
 
@@ -40,8 +41,11 @@ Future<String?> showBuyV2ManualCodeSheet(
     useSafeArea: true,
     showDragHandle: true,
     constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    sheetAnimationStyle: BuyV2ManualCodeSheetMotion.resolve(context),
     builder: (sheetContext) => AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
+      duration: BuyV2ManualCodeSheetMotion.resolveKeyboardInsetDuration(
+        sheetContext,
+      ),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
@@ -83,104 +87,113 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      key: const ValueKey('buy-manual-code-panel'),
-      constraints: const BoxConstraints(maxHeight: 238),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: BuyV2Colors.softOrange,
-                    borderRadius: BorderRadius.circular(10),
+    final title = widget.cameraUnavailable
+        ? 'Camera access needed'
+        : 'Enter product code';
+    return Semantics(
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: '$title form',
+      child: ConstrainedBox(
+        key: const ValueKey('buy-manual-code-panel'),
+        constraints: const BoxConstraints(maxHeight: 238),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: BuyV2Colors.softOrange,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: BuyV2Colors.orange,
+                      size: 19,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.qr_code_scanner_rounded,
-                    color: BuyV2Colors.orange,
-                    size: 19,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.cameraUnavailable
-                            ? 'Camera access needed'
-                            : 'Enter product code',
-                        style: const TextStyle(
-                          color: BuyV2Colors.ink,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: BuyV2Colors.ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      Text(
-                        widget.cameraUnavailable
-                            ? 'Use a code now, or allow camera access in settings.'
-                            : 'Barcode, QR or catalogue code',
-                        style: const TextStyle(
-                          color: BuyV2Colors.muted,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                        Text(
+                          widget.cameraUnavailable
+                              ? 'Use a code now, or allow camera access in settings.'
+                              : 'Barcode, QR or catalogue code',
+                          style: const TextStyle(
+                            color: BuyV2Colors.muted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (widget.canOpenSettings)
-                  IconButton(
-                    key: const ValueKey('buy-scanner-open-settings'),
-                    tooltip: 'Open camera settings',
-                    onPressed: () async {
-                      await openAppSettings();
-                    },
-                    icon: const Icon(Icons.settings_rounded),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 7),
-            TextField(
-              key: const ValueKey('buy-product-code-field'),
-              controller: _controller,
-              autofocus: !widget.cameraUnavailable,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: 'Scan number or product code',
-                prefixIcon: Icon(Icons.barcode_reader),
+                  if (widget.canOpenSettings)
+                    IconButton(
+                      key: const ValueKey('buy-scanner-open-settings'),
+                      tooltip: 'Open camera settings',
+                      onPressed: () async {
+                        await openAppSettings();
+                      },
+                      icon: const Icon(Icons.settings_rounded),
+                    ),
+                ],
               ),
-              onSubmitted: _submit,
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
+              const SizedBox(height: 7),
+              TextField(
+                key: const ValueKey('buy-product-code-field'),
+                controller: _controller,
+                autofocus: !widget.cameraUnavailable,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  labelText: 'Product code',
+                  hintText: 'Scan number or product code',
+                  prefixIcon: Icon(Icons.barcode_reader),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton.icon(
-                    key: const ValueKey('buy-use-product-code'),
-                    onPressed: _submit,
-                    icon: const Icon(Icons.search_rounded, size: 18),
-                    label: const Text('Find product'),
+                onSubmitted: _submit,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      key: const ValueKey('buy-use-product-code'),
+                      onPressed: _submit,
+                      icon: const Icon(Icons.search_rounded, size: 18),
+                      label: const Text('Find product'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

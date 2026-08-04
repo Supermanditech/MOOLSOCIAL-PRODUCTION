@@ -1,0 +1,9 @@
+{
+  "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f1ac83dea2047f40b39d772696bd0d1224edce8e",
+  "manifest": "03-source-manifest-prewrite.txt",
+  "fileCount": 2466,
+  "manifestSha256": "5294852BF5653B2B674A614311AF3F4E3182217AAA296893452267CF43EE839F",
+  "unexplainedDrift": false
+}

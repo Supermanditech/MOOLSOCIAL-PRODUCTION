@@ -1,0 +1,55 @@
+warning: [options] bootstrap class path not set in conjunction with -source 8
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:8: error: class AccessibilityHintProbe is public, should be declared in a file named AccessibilityHintProbe.java
+public final class AccessibilityHintProbe extends UiAutomatorTestCase {
+             ^
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:8: error: cannot access TestCase
+public final class AccessibilityHintProbe extends UiAutomatorTestCase {
+                                                  ^
+  class file for junit.framework.TestCase not found
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:23: error: cannot find symbol
+    assertNotNull("Category search EditText is missing", node);
+    ^
+  symbol:   method assertNotNull(String,AccessibilityNodeInfo)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:46: error: cannot find symbol
+    assertEquals("Category search, Find a category", hint);
+    ^
+  symbol:   method assertEquals(String,String)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:47: error: cannot find symbol
+    assertEquals("", text);
+    ^
+  symbol:   method assertEquals(String,String)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:48: error: cannot find symbol
+    assertTrue("Category search must be focusable", node.isFocusable());
+    ^
+  symbol:   method assertTrue(String,boolean)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:49: error: cannot find symbol
+    assertTrue("Category search must be editable", node.isEditable());
+    ^
+  symbol:   method assertTrue(String,boolean)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:50: error: cannot find symbol
+    assertTrue("Category search must expose focus", hasFocusAction);
+    ^
+  symbol:   method assertTrue(String,boolean)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:51: error: cannot find symbol
+    assertTrue("Category search must expose click", hasClickAction);
+    ^
+  symbol:   method assertTrue(String,boolean)
+  location: class AccessibilityHintProbe
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java:52: error: cannot find symbol
+    assertTrue("Category search must expose set-text", hasSetTextAction);
+    ^
+  symbol:   method assertTrue(String,boolean)
+  location: class AccessibilityHintProbe
+Note: C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175\47a-AccessibilityHintProbe.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+10 errors
+4 warnings

@@ -1,0 +1,8 @@
+backend boundary: compatible and passed.
+backend boundary self-test: compatible and passed.
+data-egress boundary: compatible and passed.
+data-egress boundary self-test: compatible and passed.
+approved UI locks: compatible; expected business/protected rejection reached.
+protected Social baseline: compatible; expected business/protected rejection reached.
+protected Buy baseline: compatible; expected business/protected rejection reached.
+Windows PowerShell 5.1 compatibility gate passed: no banned modern .NET path/hash APIs and all mandatory boundary/protected scripts reached their intended outcome.

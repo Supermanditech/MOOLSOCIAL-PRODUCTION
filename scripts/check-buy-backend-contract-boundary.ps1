@@ -11,12 +11,51 @@ if (-not $RepositoryRoot) {
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 
+function Get-PortableRelativePath {
+  param(
+    [Parameter(Mandatory)]
+    [string]$BasePath,
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
+
+  $base = [System.IO.Path]::GetFullPath($BasePath).TrimEnd(
+    [char[]]@('\', '/')
+  )
+  $target = [System.IO.Path]::GetFullPath($Path)
+  if ($target.Equals($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+    return "."
+  }
+  $prefix = $base + [System.IO.Path]::DirectorySeparatorChar
+  if (-not $target.StartsWith(
+    $prefix,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )) {
+    throw "Path escaped the repository root: $target"
+  }
+  return $target.Substring($prefix.Length)
+}
+
 $approvedDirectUrls = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::Ordinal
 )
 [void]$approvedDirectUrls.Add(
   "https://moolsocial.com/address/request"
 )
+
+$approvedLocalContractPaths = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase
+)
+foreach ($approvedLocalContractPath in @(
+  "backend\functions\src\commerce\supply_participant_contract.ts",
+  "backend\functions\src\commerce\supply_participant_contract.test.ts",
+  "backend\functions\src\commerce\catalogue_contract.ts",
+  "backend\functions\src\commerce\catalogue_contract.test.ts",
+  "backend\functions\src\commerce\wholesale_pack_contract.ts",
+  "backend\functions\src\commerce\wholesale_pack_contract.test.ts"
+)) {
+  [void]$approvedLocalContractPaths.Add($approvedLocalContractPath)
+}
 
 function Get-MobileBoundaryViolations {
   param(
@@ -83,7 +122,8 @@ function Get-BackendBoundaryViolations {
     [Parameter(Mandatory)]
     [string]$Label,
     [Parameter(Mandatory)]
-    [string]$Content
+    [string]$Content,
+    [switch]$AllowPureContractExports
   )
 
   $findings = [System.Collections.Generic.List[string]]::new()
@@ -102,7 +142,7 @@ function Get-BackendBoundaryViolations {
     "exports\.)[A-Za-z0-9_]*(?:buy|commerce|cart|checkout|catalog|" +
     "inventory|wholesale|medicine|prescription)[A-Za-z0-9_]*"
   )
-  if ($Content -match $backendExportPattern) {
+  if (-not $AllowPureContractExports -and $Content -match $backendExportPattern) {
     $findings.Add("${Label}: unapproved exported Buy backend symbol")
   }
 
@@ -181,9 +221,61 @@ if ($SelfTest) {
     throw "Buy backend boundary self-test did not reject a backend owner."
   }
 
+  $pureContractFindings = @(
+    Get-BackendBoundaryViolations `
+      -Label "registered pure contract" `
+      -Content "export interface CatalogueAggregate {}" `
+      -AllowPureContractExports
+  )
+  if ($pureContractFindings.Count -ne 0) {
+    throw "Buy backend boundary self-test rejected a pure aggregate export."
+  }
+  $pureGatewayFindings = @(
+    Get-BackendBoundaryViolations `
+      -Label "invented pure-path gateway" `
+      -Content "export class CatalogueGateway {}" `
+      -AllowPureContractExports
+  )
+  if ($pureGatewayFindings.Count -eq 0) {
+    throw "Buy backend boundary self-test allowed a gateway in a pure path."
+  }
+
+  if (-not $approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\supply_participant_contract.ts"
+  )) {
+    throw "Buy backend boundary self-test lost the exact SUP-001 allowlist."
+  }
+  if (-not $approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\catalogue_contract.ts"
+  )) {
+    throw "Buy backend boundary self-test lost the exact SUP-003 allowlist."
+  }
+  if (-not $approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\wholesale_pack_contract.ts"
+  )) {
+    throw "Buy backend boundary self-test lost the exact B2B-002 allowlist."
+  }
+  if ($approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\supply_participant_service.ts"
+  )) {
+    throw "Buy backend boundary self-test allowed an unregistered service."
+  }
+  if ($approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\catalogue_gateway.ts"
+  )) {
+    throw "Buy backend boundary self-test allowed an unregistered gateway."
+  }
+  if ($approvedLocalContractPaths.Contains(
+    "backend\functions\src\commerce\wholesale_pack_service.ts"
+  )) {
+    throw "Buy backend boundary self-test allowed an unregistered B2B service."
+  }
+
   Write-Output (
     "Buy backend contract boundary self-test passed: seven mobile cases and " +
-    "one backend owner behaved as required."
+    "one backend owner behaved as required; the exact SUP-001/SUP-003/" +
+    "B2B-002 " +
+    "pure-contract allowlist does not authorize a service or gateway."
   )
   return
 }
@@ -222,10 +314,9 @@ if ($mobileFiles.Count -eq 0) {
 
 $violations = [System.Collections.Generic.List[string]]::new()
 foreach ($file in $mobileFiles) {
-  $relative = [System.IO.Path]::GetRelativePath(
-    $RepositoryRoot,
-    $file.FullName
-  )
+  $relative = Get-PortableRelativePath `
+    -BasePath $RepositoryRoot `
+    -Path $file.FullName
   $content = Get-Content -LiteralPath $file.FullName -Raw
   foreach ($finding in Get-MobileBoundaryViolations `
     -Label $relative `
@@ -242,17 +333,21 @@ $forbiddenOwnerPathPattern = (
   "inventory|shop|wholesale|medicine|prescription)(?:[\\/._-]|$)"
 )
 foreach ($file in $backendFiles) {
-  $relative = [System.IO.Path]::GetRelativePath(
-    $RepositoryRoot,
-    $file.FullName
-  )
-  if ($relative -match $forbiddenOwnerPathPattern) {
+  $relative = Get-PortableRelativePath `
+    -BasePath $RepositoryRoot `
+    -Path $file.FullName
+  if (
+    $relative -match $forbiddenOwnerPathPattern -and
+    -not $approvedLocalContractPaths.Contains($relative)
+  ) {
     $violations.Add("${relative}: unapproved Buy backend file owner")
   }
   $content = Get-Content -LiteralPath $file.FullName -Raw
+  $allowPureContractExports = $approvedLocalContractPaths.Contains($relative)
   foreach ($finding in Get-BackendBoundaryViolations `
     -Label $relative `
-    -Content $content) {
+    -Content $content `
+    -AllowPureContractExports:$allowPureContractExports) {
     $violations.Add($finding)
   }
 }
@@ -261,10 +356,9 @@ $contractFiles = @(
   Get-ChildItem -LiteralPath $contractsRoot -Recurse -File
 )
 foreach ($file in $contractFiles) {
-  $relative = [System.IO.Path]::GetRelativePath(
-    $RepositoryRoot,
-    $file.FullName
-  )
+  $relative = Get-PortableRelativePath `
+    -BasePath $RepositoryRoot `
+    -Path $file.FullName
   if ($relative -match $forbiddenOwnerPathPattern) {
     $violations.Add(
       "${relative}: Buy contract exists without recorded approval boundary"

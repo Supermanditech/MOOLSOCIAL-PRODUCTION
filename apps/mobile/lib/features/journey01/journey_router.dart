@@ -121,6 +121,23 @@ GoRouter createJourneyRouter(
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
   late final GoRouter router;
+  VoidCallback buyExit(GoRouterState state) =>
+      () => router.go(
+        session.buyExitRoute(
+          requestedRoute: state.uri.queryParameters['return'],
+        ),
+      );
+  void rememberBuyDestination(BuyV2Destination destination) {
+    final location = '/app/buy?sub=${destination.name}';
+    session.confirmReadyRoute(location);
+    final current = router.routeInformationProvider.value.uri;
+    if (buyV2Session.view == BuyV2View.catalogue &&
+        current.path == '/app/buy' &&
+        current.queryParameters['sub'] != destination.name) {
+      router.replace(location);
+    }
+  }
+
   router = GoRouter(
     initialLocation: initialLocation,
     refreshListenable: Listenable.merge([
@@ -131,13 +148,7 @@ GoRouter createJourneyRouter(
     redirect: (context, state) {
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
-      final youtubeConnectResult = state.uri.queryParameters['youtubeConnect'];
-      final returnLocation =
-          location == '/app/creator/youtube-connect' &&
-              (youtubeConnectResult == 'complete' ||
-                  youtubeConnectResult == 'failed')
-          ? state.uri.toString()
-          : location;
+      final returnLocation = state.uri.toString();
 
       if (protected && !session.isReady) {
         session.captureReturnTo(returnLocation);
@@ -220,6 +231,8 @@ GoRouter createJourneyRouter(
             productId: state.uri.queryParameters['product'],
             orderId: state.uri.queryParameters['order'],
             recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
+            onExit: buyExit(state),
+            onDestinationChanged: rememberBuyDestination,
           );
         },
       ),
@@ -230,6 +243,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.shop,
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -239,6 +254,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.medicine,
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -253,6 +270,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.product,
                 productId: state.pathParameters['productId'],
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -268,6 +287,8 @@ GoRouter createJourneyRouter(
                 initialCartScope: _buyV2CartScope(
                   state.uri.queryParameters['scope'],
                 ),
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -278,6 +299,8 @@ GoRouter createJourneyRouter(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.checkout,
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -292,6 +315,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -306,6 +331,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -318,6 +345,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.orders,
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -330,6 +359,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.orders,
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -344,6 +375,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.assist,
                 orderId: state.pathParameters['orderId'],
+                onExit: buyExit(state),
+                onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
@@ -1326,6 +1359,7 @@ GoRouter createJourneyRouter(
                   state.uri.queryParameters['state'] ??
                   state.uri.queryParameters['mode'],
               initialItem: state.uri.queryParameters['item'],
+              initialMoolOpen: state.uri.queryParameters['openMool'] == '1',
             );
           }
           return UniversalShell(

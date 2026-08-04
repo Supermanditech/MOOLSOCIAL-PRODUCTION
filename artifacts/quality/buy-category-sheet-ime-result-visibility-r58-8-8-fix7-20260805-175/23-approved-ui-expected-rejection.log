@@ -1,0 +1,14 @@
+﻿Approved UI lock changed for app-splash-first-open accepted production file 
+apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart. Expected 
+b0e7b099b70be7240a4e7699596ab7f16b77285fba9c23c4f3708afda7ae218d but found 
+d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be at C:\GUARANTEED 
+OUTCOME\MOOLSOCIAL-PRODUCTION\apps\mobile\lib\ui_v2\screens\screen01_app_splash\app_splash_screen_v2.dart
+At C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\scripts\check-approved-ui-locks.ps1:62 char:3
++   throw "Approved UI lock changed for $Label. Expected $Expected but  ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Approved UI loc..._screen_v2.dart:String) [], RuntimeException
+    + FullyQualifiedErrorId : Approved UI lock changed for app-splash-first-open accepted production file apps/mobile/ 
+   lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart. Expected b0e7b099b70be7240a4e7699596ab7f16b77285f  
+  ba9c23c4f3708afda7ae218d but found d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be at C:\GUARANTE   
+ ED OUTCOME\MOOLSOCIAL-PRODUCTION\apps\mobile\lib\ui_v2\screens\screen01_app_splash\app_splash_screen_v2.dart
+ 

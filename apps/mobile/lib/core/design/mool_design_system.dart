@@ -8,7 +8,24 @@ import 'mool_colors.dart';
 /// vertical. Mool is a service launcher, not a second MoolSocial logo.
 abstract final class MoolBrand {
   static const String wordmark = 'MoolSocial';
+  static const String staticBrandOutcome = wordmark;
   static const IconData moolLauncherIcon = Icons.grid_view_rounded;
+  static const Color identityNavy = MoolColors.navy;
+  static const Color identitySaffron = MoolColors.orange;
+  static const Color identityWhite = Colors.white;
+  static const Color identityGreen = MoolColors.success;
+  static const List<Color> identityPalette = <Color>[
+    identityNavy,
+    identitySaffron,
+    identityWhite,
+    identityGreen,
+  ];
+
+  static bool isIdentityColor(Color color) {
+    return identityPalette.any(
+      (allowed) => allowed.toARGB32() == color.toARGB32(),
+    );
+  }
 }
 
 /// Shared full-app design tokens.
@@ -51,6 +68,10 @@ abstract final class MoolMotion {
 
   static Duration accessible(BuildContext context, Duration duration) {
     return MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+  }
+
+  static bool isReduced(BuildContext context) {
+    return MediaQuery.disableAnimationsOf(context);
   }
 }
 

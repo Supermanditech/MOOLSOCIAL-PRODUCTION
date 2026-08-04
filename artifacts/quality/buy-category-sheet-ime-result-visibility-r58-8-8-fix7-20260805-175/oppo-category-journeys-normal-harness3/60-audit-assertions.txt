@@ -1,0 +1,14 @@
+state=passed
+candidate=BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7
+profile=1.0.0-r58.23 (2026080419)
+categorySearchNoMatchClear=passed_shop
+shopCategoryOwnership=passed_shop_supplies
+wholesaleCategoryOwnership=passed_retail_supplies
+medicineCategoryOwnership=passed_diabetes
+productBackCategoryRestoration=passed_shop
+crossVerticalIndependentRestoration=passed_all_three
+hotResumeCategoryRestoration=passed_shop
+crossVerticalLeakage=false
+subcategoryTaxonomy=dependency_held_no_local_owner
+savedCartOrderPaymentProviderBackendMutation=false
+finalState=clean Shop For you root

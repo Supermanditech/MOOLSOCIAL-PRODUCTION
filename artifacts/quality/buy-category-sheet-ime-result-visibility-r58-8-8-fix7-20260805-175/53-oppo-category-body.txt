@@ -1,0 +1,104 @@
+$auditBody = @'
+try {
+  Start-CleanApp
+  Tap-Target -Text "Shop`nShop" -Exact $true
+
+  Open-Category 'Shop'
+  $shopSheet = Save-State '10-shop-category-sheet'
+  Assert-Text $shopSheet 'Shop category, For you, selected'
+  Set-Category-Query 'zzzzcatalogue'
+  $shopNoMatch = Save-State '11-shop-category-no-match'
+  Assert-Text $shopNoMatch 'No categories match. Clear category search.'
+  Tap-Target -Text 'Clear search'
+  $shopCleared = Save-State '12-shop-category-search-cleared'
+  Assert-Text $shopCleared 'Shop category, For you, selected'
+  Set-Category-Query 'shop supplies'
+  $shopNarrowed = Save-State '13-shop-category-shop-supplies-option'
+  Assert-Text $shopNarrowed 'Shop category, Shop supplies'
+  Assert-NoText $shopNarrowed 'Shop category, Dairy & bakery'
+  Choose-Category 'Shop' 'Shop supplies'
+  $shopRoot = Save-State '14-shop-supplies-root'
+  Assert-Category $shopRoot 'Shop' 'Shop supplies'
+  Assert-ProductResult $shopRoot 'POS thermal paper rolls' '10 rolls'
+  Assert-NoText $shopRoot 'Premium basmati rice'
+  $null = Open-Category-Product-And-Return -Destination 'Shop' `
+    -Category 'Shop supplies' -Title 'POS thermal paper rolls' -Pack '10 rolls' `
+    -DetailName '15-shop-supplies-product' `
+    -ReturnName '16-shop-supplies-result-restored'
+  Invoke-HotResume
+  $shopResume = Save-State '17-shop-category-hot-resume'
+  Assert-Category $shopResume 'Shop' 'Shop supplies'
+  Assert-ProductResult $shopResume 'POS thermal paper rolls' '10 rolls'
+
+  Tap-Target -Text "Wholesale`nWholesale" -Exact $true
+  Open-Category 'Wholesale'
+  Set-Category-Query 'retail supplies'
+  $wholesaleNarrowed = Save-State '20-wholesale-category-retail-supplies-option'
+  Assert-Text $wholesaleNarrowed 'Wholesale category, Retail supplies'
+  Choose-Category 'Wholesale' 'Retail supplies'
+  $wholesaleRoot = Save-State '21-wholesale-retail-supplies-root'
+  Assert-Category $wholesaleRoot 'Wholesale' 'Retail supplies'
+  Assert-ProductResult $wholesaleRoot 'POS thermal paper rolls' 'Carton of 200 rolls'
+  Assert-NoText $wholesaleRoot '10 rolls'
+
+  Tap-Target -Text "Medicine`nMedicine" -Exact $true
+  Open-Category 'Medicine'
+  Set-Category-Query 'diabetes'
+  $medicineNarrowed = Save-State '30-medicine-category-diabetes-option'
+  Assert-Text $medicineNarrowed 'Medicine category, Diabetes'
+  Choose-Category 'Medicine' 'Diabetes'
+  $medicineRoot = Save-State '31-medicine-diabetes-root'
+  Assert-Category $medicineRoot 'Medicine' 'Diabetes'
+  Assert-ProductResult $medicineRoot 'Metformin SR 500 mg' 'Strip of 10 tablets'
+  Assert-NoText $medicineRoot 'Paracetamol 500 mg tablets'
+
+  Tap-Target -Text "Shop`nShop" -Exact $true
+  $shopRestored = Save-State '40-shop-category-restored-after-verticals'
+  Assert-Category $shopRestored 'Shop' 'Shop supplies'
+  Assert-ProductResult $shopRestored 'POS thermal paper rolls' '10 rolls'
+  Tap-Target -Text "Wholesale`nWholesale" -Exact $true
+  $wholesaleRestored = Save-State '41-wholesale-category-restored-after-verticals'
+  Assert-Category $wholesaleRestored 'Wholesale' 'Retail supplies'
+  Assert-ProductResult $wholesaleRestored 'POS thermal paper rolls' 'Carton of 200 rolls'
+  Tap-Target -Text "Medicine`nMedicine" -Exact $true
+  $medicineRestored = Save-State '42-medicine-category-restored-after-verticals'
+  Assert-Category $medicineRestored 'Medicine' 'Diabetes'
+  Assert-ProductResult $medicineRestored 'Metformin SR 500 mg' 'Strip of 10 tablets'
+
+  Tap-Target -Text "Shop`nShop" -Exact $true
+  Open-Category 'Shop'
+  Choose-Category 'Shop' 'For you'
+  $final = Save-State '50-final-clean-shop-for-you'
+  Assert-Category $final 'Shop' 'For you'
+  Assert-NoText $final 'Finish search'
+  Assert-NoText $final 'View cart'
+  Assert-NoText $final 'Review order'
+
+  @(
+    'state=passed',
+    'candidate=BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7',
+    'profile=1.0.0-r58.23 (2026080419)',
+    'categorySearchNoMatchClear=passed_shop',
+    'shopCategoryOwnership=passed_shop_supplies',
+    'wholesaleCategoryOwnership=passed_retail_supplies',
+    'medicineCategoryOwnership=passed_diabetes',
+    'productBackCategoryRestoration=passed_shop',
+    'crossVerticalIndependentRestoration=passed_all_three',
+    'hotResumeCategoryRestoration=passed_shop',
+    'crossVerticalLeakage=false',
+    'subcategoryTaxonomy=dependency_held_no_local_owner',
+    'savedCartOrderPaymentProviderBackendMutation=false',
+    'finalState=clean Shop For you root'
+  ) | Set-Content -LiteralPath (Join-Path $root '60-audit-assertions.txt')
+  Write-Output 'R58.8.8 FIX7 OPPO cumulative category ownership passed.'
+} catch {
+  try {
+    Invoke-AuditAdb -Arguments @('shell', 'am', 'force-stop', 'com.moolsocial.app') | Out-Null
+    Invoke-AuditAdb -Arguments @(
+      'shell', 'monkey', '-p', 'com.moolsocial.app',
+      '-c', 'android.intent.category.LAUNCHER', '1'
+    ) | Out-Null
+  } catch {}
+  throw
+}
+'@

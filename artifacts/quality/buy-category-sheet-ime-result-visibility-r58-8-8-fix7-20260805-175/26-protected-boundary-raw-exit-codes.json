@@ -1,0 +1,14 @@
+﻿[
+    {
+        "gate":  "approved-ui",
+        "exitCode":  1
+    },
+    {
+        "gate":  "social",
+        "exitCode":  1
+    },
+    {
+        "gate":  "buy",
+        "exitCode":  1
+    }
+]

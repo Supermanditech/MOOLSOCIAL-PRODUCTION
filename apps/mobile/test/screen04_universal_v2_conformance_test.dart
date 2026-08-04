@@ -28,7 +28,7 @@ void main() {
 
     expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
     expect(find.byKey(const Key('screen04-capability-rail')), findsOneWidget);
-    expect(find.text('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
     expect(find.text('Shorts'), findsOneWidget);
     expect(find.text('Videos'), findsWidgets);
     expect(find.text('Feed'), findsOneWidget);

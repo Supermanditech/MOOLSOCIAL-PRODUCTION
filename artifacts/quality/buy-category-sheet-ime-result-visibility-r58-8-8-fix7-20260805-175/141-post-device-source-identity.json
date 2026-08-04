@@ -1,0 +1,13 @@
+{
+  "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f1ac83dea2047f40b39d772696bd0d1224edce8e",
+  "sourceFileCount": 2466,
+  "preBuildManifest": "30-source-manifest-final-prebuild.txt",
+  "postBuildManifest": "38-source-manifest-post-build.txt",
+  "postDeviceManifest": "140-source-manifest-post-device.txt",
+  "manifestSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+  "preBuildEqualsPostBuild": true,
+  "preBuildEqualsPostDevice": true,
+  "unexplainedDrift": false
+}

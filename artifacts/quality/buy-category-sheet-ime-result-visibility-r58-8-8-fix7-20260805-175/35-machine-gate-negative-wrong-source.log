@@ -1,0 +1,11 @@
+Premium-motion policy state passed: policy=BUY-PREMIUM-MOTION-POLICY-20260802; dispositions=5; candidate=BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7.
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-202
+60805-175\35-run-machine-gate-negative.ps1 : APK regression pre-build gate rejected: source fingerprint differs from 
+machine state.
+At C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-category-sheet-ime-result-visibility-r58-8-8-fix7-
+20260805-175\35-run-machine-gate-negative.ps1:21 char:3
++   Write-Error $_
++   ~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException
+    + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException,35-run-machine-gate-negative.ps1
+ 

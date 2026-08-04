@@ -1,0 +1,36 @@
+{
+  "date": "2026-08-05",
+  "decision": "founder_approved_and_protected",
+  "authority": "Founder stated: founder approved if codex is satisfying with oppo test -R58.8.8 FIX7; Codex confirmed OPPO satisfaction.",
+  "candidateId": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "profile": {
+    "versionName": "1.0.0-r58.23",
+    "versionCode": "2026080419"
+  },
+  "source": {
+    "fileCount": 2466,
+    "sha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE"
+  },
+  "apkInstall": {
+    "bytes": 134214109,
+    "sha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9"
+  },
+  "technicalEvidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175",
+  "protectedBehavior": [
+    "category_sheet_genuine_ime_height_and_opaque_surface",
+    "direct_accessible_editable_search_owner",
+    "filtered_result_422px_ime_clearance",
+    "shop_wholesale_medicine_category_ownership",
+    "product_back_context_restoration",
+    "finite_normal_and_static_reduced_motion"
+  ],
+  "excluded": [
+    "all_rejected_predecessors",
+    "future_unregistered_candidates",
+    "subcategory_backend_taxonomy_and_pagination",
+    "provider_stock_nearby_serviceability_personalization",
+    "payment_order_provider_outcomes",
+    "deployment_or_environment_promotion"
+  ],
+  "protectedBaselineUpdated": false
+}

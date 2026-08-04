@@ -1,0 +1,16 @@
+﻿cycle=1 category_sheet_arrival_and_android_back=true
+cycle=2 category_sheet_arrival_and_android_back=true
+cycle=3 category_sheet_arrival_and_android_back=true
+cycle=4 category_sheet_arrival_and_android_back=true
+cycle=5 category_sheet_arrival_and_android_back=true
+cycle=6 category_sheet_arrival_and_android_back=true
+cycle=7 category_sheet_arrival_and_android_back=true
+cycle=8 category_sheet_arrival_and_android_back=true
+cycle=9 category_sheet_arrival_and_android_back=true
+cycle=10 category_sheet_arrival_and_android_back=true
+cycle=11 category_sheet_arrival_and_android_back=true
+cycle=12 category_sheet_arrival_and_android_back=true
+cycle=13 category_sheet_arrival_and_android_back=true
+cycle=14 category_sheet_arrival_and_android_back=true
+cycle=15 category_sheet_arrival_and_android_back=true
+cycle=16 category_sheet_arrival_and_android_back=true

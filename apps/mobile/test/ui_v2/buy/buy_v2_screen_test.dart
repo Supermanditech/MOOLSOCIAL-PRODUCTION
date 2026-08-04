@@ -88,7 +88,7 @@ void main() {
     expect(find.byKey(const ValueKey('buy-dock-wholesale')), findsOneWidget);
   });
 
-  testWidgets('vertical changes acknowledge work before building the grid', (
+  testWidgets('vertical changes transition the real surface without a wait', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -100,31 +100,32 @@ void main() {
 
     expect(
       find.byKey(const ValueKey('buy-destination-progress')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-navigation-surface-current')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('buy-destination-progress')),
-        matching: find.text('Medicine'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Opening Medicine'), findsNothing);
-
-    await tester.pump();
-    expect(
-      find.byKey(const ValueKey('buy-destination-progress')),
-      findsOneWidget,
-    );
-
-    await tester.pump();
-    expect(
-      find.byKey(const ValueKey('buy-destination-progress')),
+      find.byKey(const ValueKey('buy-navigation-surface-outgoing')),
       findsNothing,
     );
     expect(
       find.byKey(ValueKey('buy-product-${session.visibleProducts.first.id}')),
       findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('buy-shared-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-persistent-dock')), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    final settledSequence = session.navigationMotionSequence;
+    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
+    await tester.pump();
+    expect(session.navigationMotionSequence, settledSequence);
+    expect(
+      find.byKey(const ValueKey('buy-navigation-surface-outgoing')),
+      findsNothing,
     );
 
     await tester.tap(find.byKey(const ValueKey('buy-dock-chat')));
@@ -132,29 +133,13 @@ void main() {
 
     expect(
       find.byKey(const ValueKey('buy-destination-progress')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('buy-destination-progress')),
-        matching: find.text('MoolSocial Assist'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Opening MoolSocial Assist'), findsNothing);
-
-    await tester.pump();
-    expect(
-      find.byKey(const ValueKey('buy-destination-progress')),
-      findsOneWidget,
-    );
-
-    await tester.pump();
-    expect(
-      find.byKey(const ValueKey('buy-destination-progress')),
       findsNothing,
     );
     expect(find.byKey(const ValueKey('buy-assist-hero')), findsOneWidget);
+    expect(
+      session.navigationMotionDirection,
+      BuyV2NavigationMotionDirection.forward,
+    );
   });
 
   testWidgets('Mool palette stays native and keeps Buy immediately available', (
@@ -256,7 +241,11 @@ void main() {
         for (final product in products)
           tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
       ];
-      expect(rects[0].top, lessThanOrEqualTo(290));
+      expect(
+        rects[0].top,
+        lessThanOrEqualTo(304),
+        reason: 'the expanded motion stage must remain compact',
+      );
       expect(rects[1].top, rects[0].top);
       expect(rects[0].left, lessThan(rects[1].left));
       final featuredPhoto = find.byKey(
@@ -363,7 +352,21 @@ void main() {
         44,
         reason: '${viewport.label} resting search target',
       );
-      expect(find.byKey(const ValueKey('buy-open-scanner')), findsOneWidget);
+      final restingSearchDecoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.byKey(const ValueKey('buy-search-control')),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(restingSearchDecoration.color, Colors.transparent);
+      expect(restingSearchDecoration.border, isNull);
+      expect(restingSearchDecoration.boxShadow, isNull);
+      expect(
+        find.byKey(const ValueKey('buy-open-scanner')),
+        findsOneWidget,
+        reason: '${viewport.label} resting scanner owner',
+      );
       await tester.tap(find.byKey(const ValueKey('buy-search-control')));
       await tester.pumpAndSettle();
       final activeSearch = tester.getRect(
@@ -374,7 +377,17 @@ void main() {
         greaterThanOrEqualTo(.90),
         reason: '${viewport.label} active search width',
       );
-      expect(activeSearch.height, 48);
+      expect(activeSearch.height, 70);
+      final activeSearchDecoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.byKey(const ValueKey('buy-search-control')),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(activeSearchDecoration.color, Colors.transparent);
+      expect(activeSearchDecoration.border, isNull);
+      expect(activeSearchDecoration.boxShadow, isNull);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-search-band')),
@@ -399,7 +412,11 @@ void main() {
         greaterThanOrEqualTo(.60),
         reason: '${viewport.label} active search typing width',
       );
-      expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-open-scanner')),
+        findsNothing,
+        reason: '${viewport.label} scanner yields to active query',
+      );
       expect(
         find.byKey(const ValueKey('buy-search-results-surface')),
         findsOneWidget,
@@ -614,13 +631,36 @@ void main() {
         );
         expect(find.byKey(const ValueKey('buy-search-close')), findsOneWidget);
         expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-        expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-open-scanner')),
+          findsNothing,
+          reason: '${destination.name} scanner yields to active query',
+        );
 
         await tester.enterText(
           find.byKey(const ValueKey('buy-search-field')),
-          'a',
+          'a long product sentence that must remain readable without hiding its beginning',
         );
         await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('buy-search-field')))
+              .maxLines,
+          6,
+        );
+        expect(
+          tester
+              .getSize(find.byKey(const ValueKey('buy-search-control')))
+              .height,
+          150,
+          reason: '${destination.name} long-query control grows progressively',
+        );
+        expect(
+          tester.getSize(find.byKey(const ValueKey('buy-search-band'))).height,
+          162,
+          reason: '${destination.name} long-query band owns all wrapped text',
+        );
+        expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
         expect(find.byKey(const ValueKey('buy-search-clear')), findsOneWidget);
         expect(
           tester.getSize(find.byKey(const ValueKey('buy-search-clear'))).height,
@@ -660,7 +700,7 @@ void main() {
       await tester.pump();
       expect(
         tester.getSize(find.byKey(const ValueKey('buy-search-control'))).height,
-        48,
+        70,
       );
       expect(
         tester
@@ -751,68 +791,186 @@ void main() {
     },
   );
 
-  testWidgets('MoolSocial brand mark uses a high-contrast white tile', (
+  testWidgets('MoolSocial promotional title is embedded in the glass scene', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    final tile = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('buy-brand-tile')),
-    );
-    final decoration = tile.decoration! as BoxDecoration;
-    expect(decoration.color, Colors.white);
     expect(
-      tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))).height,
-      44,
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-brand-tile')),
+        matching: find.byKey(const ValueKey('moolsocial-brand-surface')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-contextual-glass-header')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))),
+      const Size(104, 56),
     );
   });
 
   testWidgets(
-    'MoolSocial identity reveals once then returns to compact width',
+    'Mool and Social play one finite cinematic promotional sequence',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
       await tester.pump();
 
-      final brandTile = find.byKey(const ValueKey('buy-brand-tile'));
-      expect(tester.getSize(brandTile).width, 118);
+      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
+      expect(tester.getSize(brandOwner), const Size(104, 56));
+      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
       expect(
-        find.descendant(of: brandTile, matching: find.text('MoolSocial')),
+        find.byKey(const ValueKey('buy-header-signature-shop')),
         findsOneWidget,
       );
+      expect(find.text('Plan basket'), findsNothing);
+      expect(tester.binding.transientCallbackCount, greaterThan(0));
 
-      await tester.pump(const Duration(milliseconds: 1700));
-      await tester.pump(BuyV2Motion.brandReveal);
-      expect(tester.getSize(brandTile).width, 50);
+      await tester.pump(const Duration(milliseconds: 1800));
       expect(
-        find.descendant(of: brandTile, matching: find.text('MoolSocial')),
-        findsNothing,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('buy-shared-header')),
-          matching: find.textContaining('MoolSocial ·'),
-        ),
+        find.byKey(const ValueKey('buy-header-signature-shop')),
         findsOneWidget,
       );
+      expect(tester.binding.transientCallbackCount, greaterThan(0));
+
+      await tester.pumpAndSettle();
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('reduced motion uses the compact static MoolSocial identity', (
+  testWidgets('painted feature scene ends in one truthful context action', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
-    await tester.pumpWidget(app(session, disableAnimations: true));
+    await tester.pumpWidget(app(session));
     await tester.pump();
 
-    final brandTile = find.byKey(const ValueKey('buy-brand-tile'));
-    expect(tester.getSize(brandTile).width, 50);
-    expect(tester.widget<AnimatedContainer>(brandTile).duration, Duration.zero);
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('Plan a household basket'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-header-context-cta-shop')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-header-operational-rail')),
+      findsNothing,
+    );
+    expect(tester.binding.transientCallbackCount, greaterThan(0));
+
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-change-location')), findsOneWidget);
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a real Buy destination starts one finite cinematic scene', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    session.openDestination(BuyV2Destination.wholesale);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('buy-header-signature-wholesale')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Show flexible minimum-order packs'),
+      findsOneWidget,
+    );
+    expect(tester.binding.transientCallbackCount, greaterThan(0));
+
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'reduced motion paints the complete cinematic scene immediately',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      await tester.pumpWidget(app(session, disableAnimations: true));
+      await tester.pump();
+
+      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
+      expect(tester.getSize(brandOwner), const Size(104, 56));
+      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+      expect(find.bySemanticsLabel('Plan a household basket'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-header-signature-shop')),
+        findsOneWidget,
+      );
+      expect(find.text('Plan basket'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-header-operational-rail')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('buy-change-location')), findsOneWidget);
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('each vertical owns a distinct finite cinematic scene', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    final profileCore = tester.widget<Container>(
+      find.byKey(const ValueKey('buy-profile-glass-core')),
+    );
+    expect(
+      (profileCore.decoration! as BoxDecoration).color,
+      BuyV2Colors.navy.withValues(alpha: .76),
+    );
+
+    for (final entry in const <(BuyV2Destination, String, String)>[
+      (
+        BuyV2Destination.shop,
+        'buy-header-signature-shop',
+        'Plan a household basket',
+      ),
+      (
+        BuyV2Destination.wholesale,
+        'buy-header-signature-wholesale',
+        'Show flexible minimum-order packs',
+      ),
+      (
+        BuyV2Destination.medicine,
+        'buy-header-signature-medicine',
+        'Open the prescription centre',
+      ),
+      (
+        BuyV2Destination.orders,
+        'buy-header-signature-orders',
+        'Track active order MS-240782',
+      ),
+    ]) {
+      session.openDestination(entry.$1);
+      await tester.pump();
+      expect(find.byKey(ValueKey<String>(entry.$2)), findsOneWidget);
+      expect(find.bySemanticsLabel(entry.$3), findsOneWidget);
+      if (entry.$1 != BuyV2Destination.shop) {
+        expect(tester.binding.transientCallbackCount, greaterThan(0));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.binding.transientCallbackCount, 0);
+    }
+
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('inactive sponsored placement consumes no catalogue height', (
     tester,
   ) async {
@@ -892,7 +1050,7 @@ void main() {
   );
 
   testWidgets(
-    'category glass ends above the dock with only search and separate close',
+    'category glass ends above the dock with compact heading and close',
     (tester) async {
       addTearDown(() {
         tester.view.resetPhysicalSize();
@@ -908,7 +1066,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Find a category'), findsOneWidget);
-      expect(find.text('Shop categories'), findsNothing);
+      expect(find.text('Shop categories'), findsOneWidget);
       expect(
         tester
             .getSize(find.byKey(const ValueKey('buy-category-search')))
@@ -1176,9 +1334,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
       await tester.pumpAndSettle();
       final option = find.byKey(ValueKey('buy-filter-${entry.$2}'));
-      expect(option, findsOneWidget);
-      await tester.ensureVisible(option);
+      await tester.scrollUntilVisible(
+        option,
+        160,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('buy-filter-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
       await tester.pumpAndSettle();
+      expect(option, findsOneWidget);
       expect(tester.takeException(), isNull, reason: entry.$1.label);
       await tester.tap(option);
       await tester.pumpAndSettle();
@@ -1284,6 +1449,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(product.title), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
+        matching: find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('buy-product-action-bar')), findsNothing);
     await tester.scrollUntilVisible(
       find.text('Pack, delivery and seller'),
       220,
@@ -1300,6 +1473,14 @@ void main() {
     expect(primary, findsOneWidget);
     expect(
       find.descendant(of: primary, matching: find.byIcon(Icons.add_rounded)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: primary, matching: find.text(product.title)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: primary, matching: find.text('Add')),
       findsOneWidget,
     );
     expect(find.text('Add to cart'), findsNothing);
@@ -1346,6 +1527,7 @@ void main() {
         find.byKey(ValueKey('buy-review-comment-${product.id}')),
         'Fresh pack and the delivery promise was clear.',
       );
+      await tester.pump();
       await tester.tap(find.byKey(ValueKey('buy-submit-review-${product.id}')));
       await tester.pumpAndSettle();
       expect(
@@ -1591,9 +1773,17 @@ void main() {
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
+    final selectedProduct = BuyV2Catalogue.products.firstWhere(
+      (item) => item.destination == BuyV2Destination.shop,
+    );
+    expect(session.addProduct(selectedProduct.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.confirmOrder(), isTrue);
+    final order = session.confirmedOrders.single;
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    session.openTracking('MS-240782');
+    session.openTracking(order.id);
     await tester.pumpAndSettle();
 
     final itemsAction = find.text('Items');
@@ -1605,10 +1795,7 @@ void main() {
     await tester.tap(itemsAction);
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.orderItems);
-    expect(
-      find.byKey(const ValueKey('buy-order-items-MS-240782')),
-      findsOneWidget,
-    );
+    expect(find.byKey(ValueKey('buy-order-items-${order.id}')), findsOneWidget);
     final product = session.productsForOrder(session.selectedOrder).first;
     await tester.tap(find.byKey(ValueKey('buy-order-product-${product.id}')));
     await tester.pumpAndSettle();
@@ -1618,7 +1805,7 @@ void main() {
     session.goBack();
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.orderItems);
-    expect(session.selectedOrder.id, 'MS-240782');
+    expect(session.selectedOrder.id, order.id);
   });
 
   testWidgets(
@@ -2020,22 +2207,20 @@ void main() {
       await tester.pumpWidget(app(session, textScale: 1.4));
       await tester.pumpAndSettle();
 
-      final brand = find.text('MoolSocial · Deliver to');
-      expect(brand, findsOneWidget);
-      final brandMark = find.byKey(const ValueKey('buy-brand-mark'));
-      expect(brandMark, findsOneWidget);
-      final brandMarkSize = tester.getSize(brandMark);
-      expect(brandMarkSize, const Size(32, 24));
-      expect(
-        brandMarkSize.width / brandMarkSize.height,
-        greaterThanOrEqualTo(1.3),
-      );
-      final brandRect = tester.getRect(brand);
+      expect(find.byKey(const ValueKey('buy-change-location')), findsOneWidget);
+      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
+      expect(tester.getSize(brandOwner), const Size(104, 56));
       final headerRect = tester.getRect(
         find.byKey(const ValueKey('buy-shared-header')),
       );
+      final brandRect = tester.getRect(brandOwner);
       expect(headerRect.contains(brandRect.topLeft), isTrue);
       expect(headerRect.contains(brandRect.bottomRight), isTrue);
+      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-header-signature-shop')),
+        findsOneWidget,
+      );
 
       session.openCart();
       await tester.pumpAndSettle();
@@ -2079,7 +2264,7 @@ void main() {
     expect(find.textContaining('delivery and payment'), findsNothing);
   });
 
-  testWidgets('tracking shows live progress, next step and working alerts', (
+  testWidgets('tracking shows current progress, next step and working alerts', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -2088,8 +2273,17 @@ void main() {
     session.openTracking('MS-240782');
     await tester.pumpAndSettle();
 
-    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LIVE'), findsNothing);
     expect(find.text('54%'), findsOneWidget);
+    expect(
+      tester
+          .widget<LinearProgressIndicator>(
+            find.byKey(const ValueKey('buy-tracking-progress')),
+          )
+          .value,
+      .54,
+    );
     expect(find.text('NOW'), findsOneWidget);
     expect(find.text('What happens next'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -2098,12 +2292,12 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Order updates'), findsOneWidget);
-    expect(find.text('Live status alerts are on'), findsOneWidget);
+    expect(find.text('Order alerts are on'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-tracking-alerts-toggle')));
     await tester.pump();
     expect(session.trackingAlertsEnabled, isFalse);
-    expect(find.text('Live status alerts are paused'), findsOneWidget);
+    expect(find.text('Order alerts are paused'), findsOneWidget);
   });
 
   testWidgets('compact cart never covers tracking or support actions', (
@@ -2157,6 +2351,17 @@ void main() {
       expect(
         find.byKey(const ValueKey('buy-assist-order-progress')),
         findsOneWidget,
+      );
+      final currentOrder = session.orders.firstWhere(
+        (order) => order.status != BuyV2OrderStatus.delivered,
+      );
+      expect(
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byKey(const ValueKey('buy-assist-order-progress')),
+            )
+            .value,
+        currentOrder.progress,
       );
       expect(find.textContaining('% complete'), findsOneWidget);
 
@@ -2255,9 +2460,10 @@ void main() {
     await tester.tapAt(deliveredRect.topLeft + const Offset(60, 60));
     await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.cart);
-    expect(session.cartScope, BuyV2CartScope.shop);
-    expect(session.cartLines, isNotEmpty);
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, 'MS-240741');
+    expect(session.ordersTab, BuyV2OrdersTab.delivered);
+    expect(session.cartLines, isEmpty);
   });
 
   testWidgets('Orders opens at the top after Checkout was scrolled', (
@@ -2289,6 +2495,8 @@ void main() {
     final session = BuyV2Session(core: BuySession());
     var scannerCalls = 0;
     final scannedProduct = session.visibleProducts.last;
+    final savedProduct = session.visibleProducts.first;
+    session.toggleSaved(savedProduct.id);
     await tester.pumpWidget(
       app(
         session,
@@ -2302,7 +2510,6 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
     await tester.pumpAndSettle();
-    final savedProduct = session.savedProductsFor(BuyV2Destination.shop).first;
     expect(find.byType(BottomSheet), findsNothing);
     await tester.tap(find.byKey(ValueKey('buy-product-${savedProduct.id}')));
     await tester.pumpAndSettle();
@@ -2563,7 +2770,7 @@ void main() {
     },
   );
 
-  testWidgets('delivered Orders are reachable and expose one Reorder action', (
+  testWidgets('delivered Orders expose non-mutating order inspection', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -2577,7 +2784,8 @@ void main() {
 
     expect(session.ordersTab, BuyV2OrdersTab.delivered);
     expect(find.text('Delivered'), findsWidgets);
-    expect(find.text('Reorder'), findsWidgets);
+    expect(find.text('View order'), findsWidgets);
+    expect(find.text('Reorder'), findsNothing);
     expect(find.text('Track order'), findsNothing);
   });
 

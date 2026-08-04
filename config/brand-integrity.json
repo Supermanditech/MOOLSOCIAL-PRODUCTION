@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 20,
   "status": "founder-directed-mandatory",
   "wordmark": "MoolSocial",
   "colours": {
@@ -13,6 +13,251 @@
     "white",
     "green"
   ],
+  "wordmarkMotion": {
+    "permanentOutcome": "MoolSocial",
+    "sequence": [
+      "MoolSocial",
+      "identity-line",
+      "settled-wordmark"
+    ],
+    "durationMilliseconds": 1200,
+    "loops": false,
+    "reducedMotionResult": "static-MoolSocial",
+    "inactivityMinutes": 10,
+    "playbackCooldownMinutes": 20
+  },
+  "launchBrandReveal": {
+    "owner": "apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart",
+    "sequence": [
+      "MoolSocial",
+      "India Ka Socio Commerce App",
+      "business-promise",
+      "unified-lockup"
+    ],
+    "durationMilliseconds": 2400,
+    "presentationGateMilliseconds": 3000,
+    "identityLineCount": 1,
+    "tagline": "India Ka Socio Commerce App",
+    "businessCopy": [
+      "Create. Connect. Work. Grow.",
+      "One app for life and business."
+    ],
+    "taglinePresentation": "plain-text",
+    "loops": false,
+    "reducedMotionResult": "static-complete-lockup"
+  },
+  "sharedMotionPrimitives": {
+    "owner": "apps/mobile/lib/core/design/mool_motion_primitives.dart",
+    "reviewEntrypoint": "apps/mobile/lib/review/mool_motion_primitives_review_main.dart",
+    "gradientStops": [
+      "navy",
+      "saffron",
+      "white",
+      "green"
+    ],
+    "finite": true,
+    "reducedMotionResult": "zero-duration-final-state",
+    "customerIntegrations": []
+  },
+  "buyThemeMotion": {
+    "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "integration": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "headerDurationMilliseconds": 280,
+    "canvasDurationMilliseconds": 240,
+    "loops": false,
+    "reducedMotionResult": "zero-duration-final-theme",
+    "verticals": {
+      "shop": "navy-saffron",
+      "wholesale": "navy-green",
+      "medicine": "tricolour-navy",
+      "orders": "navy"
+    },
+    "downstream": {
+      "cart": "saffron",
+      "tracking": "green"
+    }
+  },
+  "buyContextualGlassHeader": {
+    "owners": [
+      "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
+    ],
+    "sequence": [
+      "Mool-kinetic-promotional-title-enters-scene",
+      "Social-masked-depth-reveal-overtakes-same-stage",
+      "five-context-visual-creative-stages-emerge-from-vanishing-room",
+      "camera-shifted-context-studio-walls-volumetric-light-reflections-and-near-occlusion",
+      "visible-promo-stage-reuses-existing-context-action",
+      "icon-only-owned-action-settles",
+      "finite-cinematic-context-settle"
+    ],
+    "permanentOutcome": "scene-embedded-MoolSocial-promotion-with-full-semantics",
+    "widthPixels": 104,
+    "heightPixels": 56,
+    "durationMilliseconds": 3600,
+    "sceneDurationMilliseconds": 3600,
+    "copyDurationMilliseconds": 3600,
+    "identityLineCount": 0,
+    "surface": "borderless-scene-embedded-no-logo-tile",
+    "headerTreatment": "camera-shifted-premium-glass-broadcast-studio-with-volumetric-reflective-depth",
+    "colourComposition": "four-colour-brand-structure-with-founder-authorized-rich-context-colour-inside-first-party-promo-aperture-only",
+    "gradientStops": {
+      "shop": "navy-white-structure-with-retail-cyan-violet-promo-light",
+      "wholesale": "navy-white-structure-with-teal-gold-promo-light",
+      "medicine": "navy-white-structure-with-aqua-ultraviolet-promo-light",
+      "orders": "navy-white-structure-with-electric-blue-magenta-violet-promo-light",
+      "cart": "source-vertical-over-navy",
+      "tracking": "source-vertical-over-navy"
+    },
+    "verticalMotionSignatures": {
+      "shop": "five-visual-shop-studio-creatives",
+      "wholesale": "five-visual-wholesale-studio-creatives",
+      "medicine": "five-visual-medicine-studio-creatives",
+      "orders": "five-visual-orders-studio-creatives-no-progress"
+    },
+    "featureCopy": {
+      "shop": "Everyday shop|Plan the monthly basket",
+      "wholesale": "Wholesale supply|Flexible restocking",
+      "medicine": "Everyday care|Prescription centre",
+      "orders": "Orders & delivery|Purchases"
+    },
+    "featureCopyPresentation": "no-visible-header-feature-copy-semantic-actions-only",
+    "visibleFeatureCopy": false,
+    "visualCreativeCapacity": {
+      "total": 20,
+      "perContext": 5,
+      "presentation": "five-finite-code-native-tappable-visual-stages-per-active-context",
+      "tapResult": "reuse-existing-truthful-context-action",
+      "visiblePromoContainers": false,
+      "tapSurface": "transparent-central-aperture-with-existing-icon-affordance",
+      "remoteCampaignActivation": false
+    },
+    "promoColourException": {
+      "scope": "first-party-code-native-promo-aperture-and-its-cinematic-light-only",
+      "globalTokenRegistration": false,
+      "brandIdentityAffected": false,
+      "sharedControlsAffected": false,
+      "semanticColoursAffected": false
+    },
+    "headerActionPresentation": "tappable-promo-aperture-plus-icon-affordance-with-shared-owned-action-no-visible-label-or-arrow",
+    "operationalContextPresentation": "location-standalone-when-search-closed-scanner-inside-empty-resting-search-yields-during-active-query-no-header-rail",
+    "searchPresentation": {
+      "activeControlHeightPixels": 70,
+      "longQueryControlHeightPixels": 120,
+      "longQueryBandHeightPixels": 132,
+      "accessibilityLongQueryControlHeightPixels": 150,
+      "accessibilityLongQueryBandHeightPixels": 162,
+      "longQueryThresholdCharacters": 38,
+      "activeMinimumWidthRatio": 0.9,
+      "activeQueryMaxLines": 6,
+      "shell": "borderless-transparent-no-shadow",
+      "inputBorders": "none-all-states",
+      "scannerDuringActiveQuery": false,
+      "scannerWithNonEmptyQuery": false
+    },
+    "contrast": {
+      "defaultForeground": "white-over-navy-glass-veil",
+      "medicineForeground": "white-over-navy-glass-veil",
+      "profileOwner": "navy-glass-white-outline"
+    },
+    "timerInitiatedFiniteTurns": true,
+    "continuousTicker": false,
+    "approvedVideoAssets": [],
+    "mediaFallback": "native-finite-cinematic-multi-plane-context-world",
+    "promotionalContent": "twenty-code-native-tappable-visual-context-creatives-no-visible-copy-no-remote-campaign",
+    "reducedMotionResult": "static-complete-multi-depth-premium-studio-stacked-MoolSocial-tappable-final-promo-icon-affordance-location-control-no-header-rail"
+  },
+  "buySavedQuantityCartMotion": {
+    "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "integrations": [
+      "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+    ],
+    "stateOwner": "BuyV2Session",
+    "valueDurationMilliseconds": 180,
+    "acknowledgementDurationMilliseconds": 240,
+    "loops": false,
+    "semanticResult": "current-value-only",
+    "reducedMotionResult": "zero-duration-final-value",
+    "values": [
+      "saved",
+      "quantity",
+      "mini-cart-message",
+      "mini-cart-total",
+      "cart-line-total",
+      "cart-summary",
+      "cart-payable-total"
+    ]
+  },
+  "buyCouponOfferMotion": {
+    "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "stateOwners": [
+      "BuyV2CartBenefitsAdapter",
+      "BuyV2Session"
+    ],
+    "selectionDurationMilliseconds": 150,
+    "stateDurationMilliseconds": 180,
+    "contentDurationMilliseconds": 240,
+    "loops": false,
+    "normalProductionResult": "fail-closed",
+    "reviewSeedBoundary": "compile-time-device-review-only",
+    "semanticResult": "current-state-only",
+    "reducedMotionResult": "zero-duration-final-state",
+    "values": [
+      "entry-summary",
+      "destination-selection",
+      "kind-selection",
+      "unavailable-state",
+      "benefit-action",
+      "benefit-status"
+    ]
+  },
+  "buyProductDepthMotion": {
+    "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "integrations": [
+      "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+    ],
+    "stateOwner": "BuyV2Session",
+    "pressDurationMilliseconds": 110,
+    "contentDurationMilliseconds": 240,
+    "loops": false,
+    "transformHitTests": false,
+    "semanticResult": "current-product-only",
+    "reducedMotionResult": "zero-duration-static-current-product",
+    "motionPalette": [
+      "navy",
+      "saffron",
+      "white",
+      "green"
+    ],
+    "values": [
+      "featured-product-press",
+      "dense-product-press",
+      "selected-product-media",
+      "selected-product-title"
+    ]
+  },
+  "buyQueryResultMotion": {
+    "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "stateOwner": "BuyV2Session",
+    "contentDurationMilliseconds": 240,
+    "loops": false,
+    "semanticResult": "current-query-results-only",
+    "focusResult": "search-field-and-keyboard-preserved",
+    "reducedMotionResult": "zero-duration-current-results",
+    "motionPalette": [
+      "navy",
+      "saffron",
+      "white",
+      "green"
+    ],
+    "values": [
+      "ready-suggestions",
+      "matching-results",
+      "empty-results"
+    ]
+  },
   "moolNavigation": {
     "meaning": "service-launcher-not-logo",
     "htmlGlyph": "four-rounded-squares",

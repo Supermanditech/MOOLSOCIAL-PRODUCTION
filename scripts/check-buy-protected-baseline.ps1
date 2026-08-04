@@ -15,7 +15,7 @@ if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
 
 if ([string]::IsNullOrWhiteSpace($BaselinePath)) {
   $BaselinePath = Join-Path $root (
-    "artifacts\quality\buy-protected-baseline-r35-1-20260731-28\BASELINE.json"
+    "artifacts\quality\buy-protected-baseline-r40-3-20260801-49\BASELINE.json"
   )
 } else {
   $BaselinePath = (Resolve-Path -LiteralPath $BaselinePath).Path
@@ -49,9 +49,9 @@ function Get-PortableSha256 {
 
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
-    return [Convert]::ToHexString(
+    return [BitConverter]::ToString(
       $sha.ComputeHash($bytes)
-    ).ToLowerInvariant()
+    ).Replace("-", "").ToLowerInvariant()
   } finally {
     $sha.Dispose()
   }
@@ -117,9 +117,9 @@ $payload = ($lines -join "`n") + "`n"
 
 $treeSha = [Security.Cryptography.SHA256]::Create()
 try {
-  $actualTree = [Convert]::ToHexString(
+  $actualTree = [BitConverter]::ToString(
     $treeSha.ComputeHash($utf8NoBom.GetBytes($payload))
-  ).ToLowerInvariant()
+  ).Replace("-", "").ToLowerInvariant()
 } finally {
   $treeSha.Dispose()
 }

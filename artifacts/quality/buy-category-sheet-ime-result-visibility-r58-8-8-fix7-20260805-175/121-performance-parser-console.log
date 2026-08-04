@@ -1,0 +1,22 @@
+{
+    "candidate":  "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "device":  "OPPO CPH2375 2b3e0f71",
+    "profile":  "1.0.0-r58.23 (2026080419)",
+    "replay":  "sixteen ready-process Shop category-sheet arrival and Android Back cycles",
+    "metric":  "Flutter SurfaceView queueBuffer presentation cadence",
+    "surfacePid":  5815,
+    "presentedFrames":  634,
+    "activeIntervals":  618,
+    "idleGapsExcluded":  15,
+    "p50Ms":  21.455,
+    "p90Ms":  24.871,
+    "p95Ms":  31.725,
+    "p99Ms":  55.037,
+    "maxActiveIntervalMs":  64.658,
+    "activeIntervalsOver33_333Ms":  29,
+    "activeIntervalsOver100Ms":  0,
+    "semanticShaderTraceMatches":  0,
+    "compileTraceMatches":  0,
+    "atraceBytes":  71009369,
+    "classification":  "passed"
+}

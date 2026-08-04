@@ -26,7 +26,9 @@ function Get-PortableSha256 {
 
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
-    return [Convert]::ToHexString($sha.ComputeHash($bytes)).ToLowerInvariant()
+    return [BitConverter]::ToString(
+      $sha.ComputeHash($bytes)
+    ).Replace("-", "").ToLowerInvariant()
   } finally {
     $sha.Dispose()
   }
@@ -115,9 +117,9 @@ $payload = ($lines -join "`n") + "`n"
 
 $treeSha = [Security.Cryptography.SHA256]::Create()
 try {
-  $actualTree = [Convert]::ToHexString(
+  $actualTree = [BitConverter]::ToString(
     $treeSha.ComputeHash($utf8NoBom.GetBytes($payload))
-  ).ToLowerInvariant()
+  ).Replace("-", "").ToLowerInvariant()
 } finally {
   $treeSha.Dispose()
 }

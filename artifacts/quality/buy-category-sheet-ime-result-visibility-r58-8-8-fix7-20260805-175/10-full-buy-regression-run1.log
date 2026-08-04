@@ -1,0 +1,434 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: safe Buy destination restores and malformed routes fail closed
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: route confirmation persists safe state and Social owns Buy root exit
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: route snapshots persist in invocation order and latest route wins
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: a failed snapshot does not poison the next persistence operation
+00:00 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:01 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:02 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:04 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:05 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:05 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:05 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:06 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:06 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:06 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:07 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:07 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:07 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:07 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:08 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:08 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:09 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:09 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:09 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+00:10 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back returns to Social through repeated real-router cycles
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:10 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: validated coupon and payment selections continue to exact Cart review
+00:10 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: validated coupon and payment selections continue to exact Cart review
+00:10 +25 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: validated coupon and payment selections continue to exact Cart review
+00:10 +26 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart: stale session owner rejects a completed add
+00:10 +27 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back ignores an Eat invoker and keeps Buy one tap from Social
+00:11 +28 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: root Back ignores an Eat invoker and keeps Buy one tap from Social
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:11 +29 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: completion is one native action and Back remains intact
+00:11 +30 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: completion is one native action and Back remains intact
+00:11 +30 ~2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart: completion is one native action and Back remains intact
+00:12 +31 ~2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+00:13 +32 ~2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+00:13 +32 ~3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+00:13 +32 ~4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+00:13 +32 ~5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+00:13 +32 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stateful Eat world is replaced before Buy so root Back renders Social
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:14 +33 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: catalogue vertical updates the route before a router refresh can persist it
+00:15 +34 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: catalogue vertical updates the route before a router refresh can persist it
+00:15 +35 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: catalogue vertical updates the route before a router refresh can persist it
+00:15 +36 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: catalogue vertical updates the route before a router refresh can persist it
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:15 +37 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:15 +38 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +39 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +40 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +41 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +42 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +43 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +44 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +45 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:16 +46 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:20 +47 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:20 +48 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:21 +48 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: search and internal Buy state own Back before root exit
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:21 +49 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:22 +50 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:24 +50 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: deliberate Social departure makes Buy a one-tap return
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:24 +51 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:25 +51 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: stored Medicine route restores through the production router
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:25 +52 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:25 +53 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart: Shop Wholesale and Medicine Cart lines open exact details without owning quantity
+00:25 +54 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:27 +54 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart: internal destination changes update the persisted safe route
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:27 +55 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:28 +56 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:28 +57 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:28 +58 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:29 +59 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:30 +60 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart: R58.8.8 FIX7 category search exports editable semantics
+00:31 +61 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +62 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +63 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +64 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +65 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +66 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:31 +67 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:32 +68 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:33 +69 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:34 +70 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:34 +71 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:35 +72 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:35 +73 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:35 +74 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:36 +75 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:37 +76 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:38 +77 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:38 +77 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:39 +78 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:40 +79 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: visible Checkout return restores every exact Cart scope
+00:40 +80 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: benefit destination fits compact viewport and enlarged customer text
+00:40 +81 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:41 +82 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:41 +83 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:42 +84 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:42 +85 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:42 +86 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart: real catalogue tools flow reaches the R56.6 filter sheet
+00:43 +87 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: R58.8.6 responsive Android and iOS candidate captures
+00:43 +88 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart: R58.8.6 responsive Android and iOS candidate captures
+00:43 +89 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +90 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +91 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +92 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +93 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +94 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:44 +95 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:45 +96 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:45 +97 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:45 +98 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:46 +99 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:46 +100 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:46 +100 ~8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:46 +100 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart: Orders and Tracking never replay progress or claim live state
+00:47 +101 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:47 +102 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:48 +103 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:48 +104 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:48 +105 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:49 +106 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:49 +107 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:50 +108 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:50 +109 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:50 +110 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:51 +111 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:51 +112 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:51 +112 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:53 +113 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:53 +114 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:53 +115 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:54 +116 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:54 +117 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:54 +118 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:54 +119 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:54 +120 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:55 +121 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:55 +122 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:55 +122 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:56 +123 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:56 +124 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:56 +125 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:56 +126 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart: all six recovery states use honest copy and origin semantics
+00:57 +127 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+00:57 +128 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+00:57 +129 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+00:57 +130 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+01:00 +131 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+01:00 +131 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+01:00 +132 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart: Wholesale Help renders and opens its exact order
+01:01 +133 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart: three order families expose exact immutable delivery facts
+01:02 +134 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart: three order families expose exact immutable delivery facts
+01:02 +135 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart: three order families expose exact immutable delivery facts
+01:02 +135 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart: three order families expose exact immutable delivery facts
+01:04 +136 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart: three order families expose exact immutable delivery facts
+01:04 +137 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: forward back and replacement use distinct bounded axes
+01:04 +138 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: forward back and replacement use distinct bounded axes
+01:05 +139 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:05 +140 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:05 +141 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:05 +142 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:07 +143 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:07 +144 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:07 +145 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:07 +145 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: delivered Tracking owns direct exact-order Help
+01:08 +146 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart: R56.7 route policy is finite and reduced motion is static
+01:08 +147 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: active Assist exposes cancellation preparation without mutation
+01:09 +148 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart: real Checkout and Account callers reach the R56.7 sheet
+01:10 +148 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_performance_budget_test.dart: Buy V2 conservative in-process performance budgets repeated vertical search and filter projections remain bounded
+BUY_PERF search_filter_cycles=1200 projected_offers=8600 elapsed_ms=159 budget_ms=8000
+01:10 +149 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart: real Checkout and Account callers reach the R56.7 sheet
+01:10 +150 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart: real Checkout and Account callers reach the R56.7 sheet
+01:10 +150 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_performance_budget_test.dart: Buy V2 conservative in-process performance budgets full current-seed mixed cart and checkout projection remain bounded
+BUY_PERF mixed_cart_offers=172 projection_cycles=500 lines=86000 groups=24500 elapsed_ms=334 budget_ms=8000
+01:10 +151 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart: real Checkout and Account callers reach the R56.7 sheet
+01:10 +152 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: visible Assist return restores exact Tracking and Items depth
+01:11 +152 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_performance_budget_test.dart: Buy V2 conservative in-process performance budgets repeated vertical state transitions remain bounded and isolated
+BUY_PERF vertical_transitions=6000 elapsed_ms=21 budget_ms=8000
+01:11 +153 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: visible Assist return restores exact Tracking and Items depth
+01:11 +154 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart: visible Assist return restores exact Tracking and Items depth
+01:11 +155 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:11 +156 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +157 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +158 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +159 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +160 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +161 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:12 +161 ~15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:13 +162 ~15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:13 +163 ~15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:13 +163 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:14 +164 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:16 +165 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart: prescription choice reveals stable exact-product continuity and Back
+01:17 +166 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:17 +167 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:18 +168 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:18 +169 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:19 +170 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:19 +171 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:19 +172 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:20 +173 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:21 +174 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: zero-quantity Add is compact explicit and product-specific in every vertical
+01:21 +175 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: detail media zoom is explicit, bounded and resettable
+01:21 +176 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: detail media zoom is explicit, bounded and resettable
+01:21 +177 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: detail media zoom is explicit, bounded and resettable
+01:21 +177 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: detail media zoom is explicit, bounded and resettable
+01:22 +178 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: real quantity uses compact independent 44px controls
+01:23 +179 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: one-finger drag at 1x remains owned by product page scroll
+01:23 +180 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: one-finger drag at 1x remains owned by product page scroll
+01:24 +181 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: state-owned Add point cannot retarget to replacement plus
+01:25 +182 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart: state-owned Add point cannot retarget to replacement plus
+01:25 +183 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart: review arrival/reverse is finite and invalid dismissal is inert
+01:26 +184 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart: review arrival/reverse is finite and invalid dismissal is inert
+01:26 +185 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+01:27 +186 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+01:27 +187 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+01:29 +188 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: production Buy entry mounts V2 and never the legacy shell
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:29 +189 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: product detail continues directly through genuine products
+01:30 +190 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart: report choice owns availability and sends one truthful mutation
+01:30 +190 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: historical Buy deep links resolve to V2 destinations
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:30 +191 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart: report choice owns availability and sends one truthful mutation
+01:30 +192 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 policy owns bounded forward and reverse route motion
+01:31 +193 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: Medicine continuation is isolated and not medical advice
+01:31 +194 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart: Medicine continuation is isolated and not medical advice
+01:31 +195 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+01:32 +196 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+01:33 +197 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+01:33 +197 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: query routes expose the approved Wholesale and Orders states
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:33 +198 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 sheet travels finitely and Back keeps Saved unchanged
+01:33 +199 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 sheet travels finitely and Back keeps Saved unchanged
+01:34 +200 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 sheet travels finitely and Back keeps Saved unchanged
+01:35 +201 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Buy account owner opens from a destination without losing V2
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:36 +202 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 reduced motion is immediate and safe dismissal never mutates
+01:36 +203 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart: R56.1 reduced motion is immediate and safe dismissal never mutates
+01:37 +204 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Buy account is reachable from tertiary purchase states
+01:39 +205 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Buy account is reachable from tertiary purchase states
+01:39 +205 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Buy account is reachable from tertiary purchase states
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:41 +206 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:41 +206 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: Screen 04 Mool Buy action opens only the native Buy V2
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:43 +207 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +208 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +209 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +210 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +211 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +212 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +213 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +214 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +215 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:43 +216 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:44 +217 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:46 +217 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: every historical Buy order route stays inside V2
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:46 +218 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:46 +219 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:47 +219 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: all approved recovery routes mount their native state
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:47 +220 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout expose one truthful selected dock item
+01:48 +220 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:49 +221 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_search_relevance_test.dart: Buy V2 exact-first typo-tolerant search relevance near spelling renders the real result in the existing UI
+01:50 +221 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart: stale Buy deep links never substitute another product or order
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:50 +222 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_search_relevance_test.dart: Buy V2 exact-first typo-tolerant search relevance near spelling renders the real result in the existing UI
+01:50 +223 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_search_relevance_test.dart: Buy V2 exact-first typo-tolerant search relevance near spelling renders the real result in the existing UI
+01:50 +224 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_search_relevance_test.dart: Buy V2 exact-first typo-tolerant search relevance near spelling renders the real result in the existing UI
+01:51 +225 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_search_relevance_test.dart: Buy V2 exact-first typo-tolerant search relevance near spelling renders the real result in the existing UI
+01:51 +226 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Mool palette stays native and keeps Buy immediately available
+01:52 +227 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R58.8.7 responsive Android and iOS candidate captures
+01:52 +228 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R58.8.7 responsive Android and iOS candidate captures
+01:54 +229 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:55 +230 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +231 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +232 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +233 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +234 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +235 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +236 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +237 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +238 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +239 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +240 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:56 +241 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +242 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +243 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +244 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +245 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +246 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +247 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +248 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +249 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +250 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +251 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +252 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +253 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +254 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +255 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +256 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +257 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +258 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +259 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +260 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +261 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +262 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +263 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +264 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +265 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +266 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +267 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +268 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +269 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +270 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +271 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +272 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:58 +273 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+01:59 +274 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+02:00 +275 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+02:00 +276 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+02:00 +277 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:00 +278 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:00 +279 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:00 +280 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:02 +281 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:02 +282 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:03 +283 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:03 +284 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:03 +285 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart: Shop seller action opens only exact products after reverse
+02:03 +286 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:03 +287 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:03 +288 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:03 +289 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:04 +290 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:04 +291 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:05 +292 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:05 +292 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:10 +293 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+02:10 +294 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart: supplier dismissal does not change product or catalogue state
+02:11 +295 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: expanded search offers flat separate Shop Wholesale and Medicine lists
+02:11 +296 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: expanded search offers flat separate Shop Wholesale and Medicine lists
+02:14 +297 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: responsive search surface is shared across every Buy destination
+02:18 +298 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Account and product depth close the active search owner
+02:20 +299 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category action is compact and its first-party feature reuses filters
+02:21 +300 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: MoolSocial promotional title is embedded in the glass scene
+02:22 +301 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Mool and Social play one finite cinematic promotional sequence
+02:22 +302 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: painted feature scene ends in one truthful context action
+02:23 +303 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: a real Buy destination starts one finite cinematic scene
+02:24 +304 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: reduced motion paints the complete cinematic scene immediately
+02:25 +305 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: each vertical owns a distinct finite cinematic scene
+02:26 +306 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: inactive sponsored placement consumes no catalogue height
+02:26 +307 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: shared brand and account controls stay in bounds at every depth
+02:29 +308 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category glass ends above the dock with compact heading and close
+02:30 +309 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every approved Buy category has a specific visual icon
+02:30 +310 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category selector fits 320 at 140 percent and finds a late category
+02:30 +311 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: catalogue keeps vertical discovery and lazy horizontal products
+02:31 +312 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: single-product results reserve only one horizontal lane
+02:31 +313 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: 140 percent text keeps navigation reachable
+02:32 +314 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: accessible featured cards keep purchase actions in bounds
+02:32 +315 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: destination tool menus remain usable at 140 percent text
+02:34 +316 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: purchase and navigation actions meet the 44 pixel target
+02:35 +317 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: critical Buy journeys fit compact and large phone widths
+02:40 +318 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail exposes purchase decision information
+02:40 +319 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail uses packshot partner role reviews and reporting
+02:42 +320 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: packshot atlas isolates one exact cell per product
+02:42 +321 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every seeded product resolves to exact or truthful category media
+02:42 +322 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured products lead with a dominant photo and keep dense filtered grids
+02:43 +323 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured press and quantity motion respect reduced motion
+02:44 +324 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail keeps a large upload-ready media tile
+02:44 +325 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: tracking Items opens an order item and returns to that order
+02:45 +326 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Shop Wholesale and Medicine details fit compact Android and iOS sizes
+02:50 +327 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: DC and Chat repeat taps return to the exact purchase depth
+02:51 +328 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Account Orders Prescription and Wholesale actions complete and return
+02:54 +329 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: each Buy vertical category uses lazy horizontal products
+02:55 +330 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: catalogue plus becomes an inline quantity stepper and returns
+02:56 +331 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product and Cart keep plus and minus quantity controls
+02:57 +332 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: add confirmation is owned by the Cart bar, not the top toast
+02:58 +333 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: non-empty Cart becomes a prominent reserved conversion bar
+02:59 +334 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Cart stays aggregate across Shop Wholesale Medicine and Orders
+03:01 +335 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: compact brand and Cart total remain whole at 320 and 140 percent
+03:02 +336 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: saved destination and payment remain separate decisions
+03:02 +337 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: tracking shows current progress, next step and working alerts
+03:03 +338 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: compact cart never covers tracking or support actions
+03:04 +339 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Buy Chat presents order progress honest intents and secure channels
+03:05 +340 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: cart item count uses correct singular and plural copy
+03:06 +341 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Buy prices use locked Indian currency grouping
+03:06 +342 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: order card body performs its advertised primary action
+03:07 +343 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Orders opens at the top after Checkout was scrolled
+03:08 +344 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: saved and product-code header actions complete visibly
+03:09 +345 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: scanner shows genuine progress and blocks repeated launch
+03:10 +346 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: products save at the grid and appear in the Saved owner
+03:11 +347 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category and search actions cannot strand the Saved grid
+03:12 +348 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: manual scanner recovery is compact and returns a code
+03:12 +349 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured card exposes seller context and a stable purchase action
+03:12 +350 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: checkout renders only the fulfilment families being purchased
+03:13 +351 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: order confirmation preserves family identifiers then opens Orders
+03:14 +352 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: delivered Orders expose non-mutating order inspection
+03:15 +353 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: shared search filters Orders by an existing order ID
+03:15 +354 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: first-party promotions use established Buy actions
+03:17 +355 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: promotion and featured product remain usable at 320 and 140 percent
+03:17 +356 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: all six recovery states fit and return without an extra page
+03:21 +357 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: 140 percent text fits every primary Buy state at 320 width
+03:24 +358 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every primary Buy state contains only customer-facing copy
+03:27 +359 ~20: All tests passed!

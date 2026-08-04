@@ -62,6 +62,7 @@ class JourneySession extends ChangeNotifier {
   String? reviewCode;
   String? returnTo;
   String previousPrimarySection = 'social';
+  String? _lastReadyRoute;
   DateTime? otpExpiresAt;
   DateTime? resendAvailableAt;
   bool busy = false;
@@ -72,6 +73,7 @@ class JourneySession extends ChangeNotifier {
   bool _authenticatedAtBoot = false;
   bool _authenticationCompletionInProgress = false;
   int _completedSetupExperienceVersion = 0;
+  Future<void> _persistenceTail = Future<void>.value();
 
   bool get isReady => stage == JourneyStage.ready;
   int get completedSetupExperienceVersion => _completedSetupExperienceVersion;
@@ -133,6 +135,9 @@ class JourneySession extends ChangeNotifier {
               : 'Nearby results are ready';
         }
         returnTo = returnTo ?? capturedRoute ?? snapshot.pendingRoute;
+        _lastReadyRoute = _canonicalPersistedReadyRoute(
+          snapshot.lastReadyRoute,
+        );
       }
       _storeRestored = true;
 
@@ -705,7 +710,7 @@ class JourneySession extends ChangeNotifier {
         await _persist(setupComplete: false);
         return;
       }
-      await _store.write(
+      await _writeSnapshotInOrder(
         JourneySnapshot(
           languageCode: snapshot.languageCode,
           areaMode: snapshot.areaMode,
@@ -714,6 +719,7 @@ class JourneySession extends ChangeNotifier {
           homeOrWorkAreaLabel: snapshot.homeOrWorkAreaLabel,
           setupComplete: snapshot.setupComplete,
           pendingRoute: location,
+          lastReadyRoute: snapshot.lastReadyRoute,
           setupExperienceVersion: snapshot.setupExperienceVersion,
         ),
       );
@@ -722,14 +728,23 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
-  String readyRoute() => returnTo ?? '/app/social';
+  String readyRoute() => returnTo ?? _lastReadyRoute ?? '/app/social';
 
   void confirmReadyRoute(String location) {
+    final nextReadyRoute = _canonicalPersistedReadyRoute(location);
+    final readyRouteChanged = nextReadyRoute != _lastReadyRoute;
+    _lastReadyRoute = nextReadyRoute;
+    var returnRouteCleared = false;
     if (returnTo == location) {
       returnTo = null;
+      returnRouteCleared = true;
+    }
+    if (readyRouteChanged || returnRouteCleared) {
       _persist(setupComplete: true);
     }
   }
+
+  String buyExitRoute({String? requestedRoute}) => '/app/social?openMool=1';
 
   void openMoolFrom(String section) {
     if (section != 'mool') previousPrimarySection = section;
@@ -738,7 +753,7 @@ class JourneySession extends ChangeNotifier {
   String closeMoolRoute() => '/app/$previousPrimarySection';
 
   Future<void> _persist({required bool setupComplete}) {
-    return _store.write(
+    return _writeSnapshotInOrder(
       JourneySnapshot(
         languageCode: languageCode,
         areaMode: areaChoice?.name,
@@ -747,9 +762,24 @@ class JourneySession extends ChangeNotifier {
         homeOrWorkAreaLabel: homeOrWorkArea,
         setupComplete: setupComplete,
         pendingRoute: returnTo,
+        lastReadyRoute: _lastReadyRoute,
         setupExperienceVersion: _completedSetupExperienceVersion,
       ),
     );
+  }
+
+  Future<void> _writeSnapshotInOrder(JourneySnapshot snapshot) {
+    final previous = _persistenceTail;
+    final current = () async {
+      try {
+        await previous;
+      } on Object {
+        // A failed caller retains its own error, but cannot poison later state.
+      }
+      await _store.write(snapshot);
+    }();
+    _persistenceTail = current;
+    return current;
   }
 
   bool _isValidIndianMobile(String digits) {
@@ -801,4 +831,69 @@ class JourneySession extends ChangeNotifier {
       ),
     );
   }
+}
+
+String? _canonicalPersistedReadyRoute(String? location) {
+  final uri = _localAppUri(location);
+  if (uri == null) return null;
+  if (uri.path.startsWith('/app/buy')) {
+    return _canonicalBuyResumeRoute(uri);
+  }
+  if (uri.path == '/app/social' && uri.queryParameters['openMool'] == '1') {
+    return '/app/social?openMool=1';
+  }
+  return '/app/social';
+}
+
+Uri? _localAppUri(String? location) {
+  if (location == null || location.isEmpty || location.length > 512) {
+    return null;
+  }
+  final uri = Uri.tryParse(location);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+  if (!uri.path.startsWith('/app/') || uri.pathSegments.contains('..')) {
+    return null;
+  }
+  return uri;
+}
+
+String? _canonicalBuyResumeRoute(Uri uri) {
+  final path = uri.path;
+  final segments = uri.pathSegments;
+  final isBuyProduct =
+      segments.length == 4 &&
+      segments[0] == 'app' &&
+      segments[1] == 'buy' &&
+      segments[2] == 'product' &&
+      segments[3].isNotEmpty;
+  final isBuyOrder =
+      segments.length >= 4 &&
+      segments[0] == 'app' &&
+      segments[1] == 'buy' &&
+      segments[2] == 'order' &&
+      segments[3].isNotEmpty;
+  if (path == '/app/buy') {
+    final destination = switch (uri.queryParameters['sub'] ??
+        uri.queryParameters['scope'] ??
+        uri.queryParameters['context']) {
+      'wholesale' || 'business' => 'wholesale',
+      'medicine' || 'rx' => 'medicine',
+      'orders' || 'tracking' => 'orders',
+      _ => 'shop',
+    };
+    return '/app/buy?sub=$destination';
+  }
+  if (path == '/app/buy/grocery' || isBuyProduct) {
+    return '/app/buy?sub=shop';
+  }
+  if (path == '/app/buy/medicine') {
+    return '/app/buy?sub=medicine';
+  }
+  if (path == '/app/buy/basket' || path == '/app/buy/review') {
+    return '/app/buy?view=cart';
+  }
+  if (isBuyOrder) {
+    return '/app/buy?sub=orders';
+  }
+  return null;
 }

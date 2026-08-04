@@ -1,0 +1,2 @@
+versionCode=2026080419 minSdk=24 targetSdk=36
+versionName=1.0.0-r58.23

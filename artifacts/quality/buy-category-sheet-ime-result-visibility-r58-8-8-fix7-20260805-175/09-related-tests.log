@@ -1,0 +1,79 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: session emits motion metadata only for real navigation outcomes
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: invalid and repeated same-surface actions never replay motion
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: same-view real detail replacement advances the motion identity
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: rapid replacement keeps only the newest real surface
+00:05 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: persistent dock keeps every Buy destination visible
+00:06 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: persistent dock keeps every Buy destination visible
+00:06 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: forward back and replacement use distinct bounded axes
+00:08 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: vertical changes transition the real surface without a wait
+00:08 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: restored initial destination does not replay navigation motion
+00:09 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Mool palette stays native and keeps Buy immediately available
+00:10 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart: compact large-text navigation keeps fixed chrome and no overflow
+00:10 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: approved Buy shell fits representative small and large devices
+00:16 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: discovery hierarchy leads with one horizontal product-image collection
+00:18 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: search expands into a dedicated responsive results owner
+00:25 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: expanded search offers flat separate Shop Wholesale and Medicine lists
+00:28 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: responsive search surface is shared across every Buy destination
+00:31 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Account and product depth close the active search owner
+00:33 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category action is compact and its first-party feature reuses filters
+00:34 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: MoolSocial promotional title is embedded in the glass scene
+00:34 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Mool and Social play one finite cinematic promotional sequence
+00:35 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: painted feature scene ends in one truthful context action
+00:36 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: a real Buy destination starts one finite cinematic scene
+00:36 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: reduced motion paints the complete cinematic scene immediately
+00:37 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: each vertical owns a distinct finite cinematic scene
+00:38 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: inactive sponsored placement consumes no catalogue height
+00:39 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: shared brand and account controls stay in bounds at every depth
+00:41 +26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category glass ends above the dock with compact heading and close
+00:42 +27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every approved Buy category has a specific visual icon
+00:42 +28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category selector fits 320 at 140 percent and finds a late category
+00:43 +29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: catalogue keeps vertical discovery and lazy horizontal products
+00:44 +30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: single-product results reserve only one horizontal lane
+00:44 +31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: 140 percent text keeps navigation reachable
+00:45 +32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: accessible featured cards keep purchase actions in bounds
+00:45 +33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: destination tool menus remain usable at 140 percent text
+00:48 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: purchase and navigation actions meet the 44 pixel target
+00:48 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: critical Buy journeys fit compact and large phone widths
+00:54 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail exposes purchase decision information
+00:55 +37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail uses packshot partner role reviews and reporting
+00:56 +38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: packshot atlas isolates one exact cell per product
+00:56 +39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every seeded product resolves to exact or truthful category media
+00:56 +40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured products lead with a dominant photo and keep dense filtered grids
+00:57 +41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured press and quantity motion respect reduced motion
+00:58 +42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product detail keeps a large upload-ready media tile
+00:58 +43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: tracking Items opens an order item and returns to that order
+00:59 +44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Shop Wholesale and Medicine details fit compact Android and iOS sizes
+01:03 +45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: DC and Chat repeat taps return to the exact purchase depth
+01:04 +46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Account Orders Prescription and Wholesale actions complete and return
+01:06 +47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: each Buy vertical category uses lazy horizontal products
+01:07 +48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: catalogue plus becomes an inline quantity stepper and returns
+01:08 +49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: product and Cart keep plus and minus quantity controls
+01:09 +50: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: add confirmation is owned by the Cart bar, not the top toast
+01:10 +51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: non-empty Cart becomes a prominent reserved conversion bar
+01:11 +52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Cart stays aggregate across Shop Wholesale Medicine and Orders
+01:14 +53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: compact brand and Cart total remain whole at 320 and 140 percent
+01:14 +54: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: saved destination and payment remain separate decisions
+01:15 +55: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: tracking shows current progress, next step and working alerts
+01:16 +56: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: compact cart never covers tracking or support actions
+01:17 +57: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Buy Chat presents order progress honest intents and secure channels
+01:17 +58: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: cart item count uses correct singular and plural copy
+01:18 +59: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Buy prices use locked Indian currency grouping
+01:19 +60: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: order card body performs its advertised primary action
+01:20 +61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Orders opens at the top after Checkout was scrolled
+01:21 +62: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: saved and product-code header actions complete visibly
+01:23 +63: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: scanner shows genuine progress and blocks repeated launch
+01:24 +64: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: products save at the grid and appear in the Saved owner
+01:24 +65: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: category and search actions cannot strand the Saved grid
+01:25 +66: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: manual scanner recovery is compact and returns a code
+01:26 +67: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured card exposes seller context and a stable purchase action
+01:26 +68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: checkout renders only the fulfilment families being purchased
+01:27 +69: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: order confirmation preserves family identifiers then opens Orders
+01:28 +70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: delivered Orders expose non-mutating order inspection
+01:28 +71: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: shared search filters Orders by an existing order ID
+01:29 +72: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: first-party promotions use established Buy actions
+01:31 +73: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: promotion and featured product remain usable at 320 and 140 percent
+01:31 +74: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: all six recovery states fit and return without an extra page
+01:34 +75: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: 140 percent text fits every primary Buy state at 320 width
+01:37 +76: C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: every primary Buy state contains only customer-facing copy
+01:39 +77: All tests passed!

@@ -1,0 +1,18 @@
+{
+  "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "policy": "config/buy-premium-motion-policy.json",
+  "state": "prewrite_audited_no_motion_change",
+  "applied": [],
+  "reused": [
+    "approved_r56_3_finite_route_and_static_reduced_motion",
+    "fix1_ime_height_fix3_opaque_fix4_boundary_fix5_no_live_blur"
+  ],
+  "dependencyHeld": [
+    "backend_taxonomy_pagination",
+    "provider_stock_nearby_serviceability_personalization"
+  ],
+  "inapplicable": [
+    "all_new_motion_effects"
+  ],
+  "reducedMotion": "unchanged_immediate_static"
+}

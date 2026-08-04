@@ -1,0 +1,84 @@
+$adbReplacement = @'
+function Invoke-AuditAdb {
+  param(
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+    [string[]]$Arguments
+  )
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $output = & adb -s $Serial @Arguments 2>&1
+    $nativeExit = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+  if ($nativeExit -ne 0) {
+    throw "adb failed: $($Arguments -join ' ')`n$($output -join "`n")"
+  }
+  return $output
+}
+'@
+$adbRegex = [regex]::new('(?ms)^function Invoke-AuditAdb \{.*?^\}')
+if ($adbRegex.Matches($source).Count -ne 1) {
+  throw 'Expected one Invoke-AuditAdb function.'
+}
+$source = $adbRegex.Replace(
+  $source,
+  [System.Text.RegularExpressions.MatchEvaluator]{
+    param($match)
+    return $adbReplacement
+  },
+  1
+)
+
+$saveStateReplacement = Get-Content -Raw -LiteralPath 'C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\buy-cross-family-terminal-audit-r58-8-audit15-20260804-168\02-robust-save-state.txt'
+$saveStateRegex = [regex]::new('(?ms)^function Save-State\(\[string\]\$Name\) \{.*?^\}')
+if ($saveStateRegex.Matches($source).Count -ne 1) {
+  throw 'Expected one Save-State function.'
+}
+$source = $saveStateRegex.Replace(
+  $source,
+  [System.Text.RegularExpressions.MatchEvaluator]{
+    param($match)
+    return $saveStateReplacement
+  },
+  1
+)
+
+$visibleTargetOriginal = @'
+    if ($null -ne $node) {
+      Tap-Node $node $Text
+      return
+    }
+'@
+$visibleTargetReplacement = @'
+    if ($null -ne $node -and
+        $node.GetAttribute('bounds') -cne '[0,0][0,0]') {
+      Tap-Node $node $Text
+      return
+    }
+'@
+if (-not $source.Contains($visibleTargetOriginal)) {
+  throw 'Expected one Tap-Target visible-node block.'
+}
+$source = $source.Replace($visibleTargetOriginal, $visibleTargetReplacement)
+if ($source.Contains($visibleTargetOriginal)) {
+  throw 'Tap-Target visible-node correction did not apply.'
+}
+
+$source = $source.Replace(
+  "versionName=1\.0\.0-r58\.16",
+  "versionName=1\.0\.0-r58\.23"
+)
+$source = $source.Replace(
+  "versionCode=2026080412",
+  "versionCode=2026080419"
+)
+$source = $source.Replace(
+  "founder-approved R58.8.7 OPPO profile",
+  "checksum-matched R58.8.8 FIX7 OPPO profile"
+)
+$source = $source.Replace(
+  "profile=1.0.0-r58.16 (2026080412)",
+  "profile=1.0.0-r58.23 (2026080419)"
+)

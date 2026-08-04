@@ -242,8 +242,17 @@ void main() {
     });
 
     test('order items retain the exact return depth into product detail', () {
-      expect(session.openTracking('MS-240782'), isTrue);
-      expect(session.openOrderItems('MS-240782'), isTrue);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+      final order = session.confirmedOrders.single;
+
+      expect(session.openTracking(order.id), isTrue);
+      expect(session.openOrderItems(order.id), isTrue);
       final item = session.productsForOrder(session.selectedOrder).first;
 
       expect(session.openProduct(item.id), isTrue);
@@ -252,7 +261,65 @@ void main() {
 
       expect(session.destination, BuyV2Destination.orders);
       expect(session.view, BuyV2View.orderItems);
-      expect(session.selectedOrder.id, 'MS-240782');
+      expect(session.selectedOrder.id, order.id);
+    });
+
+    test(
+      'product continuations are deterministic, local and same-catalogue',
+      () {
+        final current = BuyV2Catalogue.products.firstWhere((product) {
+          if (product.destination != BuyV2Destination.shop) return false;
+          return BuyV2Catalogue.products
+              .where(
+                (candidate) =>
+                    candidate.destination == product.destination &&
+                    candidate.categoryId == product.categoryId &&
+                    candidate.id != product.id,
+              )
+              .isNotEmpty;
+        });
+
+        final first = session.productContinuationsFor(current);
+        final second = session.productContinuationsFor(current);
+
+        expect(first, isNotEmpty);
+        expect(first, hasLength(6));
+        expect(first.map((product) => product.id), second.map((p) => p.id));
+        expect(first, everyElement(isNot(same(current))));
+        expect(
+          first,
+          everyElement(
+            predicate<BuyV2Product>(
+              (product) =>
+                  product.destination == current.destination &&
+                  product.id != current.id,
+            ),
+          ),
+        );
+        expect(first.first.categoryId, current.categoryId);
+        expect(session.productContinuationsFor(current, limit: 0), isEmpty);
+      },
+    );
+
+    test('a product chain retains its original query and return depth', () {
+      session.updateQuery('tomato');
+      final origin = session.visibleProducts.first;
+      expect(session.openProduct(origin.id), isTrue);
+
+      final next = session.productContinuationsFor(origin).first;
+      expect(session.openProduct(next.id), isTrue);
+      final third = session.productContinuationsFor(next).first;
+      expect(session.openProduct(third.id), isTrue);
+
+      expect(session.selectedProductId, third.id);
+      session.closeProduct();
+      expect(session.destination, BuyV2Destination.shop);
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.query, 'tomato');
+      expect(
+        session.visibleProducts.map((product) => product.id),
+        contains(origin.id),
+      );
     });
 
     test('one saved prescription unlocks only its matched medicine lines', () {
@@ -559,7 +626,7 @@ void main() {
       },
     );
 
-    test('Saved follows canonical products across Shop and Wholesale', () {
+    test('Saved ownership stays independent across Buy verticals', () {
       final shop = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.shop,
       );
@@ -569,17 +636,21 @@ void main() {
             item.canonicalId == shop.canonicalId,
       );
 
-      expect(session.isSaved(shop.id), isTrue);
-      expect(session.isSaved(wholesale.id), isTrue);
-      expect(session.savedCountFor(BuyV2Destination.medicine), 3);
+      expect(session.isSaved(shop.id), isFalse);
+      expect(session.isSaved(wholesale.id), isFalse);
+      expect(session.savedCountFor(BuyV2Destination.medicine), 0);
 
       session.toggleSaved(wholesale.id);
       expect(session.isSaved(shop.id), isFalse);
-      expect(session.isSaved(wholesale.id), isFalse);
+      expect(session.isSaved(wholesale.id), isTrue);
 
       session.toggleSaved(shop.id);
       expect(session.isSaved(shop.id), isTrue);
       expect(session.isSaved(wholesale.id), isTrue);
+
+      session.toggleSaved(wholesale.id);
+      expect(session.isSaved(shop.id), isTrue);
+      expect(session.isSaved(wholesale.id), isFalse);
     });
 
     test('scanned catalogue IDs resolve through production search', () {

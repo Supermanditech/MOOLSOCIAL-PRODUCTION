@@ -28,6 +28,7 @@ class SharedPreferencesJourneyStore implements JourneyStore {
   static const _setupExperienceVersionKey =
       'journey01.setup_experience_version';
   static const _pendingRouteKey = 'journey01.pending_route';
+  static const _lastReadyRouteKey = 'journey01.last_ready_route';
 
   final SharedPreferences _preferences;
 
@@ -46,6 +47,7 @@ class SharedPreferencesJourneyStore implements JourneyStore {
       homeOrWorkAreaLabel: _preferences.getString(_homeOrWorkAreaLabelKey),
       setupComplete: _preferences.getBool(_setupCompleteKey) ?? false,
       pendingRoute: _preferences.getString(_pendingRouteKey),
+      lastReadyRoute: _preferences.getString(_lastReadyRouteKey),
       setupExperienceVersion:
           _preferences.getInt(_setupExperienceVersionKey) ?? 1,
     );
@@ -64,6 +66,7 @@ class SharedPreferencesJourneyStore implements JourneyStore {
     await _setNullable(_currentAreaLabelKey, snapshot.currentAreaLabel);
     await _setNullable(_homeOrWorkAreaLabelKey, snapshot.homeOrWorkAreaLabel);
     await _setNullable(_pendingRouteKey, snapshot.pendingRoute);
+    await _setNullable(_lastReadyRouteKey, snapshot.lastReadyRoute);
   }
 
   Future<void> _setNullable(String key, String? value) async {

@@ -1,0 +1,10 @@
+shop: ready=complete visible_chars=23938 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=1 result=PASS
+wholesale: ready=complete visible_chars=20580 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+medicine: ready=complete visible_chars=6178 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+shop-product: ready=complete visible_chars=1117 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+wholesale-product: ready=complete visible_chars=1515 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+shop-cart: ready=complete visible_chars=1001 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+wholesale-cart: ready=complete visible_chars=1053 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+combined-cart: ready=complete visible_chars=1420 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+orders: ready=complete visible_chars=794 overflow=false forbidden=none runtime_errors=0 ignored_favicon_404=0 result=PASS
+Customer-copy HTML gate passed for 9 states.

@@ -1,0 +1,41 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart
+00:00 +0: R56.3 reuses exact R40.3 route timing and immediate reduction
+00:00 +1: R58.8.8 expands only for a genuine keyboard inset
+00:00 +2: R56.3 changes category only after the reverse route completes
+00:03 +3: R56.3 Back and close preserve the selected category
+00:05 +4: R56.3 named route, persistent field and selected semantics agree
+00:06 +5: R58.8.8 FIX6 category search exports editable semantics
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: true
+  Actual: Tristate:<Tristate.isTrue>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart:304:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart line 304
+The test description was:
+  R58.8.8 FIX6 category search exports editable semantics
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +5 -1: R58.8.8 FIX6 category search exports editable semantics [E]
+  Test failed. See exception logs above.
+  The test description was: R58.8.8 FIX6 category search exports editable semantics
+  
+00:09 +5 -1: R56.3 honest filtered empty state clears locally
+00:11 +6 -1: R56.3 FIX2 keeps empty recovery above keyboard
+00:12 +7 -1: R56.3 reduced motion opens and selects without delayed state
+00:13 +8 -1: R56.3 compact 140 percent and keyboard geometry remain usable
+00:14 +9 -1: R58.8.8 filtered category card and label stay wholly above keyboard
+00:15 +10 -1: R56.3 category-sheet responsive evidence captures
+00:15 +10 ~1 -1: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart: R58.8.8 FIX6 category search exports editable semantics

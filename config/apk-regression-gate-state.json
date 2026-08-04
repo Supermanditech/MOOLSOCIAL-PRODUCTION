@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "founder_approved_protected",
+  "buildAuthorization": "consumed",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/34-prebuild-validation-seal.md",
+    "negativeSelfTest": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/35-machine-gate-negative-wrong-source.log"
+  },
+  "candidate": {
+    "id": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "versionName": "1.0.0-r58.23",
+    "versionCode": "2026080419",
+    "buildMode": "profile",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f1ac83dea2047f40b39d772696bd0d1224edce8e"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/30-source-manifest-final-prebuild.txt",
+    "manifestSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "fileCount": 2466
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/32-branch.txt",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/33-head.txt"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/30-source-manifest-final-prebuild.txt",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/31-source-final-prebuild-identity.json"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/06b-format-clean.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/07b-focused-analysis.log"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/08b-focused-tests.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/09-related-tests.log"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/10-full-buy-regression-run1.log"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/11-full-buy-regression-run2.log"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/02a-premium-motion-policy-state.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/02b-premium-motion-policy-selftest.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/12-windows-powershell-compatibility.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/13-brand-integrity.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/14-buy-approved-reference.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/15-interaction-contracts.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/16-user-facing-copy.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/17-buy-backend-boundary.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/18-buy-backend-boundary-selftest.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/19-data-egress.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/20-data-egress-selftest.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/31b-html-customer-copy-authority.log"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/23-approved-ui-expected-rejection.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/24-social-expected-rejection.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/25-buy-expected-rejection.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/26-protected-boundary-raw-exit-codes.json",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/28-protected-boundary-classification.log"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix6-20260804-174/48-fix6-oppo-accessibility-rejection.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix5-20260804-173/155-fix5-oppo-accessibility-rejection.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix4-20260804-172/132-fix4-oppo-performance-rejection.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix3-20260804-171/132-fix3-oppo-performance-rejection.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix2-20260804-170/63-fix2-oppo-visual-rejection.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix1-20260804-169/59-fix1-oppo-visual-rejection.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-route-continuity-r49-1-20260801-60/00-startup-build-provenance-remediation-contract.md"
+      ]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "state": "prewrite_audited_no_motion_change",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/00-candidate-registration.md",
+    "disposition": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/01-premium-motion-policy-disposition.md",
+    "applied": [],
+    "reused": [
+      "approved_r56_3_finite_route_and_static_reduced_motion",
+      "fix1_ime_height_fix3_opaque_fix4_boundary_fix5_no_live_blur"
+    ],
+    "dependencyHeld": [
+      "backend_taxonomy_pagination",
+      "provider_stock_nearby_serviceability_personalization"
+    ],
+    "inapplicable": [
+      "all_new_motion_effects"
+    ]
+  },
+  "predecessor": {
+    "id": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX6",
+    "state": "device_accessibility_rejected_preserved",
+    "sourceSha256": "5294852BF5653B2B674A614311AF3F4E3182217AAA296893452267CF43EE839F",
+    "apkSha256": "3AFDDA9EAA6FBB84D0340F16A788DC2CDA11A5D3E6A4EAE7C121F219E6BD120A",
+    "evidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix6-20260804-174",
+    "rejection": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix6-20260804-174/48-fix6-oppo-accessibility-rejection.md",
+    "machineStateSnapshot": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/00a-fix6-rejected-machine-state-before-fix7.json"
+  },
+  "founderDirective": {
+    "state": "failed_regression_root_cause_correction_authorized",
+    "authority": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/00-candidate-registration.md",
+    "failedPredecessorEvidenceImmutable": true,
+    "continueUntilProductionGatePasses": true
+  },
+  "qualificationResult": {
+    "state": "technically_device_qualified_founder_approved_protected",
+    "founderDisposition": "approved",
+    "evidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175",
+    "protectedBaselineUpdated": false
+  },
+  "buildResult": {
+    "state": "passed",
+    "wrapper": "scripts/build-buy-device-review.ps1",
+    "profile": "1.0.0-r58.23 (2026080419)",
+    "apkPath": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/buy-r58-category-sheet-ime-result-visibility-fix7-device-review-profile.apk",
+    "apkBytes": 134214109,
+    "apkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+    "evidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/37-wrapper-build.log"
+  },
+  "installResult": {
+    "state": "passed_checksum_matched",
+    "device": "OPPO CPH2375 2b3e0f71",
+    "installedVersionName": "1.0.0-r58.23",
+    "installedVersionCode": "2026080419",
+    "installedBytes": 134214109,
+    "installedSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+    "evidence": "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/46-installed-checksum-match.json"
+  },
+  "founderApproval": {
+    "state": "approved_and_protected",
+    "authority": "artifacts/quality/buy-r58-8-8-fix7-founder-approval-20260805-177/00-founder-disposition.md",
+    "decision": "artifacts/quality/buy-r58-8-8-fix7-founder-approval-20260805-177/01-founder-disposition.json",
+    "codexOppoSatisfied": true,
+    "protectedBaselineUpdated": false
+  },
+  "postBuildGates": [
+    {
+      "id": "post-build-source-identity",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/39-post-build-source-identity.json",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/141-post-device-source-identity.json"
+      ]
+    },
+    {
+      "id": "apk-signature-badging-install-pull",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/40-apk-signature.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/41-apk-badging.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/46-installed-checksum-match.json"
+      ]
+    },
+    {
+      "id": "android-accessibility-node",
+      "state": "passed_direct_hint_probe",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/47l-accessibility-hint-probe-final.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/49-accessibility-xml-root-cause.md"
+      ]
+    },
+    {
+      "id": "cold-process-and-cumulative-journeys",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/61-oppo-cold-first-frame-matrix.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/51c-oppo-category-journeys-rerun.log",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/51b-category-journey-identity-harness-root-cause.md"
+      ]
+    },
+    {
+      "id": "focus-keyboard-close-back",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/71-oppo-focus-keyboard-back.log"
+      ]
+    },
+    {
+      "id": "visible-reduced-motion",
+      "state": "passed_scales_restored_1_1_1",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/91-oppo-reduced-motion.log"
+      ]
+    },
+    {
+      "id": "performance",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/oppo-performance-resumed1/120-performance-summary.json"
+      ]
+    },
+    {
+      "id": "runtime-failure-scan",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/130-runtime-failure-scan.json"
+      ]
+    },
+    {
+      "id": "technical-qualification",
+      "state": "passed_founder_approved_protected",
+      "evidence": [
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/142-technical-qualification.md",
+        "artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix7-20260805-175/143-founder-review-observation-points.md",
+        "artifacts/quality/buy-r58-8-8-fix7-founder-approval-20260805-177/00-founder-disposition.md"
+      ]
+    }
+  ]
+}

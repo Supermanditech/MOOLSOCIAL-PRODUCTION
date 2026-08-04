@@ -1,0 +1,4 @@
+approved-ui: EXPECTED_FAIL_CLOSED exit=1 contract=exact
+social: EXPECTED_FAIL_CLOSED exit=1 contract=exact
+buy: EXPECTED_FAIL_CLOSED exit=1 contract=exact
+Protected boundary classification passed: splash expected/found hashes exact; Social inventory 119/164 exact; Buy inventory 31/43 exact; no baseline replaced.

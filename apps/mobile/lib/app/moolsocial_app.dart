@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/design/moolsocial_brand_motion.dart';
 import '../core/design/mool_theme.dart';
 import '../features/book/book_session.dart';
 import '../features/buy/buy_session.dart';
@@ -18,6 +19,7 @@ import '../features/shared/shared_session.dart';
 import '../features/work/work_session.dart';
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
+import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
 
 class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
@@ -96,7 +98,8 @@ class MoolSocialApp extends StatefulWidget {
   State<MoolSocialApp> createState() => _MoolSocialAppState();
 }
 
-class _MoolSocialAppState extends State<MoolSocialApp> {
+class _MoolSocialAppState extends State<MoolSocialApp>
+    with WidgetsBindingObserver {
   late final JourneySession _session = widget.session ?? JourneySession();
   late final BookSession _bookSession = widget.bookSession ?? BookSession();
   late final BuySession _buySession = widget.buySession ?? BuySession();
@@ -121,6 +124,7 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
       LaunchPresentationGate();
   late final LaunchInterruptionGuard _launchInterruptionGuard =
       widget.launchInterruptionGuard ?? LaunchInterruptionGuard();
+  late final MoolSocialBrandCadence _brandCadence = MoolSocialBrandCadence();
   late final _router = createJourneyRouter(
     _session,
     _bookSession,
@@ -145,15 +149,32 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _launchInterruptionGuard.start();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _brandCadence.appPaused();
+      case AppLifecycleState.resumed:
+        _brandCadence.appResumed();
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _router.dispose();
     _launchPresentationGate.dispose();
+    _brandCadence.dispose();
     if (widget.launchInterruptionGuard == null ||
         widget.disposeLaunchInterruptionGuard) {
       _launchInterruptionGuard.dispose();
@@ -211,6 +232,22 @@ class _MoolSocialAppState extends State<MoolSocialApp> {
       title: 'MoolSocial',
       theme: MoolTheme.light(),
       routerConfig: _router,
+      builder: (context, child) => MoolSocialBrandMotionScope(
+        cadence: _brandCadence,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _brandCadence.noteActivity(),
+          child: MoolBuyTapAcknowledgement(
+            isBuyActive: () => _router
+                .routerDelegate
+                .currentConfiguration
+                .matches
+                .any((match) => match.matchedLocation.startsWith('/app/buy')),
+            routeChanges: _router.routerDelegate,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      ),
     );
   }
 }

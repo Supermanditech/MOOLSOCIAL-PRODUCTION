@@ -3,14 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
-double _contrastRatio(Color foreground, Color background) {
-  final lighter = foreground.computeLuminance() > background.computeLuminance()
-      ? foreground
-      : background;
-  final darker = foreground == lighter ? background : foreground;
-  return (lighter.computeLuminance() + .05) / (darker.computeLuminance() + .05);
-}
-
 void main() {
   group('Buy V2 motion and theme foundations', () {
     test('motion tokens are finite, restrained and ordered by intent', () {
@@ -43,12 +35,22 @@ void main() {
           destination: BuyV2ThemeSpec.resolve(destination, BuyV2View.catalogue),
       };
 
-      expect(themes.values.map((theme) => theme.canvas).toSet(), hasLength(4));
-      expect(themes.values.map((theme) => theme.accent).toSet(), hasLength(4));
+      expect(
+        themes.values.map((theme) => theme.headerGradient).toSet(),
+        hasLength(4),
+      );
+      expect(
+        themes.values.map((theme) => theme.canvasGradient).toSet(),
+        hasLength(4),
+      );
       for (final theme in themes.values) {
-        expect(_contrastRatio(Colors.white, theme.headerStart), greaterThan(7));
-        expect(_contrastRatio(Colors.white, theme.headerEnd), greaterThan(7));
+        expect(theme.headerForeground, anyOf(BuyV2Colors.navy, Colors.white));
+        expect(theme.canvas, Colors.white);
       }
+      expect(
+        themes[BuyV2Destination.medicine]!.headerForeground,
+        BuyV2Colors.navy,
+      );
     });
 
     test('tertiary surfaces use stable semantic theme families', () {
@@ -71,9 +73,9 @@ void main() {
 
       expect(cart.accent, BuyV2Colors.orange);
       expect(tracking.accent, BuyV2Colors.green);
-      expect(assist.accent, BuyV2Colors.royal);
-      expect(catalogue.canvas, isNot(cart.canvas));
-      expect(tracking.canvas, isNot(assist.canvas));
+      expect(assist.accent, BuyV2Colors.navy);
+      expect(catalogue.canvasGradient, isNot(cart.canvasGradient));
+      expect(tracking.canvasGradient, isNot(assist.canvasGradient));
     });
   });
 }

@@ -2367,3 +2367,53 @@ authority for native Buy V2 presentation.
   regressions, exact APK checksum verification on OPPO and founder review.
 - Any later presentation change requires explicit founder authorization, a new
   immutable reference version and a new acceptance cycle.
+
+## Founder directive — failing-regression remediation loop, 4 August 2026
+
+A failing regression is a root-cause trigger, not a reason to abandon a
+production-grade correction. The permanent execution rule is:
+
+1. preserve the failed candidate, source, APK, logs, screenshots, state and
+   exact failure classification unchanged;
+2. never rerun a failed sample merely to obtain a passing replacement or
+   explain away a registered threshold;
+3. register a unique successor candidate before any runtime write;
+4. reproduce and distinguish application, session, device and qualification-
+   harness causes with explicit state/owner evidence;
+5. implement the smallest demonstrated root-cause correction, avoiding broad
+   migration, speculative debounce or unrelated design change;
+6. add deterministic regression coverage for the cause and prevention;
+7. repeat the complete sealed-source host, release, machine-build and physical-
+   device qualification sequence; and
+8. continue this remediation loop until the production gate genuinely passes
+   or a protected-boundary conflict or real external/tool/device blocker
+   remains after safe alternatives.
+
+Every rejected predecessor remains rejected and immutable. A successor pass
+does not rewrite predecessor history. This directive does not authorize commit,
+push, deployment, publication, branch changes, baseline replacement or
+unrelated ticket mixing.
+
+### R59.1 remediation application — FIX7 to FIX8, 4 August 2026
+
+The remediation loop was applied without washing the failed sample. FIX7
+resolved the delayed/residual quantity finding as a fixed-coordinate harness
+ownership defect and then proved ten exact state-owned device cycles. Its
+unchanged OPPO presentation gate nevertheless failed at p95 33.413 ms and max
+50.284 ms with two intervals above 50 ms, so FIX7 remains rejected.
+
+FIX8 is separately registered before runtime write. After stable geometry,
+immediate outgoing removal, state/event integrity and zero shader compilation
+were proven, its bounded hypothesis is the remaining incoming opacity
+compositing layer. Only a finite transform-only arrival inside the same owner is
+authorized; hit testing stays settled and reduced motion stays static. This is
+the canonical example of investigating and solving each distinct root cause
+through unique immutable candidates rather than stopping or rerunning failure.
+
+FIX8 then passed the unchanged OPPO gate: p95 33.105 ms, max 33.869 ms and
+zero intervals above 50/100 ms, while settled captures remained byte-identical
+and ten exact cycles again ended with zero residual. The controlled successor
+result confirms the incoming opacity compositing layer as the remaining runtime
+performance cause and the transform-only, settled-hit-owner arrival as the
+smallest production correction. This outcome is part of the durable example;
+FIX4-FIX7 remain rejected exactly as recorded.

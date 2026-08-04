@@ -1,0 +1,10 @@
+MoolSocial YouTube API audit attachment manifest
+Prepared: 2026-07-26
+Dev project: moolsocial-dev-503018 (760290687711)
+
+moolsocial-youtube-architecture.pdf	7083	02cf3fc84326ca1c5e18aa641b3733eb80189545c293928f6e4d2650b52e2b1f
+moolsocial-youtube-conditional-evidence.pdf	3945177	a48eb049332fc9efabbc6500a547bace904d2da13d71457571190c63b11cd07d
+moolsocial-youtube-disconnect-evidence.pdf	253001	189ea5fc8fc6d176f281b78c408e9fd638a9bc3f1b7ff0a8ef54936399b0437b
+moolsocial-youtube-homepage-evidence.pdf	532516	7450856f680a4c33a557be0a8aff9011fd20d000f987068764f0130e80505115
+moolsocial-youtube-privacy-policy-evidence.pdf	703671	f6609be2eb9e4a3e4e8fd059871cb0c53ba714a202acd8e0a743dfdbce58dce3
+moolsocial-youtube-terms-evidence.pdf	556042	1bf4ebb20fc3b47405c22e1d922d618329083ece01174eed490c7adf1f3524dc

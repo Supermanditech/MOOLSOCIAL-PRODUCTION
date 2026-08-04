@@ -1,13 +1,1594 @@
 # Active Codex handoff
 
+## Repository recovery seal — 5 August 2026
+
+State: `MOOLSOCIAL_GIT_CHECKPOINT_SEAL_IN_PROGRESS_AFTER_R58_8_8_FIX7_APPROVAL`.
+
+The founder authorized a recoverable Git checkpoint after the active ticket,
+including a separate checkpoint branch pointer and all production source,
+backend, tests and current approved APK needed to resume after laptop loss.
+Exact resume authority is
+`docs/quality/MOOLSOCIAL-RESUME-CHECKPOINT-20260805.md`; local evidence inventory
+is folder `176`; exact FIX7 approval is folder `177`. Large historical binaries
+and browser-session profiles remain preserved locally and are not published;
+the current r58.23 APK is carried by Git LFS. No GCP/Firebase promotion is
+authorized by the repository seal.
+
+## Live 5 August 2026 — R58.8.8 FIX7 founder approved/protected
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX7_FOUNDER_APPROVED_PROTECTED`.
+
+The founder conditionally approved R58.8.8 FIX7 if Codex was satisfied with
+OPPO testing. Codex confirmed satisfaction from the complete passing device
+qualification, so exact candidate
+`BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7` is founder
+approved/protected at source SHA-256
+`A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE`,
+profile `1.0.0-r58.23 (2026080419)`, APK/install SHA-256
+`F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9`.
+Decision authority:
+`artifacts/quality/buy-r58-8-8-fix7-founder-approval-20260805-177`.
+No future candidate, backend/provider outcome, promotion or baseline-file
+replacement is approved by this decision.
+
+## Live 5 August 2026 — R58.8.8 FIX7 technically/device qualified
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX7_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Exact candidate `BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7`, profile
+`1.0.0-r58.23 (2026080419)`, is qualified on OPPO CPH2375 `2b3e0f71`.
+Source is 2,466 files at SHA-256
+`A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE`;
+wrapper APK and OPPO pull are byte-identical at SHA-256
+`F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9`.
+
+Direct Android accessibility inspection passed the exact category-search
+label/hint and editable actions. Legacy UIAutomator XML omits API 28+
+`hintText`; its apparent unnamed `NAF=true` field was a lossy-harness result,
+not a TalkBack defect. All host, build/install, cold/process, cumulative
+Shop/Wholesale/Medicine, focus/keyboard/Close/Back, visible reduced-motion,
+performance, runtime and final source gates passed. Performance p95 is 31.725
+ms/max 64.658 ms with zero >100 ms and zero shader/compile markers. Device
+scales are restored to `1/1/1`; OPPO is parked on the Shop category sheet.
+
+Evidence `175`; technical record `142-technical-qualification.md`; founder
+checks `143-founder-review-observation-points.md`; handoff
+`docs/quality/BUY-FV2-R58-8-8-CATEGORY-SHEET-IME-RESULT-VISIBILITY-HANDOFF-20260805.md`.
+Founder review is pending; no protected baseline was updated and no successor
+runtime candidate has started.
+
+## Live 5 August 2026 — R58.8.8 FIX6 OPPO-rejected; FIX7 registered
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX7_REGISTERED`.
+
+FIX6 passed all host gates, two 359-active Buy regressions, wrapper build,
+unchanged source and exact OPPO checksum install. The first cold device
+accessibility check nevertheless returned the empty search as
+`android.widget.EditText`, `NAF=true`, empty text/content description. The
+implicit semantics merge existed in Flutter tests but did not become an Android
+accessibility name. Exact r58.22 evidence remains at `174`; rejection `48`.
+
+FIX7 is registered at `175`, reserved profile `1.0.0-r58.23 (2026080419)`, on
+the unchanged rejected-FIX6 source SHA-256
+`5294852BF5653B2B674A614311AF3F4E3182217AAA296893452267CF43EE839F`.
+It owns only an explicit child-excluding editable semantic node with stable
+label/hint/value/focus and explicit tap/focus/set-text actions. No visual,
+geometry, matching, motion or commerce-state change is authorized. Founder
+review remains unrequested until complete host and OPPO qualification passes.
+
+## Live 4 August 2026 — R58.8.8 FIX5 accessibility-rejected; FIX6 registered
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX6_REGISTERED`.
+
+The final FIX5 founder-park UIAutomator tree exposed the visually labelled
+empty category search as an unnamed `android.widget.EditText`: `NAF=true`,
+empty `text`, empty `content-desc`, bounds `[24,801][696,889]`. This is a real
+OPPO accessibility defect. FIX5's exact source, APK and otherwise-passing host,
+functional, reduced-motion, runtime and performance evidence remain immutable,
+but its interim technical qualification is superseded by rejection
+`173/155-fix5-oppo-accessibility-rejection.md`.
+
+`BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX6`, profile reservation
+`1.0.0-r58.22 (2026080418)`, is registered in evidence `174` on the unchanged
+2,466-file source SHA-256
+`4FAC35E85635DCC20C2E983959FB7D6DA1D2E79A4655195C18D488A97D5D300C`.
+Its sole runtime scope is to merge an explicit stable name/purpose into the
+existing native editable node without duplicate announcements or loss of edit
+actions. Geometry, matching, focus ownership, motion and commerce state are
+protected. Founder review is not requested until FIX6 passes the complete host
+and OPPO qualification machine.
+
+## Live 4 August 2026 — R58.8.8 FIX5 technically qualified; founder review pending
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX5_TECHNICALLY_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX5` is technically
+qualified on OPPO CPH2375 `2b3e0f71`, profile `1.0.0-r58.21 (2026080417)`.
+Exact source is 2,466 files at SHA-256
+`4FAC35E85635DCC20C2E983959FB7D6DA1D2E79A4655195C18D488A97D5D300C`;
+the wrapper-built and OPPO-pulled APKs are byte-identical at
+`F55260F23846CB702122EEEA35DA0E81A986C3956759592001823F20CCD0252C`.
+
+The genuine-IME height correction remains bounded to the existing category
+sheet; the exact `.64` no-keyboard geometry, `0xFAFFFFFF` surface,
+whole-sheet repaint boundary and R56.3 normal/static-reduced motion remain.
+FIX5 removes only the redundant live 18 px backdrop blur after FIX3/FIX4 device
+traces proved that moving catalogue content prevented stable caching. The
+filtered card bottom is y 592 against IME top y 1014 in all three verticals.
+All host gates, two 358-active Buy regressions, cold/process recreation,
+cumulative category journey, product/Back restoration, focus/keyboard/
+Close/Back, hot resume, cross-vertical isolation, visible reduced motion with
+`1/1/1` restoration, runtime failure scan and final source identity passed.
+Sixteen performance cycles passed at p95 29.409 ms, maximum 60.218 ms, zero
+>100 ms and zero shader/compile markers.
+
+Evidence is
+`artifacts/quality/buy-category-sheet-ime-result-visibility-r58-8-8-fix5-20260804-173`;
+technical record `142-technical-qualification.md`, founder checks
+`143-founder-review-observation-points.md`. The OPPO is parked on the Shop
+category sheet. Founder disposition is pending; no protected baseline was
+updated and no subsequent runtime candidate has started.
+
+## Live 4 August 2026 — R58.8 AUDIT15 defect confirmed; R58.8.8 FIX1 registered
+
+State: `R58_8_8_CATEGORY_SHEET_IME_RESULT_VISIBILITY_FIX1_REGISTERED`.
+
+AUDIT15 passed category ownership/state but visual review confirmed the same
+local defect in Shop, Wholesale and Medicine: the one filtered category card
+extends to physical y `1077` while the OPPO IME starts at `1014`, hiding the
+label under the keyboard. Candidate
+`BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX1` is registered on exact
+2,466-file r58.16 source/install to use full available sheet height only while
+the IME is visible, retain no-keyboard `.64` geometry, and add missing
+card/label-above-keyboard tests. No subcategory/backend taxonomy or business
+state is added. Audit evidence `168`; candidate evidence `169`.
+
+## Live 4 August 2026 — R58.8 AUDIT14 scoped search recovery audit passed
+
+State: `R58_8_AUDIT14_SCOPED_SEARCH_RECOVERY_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT14` passed on exact
+approved 2,466-file r58.16 source/install. Shop Lowest-price `atta`, Wholesale
+Flexible-MOQ `basmati` and Medicine no-prescription `metformin` each produced an
+honest scoped no-match; its `Search all` action retained the exact query,
+cleared the filter and returned only the genuine current-vertical product.
+Filter-reset inspection, Shop product/Back, Medicine hot resume and clean Shop
+exit passed. Source remains exact at SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`;
+installed APK remains
+`8584CCD4D37227DC3D00952CBB8A283F85F78CE961F9CF58D55B153FAD1BA052`.
+All harness/device failures were preserved and root-caused; none was a product
+defect. Evidence `167`, conclusion `40-source-and-oppo-conclusion.md`; no
+runtime successor is warranted.
+
+## Live 4 August 2026 — R58.8 AUDIT13 cumulative exact/near search audit passed
+
+State: `R58_8_AUDIT13_EXACT_NEAR_SEARCH_HIERARCHY_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT13` passed on exact
+approved 2,466-file r58.16 source/install. Correct/near Shop `tomato/tomatos`,
+Wholesale `sunflower/sunflwer` and Medicine `paracetamol/paracetmol` returned
+only exact current-vertical products; `frsh tomatos` narrowed to Fresh tomatoes.
+All three leading-product/Back chains restored exact query/results, Wholesale
+hot resume passed, and the sequence ended on clean Shop. Source remains exact
+at SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+All harness failures were preserved and root-caused; none was a product defect.
+Evidence `166`, conclusion `40-source-and-oppo-conclusion.md`; no runtime
+successor is warranted.
+
+## Live 4 August 2026 — R58.8 AUDIT12 historical Items/Reorder audit passed
+
+State: `R58_8_AUDIT12_HISTORICAL_ORDER_ITEMS_REORDER_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT12` passed on exact
+approved 2,466-file r58.16 source/install. Delivered Shop `MS-240741`,
+Wholesale `PO-240728` and Medicine `RX-240719` each opened truthful exact
+historical Items, Back restored exact Tracking, and Reorder displayed the
+honest unavailable-products notice before any Cart mutation. Wholesale hot
+resume, all three selected-Delivered returns and clean Shop exit passed. The
+initial registration incorrectly required Items itself to remain on Tracking;
+the preserved R58.7 route and corrected classifier prove this was a harness
+error, not a product regression. Source remains exact at SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+Evidence `165`, conclusion `40-source-and-oppo-conclusion.md`; no runtime
+successor is warranted.
+
+## Live 4 August 2026 — R58.8 AUDIT11 cumulative Orders terminal audit passed
+
+State: `R58_8_AUDIT11_CUMULATIVE_ORDERS_TERMINAL_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT11` passed on exact
+founder-approved r58.16 source/install. Active Shop/Wholesale/Medicine delivery
+context, delivered `MS-240741` Assist/148-pixel compact Back, active
+`PO-240783` Assist/hot resume/Android Back, exact deep-scroll Tracking owners,
+Orders root return and clean Shop exit passed on OPPO. No Reorder, address
+change, support topic/send, cancellation, refund, provider or backend action
+ran. Source remains exact at 2,466 files and SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+All three harness issues were preserved and root-caused; none was a product
+defect. Evidence `164`, conclusion `40-source-and-oppo-conclusion.md`. No
+runtime successor is warranted from this cumulative family.
+
+## Live 4 August 2026 — R58.8 AUDIT10 combined Checkout child audit passed
+
+State: `R58_8_AUDIT10_COMBINED_CHECKOUT_CHILD_SURFACE_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT10` passed on exact
+founder-approved R58.8.7 source/install. Mixed Shop/Wholesale/Medicine All
+Checkout preserved exact three-fulfilment `₹4,905`/four-unit parent identity,
+the real Shop entry dock, address/payment Close/Back/hot resume, local Bank
+transfer selection, exact combined Cart return and cleanup. No address
+request/add, payment, Place order, prescription, provider or backend action
+ran. Source remains exact at 2,466 files and SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+Evidence `163`, conclusion `40-source-and-oppo-conclusion.md`. AUDIT8-AUDIT10
+now cover Checkout address/payment child parity for Shop, Wholesale, eligible
+local Medicine and All; no runtime successor is warranted from this family.
+
+## Live 4 August 2026 — R58.8 AUDIT9 Wholesale/Medicine child parity passed
+
+State: `R58_8_AUDIT9_WHOLESALE_MEDICINE_CHECKOUT_CHILD_PARITY_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT9` passed on exact
+founder-approved R58.8.7 source/install. Wholesale-only and eligible local
+Medicine-only Checkout preserved address/payment Close, Android Back, hot
+resume, honest local Bank transfer selection, exact parent/dock/Cart ownership
+and cleanup. No address request/add, payment, Place order, prescription,
+provider or backend action ran. Live app/test source remains exact at 2,466
+files and SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+Evidence `162`, conclusion `40-source-and-oppo-conclusion.md`. No runtime
+successor is warranted; another logical family requires separate read-only
+registration.
+
+## Live 4 August 2026 — R58.8 AUDIT8 Checkout child-surface audit passed
+
+State: `R58_8_AUDIT8_SCOPED_CHECKOUT_CHILD_SURFACE_READ_ONLY_PASSED_NO_DEFECT`.
+
+Read-only audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT8` passed on the
+unchanged founder-approved R58.8.7 source/install. Address/payment visible
+Close, Android Back, hot resume, honest local Bank transfer selection, exact
+Shop Checkout parent ownership, exact Cart return and final cleanup passed on
+OPPO. No address request/add, payment start, Place order, provider or backend
+action occurred. Source remains exact at 2,466 files and SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`.
+Evidence folder `161`; conclusion `40-source-and-oppo-conclusion.md`. The two
+preserved failures were harness-only and root-caused. No R58.8.8 runtime
+candidate is warranted or registered. A separately registered next read-only
+audit may proceed; no future runtime edit is pre-authorized.
+
+## Live 4 August 2026 — R58.8.7 FIX1 founder approved/protected
+
+State: `R58_8_7_FIX1_FOUNDER_APPROVED_PROTECTED_NEXT_READ_ONLY_AUDIT_AUTHORIZED`.
+
+The founder approved exact candidate
+`BUY-R58-SCOPED-CART-CHECKOUT-DOCK-CONTINUITY-FIX1`, profile `1.0.0-r58.16`
+(`2026080412`), 2,466-file source SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`
+and checksum-matched APK/install SHA-256
+`8584CCD4D37227DC3D00952CBB8A283F85F78CE961F9CF58D55B153FAD1BA052`.
+Decision authority: `artifacts/quality/buy-r58-8-7-founder-approval-20260804-160`.
+Protect exact scoped dock ownership and all R58.8.6 behavior. A next read-only
+navigation audit may proceed; no future runtime candidate is pre-approved.
+
+## Live 4 August 2026 — R58.8.7 scoped Cart/Checkout dock FIX1 qualified
+
+State: `R58_8_7_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-SCOPED-CART-CHECKOUT-DOCK-CONTINUITY-FIX1`, profile
+`1.0.0-r58.16` (`2026080412`), is technically/device qualified on OPPO. Exact
+source is 2,466 files at SHA-256
+`D7D382F57D672E11819173B591F3C4BE30A029CCF3AE5AC426FE30D132E14649`;
+APK and checksum-pulled install SHA-256 is
+`8584CCD4D37227DC3D00952CBB8A283F85F78CE961F9CF58D55B153FAD1BA052`.
+Shop/Wholesale/Medicine scoped Cart and Checkout now select their live owner;
+All retains entry destination. Two 356+20 regressions, release/protected gates,
+all OPPO journeys, visible reduced motion, p95 19.888 ms performance, clean
+runtime scan and zero source drift passed. Evidence folder `159`; handoff
+`docs/quality/BUY-FV2-R58-8-7-SCOPED-CART-CHECKOUT-DOCK-CONTINUITY-HANDOFF-20260804.md`.
+Founder review is pending; no protected baseline changed.
+
+## Live 4 August 2026 — R58.8.7 scoped Cart/Checkout dock FIX1 registered
+
+State: `R58_8_7_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+AUDIT7 folder `158` proved three checksum-OPPO mismatches: Shop scope selected
+Medicine, Wholesale selected Shop, and Medicine selected Wholesale on both Cart
+and Checkout. Root cause is `_BuyDock` reading last root `session.destination`
+instead of live scoped transaction ownership. Combined scope retains its entry
+vertical as the valid control; R58.8.6 return remained exact.
+
+Candidate `BUY-R58-SCOPED-CART-CHECKOUT-DOCK-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.16` (`2026080412`), is registered from founder-approved 2,460-file
+source SHA-256
+`8F3ACE96BDF036AEB28F2A2EFF448DDF1B72B9152F9D43B435DD21B224FEA075`.
+Only a derived session selection owner, `_BuyDock` active reads and focused
+tests/captures are authorized. No route destination, header, Cart/Checkout,
+payment/order/provider/backend or shared-motion change is allowed. Evidence
+folder `159`.
+
+## Live 4 August 2026 — R58.8 AUDIT7 scoped Checkout bottom-nav audit registered
+
+State: `R58_8_AUDIT7_SCOPED_CHECKOUT_BOTTOM_NAV_READ_ONLY_IN_PROGRESS`.
+
+After exact R58.8.6 founder approval, read-only audit
+`BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT7` is registered on unchanged
+2,460-file source SHA-256
+`8F3ACE96BDF036AEB28F2A2EFF448DDF1B72B9152F9D43B435DD21B224FEA075`
+and checksum OPPO profile `1.0.0-r58.15`. It will distinguish active scoped
+Checkout ownership from stale last-vertical selection across All/Shop/
+Wholesale/Medicine, preserving exact visible/Back return. Evidence folder
+`158`. No runtime edit or build is authorized; any defect requires a separate
+R58.8.7 registration before write.
+
+## Live 4 August 2026 — R58.8.6 FIX1 founder approved/protected
+
+State: `R58_8_6_FIX1_FOUNDER_APPROVED_PROTECTED_NEXT_BOUNDED_AUDIT_AUTHORIZED`.
+
+The founder explicitly approved exact candidate
+`BUY-R58-CHECKOUT-CART-RETURN-CONTINUITY-FIX1`, profile `1.0.0-r58.15`
+(`2026080411`), 2,460-file source SHA-256
+`8F3ACE96BDF036AEB28F2A2EFF448DDF1B72B9152F9D43B435DD21B224FEA075`
+and checksum-matched APK/install SHA-256
+`137E8DC5A9013115A9F45BDCD644445BBB98D0039B92580C8BC4A924A7E7EA05`.
+Decision evidence is folder `157`; technical/device evidence remains folder
+`156`. Exact scoped Cart return, compact hit ownership, Back parity, motion and
+accessibility are protected. Provider/payment/order/backend outcomes remain
+held. AUDIT7 may proceed read-only; any fix requires a separate registration.
+No protected baseline, commit, push, deployment, merge, branch or cleanup
+authority changed.
+
+## Live 4 August 2026 — R58.8.6 FIX1 technically/device qualified
+
+State: `R58_8_6_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-CHECKOUT-CART-RETURN-CONTINUITY-FIX1`, profile `1.0.0-r58.15`
+(`2026080411`), completed host, two 351+20 Buy regressions, every release/
+protected/machine gate, wrapper build and checksum-matched OPPO qualification.
+All/Shop/Wholesale/Medicine visible Checkout returns now match Android Back,
+retain exact scope and use one 44 logical-pixel compact action owner. Reduced
+motion, payment-sheet Back, hot resume, recreation, performance and failure scan
+passed. Final source is 2,460 files SHA-256
+`8F3ACE96BDF036AEB28F2A2EFF448DDF1B72B9152F9D43B435DD21B224FEA075`;
+APK/install SHA-256
+`137E8DC5A9013115A9F45BDCD644445BBB98D0039B92580C8BC4A924A7E7EA05`.
+
+Evidence is folder `156`; technical handoff is
+`docs/quality/BUY-FV2-R58-8-6-CHECKOUT-CART-RETURN-CONTINUITY-HANDOFF-20260804.md`.
+Founder observation points are `156/151-founder-review-observation-points.md`.
+Technical qualification is not founder approval; no protected baseline changed.
+The OPPO is clean on Shop with scales `1/1/1`. A scoped-Checkout bottom-nav
+selection mismatch is recorded as the next separate read-only audit, not mixed
+into this candidate. No next runtime candidate is registered yet.
+
+## Live 4 August 2026 — R58.8.6 Checkout Cart return FIX1 registered
+
+State: `R58_8_6_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+AUDIT6 reproduced a Shop-scoped Checkout visible-return defect on the exact
+founder-approved R58.8.5 OPPO/source. The `Cart` accessibility node spans
+`[20,230][700,310]`, but its centre does not hit the compact physical action.
+The visual action returns through default `openCart()` and changes exact Shop
+scope into combined Shop + Wholesale; Android Back correctly restores Shop via
+`checkoutScope`. Audit evidence is folder `155`.
+
+Candidate `BUY-R58-CHECKOUT-CART-RETURN-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.15` (`2026080411`), is registered from exact 2,454-file source
+SHA-256 `DF7A4817AB6848056A0F148EC0E6BC291F5DF0410BD31890F845206D33F571EB`.
+Runtime scope is the Checkout return call site only: bind exact scope and reuse
+one tight physical/semantic owner. Place order, confirmation, providers,
+payments and shared affordance defaults are protected. Registration/evidence:
+`artifacts/quality/buy-checkout-cart-return-continuity-r58-8-6-fix1-20260804-156`.
+
+## Live 4 August 2026 — R58.8 AUDIT6 checkout terminal audit registered
+
+State: `R58_8_AUDIT6_CHECKOUT_TERMINAL_READ_ONLY_IN_PROGRESS`.
+
+After exact R58.8.5 founder approval, the next separate action is audit
+`BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT6` on unchanged 2,454-file source
+SHA-256 `DF7A4817AB6848056A0F148EC0E6BC291F5DF0410BD31890F845206D33F571EB`
+and connected OPPO profile `1.0.0-r58.14` (`2026080410`). It is bounded to
+Cart -> Checkout, child address/benefit/payment surfaces, honest submission/
+result boundaries and exact Back/bottom/keyboard/lifecycle/recreation exits.
+Registration and motion disposition are in
+`artifacts/quality/buy-cross-family-terminal-audit-r58-8-audit6-20260804-155`.
+No runtime edit or build is authorized by the audit. A reproduced local defect
+requires a separately registered R58.8.6 candidate before runtime write.
+
+## Live 4 August 2026 — R58.8.5 FIX1 founder approved/protected
+
+State: `R58_8_5_FIX1_FOUNDER_APPROVED_PROTECTED_NEXT_BOUNDED_AUDIT_AUTHORIZED`.
+
+The founder explicitly approved exact candidate
+`BUY-R58-HONEST-RECOVERY-ORIGIN-CONTINUITY-FIX1` and directed continuation to
+the next ticket/action. Approval is bound to profile `1.0.0-r58.14`
+(`2026080410`), 2,454-file source SHA-256
+`DF7A4817AB6848056A0F148EC0E6BC291F5DF0410BD31890F845206D33F571EB`
+and checksum-matched APK/install SHA-256
+`4A6640DDEFEF3B50E76D7A4EFB73973814D0D237905B92DD75AEACDCC2E2F03D`.
+The immutable founder decision is
+`artifacts/quality/buy-r58-8-5-founder-approval-20260804-154`.
+
+The qualified source manifest was rechecked before recording approval: all
+2,454 app/test files match and drift is zero. R58.6.1 remains a separate
+founder-review decision. The next safe action is a read-only continuation of
+the registered R58.8 terminal audit on the exact approved cumulative binary;
+any confirmed defect requires its own candidate registration before runtime
+write. No protected baseline, commit, push, deployment, publication, merge,
+branch or cleanup authority changed.
+
+## Live 4 August 2026 — R58.8.5 FIX1 technically/device qualified
+
+State: `R58_8_5_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-HONEST-RECOVERY-ORIGIN-CONTINUITY-FIX1`, profile `1.0.0-r58.14`
+(`2026080410`), completed two 347+20 regressions, every release/protected gate,
+one-candidate wrapper build and checksum-matched OPPO qualification. Final
+source is 2,454 files SHA-256
+`DF7A4817AB6848056A0F148EC0E6BC291F5DF0410BD31890F845206D33F571EB`;
+APK/install SHA-256 is
+`4A6640DDEFEF3B50E76D7A4EFB73973814D0D237905B92DD75AEACDCC2E2F03D`.
+
+OPPO passed all six honest recovery states, primary/Android Back exact owner,
+Medicine isolation from an unrelated Shop Cart, exact `PO-240783` Help and
+Tracking, destination replacement, query/IME, hot resume/process recreation,
+visible 0/0/0 reduced motion and normal-state restoration. The first trace
+failed closed from UiAutomation/JIT contention; the next proved gfxinfo does
+not count Flutter SurfaceView frames without that instrumentation; the final
+ready exact-order atrace measured 507 presentations, p95 19.795 ms, max
+30.704 ms, zero over 33.333 ms and no shader/compile events. All failed harness
+evidence and root causes remain immutable. Current fatal/ANR scan is zero;
+final source is exact; OPPO is parked on Shop at 1/1/1 with dirty regions
+default-disabled. Evidence folder `151`; founder observation points `173`.
+Technical qualification is not founder approval.
+
+## Live 4 August 2026 — dual commerce and permissioned AI models selected
+
+State: `FOUNDATION_FOUNDER_MODELS_SELECTED_REMAINING_EXTERNAL_GATES_EXPLICIT`.
+
+The founder selected default platform/agent and alternate SuperMandi
+purchase/resale models, effective-dated by participant/supply family/location
+across Shop, Wholesale and Medicine. PAY and B2B ownership follow the frozen
+model. The founder also put a permissioned shopping agent in launch scope with
+bounded Cart/order authority while OTP, UPI PIN, bank transfer/authentication
+and payment truth remain user/provider/server-only. Exact decisions,
+fail-closed defaults and unresolved counsel/finance/provider/privacy/safety/
+commercial gates are in
+`artifacts/quality/production-foundation-founder-decisions-20260804-153`.
+
+## Live 4 August 2026 — six OPPO-satisfied candidates founder approved
+
+State: `R59_FIX8_R58_7_R58_8_1_TO_8_4_APPROVED_PROTECTED`.
+
+The founder approved the exact six candidates Codex marked satisfactory after
+physical OPPO qualification: R59.1 FIX8, R58.7, R58.8.1, R58.8.2, R58.8.3
+FIX2 and R58.8.4 FIX2. Exact authority is preserved in founder-decision folder
+`152` and
+`docs/quality/BUY-OVERNIGHT-OPPO-SATISFIED-FOUNDER-DISPOSITION-20260804.md`.
+Rejected predecessors remain rejected. R58.6.1 remains a separate pending
+founder decision. R58.8.5 was excluded from that six-candidate decision but is
+now separately founder approved/protected under decision folder `154`.
+
+## Live 4 August 2026 — R58.8.5 FIX1 registered after OPPO reproduction
+
+State: `R58_8_5_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The exact R58.8.4 FIX2 OPPO install reproduced three recovery-owner defects:
+Medicine network Back opened Checkout because an unrelated Shop Cart line
+existed; exact `PO-240783` delivery recovery primary reset to Shop; and generic
+payment recovery asserted “No amount was charged” without provider truth.
+Exact screenshots/XML are in AUDIT5 folder `150`.
+
+`BUY-R58-HONEST-RECOVERY-ORIGIN-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.14` (`2026080410`), is registered from unchanged 2,453-file source
+SHA-256 `6E90C71A83B644D1B45B2CEAD0F77251683C803B8F877F2005F3317228E52149`.
+Only `buy_v2_session.dart`, `buy_v2_views.dart`, one new focused test and the
+obsolete recovery expectations in `buy_v2_session_coverage_test.dart` may
+change. The six existing recovery states must retain/validate their first real
+origin, make visible primary and Android Back equivalent, use honest generic
+copy, expose delivery Help only from exact Tracking/Items, and never mutate or
+invent a business/provider/backend result. Registration/motion disposition:
+candidate folder `151`.
+
+The OPPO red blink was Android's dirty-region redraw visualizer, not an active
+call. It is disabled; a controlled reboot restored normal display, three timed
+frames are clean, scales are `1.0/1.0/1.0`, and the installed APK still matches
+R58.8.4 FIX2 SHA-256 `9EC00C89B5C490FEFE06EF0619304653DEA433E4559663756140BAA8BEC851DA`.
+
+## Live 4 August 2026 — R58.8.4 FIX2 technically/device qualified
+
+State: `R58_8_4_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-ORDER-ISSUE-RECOVERY-CONTINUITY-FIX2`, profile `1.0.0-r58.13`
+(`2026080409`), completed two 340+20 regressions, every release/protected gate
+and checksum-matched OPPO qualification. Source is 2,453 files SHA-256
+`6E90C71A83B644D1B45B2CEAD0F77251683C803B8F877F2005F3317228E52149`;
+APK/install SHA-256 is
+`9EC00C89B5C490FEFE06EF0619304653DEA433E4559663756140BAA8BEC851DA`.
+Compact Back bounds are `[20,230][168,310]`, semantic-centre return is exact,
+active/delivered topics, IME/Back/lifecycle/recreation, visible reduced motion,
+p95 21.400 ms and zero runtime failures passed. OPPO is on Orders root with
+scales `1.0/1.0/1.0`. Evidence/handoff: candidate folder `149` and
+`docs/quality/BUY-FV2-R58-8-4-ORDER-ISSUE-RECOVERY-CONTINUITY-HANDOFF-20260804.md`.
+FIX1 remains rejected; technical qualification is not founder approval.
+
+## Live 4 August 2026 — R58.8.4 FIX1 rejected; FIX2 registered
+
+State: `R58_8_4_FIX2_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+FIX1 passed host qualification and installed checksum-exact on OPPO, but the
+visible Assist Back chip exposed a full-row accessibility bound whose centre
+did not hit the compact physical InkWell. The exact semantic-centre tap stayed
+on Assist; the real visual-centre tap returned to exact `MS-240741` Tracking.
+FIX1 is device rejected and immutable in
+`artifacts/quality/buy-order-issue-recovery-continuity-r58-8-4-fix1-20260804-148`.
+
+`BUY-R58-ORDER-ISSUE-RECOVERY-CONTINUITY-FIX2`, planned `1.0.0-r58.13`
+(`2026080409`), is registered from exact 2,453-file source SHA-256
+`5AE3E24E0D4222A575E36311884DACCA472EDC0FA05E2120A74AD53BF730A080`.
+It may tighten only the Assist return semantic/physical hit owner and add one
+deterministic bounds/action regression. No visual, route, motion or business
+state change is authorized. Registration:
+`artifacts/quality/buy-order-issue-recovery-continuity-r58-8-4-fix2-20260804-149`.
+
+## Live 4 August 2026 — R58.8 AUDIT4 and R58.8.4 FIX1 registered
+
+State: `R58_8_4_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The exact qualified R58.8.3 FIX2 source/install reproduced a delivered-order
+support terminal: `MS-240741` Tracking owns Address, Items and Reorder but no
+direct exact-order return/replacement/refund help. Active `PO-240783` Assist
+has no cancellation/change-order topic. Source also proves the visible Assist
+return bypasses the stored exact origin by calling Orders/catalogue root while
+Android Back uses `closeAssist` correctly.
+
+Audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT4` is preserved in
+`artifacts/quality/buy-cross-family-terminal-audit-r58-8-audit4-20260804-147`.
+Candidate `BUY-R58-ORDER-ISSUE-RECOVERY-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.12` (`2026080408`), is registered from exact 2,447-file source
+SHA-256 `1B11F99FF677F6C48054DA9AC409BE731B7FB377151F10C211BA8D2081E5E271`.
+It may change only `buy_v2_views.dart` plus one focused test: preserve Reorder,
+add delivered exact-order Help, expose state-appropriate preparation-only
+support topics and route the visible return through existing exact
+`closeAssist`. No backend/order/Cart/payment/refund/return result is authorized.
+
+## Live 4 August 2026 — 7:00 AM consolidated founder handoff sealed
+
+State: `OVERNIGHT_IMPLEMENTATION_AND_OPPO_QUALIFICATION_COMPLETE_FOUNDER_DECISIONS_PENDING`.
+
+The branch/HEAD, ticket dispositions, files, regressions, OPPO journeys,
+checksums, rejected candidates, risks and six founder decisions are sealed in
+`docs/quality/MOOLSOCIAL-OVERNIGHT-7AM-FOUNDER-HANDOFF-20260804.md`.
+The OPPO is parked on Orders root at qualified R58.8.3 FIX2, profile
+`1.0.0-r58.11` (`2026080407`), installed SHA-256
+`16EFCE333775B723210EFA8C5B77FD2266F1C2B72691794A56EB4763240EF062`,
+with animation scales restored to `1.0/1.0/1.0`. R59 FIX7 and R58.8.3 FIX1
+remain rejected and immutable; no commit/push/merge/deploy/cleanup occurred.
+
 Snapshot date: 20 July 2026
 Purpose: durable context bootstrap for Codex in Android Studio and other Codex
 surfaces.
+
+## Live 3 August 2026 — full R57.1 OPPO review matrix passed
+
+State: `R57_1_CUMULATIVE_REVIEW_MATRIX_PASSED_FOUNDER_REVIEW_PENDING`.
+
+On the exact unchanged R56.10 FIX2 install, the founder walkthrough query
+matrix passes: Shop `tomatos` -> two bounded results and route/Back context;
+correct `tomato` -> the two direct tomato products; `frsh tomatos` -> Fresh
+tomatoes only; `mlk`, `s-tomto` and cross-vertical `w-tomato` -> empty;
+`balajii` -> Fresh tomatoes through current seller text; Medicine
+`paracetmol` -> Paracetamol only. The app returned to a query-free root between
+cases and is parked on Shop.
+
+Exact XML/screenshots and result table:
+`artifacts/quality/production-foundation-founder-review-20260803-121/62-cumulative-r57-search-matrix.md`.
+This does not activate a backend index, nearby/serviceability or live catalogue
+and remains founder-review pending.
+
+## Live 3 August 2026 — cumulative R56 popup OPPO smoke passed
+
+State: `R56_REVIEW_PENDING_FAMILIES_CUMULATIVE_SMOKE_PASSED`.
+
+On the exact unchanged R56.10 FIX2 install, cumulative founder-review smoke
+verified R56.1 Saved-clear, R56.2 scanner/manual code and R56.6-R56.10 tools,
+payment, prescription and address families. Keyboard/focus/two-stage Back,
+non-mutating dismissal, safe address bounds, six address fields, honest
+provider-unavailable recovery and state restoration all passed. No payment,
+upload, address or completion fact was invented.
+
+Manual visual inspection found clear hierarchy and no unintended primary-
+action clipping. Physical Add-form scrolling exposed Save and deliver here at
+`[32,1352][688,1440]` inside the `[0,0][720,1442]` app viewport while all six
+fields remained empty.
+
+One Paracetamol item was temporarily saved to reach the real R56.1 production
+confirmation; Back preserved it, then the real Saved owner restored the
+original zero-saved state. Two coordinate misses are preserved as non-mutating
+evidence and followed by corrected exact native-control taps.
+
+Exact XML/screenshots and classification:
+`artifacts/quality/production-foundation-founder-review-20260803-121/53-cumulative-r56-popup-review-readiness.md`.
+The device remains profile `1.0.0-r56.10` (`2026080313`) at installed SHA-256
+`B86009EFD9A74E7AB3BC7FF20FC3690C78491F9E7D8832CF41ABA5AB2D7F1711`
+and is parked on clean Shop root. Smoke success is not founder approval.
+
+The founder-approved R56.3 category picker and R56.4 household sheet also pass
+an unchanged-installation protected-lock smoke: Back retains For you and does
+not add the household basket. This confirms continuity without reopening their
+approval.
+
+## Live 3 August 2026 — premium-motion policy is machine enforced
+
+State: `BUY_POL_001_TECHNICALLY_QUALIFIED_TOOLING_ONLY`.
+
+Candidate `BUY-POL-001-PREBUILD-PREMIUM-MOTION-POLICY-GATE-FIX1` closes the
+bounded delivery gap between the documented policy and the mandatory APK
+machine. `scripts/check-apk-regression-gate-state.ps1` now invokes
+`scripts/check-buy-premium-motion-policy-state.ps1` and fails closed unless the
+candidate references the exact canonical policy/coverage, existing contract
+and disposition evidence, all required enabled rules and nonblank unique
+`applied`, `reused`, `dependencyHeld` and `inapplicable` categories.
+
+The current R56.10 qualified state passes with 14 dispositions under
+PowerShell 7 and Windows PowerShell 5.1. One positive plus six negative
+fixtures pass under both runtimes, the integration path is proven, repository
+PowerShell compatibility/backend/data-egress/diff/credential checks pass, and
+protected-gate results remain the existing classified cumulative-work
+rejections. The canonical policy and current machine state stayed byte exact.
+
+Exact script hashes, checks and boundary:
+`artifacts/quality/buy-premium-motion-policy-machine-gate-20260803-123`.
+No Flutter runtime, UI, APK, OPPO install or founder disposition changed.
+
+## Live 3 August 2026 — cumulative OPPO review smoke and 9:00 handoff sealed
+
+State: `SAFE_IMPLEMENTATION_EXHAUSTED_FOUNDER_DECISIONS_NEXT`.
+
+The exact installed cumulative R56.10 FIX2 binary remains profile
+`1.0.0-r56.10` (`2026080313`) at device-side SHA-256
+`B86009EFD9A74E7AB3BC7FF20FC3690C78491F9E7D8832CF41ABA5AB2D7F1711`.
+No build, reinstall, APK replacement or source edit was used for the review
+smoke.
+
+Fresh tomatoes and Stone-ground wheat atta each opened and Android Back
+restored Shop catalogue context. Misspelled `tomatos` returned exactly two
+results with Fresh tomatoes first and Classic tomato ketchup second; opening
+the first result and Back restored the query/results, then Clear/Finish
+returned to Shop root. Exact XML/screenshots and classification:
+`artifacts/quality/production-foundation-founder-review-20260803-121/19-cumulative-navigation-review-readiness.md`.
+
+The concise overnight delivery/ticket/test/device/decision handoff is
+`docs/quality/MOOLSOCIAL-OVERNIGHT-9AM-HANDOFF-20260803.md`. Not every possible
+future effect is complete: R51 remains deferred, R56.5 remains stopped/device
+rejected and truthful loading/video/live/provider effects remain dependency
+held. Every future UI ticket must apply
+`config/buy-premium-motion-policy.json` before its first runtime write and
+complete reduced-motion, responsive, accessibility and OPPO qualification.
+Server-only tickets must document the policy as inapplicable.
+
+## Live 3 August 2026 — 9:00 AM founder decision pack prepared
+
+State: `PRODUCTION_FOUNDATION_FOUNDER_DECISIONS_PENDING`.
+
+After B2B-002 qualification, the dependency audit found no further safe
+runtime ticket: B2B-003 is held by B2B-001/TAX-003; PAY-003 by PAY-001/order
+ownership; tax runtime by TAX-001/counsel/finance; DISC-002 by R57 founder
+approval and a canonical index owner; provider adapters by evidence/security.
+
+The concise review brief and blank durable decision forms are:
+
+- `docs/quality/PRODUCTION-FOUNDATION-9AM-FOUNDER-DECISION-BRIEF-20260803.md`
+- `docs/quality/BUY-R56-R57-9AM-OPPO-FOUNDER-WALKTHROUGH-20260803.md`
+- `artifacts/quality/production-foundation-founder-review-20260803-121`
+
+They request scoped R56/R57 founder dispositions, B2B-001 pilot choices,
+TAX-001/PAY-001 launch-family ownership and non-secret PhonePe evidence
+registration. No default in the brief is an approval. Credentials, provider
+calls, deployment, production data and funds movement remain false.
+
+Post-decision contract/test acceptance is preflighted—without a runtime
+candidate—in
+`docs/delivery/POST-DECISION-NEXT-TICKET-READINESS-PACK-20260803.md` for
+DISC-002, B2B-003 and PAY-003. Their existing dependency gates remain exact.
+
+## Live 3 August 2026 — B2B-002 pack/logistics contract qualified
+
+State: `B2B_002_TECHNICALLY_QUALIFIED_LOCAL_CONTRACT_PERSISTENCE_ENDPOINT_HELD`.
+
+Candidate `B2B-002-WHOLESALE-PACK-LOGISTICS-UNIT-CONTRACT-FIX2` builds on
+qualified SUP-001/SUP-003 and adds a pure reviewed packaging contract. One
+verified canonical pack can have non-overlapping effective profiles for exact
+count/mass/volume measure, each/weight/volume -> inner -> case -> pallet
+configuration, declared sale/loading levels, bounded coherent dimensions and
+weights, governed codes and hash-only traceability evidence.
+
+Workspace authorization precedes source/version checks; category-scoped
+product-master capability is required; proposer and reviewer are separate;
+commands are chronological, versioned and exactly idempotent. A stored profile
+lookup is not supplier, offer, stock, serviceability, price, tax or payment
+truth.
+
+FIX2 records exact source catalogue version and product/pack hashes, translates
+invalid upstream codes into the B2B error boundary and caps profile history at
+100. Qualified FIX1 remains preserved.
+
+Exact 84-file source SHA-256 is
+`8A067CE17C21F72FC2C5A8BAD5749A8F11AC5C258FC16D5CF7042084A213C599`.
+Nineteen focused tests and two unchanged-source 317-test backend regressions
+pass with all applicable gates. No endpoint, schema, persistence, provider,
+production data, Flutter surface or APK changed. Motion/OPPO is explicitly
+inapplicable. Evidence:
+`artifacts/quality/wholesale-pack-logistics-unit-contract-b2b-2-fix2-20260803-122`.
+Handoff:
+`docs/quality/B2B-002-WHOLESALE-PACK-LOGISTICS-UNIT-CONTRACT-HANDOFF-20260803.md`.
+
+B2B-003 remains held by B2B-001 and TAX-003 decisions. No MOQ, price, tax,
+freight, deposit, payment or credit term may be inferred from B2B-002. Audit
+the production-foundation register for another dependency-ready local ticket
+before opening runtime work.
+
+## Live 3 August 2026 — SUP-003 local catalogue/offer contract qualified
+
+State: `SUP_003_TECHNICALLY_QUALIFIED_LOCAL_CONTRACT_PERSISTENCE_ENDPOINT_HELD`.
+
+Candidate `SUP-003-CANONICAL-CATALOGUE-OFFER-CONTRACT-FIX1` builds on qualified
+SUP-001 without creating a live catalogue. It adds stable product/pack/offer/
+dispute identities, category-scoped product stewardship, separate governance
+review, GS1/governed-code matching, explicit ambiguous results,
+non-destructive merge/dispute outcomes and immutable effective term references.
+
+Participant capabilities must cover offer creation and the complete scheduled
+term window. New offers cannot backdate or overlap. A term-reference lookup is
+not stock, serviceability, payment or commitment truth.
+
+Exact 82-file source SHA-256 is
+`6F4574FBA21C7E31813FE8F05F170FE6E3FE7066998DF063026C79E454A30E50`.
+Fourteen focused tests and two unchanged-source 298-test backend regressions
+pass with all applicable gates. No endpoint, schema, persistence, provider,
+production data, Flutter surface or APK changed. Motion/OPPO is explicitly
+inapplicable. Evidence:
+`artifacts/quality/canonical-catalogue-offer-contract-sup-3-20260803-119`.
+Handoff:
+`docs/quality/SUP-003-CANONICAL-CATALOGUE-OFFER-CONTRACT-HANDOFF-20260803.md`.
+
+B2B-002 verified pack/logistics-unit contracts are next. B2B-003 price/MOQ/
+tax/freight/payment terms remain held by their founder/finance/tax decisions.
+
+## Live 3 August 2026 — SUP-001 local participant capability contract qualified
+
+State: `SUP_001_TECHNICALLY_QUALIFIED_LOCAL_CONTRACT_PERSISTENCE_ENDPOINT_HELD`.
+
+The founder directed continued implementation of all dependency-ready tickets
+and made premium/reduced motion a durable requirement for future UI work. The
+dependency audit placed SUP-001 before SUP-003 and B2B-002.
+
+Candidate `SUP-001-PARTICIPANT-CAPABILITY-CONTRACT-FIX1` adds only a pure
+server-domain aggregate and tests. Registration grants no capability. Exact
+tenant/workspace and governance authorization, independent retail/wholesale/
+delivery/product-master review, evidence hashes, qualifiers, effective/expiry
+boundaries, optimistic concurrency, idempotent receipts, suspension/revocation
+and append-only audit outcomes fail closed.
+
+Exact 80-file backend/build/gate source SHA-256 is
+`54459BB626F366EFD9F7411BC16AF1A0622E7E5E7BE0B43BC987E230366DC16C`.
+Thirteen focused tests and two unchanged-source complete backend regressions
+at 284 tests pass. Boundary/self-test, data-egress, Windows PowerShell 5.1,
+protected-outcome, network/credential, whitespace and diff gates pass.
+
+No deployed export, endpoint, schema, persistence, provider, production data,
+Flutter surface or APK changed. Motion/OPPO evidence is explicitly
+inapplicable to this server-only contract; the premium-motion policy remains
+mandatory for future UI tickets. Evidence:
+`artifacts/quality/supply-participant-capability-contract-sup-1-20260803-118`.
+Handoff:
+`docs/quality/SUP-001-PARTICIPANT-CAPABILITY-CONTRACT-HANDOFF-20260803.md`.
+
+SUP-003 canonical product -> verified pack -> participant offer contracts are
+next, followed by B2B-002 verified pack/loading-unit contracts. Persistence,
+endpoints, live data and deployment remain held.
+
+## Live 3 August 2026 — R56.10 FIX2 technically/device qualified
+
+State: `R56_10_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+R56.10 FIX1 remains preserved after generic UIAutomator XML omitted Android 13
+native hint text and conservatively reported unnamed fields. The FIX2
+candidate-specific `AccessibilityNodeInfo` probe proves the existing runtime
+already publishes the request hint and all six Add field hints, editable/
+focusable state and post-focus set-text action. Adding proxy values or duplicate
+semantic owners would degrade the correct native contract.
+
+FIX2 `BUY-R56-ADDRESS-REQUEST-ADD-FORMS-MOTION-FIX2`, profile
+`1.0.0-r56.10` (`2026080313`), changes deterministic focused assertions only.
+Exact source is 2,416 files at SHA-256
+`B6E29743BB17F54872E86E9FD2EDAF99E6061E4153A8C6EABDC1F4CD3FDBE743`.
+The wrapper-built/checksum-matched OPPO APK/install is 134,000,969 bytes at
+SHA-256
+`B86009EFD9A74E7AB3BC7FF20FC3690C78491F9E7D8832CF41ABA5AB2D7F1711`.
+
+Focused and combined suites, eight responsive/reduced captures, two
+289-active/15-skip full Buy regressions, every release/protected gate, native
+request/Add field accessibility, keyboard/focus/Back, hot resume, process
+recreation, honest provider-unavailable recovery, zero-match failure scan and
+the 99-frame profile trace pass. Presentation p95 is 29.569 ms, none exceeds
+100 ms and no shader/compile event occurs. Exact post-device source remains
+unchanged.
+
+Technical qualification is not founder approval. Exact evidence:
+`artifacts/quality/buy-address-request-add-forms-motion-r56-10-fix2-20260803-117`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-10-ADDRESS-REQUEST-ADD-FORMS-MOTION-HANDOFF-20260803.md`.
+
+No next popup-family runtime edit is opened by this checkpoint. PAY-001-
+PAY-012 and B2B-001-B2B-010 remain registered production-foundation work;
+provider credentials, geocode/serviceability, address persistence and payment
+integration were not assumed.
+
+## Live 3 August 2026 — R56.9 FIX4 technically/device qualified
+
+State: `R56_9_FIX4_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+R56.9 required four bounded candidates. FIX1-FIX3 remain preserved OPPO device
+rejections because Add address exposed only a clipped 42-pixel native action at
+the edge-to-edge application viewport. FIX4 retains the real MediaQuery/View/
+viewport resolver and adds one bounded 24 logical pixel fallback when the
+device reports zero for every real inset source.
+
+FIX4 `BUY-R56-ADDRESS-CHOICE-SHEET-MOTION-FIX4`, profile `1.0.0-r56.9`
+(`2026080311`), qualifies on exact 2,406-file app/test source SHA-256
+`4A938B1D41814661C7C85B8AEAD0764C303BDAAE7E7D18A35E9FB2A4F695F07B`.
+The wrapper-built/checksum-matched OPPO APK/install is 133,919,053 bytes at
+SHA-256
+`E91071F93028BCEA41F36E4229171A80EDCBED2E437C68523990A8856718F049`.
+
+Twenty-four focused checks, four responsive captures, two 278-active/14-skip
+full Buy regressions, all gates, native Account/Checkout replay, Back/Close,
+selection-after-reverse, Request/Add reachability, keyboard/focus, lifecycle,
+process recreation, zero-match failure scan and p95 28.264 ms pass. Native Add
+address bounds are `[32,1352][688,1440]`, a full 88-pixel action inside the
+1,442-pixel app viewport. Exact post-device source remains unchanged.
+
+Technical qualification is not founder approval. Exact evidence:
+`artifacts/quality/buy-address-choice-sheet-motion-r56-9-fix4-20260803-115`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-9-ADDRESS-CHOICE-SHEET-MOTION-HANDOFF-20260803.md`.
+
+R56.10 address request/add-address forms are next. PAY-001-PAY-012 and
+B2B-001-B2B-010 remain separately registered foundation work; no provider
+credential, payment, geocode, serviceability or backend result was assumed.
+
+## Live 3 August 2026 — R56.8 FIX2 technically/device qualified
+
+State: `R56_8_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+R56.8 preserves FIX1/device rejection and qualifies the bounded FIX2 successor.
+FIX1 `BUY-R56-PRESCRIPTION-SHEET-MOTION-FIX1`, source SHA-256
+`4620A481F5023514E89DEB26C26D1E4978A38FEB8DF7D77E7117E9D1C8FADC1F`,
+APK/install SHA-256
+`93505B682B09A6A35D5ACE8314298A7738BD7373B03D7AB2A52CF862786E11A5`,
+is not founder-review eligible because the affected Medicine caller advertised
+an upload capability the local session action did not perform.
+
+FIX2 `BUY-R56-PRESCRIPTION-SHEET-MOTION-FIX2`, profile `1.0.0-r56.8`
+(`2026080307`), changes only that caller word from Upload to Add and adds its
+production-caller assertion. Exact source is 2,400 files at SHA-256
+`5375B1C77BF52075736AC6E81284AAC9EA083D9550A4EE4A016B2282FD183674`.
+The wrapper-built/checksum-matched OPPO APK/install is 133,919,053 bytes at
+SHA-256
+`3E4EB324FC73EA252714054864E62335C02AFB3F7121F60664979D36EBC881E5`.
+
+Ten focused tests, four responsive captures, two full 266-active/13-skip Buy
+regressions, every release/protected gate, Medicine/Account replay, native
+`clickable=true` actions, Back/Close, lifecycle/process, zero-match failure scan
+and exact-profile p95 26.849 ms pass. No upload, camera, validity, pharmacist,
+provider, payment or backend result is invented. Technical qualification is
+not founder approval. Exact evidence:
+`artifacts/quality/buy-prescription-sheet-motion-r56-8-fix2-20260803-111/59-technical-device-qualification-summary.md`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-8-PRESCRIPTION-SHEET-MOTION-HANDOFF-20260803.md`.
+
+R56.9 address choice is the next registered popup family. PhonePe/payment-
+gateway and wholesale B2B commercial-model work remain a separate production
+foundation epic; no provider integration or credential assumption was made by
+R56.8.
+
+## Live 3 August 2026 — R56.7 FIX2 technically/device qualified
+
+State: `R56_7_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+R56.7 preserves FIX1/device rejection and qualifies the narrow FIX2 successor.
+FIX1 APK/install SHA-256
+`9DC0420AA10501C3A7F5372A8FC9079E06EC3149AB05932FA1675B9714ED08EF`
+is not founder-review eligible because all three named native payment Buttons
+reported `clickable=false` on OPPO.
+
+FIX2 `BUY-R56-PAYMENT-CHOICE-SHEET-MOTION-FIX2`, profile `1.0.0-r56.7`
+(`2026080305`), adds only the missing single semantic tap action. Exact source
+is 2,394 files at SHA-256
+`82DA30E6A411334A31D3058F85964E09210B9E8F4005D5A7D1CDC50E00720445`.
+The wrapper-built/checksum-matched OPPO APK/install is 133,902,621 bytes at
+SHA-256
+`015E6A6BD839659DC469E2BE6BB30AFE40A8ABFDC9BBA482059FB5612FC97297`.
+
+Focused normal/reduced/compact tests, unchanged visual captures, two full
+256-active/12-skip Buy regressions, every release/protected gate, Account and
+Checkout replay, native `clickable=true` actions, Back/Close, lifecycle/process,
+zero-match failure scan and exact-profile p95 29.812 ms pass. No payment starts
+or provider/eligibility/result fact is invented. Technical qualification is not
+founder approval. Exact evidence:
+`artifacts/quality/buy-payment-choice-sheet-motion-r56-7-fix2-20260803-109/59-technical-device-qualification-summary.md`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-7-PAYMENT-CHOICE-SHEET-MOTION-HANDOFF-20260803.md`.
+
+R56.8 prescription is the next registered popup family. PhonePe/payment-gateway
+and wholesale B2B commercial-model work remain separate foundation tickets;
+no provider integration was started by R56.7.
 
 This file does not replace the approved-reference manifest, product-design
 memory, QA records or release gates. It points new agents to those authorities
 and records the current checkpoint so a missing chat transcript cannot erase
 project decisions.
+
+## Live 3 August 2026 — R56.6 FIX3 technically/device qualified
+
+State: `R56_6_FIX3_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+R56.6 completed three bounded candidates without altering R56.5's stopped
+native-accessibility disposition. FIX1 is preserved/device rejected because its
+filter-sheet helper had no production caller. FIX2 repaired reachability but is
+preserved/device rejected after exact-profile p95 failures of 34.368 ms and
+41.852 ms. Neither candidate is founder-review eligible.
+
+FIX3 `BUY-R56-CATALOGUE-FILTER-SHEET-MOTION-FIX3`, profile `1.0.0-r56.6`
+(`2026080303`), removes FIX2's intermediate popup route and presents the
+existing active-order/household/prescription tools and destination filters in
+one styled native sheet. Tool and filter actions run only after reverse;
+Back/Close and stale ownership fail closed. Reduced motion is static.
+
+Exact app/test source is 2,388 files at SHA-256
+`F22B224BEA32AC13843FE4537B1CB1CD120762784842534281ED100149E2A4C0`.
+The wrapper-built and checksum-matched OPPO APK/install is 133,837,085 bytes at
+SHA-256
+`32CD47F12F27D9A326CDCF7AA54320509CA5C736597AB13F98C9897F33341709`.
+Two full regressions each pass 248 active tests with the same 11 intentional
+skips. All release/protected gates pass/reach their expected boundary. OPPO
+Shop/Wholesale/Medicine replay, native semantics, tool handoff, Back/Close,
+lifecycle/process recreation, zero-match failure scan and the decisive p95
+32.021 ms performance gate pass.
+
+Technical qualification is not founder approval. R56.7 payment choice remains
+the next registered logical family. Exact founder observation points and all
+immutable evidence:
+`artifacts/quality/buy-catalogue-filter-sheet-motion-r56-6-fix3-20260803-107/56-technical-device-qualification-summary.md`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-6-CATALOGUE-TOOLS-FILTER-SHEET-MOTION-HANDOFF-20260803.md`.
+
+## Live 3 August 2026 — R56.5 FIX3 device rejected; runtime ticket stopped
+
+State: `R56_5_FIX1_FIX2_FIX3_DEVICE_ACCESSIBILITY_REJECTED_STOPPED`.
+
+After exact R56.4 founder approval, candidate
+`BUY-R56-REVIEW-ISSUE-FORMS-MOTION-FIX1`, profile `1.0.0-r56.5`
+(`2026080222`), passed host/build/install qualification on 2,374-file source
+SHA-256 `C3B3E180744C30DF02238E66178AD603C589A6D9C525C713826AE29935B4DBB7`
+and checksum-matched OPPO APK SHA-256
+`42419EFDE5DEA133B499C7819D0A9437092C72902289459514D986A2F90447CB`.
+It is device rejected because native `AccessibilityNodeInfo` exposes the review
+`EditText` as `NAF=true` with no text/content description. Adjacent visual copy
+cannot substitute for a named editable owner. FIX1 is preserved and is not
+founder-review eligible.
+
+FIX2 `BUY-R56-REVIEW-ISSUE-FORMS-MOTION-FIX2`, profile `1.0.0-r56.5`
+(`2026080223`), also passed host/build/install qualification at 2,374-file
+source SHA-256 `D2231BB867CA03AB7914D68E219E516032F18C9886B99B445F9C3AB0405E8F79`
+and checksum-matched APK/install SHA-256
+`C398831A0A38E09FF4C1BD118347C6BDAA6CAA2D5E04E2DB6C08AD8374A18B70`.
+It remains device rejected: the real OPPO tree still contains duplicate review
+`EditText` nodes and an unnamed `NAF=true` editable owner. FIX2 is preserved and
+not founder-review eligible.
+
+Final bounded corrective candidate
+`BUY-R56-REVIEW-ISSUE-FORMS-MOTION-FIX3`, planned profile `1.0.0-r56.5`
+(`2026080224`), is registered against the exact rejected FIX2 source. It may
+change only the review input's single native semantics ownership and its
+assertion. FIX2 pixels, route/form motion, validation, report form, session
+truth and every protected owner remain exact. If native accessibility still
+fails, R56.5 stops without another retry. R56.6 remains not started. FIX1 evidence:
+`artifacts/quality/buy-review-issue-forms-motion-r56-5-20260802-101`.
+FIX2 rejected evidence:
+`artifacts/quality/buy-review-issue-forms-motion-r56-5-fix2-20260802-102`.
+FIX3 contract/evidence:
+`artifacts/quality/buy-review-issue-forms-motion-r56-5-fix3-20260803-103`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-5-PRODUCT-REVIEW-ISSUE-FORMS-MOTION-HANDOFF-20260802.md`.
+
+FIX3 subsequently passed all host checks, two 239-active/9-skip Buy
+regressions, every release/protected gate, the one-build machine gate and exact
+OPPO install/pull checksum at source SHA-256
+`52E0A858CCE1577634DF1C5FA626F0D7B6C9447C53F38265219CEB70E008E471` and
+APK SHA-256
+`7EAFA32D855DCCC4D2217B0388CAD65D6D813C842AD2945097A0971E32E66EBF`.
+The first decisive OPPO gate still failed: one native review `EditText` remains
+`NAF=true` and unnamed. The registered stop boundary is active: no FIX4, no
+founder-review claim and no R56.6 runtime work. A future native-semantics design
+decision requires separate authorization.
+
+## Founder approval — R56.4 household-only FIX2
+
+State: `R56_4_HOUSEHOLD_ONLY_FIX2_FOUNDER_APPROVED_PROTECTED_R56_5_REGISTERED`.
+
+The founder approved exact candidate
+`BUY-R56-HOUSEHOLD-INFO-SHEET-MOTION-FIX2`, profile `1.0.0-r56.4`
+(`2026080221`), app/test source SHA-256
+`A9807D9AF2171878B12031BD8B10D51B9D60C5AC431D29276DB6A552A3F3F6FD`,
+and APK/checksum-matched OPPO install SHA-256
+`EC78E90323790BC602774A304F0F60F263B9A4107E77F81D1E3E705D2181BAD1`.
+The real household sheet is protected. Approval does not create or approve the
+unreachable Saved helper, replace combined FIX1 evidence or approve R56.5.
+Decision evidence:
+`artifacts/quality/buy-household-info-sheet-motion-r56-4-founder-approval-20260802-100`.
+
+## Live 2 August 2026 — R56.4 household-only FIX2 technically/device qualified
+
+State: `R56_4_HOUSEHOLD_ONLY_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+The founder authorized the production-grade resolution of the combined FIX1
+Saved reachability hold. Unique corrective candidate
+`BUY-R56-HOUSEHOLD-INFO-SHEET-MOTION-FIX2`, profile `1.0.0-r56.4`
+(`2026080221`), is registered with no app/test runtime write. It reuses the
+exact 2,364-file source at SHA-256
+`A9807D9AF2171878B12031BD8B10D51B9D60C5AC431D29276DB6A552A3F3F6FD`
+and narrows production qualification to the real reachable household modal.
+
+The unique machine-gated APK and checksum-matched OPPO install are 133,902,621
+bytes at SHA-256
+`EC78E90323790BC602774A304F0F60F263B9A4107E77F81D1E3E705D2181BAD1`.
+Fresh formatting/analysis, seven active focused tests, two 232-active-test Buy
+regressions, responsive/reduced captures and every mandatory positive gate
+pass on the unchanged source. Corrected OPPO replay passes Close, Back, scrim,
+drag, See products, truthful four-item Add, accessibility, no-IME behavior,
+hot resume and process recreation. The decisive 105-frame more-warmed trace
+passes at presentation p95 21.871 ms, with zero frame over 100 ms and zero
+shader/compile events; the earlier 36.610 ms trace is preserved as warm-up
+variance. The process-only failure scan is clean.
+
+Combined FIX1, APK/install SHA-256
+`AE293E118BEEDF167054C81B105073FE9259D49A5CFB70838F5A557D44C1FCFF`,
+its hold, tests and evidence remain preserved. The unreachable Saved helper is
+untouched and inapplicable to FIX2; the real Saved control retains its approved
+inline grid. FIX2 is technically/device qualified and parked on the household
+sheet for founder review; this is not founder approval. R56.5 is not started.
+
+Contract/evidence:
+`artifacts/quality/buy-household-info-sheet-motion-r56-4-fix2-20260802-99`.
+
+## R56.4 FIX1 household qualified; Saved reachability held
+
+State: `R56_4_HOUSEHOLD_DEVICE_QUALIFIED_SAVED_PRODUCTION_REACHABILITY_HOLD_PRESERVED`.
+
+Exact candidate `BUY-R56-HOUSEHOLD-SAVED-INFO-SHEETS-MOTION-FIX1`, profile
+`1.0.0-r56.4` (`2026080220`), has source identity 2,364 files at SHA-256
+`A9807D9AF2171878B12031BD8B10D51B9D60C5AC431D29276DB6A552A3F3F6FD`.
+Its built and checksum-matched OPPO install SHA-256 is
+`AE293E118BEEDF167054C81B105073FE9259D49A5CFB70838F5A557D44C1FCFF`.
+
+Formatting, analysis, focused/reduced/responsive coverage, two unchanged-source
+232-active-test Buy regressions, all positive gates, one machine-gated build,
+and the physically reachable household-sheet OPPO replay pass. Close, Back,
+scrim, drag, See products, four-item Add, semantics, no-IME behavior, hot
+resume, process recreation, failure scan and warmed performance pass. The
+104-frame household trace has presentation p95 32.608 ms, no frame over 100 ms
+and zero shader/compile events.
+
+The combined candidate is not fully technical/device qualified and is not
+founder-review ready because `showBuyV2SavedProducts` has no production caller.
+The actual Saved control retains its approved inline-grid owner. No hidden
+trigger or hierarchy change was invented. Product authority must choose a new
+household-only candidate/build or explicitly authorize a production Saved-sheet
+caller. R56.5 is not started; R51 remains deferred. Contract/evidence:
+`artifacts/quality/buy-household-saved-info-sheets-motion-r56-4-20260802-98`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-4-HOUSEHOLD-SAVED-INFO-SHEETS-MOTION-HANDOFF-20260802.md`.
+
+## Founder approval — R56.3 category-picker FIX3
+
+State: `R56_3_FIX3_FOUNDER_APPROVED_PROTECTED_R56_4_NEXT_REGISTERED_FAMILY`.
+
+On 2 August 2026 the founder approved and protected exact candidate
+`BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX3`, profile `1.0.0-r56.3`
+(`2026080219`). Protected source is 2,346 app/test files at SHA-256
+`3B9F3FCFF96B3157F7455C0F303A7CD718B87614458C1C0A3EA88F4ABCB7F881`;
+the 133,820,701-byte APK and pulled OPPO install match at SHA-256
+`03B1960A0B899954502E7FC188C4BD12D68A908F368F2F8671357CABE6BE3146`.
+
+Protect its Shop/Wholesale/Medicine hierarchy, R40.3 260 ms route ownership,
+immediate reduced motion, IME-safe truthful recovery, selection-after-reverse,
+semantics/focus, geometry and keyed compositor boundary. FIX1/FIX2 remain
+preserved/rejected. Approval does not extend to another popup family.
+
+R56.4 household-basket and Saved-products informational sheets are the next
+registered bounded family. They require a unique candidate and qualification;
+R56.5-R56.10 remain registered/not started and R51 remains deferred. Decision:
+`artifacts/quality/buy-category-picker-sheet-style-motion-r56-3-founder-approval-20260802-97`.
+
+## Live 2 August 2026 — R56.3 FIX3 technically/device qualified
+
+State: `R56_3_FIX3_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Exact candidate `BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX3`, profile
+`1.0.0-r56.3` (`2026080219`), is checksum-installed and qualified on OPPO
+CPH2375 `2b3e0f71`. Qualified app/test source is 2,346 files at SHA-256
+`3B9F3FCFF96B3157F7455C0F303A7CD718B87614458C1C0A3EA88F4ABCB7F881`.
+The 133,820,701-byte APK and pulled install match at SHA-256
+`03B1960A0B899954502E7FC188C4BD12D68A908F368F2F8671357CABE6BE3146`.
+
+FIX3 adds only one keyed repaint boundary around the static category-sheet
+subtree. Shop/Wholesale/Medicine, real-IME empty recovery/Clear, all dismissal
+paths, selection-after-reverse, lifecycle/process and native accessibility
+pass. The warmed 97-frame exact-profile trace has p95 29.903 ms, no frame over
+100 ms and no shader/compile event, correcting FIX2's performance rejection.
+Two 225-active-test Buy regressions and all mandatory positive gates pass; the
+source is exact before build, after build and after device work.
+
+The OPPO is parked on the open Shop categories sheet. Founder review is
+pending; this is not approval. FIX1 and FIX2 remain preserved/rejected. R56.4
+and every other popup family remain unstarted; R51 remains deferred. Evidence:
+`artifacts/quality/buy-category-picker-sheet-style-motion-r56-3-fix3-20260802-96`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-3-CATEGORY-PICKER-SHEET-STYLE-MOTION-HANDOFF-20260802.md`.
+
+## Live 2 August 2026 — R56.3 FIX2 performance rejected; FIX3 registered
+
+State: `R56_3_FIX2_DEVICE_PERFORMANCE_REJECTED_FIX3_REGISTERED`.
+
+Exact FIX2 corrected FIX1's real-IME empty recovery and passed deterministic,
+gate, checksum-install, Shop/Wholesale/Medicine, dismissal, lifecycle/process
+and native accessibility checks. It is nevertheless rejected: its initial
+exact-profile route trace had p95 34.248 ms and its corrected pre-warmed trace
+had p95 44.594 ms, both above the established <=33 ms budget. Neither had a
+frame over 100 ms or a shader/compile event. FIX2 remains immutable at source
+SHA-256 `3C6EEE6279A3246E0638B8F67997759493C2171626D991CDC2F9CC198BB00110`
+and APK/install SHA-256
+`B34CAB62E3FB874974DB470DA7737FD89CFD15776E1C36CFF52B1A9C23BEBEB1`;
+it is not founder-review eligible.
+
+Before replacement runtime write, unique candidate
+`BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX3`, planned profile
+`1.0.0-r56.3` (`2026080219`), is registered under the same R56.3 family. Its
+only runtime scope is one keyed `RepaintBoundary` around the static category
+sheet subtree. No animation, pixel, timing, truth, semantics or state behavior
+may change. R56.4 is not started and R51 remains deferred. Contract/evidence:
+`artifacts/quality/buy-category-picker-sheet-style-motion-r56-3-fix3-20260802-96`.
+
+## Live 2 August 2026 — R56.3 FIX1 device rejected; FIX2 registered
+
+State: `R56_3_FIX1_DEVICE_KEYBOARD_EMPTY_REGRESSION_FIX2_REGISTERED`.
+
+Physical OPPO testing rejected exact candidate
+`BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX1`. With a real no-match query
+and IME visible, the truthful empty explanation and `Clear search` action were
+centred below the keyboard boundary. FIX1 source remains exact at 2,336 files,
+SHA-256 `FFE179DD78CBCCA744DF742B60F212A0BD241BA444F3254661CF8E23A87527A3`;
+its checksum-matched APK/install remains preserved at SHA-256
+`856541CAA5734223B710E8B5B00434B9797D2DF7DBA175B225CD4C95C9276BE0`.
+It is not qualified and is not eligible for founder review.
+
+Before any replacement runtime write, unique candidate
+`BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX2`, planned profile
+`1.0.0-r56.3` (`2026080218`), is registered under the same R56.3 family. Its
+only runtime scope is keeping the real empty explanation and Clear recovery
+visible/reachable in the IME-safe sheet body. R40.3 260 ms forward/reverse,
+zero reduced motion, route-completion ownership, sheet/header/search/category
+geometry and every other modal remain protected. R56.4 is not started and R51
+remains deferred. Contract/evidence:
+`artifacts/quality/buy-category-picker-sheet-style-motion-r56-3-fix2-20260802-95`.
+
+## Live 2 August 2026 — R56.3 category-picker style/motion FIX1 registered
+
+State: `R56_3_REGISTERED_IMPLEMENTATION_AND_OPPO_QUALIFICATION_IN_PROGRESS`.
+
+After the technically/device-qualified R57.1 search candidate, the founder
+directed continuation of the separately registered popup queue. Exact
+candidate `BUY-R56-CATEGORY-PICKER-SHEET-STYLE-MOTION-FIX1`, planned profile
+`1.0.0-r56.3` (`2026080217`), is registered before runtime write under existing
+`BUY-FV2-076`/`137`.
+
+The one-callsite scope is the native Shop/Wholesale/Medicine category picker.
+It must reuse founder-approved R40.3 260 ms forward/reverse route ownership,
+zero-duration reduced motion and post-dismissal vertical catalogue motion with
+no nested animation. UX scope is limited to stable width/geometry, a compact
+white/navy hierarchy, persistent search label, selected-state clarity, honest
+local empty recovery, one named semantic route and exact Back/scrim/drag/close/
+keyboard behavior.
+
+Exact predecessor source is 2,329 files at SHA-256
+`9A061A1260F44D4752F84045CD8D899398DED70295A798E9E8BE7428837A6487`;
+R57.1 APK/install SHA-256 is
+`6C2CA8264191A99E379D75BEAAF83CC2DBF2E69AF7156AE79C4F5BD0D430E08E`.
+R57.1, R56.1 and R56.2 remain separately founder-review pending; R56.4 is not
+started and R51 remains deferred. Contract/evidence:
+`artifacts/quality/buy-category-picker-sheet-style-motion-r56-3-20260802-94`.
+
+## Live 2 August 2026 — R57.1 typo-tolerant search technically/device qualified
+
+State: `R57_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+The founder observed that a nearby spelling currently returns no Buy result
+because the local projection uses only lower-cased substring matching. New
+candidate `BUY-R57-TYPO-TOLERANT-SEARCH-RANKING-FIX1`, planned profile
+`1.0.0-r57` (`2026080216`), is registered under existing `BUY-FV2-104`/`105`/
+`106` before runtime write.
+
+The implemented correction is exact/direct-first and conservative. Bounded
+token edit-distance matches are fallback-only, so a correctly spelled direct
+result set is not padded with fuzzy neighbours. Short tokens are not fuzzed;
+every query token must match; offer IDs remain literal; and destination,
+category and filter ownership stays fail-closed. It searches only current
+product title, brand, variant and seller/provider text.
+
+Qualified source is 2,329 app/test files at SHA-256
+`9A061A1260F44D4752F84045CD8D899398DED70295A798E9E8BE7428837A6487`.
+Profile `1.0.0-r57` (`2026080216`) and the pulled OPPO install are exact at
+133,804,309 bytes and SHA-256
+`6C2CA8264191A99E379D75BEAAF83CC2DBF2E69AF7156AE79C4F5BD0D430E08E`.
+Two 217-active-test Buy regressions, all mandatory gates, physical exact/near/
+multi-word/short/ID/vertical/seller replay, accessibility, IME/Back/Clear,
+lifecycle/process, failure scan and source seals pass. The 97-frame warmed
+profile trace has p95 20.55 ms, 3.093% over 33 ms, none over 100 ms and no
+shader/compile event.
+
+The OPPO is parked on Shop `tomatos` with Fresh tomatoes ranked first. Founder
+review is pending. No backend/service inventory or provider fact is inferred;
+premium motion remains no-new-motion with protected R48/R40 reuse. R56.2 stays
+separately founder-review pending, R56.3 has not started and R51 remains
+deferred. Evidence:
+`artifacts/quality/buy-search-typo-tolerance-ranking-r57-1-20260802-93`.
+Durable handoff:
+`docs/quality/BUY-FV2-R57-TYPO-TOLERANT-SEARCH-HANDOFF-20260802.md`.
+
+## Live 2 August 2026 — R56.2 FIX2 technically/device qualified; popup queue registered
+
+State: `R56_2_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING_R56_3_TO_R56_10_REGISTERED_NOT_STARTED`.
+
+Only the existing scanner manual-code sheet received R56.2 motion/style/form
+work. Exact candidate
+`BUY-R56-SCANNER-MANUAL-CODE-SHEET-MOTION-FIX2`, profile `1.0.0-r56.2`
+(`2026080215`), is installed checksum-exact on OPPO CPH2375 `2b3e0f71`:
+133,804,317 bytes and APK/install SHA-256
+`11630014586963BB8E79FFDFA9F5F87712FBF1A7CBA5EABE11C6B194886E1CF4`.
+The 2,327-file app/test source remains exact before build, after build and after
+device work at SHA-256
+`BC4CE8648382262611CFB565FC533230DD71F296B4DD5D01E6CAC2BA385FBC3C`.
+
+Format/analysis/focused tests, responsive and reduced captures, two 206-test
+Buy regressions, all mandatory gates, machine build/install/checksum, real
+scanner/result/camera-denied recovery, native accessibility, IME/Back/scrim/
+drag, app switch, lock/unlock, process recreation, failure scan and performance
+pass. The 291-frame exact-profile trace has p95 16.375 ms, zero frames over
+33/100 ms and zero shader/compile events. Founder review remains the only
+pending gate. Evidence:
+`artifacts/quality/buy-scanner-manual-code-sheet-motion-r56-2-fix2-20260802-92`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-2-SCANNER-MANUAL-CODE-SHEET-MOTION-HANDOFF-20260802.md`.
+
+FIX1 remains preserved and excluded from review. Its generic UIAutomator XML
+omitted Android `hintText` and was conservatively failed closed; the native
+`AccessibilityNodeInfo` probe used for FIX2 proves the persistent field label
+and hint are exposed on the real OPPO node.
+
+The founder's all-popup direction is registered as separate R56.3-R56.10
+logical families covering the remaining 11 native modal calls. No next-family
+runtime edit or build authorization has started. Matrix:
+`docs/quality/BUY-R56-POPUP-MOTION-STYLE-UX-TICKET-MATRIX-20260802.md`.
+
+## Live 2 August 2026 — R56.2 scanner manual-code motion registered
+
+State: `R56_2_REGISTERED_IMPLEMENTATION_AND_OPPO_QUALIFICATION_IN_PROGRESS`.
+
+The founder authorized one later implementation/OPPO task without recording
+R56.1 visual approval. R56.1 remains technically/device qualified and
+founder-review pending, exact at source SHA-256
+`5FB35AF79CE9FEDC16D214F5C1EE81CBC6175C72202266BAC85FFC77636B5BDA`
+and APK/install SHA-256
+`078619DDFAE0BEA2B1E71B4FB445E53A46D896D0F73CF683532FBF3BD36EB93A`.
+
+New candidate `BUY-R56-SCANNER-MANUAL-CODE-SHEET-MOTION-FIX1`, planned profile
+`1.0.0-r56.1` (`2026080214`), owns only the existing scanner manual-code
+`showModalBottomSheet` under `BUY-FV2-076`/`030`. It may add a finite scoped
+arrival/reverse and immediate reduced route/inset behavior while preserving
+autofocus, keyboard, compact geometry, dismissal, synchronous result, camera
+restart and every camera/provider/search owner. The other twelve modal calls
+remain untouched by R56.2.
+
+Contract/evidence:
+`artifacts/quality/buy-scanner-manual-code-sheet-motion-r56-2-20260802-91`.
+Stop after this one family; no other R56 modal migration is authorized.
+
+## Live 2 August 2026 — R56.1 Saved-clear sheet motion qualified
+
+State: `R56_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Only the existing Saved-clear confirmation family received a scoped native
+transition policy: finite 280/220 ms arrival/reverse and immediate static
+reduced motion. The other twelve audited native V2 modal/sheet calls remain
+unchanged. No second R56 family is started.
+
+Exact candidate `BUY-R56-SAVED-CLEAR-SHEET-MOTION-FIX1`, profile
+`1.0.0-r56` (`2026080213`), is installed checksum-exact on OPPO CPH2375
+`2b3e0f71`: 133,804,313 bytes and APK/install SHA-256
+`078619DDFAE0BEA2B1E71B4FB445E53A46D896D0F73CF683532FBF3BD36EB93A`.
+The 2,315-file app/test source remains exact before build, after build and
+after device work at SHA-256
+`5FB35AF79CE9FEDC16D214F5C1EE81CBC6175C72202266BAC85FFC77636B5BDA`.
+
+Analysis, focused tests, two 202-test Buy regressions, every mandatory gate,
+responsive/reduced captures, Shop/Wholesale/Medicine replay, accessibility,
+keyboard, every dismissal path, clear ownership, lifecycle/process behavior,
+failure scan and performance pass. The 106-frame exact-profile trace has p95
+19.267 ms, one frame over 33 ms, none over 100 ms and no shader/compile event.
+OPPO lacks `screenrecord`; no video is claimed.
+
+Founder review is the only pending gate. The phone is parked on Medicine Saved
+with one Saved medicine and one Cart item. Evidence and exact observation
+points:
+`artifacts/quality/buy-saved-clear-sheet-motion-r56-1-20260802-90`.
+Durable handoff:
+`docs/quality/BUY-FV2-R56-1-SAVED-CLEAR-SHEET-MOTION-HANDOFF-20260802.md`.
+
+## Live 2 August 2026 — Buy-wide premium-motion policy sealed
+
+State: `PREMIUM_MOTION_CATALOGUE_MAPPED_NO_DUPLICATE_TICKET_R56_NEXT`.
+
+The founder directed every pending and future Buy ticket to assess the complete
+premium-motion catalogue across all screens, deeper states, popups, product
+tiles/details, categories, Cart, offers/coupons, filters, Saved, Search,
+scanner, promotions, navigation, wiring and shared UI/UX. `Where appropriate`
+is a binding truth/accessibility rule, not permission to add every effect to
+every surface.
+
+The source/ticket audit found no uncovered sequential owner. Approved R43,
+R45–R48, R52.1, R53, R54 and R55 remain protected; enhancements require a new
+successor under their existing owner. R56 is the next unblocked runtime owner.
+R51 remains open/deferred. `080`/`098` loading effects and `082`/`083`/`140`
+media/campaign effects remain dependency-held. Effects with no real Buy action
+or signal remain inapplicable rather than becoming decorative behavior.
+
+Authorities:
+
+- `docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md`
+- `config/buy-premium-motion-policy.json`
+- `artifacts/quality/buy-premium-motion-scope-expansion-20260802-89`
+
+## Live 2 August 2026 — founder motion decisions sealed; R56 next
+
+State: `R43_R45_R46_R47_R48_R52_1_R53_R54_R55_FOUNDER_APPROVED_R51_ENHANCEMENT_DEFERRED`.
+
+The founder reviewed the cumulative checksum-matched R55.4 OPPO binary and
+approved `DES-001`/R43, R45 Saved/quantity/Cart, R46 Coupons/Offers, R47
+product media/title/selection depth, R48 query-to-results motion, R52.1 honest
+Orders/Tracking motion and R53 first-party promotion-card motion. The founder
+reaffirmed R54.1 and accepted the corrected current root-exit outcome. R55
+product/motion presentation remains approved. R49 is deduplicated into the
+approved R54/R55 successor; R50 remains separately founder approved.
+
+R51 FIX16 remains **NOT APPROVED — ENHANCEMENT OPEN FOR LATER IMPLEMENTATION**.
+Preserve exact profile `1.0.0-r51.15` (`2026080203`), APK/install SHA-256
+`519D60F44CE4F31631B43282B536B7F737AC83F611F227B33D276FDF910D4644`
+and all evidence. No successor, build authorization or runtime change is
+created by this decision.
+
+The observed cumulative binary is
+`BUY-R55-NAVIGATION-ROOT-EXIT-AND-PRODUCT-CONTINUITY-FIX5`, profile
+`1.0.0-r55.4` (`2026080212`), APK/install SHA-256
+`DB5A4F687CFB0352B6940ECD473D5637205A601689FF6A4A317C6E18D49D548D`
+and qualified source SHA-256
+`A27398A3B15F16AD54D7B577BB21A1CBA1A67E5206CD96234B4DC239E396C509`.
+Approval is scoped to the named owners and does not approve the R51 visual
+owner merely because it is present in the cumulative binary.
+
+Authoritative decision evidence:
+`artifacts/quality/buy-motion-founder-decisions-20260802-88`.
+
+Next unblocked implementation owner is R56 transient surfaces and honest
+recovery motion. R51 is deferred. `BUY-FV2-080`, `082`, `083`, `098` and `140`
+remain dependency-held/fail-closed; no fake loading, remote campaign, paid ad
+or video playback is authorized.
+
+## Live 2 August 2026 — R54.3/R55.4 FIX5
+
+State: **TECHNICALLY/DEVICE QUALIFIED — FOUNDER ROOT-EXIT CONFIRMATION
+PENDING**. The founder approved all other reviewed R54/R55 motion and
+presentation, but Shop-root Android Back reached Eat.
+
+FIX3 is rejected because its clean replay covered Social -> Buy but not retained
+Eat-world state. FIX4 corrected the root exit twice on OPPO, then failed closed
+when visible Medicine persisted as Shop and process death restored Shop. Both
+predecessors and all evidence remain immutable.
+
+Current installed candidate is
+`BUY-R55-NAVIGATION-ROOT-EXIT-AND-PRODUCT-CONTINUITY-FIX5`, profile
+`1.0.0-r55.4` (`2026080212`). It uses replacement navigation at the Social
+Mool-to-Buy handoff and keeps catalogue-root vertical selection in the canonical
+Buy route. No visual, motion, copy or business-state behavior changed.
+
+- Branch: `remediation/prototype-conformance-2026-07-20`
+- HEAD: `f1ac83dea2047f40b39d772696bd0d1224edce8e`
+- Source SHA-256:
+  `A27398A3B15F16AD54D7B577BB21A1CBA1A67E5206CD96234B4DC239E396C509`
+- APK/archive/install SHA-256:
+  `DB5A4F687CFB0352B6940ECD473D5637205A601689FF6A4A317C6E18D49D548D`
+- OPPO: `2b3e0f71`, exact pulled install match.
+- Two full Buy runs: 198 passed plus four capture-only skips each.
+- Eat -> Buy Shop root -> Android Back: canonical Social, Eat absent, Buy one
+  tap away. Repeated cycle passes.
+- Medicine visible route, preference and force-stop restoration agree. Product
+  semantic, one-finger page scroll and hot resume pass.
+- Profile p95 19.452 ms; zero frames over 33/100 ms; zero shader/compile events.
+- Current-process failure scan and post-device source identity pass.
+
+Evidence and summary:
+`artifacts/quality/buy-navigation-root-exit-r54-4-r55-4-20260802-87/49-technical-device-qualification-summary.md`.
+The OPPO should be left at Buy Shop root for the founder to press Android Back
+once. Expected: protected Social with the Mool choices open and Buy visible.
+
+## Live 2 August 2026 — BUY-FV2 R55.1 FIX2
+
+R55 FIX1 is **REJECTED DURING DEVICE QUALIFICATION** and must not be shown for
+founder review. Preserve source SHA-256 `4DBAB410...`, profile `1.0.0-r55`
+(`2026080208`), APK/install SHA-256
+`3F60FD1681FABD1AD53147B7E97EB1A845A6F02BA4176C218E5608B424F06300`
+and all evidence in
+`artifacts/quality/buy-product-discovery-detail-continuity-r55-20260802-83`.
+Its visible Wholesale catalogue once restored as Medicine after force-stop.
+The on-disk preference proved overlapping multi-key journey snapshot writes
+could finish out of invocation order.
+
+Current candidate `BUY-R55-PRODUCT-DISCOVERY-DETAIL-CONTINUITY-FIX2`, profile
+`1.0.0-r55.1` (`2026080209`), serializes complete snapshot writes and preserves
+the R55 visual runtime exactly. Source: 2,308 files, SHA-256
+`53EB225A2762F8C06908B66580FE1FE69C932190A490B00BAA583EB85D28861E`.
+It passes clean analysis, focused 13/13, expanded 90/90, two unchanged-source
+Buy regressions of 195 plus four established capture-only skips, all positive
+gates and exact protected fail-closed dispositions. Its single machine-gated
+build is consumed; APK/archive/install SHA-256 is
+`D9CF0B47FF9B2F776A280616E690AE97AE639F6A4B7514F112DA9D4D1C20EFBC`.
+
+OPPO `2b3e0f71` installed and pulled the exact FIX2 binary, then slept. The live
+keyguard now requires a six-digit password. No credential was entered.
+Machine state is `device_qualification_waiting_for_user_unlock`; after founder
+unlock, continue the mixed Shop/Wholesale/Medicine product replay, at least
+three visible-route/on-disk-route/force-stop restoration cycles,
+accessibility/lifecycle/failure/performance capture, post-device source seal,
+then mark technically/device qualified with founder visual review pending.
+Evidence root:
+`artifacts/quality/buy-product-discovery-detail-continuity-r55-1-20260802-84`.
+
+## Live 1 August 2026 — BUY-FV2-077 R51 FIX10
+
+Permanent release-tooling rule: every mandatory PowerShell gate must remain
+compatible with both PowerShell 7 and built-in Windows PowerShell 5.1.
+`scripts/check-windows-powershell-compatibility.ps1` is mandatory before APK
+authorization and statically rejects modern-only path/hash APIs while runtime
+smoke-testing the backend, data-egress and protected-boundary gates. Do not
+work around a compatibility failure by merely switching shells; fix the gate
+and its self-test immediately. The compatibility gate must itself pass when
+launched by either PowerShell 7 or Windows PowerShell 5.1; expected protected
+stderr must be captured for contract classification instead of becoming a
+host-dependent terminating `NativeCommandError`.
+Evidence tooling must resolve piped log/output destinations to absolute paths
+before a called script can `Push-Location`. `Start-Process` arguments under the
+spaced workspace must be explicitly quoted, and an archived Dart helper must
+receive the mobile `.dart_tool/package_config.json` via `--packages`. Treat a
+failure here as a tooling defect before build/replay, never as permission to
+reuse or silently overwrite a candidate artifact.
+
+Founder change-requested checksum-matched OPPO FIX4 after visual review.
+Preserve candidate `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX4`, APK/install
+SHA-256 `5ED0D726AF4D9D909ED4DBBFE752EFB4F81E7402F8C13D092563F5798A2E5DC5`
+and its complete evidence folder unchanged.
+
+Authorized successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX5` remains inside
+the header/theme ticket. It owns a compact far-left same-slot `Mool` then
+`Social` reveal with a meaningful full-name outcome, one replace-only feature
+copy owner, a subtle operational context rail and four context-specific native
+three-depth promotional storyboards. Only navy, Indian saffron, white and
+Indian green may be visibly composed; no transparent cross-colour mixing may
+create a fifth hue. Remote Superadmin campaigns, paid advertising and actual
+video playback remain fail-closed under existing 081/082/083/140 owners.
+
+Contract before source implementation:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-4-20260801-66/00-fix5-context-promotional-storyboard-contract.md`.
+FIX4 founder disposition:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-3-20260801-65/41-founder-fix4-change-request.md`.
+
+Founder then change-requested FIX5 on OPPO before qualification. Preserve its
+profile `1.0.0-r51.4` (`2026080122`) and APK/install SHA-256
+`24C85A8AB510495E74BFC856B7637B5096532AF7833B40CDFE241888B6E3E02E`.
+Current authorized successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX6`
+(`1.0.0-r51.5`, `2026080123`) keeps `Mool`/`Social` in the same compact
+analogue date-wheel slot; removes the operational rail; moves location to the
+former standalone scanner position and scanner inside Search; and deepens the
+four native context storyboards. It remains inside 077, uses no continuous
+Flutter ticker, is static under reduced motion and does not activate video,
+Superadmin campaigns or paid ads. Contract:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-5-20260801-67/00-fix6-founder-date-wheel-depth-contract.md`.
+
+The founder rejected checksum-matched FIX6 on OPPO. Its single-slot word
+change is not strong enough; long Search queries lose readable space to the
+scanner; and the four native scenes remain shallow, insufficiently contextual
+and visually separated from feature copy. Preserve FIX6 APK/install SHA-256
+`DA2BFFBF6BB7745FF510C8D278973AE934A2B802A585D45B7D46C5FA79592769` and
+all evidence unchanged. Disposition:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-5-20260801-67/38-founder-fix6-rejection.md`.
+
+FIX7 `1.0.0-r51.6` (`2026080124`) is Codex device-replay rejected and must not
+be shown for founder review. Preserve its APK/install SHA-256
+`124B6E7599C6BEA4BF045D10D68C332DC0F9D048EACB18FE91747DCCEB15B986` and
+all evidence. OPPO proved that scanner yielded, the drum was stronger and the
+four context worlds differed, but the two-line field still hid the beginning
+of a long query. Disposition:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-6-20260801-68/35-codex-fix7-device-rejection.md`.
+
+Current authorized successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX8`
+(`1.0.0-r51.7`, `2026080125`) remains inside 077 and preserves the FIX7 header
+motion. It changes only long-query Search: over 38 characters the active owner
+grows to 120/132 px, or 150/162 px at large text, with six wrapped lines so the
+beginning and end remain visible. Scanner/clear/finish/location ownership,
+reduced motion and every video/campaign/advertising fail-closed boundary remain
+unchanged. Contract:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-7-20260801-69/00-fix8-progressive-long-query-contract.md`.
+
+FIX8 APK/install SHA-256
+`E81EB794F38E8333F71925C2C9A05D49A60C6C73158C97766859C3FB7CBBD6C6`
+is preserved and superseded before qualification: exact OPPO replay proved the
+full long query with scanner absent, then founder inspection identified the
+outlined/fill/shadow Search shell as a remaining hard box. Current authorized
+successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX9` (`1.0.0-r51.8`,
+`2026080126`) removes only that visible shell. Tap geometry, progressive
+six-line expansion, scanner suppression, location action, semantics, context
+header motion and reduced-motion behavior remain exact. Contract:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-8-20260801-70/00-fix9-borderless-search-contract.md`.
+
+FIX9 later passed its machine gate and checksum-matched OPPO qualification with
+APK/install SHA-256
+`FC3AFCE07E1648382395F6AF3162B6A556D077029EC4D2244F48C782C39E3259`, but is
+**FOUNDER REJECTED — NOT APPROVED**. Preserve the exact candidate and R51.8
+evidence. Founder rejection: Mool/Social reads as a small brand badge rather
+than an advertisement, the scene is not sleek/professional and its copy appears
+pinned on top rather than belonging to the moving background.
+
+Current authorized successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX10`
+(`1.0.0-r51.9`, `2026080127`) remains inside 077. It owns a finite cinematic
+Mool-then-Social promotional title, a cleaner context-specific multi-plane
+native stage and perspective/masked scene copy. FIX9's borderless Search and all
+business, accessibility, reduced-motion and media/advertising fail-closed
+boundaries remain exact. Contract:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-9-20260801-71/00-founder-fix9-rejection-and-fix10-contract.md`.
+
+### Founder post-FIX10 premium-motion standard
+
+Keep FIX10 as the sole active implementation and complete its founder review
+before advancing another visual ticket. Thereafter, every approved motion ticket
+must evaluate modern native patterns—including shared-element/Hero transitions,
+spring feedback, microinteractions, finite parallax, progressive loading,
+purposeful fades/slides/scales, contextual depth, gestures, haptics and adaptive
+transitions—only where the pattern improves navigation, feedback or hierarchy.
+This is a quality standard, not permission to apply every effect everywhere or
+to combine multiple ticket owners into one candidate.
+
+The permanent acceptance rubric is: fast and responsive with a 60 FPS profile
+target; finite and event-driven; exact static/zero-duration reduced-motion
+outcome; native Android/iOS/web behavior; no distracting decoration; no fake
+loading, progress, state, entitlement or backend response; and no changed
+business meaning. Lottie, video, particles, live reactions, waveform, remote
+carousel content and other asset/data-dependent effects remain blocked until an
+approved first-party asset and complete lifecycle/accessibility/data contract
+exist. Infinite scrolling, refresh, drag/drop and other stateful interactions
+also require their real data/business owner; motion cannot invent functionality.
+All visible colours remain limited to navy blue, Indian saffron, white and
+Indian green under the existing semantic-colour contract.
 
 ## Workspace boundary
 
@@ -4227,3 +5808,2255 @@ Additive evidence:
 State: `CHECKSUM_MATCHED_FOUNDER_REVIEW_CANDIDATE`. Backend start, push,
 deploy, publication and production release remain unauthorized. A local
 preservation commit does not imply founder acceptance.
+
+## Latest protected Buy checkpoint — R38 founder approval
+
+On 31 July 2026 the founder approved every current native Flutter Buy screen,
+state, tap and connected journey through the checksum-matched R38 OPPO
+candidate, subject to later motion additions.
+
+The active protected Buy identity is now:
+
+- baseline: `buy-protected-baseline-r38-20260731-42`;
+- runtime files: `31`;
+- portable tree SHA-256:
+  `363ebe4c7342ba0118f9a7108e83fa8c2b0b3ded23332c7dd42a32849f9a5cd7`;
+- candidate: `BUY-R38-SAVED-OFFERS-REFINEMENT-DEVICE`;
+- installed version: `1.0.0-r38` (`2026073151`); and
+- candidate/pulled installed APK SHA-256:
+  `79F62DB262954BAE3334C3C77DF1F66562829225D24208970C03B8B6E787E45F`.
+
+The default `scripts/check-buy-protected-baseline.ps1` gate now protects R38.
+The prior R35.1 baseline remains immutable and preserved. Future motion,
+theme, runtime, routing or protected-media changes require a new
+checksum-matched candidate and founder review; they are not grandfathered by
+this approval.
+
+Review-only benefit seeds remain non-entitlements and the normal production
+adapter remains fail-closed. Saved cross-relaunch persistence and real Buy
+backend/provider contracts remain separately blocked. HTML, Screens 01–03 and
+protected Social were not changed. Commit, push, deploy and publication remain
+unauthorized.
+
+Durable handoff:
+
+`docs/quality/BUY-V2-R38-PROTECTED-BASELINE-HANDOFF-20260731.md`
+
+Baseline evidence:
+
+`artifacts/quality/buy-protected-baseline-r38-20260731-42`
+
+State: `FOUNDER_APPROVED_PROTECTED_BUY_BASELINE`.
+
+## Completed qualification — BUY-FV2-084 profile hardware gate
+
+`BUY-FV2-084` closed on 31 July 2026 after exact-candidate Flutter profile
+qualification on OPPO CPH2375 `2b3e0f71`. The final candidate is
+`BUY-R38-084-PROFILE-QUALIFICATION-FIX1`, version `1.0.0-r38.2`, version code
+`2026073153`. Built, installed and pulled APKs are all 132,870,329 bytes with
+SHA-256
+`4F264F86C8C25431F760978D88E7EEEEBA2B1F2C976A4574819F4595F5FE83E0`.
+The post-qualification rebuild from the final corrected source produced that
+same byte-exact APK.
+
+The first profile candidate exposed a genuine lifecycle defect: Firebase
+Performance attempted registration through the local placeholder Firebase
+options after backgrounding and killed the process. The bounded correction is
+profile-only and mirrors the established debug review overlay by disabling
+Google-hosted analytics, crash, messaging and performance collection. Main and
+release manifests and all 31 protected Buy runtime files remain unchanged.
+
+Warm representative evidence covers 673 frames: build p90 6.856 ms, scoped
+raster p90 0.416 ms, presentation-inclusive p95 19.969 ms, seven frames over
+33 ms (1.04%), zero over 100 ms and maximum 84.548 ms. The bounded outliers are
+UI build work attached to scripted pointer or route/state transitions; there
+is no shader/compile event, repeated long-frame run or raster-stage breach.
+First-interaction evidence is retained separately. Cold-start median is
+1,752 ms; three same-process warm resumes have a 146 ms median. Total PSS is
+247,628 KiB after two loops with 14.224% growth, thermal status remains 0 and
+observed per-UID network delta is zero. No corrected-candidate fatal, ANR,
+Flutter error or overflow signature remains.
+
+All shared motion tokens retain their normal 110/150/180/240/260/280/220/360/
+420 ms ceilings and resolve to zero under `MediaQuery.disableAnimations`.
+Static progress and existing semantics/navigation remain usable. Final source
+fingerprint
+`57AC2C12E1D5870EE19EBBCAAFA3936BD5A74C1F9D1373C685C57B88F86E8EB0`
+passed analysis and two complete Buy regressions at 167/167, plus every
+approved-lock, reference, brand, interaction, copy/HTML, backend, data-egress,
+Social and protected Buy gate. The protected Buy and Social tree identities
+remain unchanged.
+
+Durable handoff:
+
+`docs/quality/BUY-FV2-084-R38-PROFILE-QUALIFICATION-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-fv2-084-profile-qualification-oppo-20260731-43`
+
+State: `BUY_FV2_084_COMPLETE_PROFILE_HARDWARE_QUALIFIED`. This does not close
+`BUY-FV2-085`, approve a new protected baseline, connect Buy backend, or
+activate paid/video advertising.
+
+## Founder-accepted motion checkpoint — BUY-FV2-136 R39.2 tap acknowledgement
+
+The founder accepted the exact qualified R39.2 visual candidate on 31 July
+2026. `BUY-FV2-136` is complete. It adds a 28 logical-pixel contact-owned
+MoolSocial ring on native Flutter `/app/buy` routes only. The overlay is
+code-native, `IgnorePointer`, semantics-excluded, non-looping,
+controller/timer-free, bounded by the existing 110 ms press token and
+cancelled beyond Flutter touch slop. Reduced motion uses zero transition
+duration while retaining the static held-contact cue.
+
+The initial `R39.1` profile APK is non-qualifying and retained: its route scope
+used a stale `routeInformationProvider.value`, so real Mool-to-Buy navigation
+left the cue inactive. A new real-router widget test reproduced the physical
+failure. `R39.2` instead reads live
+`routerDelegate.currentConfiguration.matches`, and that test now passes.
+
+Exact qualified candidate:
+
+- ID: `BUY-R39-136-TAP-ACKNOWLEDGEMENT-FIX1`;
+- version: `1.0.0-r39.2` (`2026073155`);
+- bytes: `132886713`;
+- source fingerprint:
+  `B8636430DF495708E02BA10E599ABB9B5A664CE377926CCABF2304AA8EE38607`;
+- built, installed and pulled APK SHA-256:
+  `3B4E448608A37251578EC58E7B820034AC1ABEAA4E0A3F406D0EFD9DBAE58AFA`.
+
+Physical OPPO evidence shows the cue at the exact held Buy product contact and
+no cue under an equivalent held Social contact. Package-PID failure scans are
+empty. The warm 30-contact profile trace has 209 joined frames, Dart-frame p90
+0.749 ms, scoped-raster p90 0.376 ms, presentation p95 10.694 ms, zero frames
+over 33 ms, maximum 19.383 ms and zero shader/compile events.
+
+Seven focused tests pass, full analysis is clean, and two unchanged-source Buy
+regressions pass 167/167 with the same four opt-in captures skipped. Every
+approved-lock, brand, founder-reference, interaction, copy/HTML, backend,
+data-egress and protected Buy/Social gate passes. The protected R38 Buy tree
+remains
+`363ebe4c7342ba0118f9a7108e83fa8c2b0b3ded23332c7dd42a32849f9a5cd7`.
+
+Durable handoff:
+
+`docs/quality/BUY-FV2-136-R39-TAP-ACKNOWLEDGEMENT-HANDOFF-20260731.md`
+
+Additive evidence:
+
+`artifacts/quality/buy-fv2-136-tap-acknowledgement-oppo-20260731-44`
+
+Acceptance evidence:
+
+`artifacts/quality/buy-fv2-136-founder-acceptance-20260731-45`
+
+State: `COMPLETE_FOUNDER_ACCEPTED_R39_2_TAP_ACKNOWLEDGEMENT`. The next
+sequential motion ticket may start. This acceptance does not replace the
+protected R38 baseline, approve later motion, or authorize commit, push,
+deployment or publication.
+
+## Active motion contract correction — BUY-FV2-137 Search/category expansion
+
+`BUY-FV2-137` was registered after the founder accepted R39.2. The comparison
+found a concrete R36-to-R38 contract mismatch: Search/category expansion is
+owned by the shared 260 ms `BuyV2Motion.expandCollapse` token, but R38 Search
+hardcodes 180 ms and the category modal is not explicitly bound to that token
+for both forward and reverse transitions.
+
+The authorized candidate scope is limited to replacing those duration owners
+with `BuyV2Motion.resolved(context, BuyV2Motion.expandCollapse)` and focused
+test/evidence hardening. Resting/final layout, copy, behavior, data, routes,
+business rules, Social and Screens 01–03 remain unchanged. The accepted R39.2
+tap cue must continue to compose without input duplication or leakage.
+
+Because this correction touches protected Buy runtime, R38 remains the active
+baseline while the candidate is under review. The old baseline and gate are
+not weakened or overwritten. `BUY-FV2-137` may close only after exact profile
+qualification, founder visual acceptance and a new additive protected
+baseline whose default gate passes.
+
+Additive evidence:
+
+`artifacts/quality/buy-fv2-137-search-category-motion-oppo-20260731-46`
+
+Exact qualified candidate:
+
+- ID: `BUY-R40-137-SEARCH-CATEGORY-MOTION-FIX1`;
+- version: `1.0.0-r40.2` (`2026073157`);
+- bytes: `132886713`;
+- SHA-256:
+  `E66142811F4B5A86CC240A19CFFEF30CB6F32ECBC6DD60B93744018B735409E0`;
+- source fingerprint:
+  `6C783D5F202BF63BCC88CD4B35345523870B8FABA006527C047755FB12C007D6`;
+- protected candidate tree:
+  `a0c626ffd5c95ff8a190d1624c6d582c48a437cfd992c82d006974acd1d3a7c6`.
+
+The corrected candidate and pulled OPPO APK match exactly. Physical video and
+PNG/XML states prove Search open/close, category open/back and selection. The
+18-second warm trace has presentation p95 17.352 ms, one of 273 joined frames
+over 33 ms, zero over 100 ms, maximum 41.985 ms and zero shader/compile events.
+Fourteen focused motion/tap/theme tests pass, full analysis is clean, and two
+same-source Buy regressions pass 167/167 with four opt-in captures skipped.
+All non-Buy-baseline gates pass. The active R38 gate correctly rejects the
+two-file protected delta until founder acceptance authorizes a new additive
+baseline.
+
+The first R40.1 profile build remains ineligible evidence because its direct
+build omitted the sanctioned review defines and failed closed before first
+Flutter frame. No runtime source change was needed for R40.2.
+
+Durable handoff:
+
+`docs/quality/BUY-FV2-137-R40-SEARCH-CATEGORY-MOTION-HANDOFF-20260731.md`
+
+State: `R40_2_DEVICE_QUALIFIED_FOUNDER_ACCEPTANCE_AND_BASELINE_PENDING`.
+
+## Founder-prioritized next ticket — BUY-FV2-138 Buy route continuity
+
+During R40.2 device qualification the founder reported that leaving Buy makes
+it repeatedly difficult to navigate or return to Buy. The defect is confirmed
+on the connected OPPO without changing runtime source:
+
+- Android Back from root Buy exits MoolSocial to the launcher;
+- reopening the app lands on Social, not the last Buy surface;
+- Buy is absent from the collapsed Social navigation; and
+- recovery requires two actions: Mool, then Buy.
+
+`BUY-FV2-138` is now registered as the next P1 implementation ticket. It must
+not be mixed into the checksum-qualified R40.2 search/category candidate.
+After `BUY-FV2-137` founder acceptance, route continuity takes priority over
+the remaining motion queue. The fix must keep root Back in-app, safely restore
+the last valid Buy route on relaunch, and make a deliberately departed Buy
+surface rediscoverable in at most one action through approved navigation.
+
+Diagnostic evidence:
+
+`artifacts/quality/buy-fv2-route-continuity-founder-finding-20260731-47`
+
+State: `FOUNDER_REPORTED_OPPO_REPRODUCED_IMPLEMENTATION_QUEUED_AFTER_137`.
+
+## Founder change request — BUY-FV2-137 R40.3 vertical/category motion successor
+
+On 1 August 2026 the founder requested further motion rather than accepting
+R40.2. R40.2 remains preserved as a checksum-qualified but non-accepted
+reference. The successor stays inside `BUY-FV2-137` because it directly extends
+the same protected catalogue transition owner.
+
+The authorized R40.3 delta adds one finite incoming catalogue transition for
+destination and category changes, with a distinct but coherent character:
+
+- Shop: light horizontal market-flow settle, bounded scale and opacity;
+- Wholesale: denser vertical stack settle, bounded scale and opacity;
+- Medicine: calm short lift/fade with almost no scale change.
+
+Outgoing content must be removed immediately. Search/category-sheet timing,
+state, copy, geometry, routes, business rules and the accepted R39.2 tap cue
+remain unchanged. Reduced motion resolves the new transition to zero.
+
+Additive evidence:
+
+`artifacts/quality/buy-fv2-137-vertical-category-motion-r40-3-20260801-48`
+
+State: `R40_2_CHANGE_REQUESTED_R40_3_VERTICAL_CATEGORY_MOTION_IN_PROGRESS`.
+
+## Founder acceptance — BUY-FV2-137 R40.3 FIX3
+
+The founder approved the installed OPPO R40.3 motion candidate on 1 August
+2026 and directed the next implementation to `BUY-FV2-139`.
+
+- Candidate: `BUY-R40-137-VERTICAL-CATEGORY-MOTION-FIX3`
+- Version: `1.0.0-r40.3.1` (`2026080102`)
+- APK and pulled installed-base SHA-256:
+  `EBCDEA5960A22606F37A84A1E49F85E3C3812C9857F61EDAFF8A10B42F8DF190`
+- Source fingerprint:
+  `4B687B03BA8EC1EFB96AE5DDFF82FF36A65215FCE07398A48E6375A036975911`
+- Protected Buy tree:
+  `99f4870f2647b3ffd5bde50fa427c33c62654e8fd62f5b442118faadd6a55888`
+- Performance: p95 19.3 ms, one of 319 joined frames over 33 ms, none over
+  100 ms and no shader/compile events.
+- Verification: full analysis, two 167/167 Buy regressions and every required
+  policy/protected gate pass from unchanged source.
+
+Additive baseline:
+`artifacts/quality/buy-protected-baseline-r40-3-20260801-49`.
+
+## Registered future brand ticket — BUY-FV2-139 3D MoolSocial compact mark
+
+The founder directed a separate global brand-motion system: reveal `Mool`,
+introduce `Social`, then settle through finite 3D motion into one compact mark.
+The final `M` versus single combined `MS` glyph and its precise shape require a
+founder visual comparison. Identity artwork uses only navy plus Indian-flag
+saffron, white and green.
+
+The choreography is finite and event-triggered, never looping. Eligible app or
+session entry may play it once; replay after meaningful inactivity requires the
+first deliberate eligible brand interaction and a cooldown. Reduced motion
+shows the static compact mark immediately. The work must not delay app
+readiness, move the hit target or expose multiple semantic identities.
+
+State: `R41_DEVICE_QUALIFIED_AWAITING_FOUNDER_M_VS_MS_DECISION`.
+
+## Founder brand-colour memory — clarified 1 August 2026
+
+The founder clarified that MoolSocial brand identity is navy `#000080` plus
+the Indian-flag tricolour: saffron `#FF9933`, white `#FFFFFF` and green
+`#138808`. No colour outside these four may be painted into the MoolSocial
+wordmark, compact mark, identity line or brand motion. This is the authoritative
+palette memory and is enforced by `config/brand-integrity.json` schema 5 and
+`scripts/check-brand-integrity.ps1`.
+
+## BUY-FV2-139 R41 device-qualified candidate — 1 August 2026
+
+`BUY-R41-139-3D-BRAND-MOTION-FIX1`, profile `1.0.0-r41`
+(`2026080103`), is installed on the connected OPPO and awaits founder visual
+acceptance. APK SHA-256 is
+`77965744FB3FA19F5CEFB5FF38AFE11D09AA3AAD5A4CBE9C291C60882253404C`;
+the OPPO-pulled APK is an exact match. Source fingerprint is
+`6DF0C9F8FEB073E5A635C0CE47585BAA01F1E549481559C9D4F69C3C6C29C1BE`
+before build and after qualification.
+
+The installed runtime uses compact `M`; combined `MS` remains a review-only
+variant from the same painter. The 1,600 ms `Mool` -> `Social` -> compact
+perspective/depth settle is finite, session/cooldown bounded and static under
+reduced motion. Both 167-case Buy regressions and all applicable policy gates
+pass. Existing Screen 01, protected Social and R40.3 Buy gates correctly reject
+the authorized pre-approval delta and remain unchanged until founder approval.
+
+Handoff:
+`docs/quality/BUY-FV2-139-R41-3D-BRAND-MOTION-HANDOFF-20260801.md`.
+
+## Founder rejection — BUY-FV2-139 R41 FIX1
+
+On 1 August 2026 the founder rejected the installed R41 FIX1 visual candidate:
+cold-start motion was not visible, the M itself did not animate sufficiently,
+its shape/size was unsuitable, and neither a single `M` nor `MS` communicated
+MoolSocial. The technically qualified candidate and all evidence remain
+preserved and must not be relabelled as accepted.
+
+The authorized successor keeps each existing logo owner at its current size,
+uses the complete `MoolSocial` wordmark as the permanent outcome, and emits a
+restrained finite 3D wordmark treatment from inside that stable owner. It must
+guarantee a painted cold-start frame before autoplay, keep neighboring layout
+and hit ownership fixed, use only navy/saffron/white/green, and resolve to the
+full static wordmark under reduced motion. The founder also approved proceeding
+through the deduplicated motion/theme queue after this ticket is technically
+and device qualified, with ticket-by-ticket visual review deferred to morning.
+
+State: `BUY_FV2_139_FULL_WORDMARK_EMIT_SUCCESSOR_IN_PROGRESS`.
+
+## Phase 2 approved — deduplicated motion/theme tranche, 1 August 2026
+
+The founder approved the proposed deduplicated list for implementation one
+logical ticket at a time. Local native Flutter implementation, focused tests,
+unique profile candidates and checksum-matched OPPO qualification are now
+authorized. Commit, push, deploy, publish and merge remain prohibited.
+
+Execution ownership is recorded in
+`docs/delivery/BUY-FLUTTER-V2-PRODUCTION-TICKETS-20260729.md`. No duplicate was
+created for accepted `BUY-FV2-136` tap acknowledgement or `BUY-FV2-137`
+Search/category/vertical catalogue motion. Existing `DES-001`, `BUY-FV2-076`,
+`077`, `079`–`081`, `093`–`095`, `101`, `104`, `115`, `119`–`134`, `138` and
+`139` retain their exact owners. The only genuinely new sequential owner is
+`BUY-FV2-140`, a preparatory first-party header/category media lifecycle and
+fail-closed fallback ticket; playback remains blocked because no approved
+first-party app video asset or complete lifecycle/data-saver/accessibility
+contract exists.
+
+Current first implementation remains `BUY-FV2-139`. R41 FIX1 stays immutable
+and founder rejected. Its successor must paint a visible cold-start frame,
+animate the complete `MoolSocial` wordmark inside the existing fixed owner and
+settle permanently to that full wordmark. A custom `M`/`MS` outcome is no
+longer eligible. Screen 01 v3, protected Social and R40.3 Buy remain the active
+approved baselines until founder acceptance of an exact new candidate.
+
+State: `PHASE_2_APPROVED_BUY_FV2_139_FULL_WORDMARK_SUCCESSOR_FIRST`.
+
+## BUY-FV2-139 R42.1 full-wordmark successor qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+The exact installed OPPO candidate is
+`BUY-R42-139-FULL-WORDMARK-EMIT-FIX2`, profile `1.0.0-r42.1`
+(`2026080105`). Candidate and final OPPO-pulled APK are byte-identical at
+SHA-256
+`8DBE7F1BD51E74E65D2DBB753645CC9138829EAD760E6270AE37B5FDFA42FE42`.
+The 1,907-file app/test source manifest remains exact before build and after
+qualification at
+`19B4C8F211E04C9EBA2C6E37D35FCAAC24DD53F7D062EE311BDBBCD1CEFDAF38`.
+
+R42.1 replaces the rejected compact `M`/`MS` implementation with one fixed-
+geometry full `MoolSocial` owner. Cold start paints the full identity before a
+finite 1,600 ms contained perspective/depth emit and returns to the complete
+wordmark. Launch, Social and Buy share the owner; reduced motion is static;
+only navy, saffron, white and green paint the identity; semantics expose one
+exact `MoolSocial` owner.
+
+Qualification is clean: full analysis; 6/6 shared motion tests; 5/5 review
+goldens; two 167/167 Buy regressions with four intentional capture skips each;
+the existing 95/95 launch/Social/Buy integration suite; brand, founder-FINAL
+Buy reference, 154-route interaction, user-copy, nine-state HTML-copy,
+backend-boundary/self-test and data-egress/self-test gates. The protected
+Screen 01, Social and R40.3 Buy gates correctly reject the pre-acceptance
+successor and remain unchanged.
+
+The checksum-matched OPPO replay proves cold painted-start/emit/settle frames,
+static Social and Buy owners, one accessibility owner and Buy-preserving
+lifecycle/resume. Final scans contain zero fatal, unhandled, FlutterError,
+RenderFlex, overflow or ANR matches. The cold trace has 134 joined frames,
+presentation p95 16.634 ms, one frame over 33 ms, none over 100 ms and no
+unexplained shader/compile cost. Android `screenrecord` is unavailable on this
+OPPO and host `scrcpy` crashes; those attempts are retained as recorder
+contamination, while the on-device rapid frame sweep is qualifying evidence.
+
+Evidence:
+`artifacts/quality/buy-fv2-139-full-wordmark-emit-r42-1-20260801-52`.
+Handoff:
+`docs/quality/BUY-FV2-139-R42-1-FULL-WORDMARK-EMIT-HANDOFF-20260801.md`.
+The prior R41 FIX1 evidence remains immutable and founder rejected. No
+protected baseline may be replaced until the founder accepts this exact R42.1
+candidate. The approved queue may now advance one ticket at a time.
+
+## DES-001 R43 shared motion primitives qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+The installed evidence-only OPPO candidate is
+`BUY-R43-DES001-SHARED-MOTION-PRIMITIVES-FIX1`, profile `1.0.0-r43`
+(`2026080106`). Candidate and final OPPO pull are byte-identical at SHA-256
+`A3A5F0B4FC89CC465C496C960F6109714F5ED413CE4F287FE53DED7D4D8C47AB`.
+The prebuild/post-qualification 1,915-file source fingerprint is
+`B3E45210299C0134030B42B830AE2AF8FA30458D6DC56D1675B78463872E5D2C`.
+
+DES-001 adds reusable finite gradient, text, icon and generic state-transition
+owners plus an evidence-only review entrypoint. Fixed geometry, one final-state
+semantic owner, event-driven settlement and zero-duration reduced motion are
+enforced. Gradient stops and review painting use only navy, saffron, white and
+green. `config/brand-integrity.json` schema 4 records zero customer
+integrations; production remains `lib/main.dart`.
+
+Qualification: full analysis; 38/38 shared/existing motion tests; four
+deterministic review goldens; 320 px/140% fitment; two 167/167 unchanged-source
+Buy regressions with four intentional capture skips each; every brand,
+reference, interaction, copy, HTML-copy, backend and data-egress gate passes.
+The three protected gates report the exact R42.1 pending-logo hash/inventory,
+so DES-001 creates no new protected delta.
+
+The checksum-matched OPPO review proves initial/final fixed owners, one
+aggregated accessibility container, tap-triggered state replacement and a
+same-process 101 ms hot resume. The 38-frame tap trace has presentation p95
+16.162 ms, no frame over 33 or 100 ms, maximum 23.607 ms and no unexplained
+shader/compile cost. Final fatal/Unhandled/FlutterError/RenderFlex/overflow/ANR
+counts are zero.
+
+Physical reduced-motion setting mutation is denied by the OPPO and is retained
+as nonqualifying; deterministic zero-duration tests/goldens pass. Android/host
+recording remains contaminated: `scrcpy` crashes after a 48-byte header and
+ADB screencap cannot sample the 240/360 ms transition reliably. Device
+start/end, accessibility and profile pointer/frame proof are paired with the
+checksum-matched code-native intermediate golden. No duration or app runtime
+was changed to work around the recorder.
+
+Evidence:
+`artifacts/quality/shared-motion-primitives-des-001-r43-20260801-53`.
+Handoff:
+`docs/quality/DES-001-R43-SHARED-MOTION-PRIMITIVES-HANDOFF-20260801.md`.
+Next safe owner: `BUY-FV2-077` scoped Buy header/canvas/vertical themes. Do not
+globally propagate DES-001 or change a protected baseline without exact ticket
+and founder authority.
+
+## BUY-FV2-077 R44 Buy brand-theme transitions qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Final candidate `BUY-R44-077-BRAND-THEME-TRANSITIONS-FIX2`, profile
+`1.0.0-r44` (`2026080107`), runs production `lib/main.dart`. Candidate and
+final OPPO pull are byte-identical at SHA-256
+`2FB0489D04A8FF2246C8E1739492E20D5094CA76A127FEA48B77148EE4973C3B`.
+The prebuild/post-qualification 1,923-file source fingerprint is
+`E86873212171455EB2F5C435A5E5370041520AB73A614AE040732AD20B58DBCE`.
+
+R44 integrates the DES-001 gradient primitive at exactly two fixed Buy owners:
+the shared header (280 ms) and canvas (240 ms). Shop, Wholesale, Medicine,
+Orders, Cart, Tracking and Account/Assist resolve to ticket-owned finite theme
+families using only exact navy, saffron, white and green RGB values. Brand
+schema 5 enforces mappings, two integrations, finite behavior and zero reduced-
+motion durations. Geometry, copy, product facts, routes, Cart ownership,
+Search/category motion, Social and launch remain outside the delta.
+
+Qualification: final analysis clean; 5 theme contracts; six visual goldens;
+83 focused integrations; FIX2 8-test repair; two 167/167 unchanged-source Buy
+regressions with four intentional capture skips each; all positive brand,
+reference, interaction, copy, immutable HTML-copy, backend and data-egress
+gates pass. The first FIX1 regression is retained: it found two stale old-
+palette test expectations, which FIX2 repairs without runtime delta.
+
+The checksum-matched OPPO replay covers Shop, Wholesale, Medicine, Orders,
+real-add Cart and real-order Tracking. Accessibility retains one MoolSocial
+brand owner per screen; Tracking survives a same-PID 170 ms hot resume. The
+cleared 134-frame rapid transition trace has presentation p95 25.930 ms, three
+frames over 33 ms, none over 100 ms, maximum 42.577 ms and no shader/compile
+events. Final fatal/unhandled/FlutterError/RenderFlex/ANR counts are zero.
+
+Screen 01 and Social retain their exact R42.1 pending-logo rejection values.
+The Buy protected hash changes only through the authorized R44 theme sources;
+no protected baseline is replaced. Android `screenrecord` is unavailable and
+the earlier host `scrcpy` crash remains authoritative recorder contamination.
+Physical settled frames, code-native goldens and the scoped VM trace qualify
+the motion without modifying its duration.
+
+Evidence:
+`artifacts/quality/buy-fv2-077-theme-transitions-r44-20260801-54`.
+Handoff:
+`docs/quality/BUY-FV2-077-R44-BRAND-THEME-TRANSITIONS-HANDOFF-20260801.md`.
+
+Next safe approved owner: grouped Saved/quantity/Cart state motion under
+`BUY-FV2-076`, `101`, `119`–`121`, `126`, `128`, `130`, `132`, `133`. Do not
+alter Cart arithmetic, persistence meaning, hit targets or protected baselines.
+
+## Grouped Saved/quantity/Cart R45 qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Final candidate `BUY-R45-SAVED-QUANTITY-CART-MOTION-FIX4`, profile
+`1.0.0-r45` (`2026080110`), runs production `lib/main.dart`. Candidate and
+final OPPO pull are byte-identical at SHA-256
+`BAAB43F28EF6C44B82ABA757D6396BE3B71502200786AD875E7B2D37107C997B`
+(133,001,393 bytes). The prebuild/post-qualification 1,931-file source
+fingerprint is
+`C45E708CB2D13F7D63151312B437443EC410914C63F1D0020D6E2E346A596140`.
+
+R45 adds finite fixed-owner transitions to Saved bookmark/count states,
+catalogue/product/Cart quantity values, mini-Cart acknowledgement/total, Cart
+header/line/payable values and no business arithmetic. Reduced motion is zero.
+Saved, mini-Cart and catalogue quantity owners expose independent clickable
+actions on OPPO. FIX1–FIX3 remain preserved as nonqualifying accessibility
+candidates; the rejected oversized first FIX2 package is diagnosed as
+incremental ZIP residue, not source growth.
+
+Qualification: final analysis clean; five focused motion/semantics contracts;
+six deterministic goldens; 120 focused integrations; two 167/167 unchanged-
+source Buy regressions with four intentional skips each; every positive brand,
+reference, interaction, copy, live read-only HTML-copy, backend and data-egress
+gate passes. App/test manifests are identical before build and after
+qualification.
+
+The exact OPPO journey covers Saved on/off/on, Shop `1 → 2 → 1`, Wholesale MOQ
+`2 → 3 → 2`, Medicine `1 → 2 → 1`, mixed Cart
+`₹1,225 → ₹1,262 → ₹1,225` and a 186 ms hot resume retaining four products.
+The cleared 187-frame trace has p95 17.334 ms, three frames over 33 ms, none
+over 100 ms, maximum 91.669 ms and no shader/compile events. App-specific
+FlutterError, RenderFlex, fatal, unhandled, lost-connection and native-fatal
+counts are zero.
+
+Screen 01 and Social retain exact R42.1 pending-logo values. The Buy protected
+hash advances from R44 only through authorized R45 sources; no baseline is
+replaced. The separate rejected/pending global wordmark ticket is unchanged.
+
+Evidence:
+`artifacts/quality/buy-saved-quantity-cart-motion-r45-20260801-55`.
+Handoff:
+`docs/quality/BUY-FV2-R45-SAVED-QUANTITY-CART-MOTION-HANDOFF-20260801.md`.
+
+Next safe approved owner: grouped Coupons and Offers motion under
+`BUY-FV2-076`, `122`, `127`, `129`, `131`, `134`. Preserve fail-closed normal
+benefit state, real Cart totals and the completed R45 owners.
+
+## Grouped Coupons and Offers R46 qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Final candidate `BUY-R46-COUPON-OFFER-MOTION-FIX1`, profile `1.0.0-r46`
+(`2026080111`), runs production `lib/main.dart`. Candidate and final OPPO pull
+are byte-identical at SHA-256
+`443CA19D34048D4A976C39E2AF2C03338632592616C235D48BA7EFD5A85FEFFE`
+(133,001,393 bytes). The byte-identical prebuild/post-qualification 1,938-file
+app/test manifest SHA-256 is
+`C3301771D8543BB4B40EF34CC20E87DA73DBC64C62DFA8C62CD57594B59F625D`.
+
+R46 adds finite fixed-owner transitions to Cart benefit summaries, destination
+and coupon/payment selectors, fail-closed empty state and provider-backed
+Select/Remove acknowledgement. Normal production remains fail-closed;
+compile-time device-review seeds remain identified, review-only and total-
+neutral. Reduced motion is zero. No entitlement, discount, compatibility,
+persistence, provider result or Cart arithmetic is invented.
+
+Qualification: final analysis clean; three focused motion/arithmetic/semantics
+contracts; five deterministic goldens; 90 focused integrations; two 167/167
+unchanged-source Buy regressions with four intentional skips each; all
+positive brand, reference, interaction, copy, live read-only HTML-copy,
+backend and data-egress gates pass. App/test manifests are identical before
+build and after qualification.
+
+The checksum-matched OPPO journey uses a real four-product Shop + Wholesale +
+Medicine Cart at ₹1,225, exercises select/remove across all six destination/
+kind families and select/replace/remove within Shop coupons, and retains an
+honest selected Medicine payment offer through a 148 ms hot resume. Returning
+to Cart keeps the total at ₹1,225. Current Select/Remove owners are clickable
+in the accessibility tree. The cleared 267-frame trace has p95 28.792 ms,
+three frames over 33 ms, none over 100 ms, maximum 96.636 ms and no shader/
+compile events. App logs contain zero FlutterError, RenderFlex, fatal,
+unhandled, lost-connection, SIGSEGV or SIGABRT matches.
+
+Screen 01 and Social retain exact pending-logo values. The Buy protected hash
+advances from R45 only through the authorized R46 benefit-view source; no
+baseline is replaced. The separate rejected/pending global wordmark ticket is
+unchanged. Android `screenrecord` remains unavailable; deterministic mid-
+frames, physical settled frames and the exact-binary trace are retained.
+
+Evidence:
+`artifacts/quality/buy-coupon-offer-motion-r46-20260801-56`.
+Handoff:
+`docs/quality/BUY-FV2-R46-COUPON-OFFER-MOTION-HANDOFF-20260801.md`.
+
+Next safe approved owner: product media/title/selection depth under
+`BUY-FV2-079`, `093`, `095`. Preserve price, quantity and purchase hit owners,
+all completed R44–R46 motion and the separate pending global wordmark ticket.
+
+## Product media/title/selection depth R47 qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Final candidate `BUY-R47-PRODUCT-MEDIA-TITLE-DEPTH-FIX1`, profile
+`1.0.0-r47` (`2026080112`), runs production `lib/main.dart`. Candidate and
+final OPPO pull are byte-identical at SHA-256
+`E95EE651411703A36D021A354F881D11B3A96A8CAE9AE300D9AA8AAFFC94B30B`
+(133,001,393 bytes). The byte-identical prebuild/post-qualification 1,945-file
+app/test manifest SHA-256 is
+`CFAB84C0A6837F9A3C6F9B816D901BB08B5EA13B20617C14AE9FC706906D760B`.
+
+R47 adds an opt-in product-card spatial hold plane and current-product media/
+title reveal. Pointer direction affects only a finite four-palette highlight
+plane; truthful atlas media stays on a safe 2D layer and transformed hit
+testing is disabled. The initial whole-card perspective was rejected before
+build because deterministic frames exposed disappearing atlas media. No pack,
+seller, image, availability, live-data or product option is invented. Reduced
+motion is immediate/static.
+
+Qualification: final analysis clean; three focused hit/motion/reduced-motion
+contracts; five deterministic goldens; 71 focused integrations; two 167/167
+unchanged-source Buy regressions with four intentional skips each; every
+positive brand, reference, interaction, copy, live read-only HTML-copy,
+backend and data-egress gate passes. App/test manifests are byte-identical.
+
+The checksum-matched OPPO journey holds/releases real Shop, Wholesale and
+Medicine products, retains every product photo, opens the exact product detail
+without adding to Cart and keeps the Medicine detail through a 160 ms hot
+resume. The retained 201-frame exact-binary trace has p95 6.838 ms, one frame
+over 33 ms, none over 100 ms, maximum 46.050 ms and no shader/compile event.
+App logs contain zero FlutterError, RenderFlex, fatal, unhandled,
+lost-connection, SIGSEGV or SIGABRT matches.
+
+Screen 01 and Social retain exact pending-logo values. The Buy protected hash
+advances from R46 only through authorized R47 product owners; no baseline is
+replaced. The separate rejected/pending global wordmark ticket is unchanged.
+
+Evidence:
+`artifacts/quality/buy-product-media-title-depth-r47-20260801-57`.
+Handoff:
+`docs/quality/BUY-FV2-R47-PRODUCT-MEDIA-TITLE-DEPTH-HANDOFF-20260801.md`.
+
+Next safe approved owner: query-to-results transitions under `BUY-FV2-076`,
+`094`, `104`. Extend only real result replacement; retain accepted ticket 137
+Search/category open-close, keyboard/focus, ordering and vertical isolation.
+
+## Query-to-results motion R48 qualified — 1 August 2026
+
+State: `TECHNICALLY_AND_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Final candidate `BUY-R48-QUERY-RESULTS-MOTION-FIX1`, profile `1.0.0-r48`
+(`2026080113`), runs production `lib/main.dart`. Candidate and final OPPO pull
+are byte-identical at SHA-256
+`3FB5D5D54105DFDBF9D28A898F3A5B4F2084A0562A984FB7047B0F4D5C6250CD`
+(133,001,393 bytes). The byte-identical prebuild/post-qualification 1,952-file
+app/test manifest SHA-256 is
+`9393A97FFA740435926C743AF7C0851F84AE1BD0265231CDF5769723CA38D8AB`.
+
+R48 replaces the query-result outgoing/incoming switch with a finite 240-ms
+current-result-only transition keyed by destination and query. It reuses the
+existing session filter, suggestion, product-grid and empty-state owners.
+Search/category open-close, keyboard/focus, ordering, facts, filtering, Back,
+product selection and ticket-137 behavior remain unchanged. Reduced motion is
+zero-duration and current-result-only.
+
+Qualification: final analysis clean; three focused motion/focus/reduced-motion
+contracts; five deterministic goldens; 71 focused integrations; two 167/167
+unchanged-source Buy regressions with four intentional skips each; every
+positive brand, immutable-reference, interaction, customer-copy, live
+read-only HTML-copy, backend and data-egress gate passes. App/test manifests
+are byte-identical.
+
+The checksum-matched OPPO journey verifies Shop `tomato -> atta -> empty ->
+clear`, Wholesale `rice` and Medicine `paracetamol`; only current results are
+exposed, the field remains focused during typing, vertical-specific packs stay
+correct and a 169-ms hot resume retains the Medicine query/result. The
+297-frame exact-binary trace spans 18.479 seconds with p95 20.757 ms, eight
+frames over 33 ms, none over 100 ms, maximum 54.631 ms and no shader/compile
+event. App logs contain zero FlutterError, RenderFlex, fatal, lost-connection,
+exception or SIGSEGV matches.
+
+Screen 01 and Social retain exact pending-logo values. The Buy protected hash
+advances from R47 to
+`91f6636d3671517956b673fb75ca5336ee3da754c306dfe9b61be0e1478533a5`
+only through the authorized R48 query-result owner; no baseline is replaced.
+The separate rejected/pending global MoolSocial wordmark ticket is unchanged.
+
+Evidence:
+`artifacts/quality/buy-query-results-motion-r48-20260801-58`.
+Handoff:
+`docs/quality/BUY-FV2-R48-QUERY-RESULTS-MOTION-HANDOFF-20260801.md`.
+
+Next safe approved owner: `BUY-FV2-138` route and Buy re-entry continuity,
+using its existing accepted navigation contract and confirmed OPPO finding.
+
+## Route and Buy re-entry continuity R49 — device replay blocked — 1 August 2026
+
+State:
+`IMPLEMENTED_AUTOMATED_QUALIFIED_EXACT_APK_INSTALLED_DEVICE_REPLAY_BLOCKED_BY_SECURE_KEYGUARD_FOUNDER_REVIEW_PENDING`.
+
+Final candidate `BUY-R49-ROUTE-CONTINUITY-FIX1`, profile `1.0.0-r49`
+(`2026080114`), runs production `lib/main.dart`. Candidate and final OPPO pull
+are byte-identical at SHA-256
+`589D5F46B45D3E63D54E045FCE71607D44ED0B7B303967AA6E6F393A44D36CD2`
+(134,115,505 bytes). The byte-identical prebuild/post-install 1,953-file
+app/test manifest SHA-256 is
+`69B4852258264E31722889A139131A0C8930BAAA6CD59EE301DF3825949A4C95`.
+
+R49 makes root Buy Back app-owned, persists only canonical safe Buy owners,
+records internal Shop/Wholesale/Medicine/Orders destination changes, preserves
+Search/internal-depth Back priority and uses the existing Social Mool choices
+state for one-tap Buy rediscovery. Malformed, external, checkout,
+authentication and unsafe order/provider routes fail closed. No decorative
+motion, layout, customer copy, commerce, Cart, global-logo or backend meaning
+changes.
+
+Qualification completed: seven focused final route tests, the 60-test focused
+integration set, two final unchanged-source 174/174 Buy regressions with four
+intentional skips each, clean full analysis, and all positive brand,
+immutable-reference, 154-route interaction, customer-copy, live read-only
+HTML-copy, backend/self-test and data-egress/self-test gates. The legacy lock
+gates reject only the known Screen 01 pending-logo hash, 130-file Social
+pending inventory and current authorized Buy tree
+`814cb7653697e212972b7ce103eb44d3a176b9d636facaaa913dda2630934373`.
+No baseline was replaced.
+
+The final APK is installed on connected OPPO CPH2375 (`2b3e0f71`) and its pull
+matches exactly, but the phone is secured by its PIN keyguard (`showing=true`,
+`secure=true`). No PIN was guessed or bypassed. Root Back/re-entry,
+destination force-stop restoration, one-tap rediscovery, accessibility,
+lifecycle, failure scan and exact-binary performance trace remain mandatory
+after the founder unlocks the device. R49 is not device-qualified or founder-
+accepted until that replay passes.
+
+Evidence:
+`artifacts/quality/buy-route-continuity-r49-20260801-59`.
+Handoff:
+`docs/quality/BUY-FV2-R49-ROUTE-CONTINUITY-HANDOFF-20260801.md`.
+
+Do not advance to the next runtime ticket while the shared connected-device
+qualification boundary is unavailable. The separate rejected/pending global
+MoolSocial wordmark ticket remains unchanged.
+
+## Founder-reproduced R49 FIX1 startup failure — 1 August 2026
+
+State:
+`FOUNDER_REPRODUCED_FIX1_STARTUP_FAILURE_R49_1_FIX2_REQUALIFICATION_IN_PROGRESS`.
+
+After OPPO was unlocked, the founder opened the exact installed FIX1. The app
+remained indefinitely on the native navy launch background. Clean force-stop
+reproduction retained the same frame at 700 ms, 2.7 seconds and 7.7 seconds.
+The app process remained alive and foreground; its PID-specific log proves an
+unhandled `Release configuration is incomplete` exception in `_firebaseOptions`
+before `runApp`. FIX1 omitted the sanctioned `MOOLSOCIAL_DEVICE_REVIEW=true`
+and `MOOLSOCIAL_USE_EMULATORS=true` build defines.
+
+FIX1 SHA-256
+`589D5F46B45D3E63D54E045FCE71607D44ED0B7B303967AA6E6F393A44D36CD2`
+is rejected and preserved. The authorized unchanged-source successor is
+`BUY-R49-ROUTE-CONTINUITY-FIX2`, profile `1.0.0-r49.1` (`2026080115`). It must
+retain source-manifest SHA-256
+`69B4852258264E31722889A139131A0C8930BAAA6CD59EE301DF3825949A4C95`,
+use only the recorded device-review defines, cold-start beyond native launch,
+and complete the full outstanding R49 device replay before qualification.
+
+Failure evidence remains under
+`artifacts/quality/buy-route-continuity-r49-20260801-59` (`99`-`107`). FIX2
+evidence root:
+`artifacts/quality/buy-route-continuity-r49-1-20260801-60`.
+
+## R49.1 FIX2 technically/device qualified — 1 August 2026
+
+State:
+`TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+The permanent APK regression machine gate was added before FIX2 was built.
+`config/apk-regression-gate-state.json` records the complete prebuild gate
+list, exact source identity, candidate/version/mode/runtime-define allowlist,
+one-build authorization, build/install identity and every post-build result.
+`scripts/check-apk-regression-gate-state.ps1` fails closed on stale, missing,
+failed or mismatched state, and `scripts/build-buy-device-review.ps1` is now
+the required Buy review-build entry point. Raw `flutter build apk` is not an
+authorized review build. The authorization was consumed by FIX2 and the final
+machine state cannot be silently reused.
+
+Exact qualified candidate `BUY-R49-ROUTE-CONTINUITY-FIX2`, profile
+`1.0.0-r49.1` (`2026080115`), is 133,017,785 bytes. Candidate, installed OPPO
+base and final pull are byte-identical at SHA-256
+`3011D9C67B7637B2116CEE55FEAAF9CBEB0170A4BAC364FCC347652571BA5C84`.
+The unchanged 1,953-file app/test source manifest remains SHA-256
+`69B4852258264E31722889A139131A0C8930BAAA6CD59EE301DF3825949A4C95`.
+
+On OPPO CPH2375 (`2b3e0f71`), clean cold start leaves the native launch frame,
+shows Flutter launch content at 700 ms and reaches Social by 2.7 seconds. The
+exact binary passes two repeated root Buy Back cycles, force-stop/cold restore
+of Wholesale, Medicine, Orders and Shop, deliberate Social departure with
+one-tap Buy return, Search Back priority, product-detail Back and hot resume.
+Accessibility is populated and the final app scan has zero incomplete-release,
+FlutterError, RenderFlex, fatal, lost-connection, exception or signal matches.
+
+The 326-frame, 11.353471-second exact-binary trace has p95 11.754 ms, maximum
+62.749 ms, four frames over 33 ms, none over 100 ms and no shader/compile
+events. ADB trace forwarding was removed after capture. All earlier focused
+tests, two 174/174 unchanged-source Buy regressions, full analysis and positive
+gates remain valid because app/test source is byte-identical.
+
+FIX1 remains rejected and immutable at SHA-256
+`589D5F46B45D3E63D54E045FCE71607D44ED0B7B303967AA6E6F393A44D36CD2`.
+Its founder-reproduced native-blue-screen failure and PID log remain in
+`artifacts/quality/buy-route-continuity-r49-20260801-59`. FIX2 qualification
+evidence is in
+`artifacts/quality/buy-route-continuity-r49-1-20260801-60`, summarized by
+`87-device-replay-summary.md`. Founder review of R49 navigation remains
+pending. The separate rejected global MoolSocial wordmark ticket remains
+unchanged.
+
+## Founder rejection of R42.1 — R50 progressive lockup in progress — 1 August 2026
+
+State: `BUY_FV2_139_R42_1_FOUNDER_REJECTED_R50_IMPLEMENTATION_IN_PROGRESS`.
+
+The founder rejects R42.1: the wordmark motion is not sleek; the wordmark,
+separate travelling tricolour track, tagline pill, business promise and footer
+rule do not form a professionally spaced composition; and the launch content
+does not arrive progressively.
+
+The authorized, deduplicated successor remains `BUY-FV2-139`, candidate
+`BUY-R50-139-PROGRESSIVE-BRAND-LOCKUP-FIX1`. It must reveal the complete
+`MoolSocial` wordmark, then the exact tagline, then the existing business
+promise, before one whole-lockup settle. Exactly one saffron-white-green rule
+may remain. Copy, route readiness, cadence, reduced motion, one semantic owner
+and the four-colour palette remain contract-owned.
+
+R42.1 evidence remains immutable. Screen 01 v3, protected Social and accepted
+R40.3 Buy remain the active baselines until the founder accepts R50. R43-R49
+remain unchanged and are not presented during this correction.
+
+Contract:
+`artifacts/quality/buy-fv2-139-progressive-lockup-r50-20260801-61/00-founder-change-and-implementation-contract.md`.
+Handoff:
+`docs/quality/BUY-FV2-139-R50-PROGRESSIVE-BRAND-LOCKUP-HANDOFF-20260801.md`.
+
+## R50 progressive brand lockup founder accepted — 1 August 2026
+
+State: `FOUNDER_APPROVED_ON_CONNECTED_OPPO`.
+
+The founder watched the live R50 cold-start progression and approved
+`BUY-R50-139-PROGRESSIVE-BRAND-LOCKUP-FIX1`: `theek hain i saw that approved
+lets move to next ticket`. Profile `1.0.0-r50` (`2026080116`) is 133,001,393
+bytes; archived and installed-pull SHA-256 are exactly
+`F8C21E4B9C32356A451909C2FD9FB7B845E8ED393199A8356EA5EA4ED4BA74F3`.
+The final 1,986-file source manifest is unchanged at SHA-256
+`7E9E76F2753D72E9034D68DD4825405D826D67065F77DFDACB808099689103D5`.
+
+Durable founder evidence:
+`artifacts/quality/buy-fv2-139-progressive-lockup-r50-20260801-61/84-founder-acceptance.md`.
+R43-R49 are now eligible for separate one-ticket-at-a-time founder review.
+
+## R44 production header founder rejected — R51 in progress — 1 August 2026
+
+State: `R44_HEADER_FOUNDER_REJECTED_R51_CONTEXTUAL_GLASS_HEADER_IN_PROGRESS`.
+
+The founder rejects the actual R44 header: the MoolSocial text is too small
+inside a large tight white box, header geometry feels hard/compact, the header
+mark has no visible Mool-then-Social depth reveal and the surface lacks a
+professional contextual glass-gradient quality. The accepted R50 cold-start
+lockup remains accepted and is not reopened.
+
+R51 candidate `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX1` owns only the actual
+production Buy header composition. It uses a fixed-width stacked `Mool` then
+hidden-depth `Social` mark with no tile/divider and a finite Shop/Wholesale/
+Medicine/Orders glass-gradient surface using only navy, saffron, white and
+green. No approved first-party header video or complete playback/promotion
+contract exists; video, perpetual loops and invented promotions remain
+inactive.
+
+Contract:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-20260801-62/00-founder-rejection-and-r51-contract.md`.
+Handoff:
+`docs/quality/BUY-FV2-077-R51-CONTEXTUAL-GLASS-HEADER-HANDOFF-20260801.md`.
+
+R51 FIX1 was built as profile `1.0.0-r51` (`2026080118`), installed
+checksum-exact on OPPO at SHA-256
+`4B3FC7DD8277BC54A8B199D8494CE86CF592E7087526A03FC9152B15E4C442B8`,
+and stopped before founder handoff. Device screenshot
+`40-r51-medicine-settled.png` showed white contextual copy crossing the white
+centre of the Medicine tricolour gradient. FIX1 is non-qualifying and
+preserved. Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX2`
+changes only Medicine's contextual foreground to brand navy; all other R51
+acceptance, geometry and protected boundaries remain exact.
+
+The founder then rejected the visible FIX1 presentation more broadly: Mool
+motion was not perceptible, Social motion remained weak, the gradient dulled
+the mark/context/DC, and every vertical used the same choreography. FIX2 was
+stopped before build and superseded. Current
+`BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX3` adds stronger finite two-stage mark
+depth, contrast-safe glass and distinct Shop/Wholesale/Medicine/Orders motion
+signatures. Evidence owner:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-2-20260801-64`.
+
+The clarified Superadmin-controlled promotional-video intent is deduplicated
+into existing owners 081/082/083/140. R51 FIX3 does not activate an asset,
+campaign, CTA, player or remote adapter; those owners remain fail-closed until
+their recorded commercial, content, lifecycle, accessibility, consent,
+measurement and performance contracts are complete.
+
+## R51 FIX4 founder-reference successor — 1 August 2026
+
+State: `R51_FIX3_NONQUALIFYING_R51_FIX4_IN_PROGRESS`.
+
+Before FIX3 reached an APK build, the founder supplied
+`C:\Users\jisal\Downloads\Recording 2026-08-01 152420.mp4` as the exact visual
+reference for colour/theme continuity and changing text. The file is H.264,
+902 x 554 at 30 fps, 6.655979 seconds and 1,974,361 bytes; SHA-256
+`63DC17641B35A6920E35DE742FE796BD0987726FEB038AC4491834F570D2A316`.
+It is a read-only style reference, not an approved/licensed MoolSocial app
+asset. Sampled frames and contact sheet are preserved under the FIX3 reference
+inspection folder; the partial FIX3 regression remains explicitly
+nonqualifying.
+
+Current candidate `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX4`, profile
+`1.0.0-r51.3` (`2026080121`), keeps compact header geometry while translating
+only the reference grammar into original finite Flutter motion: stable navy
+depth, luminous palette-disciplined layers, clearly staged Mool then Social,
+then existing context eyebrow/value through a fixed-owner masked handoff, with
+distinct Shop, Wholesale, Medicine and Orders scene grammars. No loop,
+invented copy, fake order progress, media asset, campaign, player, CTA or
+remote adapter is authorized. Contract and evidence owner:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-3-20260801-65`.
+
+Tickets 081/082/083/140 still own future approved first-party/Superadmin
+promotion delivery and safe media playback. They remain fail-closed.
+
+## R51 FIX10 technically/device qualified — founder review pending — 1 August 2026
+
+State: `R51_FIX10_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+The current and only active founder-review candidate is
+`BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX10`, profile `1.0.0-r51.9`
+(`2026080127`). It was built once through the mandatory machine gate and
+installed checksum-exact on connected OPPO CPH2375 (`2b3e0f71`). APK and
+installed-pull SHA-256 are exactly
+`22846F9ABD60D2F99A04B8D3A432F529B96F4602451610120E5722C1A3CD0BCE`.
+
+All prebuild, exact-build, cold-launch, four-context motion, Search, Back,
+lifecycle, accessibility, failure-scan, performance and unchanged-source gates
+pass. The calibrated context trace p95 is 19.396 ms with two of 253 frames over
+33 ms, none over 100 ms and no shader/compile events. Final source identity is
+2,224 files, SHA-256
+`6AE96E45C10A6A89A6EE79B67F42BE43CB83A59F4D631BA12561A21A1426AECF`.
+
+The machine state has consumed its one-build authorization and leaves only
+`founder-review: pending`. Tests and device qualification do not constitute
+visual approval. Do not start a later ticket until the founder approves or
+rejects this exact OPPO candidate. Evidence and review frames:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-9-20260801-71`.
+
+## Founder authorized carry-on — R52 registered without replacing FIX10 — 1 August 2026
+
+The founder stated that the FIX10 visual decision would follow in 20 minutes
+and explicitly instructed Codex to carry on. FIX10 therefore remains immutable,
+installed and `TECHNICALLY/DEVICE QUALIFIED — FOUNDER VISUAL REVIEW PENDING`;
+its decision will be recorded independently when received.
+
+The next genuine uncovered deduplicated owner is honest Orders/tracking motion
+under `BUY-FV2-076`, `BUY-FV2-079` and `BUY-FV2-115`. R52 is registered as
+`BUY-R52-ORDERS-TRACKING-MOTION-FIX1`, planned profile `1.0.0-r52`
+(`2026080128`), with implementation in progress and no APK build or device
+change. It corrects zero-to-current progress replay and unproven `LIVE`
+presentation; first paint must be exact current state, and only a later real
+same-order state change may animate once. No timer, pulse, provider event,
+location or backend state may be invented. Reduced motion is immediate/static.
+
+Contract and evidence:
+`artifacts/quality/buy-orders-tracking-motion-r52-20260801-72/00-r52-honest-orders-tracking-motion-contract.md`.
+Handoff:
+`docs/quality/BUY-FV2-R52-HONEST-ORDERS-TRACKING-MOTION-HANDOFF-20260801.md`.
+
+## R52 source implemented/prebuild qualified; FIX10 still installed — 1 August 2026
+
+State: `R52_SOURCE_IMPLEMENTED_PREBUILD_QUALIFIED_NO_APK_BUILT`.
+
+The truthful Orders/tracking implementation is complete at source level. It
+removes mount-time zero-to-current progress replay from Orders, Tracking and
+the same systemic Buy Assist current-order call site; permits one finite
+transition only after a later real change for the same order; provides finite
+Active/Delivered and timeline acknowledgement; removes the unproven `LIVE`
+pulse/claim; and resolves reduced motion immediately to exact current state.
+
+The focused honest-order/motion/session set passes `35/35`, the complete
+Buy-screen set passes `69/69`, both independent unchanged-source full Buy
+regressions pass `181/181` with four intentional capture skips each, full
+Flutter analysis is clean, and all positive brand/reference/interaction/copy/
+HTML/backend/data-egress gates pass. The known fail-closed Screen 01, Social
+inventory and current Buy-tree baseline dispositions are unchanged; no baseline
+was replaced.
+
+The final 2,225-file app/test source identity is
+`14828310D032659A10850CD8395A7FBBCA3D1528B511246397F0B17D3E0EDEF6`, unchanged
+from post-implementation through final prebuild checks. R52 has no APK and has
+not touched OPPO. The machine still identifies consumed R51 FIX10 at APK SHA
+`22846F9ABD60D2F99A04B8D3A432F529B96F4602451610120E5722C1A3CD0BCE` in state
+`technically_device_qualified_founder_review_pending`. Record the founder's
+FIX10 decision independently before replacing that machine/install boundary.
+
+Summary:
+`artifacts/quality/buy-orders-tracking-motion-r52-20260801-72/09-source-qualification-summary.md`.
+
+## R51 FIX10 founder rejected except Search; FIX11 in progress — 1 August 2026
+
+State: `R51_FIX10_FOUNDER_REJECTED_SEARCH_ACCEPTED_R51_FIX11_IN_PROGRESS`.
+
+The founder rejects FIX10's header depth, disappearing final brand and lack of
+context-aware actions, but explicitly accepts its Search presentation and
+behavior. FIX10's qualified profile `1.0.0-r51.9` (`2026080127`), exact
+APK/install SHA-256
+`22846F9ABD60D2F99A04B8D3A432F529B96F4602451610120E5722C1A3CD0BCE` and
+evidence remain immutable and not approved.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX11`, planned profile
+`1.0.0-r51.10` (`2026080129`), preserves the accepted Search block exactly at
+SHA-256
+`E99C6F35FF40611759465D1AE3D4648382F651C04C57B65009213A56B72744CB`.
+It owns only deeper finite context-specific cinematic header worlds, a
+persistent final `MoolSocial`, and truthful compact actions already owned by
+Shop, Wholesale, Medicine, Orders and Account. R52 source remains preserved
+and unbuilt; remote media/advertising remains fail closed.
+
+Contract and evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-10-20260801-73`.
+
+## R51 FIX11 founder change-requested; FIX12 in progress — 1 August 2026
+
+State: `R51_FIX11_FOUNDER_CHANGE_REQUESTED_R51_FIX12_IN_PROGRESS`.
+
+FIX11 exact profile `1.0.0-r51.10` (`2026080129`) was built once and installed
+checksum-exact on OPPO at SHA-256
+`E6C8A27CD7B4BFD18FE61DD8AC0DD2C5E456D358200D0553B9B2BBDD37CB916F`.
+Cold launch was healthy and four contexts/actions were captured, but founder
+review rejected the final side-by-side `MoolSocial` settle before complete
+device qualification. Preserve all FIX11 evidence; it is not approved.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX12`, planned profile
+`1.0.0-r51.11` (`2026080130`), changes only the final mark to `Mool` above
+`Social` inside the unchanged 104 x 56 owner. The large arrival, accepted
+Search SHA, cinematic contexts/actions, compact layout, finite/reduced motion
+and media/backend boundaries remain exact. Contract and evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-11-20260801-74`.
+
+## R51 FIX12 change-requested; FIX13 technically/device qualified — 2 August 2026
+
+State: `R51_FIX13_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+FIX12 remains immutable and technically/device qualified at profile
+`1.0.0-r51.11` (`2026080130`), 133,329,077 bytes and APK/install SHA-256
+`46BD624411D5A8739D46C62D856006A68B881B8885F5D05BC180E1331C3430AB`.
+The founder accepts its stacked `Mool` above `Social` position but requests a
+bar-free, slightly larger, deeper and more premium treatment. FIX12 is not
+founder approved.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX13`, planned profile
+`1.0.0-r51.12` (`2026080131`), remains inside existing ticket 077. Source
+implements curved all-corner depth, recessed chamber, floating context forms,
+near occlusion and finite glints; removes the left word rail and coloured
+scene/shelf/rack/package bars; slightly enlarges the accepted stacked mark;
+and moves large identity passes and truthful feature copy from the vanishing
+depth. The palette is navy/white glass with restrained opaque saffron/green
+points only.
+
+The accepted Search owner is untouched at SHA-256
+`E99C6F35FF40611759465D1AE3D4648382F651C04C57B65009213A56B72744CB`.
+Focused FIX13 behavior, 390 px sequence/context goldens, 320 px at 140-percent
+text and reduced-motion checks pass. Full analysis, the 75-case focused suite,
+two 181-test Buy regressions and all mandatory gates pass. FIX13 profile
+`1.0.0-r51.12` (`2026080131`) is installed checksum-exact on OPPO: 133,329,077
+bytes, SHA-256
+`95F08B3DB0BFB7A4631DA566005B48D78F01B5568CB35A1752CA8B3D2A2E4983`.
+Cold launch, four context actions, accepted Search, 280-ms same-PID resume,
+accessibility and zero-failure scan pass. The profile trace has p95 18.653 ms,
+2/211 frames over 33 ms, none over 100 ms and no shader/compile event. The
+2,270-file source remains exact at SHA-256
+`97DE7B2A2C0629E6BCEC832E164E38425986DACD43BD5FB3F53F48AF66E10680`.
+Founder visual review is the only pending gate. Evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-12-20260802-75`.
+
+## R51 FIX13 founder change-requested; FIX14 in progress — 2 August 2026
+
+State: `R51_FIX13_FOUNDER_CHANGE_REQUESTED_R51_FIX14_IN_PROGRESS`.
+
+FIX13 remains immutable and technically/device qualified at profile
+`1.0.0-r51.12` (`2026080131`), 133,329,077 bytes and exact APK/install SHA-256
+`95F08B3DB0BFB7A4631DA566005B48D78F01B5568CB35A1752CA8B3D2A2E4983`.
+The founder accepts its stacked `Mool` above `Social` position and Search, but
+change-requests its visible feature copy, labelled/saffron CTA, rusty palette
+and insufficient studio depth. FIX13 is not founder approved.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX14`, planned profile
+`1.0.0-r51.13` (`2026080201`), remains inside existing ticket 077. It owns a
+slightly larger/refined accepted mark, a text-free icon-only semantic action,
+no saffron in the header, and a navy/white premium-glass studio with twenty
+code-native visual creative slots: five each for Shop, Wholesale, Medicine and
+Orders. Only the active context's finite five-stage reel is presented, with
+multiple visible far/mid/near objects and one finite flash-forward handoff in a
+four-corner reflective pool-room. No
+video asset, remote/Superadmin campaign, paid advertising, entitlement,
+analytics or backend state is activated; 083/140 remain fail-closed.
+
+Accepted Search remains untouched at SHA-256
+`E99C6F35FF40611759465D1AE3D4648382F651C04C57B65009213A56B72744CB`.
+Contract and evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-13-20260802-76`.
+
+## R51 FIX14 founder change-requested; FIX15 in progress — 2 August 2026
+
+State: `R51_FIX14_FOUNDER_CHANGE_REQUESTED_R51_FIX15_IN_PROGRESS`.
+
+FIX14 profile `1.0.0-r51.13` (`2026080201`) remains preserved checksum-exact
+on OPPO: 133,329,077 bytes and archive/install SHA-256
+`2734211997D10BA76331F091D90B7446566929C33855CF4B5A968A82EEB4A609`.
+Its deeper code-native room, five visual stages per context, text-free header,
+stacked identity and accepted Search were shown on device. The founder retains
+the latter three inputs but change-requests the still-shallow first visual,
+monochrome/non-cinematic lighting, limited camera/depth language and
+non-interactive promo creatives. FIX14 is not approved and its remaining
+qualification is superseded by the founder decision.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX15`, planned profile
+`1.0.0-r51.14` (`2026080202`), remains under ticket 077. It owns cinematic
+camera shift, volumetric light, illuminated thin room borders, richer
+context-specific colour confined to the first-party promo aperture, multiple
+simultaneous far/mid/near unboxed creative light fields and a transparent,
+tappable stage-specific semantic target that reuses the existing truthful
+context action. The small context icon remains the visible affordance. It cannot
+activate a video/media asset, remote/Superadmin campaign, paid ad, analytics,
+new route, entitlement or backend state; 083/140 stay fail-closed.
+
+Contract and evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-14-20260802-77`.
+
+## R51 FIX15 device regression; FIX16 in progress — 2 August 2026
+
+State: `R51_FIX15_DEVICE_INTERACTION_FAILED_R51_FIX16_IN_PROGRESS`.
+
+FIX15 profile `1.0.0-r51.14` (`2026080202`) is preserved checksum-exact on
+OPPO at 133,492,917 bytes and archive/install SHA-256
+`AC1B0519147E62194C5763B8BAC7E16E8F5EB988DDAF433E7432485DAC8B14B5`.
+Cold launch recovered from the splash to Social and the cinematic Shop header
+rendered, but a real central-aperture tap did not dispatch its action. The
+transparent target was below the later header child in Stack hit order. FIX15
+is therefore not presented for founder review.
+
+Current successor `BUY-R51-077-CONTEXTUAL-GLASS-HEADER-FIX16`, planned profile
+`1.0.0-r51.15` (`2026080203`), changes only hit/semantic layering: the same
+transparent aperture becomes topmost and exposes an Android semantic tap while
+reusing the same callback, haptic and truthful context owner. FIX15 visuals,
+stacked identity, Search SHA-256
+`E99C6F35FF40611759465D1AE3D4648382F651C04C57B65009213A56B72744CB`,
+reduced motion and all protected boundaries remain unchanged.
+
+Contract and evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-15-20260802-78`.
+
+## R51 FIX16 technically/device qualified — 2 August 2026
+
+State: `TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+FIX16 profile `1.0.0-r51.15` (`2026080203`) is installed checksum-exact on the
+connected OPPO: 133,492,913 bytes and SHA-256
+`519D60F44CE4F31631B43282B536B7F737AC83F611F227B33D276FDF910D4644`.
+The central promo aperture now reports Android clickability and real taps pass
+for Shop basket, Wholesale flexible MOQ, Medicine prescription and Orders
+tracking. Source identity remains exact at
+`174047EF984D79FC214D856F0DAC23C0135A4259A209EFC600BBCD36659F56E1`.
+Profile motion p95 is 19.417 ms with zero frames over 33/100 ms and zero
+shader/compile events. Known OPPO Impeller font-atlas renderer messages are
+preserved and classified; there is no crash, FlutterError, RenderFlex or ANR.
+
+Founder review remains pending and may request further visual enhancement to
+the unchanged FIX15 cinematic presentation. Do not relabel FIX15 or begin a
+header visual successor without that decision. Evidence:
+`artifacts/quality/buy-fv2-077-contextual-glass-header-r51-15-20260802-78`.
+
+## R52.1 honest Orders/tracking qualification in progress — 2 August 2026
+
+State: `R52_1_DEVICE_QUALIFICATION_IN_PROGRESS`.
+
+`BUY-R52-ORDERS-TRACKING-MOTION-FIX2`, planned profile `1.0.0-r52.1`
+(`2026080204`), is the monotonic-build qualification successor to source-only
+R52 FIX1. It changes no runtime source: current order motion remains finite,
+session-state driven, below completion until truthfully delivered, static under
+reduced motion, and ticker-free. It does not change header FIX16, Search, copy,
+routes, backend or protected surfaces. Evidence:
+`artifacts/quality/buy-orders-tracking-motion-r52-1-20260802-79`.
+
+## R53 first-party promotion motion in progress — 2 August 2026
+
+State: `R53_IMPLEMENTATION_IN_PROGRESS`.
+
+`BUY-R53-FIRST-PARTY-PROMOTION-MOTION-FIX1`, planned profile `1.0.0-r53`
+(`2026080205`), owns only `BuyV2PromotionCard` and its Shop/Wholesale/Medicine/
+Orders first-party rails. It adds a finite fixed-geometry entry reveal and
+immediate-action icon/arrow acknowledgement, with zero-duration reduced motion
+and no hidden ticker. Existing copy, action, route and meaning remain exact.
+Paid/remote advertising, Superadmin campaigns, media, analytics, autoplay,
+offers and backend state remain fail-closed. Evidence:
+`artifacts/quality/buy-first-party-promotion-motion-r53-20260802-80`.
+
+## Post-review Buy motion queue prepared — 2 August 2026
+
+State: `PLANNING_ONLY_CURRENT_REVIEW_CANDIDATE_UNCHANGED`.
+
+While R51 FIX16/R53 remain installed for founder review, the remaining motion
+catalogue was deduplicated read-only against the production register and actual
+Buy call sites. No runtime source, APK, device state, candidate ID or machine
+authorization changed. No new sequential ticket was required.
+
+The prepared implementation order after the founder's current-ticket visual
+decision is:
+
+1. existing `BUY-FV2-138`/`076`/`017`: directional Buy forward/back visual
+   continuity while preserving every R49.1 route/Back/restoration invariant;
+2. existing `BUY-FV2-079`/`087`/`093`/`095`: product-keyed catalogue-to-detail
+   continuity plus bounded gallery swipe/pinch and real first-frame fade; and
+3. existing `BUY-FV2-076`/`030`/`089`/`099`/`117`/`123`/`133`: finite established
+   sheet/form and honest empty/success/error/retry state transitions.
+
+Every prepared owner now records acceptance, reduced-motion behavior, risks,
+protected boundary and exact device/regression evidence requirements in the
+ticket register. Loading shimmer/skeleton/refresh/pagination stays blocked
+under existing `080`/`098` until a real asynchronous adapter owns those states.
+Video/autoplay/campaign effects stay fail-closed under `082`/`083`/`140`.
+Effects with no truthful Buy owner are explicitly not forced into production.
+Exact effect-by-effect disposition and source-owner audit:
+`docs/quality/BUY-POST-REVIEW-MOTION-COVERAGE-MATRIX-20260802.md`.
+
+Morning one-ticket-at-a-time founder observation paths, exact review-binary
+identity and decision wording are recorded in
+`docs/quality/BUY-MORNING-FOUNDER-MOTION-REVIEW-BRIEF-20260802.md`. The current
+R53 binary is cumulative; any visual decision made from it must cite the R53
+checksum rather than relabelling an earlier ticket APK as the observed binary.
+
+## R53 prebuild passed — 2 August 2026
+
+State: `R53_PREBUILD_PASSED_ONE_PROFILE_BUILD_AUTHORIZED`.
+
+Analysis is clean; the focused R53/Buy suite passed 71/71; two complete Buy
+regressions each passed 181 tests with four established capture-only skips;
+all positive gates passed and all protected gates reached their expected
+fail-closed outcomes. The accepted Search/mini-Cart block remains exact. The
+sealed 2,306-file source manifest has SHA-256
+`7515088ED6D5F0FC66B61645EDA147C50C082C971753164C26DB2AD70A8F8C0C`.
+One exact profile build is authorized for
+`BUY-R53-FIRST-PARTY-PROMOTION-MOTION-FIX1`, `1.0.0-r53` (`2026080205`).
+Evidence: `artifacts/quality/buy-first-party-promotion-motion-r53-20260802-80`.
+
+## R52.1 technically/device qualified — 2 August 2026
+
+State: `TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Profile `1.0.0-r52.1` (`2026080204`) is checksum-exact on OPPO at
+133,492,921 bytes and SHA-256
+`A3101715DE27F828F02EAB2F7F674EEB99F64CFC674A2560A08A5208E02AEEF0`.
+Orders/Tracking immediate and settled accessibility identities are exact, so
+current progress never replays from zero. Active remains incomplete,
+Delivered is 100% final, `LIVE` is absent, lifecycle resumes in process, and
+the affected 89-frame trace has p95 16.845 ms with no frame over 33/100 ms and
+no shader/compile event. Founder visual review remains pending. Evidence:
+`artifacts/quality/buy-orders-tracking-motion-r52-1-20260802-79`.
+
+## R53 technically/device qualified — 2 August 2026
+
+State: `TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+Profile `1.0.0-r53` (`2026080205`) and the pulled OPPO install are exact at
+133,509,297 bytes and SHA-256
+`6C1743A9C43468B6CF4BD40D0ED648D2A4B61D95A491838C5606B2DC1F221B80`.
+The 2,306-file source identity remains exact at
+`7515088ED6D5F0FC66B61645EDA147C50C082C971753164C26DB2AD70A8F8C0C`.
+Shop, Wholesale, Medicine and Orders promotion rails expose Android tap
+semantics and real taps immediately reach their existing owned results.
+Lifecycle resumes in process and the post-detour launch screen settles normally
+into Social; the phone is parked on Shop for founder review.
+
+The corrected 90-frame affected journey has p95 19.589 ms, maximum 19.876 ms,
+zero frames over 33/100 ms and zero shader/compile events. The earlier
+Social/Ride-contaminated trace is preserved and rejected. Known OPPO Impeller
+font-atlas messages are preserved/classified; there is no crash,
+`FlutterError`, `RenderFlex` or ANR. OPPO blocked compact display overrides, so
+the passing deterministic 320 px / 140% gates are used and explicitly
+classified; all attempted recorder files are invalid and excluded rather than
+claimed as video evidence. Founder visual review remains pending. Evidence:
+`artifacts/quality/buy-first-party-promotion-motion-r53-20260802-80`.
+
+## R54.1 navigation-continuity motion qualified — 2 August 2026
+
+State: `R54_FIX1_REJECTED_R54_1_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_VISUAL_REVIEW_PENDING`.
+
+The founder authorized continued one-by-one implementation and will review the
+qualified visuals together. Existing tickets `BUY-FV2-138`, `076` and `017`
+own successor `BUY-R54-NAVIGATION-CONTINUITY-MOTION-FIX1`, planned profile
+`1.0.0-r54` (`2026080206`). No new sequential ticket is registered.
+
+R54 removes the two-frame `$label selected` presentation placeholder and owns
+only a finite directional transition of the genuine internal Buy body. Header,
+accepted Search, mini-Cart, dock, R49.1 Back/restoration/Social continuity,
+copy, commerce state, routes, persistence, backend and protected surfaces stay
+outside the moving owner. Reduced motion replaces the body immediately. The
+session may emit presentation direction/event identity only; it cannot use
+motion to decide, delay or persist navigation.
+
+Exact predecessor: R53 source SHA-256
+`7515088ED6D5F0FC66B61645EDA147C50C082C971753164C26DB2AD70A8F8C0C`;
+R53 APK/install SHA-256
+`6C1743A9C43468B6CF4BD40D0ED648D2A4B61D95A491838C5606B2DC1F221B80`.
+Evidence and contract:
+`artifacts/quality/buy-navigation-continuity-motion-r54-20260802-81`.
+
+Full analysis is clean; the expanded focused suite passes 121/121; two
+complete unchanged-source Buy regressions each pass 187 tests with the same
+four capture-only skips. Every positive gate passes, and all protected gates
+reach their exact expected fail-closed outcomes. Accepted Search plus mini-Cart
+remains exact at 16,182 bytes and SHA-256
+`E99C6F35FF40611759465D1AE3D4648382F651C04C57B65009213A56B72744CB`.
+The sealed 2,307-file source manifest is SHA-256
+`24B1EE1E692B1944A7B5E043606D77D7EC35037D349EA83229EAA0F5FD1C5BFD`.
+Only one exact profile build may now be consumed by the mandatory wrapper.
+
+FIX1 built and installed checksum-exact at 133,509,297 bytes and SHA-256
+`D3719EBD2FFEADF9DBDBF648F1F2103FE3B5879A3E3E2011E7B1FD9AC8DCB842`.
+It is rejected before device visual review: a post-build machine audit proved
+that unavailable Checkout could emit a presentation event while Cart remained
+the same real surface. The OPPO secure PIN also contaminated the initial launch
+capture; neither that System UI frame nor FIX1 is review evidence.
+
+Narrow successor `BUY-R54-NAVIGATION-CONTINUITY-MOTION-FIX2`, planned profile
+`1.0.0-r54.1` (`2026080207`), now owns structural destination/view/detail
+identity. It changes no visual design or business outcome; it prevents motion
+sequence increments for notice-only, invalid and repeated same-surface actions.
+Evidence:
+`artifacts/quality/buy-navigation-continuity-motion-r54-1-20260802-82`.
+
+FIX2 is now sealed, built and installed. Full analysis is clean; the focused
+suite passes 123/123; two complete Buy regressions each pass 189 tests with the
+same four capture-only skips; every positive gate and exact expected protected
+gate passes. Accepted Search plus mini-Cart remains byte-exact. The 2,307-file
+source manifest is unchanged before/after build at SHA-256
+`5661D4E42E3B51E11AC14F1F4ED03A5F4337D846E7A83E316AB642E8D7B27414`.
+
+The consumed machine-gated APK is profile `1.0.0-r54.1` (`2026080207`),
+133,591,225 bytes, 709 ZIP entries, APK v2 signed, SHA-256
+`44A6468D02820758B26118659050D3E4D6ABF1E3216FB8142DC013B9EFE33CB1`.
+OPPO CPH2375 (`2b3e0f71`) reports the same version/code and the pulled installed
+APK matches the archive byte-for-byte. After founder unlock, the exact binary
+passes Shop/Wholesale/Medicine/Product/Orders forward/reverse/rapid motion,
+root Back to Social, one-tap Buy recovery, Search Back ordering, hot resume,
+established force-stop cold restoration, accessibility and the zero-match
+failure scan. Its 88-frame trace has p95 20.085 ms, one frame over 33 ms, none
+over 100 ms, maximum 43.259 ms and no shader/compile event. Post-device source
+remains exact. OPPO lacks `screenrecord` and scrcpy's Windows recorder crashes;
+the limitation is preserved and real device intermediate/end PNG plus XML
+evidence is used without inventing video. Founder visual review remains
+pending. No further R54 build is authorized or necessary.
+
+## R58 continuous-navigation program / R58.1 implementation start — 3 August 2026
+
+State: `R58_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+The founder proved on the connected OPPO that product detail ends after its
+review/report area and offers no forward path to another product. R54/R55 are
+not defective in their approved scope: they own route/Back/restoration and
+detail media continuity, not the newly requested forward-discovery lane.
+
+R58 now registers separate logical terminal-path audits for product detail,
+categories/results, Cart, offers/coupons, Medicine, Wholesale, Orders and the
+cross-family replay. Only R58.1 may enter runtime now. Candidate
+`BUY-R58-PRODUCT-DETAIL-CONTINUOUS-DISCOVERY-FIX1`, planned profile
+`1.0.0-r58` (`2026080314`), starts from unchanged 2,416-file source SHA-256
+`B6E29743BB17F54872E86E9FD2EDAF99E6061E4153A8C6EABDC1F4CD3FDBE743`.
+
+R58.1 adds a truthful same-vertical continuation lane after product reviews,
+allows direct product-to-product chaining, preserves the original return
+owner, uses no personalization/backend/clinical inference and applies the
+premium-motion policy before source edit. Shop/Wholesale/Medicine copy and
+semantics remain role-safe. R58.2-R58.8 stay registered/not started until this
+candidate receives focused, two-regression, gate, exact-source and
+checksum-matched OPPO qualification.
+
+Authority and evidence:
+
+- `docs/quality/BUY-R58-CONTINUOUS-NAVIGATION-TICKET-MATRIX-20260803.md`
+- `artifacts/quality/buy-product-detail-continuous-discovery-r58-1-20260803-124/00-r58-1-acceptance-risk-contract.md`
+
+R58.1 is now fully implemented and qualified. Exact 2,416-file source SHA-256
+is `07AFF6B40C9F020CAEC2322C1D6BC4F0E18FEA81369F2B6B4F38DAD3F81AE745`.
+The profile `1.0.0-r58` (`2026080314`) APK and pulled OPPO install are
+134,017,349 bytes and checksum-identical at SHA-256
+`5D666CD05C711BFFD1E5A33759247952ECE5754F6B443F1C8EDAB2F9ED9EA68D`.
+
+Analysis, 38 focused tests, two unchanged-source complete Buy regressions with
+295 active tests each, every release/protected gate and responsive captures
+pass. On OPPO CPH2375 the founder path continues Fresh tomatoes -> Fresh red
+onions -> Fresh tomatoes without Back, then one Back returns to the original
+Shop root. Wholesale and Medicine lanes stay within their catalogue; Medicine
+states `not medical advice`. Native cards are clickable Buttons, hot resume and
+approved force-stop restoration pass, classified app failures are zero, and
+the warmed trace has p95 26.121 ms with no frame over 100 ms or shader/compile
+event. Post-device source remains exact.
+
+Durable qualification handoff:
+`docs/quality/BUY-FV2-R58-1-PRODUCT-DETAIL-CONTINUOUS-DISCOVERY-HANDOFF-20260803.md`.
+Technical/device qualification is not founder approval. R58.2 category/result
+continuation is next and must receive its own pre-runtime contract, source
+identity, regressions, machine-gated APK and immutable evidence; R58.3-R58.8
+remain registered/not started.
+
+## R58.2 search-result recovery registered before runtime write — 3 August 2026
+
+State: `R58_2_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The R58.2 terminal audit found that non-empty category, filter, Saved and search
+results already enter qualified R58.1 product chaining. Empty Saved and
+category/filter grids already own `Show all products`, category-picker no-match
+owns its clear action, and expanded search retains header Clear/Close controls.
+The remaining gap is that a no-match query can remain constrained by
+category/filter without a one-tap current-vertical broadening owner.
+
+Candidate `BUY-R58-SEARCH-RESULT-RECOVERY-FIX1`, planned profile
+`1.0.0-r58.2` (`2026080315`), is registered from exact 2,416-file app/test
+source SHA-256
+`07AFF6B40C9F020CAEC2322C1D6BC4F0E18FEA81369F2B6B4F38DAD3F81AE745`.
+It may add only a current-vertical `Search all <destination>` command that
+preserves the exact query while clearing category/filter scope and must reuse
+the existing header Clear. R57 ranking and R48 transition parameters remain exact;
+the real scope change may reuse the finite transition and reduced motion is
+immediate/static.
+
+Contract and policy disposition:
+
+- `artifacts/quality/buy-search-result-recovery-r58-2-20260803-125/00-r58-2-acceptance-risk-contract.md`
+- `artifacts/quality/buy-search-result-recovery-r58-2-20260803-125/00c-premium-motion-policy-disposition.md`
+
+R58.1 remains technically/device qualified and preserved. R58.3-R58.8 remain
+registered/not started and cannot be mixed into R58.2.
+
+## R58.2 search-result recovery technically/device qualified — 3 August 2026
+
+State: `R58_2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-SEARCH-RESULT-RECOVERY-FIX1`, profile `1.0.0-r58.2`
+(`2026080315`), is fully host/device qualified. Exact app/test source is 2,417
+files, SHA-256
+`87C7B4182C554DCD2F0503AA2AC3480214FD60A5E70CAA8C1C44F4913AB9C679`.
+The machine-gated/checksum-matched APK and OPPO install are 134,017,505 bytes,
+SHA-256
+`9E6F762A03E41C0D41EA70465B46BEB7791BC6EB5EE11865A9680D0A1934BD72`.
+
+The bounded fix adds one native `Search all <destination>` recovery only for a
+non-empty Shop/Wholesale/Medicine query with active category/filter narrowing.
+It clears narrowing only, retains exact query/current vertical, uses only real
+current-catalogue results and reuses the qualified R57 ranking plus finite R48
+result motion. Reduced motion is immediate/static. Clear/Finish, R58.1 product
+chaining, approved R43/R45-R48/R52.1/R53/R54/R55 and Orders remain protected.
+
+Full analysis is clean. The corrected focused suite passes 41/41. Two complete
+unchanged-source Buy regressions each pass 298 active tests with 15 established
+skips. Positive gates pass; protected gates reach exact expected fail-closed
+outcomes. Checksum-matched OPPO replay passes Shop `atta`, Wholesale `basmati`
+and Medicine `metformin`, exact query/vertical retention, R58.1 chained return,
+native semantics, keyboard/Back, hot resume and approved process recreation.
+The warmed 102-frame trace has p95 18.721 ms, no frame over 33 ms, no frame over
+100 ms and no shader/compile event; classified app failures are zero. Prebuild,
+postbuild and post-device source manifests match exactly.
+
+Evidence:
+`artifacts/quality/buy-search-result-recovery-r58-2-20260803-125`.
+
+Handoff:
+`docs/quality/BUY-FV2-R58-2-SEARCH-RESULT-RECOVERY-HANDOFF-20260803.md`.
+
+Technical/device qualification is not founder approval. R58.3 Cart
+continuation is next; it must receive a fresh audit/registration/source seal
+before any runtime write. R58.4-R58.8 remain registered/not started.
+
+## R58.3.1 Cart-line product continuity registered before runtime write — 3 August 2026
+
+State: `R58_3_1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The Cart audit reused existing truthful empty-Cart catalogue return,
+recommendation lanes, checkout return and scoped Cart owners. The connected
+OPPO proved one remaining direct-context defect: the primary Cart product
+identity is focusable but `clickable=false`, with only quantity actions
+available. A customer cannot inspect the selected product directly.
+
+Candidate `BUY-R58-CART-LINE-PRODUCT-CONTINUITY-FIX1`, profile
+`1.0.0-r58.3` (`2026080316`), is registered from exact 2,417-file app/test
+source SHA-256
+`87C7B4182C554DCD2F0503AA2AC3480214FD60A5E70CAA8C1C44F4913AB9C679`.
+The bounded implementation may make media/text one native product-details
+button while leaving both 44-pixel quantity controls independent. It must use
+approved finite intent-depth and R54/R58.1 navigation, settle immediately under
+reduced motion and restore exact Cart scope/products/quantities/scroll on Back.
+
+Contract, source seal, OPPO reproduction and motion disposition:
+`artifacts/quality/buy-cart-line-product-continuity-r58-3-1-20260803-126`.
+
+R58.2 remains technically/device qualified and preserved. No R58.4-R58.8
+runtime work may be mixed into R58.3.1.
+
+## R58.2 founder approval — 3 August 2026
+
+State: `R58_2_FOUNDER_APPROVED_PROTECT`.
+
+The founder approved `BUY-R58-SEARCH-RESULT-RECOVERY-FIX1` after receiving the
+exact OPPO review points. Protect profile `1.0.0-r58.2` (`2026080315`), source
+SHA-256
+`87C7B4182C554DCD2F0503AA2AC3480214FD60A5E70CAA8C1C44F4913AB9C679`
+and APK/checksum-matched install SHA-256
+`9E6F762A03E41C0D41EA70465B46BEB7791BC6EB5EE11865A9680D0A1934BD72`.
+
+Disposition:
+`docs/quality/BUY-FV2-R58-2-FOUNDER-DISPOSITION-20260803.md`.
+
+R58.3.1 may continue only under its separate registered contract and must not
+alter approved R58.2 query/scope/vertical/Back/motion behavior.
+
+## R58.3.1 Cart-line product continuity technically/device qualified — 3 August 2026
+
+State: `R58_3_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-CART-LINE-PRODUCT-CONTINUITY-FIX1`, profile
+`1.0.0-r58.3` (`2026080316`), is fully host/device qualified. Exact app/test
+source is 2,418 files, SHA-256
+`71FA7C84EFC484E87FC866A54158D579998701CDBA105D1A5BB34A7248ED7A71`.
+The machine-gated and checksum-matched 134,017,505-byte APK/install SHA-256 is
+`BC5FAA7990F098E5C3651FB37EFF9A942492748C79E62B238B83A8B8B0DA0D7A`.
+
+The primary Cart media/title/metadata is now one native semantic product-detail
+Button. Separate 44-pixel Remove/Add Buttons remain non-nested. Exact Cart
+scroll offset is owned per live Cart scope and restored after R54/R58.1 product
+navigation. Intent depth is finite and reduced motion is static. No checkout,
+offer, provider, persistence or backend recommendation fact was added.
+
+Clean analysis, focused 3/3, related 43/43, two full Buy regressions at 301
+active passes plus 15 established skips, mandatory positive gates, protected
+fail-closed dispositions and responsive/reduced captures pass. Checksum-matched
+OPPO replay passes exact Shop/Wholesale/Medicine product packs, continuation,
+quantity separation, one-Back exact Cart scope/scroll, accessibility, hot resume
+and approved process recreation. The corrected 91-frame warmed trace has p95
+18.230 ms, zero over 33 or 100 ms and no shader/compile event; classified app
+failures are zero. Prebuild, postbuild and post-device source are exact.
+
+Evidence:
+`artifacts/quality/buy-cart-line-product-continuity-r58-3-1-20260803-126`.
+
+Handoff:
+`docs/quality/BUY-FV2-R58-3-1-CART-LINE-PRODUCT-CONTINUITY-HANDOFF-20260803.md`.
+
+Technical/device qualification is not founder approval. R58.2 is founder
+approved/protected. R58.1 remains founder-review pending. R58.4 Offers and
+coupons continuation is next and must receive a fresh audit, pre-runtime
+contract and source seal before any runtime write; R58.5-R58.8 remain queued.
+
+## R58.4.1 benefit-selection continuation registered before runtime write — 3 August 2026
+
+State: `R58_4_1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The offers/coupons audit reuses the existing separate Coupons/Payment offers
+pages, validated session benefit sources, truthful empty states,
+selection/removal, app-bar/system Back and Cart Review order. On the connected
+OPPO, selecting the real `Shop basket coupon` leaves only Back, selectors and
+select/remove actions; there is no explicit forward Cart-review owner.
+
+Candidate `BUY-R58-BENEFIT-SELECTION-CONTINUITY-FIX1`, profile
+`1.0.0-r58.4` (`2026080317`), is registered from exact 2,418-file app/test
+source SHA-256
+`71FA7C84EFC484E87FC866A54158D579998701CDBA105D1A5BB34A7248ED7A71`.
+The bounded fix may add one stable `Return to Cart` / selected-count Cart-review
+button, pop one route and restore exact Cart scope/scroll. It must not claim a
+benefit was applied, accepted or saved. R46/R54/R58.3.1 behavior is reused and
+reduced motion is static.
+
+Contract, audit, source seal and OPPO reproduction:
+`artifacts/quality/buy-offers-coupons-continuation-r58-4-audit-20260803-127`.
+
+R58.2 remains founder approved/protected. R58.1 and R58.3.1 remain preserved at
+their current review states. No R58.4.2 or R58.5-R58.8 runtime work may be mixed
+into this candidate.
+
+## R58.4.1 benefit-selection continuation technically/device qualified — 3 August 2026
+
+State: `R58_4_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-BENEFIT-SELECTION-CONTINUITY-FIX1`, profile
+`1.0.0-r58.4` (`2026080317`), is fully host/device qualified. Exact app/test
+source is 2,419 files, SHA-256
+`D1EE0B6DFC0D0282B45238A10BFC3A78CFDE3A9C458EFD911D025A1DACE5C6A1`.
+The wrapper-produced APK and checksum-matched OPPO install are 134,017,505
+bytes, SHA-256
+`468C76D18ABC6756D6AA9A7BB017DE6F8061E4277F4AAA11EA1A9290331FB0CA`.
+
+The fix adds one native `Return to Cart` / real selected-count Cart-review
+owner. It pops one route, preserves exact Cart scroll and composition, keeps
+destination/coupon/payment selections separate and makes no eligibility,
+application, acceptance, discount or savings claim. Reduced motion is
+immediate/static.
+
+Qualification passed clean analysis, focused 3/3, related 33/33, two complete
+Buy regressions at 304 active passes plus 15 established skips each, all gates,
+responsive/reduced captures, checksum-matched install, OPPO mixed-vertical
+selection replay, exact Cart restoration, both Back owners, hot resume, native
+semantics, fail-closed process recreation, zero classified app failures and a
+104-frame p95 17.123 ms profile trace with zero frames over 33 or 100 ms.
+
+Evidence:
+`artifacts/quality/buy-offers-coupons-continuation-r58-4-audit-20260803-127`.
+
+Handoff:
+`docs/quality/BUY-FV2-R58-4-1-BENEFIT-SELECTION-CONTINUITY-HANDOFF-20260803.md`.
+
+Technical/device qualification is not founder approval. R58.2 remains founder
+approved/protected. R58.1 and R58.3.1 retain their present review states.
+R58.4.2 and R58.5-R58.8 require a fresh audit, candidate contract and exact
+source seal before any runtime write.
+
+## R58.5.1 prescription-match continuity registered before runtime write — 3 August 2026
+
+State: `R58_5_1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+On the checksum-matched R58.4.1 OPPO install, Medicine -> Prescription centre
+-> Dr Meera Sharma records two real session-owned match IDs but exposes them
+only through a non-clickable 2.6-second notice. After expiry the Medicine root
+has zero matched-medicine continuation actions. Source confirms the exact IDs
+remain private to prescription quantity state and are not rendered as a
+reachable family.
+
+Candidate `BUY-R58-MEDICINE-PRESCRIPTION-MATCH-CONTINUITY-FIX1`, profile
+`1.0.0-r58.5` (`2026080318`), is registered from exact 2,419-file app/test
+source SHA-256
+`D1EE0B6DFC0D0282B45238A10BFC3A78CFDE3A9C458EFD911D025A1DACE5C6A1`.
+It may expose one stable Medicine-root lane containing only exact product IDs
+already owned by the current prescription match. Product entry must reuse
+R54/R55/R58.1, reduced motion must be static, and the existing pending-product
+Add flow must remain unchanged.
+
+The lane/copy may say match/session/review only and must retain pharmacist
+review plus `Not medical advice`. Diagnosis, substitution, pharmacist/dispense
+approval, inventory, availability, payment and fulfillment remain prohibited.
+
+Contract, motion disposition and OPPO reproduction:
+`artifacts/quality/buy-medicine-continuation-r58-5-audit-20260803-128`.
+
+R58.4.1 is sealed technically/device qualified. R58.2 remains founder
+approved/protected. No R58.5.2 or R58.6-R58.8 runtime work may be mixed into
+this candidate.
+
+## R58.5.1 prescription-match continuity technically/device qualified — 3 August 2026
+
+State: `R58_5_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-MEDICINE-PRESCRIPTION-MATCH-CONTINUITY-FIX1`, profile
+`1.0.0-r58.5` (`2026080318`), is fully host/device qualified. Exact app/test
+source is 2,420 files, SHA-256
+`31FAA75DB70CEF0385FC547896AD5CFBDC19EA830DE40A71581F7C41B4016078`.
+The wrapper-produced APK and checksum-matched OPPO install are 134,033,889
+bytes, SHA-256
+`EEB613C2619F73240D66EBEE3F5CA6FFE1C4C1F1EAA94F82831F154DB7257163`.
+
+The fix exposes only exact real session-owned prescription matches as native
+Medicine product actions, preserves the pending-Rx flow, reuses approved
+product/Back continuity and retains pharmacist-review plus `Not medical advice`
+copy. Reduced motion is immediate/static.
+
+Qualification passed clean analysis, corrected focused 4/4, related 48 active
+plus one established skip, two complete Buy regressions at 308 active passes
+plus 15 established skips each, all gates, responsive/reduced captures,
+checksum-matched installation, exact OPPO match/product/Back/search replay,
+hot resume, native semantics, fail-closed process recreation, zero classified
+app failures and a 90-frame p95 18.313 ms trace with zero frames over 33 or
+100 ms. Corrected post-device source remains exact.
+
+Evidence:
+`artifacts/quality/buy-medicine-continuation-r58-5-audit-20260803-128`.
+
+Handoff:
+`docs/quality/BUY-FV2-R58-5-1-MEDICINE-PRESCRIPTION-MATCH-CONTINUITY-HANDOFF-20260803.md`.
+
+Technical/device qualification is not founder approval. R58.2 remains founder
+approved/protected. R58.1, R58.3.1 and R58.4.1 retain their present review
+states. Continue with R58.6 as a separate Wholesale read-only audit; register a
+new candidate and exact source seal before any runtime write.
+
+## R58.6.1 exact supplier-pack continuation registered before runtime write — 3 August 2026
+
+State: `R58_6_1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+On the checksum-matched R58.5.1 OPPO install, Wholesale -> Refined sunflower
+oil exposes established supplier `Surya Oils India` only inside a non-clickable
+decision-panel view. The generic R58.1 lane remains complete and reachable but
+there is no intentional exact same-supplier continuation owner.
+
+Candidate `BUY-R58-WHOLESALE-SUPPLIER-CONTINUITY-FIX1`, profile
+`1.0.0-r58.6` (`2026080319`), is registered from exact 2,420-file app/test
+source SHA-256
+`31FAA75DB70CEF0385FC547896AD5CFBDC19EA830DE40A71581F7C41B4016078`.
+It may add a fail-closed same-seller selector and one finite native supplier
+sheet. Exact product selection waits for reverse and reuses R54/R55/R58.1.
+
+The sheet may show only current pack, MOQ, listed price and unit facts. It may
+not establish supplier identity/verification, stock, serviceability,
+recommendation, negotiated terms, credit, tax, payment or fulfilment truth.
+R58.1 and every approved/protected family remain exact.
+
+Contract, audit and source seal:
+`artifacts/quality/buy-wholesale-continuation-r58-6-audit-20260803-129`.
+
+No R58.7+ runtime work may be mixed into this candidate.
+
+## Founder approval — qualified R56/R57/R58 night candidates — 3 August 2026
+
+State: `R56_1_R56_2_R56_6_TO_R56_10_R57_1_R58_1_R58_3_1_R58_4_1_R58_5_1_FOUNDER_APPROVED_PROTECTED`.
+
+The founder explicitly approved the exact technically/device-qualified night
+candidates after Codex confirmed satisfaction with their completed OPPO and
+qualification evidence: R56.1 Saved-clear FIX1, R56.2 scanner FIX2, R56.6
+filter FIX3, R56.7 payment FIX2, R56.8 prescription FIX2, R56.9 address-choice
+FIX4, R56.10 address-forms FIX2, R57.1 typo-tolerant search FIX1, R58.1 product
+discovery FIX1, R58.3.1 Cart-line FIX1, R58.4.1 benefit-selection FIX1 and
+R58.5.1 prescription-match FIX1. The duplicated R56.7 mention resolves to the
+one exact qualified FIX2 candidate.
+
+Exact candidate IDs, profiles, qualified source/APK checksums and exclusions:
+
+- `docs/quality/BUY-R56-R57-R58-FOUNDER-DISPOSITION-20260803.md`
+- `artifacts/quality/buy-founder-approvals-20260803-130/00-founder-disposition.md`
+- `artifacts/quality/buy-founder-approvals-20260803-130/01-founder-disposition.json`
+
+Protect their qualified scope, truth/copy boundary, normal/reduced motion,
+semantics/hit ownership, geometry, Back/lifecycle/process behavior and
+evidence. Previously approved R56.3, R56.4 and R58.2 remain protected. R56.5
+remains device rejected and R51 FIX16 remains not approved/deferred.
+
+R58.6.1 remains the current separately registered candidate. Its protected
+scope contract was updated before first runtime write to include every newly
+approved owner. No provider/backend integration, credential, deployment,
+publication, payment execution or invented live fact is authorized.
+
+## R58.6.1 Wholesale supplier continuity technically/device qualified — 3 August 2026
+
+State: `R58_6_1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-WHOLESALE-SUPPLIER-CONTINUITY-FIX1`, profile
+`1.0.0-r58.6` (`2026080319`), is fully host/device qualified. Exact app/test
+source is 2,422 files, SHA-256
+`1D85096A578FC1B2E5C87E6A07E745D8DD3A4902CB5DEA92735C6D172E30A8BC`.
+The wrapper-produced APK and checksum-matched OPPO install are 134,115,809
+bytes, SHA-256
+`D24497C67F18DE4A1ED4CD7972DE3C676A63FF86DABF5628EA4491A311CBCBA0`.
+
+The fix turns the established Wholesale supplier row into one native exact
+same-seller continuation owner and sheet. It exposes only three other current-
+catalogue `Surya Oils India` products and only established pack/MOQ/price/unit
+facts. Selection awaits real route reverse; existing R54/R55/R58.1 Back,
+product and root/scroll ownership remains exact. No supplier verification,
+stock, recommendation, serviceability, negotiated term, credit, tax, payment
+or fulfilment fact was introduced.
+
+Final focused 4/4, format/analysis, responsive/reduced captures, two complete
+Buy regressions at 312 active passes plus 15 established skips each, mandatory
+positive gates, exact protected-boundary dispositions, negative and positive
+machine gates, wrapper build, checksum-matched install and full OPPO replay
+passed. Device replay covers selection after reverse, all dismissal owners,
+root/scroll Back, hot resume, fail-closed process recreation, keyboard/focus,
+semantics and visible-system reduced motion. The extended six-cycle sample has
+p95/max 17.042 ms, one 0.375 ms deadline miss, zero frames over 33.333 ms or
+100 ms and zero shader/compile events. Classified fatal/ANR failures are zero.
+Post-device source remains exact.
+
+Evidence:
+`artifacts/quality/buy-wholesale-continuation-r58-6-audit-20260803-129`.
+
+Handoff:
+`docs/quality/BUY-FV2-R58-6-1-WHOLESALE-SUPPLIER-CONTINUITY-HANDOFF-20260803.md`.
+
+Technical/device qualification is not founder approval. The founder then
+reported a separate cross-vertical product-detail density defect: the full-
+width navy Add/quantity control consumes excessive vertical/visual space in
+Shop, Wholesale and Medicine. Register and qualify that as its own bounded
+successor candidate before R58.7; do not alter the sealed R58.6.1 APK/evidence.
+
+## R59.1 compact product-detail action registered — 3 August 2026
+
+State: `R59_1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+Candidate `BUY-R59-PRODUCT-DETAIL-COMPACT-ACTION-FIX1`, planned profile
+`1.0.0-r59.1` (`2026080320`), starts from exact 2,422-file source SHA-256
+`1D85096A578FC1B2E5C87E6A07E745D8DD3A4902CB5DEA92735C6D172E30A8BC`.
+Its sole runtime scope is the product-detail action-dock geometry across Shop,
+Wholesale and Medicine: compact trailing Add, compact real-quantity stepper and
+truthful bounded prescription action, all with 44 px minimum targets.
+
+Registration, acceptance/risks, complete motion disposition, protected scope,
+branch/HEAD/dirty state and starting source seal:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-20260803-131`.
+
+R58.6.1 remains sealed and review pending. R58.7 Orders continuity remains
+queued and must not be mixed into this candidate.
+
+## R59.1 FIX1 rejected on OPPO — 3 August 2026
+
+State: `R59_1_FIX1_DEVICE_REJECTED_FOUNDER_REVISION_REQUIRED`.
+
+The 56 × 44 icon-only compact Add removed the full-width navy body but did not
+visibly identify the product after its title scrolled away. The founder rejected
+that ambiguity on the connected OPPO. Preserve exact source
+`1B96473423D6B0CEA3A3E4B80110260DBEF7764D70BCDA267E8560D1DE2B8FA0`
+and APK/install
+`EF95DC923842FE314C8F0E78A128F4BDE307039C0DB67C54BDC76840B7306833`.
+
+FIX2 requires a fresh candidate before runtime write. It must keep persistent
+visible product identity in the dock and use a compact explicit `+ Add` pill;
+quantity and prescription states must retain the same identity. R58.7 remains
+queued and unmixed.
+
+## R59.1 FIX3 rejected; direct product-owned FIX4 registered — 3 August 2026
+
+State: `R59_1_FIX4_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+FIX3 profile `1.0.0-r59.3` (`2026080322`) restored the product-specific native
+tap owner and passed its technical/device subchecks, but founder OPPO review
+rejected its visual ownership. The persistent bottom product-action strip still
+reads beside Cart as a separate/Cart-area action; repeating the product name
+inside the control did not establish direct product attachment.
+
+Preserve exact rejected FIX3 source 2,423 files / SHA-256
+`67221A92060B3445216DA38C56734142F855FBEDD1EA371B6EFA716D62BC4DE7`,
+APK/install 134,115,809 bytes / SHA-256
+`4C82C1FB7194B3D8EA3385E897A095C890E78685398F6E252E6541A6303D4939`
+and all evidence in
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix3-20260803-133`.
+
+Successor `BUY-R59-PRODUCT-DETAIL-COMPACT-ACTION-FIX4`, planned profile
+`1.0.0-r59.4` (`2026080323`), is registered before runtime write from that exact
+source. It may remove the separate persistent product strip and move the compact
+`+ Add`, real quantity or truthful prescription owner into the selected
+product's scrolling price block. The normal button must not repeat the product
+name. Cart, routes, session arithmetic, continuation and all approved owners
+remain protected. R58.7 stays queued and unmixed.
+
+Registration/evidence:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix4-20260803-134`.
+
+## R59.1 FIX6 built; OPPO reconnect blocker — 3 August 2026
+
+State: `R59_1_FIX6_BUILT_AWAITING_OPPO_RECONNECT`.
+
+Exact candidate `BUY-R59-PRODUCT-DETAIL-COMPACT-ACTION-FIX6`, profile
+`1.0.0-r59.6` (`2026080325`), is host qualified on 2,423 app/test files,
+SHA-256 `8CB4F2E00922E341AD6A3D4047D83ADF9EEE1FCC42BD6C329B321841D41C85F5`.
+The settled Shop/Wholesale/Medicine captures are byte-identical to the
+founder-reviewed direct product-owned design. Focused 4/4, related 81/81,
+responsive/reduced 3/3, format/analysis, two full Buy regressions at 316 active
+passes plus 15 established skips, every positive/HTML gate and exact protected
+classification passed.
+
+The required wrapper produced one APK, 134,115,809 bytes, SHA-256
+`F12E3E0174940CD1AFE948768C494F876CA3DF7994AF4217E716A4EC56E3100B`.
+Post-build source, signature and exact `1.0.0-r59.6 / 2026080325` badging
+passed; one-build authorization is consumed.
+
+OPPO CPH2375 serial `2b3e0f71` is absent from both ADB and Windows PnP. The
+local ADB restart and four bounded reconnect checks did not recover it. Resume
+without rebuilding only after physical USB/data/debug authorization is restored:
+install the exact APK, pull installed `base.apk`, require checksum equality,
+then replay Shop/Wholesale/Medicine Add/quantity/Rx, accessibility, keyboard,
+focus, Android Back, lifecycle/process recreation, visible system reduced
+motion, runtime failure scan and the unchanged SurfaceFlinger performance gate.
+
+Founder approval is `approved subject to your OPPO testing`; therefore FIX6 is
+not yet finally approved or protected. Do not start R58.7 while it is pending.
+Exact evidence root:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix6-20260803-136`.
+
+## R59.1 FIX6 device rejected — 4 August 2026
+
+State: `R59_1_FIX6_DEVICE_REJECTED_PERFORMANCE_AND_CYCLE_INTEGRITY`.
+
+OPPO CPH2375 reconnected and received the exact existing FIX6 wrapper; pulled
+install checksum matched `F12E3E0174940CD1AFE948768C494F876CA3DF7994AF4217E716A4EC56E3100B`.
+Direct product ownership, Shop/Wholesale/Medicine journeys, exact compact
+geometry, Cart separation, Android Back, hot resume, keyboard/semantics,
+process recreation and visible Remove animations On/Off passed. Runtime scan
+found zero classified fatal, ANR, Flutter exception or crash exit. Post-device
+source is still 2,423 files / SHA-256
+`8CB4F2E00922E341AD6A3D4047D83ADF9EEE1FCC42BD6C329B321841D41C85F5`.
+
+Performance failed unchanged limits: p95 33.368 ms, max 50.415 ms, one interval
+above 50 ms. The replay also failed exact state-cycle integrity: it started
+with an empty Cart and ended its detail capture at target zero/background ₹37,
+but the subsequent root exposed four items / ₹121 and Cart identified three
+Paracetamol units / ₹84 after the background item was removed. The test units
+were removed through real Cart controls; empty Medicine root was restored.
+
+Founder instruction was approval subject to OPPO testing. That condition is
+not satisfied; FIX6 is not approved or protected. Do not rerun/rebuild FIX6 or
+start R58.7 on it. Register any R59 successor separately before runtime write,
+with a root-cause audit for delayed/residual quantity state and the complete
+unchanged qualification machine.
+
+Exact rejection:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix6-20260803-136/135-fix6-oppo-performance-and-cycle-rejection.md`.
+
+## Founder directive and R59.1 FIX7 registration — 4 August 2026
+
+State: `R59_1_FIX7_REGISTERED_ROOT_CAUSE_REMEDIATION`.
+
+The founder overrode the former failing-regression stop behavior. A regression
+failure must now preserve the failed candidate and continue through a unique
+successor root-cause/remediation loop. The durable rule is recorded in
+`docs/design/APPLE-INSPIRED-PRODUCT-DESIGN-MEMORY.md`. It does not permit
+rewriting a failed sample, predecessor evidence or protected baselines.
+
+Candidate `BUY-R59-PRODUCT-DETAIL-COMPACT-ACTION-FIX7`, planned profile
+`1.0.0-r59.7` (`2026080401`), starts from exact 2,423-file source SHA-256
+`8CB4F2E00922E341AD6A3D4047D83ADF9EEE1FCC42BD6C329B321841D41C85F5`
+on required branch/HEAD. FIX6 remains rejected and immutable.
+
+The first diagnostic hypothesis is ownership overlap in the performance
+harness: its normal Add centre x=592 is also the replacement `Add one` left
+boundary. FIX7 must instrument state, semantic owner, product quantity and Cart
+total around every event and distinguish a harness problem from an app/session
+problem before runtime change. It must preserve settled visuals and all
+approved/protected behavior and complete the entire qualification machine.
+
+Evidence/registration:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix7-20260804-137`.
+
+## R59.1 FIX7 rejected; FIX8 registered — 4 August 2026
+
+State: `R59_1_FIX8_REGISTERED_PERFORMANCE_ROOT_CAUSE`.
+
+FIX7's checksum-matched OPPO replay solved cycle integrity: ten exact
+state-owned `0 -> 1 -> 0` cycles, exact totals, three-second drain, zero
+residual and empty cleanup passed. All affected journeys, Back, Rx lifecycle,
+accessibility, process restoration and visible reduced motion passed; normal
+device scales were restored. Source remained exact at 2,423 files / SHA-256
+`041257E7B8C171C25AA8DD8A4107BBF2D0B2F02A2B697367B76BBB74E517D857`.
+
+FIX7 nevertheless failed performance: p95 33.413 ms, max 50.284 ms and two
+intervals above 50 ms. It is rejected; failed evidence cannot be rerun.
+
+FIX8 (`1.0.0-r59.8`, `2026080402`) is registered before runtime write from the
+same source. Its only runtime scope is replacing the remaining incoming
+opacity layer with a finite transform-only fractional slide inside the stable
+action owner, with hit testing fixed and reduced motion static. Complete host,
+machine-build and OPPO qualification remains required.
+
+Evidence:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix8-20260804-138`.
+
+## R59.1 FIX8 qualified — 4 August 2026
+
+State: `R59_1_FIX8_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_CONFIRMATION_PENDING`.
+
+FIX8's transform-only compact-action arrival preserved all settled visuals
+byte-for-byte and passed the complete host/machine/OPPO sequence. Exact source:
+2,423 files / `A68B20102D9922BA25E013EF8F8F6E0EDF7F71D87FB7E3EB3EEE257830C63DFA`.
+Exact wrapper/install: `1.0.0-r59.8` (`2026080402`), 134,115,809 bytes,
+`0B6FC4D4500B85B0B744C283902C0BEFF22DD98ADEA4FC7D2CB64C0202DC0A91`.
+
+OPPO direct journeys, Back, Rx lifecycle/process, semantics, visible reduced
+motion with final `1/1/1`, ten exact cycles, zero residual, cleanup and failure
+scan passed. Performance passed p95 33.105 ms / max 33.869 ms / zero over 50 or
+100 ms. This isolates FIX7's incoming opacity layer as the remaining runtime
+performance cause and validates the transform-only correction.
+
+Do not rebuild or mix R58.7/another ticket. Founder observation/confirmation
+precedes any protected-baseline update. Evidence and observation points:
+`artifacts/quality/buy-product-detail-compact-action-r59-1-fix8-20260804-138`.
+## Active candidate — R58.7 Orders/purchased-item continuity FIX1
+
+The exact qualified R59 FIX8 source remains technically/device qualified and
+founder-disposition pending. Under the founder's overnight continuation
+directive, the next separate safe family is now registered without relabelling
+or replacing FIX8.
+
+Candidate `BUY-R58-ORDERS-PURCHASED-ITEM-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.7` (`2026080403`), starts from exact 2,423-file app/test source
+SHA-256
+`A68B20102D9922BA25E013EF8F8F6E0EDF7F71D87FB7E3EB3EEE257830C63DFA`.
+
+The unchanged OPPO reproduced a Delivered-order dead end: the complete card
+owns only `Reorder`, so selecting the purchase mutates Cart and exits Orders.
+The source root cause includes an untruthful fallback that substitutes the
+first two destination-catalogue products when an order owns no exact product
+IDs. FIX1 is bounded to non-mutating order inspection, exact tab/query/depth
+return, real order-owned item continuation and complete pre-mutation Reorder
+validation. Missing/stale/cross-vertical IDs fail closed. R58.8 remains queued.
+
+Contract/evidence:
+`artifacts/quality/buy-orders-purchased-item-continuity-r58-7-fix1-20260804-139`.
+
+R58.6.1 remains technically/device qualified and founder-review pending. No
+backend/provider/payment integration, live order state, protected baseline
+replacement, commit, push, deployment, merge, branch switch or cleanup is
+authorized.
+
+## R58.7 Orders/purchased-item continuity FIX1 qualified — 4 August 2026
+
+State: `R58_7_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-ORDERS-PURCHASED-ITEM-CONTINUITY-FIX1`, profile `1.0.0-r58.7`
+(`2026080403`), completed the full host, machine-build and checksum-matched
+OPPO qualification. Final app/test source is 2,429 files, SHA-256
+`BF7CAE2F2225C833AFB72824F9BB32AA463E3E20BC192A799688D4C8E5A9F1AA`.
+Wrapper APK and pulled install are 134,115,809 bytes, SHA-256
+`D38C0BBEDB6245584F630D6A096E1FD8034495688B0F4C79A97914F7F9C8B71E`.
+
+The exact candidate makes Active/Delivered order inspection non-mutating,
+separates Delivered `View order` from in-order `Reorder`, restores exact Orders
+tab/query/depth and removes the false fallback from an order without product
+IDs to unrelated catalogue products. Items/Reorder use only a complete real
+order-owned set and fail closed before Cart mutation.
+
+Focused 5/5, related 137/137, responsive/reduced captures, format/analysis,
+two full Buy regressions at 322 active plus 16 established skips, all release/
+HTML/protected classifications and the one-candidate gate passed. OPPO passed
+older-order fail-closed Items/Reorder, real current-session order/item/R58.1
+continuation/return, query and Back retention, semantics/keyboard, hot resume,
+truthful process recreation, visible reduced motion with final `1/1/1`, zero
+classified runtime failures and ten-cycle p95 16.948 ms / max 17.037 ms / zero
+over 25/33.333/50/100 ms. Post-device source is byte-identical.
+
+Evidence:
+`artifacts/quality/buy-orders-purchased-item-continuity-r58-7-fix1-20260804-139`.
+Handoff:
+`docs/quality/BUY-FV2-R58-7-ORDERS-PURCHASED-ITEM-CONTINUITY-HANDOFF-20260804.md`.
+
+Technical/device qualification is not founder approval. R58.6.1 and R59 FIX8
+also remain separately founder-review pending. R58.8 cross-family audit is the
+next safe work item; any confirmed runtime defect requires a new candidate and
+cannot be mixed into or relabel this exact R58.7 APK/evidence.
+
+## R58.8 cross-family terminal audit started — 4 August 2026
+
+State: `R58_8_UNCHANGED_BINARY_AUDIT_IN_PROGRESS`.
+
+Audit `BUY-R58-CROSS-FAMILY-TERMINAL-AUDIT-AUDIT1` is registered on the exact
+R58.7 2,429-file source
+`BF7CAE2F2225C833AFB72824F9BB32AA463E3E20BC192A799688D4C8E5A9F1AA`
+and checksum-matched OPPO install
+`D38C0BBEDB6245584F630D6A096E1FD8034495688B0F4C79A97914F7F9C8B71E`.
+
+It is a read-only source/unchanged-binary audit across Shop, search/categories,
+Cart/checkout, benefits, Medicine, Wholesale, Orders, seller/store/pharmacy
+facts, overlays, bottom/root navigation, lifecycle and honest failure/recovery
+states. Any confirmed defect must receive a separate registered candidate and
+cannot modify, relabel or rebuild R58.7.
+
+Audit evidence:
+`artifacts/quality/buy-cross-family-terminal-audit-r58-8-20260804-140`.
+
+## R58.8.1 Shop/Medicine seller continuity FIX1 registered — 4 August 2026
+
+State: `R58_8_1_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+The unchanged R58.7 OPPO/source audit confirmed that Shop Ghar Bazaar and
+Medicine Sardarpura Health Pharmacy are rendered in non-clickable decision
+panels despite owning other exact products in their current verticals.
+Wholesale already has the approved R58.6.1 native same-supplier owner.
+
+`BUY-R58-SHOP-PHARMACY-SELLER-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.8` (`2026080404`), is registered from exact 2,429-file source
+`BF7CAE2F2225C833AFB72824F9BB32AA463E3E20BC192A799688D4C8E5A9F1AA`.
+It may add only an exact same-seller/same-vertical selector and native
+Shop/Medicine action/sheet while preserving Wholesale keys/copy. Medicine must
+say `Not medical advice`; no seller/pharmacy profile, stock, serviceability,
+verification, recommendation, substitution or provider fact may be invented.
+
+Registration/evidence:
+`artifacts/quality/buy-shop-pharmacy-seller-continuity-r58-8-1-fix1-20260804-141`.
+
+## R58.8.1 Shop/Medicine seller continuity FIX1 qualified — 4 August 2026
+
+State: `R58_8_1_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-SHOP-PHARMACY-SELLER-CONTINUITY-FIX1`, profile `1.0.0-r58.8`
+(`2026080404`), completed full host, machine-build and checksum-matched OPPO
+qualification. Final app/test source is 2,435 files, SHA-256
+`6F208E876E1498D8F5B6B74A87C6A4BF60F46945DB88FB4087677797EE194ADB`.
+The single wrapper APK and pulled install are 134,197,729 bytes, SHA-256
+`CF92487DDDF42A2E7DD42688D026E3967ED475C0EB6CD097F0C7BCEB507B831E`.
+
+The candidate adds only fail-closed same-literal-seller/same-vertical current-
+catalogue selection and an attached Shop/Medicine native sheet. Shop exposes
+pack/price facts only. Medicine exposes `Not medical advice` and exact current
+prescription/pharmacist facts. No peer means the seller remains a plain fact.
+Wholesale R58.6.1 keys, copy, supplier scope and motion remain unchanged.
+
+Focused/protected/related suites, five Android/iOS responsive captures,
+format/analysis, two unchanged-source full Buy regressions at 326 active plus
+17 established skips, every positive/HTML/protected gate and the one-candidate
+machine passed. OPPO passed Shop and Medicine four-peer sheets, selection after
+reverse, exact query/result restoration, no-peer fail closed, protected
+Wholesale, semantic focus, keyboard, Back/scrim/close, hot resume, truthful
+process recreation, visible reduced motion and final scales `1.0/1.0/1.0`.
+Warmed joined-frame p95/max is 17.683 ms with zero over 33.333/100 ms and zero
+shader/compile events. Runtime scan is clean. Post-device source is exact.
+
+Evidence:
+`artifacts/quality/buy-shop-pharmacy-seller-continuity-r58-8-1-fix1-20260804-141`.
+Handoff:
+`docs/quality/BUY-FV2-R58-8-1-SHOP-PHARMACY-SELLER-CONTINUITY-HANDOFF-20260804.md`.
+
+Technical/device qualification is not founder approval. R58.8 remainder audit
+may continue read-only; any further runtime defect needs its own registration,
+source seal and unique candidate. No seller profile, verification, stock,
+serviceability, recommendation, clinical substitution, payment, fulfilment or
+provider fact is authorized by this candidate.
+
+## R58.8 AUDIT2 and R58.8.2 order Assist context FIX1 — 4 August 2026
+
+State: `R58_8_2_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+AUDIT2 continued on the exact qualified R58.8.1 source/install. The OPPO
+reproduced Orders -> Wholesale `PO-240783` -> Help opening Assist with unrelated
+Shop order `MS-240782`. Source root cause is the Assist view's unconditional
+first-non-delivered-order selection despite the session retaining the exact
+selected order and return depth.
+
+Candidate `BUY-R58-ORDER-ASSIST-CONTEXT-CONTINUITY-FIX1`, planned profile
+`1.0.0-r58.9` (`2026080405`), is registered from exact 2,435-file app/test
+source SHA-256
+`6F208E876E1498D8F5B6B74A87C6A4BF60F46945DB88FB4087677797EE194ADB`.
+It may only bind Assist to a valid selected order when the origin is Tracking
+or Order Items, retain the existing general first-active fallback elsewhere,
+and add deterministic tests. Existing route motion/Back semantics are reused;
+no support, live order, provider, payment or fulfilment result may be invented.
+
+Audit/candidate evidence:
+`artifacts/quality/buy-cross-family-terminal-audit-r58-8-audit2-20260804-142`
+and
+`artifacts/quality/buy-order-assist-context-continuity-r58-8-2-fix1-20260804-143`.
+
+## R58.8.2 order Assist context FIX1 qualified — 4 August 2026
+
+State: `R58_8_2_FIX1_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+`BUY-R58-ORDER-ASSIST-CONTEXT-CONTINUITY-FIX1`, profile `1.0.0-r58.9`
+(`2026080405`), completed the full host, machine-build and checksum-matched
+OPPO qualification. Final app/test source is 2,441 files, SHA-256
+`5D067817F2C0A49105BC3CB1C030749DF878178F50E2C552741AB5D8CE6358BB`.
+The single wrapper APK and pulled install are 134,197,729 bytes, SHA-256
+`9526B671D3F6F9C1ED382E4A56FE96CD88254ECABDFB7F99A1B7E8ACB61E23AA`.
+
+The session now treats selected order context as valid for Assist only when the
+origin is Tracking or Order Items. General Assist retains the established
+first-active fallback and cannot consume stale selection. Existing Assist card,
+route/Back motion and support-channel boundaries remain unchanged.
+
+Focused/related/responsive checks, two complete Buy regressions at 330 active
+plus 18 established skips, every host/HTML/protected gate and the one-candidate
+machine passed. OPPO passed Shop/Wholesale/Medicine exact Help context, card
+tap/Back, stale-general fallback, semantics/keyboard, hot resume, truthful
+Orders-root recreation, dialer/screen interruption, bottom navigation, visible
+static reduced motion with restored `1.0/1.0/1.0`, corrected joined-frame p95
+20.020 ms / max 22.037 ms and zero classified runtime failures.
+
+Evidence:
+`artifacts/quality/buy-order-assist-context-continuity-r58-8-2-fix1-20260804-143`.
+Handoff:
+`docs/quality/BUY-FV2-R58-8-2-ORDER-ASSIST-CONTEXT-CONTINUITY-HANDOFF-20260804.md`.
+
+Technical/device qualification is not founder approval. R58.8 remainder audit
+may continue read-only on this exact cumulative binary. Any further defect
+requires a new source seal/candidate; no live support, provider, payment,
+stock, fulfilment or backend order result is authorized.
+
+## R58.8 AUDIT3 and R58.8.3 tracked-order delivery address context — 4 August 2026
+
+State: `R58_8_3_FIX1_REGISTERED_BEFORE_RUNTIME_WRITE`.
+
+AUDIT3 continued on the exact qualified R58.8.2 source/install. The OPPO
+reproduced Wholesale `PO-240783` Tracking -> Address opening the global saved
+address chooser directly. Selecting Work changed the global
+`selectedAddressId` used by future checkout while the tracked order's
+destination remained unchanged; the surface did not expose that ownership
+boundary. The audit restored Home after reproduction and preserved the source,
+screens and accessibility hierarchy in
+`artifacts/quality/buy-cross-family-terminal-audit-r58-8-audit3-20260804-144`.
+
+Candidate `BUY-R58-ORDER-DELIVERY-ADDRESS-CONTEXT-FIX1`, planned profile
+`1.0.0-r58.10` (`2026080406`), is registered from exact 2,441-file app/test
+source SHA-256
+`5D067817F2C0A49105BC3CB1C030749DF878178F50E2C552741AB5D8CE6358BB`.
+It may change only the existing Tracking Address action: show the exact order's
+read-only destination/promise/instruction facts first, state that saved-address
+changes apply to future checkout and do not change this order, then continue
+after reverse to the existing address owner or R58.8.2 exact-order Assist.
+Existing address forms, checkout ownership, route/Back motion and all approved
+R43/R45-R48/R52.1/R53/R54/R55 behavior stay protected.
+
+Registration:
+`artifacts/quality/buy-order-delivery-address-context-r58-8-3-fix1-20260804-145`.
+
+No live order-address mutation, backend refresh, support/provider/payment/
+stock/fulfilment/entitlement result is authorized. Full unchanged-source host,
+machine-gated APK and checksum-matched OPPO qualification remains required.
+
+## R58.8.3 FIX1 rejected on OPPO; FIX2 registered — 4 August 2026
+
+FIX1 passed 334+19 twice, every host/protected gate, wrapper build and exact
+OPPO checksum. Its Wholesale order sheet showed correct facts and ownership
+copy, but the accessibility XML exposed both continuation semantic owners with
+`clickable=false`. The merged `Semantics` node had no tap action and excluded
+the descendant InkWell node. FIX1 is not technically/device qualified.
+
+Candidate `BUY-R58-ORDER-DELIVERY-ADDRESS-CONTEXT-FIX2`, planned profile
+`1.0.0-r58.11` (`2026080407`), is registered before runtime write from exact
+2,447-file source SHA-256
+`358486E8DD5E25857ECD0E9F5B0BC71F77C0CC332C976176B4EC13B22E171930`.
+Scope is one explicit semantic `onTap` owner plus deterministic host assertion;
+all visual, order/address truth, route/reverse/reduced-motion and protected
+behavior stays exact. Evidence is in
+`artifacts/quality/buy-order-delivery-address-context-r58-8-3-fix2-20260804-146`.
+
+## R58.8.3 FIX2 technically/device qualified — 4 August 2026
+
+State: `R58_8_3_FIX2_TECHNICALLY_DEVICE_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+Candidate `BUY-R58-ORDER-DELIVERY-ADDRESS-CONTEXT-FIX2`, profile
+`1.0.0-r58.11` (`2026080407`), completed full host, wrapper and checksum OPPO
+qualification. Final source is 2,447 files, SHA-256
+`1B11F99FF677F6C48054DA9AC409BE731B7FB377151F10C211BA8D2081E5E271`;
+APK/install are 134,197,725 bytes, SHA-256
+`16EFCE333775B723210EFA8C5B77FD2266F1C2B72691794A56EB4763240EF062`.
+
+Exact three-family delivery facts, `clickable=true` action owners, all
+dismissals, future-checkout Work boundary, exact PO Help, keyboard/Back,
+lifecycle/recreation/dialer, visible 0/0/0 reduced motion with restored 1/1/1,
+24-frame p95 25.111 ms and clean runtime scan passed. Two full Buy regressions
+passed at 334 active + 19 established skips. OPPO is parked on Orders root.
+
+Evidence:
+`artifacts/quality/buy-order-delivery-address-context-r58-8-3-fix2-20260804-146`.
+Handoff:
+`docs/quality/BUY-FV2-R58-8-3-ORDER-DELIVERY-ADDRESS-CONTEXT-HANDOFF-20260804.md`.
+Technical/device qualification is not founder approval. FIX1 remains rejected;
+no live order address/backend/provider/payment/fulfilment fact is authorized.

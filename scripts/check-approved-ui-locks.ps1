@@ -46,9 +46,9 @@ function Assert-Hash {
     $normalizedBytes = $utf8.GetBytes($text.Replace("`r`n", "`n"))
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
-      $normalized = [Convert]::ToHexString(
+      $normalized = [BitConverter]::ToString(
         $sha.ComputeHash($normalizedBytes)
-      ).ToLowerInvariant()
+      ).Replace("-", "").ToLowerInvariant()
     } finally {
       $sha.Dispose()
     }

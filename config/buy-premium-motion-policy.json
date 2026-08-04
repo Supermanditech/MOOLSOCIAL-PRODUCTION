@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "policyId": "BUY-PREMIUM-MOTION-POLICY-20260802",
+  "authority": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+  "rules": {
+    "whereAppropriateRequired": true,
+    "finiteAndEventDriven": true,
+    "reducedMotionResolvesStatic": true,
+    "preserveSemanticsAndHitOwnership": true,
+    "noInventedBusinessOrBackendState": true,
+    "noPerpetualDecorativeLoop": true,
+    "approvedOwnersRequireSuccessorForEnhancement": true
+  },
+  "founderApprovedProtectedOwners": [
+    "DES-001-R43",
+    "R45",
+    "R46",
+    "R47",
+    "R48",
+    "R52.1",
+    "R53",
+    "R54",
+    "R55"
+  ],
+  "nextRuntimeOwner": {
+    "release": "R56",
+    "tickets": ["BUY-FV2-076", "BUY-FV2-030", "BUY-FV2-089", "BUY-FV2-099", "BUY-FV2-117", "BUY-FV2-123", "BUY-FV2-133"],
+    "scope": "transient_surfaces_forms_and_honest_recovery_motion"
+  },
+  "deferredOwners": [
+    {
+      "release": "R51-successor",
+      "tickets": ["BUY-FV2-077"],
+      "state": "founder_enhancement_open_implementation_deferred"
+    }
+  ],
+  "dependencyHeldOwners": [
+    {
+      "tickets": ["BUY-FV2-080", "BUY-FV2-098"],
+      "effects": ["skeleton", "shimmer", "infinite_scrolling", "lazy_loading", "pull_to_refresh", "progressive_network_media"],
+      "dependency": "real_async_loading_page_stale_error_retry_adapter"
+    },
+    {
+      "tickets": ["BUY-FV2-082", "BUY-FV2-083", "BUY-FV2-140"],
+      "effects": ["remote_video", "ken_burns", "autoplay_carousel", "superadmin_campaign_media"],
+      "dependency": "approved_assets_rights_lifecycle_consent_accessibility_data_saver_measurement_and_device_budget"
+    }
+  ],
+  "noEligibleCurrentOwner": [
+    "fab_expansion",
+    "swipeable_dismissible_cards",
+    "drag_and_drop",
+    "long_press_context_menu",
+    "double_tap_like",
+    "page_curl_flip",
+    "neumorphism",
+    "marquee_text",
+    "autonomous_carousel"
+  ],
+  "signalHeldEffects": [
+    "notification_live_glow",
+    "live_reactions",
+    "typing_indicator",
+    "voice_waveform",
+    "ai_powered_adaptive_motion",
+    "confetti_or_particles_for_real_completion"
+  ],
+  "sourceAudit": {
+    "modalFamilies": 13,
+    "productionRoots": [
+      "apps/mobile/lib/ui_v2/buy",
+      "apps/mobile/lib/features/buy",
+      "apps/mobile/lib/core/design/mool_motion_primitives.dart"
+    ],
+    "noNewSequentialTicketRequired": true
+  }
+}

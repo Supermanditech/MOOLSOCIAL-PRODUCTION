@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 
@@ -53,6 +54,295 @@ abstract final class BuyV2Motion {
   }
 }
 
+/// A truthful, finite progress owner for state supplied by the Buy session.
+///
+/// The first frame is always the current value. A transition is allowed only
+/// when the same owner later receives a different real value; changing owners,
+/// remounting, restoring or enabling reduced motion resolves immediately.
+class BuyV2HonestProgressIndicator extends StatefulWidget {
+  const BuyV2HonestProgressIndicator({
+    super.key,
+    required this.ownerId,
+    required this.progress,
+    required this.statusLabel,
+    required this.backgroundColor,
+    required this.valueColor,
+    required this.minHeight,
+    this.isComplete = false,
+    this.indicatorKey,
+  });
+
+  final String ownerId;
+  final double progress;
+  final String statusLabel;
+  final Color backgroundColor;
+  final Color valueColor;
+  final double minHeight;
+  final bool isComplete;
+  final Key? indicatorKey;
+
+  @override
+  State<BuyV2HonestProgressIndicator> createState() =>
+      _BuyV2HonestProgressIndicatorState();
+}
+
+class _BuyV2HonestProgressIndicatorState
+    extends State<BuyV2HonestProgressIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<double> _animation;
+  late String _ownerId;
+  late double _target;
+  bool _hasObservedRealChange = false;
+
+  double _resolvedTarget(BuyV2HonestProgressIndicator source) {
+    if (source.isComplete) return 1;
+    final bounded = source.progress.clamp(0.0, 1.0).toDouble();
+    return bounded >= 1 ? .999 : bounded;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ownerId = widget.ownerId;
+    _target = _resolvedTarget(widget);
+    _controller = AnimationController(
+      vsync: this,
+      duration: BuyV2Motion.stateChange,
+    );
+    _animation = AlwaysStoppedAnimation<double>(_target);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+      _animation = AlwaysStoppedAnimation<double>(_target);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2HonestProgressIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTarget = _resolvedTarget(widget);
+    if (_ownerId != widget.ownerId) {
+      _controller.stop();
+      _ownerId = widget.ownerId;
+      _target = nextTarget;
+      _animation = AlwaysStoppedAnimation<double>(_target);
+      _hasObservedRealChange = false;
+      return;
+    }
+
+    final statusChanged = oldWidget.statusLabel != widget.statusLabel;
+    if (nextTarget == _target) {
+      _hasObservedRealChange = _hasObservedRealChange || statusChanged;
+      return;
+    }
+
+    _hasObservedRealChange = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+      _target = nextTarget;
+      _animation = AlwaysStoppedAnimation<double>(_target);
+      return;
+    }
+
+    final currentValue = _animation.value;
+    _target = nextTarget;
+    _animation = Tween<double>(begin: currentValue, end: _target).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (_target * 100).round();
+    return Semantics(
+      label: widget.statusLabel,
+      value: '$percent% complete',
+      liveRegion: _hasObservedRealChange,
+      excludeSemantics: true,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => ExcludeSemantics(
+          child: LinearProgressIndicator(
+            key: widget.indicatorKey,
+            value: _animation.value,
+            minHeight: widget.minHeight,
+            backgroundColor: widget.backgroundColor,
+            valueColor: AlwaysStoppedAnimation<Color>(widget.valueColor),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A fixed-owner finite transition for a real Buy value change.
+///
+/// The outgoing visual is excluded from semantics by the shared primitive, so
+/// quantity and money updates expose only the current value while settling.
+class BuyV2FiniteValueTransition extends StatelessWidget {
+  const BuyV2FiniteValueTransition({
+    super.key,
+    required this.stateKey,
+    required this.text,
+    required this.ownerSize,
+    required this.style,
+    this.textAlign = TextAlign.center,
+    this.maxLines = 1,
+    this.duration = BuyV2Motion.stateChange,
+  });
+
+  final Object stateKey;
+  final String text;
+  final Size ownerSize;
+  final TextStyle style;
+  final TextAlign textAlign;
+  final int maxLines;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    final alignment = switch (textAlign) {
+      TextAlign.left => Alignment.centerLeft,
+      TextAlign.right => Alignment.centerRight,
+      TextAlign.start => AlignmentDirectional.centerStart,
+      TextAlign.end => AlignmentDirectional.centerEnd,
+      TextAlign.center || TextAlign.justify => Alignment.center,
+    };
+    return MoolFiniteStateTransition(
+      stateKey: stateKey,
+      ownerSize: ownerSize,
+      semanticLabel: text,
+      alignment: alignment,
+      duration: duration,
+      child: Text(
+        text,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      ),
+    );
+  }
+}
+
+/// Finite visual replacement inside an existing semantic/hit owner.
+class BuyV2FiniteVisualTransition extends StatelessWidget {
+  const BuyV2FiniteVisualTransition({
+    super.key,
+    required this.stateKey,
+    required this.ownerSize,
+    required this.child,
+    this.duration = BuyV2Motion.stateChange,
+    this.alignment = Alignment.center,
+  });
+
+  final Object stateKey;
+  final Size ownerSize;
+  final Widget child;
+  final Duration duration;
+  final AlignmentGeometry alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return MoolFiniteStateTransition(
+      stateKey: stateKey,
+      ownerSize: ownerSize,
+      duration: duration,
+      alignment: alignment,
+      child: child,
+    );
+  }
+}
+
+/// One finite incoming visual for content whose geometry remains owned by its
+/// current child. Unlike a switcher, this never retains an outgoing semantic
+/// copy while a coupon/offer context is replaced.
+class BuyV2FiniteIncomingTransition extends StatelessWidget {
+  const BuyV2FiniteIncomingTransition({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.duration = BuyV2Motion.contentChange,
+  });
+
+  final Object stateKey;
+  final Widget child;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<Object>(stateKey),
+      tween: Tween<double>(begin: reduced ? 1 : .72, end: 1),
+      duration: BuyV2Motion.resolved(context, duration),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - value) * 4),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// One finite spatial reveal for truthful product media entering its existing
+/// layout owner. This does not retain an outgoing image or alter hit testing.
+class BuyV2FiniteDepthReveal extends StatelessWidget {
+  const BuyV2FiniteDepthReveal({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.duration = BuyV2Motion.contentChange,
+  });
+
+  final Object stateKey;
+  final Widget child;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<Object>(stateKey),
+      tween: Tween<double>(begin: reduced ? 1 : .76, end: 1),
+      duration: BuyV2Motion.resolved(context, duration),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) {
+        final remaining = 1 - value;
+        final transform = Matrix4.translationValues(0, remaining * 5, 0)
+          ..setEntry(3, 2, .001)
+          ..rotateY(remaining * .035);
+        return Opacity(
+          opacity: value,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: transform,
+            transformHitTests: false,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
 @immutable
 class BuyV2ThemeSpec {
   const BuyV2ThemeSpec({
@@ -61,6 +351,10 @@ class BuyV2ThemeSpec {
     required this.canvas,
     required this.headerStart,
     required this.headerEnd,
+    required this.headerForeground,
+    required this.headerAccent,
+    required this.headerGradient,
+    required this.canvasGradient,
   });
 
   final Color accent;
@@ -68,36 +362,56 @@ class BuyV2ThemeSpec {
   final Color canvas;
   final Color headerStart;
   final Color headerEnd;
+  final Color headerForeground;
+  final Color headerAccent;
+  final MoolBrandGradient headerGradient;
+  final MoolBrandGradient canvasGradient;
 
   static BuyV2ThemeSpec resolve(BuyV2Destination destination, BuyV2View view) {
     final vertical = switch (destination) {
       BuyV2Destination.shop => const BuyV2ThemeSpec(
         accent: BuyV2Colors.orange,
-        softAccent: Color(0xFFFFF0DE),
-        canvas: Color(0xFFF7F5F1),
-        headerStart: Color(0xFF0B075D),
-        headerEnd: BuyV2Colors.navy,
+        softAccent: Color(0x1AFF9933),
+        canvas: Colors.white,
+        headerStart: BuyV2Colors.navy,
+        headerEnd: BuyV2Colors.orange,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.navy,
+        headerGradient: MoolBrandGradient.saffron,
+        canvasGradient: MoolBrandGradient.saffron,
       ),
       BuyV2Destination.wholesale => const BuyV2ThemeSpec(
         accent: BuyV2Colors.green,
-        softAccent: Color(0xFFEAF7E8),
-        canvas: Color(0xFFF2F7F3),
-        headerStart: Color(0xFF071B45),
-        headerEnd: Color(0xFF003E48),
+        softAccent: Color(0x1A138808),
+        canvas: Colors.white,
+        headerStart: BuyV2Colors.navy,
+        headerEnd: BuyV2Colors.green,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.orange,
+        headerGradient: MoolBrandGradient.green,
+        canvasGradient: MoolBrandGradient.green,
       ),
       BuyV2Destination.medicine => const BuyV2ThemeSpec(
-        accent: Color(0xFF287C69),
-        softAccent: Color(0xFFE8F5F0),
-        canvas: Color(0xFFF2F7F8),
-        headerStart: Color(0xFF11104F),
-        headerEnd: Color(0xFF064C52),
+        accent: BuyV2Colors.navy,
+        softAccent: Color(0x14000080),
+        canvas: Colors.white,
+        headerStart: BuyV2Colors.green,
+        headerEnd: BuyV2Colors.navy,
+        headerForeground: BuyV2Colors.navy,
+        headerAccent: BuyV2Colors.navy,
+        headerGradient: MoolBrandGradient.tricolour,
+        canvasGradient: MoolBrandGradient.navy,
       ),
       BuyV2Destination.orders => const BuyV2ThemeSpec(
-        accent: BuyV2Colors.royal,
-        softAccent: Color(0xFFEDECFF),
-        canvas: Color(0xFFF4F4FA),
-        headerStart: Color(0xFF09194B),
-        headerEnd: Color(0xFF25105D),
+        accent: BuyV2Colors.navy,
+        softAccent: Color(0x14000080),
+        canvas: Colors.white,
+        headerStart: BuyV2Colors.navy,
+        headerEnd: BuyV2Colors.navy,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.orange,
+        headerGradient: MoolBrandGradient.navy,
+        canvasGradient: MoolBrandGradient.tricolour,
       ),
     };
     return switch (view) {
@@ -105,24 +419,36 @@ class BuyV2ThemeSpec {
       BuyV2View.checkout ||
       BuyV2View.confirmation => BuyV2ThemeSpec(
         accent: BuyV2Colors.orange,
-        softAccent: BuyV2Colors.softOrange,
-        canvas: const Color(0xFFF5F3F8),
+        softAccent: const Color(0x1AFF9933),
+        canvas: Colors.white,
         headerStart: vertical.headerStart,
-        headerEnd: BuyV2Colors.navy,
+        headerEnd: BuyV2Colors.orange,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.navy,
+        headerGradient: MoolBrandGradient.saffron,
+        canvasGradient: MoolBrandGradient.saffron,
       ),
       BuyV2View.tracking || BuyV2View.orderItems => BuyV2ThemeSpec(
         accent: BuyV2Colors.green,
-        softAccent: BuyV2Colors.softGreen,
-        canvas: const Color(0xFFF2F5F8),
+        softAccent: const Color(0x1A138808),
+        canvas: Colors.white,
         headerStart: vertical.headerStart,
-        headerEnd: vertical.headerEnd,
+        headerEnd: BuyV2Colors.green,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.orange,
+        headerGradient: MoolBrandGradient.green,
+        canvasGradient: MoolBrandGradient.green,
       ),
       BuyV2View.account || BuyV2View.assist => BuyV2ThemeSpec(
-        accent: BuyV2Colors.royal,
-        softAccent: BuyV2Colors.softBlue,
-        canvas: const Color(0xFFF3F5FA),
-        headerStart: const Color(0xFF0B075D),
+        accent: BuyV2Colors.navy,
+        softAccent: const Color(0x14000080),
+        canvas: Colors.white,
+        headerStart: BuyV2Colors.navy,
         headerEnd: BuyV2Colors.navy,
+        headerForeground: Colors.white,
+        headerAccent: BuyV2Colors.orange,
+        headerGradient: MoolBrandGradient.navy,
+        canvasGradient: MoolBrandGradient.navy,
       ),
       BuyV2View.catalogue ||
       BuyV2View.product ||
@@ -148,10 +474,16 @@ class BuyV2ThemeScope extends InheritedWidget {
 }
 
 class BuyV2IntentDepth extends StatefulWidget {
-  const BuyV2IntentDepth({super.key, required this.child, this.enabled = true});
+  const BuyV2IntentDepth({
+    super.key,
+    required this.child,
+    this.enabled = true,
+    this.spatial = false,
+  });
 
   final Widget child;
   final bool enabled;
+  final bool spatial;
 
   @override
   State<BuyV2IntentDepth> createState() => _BuyV2IntentDepthState();
@@ -159,10 +491,23 @@ class BuyV2IntentDepth extends StatefulWidget {
 
 class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
   bool _pressed = false;
+  double _tiltX = .008;
+  double _tiltY = 0;
 
-  void _setPressed(bool value) {
+  void _setPressed(bool value, [Offset? localPosition]) {
     if (_pressed == value) return;
-    setState(() => _pressed = value);
+    setState(() {
+      _pressed = value;
+      if (value && widget.spatial && localPosition != null) {
+        final size = context.size;
+        if (size != null && size.width > 0 && size.height > 0) {
+          final horizontal = (localPosition.dx / size.width).clamp(0.0, 1.0);
+          final vertical = (localPosition.dy / size.height).clamp(0.0, 1.0);
+          _tiltX = (.5 - vertical) * .022;
+          _tiltY = (horizontal - .5) * .032;
+        }
+      }
+    });
   }
 
   @override
@@ -171,7 +516,9 @@ class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
     final enabled = widget.enabled && !reduceMotion;
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: enabled ? (_) => _setPressed(true) : null,
+      onPointerDown: enabled
+          ? (event) => _setPressed(true, event.localPosition)
+          : null,
       onPointerUp: enabled ? (_) => _setPressed(false) : null,
       onPointerCancel: enabled ? (_) => _setPressed(false) : null,
       child: TweenAnimationBuilder<double>(
@@ -179,13 +526,77 @@ class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
         duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
         curve: Curves.easeOutCubic,
         builder: (context, value, child) {
-          final transform = Matrix4.translationValues(0, value * .8, 0)
-            ..setEntry(3, 2, .0007)
-            ..rotateX(value * .008);
-          return Transform(
-            alignment: Alignment.center,
-            transform: transform,
-            child: child,
+          if (!widget.spatial) {
+            final transform = Matrix4.translationValues(0, value * .8, 0)
+              ..setEntry(3, 2, value * .0007)
+              ..rotateX(value * .008);
+            return Transform(
+              key: const ValueKey('buy-intent-depth-transform'),
+              alignment: Alignment.center,
+              transform: transform,
+              transformHitTests: false,
+              child: child,
+            );
+          }
+          final contentTransform = Matrix4.translationValues(0, value * .8, 0);
+          final planeTransform = Matrix4.identity()
+            ..setEntry(3, 2, value * .0011)
+            ..rotateX(value * _tiltX)
+            ..rotateY(value * _tiltY);
+          final sheenDirection = Alignment(
+            (_tiltY * 28).clamp(-1.0, 1.0),
+            (_tiltX * 36).clamp(-1.0, 1.0),
+          );
+          return Transform.scale(
+            key: const ValueKey('buy-intent-depth-scale'),
+            scale: 1 - value * .007,
+            transformHitTests: false,
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                Transform(
+                  key: const ValueKey('buy-intent-depth-transform'),
+                  alignment: Alignment.center,
+                  transform: contentTransform,
+                  transformHitTests: false,
+                  child: child,
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: value.clamp(0.0, 1.0),
+                      child: Transform(
+                        key: const ValueKey('buy-intent-depth-plane'),
+                        alignment: Alignment.center,
+                        transform: planeTransform,
+                        transformHitTests: false,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: BuyV2Colors.navy.withValues(alpha: .14),
+                            ),
+                            gradient: LinearGradient(
+                              begin: sheenDirection,
+                              end: Alignment(
+                                -sheenDirection.x,
+                                -sheenDirection.y,
+                              ),
+                              colors: [
+                                BuyV2Colors.navy.withValues(alpha: 0),
+                                Colors.white.withValues(alpha: .12),
+                                BuyV2Colors.orange.withValues(alpha: .08),
+                                BuyV2Colors.green.withValues(alpha: .06),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         },
         child: widget.child,
@@ -234,6 +645,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
     super.key,
     required this.product,
     this.borderRadius = 14,
+    this.animateFirstFrame = false,
   });
 
   static const productAtlasPath =
@@ -249,6 +661,7 @@ class BuyV2ProductPackshot extends StatelessWidget {
 
   final BuyV2Product product;
   final double borderRadius;
+  final bool animateFirstFrame;
 
   @override
   Widget build(BuildContext context) {
@@ -306,6 +719,25 @@ class BuyV2ProductPackshot extends StatelessWidget {
                         source.assetPath,
                         fit: BoxFit.fill,
                         filterQuality: FilterQuality.medium,
+                        frameBuilder: animateFirstFrame
+                            ? (context, child, frame, synchronouslyLoaded) {
+                                if (synchronouslyLoaded) {
+                                  return child;
+                                }
+                                return AnimatedOpacity(
+                                  key: ValueKey(
+                                    'buy-packshot-decoded-frame-${product.id}',
+                                  ),
+                                  opacity: frame == null ? 0 : 1,
+                                  duration: BuyV2Motion.resolved(
+                                    context,
+                                    const Duration(milliseconds: 180),
+                                  ),
+                                  curve: Curves.easeOutCubic,
+                                  child: child,
+                                );
+                              }
+                            : null,
                         errorBuilder: (_, _, _) => const Center(
                           child: Icon(
                             Icons.inventory_2_outlined,
@@ -547,7 +979,7 @@ BoxDecoration buyV2CardDecoration({
   );
 }
 
-class BuyV2PromotionCard extends StatelessWidget {
+class BuyV2PromotionCard extends StatefulWidget {
   const BuyV2PromotionCard({
     super.key,
     required this.title,
@@ -556,6 +988,7 @@ class BuyV2PromotionCard extends StatelessWidget {
     required this.onTap,
     this.accent = BuyV2Colors.orange,
     this.width = 220,
+    this.sequenceIndex = 0,
   });
 
   final String title;
@@ -564,92 +997,209 @@ class BuyV2PromotionCard extends StatelessWidget {
   final VoidCallback onTap;
   final Color accent;
   final double width;
+  final int sequenceIndex;
+
+  @override
+  State<BuyV2PromotionCard> createState() => _BuyV2PromotionCardState();
+}
+
+class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
+    with TickerProviderStateMixin {
+  late final AnimationController _entryController;
+  late final AnimationController _acknowledgementController;
+  bool _entryStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _acknowledgementController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (reduced) {
+      _entryController.value = 1;
+      _acknowledgementController.value = 0;
+    } else if (!_entryStarted) {
+      _entryStarted = true;
+      _entryController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _entryController.dispose();
+    _acknowledgementController.dispose();
+    super.dispose();
+  }
+
+  void _dispatchAction() {
+    if (!MediaQuery.disableAnimationsOf(context)) {
+      _acknowledgementController.forward(from: 0);
+    }
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = BuyV2ThemeScope.of(context);
+    final entryBegin = (widget.sequenceIndex.clamp(0, 3) * .12).toDouble();
+    final entry = CurvedAnimation(
+      parent: _entryController,
+      curve: Interval(entryBegin, 1, curve: Curves.easeOutCubic),
+    );
+    final acknowledgement = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 42,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+        weight: 58,
+      ),
+    ]).animate(_acknowledgementController);
     return Semantics(
-      label: '$title. $detail',
+      label: '${widget.title}. ${widget.detail}',
       button: true,
-      child: BuyV2IntentDepth(
-        child: SizedBox(
-          width: width,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onTap();
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Ink(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      accent.withValues(alpha: .15),
-                      Colors.white,
-                      BuyV2Colors.softGreen.withValues(alpha: .72),
-                    ],
+      onTap: _dispatchAction,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([entry, acknowledgement]),
+        builder: (context, child) {
+          final entryValue = entry.value;
+          final acknowledgementValue = acknowledgement.value;
+          return Opacity(
+            opacity: entryValue.clamp(.001, 1),
+            child: Transform.translate(
+              key: const ValueKey('buy-promotion-entry-transform'),
+              offset: Offset(0, 7 * (1 - entryValue)),
+              transformHitTests: false,
+              child: Transform.scale(
+                scale: .985 + (.015 * entryValue),
+                transformHitTests: false,
+                child: BuyV2IntentDepth(
+                  child: SizedBox(
+                    width: widget.width,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _dispatchAction,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                widget.accent.withValues(alpha: .15),
+                                Colors.white,
+                                BuyV2Colors.softGreen.withValues(alpha: .72),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: BuyV2Colors.line),
+                          ),
+                          child: Row(
+                            children: [
+                              Transform.rotate(
+                                angle: acknowledgementValue * -.07,
+                                child: Transform.scale(
+                                  key: const ValueKey(
+                                    'buy-promotion-action-icon',
+                                  ),
+                                  scale: 1 + acknowledgementValue * .08,
+                                  child: Container(
+                                    width: 38,
+                                    height: 38,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: widget.accent.withValues(
+                                          alpha: .4,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      widget.icon,
+                                      color: theme.headerEnd,
+                                      size: 21,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: BuyV2Colors.ink,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      widget.detail,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: BuyV2Colors.muted,
+                                        fontSize: 8,
+                                        height: 1.15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Transform.translate(
+                                key: const ValueKey(
+                                  'buy-promotion-action-arrow',
+                                ),
+                                offset: Offset(acknowledgementValue * 3.5, 0),
+                                child: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: widget.accent,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: BuyV2Colors.line),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: accent.withValues(alpha: .4)),
-                      ),
-                      child: Icon(icon, color: theme.headerEnd, size: 21),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            detail,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BuyV2Colors.muted,
-                              fontSize: 8,
-                              height: 1.15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded, color: accent, size: 18),
-                  ],
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

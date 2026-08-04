@@ -2,6 +2,13 @@ import 'buy_v2_catalogue_data.dart';
 
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
+/// Presentation-only direction for a genuine Buy surface replacement.
+///
+/// Route, Back and restoration outcomes remain owned by [BuyV2Session]. This
+/// value lets the fixed Buy body communicate that already-decided outcome; it
+/// must never be used to choose, delay or persist navigation.
+enum BuyV2NavigationMotionDirection { forward, back, replace }
+
 enum BuyV2View {
   catalogue,
   product,
@@ -165,6 +172,8 @@ class BuyV2FulfilmentGroup {
 
   int get total => lines.fold(0, (total, line) => total + line.total);
 
+  String get key => '${destination.name}|$partner';
+
   List<String> get productIds =>
       lines.map((line) => line.product.id).toList(growable: false);
 }
@@ -211,6 +220,8 @@ class BuyV2Order {
     required this.progress,
     required this.status,
     this.productIds = const [],
+    this.deliveryInstruction,
+    this.tip = 0,
   });
 
   final String id;
@@ -225,6 +236,8 @@ class BuyV2Order {
   final double progress;
   final BuyV2OrderStatus status;
   final List<String> productIds;
+  final String? deliveryInstruction;
+  final int tip;
 }
 
 class _BuyV2CommerceSeed {

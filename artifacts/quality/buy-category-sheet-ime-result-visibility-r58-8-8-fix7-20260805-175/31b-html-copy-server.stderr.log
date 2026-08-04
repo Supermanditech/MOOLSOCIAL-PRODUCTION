@@ -1,0 +1,15 @@
+127.0.0.1 - - [05/Aug/2026 00:34:48] "GET /screens/09-buy.html HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:49] "GET /screens/09-buy.html HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:49] "GET /shared/moolsocial-ui-foundation.css HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:49] "GET /shared/moolsocial-buy-v2.css?v=20260729-buy-mini-cart-71 HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:49] "GET /shared/moolsocial-buy-v2.js?v=20260729-buy-mini-cart-71 HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:50] code 404, message File not found
+127.0.0.1 - - [05/Aug/2026 00:34:50] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [05/Aug/2026 00:34:51] "GET /screens/09-buy.html?context=business HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:53] "GET /screens/09-buy.html?view=medicine HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:55] "GET /screens/09-buy.html?category=meat-seafood&product=fish-fillet&view=product HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:34:58] "GET /screens/09-buy.html?context=business&category=retail-supplies&product=thermal-rolls&view=product HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:35:00] "GET /screens/09-buy.html?seed=retail-cart&view=basket&cart=retail HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:35:03] "GET /screens/09-buy.html?context=business&seed=1&view=basket&cart=wholesale HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:35:05] "GET /screens/09-buy.html?seed=combined-cart&view=basket&cart=all HTTP/1.1" 200 -
+127.0.0.1 - - [05/Aug/2026 00:35:08] "GET /screens/09-buy.html?view=orders HTTP/1.1" 200 -

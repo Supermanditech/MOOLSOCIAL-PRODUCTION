@@ -1,0 +1,9 @@
+﻿Protected Buy inventory changed. Expected 31 files but found 43. A founder-approved baseline replacement is required 
+for runtime changes.
+At C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\scripts\check-buy-protected-baseline.ps1:105 char:3
++   throw (
++   ~~~~~~~
+    + CategoryInfo          : OperationStopped: (Protected Buy i...untime changes.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Protected Buy inventory changed. Expected 31 files but found 43. A founder-approved base 
+   line replacement is required for runtime changes.
+ 

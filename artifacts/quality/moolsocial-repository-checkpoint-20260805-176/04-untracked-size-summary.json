@@ -1,0 +1,56 @@
+{
+  "capturedAtIst": "2026-08-05T01:18:20.113+05:30",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f1ac83dea2047f40b39d772696bd0d1224edce8e",
+  "trackedDirtyCount": 39,
+  "untrackedCount": 47536,
+  "untrackedBytes": 77224427128,
+  "untrackedByRoot": [
+    {
+      "root": "apps",
+      "files": 1688,
+      "bytes": 134001270
+    },
+    {
+      "root": "artifacts",
+      "files": 45007,
+      "bytes": 76687365189
+    },
+    {
+      "root": "backend",
+      "files": 7,
+      "bytes": 149386
+    },
+    {
+      "root": "config",
+      "files": 2,
+      "bytes": 15343
+    },
+    {
+      "root": "docs",
+      "files": 73,
+      "bytes": 422322
+    },
+    {
+      "root": "output",
+      "files": 7,
+      "bytes": 5998301
+    },
+    {
+      "root": "scripts",
+      "files": 4,
+      "bytes": 22202
+    },
+    {
+      "root": "tmp",
+      "files": 748,
+      "bytes": 396453115
+    }
+  ],
+  "apkFiles": 441,
+  "apkBytes": 70389486529,
+  "over100MiBFiles": 419,
+  "over100MiBBytes": 69299890772,
+  "browserProfileFiles": 19654,
+  "browserProfileBytes": 2592358310
+}

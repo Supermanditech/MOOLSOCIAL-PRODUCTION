@@ -1,0 +1,253 @@
+--------- beginning of main
+08-05 01:05:06.945 15422 15422 I .moolsocial.app: Late-enabling -Xcheck:jni
+08-05 01:05:06.973 15422 15422 E .moolsocial.app: Unknown bits set in runtime_flags: 0x40000000
+08-05 01:05:06.973 15422 15422 I .moolsocial.app: Using generational CollectorTypeCC GC.
+08-05 01:05:06.988 15422 15422 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+08-05 01:05:06.996 15422 15422 I OneTrace: Mark active for pid=15422? true
+08-05 01:05:06.997 15422 15422 D cutils-dev: otrace_set_tracing_enabled? true
+08-05 01:05:06.997 15422 15427 D cutils-dev: properties changed in otrace_seq_number_changed!
+08-05 01:05:07.056 15422 15422 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10465; state: ENABLED
+08-05 01:05:07.056 15422 15422 I oplus.android.OplusFrameworkFactoryImpl: get feature:IOplusAutoResolutionFeature
+08-05 01:05:07.056 15422 15422 I oplus.android.OplusFrameworkFactoryImpl: getOplusAutoResolutionFeature
+08-05 01:05:07.110 15422 15422 I OplusFeatureCache: Milliseconds spent on init(): 54
+08-05 01:05:07.112 15422 15422 D CompactWindowAppManager: initCompactApplicationInfo 
+08-05 01:05:07.124 15422 15422 W libc    : Access denied finding property "ro.odm.prev.product.name"
+08-05 01:05:07.127 15422 15422 D LoadedApk: mApplicationInfo overrideDisplayId:null
+08-05 01:05:07.132 15422 15422 D nativeloader: Configuring clns-4 for other apk /system_ext/framework/androidx.window.extensions.jar. target_sdk_version=36, uses_libraries=ALL, library_path=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/lib/arm64:/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.moolsocial.app
+08-05 01:05:07.132 15422 15422 D nativeloader: Extending system_exposed_libraries: libbinauralrenderer_wrapper.qti.so:libhoaeffects.qti.so:libSloganJni.oplus.so:libsuperNight.oplus.so:libupdateprof.qti.so:libQOC.qti.so:libthermalclient.qti.so:libdiag_system.qti.so:libqape.qti.so:liblistenjni.qti.so
+08-05 01:05:07.136 15422 15422 D nativeloader: Configuring clns-5 for other apk /system_ext/framework/androidx.window.sidecar.jar. target_sdk_version=36, uses_libraries=ALL, library_path=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/lib/arm64:/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.moolsocial.app
+08-05 01:05:07.136 15422 15422 D nativeloader: Extending system_exposed_libraries: libbinauralrenderer_wrapper.qti.so:libhoaeffects.qti.so:libSloganJni.oplus.so:libsuperNight.oplus.so:libupdateprof.qti.so:libQOC.qti.so:libthermalclient.qti.so:libdiag_system.qti.so:libqape.qti.so:liblistenjni.qti.so
+08-05 01:05:07.659 15422 15422 D nativeloader: Configuring clns-6 for other apk /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/lib/arm64:/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.moolsocial.app
+--------- beginning of system
+08-05 01:05:07.660 15422 15422 I Quality : ActivityThread: createClassLoader delay 522 /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk 15422
+08-05 01:05:07.662 15422 15422 I Quality : ActivityThread: createOrUpdateClassLoaderLocked delay 535 com.moolsocial.app 15422
+08-05 01:05:07.667 15422 15422 D nativeloader: Load libframework-connectivity-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity.jar: ok
+08-05 01:05:07.672 15422 15422 V GraphicsEnvironment: ANGLE Developer option for 'com.moolsocial.app' set to: 'default'
+08-05 01:05:07.672 15422 15422 V GraphicsEnvironment: ANGLE GameManagerService for com.moolsocial.app: false
+08-05 01:05:07.672 15422 15422 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-05 01:05:07.675 15422 15422 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-05 01:05:07.676 15422 15422 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-05 01:05:07.684 15422 15422 W FirebaseApp: Default FirebaseApp failed to initialize because no default options were found. This usually means that com.google.gms:google-services was not applied to your gradle project.
+08-05 01:05:07.684 15422 15422 I FirebaseInitProvider: FirebaseApp initialization unsuccessful
+08-05 01:05:07.685 15422 15422 D FLTFireContextHolder: received application context.
+08-05 01:05:07.719 15422 15422 D nativeloader: Load libSchedAssistJni.so using system ns (caller=/system/framework/oplus-framework.jar): ok
+08-05 01:05:07.719 15422 15422 D ExtensionsLoader: createInstance(64bit) : createExtendedFactory
+08-05 01:05:07.719 15422 15422 D ExtensionsLoader: Opened libSchedAssistExtImpl.so
+08-05 01:05:07.719 15422 15422 E .moolsocial.app: ofbOpen failed with error=No such file or directory
+08-05 01:05:07.719 15422 15422 E .moolsocial.app: sysOpen failed with error=No such file or directory
+08-05 01:05:07.721 15422 15422 D OplusGraphicsEvent: OplusGraphicsEventListener create now!
+08-05 01:05:07.721 15422 15422 D OplusGraphicsEvent: addEventListener success!
+08-05 01:05:07.728 15422 15422 D OplusActivityManager: get AMS extension: android.os.BinderProxy@400993b
+08-05 01:05:07.728 15422 15422 I Quality : ActivityThread: bindApplication delay 674 com.moolsocial.app 15422
+08-05 01:05:07.792 15422 15456 D nativeloader: Load /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a/libflutter.so using class loader ns clns-6 (caller=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes20.dex): ok
+08-05 01:05:07.799 15422 15457 D skia    : [SkFontMgr Android Parser] '/product/etc/fonts_customization.xml' could not be opened
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getTouchX()F (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getTouchY()F (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getProgress()F (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getSwipeEdge()I (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getProgress()F (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.814 15422 15422 E .moolsocial.app: hiddenapi: Accessing hidden method Landroid/window/BackEvent;->getSwipeEdge()I (runtime_flags=0, domain=platform, api=blocked) from /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex (domain=app, TargetSdkVersion=36) using linking: denied
+08-05 01:05:07.841 15422 15458 D vulkan  : searching for layers in '/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/lib/arm64'
+08-05 01:05:07.841 15422 15458 D vulkan  : searching for layers in '/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a'
+08-05 01:05:07.842 15422 15468 I flutter : The Dart VM service is listening on http://127.0.0.1:42787/1_7d4AWqMMc=/
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: ===== BEGIN DUMP OF OVERRIDDEN SETTINGS =====
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: ===== END DUMP OF OVERRIDDEN SETTINGS =====
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: QUALCOMM build          : 3d24e2bbef, I3c0bc64a9d
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Build Date              : 11/10/21
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Shader Compiler Version : EV031.32.02.16
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Local Branch            : 
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Remote Branch           : 
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Remote Branch           : 
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Reconstruct Branch      : 
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Build Config            : S P 10.0.7 AArch64
+08-05 01:05:07.851 15422 15458 I AdrenoVK-0: Driver Path             : /vendor/lib64/hw/vulkan.adreno.so
+08-05 01:05:07.860 15422 15458 I flutter : [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: QUALCOMM build                   : 3d24e2bbef, I3c0bc64a9d
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Build Date                       : 11/10/21
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: OpenGL ES Shader Compiler Version: EV031.32.02.16
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Local Branch                     : 
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Remote Branch                    : 
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Remote Branch                    : 
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Reconstruct Branch               : 
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Build Config                     : S P 10.0.7 AArch64
+08-05 01:05:07.862 15422 15458 I AdrenoGLES-0: Driver Path                      : /vendor/lib64/egl/libGLESv2_adreno.so
+08-05 01:05:07.865 15422 15458 I AdrenoGLES-0: PFP: 0x016ee197, ME: 0x00000000
+08-05 01:05:07.882 15422 15458 I flutter : [IMPORTANT:flutter/shell/platform/android/android_context_gl_impeller.cc(104)] Using the Impeller rendering backend (OpenGLES).
+08-05 01:05:07.898 15422 15422 D com.llfbandit.app_links: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.moolsocial.app/.MainActivity mCallingUid=2000 }
+08-05 01:05:07.943 15422 15472 I DynamiteModule: Considering local module com.google.android.gms.measurement.dynamite:185 and remote module com.google.android.gms.measurement.dynamite:199
+08-05 01:05:07.943 15422 15472 I DynamiteModule: Selected remote version of com.google.android.gms.measurement.dynamite, version >= 199
+08-05 01:05:07.943 15422 15472 V DynamiteModule: Dynamite loader version >= 2, using loadModule2NoCrashUtils
+08-05 01:05:07.945 15422 15422 D FLTFireContextHolder: received application context.
+08-05 01:05:07.957 15422 15472 W System  : ClassLoader referenced unknown path: 
+08-05 01:05:07.961 15422 15422 D nativeloader: Load /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a/libdartjni.so using class loader ns clns-6 (caller=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes10.dex): ok
+08-05 01:05:07.963 15422 15472 D nativeloader: Configuring clns-7 for other apk . target_sdk_version=37, uses_libraries=, library_path=/data/app/~~6mILpYZB9oyxHHfdwPTqrQ==/com.google.android.gms-orNRhPRidqUsIsS72TXdtw==/lib/arm64:/data/app/~~6mILpYZB9oyxHHfdwPTqrQ==/com.google.android.gms-orNRhPRidqUsIsS72TXdtw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.google.android.gms
+08-05 01:05:07.999 15422 15422 I oplus.android.OplusFrameworkFactoryImpl: Unknow feature:IOplusTextViewRTLUtilForUG
+08-05 01:05:08.012 15422 15422 D OplusInputMethodUtil: init sDebug to false, init sDebugIme to false, init sAlwaysOn to false
+08-05 01:05:08.012 15422 15422 D OplusInputMethodUtil: updateDebugToClass InputMethodManager.DEBUG = false
+08-05 01:05:08.012 15422 15422 D OplusInputMethodUtil: updateDebugToClass ImeFocusController.DEBUG = false
+08-05 01:05:08.012 15422 15422 D OplusInputMethodUtil: updateDebugToClass BaseInputConnection.DEBUG = false
+08-05 01:05:08.012 15422 15422 D OplusInputMethodUtil: updateDebugToClass ImeFocusController.sDebugIme = false
+08-05 01:05:08.028 15422 15422 I .moolsocial.app: hiddenapi: Accessing hidden method Landroid/view/accessibility/AccessibilityNodeInfo;->getSourceNodeId()J (runtime_flags=0, domain=platform, api=unsupported,test-api) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app, TargetSdkVersion=36) using reflection: allowed
+08-05 01:05:08.028 15422 15422 I .moolsocial.app: hiddenapi: Accessing hidden method Landroid/view/accessibility/AccessibilityRecord;->getSourceNodeId()J (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app, TargetSdkVersion=36) using reflection: allowed
+08-05 01:05:08.028 15422 15422 I .moolsocial.app: hiddenapi: Accessing hidden field Landroid/view/accessibility/AccessibilityNodeInfo;->mChildNodeIds:Landroid/util/LongArray; (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app, TargetSdkVersion=36) using reflection: allowed
+08-05 01:05:08.028 15422 15422 I .moolsocial.app: hiddenapi: Accessing hidden method Landroid/util/LongArray;->get(I)J (runtime_flags=0, domain=platform, api=unsupported) from Lio/flutter/view/AccessibilityViewEmbedder$ReflectionAccessors; (domain=app, TargetSdkVersion=36) using reflection: allowed
+08-05 01:05:08.028 15422 15476 D CompatibilityChangeReporter: Compat change id reported: 183155436; UID 10465; state: ENABLED
+08-05 01:05:08.034 15422 15478 I .moolsocial.app: hiddenapi: Accessing hidden method Ldalvik/system/VMStack;->getStackClass2()Ljava/lang/Class; (runtime_flags=0, domain=core-platform, api=unsupported) from Lm7/aqc; (domain=app, TargetSdkVersion=36) using reflection: allowed
+08-05 01:05:08.049 15422 15422 I Quality : ActivityThread: activityStart delay 321 com.moolsocial.app 15422
+08-05 01:05:08.051 15422 15476 I FA      : App measurement disabled via the manifest
+08-05 01:05:08.051 15422 15476 E .moolsocial.app: No package ID 6a found for ID 0x6a0b0013.
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=<empty> and /system/framework/framework-res.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/GmsConfigOverlayASI_Infrastructure/GmsConfigOverlayASI_Infrastructure.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/GmsConfigOverlayCommonEx/GmsConfigOverlayCommonEx.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/GmsConfigOverlayComms/GmsConfigOverlayComms.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/GmsConfigOverlayGSA/GmsConfigOverlayGSA.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/GmsConfigOverlayNoSafetyCenter/GmsConfigOverlayNoSafetyCenter.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/CaptivePortalLoginFrameworkOverlay.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/GoogleExtServicesConfigOverlay.apk}
+08-05 01:05:08.051 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/GooglePermissionControllerFrameworkOverlay.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/ModuleMetadataGoogleOverlay.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/my_bigball/overlay/OplusGmsConfigOverlayCommon/OplusGmsConfigOverlayCommon.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/FrameworksResCommon_Sys.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/vendor/overlay/FrameworksResTarget.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/system_ext/overlay/framework_res_overlay_Network.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/odm/overlay/android_framework_res_overlay.display.odm.21267.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/android_framework_res_overlay.display.product.21267.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/aon_framework_res_overlay.display.product.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/system_ext/overlay/ConnectivityBaseOverlay.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/system_ext/overlay/OplusFrameworkBluetoothResource.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=<empty> and /system_ext/framework/oplus-framework-res.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/oplus_framework_res_overlay.display.product.21267.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/product/overlay/oplus_framework_res_rro_oppo.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=<empty> and /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/data/resource-cache/com.android.systemui-neutral-v4AE.frro}
+08-05 01:05:08.052 15422 15476 E ResourcesImplExt: the AssetManager's apkAsset: ApkAssets{path=/data/resource-cache/com.android.systemui-accent-baoE.frro}
+08-05 01:05:08.053 15422 15476 I FA      : App measurement initialized, version: 175000
+08-05 01:05:08.053 15422 15476 I FA      : To enable debug logging run: adb shell setprop log.tag.FA VERBOSE
+08-05 01:05:08.053 15422 15476 I FA      : To enable faster debug mode event logging run:
+08-05 01:05:08.053 15422 15476 I FA      :   adb shell setprop debug.firebase.analytics.app com.moolsocial.app
+08-05 01:05:08.059 15422 15476 E FA      : Missing google_app_id. Firebase Analytics disabled. See https://goo.gl/NAOOOI
+08-05 01:05:08.060 15422 15480 I OplusSlideAnimOptHelper: checkListMode: is blacklist mode = true
+08-05 01:05:08.061 15422 15422 D WindowManager: Add to mViews: DecorView@b1a7813[MainActivity],pkg= com.moolsocial.app
+08-05 01:05:08.061 15422 15480 D OplusSlideAnimOptHelper: com.moolsocial.app scrollEffectOpt enable = true
+08-05 01:05:08.063 15422 15453 D ExtensionsLoader: createInstance(64bit) : createExtendedFactory
+08-05 01:05:08.068 15422 15453 D ExtensionsLoader: Opened libhwuiextimpl.so
+08-05 01:05:08.069 15422 15422 D ExtensionsLoader: createInstance(64bit) : createExtendedFactory
+08-05 01:05:08.069 15422 15422 D ExtensionsLoader: Opened libSchedAssistExtImpl.so
+08-05 01:05:08.081 15422 15422 D ViewRootImplExtImpl: onDisplayChanged -1 for VRI android.view.ViewRootImpl@80ee45a
+08-05 01:05:08.082 15422 15422 D InputEventReceiver: Input log is disabled
+08-05 01:05:08.090 15422 15422 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+08-05 01:05:08.090 15422 15422 I Quality : Skipped: false 3 cost 37.7775 refreshRate 11116656 bit true processName com.moolsocial.app
+08-05 01:05:08.138 15422 15422 I SurfaceView: 133831465 onAttachedToWindow
+08-05 01:05:08.158 15422 15422 D BufferQueueConsumer: [](id:3c3e00000000,api:0,p:-1,c:15422) connect: controlledByApp=false
+08-05 01:05:08.159 15422 15422 D ExtensionsLoader: createInstance(64bit) : createExtendedFactory
+08-05 01:05:08.159 15422 15422 D ExtensionsLoader: Opened libSchedAssistExtImpl.so
+08-05 01:05:08.161 15422 15422 V ZoomWindowDecorView: setLastReportedMergedConfiguration mZoomDisplayHeight: 1612 getDecorView.186284051
+08-05 01:05:08.170 15422 15453 D BufferQueueProducer: [VRI[MainActivity]#0(BLAST Consumer)0](id:3c3e00000000,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:05:08.171 15422 15422 D BufferQueueConsumer: [](id:3c3e00000001,api:0,p:-1,c:15422) connect: controlledByApp=false
+08-05 01:05:08.172 15422 15422 I SurfaceView: 133831465 visibleChanged -- surfaceCreated 
+08-05 01:05:08.172 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:05:08.257 15422 15422 I SurfaceView: 133831465 surfaceChanged -- format=4 w=720 h=1524
+08-05 01:05:08.257 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:1,p:15422,c:15422) disconnect: api 1
+08-05 01:05:08.257 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:05:08.273 15422 15422 I Quality : Skipped: false 11 cost 127.60554 refreshRate 11116255 bit true processName com.moolsocial.app
+08-05 01:05:08.299 15422 15487 D FirebaseSessions: Dependency to CRASHLYTICS added.
+08-05 01:05:08.306 15422 15487 I FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]
+08-05 01:05:08.355 15422 15487 D nativeloader: Load /data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!/lib/arm64-v8a/libdatastore_shared_counter.so using class loader ns clns-6 (caller=/data/app/~~BIP1fxqnaUhtLgIo8tS73A==/com.moolsocial.app-7ZRlJTvXWRQx5d4XeZeOfw==/base.apk!classes21.dex): ok
+08-05 01:05:08.372 15422 15487 D FirebaseSessions: Initializing Firebase Sessions 3.0.6.
+08-05 01:05:08.377 15422 15487 I FirebaseCrashlytics: Initializing Firebase Crashlytics 20.0.6 for com.moolsocial.app
+08-05 01:05:08.393 15422 15487 D FirebaseSessions: Subscriber CRASHLYTICS registered.
+08-05 01:05:08.393 15422 15504 D FirebaseSessions: No Sessions subscribers. Not listening to lifecycle events.
+08-05 01:05:08.394 15422 15501 D FirebaseSessions: Notified CRASHLYTICS of new session c742333523f14894ac83ff69109176fc
+08-05 01:05:08.442 15422 15505 I FirebaseCrashlytics: No version control information found
+08-05 01:05:08.481 15422 15422 I flutter : Mapping Auth Emulator host "127.0.0.1" to "10.0.2.2".
+08-05 01:05:08.529 15422 15422 I Quality : Skipped: false 3 cost 38.730705 refreshRate 11116028 bit true processName com.moolsocial.app
+08-05 01:05:08.547 15422 15422 I Quality : Skipped: false 1 cost 12.089924 refreshRate 11116028 bit true processName com.moolsocial.app
+08-05 01:05:08.549 15422 15422 D VRI[MainActivity]: registerCallbacksForSync syncBuffer=false
+08-05 01:05:08.558 15422 15453 D VRI[MainActivity]: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+08-05 01:05:08.560 15422 15453 W Parcel  : Expecting binder but got null!
+08-05 01:05:08.560 15422 15422 D VRI[MainActivity]: draw finished.
+08-05 01:05:08.587 15422 15422 D VRI[MainActivity]: onFocusEvent true
+08-05 01:05:08.638 15422 15427 I .moolsocial.app: Compiler allocated 4869KB to compile void android.view.ViewRootImpl.performTraversals()
+08-05 01:05:08.653 15422 15422 D ViewRootImplExtImpl: onDisplayChanged 0 for VRI android.view.ViewRootImpl@80ee45a
+08-05 01:05:11.644 15422 15422 W OnBackInvokedCallback: OnBackInvokedCallback is not enabled for the application.
+08-05 01:05:11.644 15422 15422 W OnBackInvokedCallback: Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+08-05 01:05:13.845 15422 15562 D ProfileInstaller: Installing profile for com.moolsocial.app
+08-05 01:05:16.506 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:05:16.513 15422 15422 D OplusSystemUINavigationGestureExtImpl: regionString = null
+08-05 01:05:16.521 15422 15422 D OplusInputMethodManagerInternal: get inputMethodManager extension: com.android.internal.view.IInputMethodManager$Stub$Proxy@e822a82
+08-05 01:05:22.774 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:05:33.495 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:05:33.518 15422 15422 D InputMethodManager: showSoftInput() view=io.flutter.embedding.android.FlutterView{27040e5 VFE...... .F....ID 0,0-720,1524 #1 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+08-05 01:05:33.527 15422 15422 V AutofillManager: receiver results: flags=7 enabled=true, enabledForAugmentedOnly: false
+08-05 01:05:33.528 15422 15422 V AutofillManager: startSessionLocked(): id=1073741824:769453366, bounds=Rect(112, 831 - 688, 864), value=null, flags=0, state=UNKNOWN, compatMode=false, augmentedOnly=false, enabledAugmentedOnly=false, enteredIds=null
+08-05 01:05:33.539 15422 15422 I Quality : Skipped: false 1 cost 27.332909 refreshRate 16723624 bit true processName com.moolsocial.app
+08-05 01:05:33.544 15422 15422 I AssistStructure: Flattened final assist data: 380 bytes, containing 1 windows, 3 views
+08-05 01:05:33.580 15422 15422 W OnBackInvokedCallback: OnBackInvokedCallback is not enabled for the application.
+08-05 01:05:33.580 15422 15422 W OnBackInvokedCallback: Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+08-05 01:05:33.615 15422 15422 D InsetsController: show(ime(), fromIme=true)
+08-05 01:05:33.627 15422 15422 D OplusWindowManager: get WMS extension: android.os.BinderProxy@21aa442
+08-05 01:05:33.694 15422 15422 V AutofillManager: setSessionFinished(): from ACTIVE to FINISHED; autofillableIds=[1073741824:769453366]
+08-05 01:05:33.694 15422 15422 I Quality : Skipped: false 2 cost 35.91476 refreshRate 16675959 bit true processName com.moolsocial.app
+08-05 01:05:34.370 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.401 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.424 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.433 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.441 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.455 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.466 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.476 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.522 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.552 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.570 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.584 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:34.604 15422 15422 V AutofillManager: notifyValueChanged(1073741824:769453366): ignoring on state FINISHED
+08-05 01:05:41.492 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:05:41.506 15422 15422 V AutofillManager: notifyViewExited(1073741824, 769453366
+08-05 01:05:47.066 15422 15422 I Quality : Skipped: false 1 cost 17.735968 refreshRate 16666666 bit true processName com.moolsocial.app
+08-05 01:05:50.847 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:05:51.881 15422 15422 D Activity: dispatchKeyEvent to com.moolsocial.app.MainActivity@2cd2920 will call onBackPressed
+08-05 01:05:52.306 15422 15422 I Quality : Skipped: false 1 cost 21.330317 refreshRate 16691514 bit true processName com.moolsocial.app
+08-05 01:06:00.553 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:06:04.033 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null
+08-05 01:06:10.928 15422 15422 D FirebaseSessions: App backgrounded on com.moolsocial.app
+08-05 01:06:10.947 15422 15422 D VRI[MainActivity]: onFocusEvent false
+08-05 01:06:10.984 15422 15526 D VRI[MainActivity]: dispatchAppVisibility visible:false
+08-05 01:06:10.996 15422 15422 I SurfaceView: 133831465 surfaceDestroyed
+08-05 01:06:11.019 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:1,p:15422,c:15422) disconnect: api 1
+08-05 01:06:11.021 15422 15422 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:0,p:-1,c:15422) disconnect: api -1
+08-05 01:06:11.025 15422 15453 D SurfaceView: 15389894positionLost mSurfaceControl is null return;
+08-05 01:06:11.026 15422 15453 D BufferQueueProducer: [VRI[MainActivity]#0(BLAST Consumer)0](id:3c3e00000000,api:1,p:15422,c:15422) disconnect: api 1
+08-05 01:06:11.032 15422 15436 D BufferQueueConsumer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#1(BLAST Consumer)1](id:3c3e00000001,api:0,p:-1,c:15422) disconnect
+08-05 01:06:11.037 15422 15422 D BufferQueueConsumer: [VRI[MainActivity]#0(BLAST Consumer)0](id:3c3e00000000,api:0,p:-1,c:15422) disconnect
+08-05 01:06:11.052 15422 15422 D VRI[MainActivity]: setWindowStopped stopped:true
+08-05 01:06:11.055 15422 15422 V AutofillManager: updateSessionLocked(): id=null, bounds=null, value=null, action=5, flags=0
+08-05 01:06:11.201 15422 15422 D ViewRootImplExtImpl: onDisplayChanged 0 for VRI android.view.ViewRootImpl@80ee45a
+08-05 01:06:12.996 15422 16360 I FA      : Application backgrounded at: timestamp_millis: 1785872170988
+08-05 01:06:14.224 15422 15422 D ActivityThread: do gfx trim 40 success
+08-05 01:06:19.270 15422 15422 D CompatibilityChangeReporter: Compat change id reported: 150939131; UID 10465; state: ENABLED
+08-05 01:06:24.792 15422 15526 D VRI[MainActivity]: dispatchAppVisibility visible:true
+08-05 01:06:24.802 15422 15422 D VRI[MainActivity]: setWindowStopped stopped:false
+08-05 01:06:24.821 15422 15422 D com.llfbandit.app_links: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10600000 cmp=com.moolsocial.app/.MainActivity mCallingUid=2000 }
+08-05 01:06:24.825 15422 15422 D FirebaseSessions: App foregrounded on com.moolsocial.app
+08-05 01:06:24.825 15422 15422 D FirebaseSessions: Process com.moolsocial.app is stale
+08-05 01:06:24.850 15422 15422 I Quality : Skipped: false 2 cost 26.683279 refreshRate 11111111 bit true processName com.moolsocial.app
+08-05 01:06:24.858 15422 15503 D FirebaseSessions: Cold app start detected
+08-05 01:06:24.859 15422 15503 D FirebaseSessions: Process com.moolsocial.app is stale
+08-05 01:06:24.866 15422 15422 D BufferQueueConsumer: [](id:3c3e00000002,api:0,p:-1,c:15422) connect: controlledByApp=false
+08-05 01:06:24.867 15422 15422 E IPCThreadState: attemptIncStrongHandle(64): Not supported
+08-05 01:06:24.868 15422 15453 D BufferQueueProducer: [VRI[MainActivity]#2(BLAST Consumer)2](id:3c3e00000002,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:06:24.869 15422 15503 D FirebaseSessions: Sessions SDK disabled through data collection. Events will not be sent.
+08-05 01:06:24.871 15422 15422 D BufferQueueConsumer: [](id:3c3e00000003,api:0,p:-1,c:15422) connect: controlledByApp=false
+08-05 01:06:24.871 15422 15422 I SurfaceView: 133831465 visibleChanged -- surfaceCreated 
+08-05 01:06:24.872 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#3(BLAST Consumer)3](id:3c3e00000003,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:06:24.882 15422 15422 I SurfaceView: 133831465 surfaceChanged -- format=4 w=720 h=1524
+08-05 01:06:24.883 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#3(BLAST Consumer)3](id:3c3e00000003,api:1,p:15422,c:15422) disconnect: api 1
+08-05 01:06:24.883 15422 15458 D BufferQueueProducer: [SurfaceView[com.moolsocial.app/com.moolsocial.app.MainActivity]#3(BLAST Consumer)3](id:3c3e00000003,api:1,p:15422,c:15422) connect: api=1 producerControlledByApp=true
+08-05 01:06:24.883 15422 15422 D VRI[MainActivity]: registerCallbacksForSync syncBuffer=false
+08-05 01:06:24.888 15422 15453 D VRI[MainActivity]: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+08-05 01:06:24.896 15422 15504 D FirebaseSessions: Notified CRASHLYTICS of new session 00ebf654b6a249399aa4692c896c452f
+08-05 01:06:24.977 15422 15422 D VRI[MainActivity]: draw finished.
+08-05 01:06:24.997 15422 15422 D VRI[MainActivity]: onFocusEvent true
+08-05 01:06:25.320 15422 15422 D ViewRootImplExtImpl: onDisplayChanged 0 for VRI android.view.ViewRootImpl@80ee45a
+08-05 01:06:28.009 15422 15422 I Quality : Skipped: false 1 cost 29.27592 refreshRate 16666666 bit true processName com.moolsocial.app
+08-05 01:06:30.273 15422 15422 V AutofillManager: requestHideFillUi(null): anchor = null

@@ -3,20 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/design/moolsocial_brand_motion.dart';
 import '../../../features/journey01/journey_session.dart';
 import '../../launch/launch_presentation_gate.dart';
 
 abstract final class _SplashV2Tokens {
   static const navy = Color(0xFF000080);
-  static const saffron = Color(0xFFFF9933);
   static const green = Color(0xFF138808);
   static const white = Colors.white;
 
   static const horizontalPadding = 26.0;
-  static const trackWidth = 154.0;
-  static const trackHeight = 6.0;
-  static const capsuleWidth = 60.0;
-  static const capsuleTravel = trackWidth - capsuleWidth;
+  static const revealDuration = Duration(milliseconds: 2400);
 }
 
 class AppSplashScreenV2 extends StatefulWidget {
@@ -37,56 +34,7 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
     with TickerProviderStateMixin {
   late final AnimationController _brandMotion = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-  late final AnimationController _promiseEntrance = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
-  late final Animation<double> _capsuleTravel = TweenSequence<double>([
-    TweenSequenceItem(tween: ConstantTween<double>(0), weight: 10),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 0,
-        end: _SplashV2Tokens.capsuleTravel,
-      ).chain(CurveTween(curve: const Cubic(.45, 0, .2, 1))),
-      weight: 35,
-    ),
-    TweenSequenceItem(
-      tween: ConstantTween<double>(_SplashV2Tokens.capsuleTravel),
-      weight: 10,
-    ),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: _SplashV2Tokens.capsuleTravel,
-        end: 0,
-      ).chain(CurveTween(curve: const Cubic(.45, 0, .2, 1))),
-      weight: 35,
-    ),
-    TweenSequenceItem(tween: ConstantTween<double>(0), weight: 10),
-  ]).animate(_brandMotion);
-  late final Animation<double> _taglineScale = TweenSequence<double>([
-    TweenSequenceItem(tween: ConstantTween<double>(1), weight: 10),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1,
-        end: 1.025,
-      ).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 35,
-    ),
-    TweenSequenceItem(tween: ConstantTween<double>(1.025), weight: 10),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1.025,
-        end: 1,
-      ).chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 35,
-    ),
-    TweenSequenceItem(tween: ConstantTween<double>(1), weight: 10),
-  ]).animate(_brandMotion);
-  late final Animation<double> _promiseOpacity = CurvedAnimation(
-    parent: _promiseEntrance,
-    curve: Curves.easeOutCubic,
+    duration: _SplashV2Tokens.revealDuration,
   );
   late final Listenable _screenState = Listenable.merge([
     widget.session,
@@ -118,12 +66,9 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
 
     if (reduceMotion) {
       _brandMotion.stop();
-      _brandMotion.value = 0;
-      _promiseEntrance.stop();
-      _promiseEntrance.value = 1;
+      _brandMotion.value = 1;
     } else {
       _syncMotionWithVisibleState();
-      _promiseEntrance.forward(from: 0);
     }
   }
 
@@ -134,8 +79,8 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
             widget.session.stage == JourneyStage.booting);
     if ((_reduceMotion ?? false) || !normalOpen) {
       _brandMotion.stop();
-    } else if (!_brandMotion.isAnimating) {
-      _brandMotion.repeat();
+    } else if (!_brandMotion.isAnimating && !_brandMotion.isCompleted) {
+      _brandMotion.forward();
     }
   }
 
@@ -144,7 +89,6 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
     widget.session.removeListener(_syncMotionWithVisibleState);
     widget.presentationGate.removeListener(_syncMotionWithVisibleState);
     _brandMotion.dispose();
-    _promiseEntrance.dispose();
     super.dispose();
   }
 
@@ -180,9 +124,6 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
 
               return _NormalOpenState(
                 brandMotion: _brandMotion,
-                capsuleTravel: _capsuleTravel,
-                taglineScale: _taglineScale,
-                promiseOpacity: _promiseOpacity,
                 reduceMotion: _reduceMotion ?? false,
               );
             },
@@ -201,16 +142,10 @@ class _AppSplashScreenV2State extends State<AppSplashScreenV2>
 class _NormalOpenState extends StatelessWidget {
   const _NormalOpenState({
     required this.brandMotion,
-    required this.capsuleTravel,
-    required this.taglineScale,
-    required this.promiseOpacity,
     required this.reduceMotion,
   });
 
   final AnimationController brandMotion;
-  final Animation<double> capsuleTravel;
-  final Animation<double> taglineScale;
-  final Animation<double> promiseOpacity;
   final bool reduceMotion;
 
   @override
@@ -237,23 +172,9 @@ class _NormalOpenState extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const _Wordmark(),
-                      const SizedBox(height: 10),
-                      _MotionIdentityLine(
+                      _ProgressiveBrandLockup(
                         animation: brandMotion,
-                        travel: capsuleTravel,
                         reduceMotion: reduceMotion,
-                      ),
-                      const SizedBox(height: 10),
-                      _MotionTagline(
-                        animation: brandMotion,
-                        scale: taglineScale,
-                        reduceMotion: reduceMotion,
-                      ),
-                      const SizedBox(height: 10),
-                      FadeTransition(
-                        opacity: promiseOpacity,
-                        child: const _ApprovedPromise(),
                       ),
                     ],
                   ),
@@ -295,16 +216,7 @@ class _SilentHandoffState extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const _Wordmark(),
-                      const SizedBox(height: 10),
-                      const _StaticIdentityLine(
-                        width: _SplashV2Tokens.trackWidth,
-                        height: _SplashV2Tokens.trackHeight,
-                      ),
-                      const SizedBox(height: 10),
-                      const _StaticTagline(),
-                      const SizedBox(height: 10),
-                      const _ApprovedPromise(),
+                      const _ProgressiveBrandLockup(reduceMotion: true),
                     ],
                   ),
                 ),
@@ -340,9 +252,7 @@ class _RecoveryState extends StatelessWidget {
           children: [
             const Spacer(),
             const _Wordmark(),
-            const SizedBox(height: 10),
-            const _StaticIdentityLine(width: 126, height: 4),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -448,291 +358,154 @@ class _Wordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
-      'MoolSocial',
-      style: TextStyle(
-        color: _SplashV2Tokens.white,
-        fontSize: 25,
-        height: .95,
-        fontWeight: FontWeight.w900,
-      ),
+    return const MoolSocialBrandMotion(
+      width: 190,
+      height: 52,
+      fontSize: 25,
+      onDarkBackground: true,
+      autoPlay: false,
+      progressOverride: 1,
     );
   }
 }
 
-class _ApprovedPromise extends StatelessWidget {
-  const _ApprovedPromise();
+class _ProgressiveBrandLockup extends StatelessWidget {
+  const _ProgressiveBrandLockup({this.animation, required this.reduceMotion});
 
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        Text(
-          'Create. Connect. Work. Grow.',
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: TextStyle(
-            color: _SplashV2Tokens.white,
-            fontSize: 15,
-            height: 1.2,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .15,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'One app for life and business.',
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: TextStyle(
-            color: Color(0xE0FFFFFF),
-            fontSize: 12,
-            height: 1.3,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MotionIdentityLine extends StatelessWidget {
-  const _MotionIdentityLine({
-    required this.animation,
-    required this.travel,
-    required this.reduceMotion,
-  });
-
-  final Animation<double> animation;
-  final Animation<double> travel;
+  final Animation<double>? animation;
   final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
-    if (reduceMotion) {
-      return const _StaticIdentityLine(
-        width: _SplashV2Tokens.trackWidth,
-        height: _SplashV2Tokens.trackHeight,
-      );
-    }
+    final listenable = animation ?? const AlwaysStoppedAnimation<double>(1);
+    return AnimatedBuilder(
+      animation: listenable,
+      builder: (context, _) {
+        final progress = reduceMotion ? 1.0 : listenable.value;
+        final wordmarkProgress = _interval(
+          progress,
+          0,
+          .26,
+          Curves.easeOutCubic,
+        );
+        final taglineProgress = _interval(
+          progress,
+          .20,
+          .50,
+          Curves.easeOutCubic,
+        );
+        final businessProgress = _interval(
+          progress,
+          .44,
+          .76,
+          Curves.easeOutCubic,
+        );
+        final settleProgress = _interval(progress, .72, 1, Curves.easeOutCubic);
+        final lockupTransform = Matrix4.identity()
+          ..setEntry(3, 2, .0012)
+          ..rotateX(.018 * (1 - settleProgress));
 
-    return ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(99),
-        child: Container(
-          width: _SplashV2Tokens.trackWidth,
-          height: _SplashV2Tokens.trackHeight,
-          color: _SplashV2Tokens.white.withValues(alpha: .18),
-          child: AnimatedBuilder(
-            animation: animation,
-            builder: (context, child) => Transform.translate(
-              offset: Offset(travel.value, 0),
-              child: child,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                key: const Key('splash-v2-moving-tricolour'),
-                width: _SplashV2Tokens.capsuleWidth,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(99),
-                  gradient: const LinearGradient(
-                    stops: [0, .36, .36, .62, .62, 1],
-                    colors: [
-                      _SplashV2Tokens.saffron,
-                      _SplashV2Tokens.saffron,
-                      _SplashV2Tokens.white,
-                      _SplashV2Tokens.white,
-                      _SplashV2Tokens.green,
-                      _SplashV2Tokens.green,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _SplashV2Tokens.saffron.withValues(alpha: .65),
-                      blurRadius: 12,
+        return RepaintBoundary(
+          key: const Key('splash-v2-progressive-lockup'),
+          child: Transform.translate(
+            offset: Offset(0, 2 * (1 - settleProgress)),
+            child: Transform.scale(
+              scale: 1.012 - (.012 * settleProgress),
+              child: Transform(
+                key: const Key('splash-v2-unified-settle'),
+                alignment: Alignment.center,
+                transform: lockupTransform,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      key: const Key('splash-v2-wordmark-stage'),
+                      width: 190,
+                      height: 52,
+                      child: Center(
+                        child: MoolSocialBrandMotion(
+                          width: 190,
+                          height: 52,
+                          fontSize: 29,
+                          onDarkBackground: true,
+                          progressOverride: wordmarkProgress,
+                        ),
+                      ),
                     ),
-                    BoxShadow(
-                      color: _SplashV2Tokens.white.withValues(alpha: .5),
-                      blurRadius: 18,
+                    const SizedBox(height: 10),
+                    Opacity(
+                      key: const Key('splash-v2-tagline-stage'),
+                      opacity: taglineProgress,
+                      child: Transform.translate(
+                        offset: Offset(0, 8 * (1 - taglineProgress)),
+                        child: Text(
+                          'India Ka Socio Commerce App',
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          style: TextStyle(
+                            color: _SplashV2Tokens.white.withValues(alpha: .92),
+                            fontSize: 13,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .28,
+                          ),
+                        ),
+                      ),
                     ),
-                    BoxShadow(
-                      color: _SplashV2Tokens.green.withValues(alpha: .65),
-                      blurRadius: 12,
+                    const SizedBox(height: 14),
+                    Opacity(
+                      key: const Key('splash-v2-business-stage'),
+                      opacity: businessProgress,
+                      child: Transform.translate(
+                        offset: Offset(0, 10 * (1 - businessProgress)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Create. Connect. Work. Grow.',
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              style: TextStyle(
+                                color: _SplashV2Tokens.white,
+                                fontSize: 15.5,
+                                height: 1.2,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .12,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'One app for life and business.',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: _SplashV2Tokens.white.withValues(
+                                  alpha: .78,
+                                ),
+                                fontSize: 11.5,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: .16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MotionTagline extends StatelessWidget {
-  const _MotionTagline({
-    required this.animation,
-    required this.scale,
-    required this.reduceMotion,
-  });
-
-  final Animation<double> animation;
-  final Animation<double> scale;
-  final bool reduceMotion;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        final value = reduceMotion ? 0.0 : animation.value;
-        return Transform.scale(
-          scale: reduceMotion ? 1 : scale.value,
-          child: Container(
-            height: 30,
-            constraints: const BoxConstraints(minWidth: 214),
-            decoration: BoxDecoration(
-              color: _SplashV2Tokens.white,
-              borderRadius: BorderRadius.circular(99),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x24000000),
-                  offset: Offset(0, 8),
-                  blurRadius: 24,
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (!reduceMotion)
-                  Positioned(
-                    top: -16,
-                    bottom: -16,
-                    left: -120 + (334 * value),
-                    width: 112,
-                    child: Transform.rotate(
-                      angle: -.28,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              _SplashV2Tokens.saffron.withValues(alpha: .62),
-                              _SplashV2Tokens.white.withValues(alpha: .92),
-                              _SplashV2Tokens.green.withValues(alpha: .62),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'India Ka Socio Commerce App',
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: _SplashV2Tokens.navy,
-                      fontSize: 12,
-                      height: 1.35,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
   }
-}
 
-class _StaticIdentityLine extends StatelessWidget {
-  const _StaticIdentityLine({
-    required this.width,
-    required this.height,
-    super.key,
-  });
-
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(99),
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: const Row(
-            children: [
-              Expanded(
-                flex: 45,
-                child: SizedBox.expand(
-                  child: ColoredBox(color: _SplashV2Tokens.saffron),
-                ),
-              ),
-              Expanded(
-                flex: 14,
-                child: SizedBox.expand(
-                  child: ColoredBox(color: _SplashV2Tokens.white),
-                ),
-              ),
-              Expanded(
-                flex: 41,
-                child: SizedBox.expand(
-                  child: ColoredBox(color: _SplashV2Tokens.green),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StaticTagline extends StatelessWidget {
-  const _StaticTagline();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 30,
-      constraints: const BoxConstraints(minWidth: 214),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: _SplashV2Tokens.white,
-        borderRadius: BorderRadius.circular(99),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x24000000),
-            offset: Offset(0, 8),
-            blurRadius: 24,
-          ),
-        ],
-      ),
-      child: const Text(
-        'India Ka Socio Commerce App',
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        style: TextStyle(
-          color: _SplashV2Tokens.navy,
-          fontSize: 12,
-          height: 1.35,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
+  static double _interval(double value, double begin, double end, Curve curve) {
+    if (value <= begin) return 0;
+    if (value >= end) return 1;
+    return curve.transform((value - begin) / (end - begin));
   }
 }
 
@@ -748,39 +521,32 @@ class _OpeningFooter extends StatelessWidget {
         (_SplashV2Tokens.horizontalPadding * 2);
     return SizedBox(
       width: availableWidth,
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              const SizedBox(
-                width: 9,
-                height: 9,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _SplashV2Tokens.green,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+          const SizedBox(
+            width: 8,
+            height: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _SplashV2Tokens.green,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  status,
-                  style: const TextStyle(
-                    color: _SplashV2Tokens.white,
-                    fontSize: 12,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 10),
-          _StaticIdentityLine(
-            key: const Key('splash-v2-footer-line'),
-            width: availableWidth,
-            height: 5,
+          const SizedBox(width: 9),
+          Flexible(
+            child: Text(
+              status,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _SplashV2Tokens.white.withValues(alpha: .82),
+                fontSize: 11.5,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .12,
+              ),
+            ),
           ),
         ],
       ),

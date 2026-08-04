@@ -1,0 +1,15 @@
+﻿state=passed
+candidate=BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7
+profile=1.0.0-r58.23 (2026080419)
+scales=1/1/1
+shop-1-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+shop-2-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+shop-3-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+wholesale-1-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+wholesale-2-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+wholesale-3-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+medicine-1-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+medicine-2-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+medicine-3-second=passed target=24,424,237,592 imeTop=1014 clearance=422
+processRecreation=passed_all_three
+finalState=clean Shop root

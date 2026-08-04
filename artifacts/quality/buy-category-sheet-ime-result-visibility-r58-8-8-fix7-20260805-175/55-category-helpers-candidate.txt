@@ -1,0 +1,50 @@
+$auditHelpers = @'
+function Open-Category([string]$Destination) {
+  Tap-Target -Text "$Destination categories"
+  $ui = Get-UiXml
+  Assert-Text $ui "$Destination categories"
+  $edit = $ui.SelectSingleNode('//node[@class="android.widget.EditText"]')
+  if ($null -eq $edit) { throw "$Destination category search has no EditText owner." }
+}
+
+function Set-Category-Query([string]$Query) {
+  $ui = Get-UiXml
+  $edit = $ui.SelectSingleNode('//node[@class="android.widget.EditText"]')
+  if ($null -eq $edit) { throw "No category EditText for query: $Query" }
+  Tap-Node $edit 'Category search edit owner'
+  $encoded = $Query.Replace(' ', '%s')
+  Invoke-AuditAdb -Arguments @('shell', 'input', 'text', $encoded) | Out-Null
+  Start-Sleep -Milliseconds 850
+}
+
+function Choose-Category([string]$Destination, [string]$Label) {
+  Tap-Target -Text "$Destination category, $Label"
+  Start-Sleep -Milliseconds 450
+}
+
+function Assert-Category($Ui, [string]$Destination, [string]$Label) {
+  Assert-Text $Ui "Choose $Destination category. Current category $Label"
+}
+
+function Open-Category-Product-And-Return {
+  param(
+    [string]$Destination,
+    [string]$Category,
+    [string]$Title,
+    [string]$Pack,
+    [string]$DetailName,
+    [string]$ReturnName
+  )
+  $ui = Get-UiXml
+  Tap-Node (Find-ProductNode $ui $Title) $Title
+  $detail = Save-State $DetailName
+  Assert-Text $detail $Title
+  Assert-NoText $detail 'Review order'
+  Invoke-AuditAdb -Arguments @('shell', 'input', 'keyevent', 'BACK') | Out-Null
+  Wait-App
+  $returned = Save-State $ReturnName
+  Assert-Category $returned $Destination $Category
+  Assert-ProductResult $returned $Title $Pack
+  return $returned
+}
+'@

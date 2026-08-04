@@ -1,0 +1,9 @@
+{
+  "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+  "preBuildManifest": "30-source-manifest-final-prebuild.txt",
+  "postBuildManifest": "38-source-manifest-post-build.txt",
+  "fileCount": 2466,
+  "manifestSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+  "exactMatch": true,
+  "unexplainedDrift": false
+}

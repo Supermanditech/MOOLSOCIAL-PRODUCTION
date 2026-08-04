@@ -11,6 +11,7 @@ class JourneySnapshot {
     this.currentAreaLabel,
     this.homeOrWorkAreaLabel,
     this.pendingRoute,
+    this.lastReadyRoute,
     this.setupExperienceVersion = approvedSetupExperienceVersion,
   });
 
@@ -21,6 +22,7 @@ class JourneySnapshot {
   final String? homeOrWorkAreaLabel;
   final bool setupComplete;
   final String? pendingRoute;
+  final String? lastReadyRoute;
   final int setupExperienceVersion;
 }
 

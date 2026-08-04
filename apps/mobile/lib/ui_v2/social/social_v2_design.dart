@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/design/moolsocial_brand_motion.dart';
+
 abstract final class SocialV2Colors {
   static const navy = Color(0xFF000080);
   static const royal = Color(0xFF1717A5);
@@ -297,35 +299,19 @@ class SocialV2Header extends StatelessWidget {
 }
 
 class SocialV2Wordmark extends StatelessWidget {
-  const SocialV2Wordmark({this.compact = false, super.key});
+  const SocialV2Wordmark({this.compact = false, this.onPressed, super.key});
 
   final bool compact;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return MoolSocialBrandMotion(
+      width: compact ? 104 : 124,
       height: compact ? 44 : 48,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'MoolSocial',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: compact ? 18 : 22,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.6,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SocialV2IdentityLine(compact: compact),
-          ],
-        ),
-      ),
+      fontSize: compact ? 12 : 14,
+      onDarkBackground: true,
+      onPressed: onPressed,
     );
   }
 }

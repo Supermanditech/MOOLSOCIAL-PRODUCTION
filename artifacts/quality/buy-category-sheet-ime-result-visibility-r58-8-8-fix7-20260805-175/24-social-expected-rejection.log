@@ -1,0 +1,9 @@
+﻿Protected Social inventory changed. Expected 119 files but found 164. A founder-approved baseline replacement is 
+required.
+At C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\scripts\check-social-protected-baseline.ps1:105 char:3
++   throw (
++   ~~~~~~~
+    + CategoryInfo          : OperationStopped: (Protected Socia...nt is required.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Protected Social inventory changed. Expected 119 files but found 164. A founder-approved 
+    baseline replacement is required.
+ 

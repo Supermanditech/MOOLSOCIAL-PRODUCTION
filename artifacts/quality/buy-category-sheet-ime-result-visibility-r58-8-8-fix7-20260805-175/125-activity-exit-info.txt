@@ -1,0 +1,68 @@
+ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+Last Timestamp of Persistence Into Persistent Storage: 2026-08-05 00:40:57.291
+  package: com.moolsocial.app
+    Historical Process Exit for uid=10465
+        ApplicationExitInfo #0:
+          timestamp=2026-08-05 01:05:06.440 pid=13968 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=400 pss=224MB rss=379MB description=stop com.moolsocial.app due to from pid 15398|J:700 state=empty trace=null
+        ApplicationExitInfo #1:
+          timestamp=2026-08-05 01:03:45.059 pid=11123 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=234MB rss=393MB description=stop com.moolsocial.app due to from pid 13932|J:0 state=empty trace=null
+        ApplicationExitInfo #2:
+          timestamp=2026-08-05 01:00:32.382 pid=9172 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=198MB rss=355MB description=stop com.moolsocial.app due to from pid 11062|J:0 state=empty trace=null
+        ApplicationExitInfo #3:
+          timestamp=2026-08-05 00:57:04.710 pid=8559 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=234MB rss=390MB description=stop com.moolsocial.app due to from pid 9141|J:0 state=empty trace=null
+        ApplicationExitInfo #4:
+          timestamp=2026-08-05 00:56:33.146 pid=8055 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=228MB rss=385MB description=stop com.moolsocial.app due to from pid 8367|J:0 state=empty trace=null
+        ApplicationExitInfo #5:
+          timestamp=2026-08-05 00:56:01.216 pid=7544 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=232MB rss=388MB description=stop com.moolsocial.app due to from pid 8027|J:0 state=empty trace=null
+        ApplicationExitInfo #6:
+          timestamp=2026-08-05 00:55:29.295 pid=5815 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=232MB rss=387MB description=stop com.moolsocial.app due to from pid 7495|J:0 state=empty trace=null
+        ApplicationExitInfo #7:
+          timestamp=2026-08-05 00:52:40.657 pid=5010 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=209MB rss=363MB description=stop com.moolsocial.app due to from pid 5677|J:0 state=empty trace=null
+        ApplicationExitInfo #8:
+          timestamp=2026-08-05 00:50:40.593 pid=1664 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=237MB rss=391MB description=stop com.moolsocial.app due to from pid 4940|J:0 state=empty trace=null
+        ApplicationExitInfo #9:
+          timestamp=2026-08-05 00:48:45.598 pid=30359 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=22 (REMOVE TASK) status=0
+          importance=400 pss=225MB rss=377MB description=remove task|J:905 state=empty trace=null
+        ApplicationExitInfo #10:
+          timestamp=2026-08-05 00:40:41.210 pid=23198 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=187MB rss=238MB description=stop com.moolsocial.app due to installPackageLI|J:0 state=empty trace=null
+        ApplicationExitInfo #11:
+          timestamp=2026-08-05 00:16:52.116 pid=11689 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=221MB rss=238MB description=stop com.moolsocial.app due to installPackageLI|J:0 state=empty trace=null
+        ApplicationExitInfo #12:
+          timestamp=2026-08-04 23:39:09.578 pid=10920 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=400 pss=222MB rss=379MB description=stop com.moolsocial.app due to from pid 11667|J:700 state=empty trace=null
+        ApplicationExitInfo #13:
+          timestamp=2026-08-04 23:37:52.673 pid=8208 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=230MB rss=390MB description=stop com.moolsocial.app due to from pid 10739|J:0 state=empty trace=null
+        ApplicationExitInfo #14:
+          timestamp=2026-08-04 23:34:49.180 pid=7915 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=246MB rss=404MB description=stop com.moolsocial.app due to from pid 8176|J:0 state=empty trace=null
+        ApplicationExitInfo #15:
+          timestamp=2026-08-04 23:34:27.400 pid=7090 realUid=10465 packageUid=10465 definingUid=10465 user=0
+          process=com.moolsocial.app reason=10 (USER REQUESTED) subreason=21 (FORCE STOP) status=0
+          importance=100 pss=237MB rss=395MB description=stop com.moolsocial.app due to from pid 7884|J:0 state=empty trace=null

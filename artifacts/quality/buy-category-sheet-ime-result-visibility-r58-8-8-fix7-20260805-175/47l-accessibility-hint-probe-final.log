@@ -1,0 +1,28 @@
+Warning: This version of UI Automator is deprecated. New tests should be written using
+UI Automator 2.0 which is available as part of the Android Testing Support Library.
+See https://developer.android.com/training/testing/ui-testing/uiautomator-testing.html
+for more details.
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+com.moolsocial.evidence.AccessibilityHintProbe:
+INSTRUMENTATION_STATUS: id=UiAutomatorTestRunner
+INSTRUMENTATION_STATUS: test=testCategorySearchHintAndActions
+INSTRUMENTATION_STATUS: class=com.moolsocial.evidence.AccessibilityHintProbe
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS_CODE: 1
+MOOLSOCIAL_ACCESSIBILITY_HINT_PROBE class=android.widget.EditText; hint=Category search, Find a category; text=; contentDescription=null; focusable=true; editable=true; hasFocusAction=false; hasAccessibilityFocusAction=true; hasClickAction=true; hasSetTextAction=true
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: id=UiAutomatorTestRunner
+INSTRUMENTATION_STATUS: test=testCategorySearchHintAndActions
+INSTRUMENTATION_STATUS: class=com.moolsocial.evidence.AccessibilityHintProbe
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=
+Test results for WatcherResultPrinter=.
+Time: 7.79
+
+OK (1 test)
+
+
+INSTRUMENTATION_STATUS_CODE: -1
