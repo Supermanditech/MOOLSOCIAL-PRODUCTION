@@ -40931,7 +40931,7 @@
     },
     {
       "id": "REG-20260824-3671-APP-SPLASH-PRODUCTION-SOURCE-EXPECTED-DIGEST-NOT-RAW-OR-CANONICAL",
-      "status": "registered_no_later_action_and_semantic_history_comparison_required",
+      "status": "registered_root_cause_proven_external_founder_UI_baseline_direction_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40939,8 +40939,8 @@
         "failure_handling"
       ],
       "mistake": "After text baselines were allowed to match unchanged expected raw or canonical hashes, app_splash_screen_v2.dart still rejected because neither current production raw nor canonical text equals its expected digest.",
-      "rootCause": "The difference may be semantic source drift rather than line-ending materialization and must be compared to the accepted repository history after registration.",
-      "prevention": "Do not weaken the lock or alter UI/reference content. Bind this registry generation, compare only the current file's canonical content against the accepted historical blob that matches the expected digest, and stop for founder UI-baseline direction if the delta is semantic.",
+      "rootCause": "The expected digest maps exactly to historical commit b2839b82f5d2164e60df3d89e5ca39e1419acf86. Its raw and canonical hashes both equal b0e7b099b70be7240a4e7699596ab7f16b77285fba9c23c4f3708afda7ae218d, while current canonical source is d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be. Git reports 156 additions and 390 deletions, proving semantic source drift rather than line-ending materialization.",
+      "prevention": "Do not weaken the lock or alter UI/reference content under authentication scope. Preserve the portability gate changes and stop for founder direction to either restore the accepted splash implementation or separately review and accept a new UI baseline with exact visual/device evidence and refreshed immutable digests.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
@@ -40949,6 +40949,26 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3672-UI-LOCK-BLOCKER-FINAL-BINDING-PATCH-STALE-ANCHOR",
+      "status": "registered_atomic_rejection_and_exact_current_binding_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The final REG3671 blocker-binding patch used a stale assumed coordination value and was rejected atomically.",
+      "rootCause": "The primary did not read the exact current coordination binding after the latest local governance sequence before constructing the final blocker patch.",
+      "prevention": "Count the rejected patch as zero change, read the exact current binding once, update directly to the final blocker generation/hash, commit locally, and stop without another feature or gate action.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
       ]
     }
   ]
