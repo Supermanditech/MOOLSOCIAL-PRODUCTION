@@ -332,7 +332,7 @@ Assert-ExactNames $gitDiscipline.workStart @(
 ) 'production work start'
 Assert-Coordination (
   [string]$gitDiscipline.workStart.annotatedTag -ceq
-    'moolsocial-parallel-production-discipline-20260824-v45' -and
+    'moolsocial-parallel-production-discipline-20260824-v46' -and
   [bool]$gitDiscipline.workStart.mustDescendFromAcceptedRuntimeBaseline -and
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
@@ -405,7 +405,7 @@ Assert-ExactNames $gitDiscipline.agentTicketQueues @(
   'cursorUiMaximumOpenTickets','codexAuthMaximumOpenTickets',
   'codexBackendMaximumOpenTickets','priorTicketClosureRequired',
   'founderSelectsExactNextTicket','crossLaneImplementationAllowed',
-  'plannedCodexAuthenticationProviders'
+  'plannedCodexAuthenticationProviders','authPrebuildBatch'
 ) 'agent ticket queue discipline'
 $plannedCodexAuthenticationProviders = @(
   $gitDiscipline.agentTicketQueues.plannedCodexAuthenticationProviders |
@@ -421,6 +421,44 @@ Assert-Coordination (
   (@($plannedCodexAuthenticationProviders) -join '|') -ceq
     'email_link|facebook|instagram|youtube_connect|x'
 ) 'agent ticket queue discipline weakened.'
+$authPrebuildBatch = $gitDiscipline.agentTicketQueues.authPrebuildBatch
+Assert-ExactNames $authPrebuildBatch @(
+  'state','orderedProviders','maximumActiveMutationTickets',
+  'priorProviderImplementationAndQualificationCommitsRequired',
+  'runtimeAcceptanceDeferredUntilOneCombinedApk','finalTicketCloseStillRequired',
+  'currentProvider','completedPrebuildProviders'
+) 'authentication prebuild batch'
+$completedPrebuildProviders = @($authPrebuildBatch.completedPrebuildProviders)
+Assert-Coordination (
+  [string]$authPrebuildBatch.state -ceq
+    'founder_authorized_runtime_acceptance_deferred_2026_08_24' -and
+  (@($authPrebuildBatch.orderedProviders) -join '|') -ceq
+    'email_link|facebook|youtube_connect|x|instagram' -and
+  [int]$authPrebuildBatch.maximumActiveMutationTickets -eq 1 -and
+  [bool]$authPrebuildBatch.priorProviderImplementationAndQualificationCommitsRequired -and
+  [bool]$authPrebuildBatch.runtimeAcceptanceDeferredUntilOneCombinedApk -and
+  [bool]$authPrebuildBatch.finalTicketCloseStillRequired -and
+  [string]$authPrebuildBatch.currentProvider -ceq 'facebook' -and
+  $completedPrebuildProviders.Count -eq 1
+) 'authentication prebuild batch weakened or changed.'
+$emailLinkPrebuild = $completedPrebuildProviders[0]
+Assert-ExactNames $emailLinkPrebuild @(
+  'provider','ticketId','branch','implementationCommit','qualificationCommit',
+  'remoteQualified','runtimeAcceptancePending'
+) 'email-link prebuild qualification'
+Assert-Coordination (
+  [string]$emailLinkPrebuild.provider -ceq 'email_link' -and
+  [string]$emailLinkPrebuild.ticketId -ceq
+    'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [string]$emailLinkPrebuild.branch -ceq
+    'work/codex-auth/email-link-auth-20260823' -and
+  [string]$emailLinkPrebuild.implementationCommit -ceq
+    '883f1d06c315438823c801b184b990b672c77f85' -and
+  [string]$emailLinkPrebuild.qualificationCommit -ceq
+    '84ab8e55414d4b87b3442a3b9631fe058efc6efe' -and
+  [bool]$emailLinkPrebuild.remoteQualified -and
+  [bool]$emailLinkPrebuild.runtimeAcceptancePending
+) 'email-link prebuild qualification changed.'
 
 $productionLanes = @($gitDiscipline.lanes)
 $expectedLaneIds = @('cursor_ui','codex_auth','codex_backend','integration')
@@ -600,7 +638,7 @@ foreach ($token in @(
   'never enumerate all historical assessment properties',
   'digest output allowlist is',
   'Mandatory Codex/Cursor isolated production Git discipline',
-  'moolsocial-parallel-production-discipline-20260824-v45',
+  'moolsocial-parallel-production-discipline-20260824-v46',
   'Parallel mutation in one checkout is forbidden',
   'codex-cursor-baseline-reconciliation',
   '`governance_preflight`',
@@ -639,6 +677,7 @@ foreach ($token in @(
   '`--no-ff` merge commits',
   'zero staged, unstaged and untracked files',
   '`ticket_acceptance` phase before push and `ticket_close`',
+  'runtime acceptance may be deferred only under the founder-authorized authentication prebuild batch',
   'integration owner owns batch-wide Git closure',
   'moolsocial_ticket_founder_acceptance_v1',
   'moolsocial_ticket_oppo_acceptance_v1',

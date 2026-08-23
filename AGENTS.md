@@ -38,7 +38,7 @@ The accepted Google-auth runtime baseline remains commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. Parallel work begins only
 from the annotated governance tag
-`moolsocial-parallel-production-discipline-20260824-v45` after the founder
+`moolsocial-parallel-production-discipline-20260824-v46` after the founder
 explicitly authorizes its commit/tag/push.
 
 Before that work-start tag is created, the primary must pass
@@ -75,6 +75,12 @@ is classified and preserved; it is never deleted to force this gate green.
   Instagram, YouTube Connect and X as separate founder-selected tickets, one at
   a time. Neither agent may accept its next ticket until `ticket_close` proves
   the prior branch is accepted, clean and equal to its remote readback.
+- Runtime acceptance may be deferred only under the founder-authorized
+  authentication prebuild batch. The prior provider must have an atomic
+  implementation commit, evidence-only prebuild qualification commit, clean
+  exact `origin` readback and zero active mutation. It remains open for the one
+  later combined APK, founder/OPPO acceptance and final `ticket_close`; only
+  one provider ticket may mutate at a time.
 - `codex_backend` for a Cursor-designed journey is blocked until the founder
   accepts the exact Cursor UI commit and a repository evidence file binds that
   commit, the interaction/business contract and their SHA-256 values. Backend

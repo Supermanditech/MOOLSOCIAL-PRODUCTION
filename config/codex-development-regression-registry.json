@@ -41099,6 +41099,95 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3679-FOUNDER-AUTH-PROVIDER-PREBUILD-BATCH-RUNTIME-ACCEPTANCE-DEFERRED",
+      "status": "registered_email_link_prebuild_qualified_facebook_next_single_active_ticket",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "email_link_auth",
+        "facebook_auth"
+      ],
+      "mistake": "The ordinary one-ticket rule requires final OPPO/private acceptance before another provider, while the founder explicitly requires every provider to become locally green before exactly one combined APK and private acceptance sequence.",
+      "rootCause": "Per-provider runtime acceptance cannot occur without violating the founder's single-APK rule, so full ticket closure and the prebuild provider queue must be represented as distinct states without allowing parallel mutation.",
+      "prevention": "Require each provider to produce an atomic implementation commit, evidence-only prebuild qualification commit, clean exact origin readback and zero active mutation before the next provider claim. Keep at most one active auth ticket, retain all prebuild-qualified tickets as runtime-acceptance-pending, integrate only exact qualified SHAs later, build exactly one combined APK after every provider is locally green, and require founder/OPPO private acceptance before final ticket_close or promotion.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md"
+      ]
+    },
+    {
+      "id": "REG-20260824-3680-AUTH-PREBUILD-BATCH-MULTI-OWNER-PATCH-STALE-WORKSTART-ANCHOR",
+      "status": "registered_policy_JSON_applied_checker_docs_zero_change_and_small_patches_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The authentication batch JSON and Facebook claim patch applied, but the subsequent checker/AGENTS/docs patch was rejected atomically because its remembered work-start assertion anchor did not match the exact checker text.",
+      "rootCause": "A heterogeneous patch coupled schema logic, work-start literals and prose owners without first reading each exact current anchor.",
+      "prevention": "Preserve the applied policy JSON, bind this registry generation, patch checker schema/assertions separately, then patch each mandatory prose/work-start owner with exact current anchors and parse/gate before sealing v46.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3681-AUTH-BATCH-CHECKER-PATCH-REPEATED-HETEROGENEOUS-ANCHOR-COUPLING",
+      "status": "registered_atomic_rejection_schema_and_literals_must_be_separate",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The corrected checker patch still coupled queue schema assertions, work-start literals and required-document phrases; one literal anchor rejected the entire patch atomically.",
+      "rootCause": "The primary repeated heterogeneous anchor coupling after REG3680 instead of applying schema and literal changes independently.",
+      "prevention": "Bind this registry generation, patch and parse the queue schema/assertions first, then replace work-start literals through an exact mechanical substitution, then patch the required phrase separately with readback.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3682-FACEBOOK-GOVERNANCE-OWNER-CHECK-OMITTED-UNTRACKED-TICKET",
+      "status": "registered_no_staging_and_tracked_plus_untracked_union_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first Facebook governance owner validation compared git diff --name-only to an expected set containing the newly created untracked Facebook ticket and rejected before staging.",
+      "rootCause": "git diff --name-only omits untracked owners; the probe did not union git ls-files --others --exclude-standard.",
+      "prevention": "Bind this registry generation, compute the exact changed-owner set as tracked diff union untracked files, require it to equal the eight claimed governance owners, then stage and validate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md"
+      ]
     }
   ]
 }

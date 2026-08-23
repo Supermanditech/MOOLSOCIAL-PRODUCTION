@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3649,
-    "sha256": "03158AAC82294EB914D90251B096780CE78EEFC2D39D423A99B07F5A0012824A"
+    "entryCount": 3653,
+    "sha256": "93A54EAEE85046E6F4E9582CA74A2F418902422B107C0A990614237011DC6C39"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -119,31 +119,33 @@
       ]
     },
     {
-      "task": "/root/codex_auth_email_link_20260823",
+      "task": "/root/codex_auth_facebook_prebuild_20260824",
       "role": "primary",
       "owners": [
         "apps/mobile/lib/main.dart",
-        "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
+        "apps/mobile/lib/core/auth/facebook_login_contract.dart",
+        "apps/mobile/lib/core/auth/facebook_native_sdk_adapter.dart",
+        "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
         "apps/mobile/lib/features/journey01/journey_services.dart",
         "apps/mobile/lib/features/journey01/journey_session.dart",
         "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/features/journey01/screens/sign_in_screen.dart",
         "apps/mobile/android/app/src/main/AndroidManifest.xml",
-        "apps/mobile/test/uaw_c33j_fix1_foreground_email_link_return_handoff_test.dart",
-        "apps/mobile/test/uaw_c33j_fix2_android_email_link_same_device_exact_return_test.dart",
-        "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart",
-        "apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart",
-        "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
-        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
-        "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
-        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1",
-        "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1",
-        "scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1",
-        "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1",
-        "scripts/check-uaw-c33n-fix1-c33m-fix5-gate-generic-successor-replay-compatibility.ps1",
-        "scripts/check-uaw-c33k-firebase-passwordless-email-link-live-readiness.ps1",
-        "scripts/check-uaw-c33m-fix7-c33k-gate-generic-successor-replay-compatibility.ps1",
-        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1",
-        "scripts/check-approved-ui-locks.ps1"
+        "apps/mobile/android/app/build.gradle.kts",
+        "apps/mobile/pubspec.yaml",
+        "apps/mobile/pubspec.lock",
+        "apps/mobile/test/firebase_social_auth_gateway_test.dart",
+        "apps/mobile/test/uaw_c34p_facebook_login_contract_test.dart",
+        "apps/mobile/test/uaw_c34p_facebook_native_sdk_adapter_test.dart",
+        "apps/mobile/test/uaw_c34p_public_auth_failure_and_availability_test.dart",
+        "apps/mobile/test/uaw_c34p_fix8_global_social_login_runtime_composition_test.dart",
+        "apps/mobile/test/uaw_c33g_fix2_social_identity_provider_truth_test.dart",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1",
+        "scripts/check-full-social-founder-dev-readiness.ps1",
+        "scripts/check-uaw-c33g-fix2-social-identity-provider-truth.ps1",
+        "scripts/check-android-plugin-manifest-namespace-readiness.ps1"
       ]
     }
   ],
@@ -173,7 +175,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v45",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v46",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },
@@ -229,7 +231,33 @@
         "instagram",
         "youtube_connect",
         "x"
-      ]
+      ],
+      "authPrebuildBatch": {
+        "state": "founder_authorized_runtime_acceptance_deferred_2026_08_24",
+        "orderedProviders": [
+          "email_link",
+          "facebook",
+          "youtube_connect",
+          "x",
+          "instagram"
+        ],
+        "maximumActiveMutationTickets": 1,
+        "priorProviderImplementationAndQualificationCommitsRequired": true,
+        "runtimeAcceptanceDeferredUntilOneCombinedApk": true,
+        "finalTicketCloseStillRequired": true,
+        "currentProvider": "facebook",
+        "completedPrebuildProviders": [
+          {
+            "provider": "email_link",
+            "ticketId": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
+            "branch": "work/codex-auth/email-link-auth-20260823",
+            "implementationCommit": "883f1d06c315438823c801b184b990b672c77f85",
+            "qualificationCommit": "84ab8e55414d4b87b3442a3b9631fe058efc6efe",
+            "remoteQualified": true,
+            "runtimeAcceptancePending": true
+          }
+        ]
+      }
     },
     "lanes": [
       {

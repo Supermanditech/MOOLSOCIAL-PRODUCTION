@@ -78,7 +78,7 @@ The immutable runtime starting point is accepted r60.87 commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. The reusable work starting
 point is the later annotated governance tag
-`moolsocial-parallel-production-discipline-20260824-v45`. No feature lane may start
+`moolsocial-parallel-production-discipline-20260824-v46`. No feature lane may start
 until that governance tag exists and descends from the accepted runtime commit.
 Immediately before creating the tag, the primary runs `governance_preflight`.
 That gate requires the production checkout to descend from accepted r60.87,
@@ -138,6 +138,12 @@ classified and preserved; it is not deleted to manufacture a clean baseline.
    `ticket_acceptance` phase before push and `ticket_close` after the exact
    remote readback. An agent with an open or dirty ticket may not accept a new
    ticket.
+   Runtime acceptance may be deferred only under the founder-authorized
+   authentication prebuild batch. The prior provider must have an atomic
+   implementation commit, evidence-only qualification commit, clean exact
+   remote readback and zero active mutation. It remains open for the one later
+   combined APK, founder/OPPO acceptance and final `ticket_close`; only one
+   provider ticket may mutate at a time.
 8. Consolidation uses a third primary-owned integration worktree and an exact
    `integration/moolsocial/<work-id>` branch starting from the governance tag.
    It admits only founder-approved feature commit SHAs through `--no-ff` merge
