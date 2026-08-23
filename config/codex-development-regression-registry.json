@@ -39902,6 +39902,98 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260823-3625-EMAIL-LINK-MVP-STATE-PROJECTION-HISTORICAL-ASSESSMENT-OUTPUT-TRUNCATION",
+      "status": "registered_no_state_mutation_and_exact_active_field_patch_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first MVP state projection included the complete pre-ticket checkpoint with thousands of retained historical assessment lines and returned truncated output.",
+      "rootCause": "The projection selected the entire historical checkpoint object instead of only the already-identified active ticket, authorization and selected assessment fields.",
+      "prevention": "Treat the truncated projection as no complete evidence, bind this registry generation, preserve all historical assessments, and patch only the exact active email-link selection fields supplied by the bounded lane readback before running the candidate-specific MVP execution gate.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-mvp-scope-gate-state.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3626-EMAIL-LINK-READONLY-REG3377-FULL-ID-GUESSED-FROM-MEMORY-LABEL",
+      "status": "registered_no_mutation_and_literal_registry_id_resolution_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The supervised email-link lane inferred a full registry ID from memory label REG3377 and the exact read-only lookup returned zero entries.",
+      "rootCause": "A short memory label is not an authoritative full registry ID, and the lane queried an unproven constructed identifier rather than resolving the numeric suffix from the registry.",
+      "prevention": "Bind this registry generation, provide this literal incident ID and registry path, resolve REG3377 only by exact numeric-suffix search in the authoritative registry, and do not infer any full ID from memory prose.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3627-EMAIL-LINK-MVP-STATE-BROAD-PATCH-CHECKPOINT-ANCHOR-MISMATCH",
+      "status": "registered_atomic_rejection_zero_state_change_and_small_hunks_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first multi-section email-link MVP state patch was rejected atomically because its checkpoint approval-state anchor did not match the exact current owner.",
+      "rootCause": "A broad heterogeneous state patch coupled independently located active sections to one exact long-string checkpoint anchor, so one stale or inexact anchor rejected the entire operation.",
+      "prevention": "Count the rejected patch as zero changes, bind this registry generation, and apply independently verified small hunks for current ticket, assessment, disclosure, authorization, execution, checkpoint and provider-gate sections with JSON readback after each group.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-mvp-scope-gate-state.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3628-EMAIL-LINK-MVP-ASSESSMENT-TICKET-MANIFEST-HASH-MATERIALIZATION-MISMATCH",
+      "status": "registered_gate_rejected_and_canonical_production_hash_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first email-link MVP execution gate rejected because the selected assessment used the ticket hash reported from the feature worktree rather than the canonical production checkout materialization.",
+      "rootCause": "The same tracked Markdown ticket can materialize with different line endings across worktrees, while the MVP delivery gate hashes the exact repository-root file bytes supplied to that invocation.",
+      "prevention": "Bind this registry generation, read only the production and feature ticket hashes, set the central assessment to the canonical production hash used by the authoritative gate, and keep the ticket content unchanged before one gate retry.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-mvp-scope-gate-state.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+      ]
     }
   ]
 }

@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR",
+    "currentTicketId": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,65 +1672,65 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR",
-      "customerOutcome": "A Personal user can tap Continue with Google on the exact installed OPPO candidate, complete the Google-owned account handoff and Firebase-backed MoolSocial session, reach the preserved destination, and remain correctly authenticated after relaunch with truthful cancel, collision, retry and failure recovery.",
-      "manifestPath": "config/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-ticket.json",
-      "manifestSha256": "1DB3D993DAD2D5F802B8C22EE16849D446D7CF4D410590CA4595A8B42B2C9215",
+      "ticketId": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
+      "customerOutcome": "A Personal user can request an email sign-in link, open the same-device Android return privately, obtain Firebase credential acceptance and enter a persistent authenticated MoolSocial session without regressing the accepted Google path.",
+      "manifestPath": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
+      "manifestSha256": "9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
-      "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+      "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/features/journey01/screens/sign_in_screen.dart",
+        "apps/mobile/lib/main.dart",
+        "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
         "apps/mobile/lib/features/journey01/journey_services.dart",
         "apps/mobile/lib/features/journey01/journey_session.dart",
-        "apps/mobile/lib/main.dart",
-        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
-        "apps/mobile/android/app/build.gradle.kts",
-        "apps/mobile/lib/core/auth/public_auth_failure.dart",
-        "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
-        "apps/mobile/test/firebase_social_auth_gateway_test.dart",
-        "scripts/check-google-android-oauth-signing-readiness.ps1",
-        "scripts/check-google-android-identity-bridge-readiness.ps1"
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/android/app/src/main/AndroidManifest.xml",
+        "apps/mobile/test/uaw_c33j_fix1_foreground_email_link_return_handoff_test.dart",
+        "apps/mobile/test/uaw_c33j_fix2_android_email_link_same_device_exact_return_test.dart",
+        "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart",
+        "apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart",
+        "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
+        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The existing Google UI, gateway, session, runtime, Android bridge and readiness gates are reusable, but r60.84 still failed on the founder's OPPO and collapsed the exact failed layer. Sanitized stage receipts plus exact prior-failure fixtures inside the existing ownership graph are the smallest necessary repair; no new screen, route, provider adapter or backend owner is added.",
+      "necessityProof": "The current email-link runtime, Firebase gateway, same-device Android return and session owners already exist. Inspecting and correcting only the exact claimed owners is the smallest complete production repair and creates no new screen, route, backend or parallel authentication path.",
       "robustnessCoverage": [
-        "locked_Screen03_Google_tap_and_busy_retry_wiring",
-        "Android_identity_bridge_and_Credential_Manager_result_classification",
-        "exact_package_signer_OAuth_client_and_runtime_input_provenance",
-        "Firebase_Google_credential_exchange_collision_and_auth_state",
-        "shared_bootstrap_navigation_session_persistence_and_sign_out",
-        "sanitized_stage_receipts_without_private_or_credential_material",
-        "postbuild_Firebase_Core_registrant_and_no_integration_test",
-        "one_checksum_matched_in_place_OPPO_successor_and_founder_real_Google_acceptance"
+        "email_link_request_contract_without_live_send",
+        "same_device_Android_deep_link_return",
+        "fresh_process_return_persistence",
+        "Firebase_email_link_credential_acceptance_contract",
+        "authenticated_session_creation_and_MoolSocial_state_transition",
+        "retry_and_invalid_or_foreign_link_fail_closed_behavior",
+        "sanitized_telemetry_without_email_link_token_UID_API_key_or_secret",
+        "accepted_Google_r60_87_path_preserved"
       ],
       "adjustments": [
-        "narrow_the_existing_multi_provider_ticket_to_one_Google_acceptance_unit",
-        "reuse_existing_Screen03_gateway_session_runtime_bridge_and_readiness_owners",
-        "add_only_evidenced_stage_telemetry_and_exact_prior_failure_tests",
-        "preserve_r60_84_as_rejected_consumed_and_non_reusable",
-        "hold_every_other_provider_until_founder_Google_acceptance"
+        "select_email_link_as_the_only_active_authentication_ticket",
+        "reuse_existing_runtime_gateway_session_and_Android_return_owners",
+        "implement_only_a_proven_local_defect_with_focused_negative_and_session_tests",
+        "hold_build_device_external_configuration_and_live_email_until_separate_authority"
       ],
       "explicitExclusions": [
-        "no_other_provider_SQL_Connect_UI_or_backend_expansion",
-        "no_new_screen_route_or_locked_Screen01_through_Screen03_presentation_change",
-        "no_AAB_Play_Production_private_Codex_login_email_SMS_commit_push_or_merge",
-        "no_uninstall_data_clear_downgrade_or_reuse_of_r60_84",
-        "no_static_local_mock_or_configuration_gate_as_end_to_end_acceptance"
+        "no_Facebook_Instagram_X_YouTube_Connect_or_Google_authentication_change",
+        "no_new_screen_route_backend_or_unrelated_UI_change",
+        "no_real_email_private_login_external_configuration_or_production_project_mutation",
+        "no_APK_AAB_Play_device_install_uninstall_or_data_clear",
+        "no_email_address_link_token_credential_UID_API_key_secret_or_private_payload_output"
       ],
       "dependenciesAndApprovals": [
-        "founder_google_only_forensic_repair_build_install_and_on_screen_test_authorization_2026_08_23",
-        "REG3476_through_REG3480_registered_before_implementation",
-        "exact_installed_r60_84_and_source_provenance_reconstruction",
-        "green_pre_APK_historical_and_new_Google_forensic_gates",
-        "founder_private_Google_account_choice_and_consent_after_one_qualified_install"
+        "founder_parallel_lane_and_email_link_queue_authorization_2026_08_23",
+        "clean_v10_work_start_and_non_overlapping_12_owner_claim",
+        "current_email_link_ticket_manifest_and_hash",
+        "focused_local_tests_and_no_build_preflight_before_any_later_build_request",
+        "founder_only_private_address_link_open_and_real_device_acceptance"
       ],
       "timelineImpactDays": 2,
       "within60To75DayLock": true,
-      "implementationState": "google_only_forensic_ticket_selected_failures_registered_source_and_test_repair_authorized_build_and_install_held_until_evidenced_root_cause_and_green_preflight",
-      "evidencePath": "docs/quality/UAW-C34P-FIX11-GOOGLE-SIGN-IN-ROBUSTNESS-REUSE-ASSESSMENT-20260823.md"
+      "implementationState": "email_link_ticket_selected_runtime_and_focused_test_writes_authorized_real_email_private_login_external_configuration_build_device_Play_and_AAB_held",
+      "evidencePath": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -4435,7 +4435,7 @@
     "branch": "remediation/prototype-conformance-2026-07-20",
     "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
     "lastApprovedCandidate": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-MOTION-CONTAINMENT-OPPO-FIX1-C10E-R60-10",
-    "approvalState": "FIX11_Google_only_forensic_source_and_test_repair_authorized_one_unique_successor_APK_and_one_in_place_OPPO_install_machine_held_until_evidenced_root_cause_and_green_preflight_founder_private_Google_action_only_all_other_providers_email_SMS_Play_AAB_Production_SQL_Connect_and_unrelated_work_held",
+    "approvalState": "email_link_runtime_and_focused_test_work_authorized_in_isolated_Codex_lane_real_email_private_login_external_configuration_build_device_Play_AAB_and_unrelated_providers_held",
     "successorRegistered": true
   },
   "priorC33LTicket": {
@@ -5050,47 +5050,44 @@
     ]
   },
   "ticket": {
-    "id": "UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR",
+    "id": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
     "parentTicketId": "UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR",
-    "customerOutcome": "A Personal user can tap Continue with Google on the exact installed OPPO candidate, complete the Google-owned account handoff and Firebase-backed MoolSocial session, reach the preserved destination, and remain correctly authenticated after relaunch with truthful cancel, collision, retry and failure recovery.",
+    "customerOutcome": "A Personal user can request an email sign-in link, open the same-device Android return privately, obtain Firebase credential acceptance and enter a persistent authenticated MoolSocial session without regressing the accepted Google path.",
     "classification": "mvp_required",
-    "classificationReason": "Real founder testing rejected r60.84 because Google Sign-In did not complete. Google authentication is a core launch identity path and the failure remains unclassified across UI, Android identity, OAuth client selection, Firebase exchange, shared bootstrap and navigation/session layers.",
+    "classificationReason": "Passwordless email-link authentication is a planned launch identity path. Its existing runtime and return owners require production-grade verification and only evidenced repairs before provider acceptance.",
     "minimumCompleteScope": [
-      "preserve_locked_Screen03_presentation_and_trace_the_existing_Google_tap_callback",
-      "inspect_the_exact_installed_r60_84_APK_manifest_resources_dex_plugins_runtime_defines_signature_version_and_source_provenance",
-      "trace_Flutter_state_Android_identity_OAuth_client_FirebaseAuth_App_Check_bootstrap_navigation_and_persistence",
-      "add_sanitized_stage_specific_receipts_and_fix_only_evidenced_Google_defects",
-      "add_focused_positive_and_negative_Google_contract_tests",
-      "publish_a_pre_APK_local_emulated_static_and_real_OPPO_evidence_matrix",
-      "after_green_preflight_build_one_unique_successor_not_r60_84_and_install_once_in_place",
-      "obtain_founder_completed_real_Google_Sign_In_and_verify_post_login_navigation_and_relaunch"
+      "trace_existing_email_link_request_runtime_and_same_device_Android_return",
+      "verify_Firebase_email_link_credential_acceptance_and_authenticated_session_transition",
+      "identify_a_proven_local_defect_or_exact_external_blocker_before_functional_change",
+      "implement_only_the_proven_cause_inside_the_12_claimed_owners",
+      "add_focused_invalid_foreign_retry_fresh_process_and_session_tests",
+      "pass_local_no_build_email_link_preflight_before_any_later_APK_authority",
+      "obtain_founder_private_real_link_and_OPPO_acceptance_only_after_separate_authority"
     ],
     "explicitExclusions": [
-      "no_YouTube_Facebook_X_Instagram_Apple_email_link_mobile_OTP_or_other_provider_implementation_or_acceptance",
-      "no_SQL_Connect_UI_expansion_backend_expansion_or_unrelated_ticket_work",
-      "no_new_screen_or_route_and_no_locked_Screen01_through_Screen03_presentation_change",
-      "no_AAB_Play_Production_commit_push_merge_private_Codex_login_real_email_or_SMS",
-      "no_uninstall_data_clear_downgrade_or_second_successor_build_or_install",
-      "no_secret_token_private_email_account_name_private_user_identifier_or_credential_payload_output",
-      "no_production_readiness_claim_from_static_local_mock_configuration_or_emulator_gates"
+      "no_Facebook_Instagram_X_YouTube_Connect_or_Google_authentication_change",
+      "no_new_screen_route_backend_or_unrelated_UI_change",
+      "no_real_email_private_login_external_configuration_or_production_project_mutation",
+      "no_APK_AAB_Play_device_install_uninstall_or_data_clear",
+      "no_email_address_link_token_credential_UID_API_key_secret_or_private_payload_output",
+      "no_end_to_end_acceptance_claim_from_local_or_mock_tests"
     ],
     "dependenciesAndApprovals": [
-      "founder_google_only_end_to_end_forensic_repair_authorization_2026_08_23",
-      "REG3476_through_REG3480_registered_before_implementation",
-      "exact_r60_84_installed_identity_and_preserved_artifact_provenance",
-      "Dev_only_readback_or_configuration_correction_strictly_required_for_Google",
-      "fresh_registry_coordination_MVP_UI_and_release_gates_after_generation_changes",
-      "founder_only_private_Google_account_choice_and_consent_for_final_acceptance"
+      "founder_parallel_lane_and_email_link_queue_authorization_2026_08_23",
+      "clean_v10_work_start_and_non_overlapping_12_owner_claim",
+      "current_email_link_ticket_manifest_and_hash",
+      "focused_local_tests_and_no_build_preflight_before_any_later_build_request",
+      "founder_only_private_address_link_open_and_real_device_acceptance"
     ],
     "testAndEvidencePlan": [
-      "widget_Google_tap_busy_retry_and_error_wiring",
-      "Android_identity_bridge_availability_result_and_stage_error_mapping",
-      "Firebase_Google_credential_exchange_collision_and_non_cancellation_truth",
-      "auth_state_bootstrap_navigation_sign_out_and_authenticated_relaunch",
-      "sanitized_receipt_negative_fixtures_for_native_Firebase_bootstrap_and_navigation_failures",
-      "APK_package_signature_manifest_resource_dex_plugin_Firebase_Core_and_no_integration_test_inspection",
-      "pre_APK_evidence_matrix_with_real_OPPO_provider_limits",
-      "founder_real_Google_sign_in_and_post_login_session_navigation_relaunch_verification"
+      "email_link_request_runtime_contract_without_live_send",
+      "same_device_and_foreground_Android_return_handoff",
+      "fresh_process_return_persistence",
+      "Firebase_passwordless_email_gateway_positive_and_negative_contracts",
+      "authenticated_session_creation_persistence_and_MoolSocial_state_transition",
+      "sanitized_invalid_foreign_expired_retry_and_configuration_failures",
+      "focused_no_build_regression_and_preflight",
+      "founder_private_OPPO_end_to_end_acceptance_after_separate_authority"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5350,13 +5347,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "config/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-ticket.json"
+    "evidence": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
   },
   "authorization": {
     "state": "founder_acknowledged_mvp_scope",
-    "evidence": "config/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-ticket.json",
+    "evidence": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "google_only_end_to_end_forensic_repair_one_successor_APK_one_in_place_OPPO_install_and_founder_private_on_screen_Google_acceptance_2026_08_23"
+    "founderAcceptance": "email_link_runtime_and_focused_test_implementation_authorized_real_email_private_login_external_configuration_build_device_Play_and_AAB_held_2026_08_23"
   },
   "execution": {
     "referenceWriteAuthorized": false,
@@ -5365,8 +5362,8 @@
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "fix11_one_unique_successor_not_r60_84_founder_authorized_but_machine_held_until_evidenced_root_cause_green_preflight_and_fresh_source_seal",
-    "deviceInstallAuthorizationScope": "fix11_one_in_place_OPPO_sideload_founder_authorized_but_machine_held_until_independent_successor_artifact_qualification_no_uninstall_or_data_clear",
+    "buildAuthorizationScope": "email_link_build_not_authorized_until_proven_fix_focused_preflight_and_separate_founder_authority",
+    "deviceInstallAuthorizationScope": "email_link_device_install_not_authorized_until_independent_artifact_qualification_and_separate_founder_authority_no_uninstall_or_data_clear",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,
     "playUploadAuthorized": false,
@@ -5393,8 +5390,8 @@
     "founderAcceptancePending": true
   },
   "providerGate": {
-    "nextTicket": "UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR",
-    "state": "FIX11_Google_only_forensic_repair_active_all_other_providers_held_one_successor_APK_and_one_in_place_OPPO_install_machine_held_until_evidenced_root_cause_and_green_preflight",
+    "nextTicket": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
+    "state": "email_link_runtime_and_focused_test_ticket_active_real_email_private_login_external_configuration_build_device_Play_AAB_and_other_provider_work_held",
     "readOnlyAudit": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-provider-read-audit-20260811-01/deployment-metadata.json",
     "deployedPrivateUpload": false,
     "acceptedPublicDataReviewRevisions": {
@@ -5406,7 +5403,7 @@
     "externalServiceWriteAuthorized": false,
     "secretValueAccessAuthorized": false,
     "apkBuildOrInstallAuthorized": false,
-    "apkBuildOrInstallScope": "fix11_one_unique_successor_build_and_one_in_place_OPPO_install_founder_authorized_machine_held_until_preflight_r60_84_rejected_consumed_and_non_reusable",
+    "apkBuildOrInstallScope": "email_link_APK_build_and_install_not_authorized_until_proven_fix_green_preflight_and_separate_founder_authority",
     "successorR60_78InPlaceInstallAuthorized": true,
     "successorR60_78InstallAuthorizationConsumed": true,
     "successorR60_79InPlaceInstallAuthorized": true,
