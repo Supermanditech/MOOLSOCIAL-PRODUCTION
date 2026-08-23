@@ -40402,6 +40402,29 @@
         "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1",
         "scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3647-EMAIL-LINK-C33M-FIX5-TICKET-RAW-BYTE-HASH-REJECTION",
+      "status": "registered_no_later_action_and_exact_FIX5_portability_successor_correction_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After v21, the next distinct no-build FIX5 Firebase passwordless email gateway exited one at line 16 because its historical FIX5 ticket bytes changed.",
+      "rootCause": "The exact FIX5 ticket and current selected-manifest hash materialization plus current-successor boundary must be classified after registration; no later action followed.",
+      "prevention": "Bind this registry generation, do not rerun C33J or FIX4, claim only the FIX5 gate and one existing minimal compatibility checker, canonicalize text-manifest hashing, preserve historical bindings and every closed authority, add exact current email-link positive and wrong-ticket/hash/authority negatives, then replay FIX5 once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1"
+      ]
     }
   ]
 }
