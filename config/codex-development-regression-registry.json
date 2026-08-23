@@ -40970,6 +40970,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3673-CURRENT-SPLASH-PAIRED-PRODUCTION-TEST-LOCK-DRIFT",
+      "status": "registered_source_exception_passed_and_exact_paired_test_digest_binding_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "ui_lock",
+        "testing"
+      ],
+      "mistake": "The exact current splash provisional lock passed, then the lock gate stopped on its paired apps/mobile/test/ui_v2_screen01_app_splash_test.dart expected digest.",
+      "rootCause": "The current splash implementation includes a semantically updated paired test whose canonical content differs from the historical accepted test; founder option 2 applies to the complete current splash implementation and its exact test contract.",
+      "prevention": "Bind this registry generation, leave splash source/test/reference content and expected digests unchanged, admit only the exact current paired test canonical digest under the same pending founder/OPPO splash acceptance flag, fail on any other test change, and replay the UI lock once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }
