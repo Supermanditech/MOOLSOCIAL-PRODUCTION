@@ -40472,6 +40472,29 @@
         "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1",
         "apps/mobile/lib/features/journey01/review_journey_services.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3650-EMAIL-LINK-C33K-CURRENT-TOP-SELECTED-TICKET-BINDING-REJECTION",
+      "status": "registered_no_later_action_and_exact_C33K_successor_portability_correction_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After v24, the next distinct no-build C33K Firebase passwordless email-link live-readiness gate exited one at line 41 because current, top-level or selected ticket binding changed.",
+      "rootCause": "The C33K selection function, selected-manifest hash and current-successor authority boundary must be classified after registration; no later action followed.",
+      "prevention": "Bind this registry generation, do not rerun C33J, FIX4 or FIX5, claim only C33K and one existing focused checker, preserve historical bindings and every live/external/build/device/private/secret prohibition, add exact evidence-bound email-link positive and wrong-ticket/hash/authority negatives, then replay C33K once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33k-firebase-passwordless-email-link-live-readiness.ps1"
+      ]
     }
   ]
 }
