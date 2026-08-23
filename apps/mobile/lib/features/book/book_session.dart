@@ -4,10 +4,15 @@ import 'book_models.dart';
 import 'book_services.dart';
 
 class BookSession extends ChangeNotifier {
-  BookSession({BookGateway? gateway})
-    : gateway = gateway ?? ReviewBookGateway();
+  BookSession({BookGateway? gateway, DateTime Function()? now})
+    : gateway = gateway ?? ReviewBookGateway(),
+      _now = now ?? DateTime.now {
+    final today = _now();
+    busDate = DateTime(today.year, today.month, today.day);
+  }
 
   final BookGateway gateway;
+  final DateTime Function() _now;
 
   bool busy = false;
   String? noticeMessage;
@@ -44,6 +49,13 @@ class BookSession extends ChangeNotifier {
   SalonIssue salonIssue = SalonIssue.bill;
   BookSupportCase? salonSupportCase;
 
+  String busFrom = 'Jodhpur';
+  String busTo = 'Jaipur';
+  late DateTime busDate;
+  bool busSearching = false;
+  List<BusTrip> busResults = const [];
+  String? selectedBusId;
+
   String taskCity = 'Jodhpur';
   TaskType taskType = TaskType.pickup;
   String taskDetail = '';
@@ -73,6 +85,20 @@ class BookSession extends ChangeNotifier {
   int get taskActualSpend => 420;
   int get taskReleaseAmount => taskFee + taskActualSpend;
   int get taskReturnAmount => taskSpendLimit - taskActualSpend;
+
+  DateTime get busToday {
+    final current = _now();
+    return DateTime(current.year, current.month, current.day);
+  }
+
+  int get busDayOffset => busDate.difference(busToday).inDays;
+
+  BusTrip? get selectedBus {
+    for (final trip in busResults) {
+      if (trip.id == selectedBusId) return trip;
+    }
+    return null;
+  }
 
   void showNotice(String message) {
     errorMessage = null;
@@ -282,6 +308,90 @@ class BookSession extends ChangeNotifier {
   void chooseSalonAddon(String value) {
     salonAddon = value;
     showNotice('$value selected. Total ₹$salonTotal.');
+  }
+
+  void updateBusFrom(String value) {
+    busFrom = value;
+  }
+
+  void updateBusTo(String value) {
+    busTo = value;
+  }
+
+  void swapBusStops() {
+    final previousFrom = busFrom;
+    busFrom = busTo;
+    busTo = previousFrom;
+    busResults = const [];
+    selectedBusId = null;
+    clearMessages();
+  }
+
+  void chooseBusDate(DateTime value) {
+    busDate = DateTime(value.year, value.month, value.day);
+    busResults = const [];
+    selectedBusId = null;
+    clearMessages();
+  }
+
+  void chooseBusDayOffset(int days) {
+    chooseBusDate(busToday.add(Duration(days: days)));
+  }
+
+  Future<bool> searchBuses() async {
+    if (busSearching) return false;
+    final from = busFrom.trim();
+    final to = busTo.trim();
+    if (from.isEmpty || to.isEmpty) {
+      showError('Enter both From and To before searching buses.');
+      return false;
+    }
+    if (from.toLowerCase() == to.toLowerCase()) {
+      showError('From and To must be different places.');
+      return false;
+    }
+    busFrom = from;
+    busTo = to;
+    busSearching = true;
+    selectedBusId = null;
+    clearMessages();
+    try {
+      busResults = await gateway.searchBusTrips(
+        from: from,
+        to: to,
+        date: busDate,
+      );
+      noticeMessage =
+          '${busResults.length} review options found. Seats and fares are confirmed only at checkout.';
+      return true;
+    } on BookServiceException catch (error) {
+      errorMessage = error.userMessage;
+      return false;
+    } on Object {
+      errorMessage = 'Bus results could not refresh. Try again.';
+      return false;
+    } finally {
+      busSearching = false;
+      notifyListeners();
+    }
+  }
+
+  void selectBus(String tripId) {
+    BusTrip? trip;
+    for (final candidate in busResults) {
+      if (candidate.id == tripId) {
+        trip = candidate;
+        break;
+      }
+    }
+    if (trip == null) {
+      showError('This bus option is no longer available. Search again.');
+      return;
+    }
+    selectedBusId = trip.id;
+    showNotice(
+      '${trip.operatorName} selected for review. No payment was taken and no ticket was issued.',
+    );
   }
 
   Future<bool> confirmSalon() async {

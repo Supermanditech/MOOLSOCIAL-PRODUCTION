@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_scanner.dart';
@@ -25,6 +27,9 @@ class BuyV2Screen extends StatefulWidget {
     this.recoveryKind,
     this.scannerLauncher = showBuyV2ProductScanner,
     this.onExit,
+    this.onOpenMool,
+    this.onOpenMainAction,
+    this.onOpenChat,
     this.onDestinationChanged,
   });
 
@@ -37,6 +42,9 @@ class BuyV2Screen extends StatefulWidget {
   final BuyV2RecoveryKind? recoveryKind;
   final BuyV2ScannerLauncher scannerLauncher;
   final VoidCallback? onExit;
+  final VoidCallback? onOpenMool;
+  final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
+  final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
 
   @override
@@ -170,6 +178,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    final careNavigation =
+        session.activeDockDestination == BuyV2Destination.medicine;
     final surfaceTheme = BuyV2ThemeSpec.resolve(
       session.destination,
       session.view,
@@ -189,101 +199,284 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
             } else if (widget.onExit case final onExit?) {
               onExit();
             } else {
-              context.go('/app/social');
+              context.go('/app/mool?from=buy');
             }
           }
         },
         child: Scaffold(
           key: const ValueKey('buy-v2-screen'),
+          extendBody: true,
           backgroundColor: Colors.white,
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: BuyV2Metrics.maxWidth,
-                ),
-                child: MoolFiniteGradientTransition(
-                  key: const ValueKey('buy-theme-canvas'),
-                  gradient: surfaceTheme.canvasGradient,
-                  duration: BuyV2Motion.contentChange,
-                  child: ColoredBox(
-                    color: Colors.white.withValues(alpha: .94),
-                    child: Column(
-                      children: [
-                        RepaintBoundary(
-                          key: ValueKey(
-                            'buy-header-boundary-${session.destination.name}-'
-                            '${session.view.name}',
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: surfaceTheme.canvasGradient.colors,
+              ),
+            ),
+            child: SafeArea(
+              bottom: true,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: BuyV2Metrics.maxWidth,
+                  ),
+                  child: MoolFiniteGradientTransition(
+                    key: const ValueKey('buy-theme-canvas'),
+                    gradient: surfaceTheme.canvasGradient,
+                    duration: BuyV2Motion.contentChange,
+                    child: ColoredBox(
+                      color: Colors.white.withValues(alpha: .94),
+                      child: Column(
+                        children: [
+                          RepaintBoundary(
+                            key: ValueKey(
+                              'buy-header-boundary-${session.destination.name}-'
+                              '${session.view.name}',
+                            ),
+                            child: _BuyHeader(
+                              session: session,
+                              onOpenChat: _openGlobalChat,
+                            ),
                           ),
-                          child: _BuyHeader(session: session),
-                        ),
-                        if (session.view == BuyV2View.catalogue)
-                          _BuySearchBand(
-                            session: session,
-                            controller: _searchController,
-                            open: _searchOpen,
-                            onOpenChanged: (value) =>
-                                setState(() => _searchOpen = value),
-                            onScan: _scanProduct,
-                            onLocation: () =>
-                                showBuyV2AddressSheet(context, session),
-                            scannerBusy: _scannerBusy,
-                          ),
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: _BuyNavigationSurfaceOwner(
-                                  key: ObjectKey(session),
-                                  stateKey: session.navigationMotionSequence,
-                                  direction: session.navigationMotionDirection,
-                                  child: _BuyExpandCollapseOwner(
-                                    key: ValueKey(
-                                      _searchOpen &&
+                          if (session.view == BuyV2View.catalogue)
+                            _BuySearchBand(
+                              session: session,
+                              controller: _searchController,
+                              open: _searchOpen,
+                              onOpenChanged: (value) =>
+                                  setState(() => _searchOpen = value),
+                              onScan: _scanProduct,
+                              onLocation: () =>
+                                  showBuyV2AddressSheet(context, session),
+                              scannerBusy: _scannerBusy,
+                            ),
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: _BuyNavigationSurfaceOwner(
+                                    key: ObjectKey(session),
+                                    stateKey: session.navigationMotionSequence,
+                                    direction:
+                                        session.navigationMotionDirection,
+                                    child: _BuyExpandCollapseOwner(
+                                      key: ValueKey(
+                                        _searchOpen &&
+                                                session.destination !=
+                                                    BuyV2Destination.orders
+                                            ? 'buy-search-owner-motion-search'
+                                            : 'buy-search-owner-motion-primary',
+                                      ),
+                                      child:
+                                          _searchOpen &&
                                               session.destination !=
                                                   BuyV2Destination.orders
-                                          ? 'buy-search-owner-motion-search'
-                                          : 'buy-search-owner-motion-primary',
+                                          ? BuyV2SearchResultsView(
+                                              session: session,
+                                            )
+                                          : _currentView(session),
                                     ),
-                                    child:
-                                        _searchOpen &&
-                                            session.destination !=
-                                                BuyV2Destination.orders
-                                        ? BuyV2SearchResultsView(
-                                            session: session,
-                                          )
-                                        : _currentView(session),
                                   ),
                                 ),
-                              ),
-                              if (session.notice case final message?)
-                                Positioned(
-                                  right: 8,
-                                  top: 8,
-                                  child: _BuyNotice(message: message),
-                                ),
-                            ],
+                                if (session.notice case final message?)
+                                  Positioned(
+                                    right: 8,
+                                    top: 8,
+                                    child: _BuyNotice(message: message),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                        if (_showsMiniCart(session))
-                          _BuyMiniCartBar(session: session),
-                        _BuyDock(session: session),
-                      ],
+                          if (_showsMiniCart(session))
+                            _BuyMiniCartBar(session: session),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
+          bottomNavigationBar: MoolDestinationNavigationV2(
+            activeId: careNavigation ? 'book' : 'buy',
+            destinationLabel: careNavigation ? 'Care' : 'Shop',
+            selectedLocalIndex: careNavigation
+                ? 1
+                : switch (session.activeDockDestination) {
+                    BuyV2Destination.orders => 1,
+                    _ => 0,
+                  },
+            localActionCount: careNavigation ? 3 : 2,
+            localNavigation: careNavigation
+                ? _buildCareLocalNavigation()
+                : _buildBuyLocalNavigation(session),
+            onOpenMool: _openGlobalMool,
+            onOpenAction: _openGlobalAction,
+            onOpenChat: _openGlobalChat,
+            onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+            onNextLocalAction: () => _moveBuyLocal(session, 1),
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildBuyLocalNavigation(BuyV2Session session) {
+    final active = session.activeDockDestination;
+    return MoolLocalNavigationRail(
+      key: const ValueKey('buy-local-destination-tabs'),
+      familyId: 'buy',
+      surfaceTone: MoolLocalNavigationSurfaceTone.light,
+      semanticLabel: 'Shop choices: Wholesale and Orders.',
+      activeId: active.name,
+      actions: [
+        MoolLocalNavigationAction(
+          keyName: 'buy-local-tab-wholesale',
+          id: BuyV2Destination.wholesale.name,
+          label: 'Wholesale',
+          icon: Icons.inventory_2_outlined,
+          onPressed: active == BuyV2Destination.wholesale
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  session.openDestination(BuyV2Destination.wholesale);
+                },
+        ),
+        MoolLocalNavigationAction(
+          keyName: 'buy-local-tab-orders',
+          id: BuyV2Destination.orders.name,
+          label: 'Orders',
+          icon: Icons.receipt_long_outlined,
+          onPressed: active == BuyV2Destination.orders
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  session.openOrders();
+                },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCareLocalNavigation() {
+    return MoolLocalNavigationRail(
+      key: const ValueKey('care-local-destination-tabs'),
+      familyId: 'book',
+      surfaceTone: MoolLocalNavigationSurfaceTone.light,
+      semanticLabel: 'Care choices: Doctor, Medicine and Salon.',
+      activeId: 'medicine',
+      actions: [
+        MoolLocalNavigationAction(
+          keyName: 'care-local-tab-doctor',
+          id: 'doctor',
+          label: 'Doctor',
+          icon: Icons.medical_services_outlined,
+          onPressed: () => openMoolConnectedRoute(
+            context,
+            activeFamilyId: 'book',
+            route: '/app/book/doctor',
+          ),
+        ),
+        const MoolLocalNavigationAction(
+          keyName: 'care-local-tab-medicine',
+          id: 'medicine',
+          label: 'Medicine',
+          icon: Icons.medication_outlined,
+        ),
+        MoolLocalNavigationAction(
+          keyName: 'care-local-tab-salon',
+          id: 'salon',
+          label: 'Salon',
+          icon: Icons.content_cut_rounded,
+          onPressed: () => openMoolConnectedRoute(
+            context,
+            activeFamilyId: 'book',
+            route: '/app/book/salon',
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _moveBuyLocal(BuyV2Session session, int delta) {
+    if (session.activeDockDestination == BuyV2Destination.medicine) {
+      const careRoutes = [
+        '/app/book/doctor',
+        '/app/buy?sub=medicine',
+        '/app/book/salon',
+      ];
+      final next = (1 + delta + careRoutes.length) % careRoutes.length;
+      openMoolConnectedRoute(
+        context,
+        activeFamilyId: 'book',
+        route: careRoutes[next],
+      );
+      return;
+    }
+    const destinations = [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+      BuyV2Destination.orders,
+    ];
+    final current = destinations.indexOf(session.activeDockDestination);
+    final next =
+        destinations[(current + delta + destinations.length) %
+            destinations.length];
+    HapticFeedback.selectionClick();
+    if (next == BuyV2Destination.orders) {
+      session.openOrders();
+    } else {
+      session.openDestination(next);
+    }
   }
 
   bool _showsMiniCart(BuyV2Session session) =>
       session.itemCount > 0 &&
       (session.view == BuyV2View.product ||
           session.view == BuyV2View.catalogue);
+
+  void _openGlobalMool() {
+    final onOpenMool = widget.onOpenMool;
+    if (onOpenMool != null) {
+      onOpenMool();
+      return;
+    }
+    context.push('/app/mool?from=buy');
+  }
+
+  void _openGlobalAction(PersonalMoolActionSpec action) {
+    final onOpenMainAction = widget.onOpenMainAction;
+    if (onOpenMainAction != null) {
+      onOpenMainAction(action);
+      return;
+    }
+    openMoolConnectedRoute(
+      context,
+      activeFamilyId:
+          widget.session.activeDockDestination == BuyV2Destination.medicine
+          ? 'book'
+          : 'buy',
+      route: action.route,
+    );
+  }
+
+  void _openGlobalChat() {
+    final onOpenChat = widget.onOpenChat;
+    if (onOpenChat != null) {
+      onOpenChat();
+      return;
+    }
+    final router = GoRouter.maybeOf(context);
+    final returnRoute = router?.routeInformationProvider.value.uri.toString();
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {'return': returnRoute ?? '/app/buy'},
+      ).toString(),
+    );
+  }
 
   Widget _currentView(BuyV2Session session) {
     if (session.destination == BuyV2Destination.orders &&
@@ -413,9 +606,10 @@ class _BuyNavigationSurfaceOwnerState
 }
 
 class _BuyHeader extends StatelessWidget {
-  const _BuyHeader({required this.session});
+  const _BuyHeader({required this.session, required this.onOpenChat});
 
   final BuyV2Session session;
+  final VoidCallback onOpenChat;
 
   @override
   Widget build(BuildContext context) {
@@ -430,17 +624,25 @@ class _BuyHeader extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
           child: Row(
             children: [
-              Semantics(
-                label: 'MoolSocial',
-                child: SizedBox(
-                  key: const ValueKey('buy-brand-tile'),
-                  width: 104,
-                  height: 56,
+              SizedBox(
+                key: const ValueKey('buy-header-context-slot'),
+                width: 44,
+                height: 56,
+                child: Center(
+                  child: SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: _HeaderContextButton(session: session),
+                  ),
                 ),
               ),
-              const SizedBox(width: 2),
-              Expanded(child: _HeaderContextButton(session: session)),
-              const SizedBox(width: 2),
+              const Spacer(),
+              MoolGlobalChatShortcut(
+                keyName: 'buy-global-chat',
+                onPressed: onOpenChat,
+                onDarkSurface: true,
+              ),
+              const SizedBox(width: 4),
               Semantics(
                 label: session.view == BuyV2View.account
                     ? 'Close profile and return to purchases'
@@ -585,11 +787,10 @@ class _ContextualGlassHeader extends StatelessWidget {
                 ),
               ),
             ),
-            child,
             if (promoAction != null)
               Positioned(
-                left: 114,
-                right: 52,
+                left: 8,
+                width: 96,
                 top: 0,
                 bottom: 0,
                 child: _HeaderPromoTapTarget(
@@ -598,6 +799,7 @@ class _ContextualGlassHeader extends StatelessWidget {
                   action: promoAction,
                 ),
               ),
+            child,
           ],
         ),
       ),
@@ -764,9 +966,7 @@ class _HeaderScenePainter extends CustomPainter {
     canvas.drawRect(bounds, Paint()..color = BuyV2Colors.navy);
     _paintCinematicVolume(canvas, size, far, middle);
     _paintContextCreativeReel(canvas, size, far, middle, near);
-    _paintPromotionalTitle(canvas, size);
     _paintForegroundOcclusion(canvas, size, near);
-    _paintSettledBrand(canvas, _phase(.62, .82));
   }
 
   void _paintCinematicVolume(
@@ -2590,165 +2790,6 @@ class _HeaderScenePainter extends CustomPainter {
     }
   }
 
-  void _paintPromotionalTitle(Canvas canvas, Size size) {
-    final moolArrival = _phase(.01, .24);
-    final socialArrival = _phase(.22, .52);
-    final socialDominance = _phase(.34, .62);
-    final sceneRecession = _phase(.46, .66);
-    final titleWidth = size.width * .64;
-    final titleSize = math.min(29.0, size.width * .082);
-    final vanishing = Offset(size.width * .72, size.height * .43);
-    canvas.save();
-    canvas.clipRect(Rect.fromLTWH(0, 0, titleWidth, size.height));
-
-    final moolOpacity = (moolArrival * (1 - socialDominance)).clamp(0.0, 1.0);
-    final moolTarget = Offset(10 - (34 * socialDominance), 20);
-    final moolPosition = Offset.lerp(vanishing, moolTarget, moolArrival)!;
-    canvas.save();
-    canvas.translate(moolPosition.dx, moolPosition.dy);
-    final moolScale = .24 + (.76 * moolArrival);
-    canvas.scale(moolScale, moolScale);
-    _paintDepthText(
-      canvas,
-      'Mool',
-      Offset.zero,
-      fontSize: titleSize * (1 + (.08 * socialDominance)),
-      opacity: moolOpacity,
-      maxWidth: titleWidth - 12,
-    );
-    canvas.restore();
-
-    final socialTarget = Offset(10 + (22 * sceneRecession), 22);
-    final socialPosition = Offset.lerp(vanishing, socialTarget, socialArrival)!;
-    canvas.save();
-    canvas.translate(socialPosition.dx, socialPosition.dy);
-    final socialScale = .22 + (.78 * socialArrival);
-    canvas.scale(socialScale, socialScale);
-    _paintDepthText(
-      canvas,
-      'Social',
-      Offset.zero,
-      fontSize: titleSize * (1 + (.34 * sceneRecession)),
-      opacity: socialArrival * (1 - sceneRecession),
-      maxWidth: titleWidth - 12,
-    );
-    canvas.restore();
-
-    canvas.restore();
-  }
-
-  void _paintSettledBrand(Canvas canvas, double opacity) {
-    if (opacity <= 0) return;
-    final resolvedOpacity = opacity.clamp(0.0, 1.0);
-    final moolPainter = TextPainter(
-      text: TextSpan(
-        text: 'Mool',
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: resolvedOpacity),
-          fontSize: 18.2,
-          fontFamily: 'Inter',
-          height: 1,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -.42,
-          shadows: [
-            Shadow(
-              color: BuyV2Colors.navy.withValues(alpha: .96 * resolvedOpacity),
-              offset: const Offset(0, 2),
-              blurRadius: 4,
-            ),
-          ],
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: 91);
-    final socialPainter = TextPainter(
-      text: TextSpan(
-        text: 'Social',
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: resolvedOpacity),
-          fontSize: 16.6,
-          fontFamily: 'Inter',
-          height: 1,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -.32,
-          shadows: [
-            Shadow(
-              color: BuyV2Colors.navy.withValues(alpha: .96 * resolvedOpacity),
-              offset: const Offset(0, 2),
-              blurRadius: 4,
-            ),
-          ],
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: 91);
-    final x = 8 + (20 * (1 - resolvedOpacity));
-    final moolOffset = Offset(x, 8.5);
-    final socialOffset = Offset(x, 29);
-    moolPainter.paint(canvas, moolOffset);
-    socialPainter.paint(canvas, socialOffset);
-    canvas.drawCircle(
-      Offset(socialOffset.dx + socialPainter.width + 3, socialOffset.dy + 9),
-      2.2,
-      Paint()..color = BuyV2Colors.green,
-    );
-  }
-
-  void _paintDepthText(
-    Canvas canvas,
-    String text,
-    Offset offset, {
-    required double fontSize,
-    required double opacity,
-    required double maxWidth,
-  }) {
-    final resolvedOpacity = opacity.clamp(0.0, 1.0);
-    if (resolvedOpacity == 0) return;
-    final depthPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: .18 * resolvedOpacity),
-          fontSize: fontSize,
-          fontFamily: 'Inter',
-          height: 1,
-          fontStyle: FontStyle.italic,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -.65,
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: maxWidth);
-    depthPainter.paint(canvas, offset + const Offset(-3.5, 3));
-    final facePainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: resolvedOpacity),
-          fontSize: fontSize,
-          fontFamily: 'Inter',
-          height: 1,
-          fontStyle: FontStyle.italic,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -.65,
-          shadows: [
-            Shadow(
-              color: BuyV2Colors.navy.withValues(alpha: .88 * resolvedOpacity),
-              offset: const Offset(0, 2),
-              blurRadius: 5,
-            ),
-          ],
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: maxWidth);
-    facePainter.paint(canvas, offset);
-  }
-
   // Kept only while FIX13 remains source-reconstructable. FIX14 never calls it.
   // ignore: unused_element
   void _paintSceneNarrative(Canvas canvas, Size size) {
@@ -3821,8 +3862,8 @@ class _BuySearchBand extends StatelessWidget {
     final showScanner = session.destination != BuyV2Destination.orders;
     final longQuery = open && controller.text.trim().length > 38;
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
-    final longQueryBandHeight = accessibilityText ? 162.0 : 132.0;
-    final longQueryControlHeight = accessibilityText ? 150.0 : 120.0;
+    final longQueryBandHeight = accessibilityText ? 174.0 : 132.0;
+    final longQueryControlHeight = accessibilityText ? 162.0 : 120.0;
     final expandCollapseDuration = BuyV2Motion.resolved(
       context,
       BuyV2Motion.expandCollapse,
@@ -4301,222 +4342,6 @@ class _HeaderContextButton extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BuyDock extends StatefulWidget {
-  const _BuyDock({required this.session});
-
-  final BuyV2Session session;
-
-  @override
-  State<_BuyDock> createState() => _BuyDockState();
-}
-
-class _BuyDockState extends State<_BuyDock> {
-  bool _showPrimaryActions = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final session = widget.session;
-    final theme = BuyV2ThemeScope.of(context);
-    final activeDestination = session.activeDockDestination;
-    final items = _showPrimaryActions
-        ? <({String label, IconData icon, VoidCallback onTap, bool active})>[
-            (
-              label: 'Social',
-              icon: Icons.people_alt_outlined,
-              onTap: () => context.go('/app/social?openMool=1'),
-              active: false,
-            ),
-            (
-              label: 'Buy',
-              icon: Icons.shopping_bag_outlined,
-              onTap: () => setState(() => _showPrimaryActions = false),
-              active: true,
-            ),
-            (
-              label: 'Eat',
-              icon: Icons.restaurant_outlined,
-              onTap: () => context.go('/app/eat'),
-              active: false,
-            ),
-            (
-              label: 'Ride',
-              icon: Icons.directions_bike_outlined,
-              onTap: () => context.go('/app/ride'),
-              active: false,
-            ),
-            (
-              label: 'Book',
-              icon: Icons.calendar_month_outlined,
-              onTap: () => context.go('/app/book'),
-              active: false,
-            ),
-            (
-              label: 'Pay',
-              icon: Icons.account_balance_wallet_outlined,
-              onTap: () => context.go('/app/pay'),
-              active: false,
-            ),
-            (
-              label: 'Work',
-              icon: Icons.work_outline_rounded,
-              onTap: () => context.go('/app/work'),
-              active: false,
-            ),
-          ]
-        : <({String label, IconData icon, VoidCallback onTap, bool active})>[
-            (
-              label: 'Mool',
-              icon: Icons.grid_view_rounded,
-              onTap: () => setState(() => _showPrimaryActions = true),
-              active: false,
-            ),
-            (
-              label: 'Shop',
-              icon: Icons.shopping_bag_outlined,
-              onTap: () => session.openDestination(BuyV2Destination.shop),
-              active: activeDestination == BuyV2Destination.shop,
-            ),
-            (
-              label: 'Wholesale',
-              icon: Icons.inventory_2_outlined,
-              onTap: () => session.openDestination(BuyV2Destination.wholesale),
-              active: activeDestination == BuyV2Destination.wholesale,
-            ),
-            (
-              label: 'Medicine',
-              icon: Icons.medication_outlined,
-              onTap: () => session.openDestination(BuyV2Destination.medicine),
-              active: activeDestination == BuyV2Destination.medicine,
-            ),
-            (
-              label: 'Orders',
-              icon: Icons.receipt_long_outlined,
-              onTap: session.openOrders,
-              active:
-                  activeDestination == BuyV2Destination.orders &&
-                  session.view != BuyV2View.assist,
-            ),
-            (
-              label: 'Chat',
-              icon: Icons.chat_bubble_outline_rounded,
-              onTap: session.view == BuyV2View.assist
-                  ? session.closeAssist
-                  : session.openAssist,
-              active: session.view == BuyV2View.assist,
-            ),
-          ];
-
-    return SizedBox(
-      key: const ValueKey('buy-persistent-dock'),
-      height: BuyV2Metrics.dockHeight,
-      child: Material(
-        color: Colors.white,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-            child: Row(
-              children: [
-                for (final item in items)
-                  Expanded(
-                    child: Semantics(
-                      label: item.label,
-                      selected: item.active,
-                      button: true,
-                      child: InkWell(
-                        key: ValueKey(
-                          _showPrimaryActions
-                              ? 'buy-mool-${item.label.toLowerCase()}'
-                              : 'buy-dock-${item.label.toLowerCase()}',
-                        ),
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          item.onTap();
-                        },
-                        borderRadius: BorderRadius.circular(11),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: item.active
-                                ? theme.softAccent
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            border: item.active
-                                ? Border.all(color: const Color(0x2FFF9933))
-                                : null,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedContainer(
-                                duration:
-                                    MediaQuery.disableAnimationsOf(context)
-                                    ? Duration.zero
-                                    : const Duration(milliseconds: 140),
-                                width: item.active ? 16 : 0,
-                                height: 2,
-                                decoration: BoxDecoration(
-                                  color: item.active
-                                      ? theme.accent
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Icon(
-                                item.icon,
-                                size: _showPrimaryActions ? 17 : 18,
-                                color: item.active
-                                    ? BuyV2Colors.navy
-                                    : !_showPrimaryActions &&
-                                          item.label == 'Mool'
-                                    ? BuyV2Colors.navy
-                                    : BuyV2Colors.muted,
-                              ),
-                              const SizedBox(height: 1),
-                              Flexible(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                  ),
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      item.label,
-                                      maxLines: 1,
-                                      softWrap: false,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: item.active
-                                            ? BuyV2Colors.navy
-                                            : !_showPrimaryActions &&
-                                                  item.label == 'Mool'
-                                            ? BuyV2Colors.navy
-                                            : BuyV2Colors.muted,
-                                        fontSize: _showPrimaryActions ? 7.5 : 8,
-                                        height: .9,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
         ),
       ),
     );

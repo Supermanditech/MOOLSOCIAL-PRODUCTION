@@ -14,6 +14,32 @@ enum TaskIssue { wrongProof, incomplete, overcharged, safety }
 
 enum TaskResolution { refund, rework, adjustBill, closeCase }
 
+class BusTrip {
+  const BusTrip({
+    required this.id,
+    required this.operatorName,
+    required this.from,
+    required this.to,
+    required this.departure,
+    required this.arrival,
+    required this.duration,
+    required this.availableSeats,
+    required this.rating,
+    required this.fare,
+  });
+
+  final String id;
+  final String operatorName;
+  final String from;
+  final String to;
+  final String departure;
+  final String arrival;
+  final String duration;
+  final int availableSeats;
+  final double rating;
+  final int fare;
+}
+
 class DoctorAppointment {
   const DoctorAppointment({
     required this.id,

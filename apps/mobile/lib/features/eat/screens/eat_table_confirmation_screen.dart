@@ -29,7 +29,7 @@ class EatTableConfirmationScreen extends StatelessWidget {
             session: session,
             title: 'Booking not found',
             subtitle: 'Choose another table',
-            activeDock: 'table',
+            activeLocalAction: 'table',
             body: Center(
               child: FilledButton(
                 key: const Key('eat-table-missing-return'),
@@ -45,7 +45,7 @@ class EatTableConfirmationScreen extends StatelessWidget {
           session: session,
           title: cancelled ? 'Booking cancelled' : 'Table confirmed',
           subtitle: receipt.id,
-          activeDock: 'table',
+          activeLocalAction: 'table',
           fallbackBackRoute: '/app/eat/table',
           body: ListView(
             padding: const EdgeInsets.fromLTRB(

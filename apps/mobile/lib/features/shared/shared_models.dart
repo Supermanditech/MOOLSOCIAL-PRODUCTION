@@ -35,6 +35,62 @@ class SocialPublishedChoice {
   );
 }
 
+class SocialQuotedPost {
+  const SocialQuotedPost({
+    required this.id,
+    required this.authorName,
+    required this.authorHandle,
+    required this.body,
+    this.mediaPath,
+  });
+
+  final String id;
+  final String authorName;
+  final String authorHandle;
+  final String body;
+  final String? mediaPath;
+}
+
+class SocialComment {
+  const SocialComment({
+    required this.id,
+    required this.postId,
+    required this.authorId,
+    required this.authorName,
+    required this.authorHandle,
+    required this.body,
+    required this.publishedAt,
+  });
+
+  final String id;
+  final String postId;
+  final String authorId;
+  final String authorName;
+  final String authorHandle;
+  final String body;
+  final DateTime publishedAt;
+}
+
+class SocialAuthorProfile {
+  const SocialAuthorProfile({
+    required this.authorId,
+    required this.authorName,
+    required this.authorHandle,
+    required this.followerCount,
+    required this.followed,
+    required this.isSelf,
+    required this.posts,
+  });
+
+  final String authorId;
+  final String authorName;
+  final String authorHandle;
+  final int followerCount;
+  final bool followed;
+  final bool isSelf;
+  final List<SocialPublishedItem> posts;
+}
+
 class SocialPublishedItem {
   const SocialPublishedItem({
     required this.id,
@@ -44,14 +100,18 @@ class SocialPublishedItem {
     required this.body,
     required this.audience,
     required this.publishedAt,
+    this.authorId,
+    this.publishIdempotencyKey,
     this.mediaPaths = const <String>[],
     this.mediaAreAssets = false,
     this.choices = const <SocialPublishedChoice>[],
     this.correctChoiceIndex,
     this.selectedChoiceIndex,
     this.closesAt,
+    this.quotedPost,
     this.liked = false,
     this.saved = false,
+    this.reposted = false,
     this.likeCount = 0,
     this.replyCount = 0,
     this.repostCount = 0,
@@ -59,6 +119,8 @@ class SocialPublishedItem {
   });
 
   final String id;
+  final String? authorId;
+  final String? publishIdempotencyKey;
   final SocialPublishedContentType type;
   final String authorName;
   final String authorHandle;
@@ -71,8 +133,10 @@ class SocialPublishedItem {
   final int? correctChoiceIndex;
   final int? selectedChoiceIndex;
   final DateTime? closesAt;
+  final SocialQuotedPost? quotedPost;
   final bool liked;
   final bool saved;
+  final bool reposted;
   final int likeCount;
   final int replyCount;
   final int repostCount;
@@ -86,12 +150,15 @@ class SocialPublishedItem {
     int? selectedChoiceIndex,
     bool? liked,
     bool? saved,
+    bool? reposted,
     int? likeCount,
     int? replyCount,
     int? repostCount,
     int? shareCount,
   }) => SocialPublishedItem(
     id: id,
+    authorId: authorId,
+    publishIdempotencyKey: publishIdempotencyKey,
     type: type,
     authorName: authorName,
     authorHandle: authorHandle,
@@ -104,8 +171,10 @@ class SocialPublishedItem {
     correctChoiceIndex: correctChoiceIndex,
     selectedChoiceIndex: selectedChoiceIndex ?? this.selectedChoiceIndex,
     closesAt: closesAt,
+    quotedPost: quotedPost,
     liked: liked ?? this.liked,
     saved: saved ?? this.saved,
+    reposted: reposted ?? this.reposted,
     likeCount: likeCount ?? this.likeCount,
     replyCount: replyCount ?? this.replyCount,
     repostCount: repostCount ?? this.repostCount,
@@ -727,9 +796,9 @@ const sharedScreenSpecs = <int, SharedScreenSpec>{
           SharedStep('Publish', 'Social audience'),
         ],
         currentStep: 3,
-        primary: 'View performance',
-        primaryOutcome: 'Creator performance opened with aggregated results.',
-        primaryRoute: '/app/creator/performance',
+        primary: 'View MoolSocial post',
+        primaryOutcome: 'The published MoolSocial Feed opened.',
+        primaryRoute: '/app/social?sub=feed',
         secondary: 'Manage media',
         secondaryOutcome:
             'Original, edit, rights and publication controls opened.',
@@ -973,9 +1042,9 @@ const sharedScreenSpecs = <int, SharedScreenSpec>{
           SharedStep('Earn', 'Campaigns and payout'),
         ],
         currentStep: 0,
-        primary: 'Open creator studio',
-        primaryOutcome: 'Creator Studio opened.',
-        primaryRoute: '/app/creator',
+        primary: 'Open Social Create',
+        primaryOutcome: 'The MoolSocial Create workbench opened.',
+        primaryRoute: '/app/social?sub=create',
         secondary: 'Channel settings',
         secondaryOutcome:
             'Creator visibility and communication controls opened.',

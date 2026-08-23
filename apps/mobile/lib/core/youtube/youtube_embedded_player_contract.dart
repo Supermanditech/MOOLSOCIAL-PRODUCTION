@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Closed, disabled-by-default contract for the future official YouTube
 /// embedded-player boundary.
 ///
@@ -9,18 +7,14 @@ import 'package:flutter/foundation.dart';
 const youtubeEmbeddedPlayerBaseUrl = 'https://com.moolsocial.app/';
 const youtubeEmbeddedPlayerOrigin = 'https://com.moolsocial.app';
 
-const youtubeEmbeddedPlayerEnabled =
-    kDebugMode &&
-    bool.fromEnvironment(
-      'MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED',
-      defaultValue: false,
-    );
-const youtubeShortsAutoplayEnabled =
-    kDebugMode &&
-    bool.fromEnvironment(
-      'MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED',
-      defaultValue: false,
-    );
+const youtubeEmbeddedPlayerEnabled = bool.fromEnvironment(
+  'MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED',
+  defaultValue: false,
+);
+const youtubeShortsAutoplayEnabled = bool.fromEnvironment(
+  'MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED',
+  defaultValue: false,
+);
 
 class YouTubeEmbeddedPlayerFeatureConfig {
   const YouTubeEmbeddedPlayerFeatureConfig({

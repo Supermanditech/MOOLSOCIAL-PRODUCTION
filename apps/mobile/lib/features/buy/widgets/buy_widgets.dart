@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../buy_models.dart';
 import '../buy_session.dart';
 
@@ -20,7 +21,6 @@ class BuyPageScaffold extends StatelessWidget {
     required this.body,
     this.activeDock = 'shop',
     this.fallbackBackRoute = '/app/buy',
-    this.showBack = true,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -32,99 +32,217 @@ class BuyPageScaffold extends StatelessWidget {
   final Widget body;
   final String activeDock;
   final String fallbackBackRoute;
-  final bool showBack;
   final Widget? trailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        leadingWidth: showBack ? 64 : 16,
-        leading: showBack
-            ? Padding(
-                padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('buy-back'),
-                  tooltip: 'Go back',
-                  onPressed: () => buyBack(context, fallbackBackRoute),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) buyBack(context, fallbackBackRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          titleSpacing: MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
                 ),
-              )
-            : null,
-        titleSpacing: showBack ? 4 : MoolSpacing.md,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+            ],
+          ),
+          actions: [
+            _BuyFlowHeaderAction(
+              id: 'shop',
+              label: 'Shop',
+              icon: Icons.storefront_outlined,
+              selected: activeDock == 'shop',
+              onPressed: () => context.go('/app/buy/grocery'),
             ),
+            _BuyFlowHeaderAction(
+              id: 'basket',
+              label: session.itemCount == 0
+                  ? 'Basket'
+                  : 'Basket, ${session.itemCount} items',
+              icon: Icons.shopping_bag_outlined,
+              selected: activeDock == 'basket',
+              badgeCount: session.itemCount,
+              keyName: 'buy-open-basket',
+              onPressed: () => context.go('/app/buy/basket'),
+            ),
+            _BuyFlowHeaderAction(
+              id: 'orders',
+              label: 'Orders',
+              icon: Icons.receipt_long_outlined,
+              selected: activeDock == 'orders',
+              onPressed: () => _openBuyOrder(context, session),
+            ),
+            ?trailing,
+            const SizedBox(width: MoolSpacing.xxs),
           ],
         ),
-        actions: [
-          if (trailing != null)
-            Padding(
-              padding: const EdgeInsets.only(right: MoolSpacing.sm),
-              child: trailing!,
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(right: MoolSpacing.sm),
-              child: BuyBasketButton(session: session),
-            ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                BuyMessageBanner(session: session),
-                Expanded(child: body),
-                if (bottomAction != null)
-                  Material(
-                    color: Colors.white,
-                    child: SafeArea(
-                      top: false,
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          MoolSpacing.md,
-                          MoolSpacing.sm,
-                          MoolSpacing.md,
-                          MoolSpacing.xs,
+        body: SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  BuyMessageBanner(session: session),
+                  Expanded(child: body),
+                  if (bottomAction != null)
+                    Material(
+                      color: Colors.white,
+                      child: SafeArea(
+                        top: false,
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            MoolSpacing.md,
+                            MoolSpacing.sm,
+                            MoolSpacing.md,
+                            MoolSpacing.xs,
+                          ),
+                          child: bottomAction!,
                         ),
-                        child: bottomAction!,
                       ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: MoolGlobalNavigationV2(
+          activeId: 'buy',
+          onOpenMool: () => context.go('/app/mool?from=buy'),
+          onOpenAction: (action) => openMoolConnectedRoute(
+            context,
+            activeFamilyId: 'buy',
+            route: action.route,
+          ),
+          onOpenChat: () {
+            final current = GoRouterState.of(context).uri.toString();
+            context.go(
+              Uri(
+                path: '/app/chat/inbox',
+                queryParameters: {'return': current},
+              ).toString(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+void _openBuyOrder(BuildContext context, BuySession session) {
+  final receipt = session.receipt;
+  if (receipt == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Place an order to see its live status here.'),
+      ),
+    );
+    return;
+  }
+  final route = receipt.fulfilment == BuyFulfilment.storePickup
+      ? '/app/buy/order/${receipt.id}/collection'
+      : '/app/buy/order/${receipt.id}';
+  context.go(route);
+}
+
+class _BuyFlowHeaderAction extends StatelessWidget {
+  const _BuyFlowHeaderAction({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onPressed,
+    this.badgeCount = 0,
+    this.keyName,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onPressed;
+  final int badgeCount;
+  final String? keyName;
+
+  @override
+  Widget build(BuildContext context) {
+    final semantics = selected ? '$label, current' : 'Open $label';
+    return Semantics(
+      selected: selected,
+      button: true,
+      enabled: !selected,
+      label: semantics,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: semantics,
+        child: InkWell(
+          key: Key(keyName ?? 'buy-local-flow-$id'),
+          onTap: selected ? null : onPressed,
+          borderRadius: BorderRadius.circular(MoolRadii.control),
+          child: AnimatedContainer(
+            duration: MoolMotion.accessible(context, MoolMotion.quick),
+            width: MoolMetrics.minimumTapTarget,
+            height: MoolMetrics.minimumTapTarget,
+            decoration: BoxDecoration(
+              color: selected ? const Color(0xFFE9E9FF) : Colors.transparent,
+              borderRadius: BorderRadius.circular(MoolRadii.control),
+              border: selected
+                  ? Border.all(color: const Color(0x33000080))
+                  : null,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  color: selected ? MoolColors.navy : MoolColors.muted,
+                  size: 20,
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Badge(
+                      label: Text('$badgeCount'),
+                      backgroundColor: MoolColors.orange,
+                      textColor: MoolColors.ink,
                     ),
                   ),
               ],
@@ -132,7 +250,6 @@ class BuyPageScaffold extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: BuyBottomDock(session: session, active: activeDock),
     );
   }
 }
@@ -201,104 +318,6 @@ class BuyMessageBanner extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class BuyBasketButton extends StatelessWidget {
-  const BuyBasketButton({required this.session, super.key});
-
-  final BuySession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return Badge(
-      isLabelVisible: session.itemCount > 0,
-      label: Text('${session.itemCount}'),
-      backgroundColor: MoolColors.orange,
-      textColor: MoolColors.ink,
-      child: IconButton.outlined(
-        key: const Key('buy-open-basket'),
-        tooltip: 'Open basket',
-        onPressed: () => context.go('/app/buy/basket'),
-        icon: const Icon(Icons.shopping_bag_outlined),
-      ),
-    );
-  }
-}
-
-class BuyBottomDock extends StatelessWidget {
-  const BuyBottomDock({required this.session, required this.active, super.key});
-
-  final BuySession session;
-  final String active;
-
-  @override
-  Widget build(BuildContext context) {
-    return MoolOutcomeDock(
-      semanticLabel: 'Buy navigation',
-      activeId: active,
-      mool: MoolDockAction(
-        keyName: 'buy-dock-mool',
-        id: 'mool',
-        label: 'Mool',
-        icon: MoolBrand.moolLauncherIcon,
-        onPressed: () => context.go('/app/mool'),
-      ),
-      actions: [
-        MoolDockAction(
-          keyName: 'buy-dock-shop',
-          id: 'shop',
-          label: 'Shop',
-          icon: Icons.storefront_outlined,
-          onPressed: () => context.go('/app/buy/grocery'),
-        ),
-        MoolDockAction(
-          keyName: 'buy-dock-basket',
-          id: 'basket',
-          label: session.itemCount == 0
-              ? 'Basket'
-              : 'Basket ${session.itemCount}',
-          icon: Icons.shopping_bag_outlined,
-          onPressed: () => context.go('/app/buy/basket'),
-        ),
-        MoolDockAction(
-          keyName: 'buy-dock-orders',
-          id: 'orders',
-          label: 'Order',
-          icon: Icons.receipt_long_outlined,
-          onPressed: () {
-            final receipt = session.receipt;
-            if (receipt == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Place an order to see its live status here.'),
-                ),
-              );
-              return;
-            }
-            final route = receipt.fulfilment == BuyFulfilment.storePickup
-                ? '/app/buy/order/${receipt.id}/collection'
-                : '/app/buy/order/${receipt.id}';
-            context.go(route);
-          },
-        ),
-      ],
-      chat: MoolDockAction(
-        keyName: 'buy-dock-chat',
-        id: 'chat',
-        label: 'Chat',
-        icon: Icons.chat_bubble_outline_rounded,
-        onPressed: () {
-          final current = GoRouterState.of(context).uri.toString();
-          context.go(
-            Uri(
-              path: '/app/chat/inbox',
-              queryParameters: {'return': current},
-            ).toString(),
-          );
-        },
       ),
     );
   }

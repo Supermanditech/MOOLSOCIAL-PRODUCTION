@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "MOOLSOCIAL-GOOGLE-AUTH-PRODUCTION-BASELINE-R60-87-20260823",
+  "status": "LOCKED_GOOGLE_AUTH_ACCEPTED",
+  "scope": "google_sign_in_only",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "candidate": {
+    "versionName": "1.0.0-r60.87",
+    "versionCode": "2026082387",
+    "packageName": "com.moolsocial.app",
+    "artifactPath": "artifacts/quality/uaw-c34p-fix11-google-sign-in-final-r60-87-20260823-01/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-device-review-release.apk",
+    "artifactSha256": "EF80600A99FDB9991F7C1763F049863D60F9A9320127FBC179149494757670D8",
+    "artifactBytes": 104047340,
+    "buildCount": 1,
+    "inPlaceInstallCount": 1,
+    "signerReferencePath": "artifacts/quality/uaw-c34p-fix11-google-sign-in-diagnostic-r60-86-20260823-04/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-device-review-release.apk"
+  },
+  "sourceSeal": {
+    "manifestPath": "artifacts/quality/uaw-c34p-fix11-google-sign-in-final-r60-87-20260823-01/source-aggregate-manifest.txt",
+    "manifestSha256": "5194D6C5A9F391D8678A5A64283D71F1AD2173FAF9DFB4DB8F13F2BA29C3F0B0",
+    "ownerCount": 652,
+    "independentReplayRequired": true,
+    "postBuildGeneratedOwnerExclusions": [
+      "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
+    ],
+    "postBuildGeneratedOwnerDisposition": "The Flutter build regenerated this single derived owner after the pre-build seal. Its release result is independently covered by APK plugin integrity proving registrant=true, firebaseCore=true, and integrationTest=false. Every non-generated manifest owner must still replay exactly.",
+    "localRuntimeConfigurationExclusions": [
+      "apps/mobile/android/app/google-services.json"
+    ],
+    "localRuntimeConfigurationDisposition": "This Firebase Android runtime configuration is founder-held and must remain only on the local build laptop at apps/mobile/android/app/google-services.json. The baseline checker requires the local file and verifies it against the accepted r60.87 source-manifest hash without emitting its contents. It must never be committed; a future APK or AAB preflight must stop and request this exact local file if it is absent or changed.",
+    "postAcceptanceAdministrativeOwnerExclusions": [
+      "scripts/check-codex-subagent-coordination-policy.ps1"
+    ],
+    "postAcceptanceAdministrativeOwnerDisposition": "This non-runtime coordination checker changed only to recognize the annotated r60.87 Git acceptance tag while preserving the build anchor, branch, registry binding, policy identity, and release controls. It is excluded from the immutable production source replay while those controls remain machine verified."
+  },
+  "componentSeals": [
+    {
+      "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "sha256": "1FF171E5CCF6FE49970A9FAC38B5610AD4D7F87BB0C37D659981BFF642AAC1A4"
+    },
+    {
+      "path": "apps/mobile/test/firebase_social_auth_gateway_test.dart",
+      "sha256": "941B63E3AF7DDAFE78177A3B925212F1AC5ABD2D9CD2ED58BFE83EF8777002AC"
+    },
+    {
+      "path": "config/google-authentication-production-traceability-map.json",
+      "sha256": "8FAAE7336176448014002EE9E77CA5139EE182C68BB1230AB5170D5462EAEE4D"
+    },
+    {
+      "path": "config/google-authentication-production-runtime-acceptance-r60-87.json",
+      "sha256": "2232696D6228706F028D164CF6823C4DF5DDC12269803E36B17096CEB5AFE59B"
+    }
+  ],
+  "provenRootCause": {
+    "classification": "firebase_android_api_key_application_restriction_missing_current_release_signer",
+    "correction": "The existing authorized release signer was added only to the existing com.moolsocial.app Firebase Android API-key restriction and independently reloaded as matched.",
+    "ticketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY"
+  },
+  "p0Tickets": [
+    {
+      "path": "config/uaw-c34p-fix12-google-firebase-exact-code-preservation-ticket.json",
+      "ticketId": "UAW-C34P-FIX12-GOOGLE-FIREBASE-EXACT-CODE-PRESERVATION",
+      "state": "local_implementation_and_focused_tests_passed",
+      "classification": "PROVEN_GAP_FIXED_LOCALLY"
+    },
+    {
+      "path": "config/uaw-c34p-fix13-google-firebase-auth-app-check-alignment-ticket.json",
+      "ticketId": "UAW-C34P-FIX13-GOOGLE-FIREBASE-AUTH-APP-CHECK-ALIGNMENT",
+      "state": "closed_not_applicable_no_change",
+      "classification": "NOT_APPLICABLE_CURRENT_REJECTION_PATH"
+    },
+    {
+      "path": "config/uaw-c34p-fix14-google-firebase-identity-toolkit-availability-ticket.json",
+      "ticketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+      "state": "closed_proven_gap_corrected_and_verified",
+      "classification": "PROVEN_GAP_FIXED_EXTERNALLY"
+    },
+    {
+      "path": "config/uaw-c34p-fix15-google-identity-platform-rejection-controls-ticket.json",
+      "ticketId": "UAW-C34P-FIX15-GOOGLE-IDENTITY-PLATFORM-REJECTION-CONTROLS",
+      "state": "closed_not_applicable_no_change",
+      "classification": "NOT_APPLICABLE_CURRENT_REJECTION_PATH"
+    }
+  ],
+  "stableExternalConfiguration": {
+    "googleProviderEnabled": true,
+    "authenticationAppCheckEnforcement": "UNENFORCED",
+    "identityToolkitApi": "ENABLED",
+    "identityToolkitAllowedByFirebaseAndroidKey": true,
+    "exactPackageAllowedByFirebaseAndroidKey": true,
+    "r60_87SignerMatchesCorrectedRestriction": true,
+    "identityPlatformBlockingHooksConfigured": false,
+    "identityPlatformUserCreationEnabled": true,
+    "identityPlatformMultiTenancyEnabled": false,
+    "credentialValuesRecorded": false
+  },
+  "runtimeAcceptance": {
+    "path": "config/google-authentication-production-runtime-acceptance-r60-87.json",
+    "decision": "GOOGLE_SIGN_IN_ACCEPTED_ON_OPPO",
+    "requirementsPassed": ["G10", "G29", "G31", "G40"],
+    "authenticatedReadyObserved": true,
+    "authenticatedReadyRestoredAfterColdRelaunch": true,
+    "fatalOrAnrCount": 0
+  },
+  "postInstallGoogleLogAudit": {
+    "scope": "r60_87_processes_after_install_only",
+    "appProcessCount": 3,
+    "authenticatedReadyMarkerCount": 1,
+    "unauthenticatedSignInMarkerCount": 0,
+    "firebaseCredentialFailureCount": 0,
+    "firebaseExceptionCodeCount": 0,
+    "nativeGoogleFailureCount": 0,
+    "appCheckRejectionCount": 0,
+    "apiKeyRestrictionErrorCount": 0,
+    "identityToolkitUnavailableCount": 0,
+    "firebaseOrFlutterErrorLevelCount": 0,
+    "unhandledExceptionCount": 0,
+    "fatalOrAnrCount": 0,
+    "blockingIssueCount": 0,
+    "rawMessagesRecorded": false,
+    "privateValuesRecorded": false
+  },
+  "postBuildSourceReplay": {
+    "sealedManifestHashMatched": true,
+    "nonGeneratedOwnerMismatchCount": 0,
+    "generatedOwnerMismatchCount": 1,
+    "generatedOwner": "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
+    "localRuntimeConfigurationExclusionCount": 1,
+    "postAcceptanceAdministrativeOwnerExclusionCount": 1,
+    "apkPluginIntegrityPassed": true
+  },
+  "baselineRules": {
+    "googleAcceptanceMayNotBeInferredFromBuildOnly": true,
+    "runtimeAcceptanceOverlayRequired": true,
+    "stablePassEvidenceMustBeReused": true,
+    "otherProvidersHeld": true,
+    "newBuildOrInstallAuthorized": false,
+    "aabPlayOrProductionMutationAuthorized": false,
+    "privateIdentityValuesMayBeRecorded": false
+  },
+  "reverifyWhen": [
+    "Google authentication source, tests, plugin, Android bridge, generated resources, or Firebase initialization changes",
+    "Package, release signer, Android OAuth client, Web/server OAuth client, Firebase project, or packaged configuration changes",
+    "Firebase Android API-key application/API restrictions or Identity Toolkit availability changes",
+    "Authentication App Check enforcement, blocking functions, user actions, or tenant configuration changes",
+    "A new Google authentication APK is built or installed",
+    "The accepted OPPO session no longer restores authenticated ready state"
+  ],
+  "checker": "scripts/check-google-authentication-production-baseline-r60-87.ps1",
+  "lock": "config/google-authentication-production-baseline-r60-87.lock.json"
+}

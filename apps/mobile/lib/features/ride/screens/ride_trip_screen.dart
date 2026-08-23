@@ -162,7 +162,7 @@ class _CaptainArriving extends StatelessWidget {
       subtitle: session.rideCancelled
           ? 'No payment taken'
           : '700 m away · about 4 min',
-      activeDock: 'trip',
+      activeLocalAction: 'trip',
       fallbackBackRoute: '/app/ride/book',
       bottomAction: session.rideCancelled
           ? FilledButton(
@@ -399,7 +399,7 @@ class _LiveTrip extends StatelessWidget {
       session: session,
       title: 'Trip in progress',
       subtitle: '3.2 km · about 12 min to Railway Station',
-      activeDock: 'trip',
+      activeLocalAction: 'trip',
       fallbackBackRoute: '/app/ride/book',
       bottomAction: FilledButton.icon(
         key: const Key('ride-reach-destination'),
@@ -609,7 +609,7 @@ class _PaymentApproval extends StatelessWidget {
       session: session,
       title: 'Review final fare',
       subtitle: 'Reached Railway Station · approve before payment',
-      activeDock: 'trip',
+      activeLocalAction: 'trip',
       fallbackBackRoute: '/app/ride/trip/$tripId',
       bottomAction: FilledButton.icon(
         key: const Key('ride-approve-payment'),
@@ -765,7 +765,7 @@ class _RideReceipt extends StatelessWidget {
       session: session,
       title: 'Ride complete',
       subtitle: 'Payment confirmed · receipt saved',
-      activeDock: 'trip',
+      activeLocalAction: 'trip',
       fallbackBackRoute: '/app/ride/book',
       bottomAction: FilledButton.icon(
         key: const Key('ride-again'),

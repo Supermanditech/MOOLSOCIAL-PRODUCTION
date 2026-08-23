@@ -63,21 +63,21 @@ void main() {
     );
     expect(
       releaseRegistrarSource,
-      isNot(contains('registerViewFactory(')),
-      reason: 'Release registration must be a no-op.',
+      contains('registerViewFactory('),
+      reason: 'The authorized Play release must register the official player.',
     );
     expect(
       releaseRegistrarSource,
-      isNot(contains('YouTubeEmbeddedPlayerPlatformViewFactory')),
+      contains('YouTubeEmbeddedPlayerPlatformViewFactory'),
     );
     expect(
       profileRegistrarSource,
-      isNot(contains('registerViewFactory(')),
-      reason: 'Profile registration must be a no-op.',
+      contains('registerViewFactory('),
+      reason: 'Profile device review must exercise the same player surface.',
     );
     expect(
       profileRegistrarSource,
-      isNot(contains('YouTubeEmbeddedPlayerPlatformViewFactory')),
+      contains('YouTubeEmbeddedPlayerPlatformViewFactory'),
     );
     expect(
       pluginSource,
@@ -85,13 +85,14 @@ void main() {
     );
     expect(
       contractSource,
-      contains('kDebugMode &&'),
-      reason: 'Build defines cannot enable the private adapter in release.',
+      contains('defaultValue: false'),
+      reason:
+          'The player remains disabled unless an authorized build enables it.',
     );
     expect(
       dartAdapterSource,
-      contains('if (!kDebugMode ||'),
-      reason: 'The Android surface must fail closed outside debug builds.',
+      contains('defaultTargetPlatform != TargetPlatform.android'),
+      reason: 'The registered player remains Android-only.',
     );
     expect(
       nativeSource,
@@ -165,5 +166,50 @@ void main() {
     expect(activitySource, contains('openLocationServicesSettings'));
     expect(activitySource, contains('reverseGeocode'));
     expect(activitySource, contains('geocodingExecutor.shutdownNow()'));
+  });
+
+  test('Android provider full-screen custom view has one paired host', () {
+    final nativeSource = File(
+      'packages/youtube_embedded_player_private_dev/android/src/debug/kotlin/'
+      'com/moolsocial/app/youtube/'
+      'YouTubeEmbeddedPlayerPlatformView.kt',
+    ).readAsStringSync();
+    final activitySource = File(
+      'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+    ).readAsStringSync();
+
+    expect(
+      'override fun onShowCustomView('.allMatches(nativeSource),
+      hasLength(2),
+      reason: 'Both current and legacy WebChromeClient entry points must pair.',
+    );
+    expect(
+      'override fun onHideCustomView()'.allMatches(nativeSource),
+      hasLength(1),
+    );
+    expect(nativeSource, contains('Theme_Black_NoTitleBar_Fullscreen'));
+    expect(
+      nativeSource,
+      contains('WindowManager.LayoutParams.FLAG_FULLSCREEN'),
+    );
+    expect(nativeSource, contains('WindowInsets.Type.systemBars()'));
+    expect(nativeSource, contains('BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE'));
+    expect(nativeSource, contains('dialog.setOnCancelListener'));
+    expect(nativeSource, contains('callback?.onCustomViewHidden()'));
+    expect(nativeSource, contains('root.visibility = View.INVISIBLE'));
+    expect(nativeSource, contains('root.visibility = View.VISIBLE'));
+    expect(
+      RegExp(
+        r'private fun destroyCurrentWebView\([^)]*\) \{\s*'
+        r'hideProviderFullscreen\(\)',
+      ).hasMatch(nativeSource),
+      isTrue,
+      reason: 'Detach, renderer loss and disposal must all close full-screen.',
+    );
+    expect(
+      activitySource,
+      isNot(contains('YouTubeEmbeddedPlayer')),
+      reason: 'The accepted MainActivity remains player agnostic.',
+    );
   });
 }

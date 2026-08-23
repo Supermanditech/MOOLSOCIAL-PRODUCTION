@@ -29,7 +29,7 @@ class EatTrackingScreen extends StatelessWidget {
             session: session,
             title: 'Order not found',
             subtitle: 'Start a new food order',
-            activeDock: 'order',
+            activeLocalAction: 'order',
             body: Center(
               child: FilledButton(
                 key: const Key('eat-order-missing-return'),
@@ -46,7 +46,7 @@ class EatTrackingScreen extends StatelessWidget {
           session: session,
           title: cancelled ? 'Order cancelled' : session.orderStage.title,
           subtitle: '${receipt.id} · ${receipt.restaurant.name}',
-          activeDock: 'order',
+          activeLocalAction: 'order',
           fallbackBackRoute: '/app/eat/home',
           trailing: IconButton.outlined(
             key: const Key('eat-refresh-order'),

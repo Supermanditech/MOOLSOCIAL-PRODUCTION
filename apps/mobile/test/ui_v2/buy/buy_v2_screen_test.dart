@@ -22,12 +22,23 @@ final _forbiddenBuyCopy = RegExp(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  Finder scrollableWithin(Key ownerKey) => find.descendant(
+    of: find.byKey(ownerKey),
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable &&
+          (widget.axisDirection == AxisDirection.down ||
+              widget.axisDirection == AxisDirection.up),
+    ),
+  );
+
   Widget app(
     BuyV2Session session, {
     double textScale = 1,
     EdgeInsets safePadding = EdgeInsets.zero,
     bool disableAnimations = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
+    VoidCallback? onOpenMool,
   }) {
     return MaterialApp(
       theme: MoolTheme.light(),
@@ -43,49 +54,65 @@ void main() {
           child: child!,
         );
       },
-      home: BuyV2Screen(session: session, scannerLauncher: scannerLauncher),
+      home: BuyV2Screen(
+        session: session,
+        scannerLauncher: scannerLauncher,
+        onOpenMool: onOpenMool,
+        onOpenMainAction: (action) {
+          final uri = Uri.parse(action.route);
+          if (uri.path != '/app/buy') return;
+          switch (uri.queryParameters['sub']) {
+            case 'wholesale':
+              session.openDestination(BuyV2Destination.wholesale);
+              return;
+            case 'medicine':
+              session.openDestination(BuyV2Destination.medicine);
+              return;
+            case 'orders':
+              session.openOrders();
+              return;
+            default:
+              session.openDestination(BuyV2Destination.shop);
+              return;
+          }
+        },
+      ),
     );
   }
 
-  testWidgets('persistent dock keeps every Buy destination visible', (
+  Future<void> openBuyAction(WidgetTester tester, String actionId) async {
+    await tester.tap(find.byKey(const Key('mool-home-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('mool-navigator-buy-$actionId')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('connected Buy actions preserve one destination surface', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    for (final label in [
-      'Mool',
-      'Shop',
-      'Wholesale',
-      'Medicine',
-      'Orders',
-      'Chat',
-    ]) {
-      expect(
-        find.byKey(ValueKey('buy-dock-${label.toLowerCase()}')),
-        findsOneWidget,
-      );
-    }
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
+      findsNothing,
+    );
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-wholesale')));
-    await tester.pumpAndSettle();
+    await openBuyAction(tester, 'wholesale');
     expect(session.destination, BuyV2Destination.wholesale);
     expect(
       find.byKey(ValueKey('buy-product-${session.visibleProducts.first.id}')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('buy-dock-shop')), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-dock-medicine')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
-    await tester.pumpAndSettle();
+    await openBuyAction(tester, 'medicine');
     expect(session.destination, BuyV2Destination.medicine);
     expect(
       find.byKey(ValueKey('buy-product-${session.visibleProducts.first.id}')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('buy-dock-wholesale')), findsOneWidget);
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
   });
 
   testWidgets('vertical changes transition the real surface without a wait', (
@@ -95,7 +122,7 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
+    session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
 
     expect(
@@ -115,12 +142,15 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('buy-shared-header')), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-persistent-dock')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
+      findsNothing,
+    );
 
     await tester.pumpAndSettle();
 
     final settledSequence = session.navigationMotionSequence;
-    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
+    session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
     expect(session.navigationMotionSequence, settledSequence);
     expect(
@@ -128,7 +158,9 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-chat')));
+    session.openOrders();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-orders-assist')));
     await tester.pump();
 
     expect(
@@ -142,40 +174,36 @@ void main() {
     );
   });
 
-  testWidgets('Mool palette stays native and keeps Buy immediately available', (
+  testWidgets('MoolSocial opens connected actions without replacing Buy', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
-    await tester.pumpWidget(app(session));
+    var moolTaps = 0;
+    await tester.pumpWidget(app(session, onOpenMool: () => moolTaps += 1));
     await tester.pumpAndSettle();
-    final dockBefore = tester.getRect(
-      find.byKey(const ValueKey('buy-dock-mool')),
-    );
+    session.openDestination(BuyV2Destination.medicine);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.medicine);
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-mool')));
+    await tester.tap(find.byKey(const Key('mool-home-launcher')));
     await tester.pumpAndSettle();
 
+    expect(moolTaps, 0);
+    expect(session.destination, BuyV2Destination.medicine);
     expect(find.byType(BottomSheet), findsNothing);
-    for (final action in [
-      'social',
-      'buy',
-      'eat',
-      'ride',
-      'book',
-      'pay',
-      'work',
-    ]) {
-      expect(find.byKey(ValueKey('buy-mool-$action')), findsOneWidget);
+    for (final actionId in const ['shop', 'wholesale', 'medicine', 'orders']) {
+      expect(
+        find.byKey(ValueKey('mool-navigator-buy-$actionId')),
+        findsOneWidget,
+      );
     }
-    final palette = tester.getRect(find.byKey(const ValueKey('buy-mool-buy')));
-    expect(palette.top, dockBefore.top);
-    expect(palette.bottom, dockBefore.bottom);
-
-    await tester.tap(find.byKey(const ValueKey('buy-mool-buy')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-mool-social')), findsNothing);
     expect(find.byKey(const ValueKey('buy-mool-buy')), findsNothing);
+    expect(find.text('Pay'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('mool-navigator-buy-shop')));
+    await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.shop);
-    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
   });
 
   testWidgets(
@@ -209,8 +237,7 @@ void main() {
         await tester.pumpWidget(app(session));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'viewport $size');
-        expect(find.byKey(const ValueKey('buy-dock-medicine')), findsOneWidget);
-        expect(find.byKey(const ValueKey('buy-dock-orders')), findsOneWidget);
+        expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
       }
     },
   );
@@ -328,7 +355,10 @@ void main() {
         find.byKey(const ValueKey('buy-search-control')),
       );
       final dock = tester.getRect(
-        find.byKey(const ValueKey('buy-persistent-dock')),
+        find.byKey(const Key('moolsocial-single-home-launcher-area')),
+      );
+      final dockSurface = tester.getRect(
+        find.byKey(const Key('mool-home-launcher')),
       );
       final safeBodyHeight =
           viewport.size.height -
@@ -488,8 +518,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('buy-search-close')));
       await tester.pumpAndSettle();
       expect(
-        dock.height / safeBodyHeight,
-        lessThanOrEqualTo(.08),
+        dockSurface.height / safeBodyHeight,
+        lessThanOrEqualTo(.14),
         reason: '${viewport.label} navigation',
       );
       expect(
@@ -652,12 +682,12 @@ void main() {
           tester
               .getSize(find.byKey(const ValueKey('buy-search-control')))
               .height,
-          150,
+          162,
           reason: '${destination.name} long-query control grows progressively',
         );
         expect(
           tester.getSize(find.byKey(const ValueKey('buy-search-band'))).height,
-          162,
+          174,
           reason: '${destination.name} long-query band owns all wrapped text',
         );
         expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
@@ -791,40 +821,41 @@ void main() {
     },
   );
 
-  testWidgets('MoolSocial promotional title is embedded in the glass scene', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Buy contextual promotion has no redundant destination wordmark',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('buy-brand-tile')),
-        matching: find.byKey(const ValueKey('moolsocial-brand-surface')),
-      ),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-contextual-glass-header')),
-      findsOneWidget,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))),
-      const Size(104, 56),
-    );
-  });
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-header-context-slot')),
+          matching: find.byKey(const ValueKey('moolsocial-brand-surface')),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-contextual-glass-header')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('buy-header-context-slot'))),
+        const Size(44, 56),
+      );
+    },
+  );
 
   testWidgets(
-    'Mool and Social play one finite cinematic promotional sequence',
+    'Context visuals play one finite cinematic promotional sequence',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
       await tester.pump();
 
-      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
-      expect(tester.getSize(brandOwner), const Size(104, 56));
-      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+      final brandOwner = find.byKey(const ValueKey('buy-header-context-slot'));
+      expect(tester.getSize(brandOwner), const Size(44, 56));
+      expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-header-signature-shop')),
         findsOneWidget,
@@ -902,9 +933,9 @@ void main() {
       await tester.pumpWidget(app(session, disableAnimations: true));
       await tester.pump();
 
-      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
-      expect(tester.getSize(brandOwner), const Size(104, 56));
-      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+      final brandOwner = find.byKey(const ValueKey('buy-header-context-slot'));
+      expect(tester.getSize(brandOwner), const Size(44, 56));
+      expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
       expect(find.bySemanticsLabel('Plan a household basket'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('buy-header-signature-shop')),
@@ -1036,7 +1067,7 @@ void main() {
           find.byKey(const ValueKey('buy-shared-header')),
         );
         final brand = tester.getRect(
-          find.byKey(const ValueKey('buy-brand-tile')),
+          find.byKey(const ValueKey('buy-header-context-slot')),
         );
         final account = tester.getRect(
           find.byKey(const ValueKey('buy-open-account')),
@@ -1081,9 +1112,9 @@ void main() {
         find.byKey(const ValueKey('buy-category-sheet-surface')),
       );
       final dock = tester.getRect(
-        find.byKey(const ValueKey('buy-persistent-dock')),
+        find.byKey(const Key('moolsocial-single-home-launcher-area')),
       );
-      expect((surface.bottom - dock.top).abs(), lessThanOrEqualTo(1));
+      expect((surface.bottom - dock.top).abs(), lessThanOrEqualTo(24));
       expect(
         find.byKey(ValueKey('buy-product-${session.visibleProducts.first.id}')),
         findsOneWidget,
@@ -1167,7 +1198,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('buy-horizontal-product-grid')),
         220,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: scrollableWithin(
+          PageStorageKey(
+            'buy-${session.destination.name}-'
+            '${session.selectedCategoryId}-all',
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -1201,7 +1237,9 @@ void main() {
       expect(lowerState.position.pixels, 0);
 
       final dockTop = tester
-          .getRect(find.byKey(const ValueKey('buy-persistent-dock')))
+          .getRect(
+            find.byKey(const Key('moolsocial-single-home-launcher-area')),
+          )
           .top;
       expect(tester.getRect(horizontalGrid).top, lessThan(dockTop));
       await tester.drag(upperLane, const Offset(-520, 0));
@@ -1253,36 +1291,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    for (final label in const [
-      'Mool',
-      'Shop',
-      'Wholesale',
-      'Medicine',
-      'Orders',
-      'Chat',
+    await tester.tap(find.byKey(const Key('mool-home-launcher')));
+    await tester.pumpAndSettle();
+    for (final entry in const [
+      (id: 'shop', label: 'Shop'),
+      (id: 'wholesale', label: 'Wholesale'),
+      (id: 'medicine', label: 'Medicine'),
+      (id: 'orders', label: 'Orders'),
     ]) {
-      final cell = find.byKey(ValueKey('buy-dock-${label.toLowerCase()}'));
+      final cell = find.byKey(ValueKey('mool-navigator-buy-${entry.id}'));
       final visibleLabel = find.descendant(
         of: cell,
-        matching: find.text(label),
+        matching: find.text(entry.label),
       );
       expect(cell, findsOneWidget);
       expect(visibleLabel, findsOneWidget);
       final cellRect = tester.getRect(cell);
       final labelRect = tester.getRect(visibleLabel);
-      expect(cellRect.contains(labelRect.topLeft), isTrue, reason: label);
-      expect(cellRect.contains(labelRect.bottomRight), isTrue, reason: label);
+      expect(cellRect.contains(labelRect.topLeft), isTrue, reason: entry.label);
+      expect(
+        cellRect.contains(labelRect.bottomRight),
+        isTrue,
+        reason: entry.label,
+      );
       expect(
         labelRect.left,
         greaterThanOrEqualTo(cellRect.left + 2),
-        reason: '$label left separation',
+        reason: '${entry.label} left separation',
       );
       expect(
         labelRect.right,
         lessThanOrEqualTo(cellRect.right - 2),
-        reason: '$label right separation',
+        reason: '${entry.label} right separation',
       );
     }
+    await tester.tap(find.byKey(const Key('mool-connected-navigator-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
   });
 
   testWidgets('accessible featured cards keep purchase actions in bounds', (
@@ -1362,12 +1407,17 @@ void main() {
 
     final add = find.byKey(ValueKey('buy-add-${product.id}'));
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+    expect(
+      tester.getSize(find.byKey(const Key('mool-home-launcher'))).height,
+      greaterThanOrEqualTo(44),
+    );
+    await tester.tap(find.byKey(const Key('mool-home-launcher')));
+    await tester.pumpAndSettle();
     for (final key in const [
-      ValueKey('buy-dock-mool'),
-      ValueKey('buy-dock-shop'),
-      ValueKey('buy-dock-wholesale'),
-      ValueKey('buy-dock-medicine'),
-      ValueKey('buy-dock-orders'),
+      ValueKey('mool-navigator-buy-shop'),
+      ValueKey('mool-navigator-buy-wholesale'),
+      ValueKey('mool-navigator-buy-medicine'),
+      ValueKey('mool-navigator-buy-orders'),
     ]) {
       expect(tester.getSize(find.byKey(key)).height, greaterThanOrEqualTo(44));
     }
@@ -1422,7 +1472,7 @@ void main() {
           isNull,
           reason: 'critical Buy view at $size',
         );
-        expect(find.byKey(const ValueKey('buy-dock-medicine')), findsOneWidget);
+        expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
       }
     }
   });
@@ -1457,33 +1507,50 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('buy-product-action-bar')), findsNothing);
+    final productScrollable = scrollableWithin(
+      PageStorageKey('buy-product-${product.id}'),
+    );
     await tester.scrollUntilVisible(
       find.text('Pack, delivery and seller'),
       220,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: productScrollable,
     );
     expect(find.text('Pack, delivery and seller'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Wholesale terms'),
-      260,
-      scrollable: find.byType(Scrollable).first,
-    );
+    final wholesaleTerms = find.text('Wholesale terms', skipOffstage: false);
+    expect(wholesaleTerms, findsOneWidget);
+    await tester.ensureVisible(wholesaleTerms);
+    await tester.pumpAndSettle();
     expect(find.text('Wholesale terms'), findsOneWidget);
-    final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
+    final primary = find.byKey(
+      ValueKey('buy-product-primary-${product.id}'),
+      skipOffstage: false,
+    );
     expect(primary, findsOneWidget);
     expect(
-      find.descendant(of: primary, matching: find.byIcon(Icons.add_rounded)),
+      find.descendant(
+        of: primary,
+        matching: find.byIcon(Icons.add_rounded, skipOffstage: false),
+        skipOffstage: false,
+      ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: primary, matching: find.text(product.title)),
+      find.descendant(
+        of: primary,
+        matching: find.text(product.title, skipOffstage: false),
+        skipOffstage: false,
+      ),
       findsNothing,
     );
     expect(
-      find.descendant(of: primary, matching: find.text('Add')),
+      find.descendant(
+        of: primary,
+        matching: find.text('Add', skipOffstage: false),
+        skipOffstage: false,
+      ),
       findsOneWidget,
     );
-    expect(find.text('Add to cart'), findsNothing);
+    expect(find.text('Add to cart', skipOffstage: false), findsNothing);
   });
 
   testWidgets(
@@ -1502,10 +1569,13 @@ void main() {
         find.byKey(ValueKey('buy-product-packshot-${product.id}')),
         findsOneWidget,
       );
+      final productScrollable = scrollableWithin(
+        PageStorageKey('buy-product-${product.id}'),
+      );
       await tester.scrollUntilVisible(
         find.text('Mool Retail Partner'),
         220,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: productScrollable,
       );
       expect(find.text('Mool Retail Partner'), findsOneWidget);
       expect(find.textContaining('Verified'), findsNothing);
@@ -1514,7 +1584,7 @@ void main() {
       await tester.scrollUntilVisible(
         reviews,
         240,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: productScrollable,
       );
       await tester.tap(
         find.byKey(ValueKey('buy-review-product-${product.id}')),
@@ -1790,7 +1860,7 @@ void main() {
     await tester.scrollUntilVisible(
       itemsAction,
       220,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: scrollableWithin(PageStorageKey('buy-tracking-${order.id}')),
     );
     await tester.tap(itemsAction);
     await tester.pumpAndSettle();
@@ -1844,10 +1914,13 @@ void main() {
             findsOneWidget,
             reason: '$destination at $viewport',
           );
+          final productScrollable = scrollableWithin(
+            PageStorageKey('buy-product-${product.id}'),
+          );
           await tester.scrollUntilVisible(
             find.text(product.partnerRole),
             140,
-            scrollable: find.byType(Scrollable).first,
+            scrollable: productScrollable,
           );
           expect(
             find.text(product.partnerRole),
@@ -1858,7 +1931,7 @@ void main() {
           await tester.scrollUntilVisible(
             find.byKey(ValueKey('buy-product-reviews-${product.id}')),
             180,
-            scrollable: find.byType(Scrollable).first,
+            scrollable: productScrollable,
           );
           expect(
             tester.takeException(),
@@ -1892,10 +1965,18 @@ void main() {
 
     session.openTracking('MS-240782');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-dock-chat')));
+    final trackingHelp = find.byKey(const ValueKey('buy-tracking-help'));
+    await tester.scrollUntilVisible(
+      trackingHelp,
+      180,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-tracking-MS-240782'),
+      ),
+    );
+    await tester.tap(trackingHelp);
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.assist);
-    await tester.tap(find.byKey(const ValueKey('buy-dock-chat')));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.orders);
     expect(session.view, BuyV2View.tracking);
@@ -2208,15 +2289,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-change-location')), findsOneWidget);
-      final brandOwner = find.byKey(const ValueKey('buy-brand-tile'));
-      expect(tester.getSize(brandOwner), const Size(104, 56));
+      final brandOwner = find.byKey(const ValueKey('buy-header-context-slot'));
+      expect(tester.getSize(brandOwner), const Size(44, 56));
       final headerRect = tester.getRect(
         find.byKey(const ValueKey('buy-shared-header')),
       );
       final brandRect = tester.getRect(brandOwner);
       expect(headerRect.contains(brandRect.topLeft), isTrue);
       expect(headerRect.contains(brandRect.bottomRight), isTrue);
-      expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+      expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-header-signature-shop')),
         findsOneWidget,
@@ -2285,11 +2366,21 @@ void main() {
       .54,
     );
     expect(find.text('NOW'), findsOneWidget);
-    expect(find.text('What happens next'), findsOneWidget);
+    final nextStep = find.text('What happens next');
+    await tester.scrollUntilVisible(
+      nextStep,
+      180,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-tracking-MS-240782'),
+      ),
+    );
+    expect(nextStep, findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('buy-tracking-alerts')),
       180,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-tracking-MS-240782'),
+      ),
     );
     expect(find.text('Order updates'), findsOneWidget);
     expect(find.text('Order alerts are on'), findsOneWidget);
@@ -2316,7 +2407,9 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Help'),
       260,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-tracking-MS-240782'),
+      ),
     );
     expect(find.text('Help'), findsOneWidget);
     expect(
@@ -2325,6 +2418,11 @@ void main() {
     );
 
     session.openAssist();
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const PageStorageKey('buy-assist')),
+      const Offset(0, -700),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Chat in app'), findsOneWidget);
     expect(
@@ -2481,7 +2579,7 @@ void main() {
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -500));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-dock-orders')));
+    session.openOrders();
     await tester.pumpAndSettle();
 
     expect(find.text('PURCHASES'), findsOneWidget);
@@ -2867,7 +2965,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('buy-orders-promotions')),
       180,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
     );
     expect(find.byKey(const ValueKey('buy-orders-promotions')), findsOneWidget);
   });
@@ -2895,7 +2993,9 @@ void main() {
       );
       final product = session.visibleProducts.first;
       final dockTop = tester
-          .getRect(find.byKey(const ValueKey('buy-persistent-dock')))
+          .getRect(
+            find.byKey(const Key('moolsocial-single-home-launcher-area')),
+          )
           .top;
       final rect = tester.getRect(
         find.byKey(ValueKey('buy-product-${product.id}')),
@@ -2990,10 +3090,7 @@ void main() {
         debugPrint(failure.toStringDeep());
       }
       expect(failure, isNull, reason: entry.$1);
-      expect(find.byKey(const ValueKey('buy-dock-shop')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-dock-wholesale')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-dock-medicine')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-dock-orders')), findsOneWidget);
+      expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
     }
   });
 

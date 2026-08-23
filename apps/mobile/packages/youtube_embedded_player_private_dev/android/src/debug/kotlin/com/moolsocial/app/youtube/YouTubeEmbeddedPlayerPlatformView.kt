@@ -3,8 +3,11 @@ package com.moolsocial.app.youtube
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
@@ -13,6 +16,10 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
@@ -31,6 +38,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
+import com.moolsocial.youtube_embedded_player_private_dev.BuildConfig
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -58,6 +66,10 @@ class YouTubeEmbeddedPlayerPlatformView(
     private var disposed = false
     private var connectionNonce: String? = null
     private var readyTimeout: Runnable? = null
+    private var fullscreenDialog: Dialog? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var fullscreenActivity: Activity? = null
+    private var previousRequestedOrientation: Int? = null
 
     init {
         channel.setMethodCallHandler(this)
@@ -140,7 +152,7 @@ class YouTubeEmbeddedPlayerPlatformView(
         val playerWebView = WebView(context)
         webView = playerWebView
         bootstrapLoadPending = true
-        WebView.setWebContentsDebuggingEnabled(true)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         playerWebView.setBackgroundColor(Color.BLACK)
         playerWebView.isHorizontalScrollBarEnabled = false
         playerWebView.isVerticalScrollBarEnabled = false
@@ -384,7 +396,27 @@ class YouTubeEmbeddedPlayerPlatformView(
         }
     }
 
-    private class ProviderWebChromeClient : WebChromeClient() {
+    private inner class ProviderWebChromeClient : WebChromeClient() {
+        override fun onShowCustomView(
+            view: View,
+            callback: WebChromeClient.CustomViewCallback,
+        ) {
+            showProviderFullscreen(view, callback)
+        }
+
+        @Suppress("DEPRECATION")
+        override fun onShowCustomView(
+            view: View,
+            requestedOrientation: Int,
+            callback: WebChromeClient.CustomViewCallback,
+        ) {
+            showProviderFullscreen(view, callback, requestedOrientation)
+        }
+
+        override fun onHideCustomView() {
+            hideProviderFullscreen()
+        }
+
         override fun onPermissionRequest(request: PermissionRequest) {
             request.deny()
         }
@@ -395,6 +427,145 @@ class YouTubeEmbeddedPlayerPlatformView(
         ) {
             callback.invoke(origin, false, false)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun showProviderFullscreen(
+        view: View,
+        callback: WebChromeClient.CustomViewCallback,
+        requestedOrientation: Int? = null,
+    ) {
+        if (disposed || fullscreenDialog != null || view.parent != null) {
+            callback.onCustomViewHidden()
+            return
+        }
+        val activity = context.findActivity()
+        if (activity == null || activity.isFinishing || activity.isDestroyed) {
+            callback.onCustomViewHidden()
+            return
+        }
+
+        val dialog = Dialog(
+            activity,
+            android.R.style.Theme_Black_NoTitleBar_Fullscreen,
+        )
+        dialog.setCancelable(true)
+        dialog.setContentView(
+            view,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        dialog.setOnCancelListener { hideProviderFullscreen() }
+        dialog.setOnDismissListener {
+            if (fullscreenDialog === dialog) hideProviderFullscreen()
+        }
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.black)
+            setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            )
+            setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insetsController?.apply {
+                    systemBarsBehavior =
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsets.Type.systemBars())
+                }
+            } else {
+                decorView.systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            }
+        }
+
+        fullscreenDialog = dialog
+        fullscreenCallback = callback
+        fullscreenActivity = activity
+        previousRequestedOrientation = activity.requestedOrientation
+        if (
+            requestedOrientation != null &&
+            requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        ) {
+            activity.requestedOrientation = requestedOrientation
+        }
+        root.visibility = View.INVISIBLE
+        try {
+            dialog.show()
+            dialog.window?.apply {
+                setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insetsController?.apply {
+                        systemBarsBehavior =
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        hide(WindowInsets.Type.systemBars())
+                    }
+                }
+            }
+        } catch (_: RuntimeException) {
+            hideProviderFullscreen()
+        }
+    }
+
+    private fun hideProviderFullscreen() {
+        val dialog = fullscreenDialog ?: return
+        val callback = fullscreenCallback
+        val activity = fullscreenActivity
+        val priorOrientation = previousRequestedOrientation
+        fullscreenDialog = null
+        fullscreenCallback = null
+        fullscreenActivity = null
+        previousRequestedOrientation = null
+
+        dialog.setOnCancelListener(null)
+        dialog.setOnDismissListener(null)
+        try {
+            if (dialog.isShowing) dialog.dismiss()
+        } catch (_: RuntimeException) {
+            // The Activity window is already gone; native state still clears below.
+        }
+        if (
+            activity != null &&
+            priorOrientation != null &&
+            !activity.isFinishing &&
+            !activity.isDestroyed &&
+            activity.requestedOrientation != priorOrientation
+        ) {
+            activity.requestedOrientation = priorOrientation
+        }
+        root.visibility = View.VISIBLE
+        try {
+            callback?.onCustomViewHidden()
+        } catch (_: RuntimeException) {
+            // The provider already released its custom view.
+        }
+    }
+
+    private fun Context.findActivity(): Activity? {
+        var current: Context? = this
+        while (current != null) {
+            when (current) {
+                is Activity -> return current
+                is ContextWrapper -> {
+                    val base = current.baseContext
+                    current = if (base === current) null else base
+                }
+                else -> current = null
+            }
+        }
+        return null
     }
 
     private fun openExternal(uri: Uri) {
@@ -450,6 +621,7 @@ class YouTubeEmbeddedPlayerPlatformView(
     }
 
     private fun destroyCurrentWebView(rendererGone: Boolean = false) {
+        hideProviderFullscreen()
         cancelReadyTimeout()
         connectionNonce = null
         portTransferred = false

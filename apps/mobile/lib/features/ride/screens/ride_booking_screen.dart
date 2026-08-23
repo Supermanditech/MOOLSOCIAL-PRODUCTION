@@ -2,10 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../ride_models.dart';
 import '../ride_session.dart';
 import '../widgets/ride_widgets.dart';
+
+const _rideAccent = Color(0xFF175CD3);
+
+const _ridePlaces = <_RidePlace>[
+  _RidePlace(
+    id: 'railway-station',
+    title: 'Railway Station',
+    destination: 'Railway Station main gate',
+    detail: 'Main gate · Jodhpur',
+    icon: Icons.history_rounded,
+  ),
+  _RidePlace(
+    id: 'aiims-jodhpur',
+    title: 'AIIMS Jodhpur',
+    destination: 'AIIMS Jodhpur main entrance',
+    detail: 'Basni Industrial Area',
+    icon: Icons.history_rounded,
+  ),
+  _RidePlace(
+    id: 'home',
+    title: 'Home',
+    destination: 'Sardarpura, Jodhpur',
+    detail: 'Saved place',
+    icon: Icons.home_outlined,
+  ),
+];
 
 class RideBookingScreen extends StatefulWidget {
   const RideBookingScreen({required this.session, this.initialType, super.key});
@@ -27,9 +54,9 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
   void initState() {
     super.initState();
     if (widget.initialType != null && session.trip == null) {
-      session.prepareBooking(widget.initialType!);
+      session.prepareBooking(widget.initialType!, notifyChange: false);
     } else {
-      session.clearMessages();
+      session.clearMessages(notifyChange: false);
     }
     _pickupController = TextEditingController(text: session.pickup);
     _dropController = TextEditingController(text: session.drop);
@@ -243,11 +270,29 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
       animation: session,
       builder: (context, _) => RidePageScaffold(
         session: session,
-        title: 'Book your ride',
-        subtitle: 'Fare first · captain next · pay after the trip',
+        title: 'Ride',
+        subtitle: 'Choose destination, vehicle and fare',
         fallbackBackRoute: '/app/ride',
+        showBack: false,
+        activeLocalAction: session.selectedType.name,
         bottomAction: FilledButton.icon(
           key: const Key('ride-book'),
+          style: FilledButton.styleFrom(
+            backgroundColor: _rideAccent,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(
+              44,
+              MoolServiceHomeTokens.primaryActionHeight,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(MoolRadii.card),
+            ),
+            textStyle: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: MoolServiceHomeTokens.bodySize,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           onPressed: session.busy ? null : _book,
           icon: session.busy
               ? const SizedBox.square(
@@ -264,63 +309,116 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
                 : 'Book ${session.selectedPackage.name} · ${rideMoney(session.fare)}',
           ),
         ),
-        body: ListView(
-          key: const Key('ride-booking-screen'),
-          padding: const EdgeInsets.fromLTRB(
-            MoolSpacing.md,
-            MoolSpacing.xs,
-            MoolSpacing.md,
-            MoolSpacing.lg,
-          ),
-          children: [
-            _RouteCard(session: session, onEdit: _editRoute),
-            const SizedBox(height: MoolSpacing.md),
-            const RideSectionTitle(
-              'Pickup time',
-              detail: 'Cancel free before pickup',
+        body: ColoredBox(
+          color: MoolServiceHomeTokens.page,
+          child: ListView(
+            key: const Key('ride-booking-screen'),
+            padding: const EdgeInsets.fromLTRB(
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.xs,
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.lg,
             ),
-            const SizedBox(height: MoolSpacing.xs),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: [
-                MoolSegment(
-                  key: const Key('ride-time-now'),
-                  label: 'Now',
-                  icon: Icons.bolt_rounded,
-                  selected: session.rideTime == RideTime.now,
-                  onPressed: () => session.chooseRideTime(RideTime.now),
+            children: [
+              MoolServiceCard(
+                key: const Key('ride-current-pickup'),
+                title: 'Current pickup',
+                subtitle: session.pickup,
+                icon: Icons.my_location_rounded,
+                accent: MoolColors.success,
+                trailing: TextButton(
+                  key: const Key('ride-edit-route'),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    foregroundColor: _rideAccent,
+                  ),
+                  onPressed: _editRoute,
+                  child: const Text('Change'),
                 ),
-                MoolSegment(
-                  key: const Key('ride-time-15'),
-                  label: 'After 15 min',
-                  icon: Icons.timer_outlined,
-                  selected: session.rideTime == RideTime.after15Minutes,
-                  onPressed: () =>
-                      session.chooseRideTime(RideTime.after15Minutes),
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Where to?',
+                subtitle: 'Search or choose a recent place',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              MoolServiceSearchField(
+                key: const Key('ride-destination-search-surface'),
+                fieldKey: const Key('ride-destination-search'),
+                hintText: session.drop,
+                semanticLabel: 'Search destination. Selected ${session.drop}',
+                readOnly: true,
+                onTap: _editRoute,
+                leading: Icons.search_rounded,
+                trailing: const Icon(Icons.arrow_forward_rounded, size: 20),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              for (final place in _ridePlaces) ...[
+                _PlaceRow(
+                  place: place,
+                  selected: session.drop == place.destination,
+                  onTap: () => session.updateRoute(
+                    pickupValue: session.pickup,
+                    dropValue: place.destination,
+                  ),
                 ),
-                MoolSegment(
-                  key: const Key('ride-time-schedule'),
-                  label: session.rideTime == RideTime.scheduled
-                      ? session.rideTimeLabel
-                      : 'Schedule',
-                  icon: Icons.calendar_month_outlined,
-                  selected: session.rideTime == RideTime.scheduled,
-                  onPressed: () {
-                    session.chooseRideTime(RideTime.scheduled);
-                    _scheduleRide();
-                  },
-                ),
+                if (place != _ridePlaces.last)
+                  const SizedBox(height: MoolSpacing.xs),
               ],
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            const RideSectionTitle('Choose a ride'),
-            const SizedBox(height: MoolSpacing.xs),
-            Row(
-              children: [
-                for (final type in RideType.values) ...[
-                  Expanded(
-                    child: MoolSegment(
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Pickup time',
+                subtitle: 'Free cancellation before captain matching',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              Wrap(
+                spacing: MoolSpacing.xs,
+                runSpacing: MoolSpacing.xs,
+                children: [
+                  MoolServiceChoice(
+                    key: const Key('ride-time-now'),
+                    label: 'Now',
+                    icon: Icons.bolt_rounded,
+                    accent: _rideAccent,
+                    selected: session.rideTime == RideTime.now,
+                    onSelected: (_) => session.chooseRideTime(RideTime.now),
+                  ),
+                  MoolServiceChoice(
+                    key: const Key('ride-time-15'),
+                    label: 'After 15 min',
+                    icon: Icons.timer_outlined,
+                    accent: _rideAccent,
+                    selected: session.rideTime == RideTime.after15Minutes,
+                    onSelected: (_) =>
+                        session.chooseRideTime(RideTime.after15Minutes),
+                  ),
+                  MoolServiceChoice(
+                    key: const Key('ride-time-schedule'),
+                    label: session.rideTime == RideTime.scheduled
+                        ? session.rideTimeLabel
+                        : 'Schedule',
+                    icon: Icons.calendar_month_outlined,
+                    accent: _rideAccent,
+                    selected: session.rideTime == RideTime.scheduled,
+                    onSelected: (_) {
+                      session.chooseRideTime(RideTime.scheduled);
+                      _scheduleRide();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Choose a ride',
+                subtitle: 'Fare and pickup time shown before booking',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              Wrap(
+                spacing: MoolSpacing.xs,
+                runSpacing: MoolSpacing.xs,
+                children: [
+                  for (final type in RideType.values)
+                    MoolServiceChoice(
                       key: Key('ride-type-${type.name}'),
                       label: type.label,
                       icon: switch (type) {
@@ -328,156 +426,114 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
                         RideType.auto => Icons.electric_rickshaw_rounded,
                         RideType.cab => Icons.local_taxi_rounded,
                       },
+                      accent: _rideAccent,
                       selected: session.selectedType == type,
-                      onPressed: () => session.chooseType(type),
+                      onSelected: (_) => session.chooseType(type),
                     ),
-                  ),
-                  if (type != RideType.cab)
-                    const SizedBox(width: MoolSpacing.xs),
                 ],
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              for (final package in session.visiblePackages) ...[
+                _PackageCard(
+                  package: package,
+                  selected: package.id == session.selectedPackageId,
+                  onTap: () => session.choosePackage(package.id),
+                ),
+                if (package != session.visiblePackages.last)
+                  const SizedBox(height: MoolSpacing.xs),
               ],
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            for (final package in session.visiblePackages) ...[
-              _PackageCard(
-                package: package,
-                selected: package.id == session.selectedPackageId,
-                onTap: () => session.choosePackage(package.id),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Payment',
+                subtitle: 'Nothing is charged before your ride',
               ),
-              const SizedBox(height: MoolSpacing.xs),
-            ],
-            const SizedBox(height: MoolSpacing.sm),
-            const RideSectionTitle('Pay after your ride'),
-            const SizedBox(height: MoolSpacing.xs),
-            RideCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: MoolSpacing.xs,
-                    runSpacing: MoolSpacing.xs,
-                    children: [
-                      for (final method in RidePaymentMethod.values)
-                        MoolSegment(
-                          key: Key('ride-payment-${method.name}'),
-                          label: method.label,
-                          selected: session.paymentMethod == method,
-                          onPressed: () => session.choosePayment(method),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  Text(
-                    session.paymentMethod == RidePaymentMethod.card
-                        ? 'Your card is not charged now. Approve the final fare after arrival.'
-                        : 'Pay only after you reach your destination.',
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(height: MoolSpacing.sm),
+              RideCard(
+                key: const Key('ride-payment-summary'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: MoolSpacing.xs,
+                      runSpacing: MoolSpacing.xs,
+                      children: [
+                        for (final method in RidePaymentMethod.values)
+                          MoolServiceChoice(
+                            key: Key('ride-payment-${method.name}'),
+                            label: method.label,
+                            accent: _rideAccent,
+                            selected: session.paymentMethod == method,
+                            onSelected: (_) => session.choosePayment(method),
+                          ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: MoolSpacing.sm),
+                    Text(
+                      session.paymentMethod == RidePaymentMethod.card
+                          ? 'Approve the final card fare after you reach your destination.'
+                          : 'Pay only after you reach your destination.',
+                      style: const TextStyle(
+                        color: MoolServiceHomeTokens.muted,
+                        fontSize: MoolServiceHomeTokens.metadataSize,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            const _TrustStrip(),
-          ],
+              const SizedBox(height: MoolSpacing.md),
+              const _TrustStrip(),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _RouteCard extends StatelessWidget {
-  const _RouteCard({required this.session, required this.onEdit});
+class _RidePlace {
+  const _RidePlace({
+    required this.id,
+    required this.title,
+    required this.destination,
+    required this.detail,
+    required this.icon,
+  });
 
-  final RideSession session;
-  final VoidCallback onEdit;
+  final String id;
+  final String title;
+  final String destination;
+  final String detail;
+  final IconData icon;
+}
+
+class _PlaceRow extends StatelessWidget {
+  const _PlaceRow({
+    required this.place,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _RidePlace place;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return RideCard(
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.my_location_rounded, color: MoolColors.success),
-              const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Pickup',
-                      style: TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      session.pickup,
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 11),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                height: 22,
-                child: VerticalDivider(color: MoolColors.line, thickness: 2),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(Icons.location_on_rounded, color: MoolColors.orange),
-              const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Destination',
-                      style: TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      session.drop,
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              key: const Key('ride-edit-route'),
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_location_alt_outlined),
-              label: const Text('Edit route'),
-            ),
-          ),
-        ],
-      ),
+    return MoolServiceCard(
+      key: Key('ride-place-${place.id}'),
+      title: place.title,
+      subtitle: place.detail,
+      icon: place.icon,
+      accent: _rideAccent,
+      emphasized: selected,
+      trailing: selected
+          ? const Icon(Icons.check_circle_rounded, color: _rideAccent, size: 22)
+          : null,
+      semanticLabel:
+          '${place.title}. ${place.detail}.${selected ? ' Selected destination.' : ''}',
+      onTap: onTap,
     );
   }
 }
@@ -495,70 +551,53 @@ class _PackageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RideCard(
+    return MoolServiceCard(
       key: Key('ride-package-${package.id}'),
-      onTap: onTap,
-      color: selected ? const Color(0xFFEDEEFF) : Colors.white,
-      child: Row(
+      title: package.name,
+      subtitle: '${package.capacity} · ${package.note}',
+      icon: switch (package.type) {
+        RideType.bike => Icons.two_wheeler_rounded,
+        RideType.auto => Icons.electric_rickshaw_rounded,
+        RideType.cab => Icons.local_taxi_rounded,
+      },
+      accent: _rideAccent,
+      emphasized: selected,
+      metadata: [
+        MoolServiceMeta(
+          icon: Icons.schedule_rounded,
+          label: '${package.arrivalMinutes} min',
+        ),
+        MoolServiceMeta(
+          icon: Icons.near_me_outlined,
+          label: '${package.nearbyCaptains} nearby',
+        ),
+      ],
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: selected ? MoolColors.navy : const Color(0xFFF0F1F8),
-              borderRadius: BorderRadius.circular(MoolRadii.control),
-            ),
-            child: Icon(switch (package.type) {
-              RideType.bike => Icons.two_wheeler_rounded,
-              RideType.auto => Icons.electric_rickshaw_rounded,
-              RideType.cab => Icons.local_taxi_rounded,
-            }, color: selected ? Colors.white : MoolColors.navy),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  package.name,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  '${package.arrivalMinutes} min · ${package.capacity} · ${package.note}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  '${package.nearbyCaptains} captains nearby',
-                  style: const TextStyle(
-                    color: MoolColors.success,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.xs),
           Text(
             rideMoney(package.fare),
             style: const TextStyle(
-              color: MoolColors.ink,
+              color: MoolServiceHomeTokens.ink,
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
+          if (selected)
+            const Icon(
+              Icons.check_circle_rounded,
+              color: _rideAccent,
+              size: 20,
+            ),
         ],
       ),
+      semanticLabel:
+          '${package.type.label} ${package.name}. ${rideMoney(package.fare)}. '
+          'Arrives in ${package.arrivalMinutes} minutes. ${package.capacity}. '
+          '${package.note}. ${package.nearbyCaptains} captains nearby.'
+          '${selected ? ' Selected.' : ''}',
+      onTap: onTap,
     );
   }
 }
@@ -568,24 +607,12 @@ class _TrustStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const RideCard(
-      color: Color(0xFFF0F8EF),
-      child: Row(
-        children: [
-          Icon(Icons.verified_user_outlined, color: MoolColors.success),
-          SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Text(
-              'Verified captain · fare shown before booking · free cancellation before pickup',
-              style: TextStyle(
-                color: Color(0xFF155B17),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return const MoolServiceCard(
+      title: 'Know before you book',
+      subtitle:
+          'Verified captain · fare shown first · free cancellation before matching',
+      icon: Icons.verified_user_outlined,
+      accent: MoolColors.success,
     );
   }
 }

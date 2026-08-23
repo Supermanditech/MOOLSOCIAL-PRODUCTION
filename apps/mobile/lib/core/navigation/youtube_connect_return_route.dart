@@ -2,16 +2,22 @@ const youtubeConnectRoute = '/app/creator/youtube-connect';
 
 String? youtubeConnectReturnLocation(String platformRouteName) {
   final uri = Uri.tryParse(platformRouteName);
-  if (uri == null || uri.hasFragment || uri.path != youtubeConnectRoute) {
+  if (uri == null || uri.hasFragment) {
     return null;
   }
 
-  final allowedOrigin =
-      (uri.scheme == 'moolsocial' && uri.host.isEmpty) ||
-      (uri.scheme == 'https' && uri.host == 'moolsocial.com') ||
-      (uri.scheme.isEmpty && uri.host.isEmpty);
+  final customSchemeReturn =
+      uri.scheme == 'moolsocial' &&
+      uri.host == 'app' &&
+      uri.path == '/creator/youtube-connect';
+  final webReturn =
+      uri.scheme == 'https' &&
+      uri.host == 'moolsocial.com' &&
+      uri.path == youtubeConnectRoute;
+  final internalReturn =
+      uri.scheme.isEmpty && uri.host.isEmpty && uri.path == youtubeConnectRoute;
   final resultValues = uri.queryParametersAll['youtubeConnect'];
-  if (!allowedOrigin ||
+  if (!(customSchemeReturn || webReturn || internalReturn) ||
       uri.queryParametersAll.length != 1 ||
       resultValues == null ||
       resultValues.length != 1) {

@@ -11,6 +11,8 @@ class JourneySnapshot {
     this.currentAreaLabel,
     this.homeOrWorkAreaLabel,
     this.pendingRoute,
+    this.pendingAuthenticationCancelRoute,
+    this.pendingAuthenticationPurpose,
     this.lastReadyRoute,
     this.setupExperienceVersion = approvedSetupExperienceVersion,
   });
@@ -22,6 +24,8 @@ class JourneySnapshot {
   final String? homeOrWorkAreaLabel;
   final bool setupComplete;
   final String? pendingRoute;
+  final String? pendingAuthenticationCancelRoute;
+  final String? pendingAuthenticationPurpose;
   final String? lastReadyRoute;
   final int setupExperienceVersion;
 }
@@ -54,6 +58,19 @@ class MemoryJourneyStore implements JourneyStore {
   }
 }
 
+class SeededJourneyStore implements JourneyStore {
+  SeededJourneyStore({required this.delegate, required this.seed});
+
+  final JourneyStore delegate;
+  final JourneySnapshot seed;
+
+  @override
+  Future<JourneySnapshot?> read() async => await delegate.read() ?? seed;
+
+  @override
+  Future<void> write(JourneySnapshot snapshot) => delegate.write(snapshot);
+}
+
 class OtpRequestResult {
   const OtpRequestResult({this.automaticallyVerified = false, this.userId});
 
@@ -62,9 +79,10 @@ class OtpRequestResult {
 }
 
 class JourneyServiceException implements Exception {
-  const JourneyServiceException(this.userMessage);
+  const JourneyServiceException(this.userMessage, {this.code});
 
   final String userMessage;
+  final String? code;
 
   @override
   String toString() => userMessage;
@@ -72,18 +90,23 @@ class JourneyServiceException implements Exception {
 
 enum SocialAuthProvider { google, youtube, apple, x, instagram, facebook }
 
-enum SocialAuthOutcome { authenticated, cancelled }
+enum SocialAuthOutcome { authenticated, authorizationPending, cancelled }
 
 class SocialAuthResult {
-  const SocialAuthResult._(this.outcome, {this.userId});
+  const SocialAuthResult._(this.outcome, {this.userId, this.code});
 
-  const SocialAuthResult.authenticated(String userId)
-    : this._(SocialAuthOutcome.authenticated, userId: userId);
+  const SocialAuthResult.authenticated(String userId, {String? code})
+    : this._(SocialAuthOutcome.authenticated, userId: userId, code: code);
 
-  const SocialAuthResult.cancelled() : this._(SocialAuthOutcome.cancelled);
+  const SocialAuthResult.authorizationPending({String? code})
+    : this._(SocialAuthOutcome.authorizationPending, code: code);
+
+  const SocialAuthResult.cancelled({String? code})
+    : this._(SocialAuthOutcome.cancelled, code: code);
 
   final SocialAuthOutcome outcome;
   final String? userId;
+  final String? code;
 }
 
 abstract interface class SocialAuthGateway {
@@ -94,6 +117,14 @@ abstract interface class SocialAuthGateway {
   Future<void> signOut();
 }
 
+abstract interface class SocialAuthCallbackGateway {
+  SocialAuthProvider? providerForCallback(Uri callbackUri);
+
+  Future<SocialAuthResult> completeForegroundCallback(Uri callbackUri);
+
+  Future<SocialAuthResult> completeColdStartCallback(Uri callbackUri);
+}
+
 class ReviewSocialAuthGateway implements SocialAuthGateway {
   ReviewSocialAuthGateway({
     this.defaultResult = const SocialAuthResult.cancelled(),
@@ -101,6 +132,7 @@ class ReviewSocialAuthGateway implements SocialAuthGateway {
     Map<SocialAuthProvider, Object>? failures,
     this.signedIn = false,
     this.responseDelay = Duration.zero,
+    this.signOutFailure,
   }) : results = results ?? <SocialAuthProvider, SocialAuthResult>{},
        failures = failures ?? <SocialAuthProvider, Object>{};
 
@@ -108,8 +140,10 @@ class ReviewSocialAuthGateway implements SocialAuthGateway {
   final Map<SocialAuthProvider, SocialAuthResult> results;
   final Map<SocialAuthProvider, Object> failures;
   final Duration responseDelay;
+  final Object? signOutFailure;
   bool signedIn;
   int signInCount = 0;
+  int signOutCount = 0;
   SocialAuthProvider? lastProvider;
 
   @override
@@ -130,6 +164,8 @@ class ReviewSocialAuthGateway implements SocialAuthGateway {
 
   @override
   Future<void> signOut() async {
+    signOutCount += 1;
+    if (signOutFailure case final failure?) throw failure;
     signedIn = false;
   }
 }
@@ -193,6 +229,101 @@ class ReviewEmailOtpGateway implements EmailOtpGateway {
   }
 }
 
+abstract interface class EmailLinkGateway {
+  Future<void> sendSignInLink(String emailAddress);
+
+  bool isSignInLink(String emailLink);
+
+  Future<String> signInWithEmailLink({
+    required String emailAddress,
+    required String emailLink,
+  });
+
+  Future<void> signOut();
+}
+
+class UnavailableEmailLinkGateway implements EmailLinkGateway {
+  const UnavailableEmailLinkGateway();
+
+  static const _unavailable = JourneyServiceException(
+    'Email link sign-in is not available right now. Choose another method.',
+    code: 'email-link-unavailable',
+  );
+
+  @override
+  Future<void> sendSignInLink(String emailAddress) async => throw _unavailable;
+
+  @override
+  bool isSignInLink(String emailLink) => false;
+
+  @override
+  Future<String> signInWithEmailLink({
+    required String emailAddress,
+    required String emailLink,
+  }) async => throw _unavailable;
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class ReviewEmailLinkGateway implements EmailLinkGateway {
+  ReviewEmailLinkGateway({
+    this.acceptedLink = 'moolsocial-review-email-link',
+    this.userId = 'review-email-link-user',
+    this.sendFailure,
+    this.completionFailure,
+  });
+
+  final String acceptedLink;
+  final String userId;
+  Object? sendFailure;
+  Object? completionFailure;
+  int sendCount = 0;
+  int completionCount = 0;
+  int signOutCount = 0;
+  String? lastEmailAddress;
+  bool signedIn = false;
+
+  @override
+  Future<void> sendSignInLink(String emailAddress) async {
+    sendCount += 1;
+    lastEmailAddress = emailAddress;
+    if (sendFailure case final failure?) throw failure;
+  }
+
+  @override
+  bool isSignInLink(String emailLink) => emailLink == acceptedLink;
+
+  @override
+  Future<String> signInWithEmailLink({
+    required String emailAddress,
+    required String emailLink,
+  }) async {
+    completionCount += 1;
+    if (completionFailure case final failure?) throw failure;
+    if (!isSignInLink(emailLink)) {
+      throw const JourneyServiceException(
+        'This sign-in link is invalid. Request a new link.',
+        code: 'invalid-action-code',
+      );
+    }
+    if (lastEmailAddress != null && lastEmailAddress != emailAddress) {
+      throw const JourneyServiceException(
+        'Enter the email address that received this link.',
+        code: 'invalid-email',
+      );
+    }
+    signedIn = true;
+    return userId;
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOutCount += 1;
+    signedIn = false;
+  }
+}
+
 class ReviewOtpGateway implements OtpGateway {
   ReviewOtpGateway({
     this.acceptedCode = '123456',
@@ -207,6 +338,7 @@ class ReviewOtpGateway implements OtpGateway {
   Object? verifyFailure;
   int requestCount = 0;
   int verificationCount = 0;
+  int signOutCount = 0;
   String? lastPhoneNumber;
 
   @override
@@ -225,6 +357,7 @@ class ReviewOtpGateway implements OtpGateway {
 
   @override
   Future<void> signOut() async {
+    signOutCount += 1;
     signedIn = false;
   }
 
@@ -318,7 +451,7 @@ class ReviewCurrentAreaGateway implements CurrentAreaGateway {
 }
 
 abstract interface class AccountBootstrapGateway {
-  Future<void> prepareAuthenticatedAccount();
+  Future<void> prepareAuthenticatedAccount({String? expectedUserId});
 }
 
 class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
@@ -326,10 +459,12 @@ class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
 
   Object? failure;
   int prepareCount = 0;
+  String? lastExpectedUserId;
 
   @override
-  Future<void> prepareAuthenticatedAccount() async {
+  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
     prepareCount += 1;
+    lastExpectedUserId = expectedUserId;
     if (failure case final value?) throw value;
   }
 }

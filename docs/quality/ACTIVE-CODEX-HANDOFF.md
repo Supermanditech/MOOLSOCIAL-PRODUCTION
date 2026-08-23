@@ -1,5 +1,598 @@
 # Active Codex handoff
 
+## 2026-08-23 16:15 IST — r60.87 Google Sign-In accepted; immutable Git baseline authorized
+
+Founder accepted Google Sign-In on the OPPO with release APK `1.0.0-r60.87`
+(`versionCode 2026082387`): Google identity returned, Firebase accepted the
+credential, MoolSocial entered authenticated Social Home, and a cold relaunch
+restored the authenticated session. The accepted APK SHA-256 is
+`EF80600A99FDB9991F7C1763F049863D60F9A9320127FBC179149494757670D8`.
+
+The permanent machine baseline is
+`config/google-authentication-production-baseline-r60-87.json`, locked by
+`config/google-authentication-production-baseline-r60-87.lock.json` and checked
+by `scripts/check-google-authentication-production-baseline-r60-87.ps1`. Other
+providers, YouTube Connect/backend work, AAB, Play and Production remain held.
+
+Founder authorized exactly one curated r60.87 baseline commit on
+`remediation/prototype-conformance-2026-07-20`, annotated tag
+`moolsocial-google-auth-r60.87-accepted-20260823`, and push of only that branch
+and tag. `main` remains frozen and must not be merged or modified. All unrelated
+tracked and untracked evidence remains preserved outside the curated baseline.
+
+## 2026-08-21 — PRE_AAB_AUTH_AUDIT_FIX6_GREEN; FIX7 blocks public Meta release
+
+Founder paused Cursor baseline work until after OPPO testing and directed Codex
+Desktop to perform a comprehensive pre-AAB authentication audit in the existing
+production checkout. The audit is complete for executable auth source.
+
+FIX6 implements and qualifies end-to-end OAuth timeout ordering, exact X/
+Instagram expiry, truthful provider-error classification, bounded provider JSON
+and first-terminal Firebase Phone Auth coordination. Whole-mobile analysis is
+clean; backend is 577/577; the affected mobile authentication set is 205/205;
+shared, FIX1A, FIX5 and FIX6 gates are green in PS7 and Windows PowerShell 5.1.
+
+The AAB has not started. The founder-controlled secure build shell holds runtime
+and signing inputs, but its keystore path must be copied to the canonical
+`MOOLSOCIAL_UPLOAD_STORE_FILE` variable before build. FIX7 truthfully blocks
+public Meta review/production release until shared product-data erasure policy
+and schema-complete implementation exist; it does not block the non-acceptance
+Play-signing bootstrap or developer-role OPPO login test.
+
+No Play, OPPO, private login, real email/SMS, commit, push or merge occurred.
+
+## 2026-08-20 — PRE_BUY_BASELINE_CUTOVER_READY; provider/broker checkpoint frozen before build
+
+Codex Desktop has reached the agreed pre-build cutover for task `20-08-2026`.
+Branch/HEAD remain `remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; the complete existing dirty tree
+remains preserved. This is a source/configuration freeze signal for Cursor to
+reconstruct a separate clean baseline worktree. It is not a claim that all
+eight providers are published, privately tested or OPPO-accepted.
+
+The locked Screen 03 still exposes exactly Google; YouTube through the same
+Google identity; Apple through Firebase; X authorization code plus PKCE S256;
+eligible Instagram professional login; Facebook native `public_profile`;
+Firebase passwordless Email Link; and Firebase Mobile OTP. No replacement
+screen, route, JourneySession or authentication architecture was introduced.
+
+Sanitized provider checkpoint:
+
+- Google/YouTube provider, one Android Firebase app and two SHA-1 plus two
+  SHA-256 registrations are present. Final upload/Play-signing mapping, release
+  server-client input and device return remain C34L/private-device facts.
+- Apple stays disabled and explicitly blocked by founder Apple account recovery;
+  no Apple secret, capability write or private login occurred.
+- X public-client OAuth, exact redirect, minimum scopes and server projection
+  secret are configured. Paid provider availability and a private login remain
+  unclaimed; funds are still unauthorized.
+- Instagram has the dedicated professional app, exact
+  `instagram_business_basic`, exact OAuth redirect, deployed deauthorization
+  and data-deletion callbacks, and server secret/runtime parameters. App Review
+  and private professional-account acceptance remain pending.
+- Facebook has the dedicated app, `public_profile` only, native Android
+  package/activity, founder-controlled development key hash, web/embedded/
+  device/JavaScript OAuth disabled, notification SSO disabled, deployed
+  deauthorization/data-deletion callbacks, privacy/terms and automatic purchase/
+  subscription logging disabled. Final icon/category, upload/Play key hashes,
+  App Review and private Graph revocation replay remain pending by founder
+  direction.
+- Passwordless Email Link, authorized domains and the noindex `/app` fallback
+  are live. Custom and default Hosting `/app` plus `assetlinks.json` return 200;
+  real email remains held.
+- Mobile OTP is enabled with India-only SMS allowlisting, registered certificate
+  sets and Play Integrity. Real SMS remains held.
+
+The Gen2 `moolSocialPublicAuth` Dev function is ACTIVE in `asia-south1` on the
+dedicated runtime service account with all four runtime parameters and all four
+Secret Manager bindings. Its one service has the Cloud Run Invoker IAM check
+disabled because domain-restricted sharing blocks `allUsers`; organization
+policy was not weakened. Application rejection readback is exact: missing App
+Check POST `401`, unsupported GET `405`, invalid Meta signed request `400`.
+App Check Token Verifier, Firebase Auth Admin, Datastore User, Log Writer and
+self Token Creator IAM are bound. X and Instagram `expiresAt` Firestore TTL
+policies are ACTIVE.
+
+Fresh changed-surface verification is green: backend typecheck passes; focused
+X/Instagram/Meta callback suites pass `38/38`; full backend passes `575/575`;
+public Hosting tests pass `9/9`; FIX5 preparation passes PowerShell 7 and Windows
+PowerShell 5.1. The prior unchanged mobile qualification remains whole-mobile
+analysis clean with two identical 16-suite `158/158` cycles.
+
+Sanitized action counts are provider-console `14`, Dev broker deployment `1`,
+Hosting deployment `1`, Firestore TTL writes `2`, IAM writes `10`, secret
+containers `4`, secret versions `4` and service-access write `1`. Real
+authentication, email, SMS, build, Play upload, OPPO update, device acceptance,
+production promotion and funds remain `0`. No commit, push, merge, reset, clean
+or main-branch action occurred.
+
+Regression memory is generation `3006`, SHA-256
+`1226BCDE7E1EEA6C924C4E1D5AD81BEF818D63A17E5F5B8DCA10530B65912D92`.
+The FIX5 machine remains truthfully
+`selected_provider_configuration_and_sanitized_readback_pending`; its
+`-RequireQualified` branch is not passed because Apple, X paid/live access,
+Meta App Review/final submission fields, release signing/build inputs and
+private acceptance remain later gates.
+
+Cursor may now keep `/root/pre_buy_baseline_b0` read-only, reconstruct and
+qualify the separate clean baseline, then create the approved baseline commit
+and tag `moolsocial-mvp-pre-buy-baseline-v1`. Cursor must not take authentication,
+provider, build, Play, OPPO or external-action ownership. Codex Desktop must not
+build until Cursor returns the exact baseline commit/tag. After that tag,
+Desktop may select C34L and build the Internal Testing candidate under its later
+action-time gate; Cursor may begin Buy work from the same tag without waiting
+for OPPO completion.
+
+## 2026-08-20 — C34P source qualified; FIX5 live-provider preparation selected; build/OPPO held
+
+Task `20-08-2026` continues the existing selected
+`UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION`
+without restarting the closed `18-08-2026` work. Branch/HEAD remain
+`remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; the complete founder/user dirty
+tree remains preserved.
+
+The locked Screen 03 still has exactly eight methods: Google; YouTube through
+the same Google identity; Apple through Firebase; X OAuth 2.0 authorization
+code plus PKCE S256; eligible Instagram professional login; Facebook native
+login with `public_profile` only; Firebase passwordless Email Link; and
+Firebase Mobile OTP. No screen, route, JourneySession, Firebase session or
+backend package was added.
+
+Two production source/test defects found during method-by-method review are
+corrected. X/Instagram public-auth requests now acquire Firebase App Check
+limited-use tokens matching backend replay consumption. The pure X contract,
+test and gate no longer permit ticket-forbidden `offline.access` or a refresh
+lifecycle; every production/test owner enforces exactly `tweet.read users.read`.
+
+Focused results are green: Google `1/1`; shared-identity YouTube `1/1`; Apple
+`4/4`; X pure/mobile/backend `12/12`, `10/10`, `12/12`; Instagram
+mobile/backend `5/5`, `10/10`; Facebook contract/native-Graph `19/19`,
+`18/18`; Email Link `10/10`, `3/3`, `3/3`; Mobile OTP `6/6`; and shared
+failure/readiness including limited-use App Check `27/27`. Two fresh identical
+affected cycles pass 16 suites at `158/158` each. Whole-mobile analysis has no
+issues; backend `tsc --noEmit` passes; approved UI locks pass; and both auth
+gates pass PowerShell 7 and Windows PowerShell 5.1.
+
+Regression memory is generation `2972`, SHA-256
+`2CD3B0C0862E75CF53D744D46801B57FB86AC39521A27F6E290711B046683466`.
+The qualification pre-report dirty digest is bytes `592315`, records `7223`,
+SHA-256 `057D2736CAFBD0CFA641B33BA99B024D6641AB597A466359B7C23CBFFCBB6AD8`,
+stderr bytes `0`, exit code `0`. Complete evidence is appended to
+`docs/quality/UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION-QUALIFICATION-20260818.md`
+at SHA-256
+`7B8FD50319C44A9B4994FA9F4EA4412B4FE927E99801C7083E74A51970BC5182`.
+
+No provider-console write, deployment, real authentication, private input,
+email/SMS, build, Play, OPPO, funds, commit, push, merge or main action
+occurred. Founder-controlled provider readback remains required, including the
+App Check Token Verifier IAM fact and abandoned-attempt Firestore TTL. Build,
+Internal Testing and one-by-one OPPO provider acceptance remain later exact
+gates with action-time founder confirmation; source readiness does not imply
+device or live-provider acceptance.
+
+Founder direction on 20 August 2026 now selects
+`UAW-C34P-FIX5-ALL-EIGHT-PUBLIC-AUTH-LIVE-PROVIDER-READINESS` as the exact
+`beyond_mvp` configuration/readback successor before YouTube API submission.
+It reuses all qualified source and the paused C34L transactional release path;
+no UI, route, JourneySession, provider adapter or backend package is added.
+
+The selected machine state is
+`config/public-auth-live-provider-readiness-state-c34p-fix5.json` at
+`selected_provider_configuration_and_sanitized_readback_pending`. Its
+preparation gate passes PowerShell 7 and Windows PowerShell 5.1 with all
+provider/deployment action counts `0`, build/Play/OPPO held and no private or
+secret value observed. The founder-only configuration runbook is
+`docs/quality/UAW-C34P-FIX5-FOUNDER-LIVE-PROVIDER-CONFIGURATION-RUNBOOK-20260820.md`.
+
+Current regression memory is generation `2975`, SHA-256
+`1BE7AC4CB4E2621BBD2330F00A98ED701B4EC2A09EB8777A10F3E3230247108B`.
+FIX5 provider-console configuration/readback and the existing Dev
+`moolSocialPublicAuth` deployment are authorized, but secrets, identifiers,
+key hashes and private accounts remain founder-only. Real email/SMS, build,
+Play, OPPO, funds, staging/Production promotion, commit, push and merge remain
+held. C34L selection cannot begin until every required sanitized provider fact
+passes the FIX5 `-RequireQualified` gate.
+
+## 2026-08-18 — C34P FIX1A all-eight public-auth source and local regressions qualified; live configuration held
+
+Task `18-08-2026` now selects
+`UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION`
+as the one founder-corrected beyond-MVP parent. Branch/HEAD remain
+`remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. C34L is preserved as paused
+evidence; rejected r60.72 was not reused. No build, deployment, Play, OPPO,
+provider-console, real Email Link/SMS, private login, funds, commit, push, merge
+or main-branch action occurred.
+
+The locked Screen 03 gateway retains exactly eight controls: Google, YouTube
+through the same Google identity, Apple, X, eligible Instagram professional
+login, Facebook, Firebase passwordless Email Link and Firebase Mobile OTP. No
+duplicate screen, route, JourneySession, Firebase session or auth backend was
+added. Foreground and cold broker callbacks reuse JourneySession bootstrap,
+rollback, authenticated relaunch and exact accepted protected-return routes.
+
+Qualified local source outcomes:
+
+- Google/YouTube retain one sanitized native Google-to-Firebase identity path.
+- Apple uses Firebase `AppleAuthProvider`, the iOS entitlement and Xcode
+  capability, and remains runtime-gated on exact Apple/Firebase/revocation facts.
+- X now has the real mobile browser/callback adapter and App Check-protected
+  backend broker: one-use attempt, exact state/redirect, S256, only
+  `tweet.read users.read`, HMAC project-scoped Firebase identity, custom token
+  and immediate transient provider-token revocation. OAuth 1, client secrets and
+  `offline.access` are absent.
+- Instagram has its distinct mobile/backend path, exact
+  `instagram_business_basic`, BUSINESS/MEDIA_CREATOR eligibility,
+  `account_ineligible` for unsupported accounts, custom-token completion and
+  transient token revocation. Facebook Login is not relabeled as Instagram.
+- Facebook pins `flutter_facebook_auth` 7.2.0, requests only
+  `public_profile`, consumes the transient credential directly in Firebase, and
+  has a tested exact Graph `/me/permissions` revocation seam. Logout remains
+  separate; no email permission is requested.
+- Existing passwordless Email Link and Firebase Mobile OTP lifecycle/recovery
+  paths remain green and independently fail closed on readiness.
+
+Verification is clean: whole-mobile analysis has no issues; backend
+`tsc --noEmit` passes; targeted backend X and Instagram suites pass `12/12` and
+`10/10`; focused mobile suites pass; and two identical 16-suite affected mobile
+cycles pass `155/155`. Approved UI locks pass. The legacy C34P shared gate and
+new FIX1A all-eight gate both pass PowerShell 7 and Windows PowerShell 5.1. MVP
+delivery discipline plus `-RequireExecutionAuthorized` pass. Exact hashes and
+the complete ledger are in
+`docs/quality/UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION-QUALIFICATION-20260818.md`
+at SHA-256
+`E2CD94EA1A08CCBB773E20679653935941AA2C067435D5E102814E068515E2A7`.
+
+The current regression generation is `2964` entries at SHA-256
+`8E3D0E23736F0A405AF08AF57A9860479D2F12AC5952D57F0046D6DC0662DFB8`.
+The qualification pre-report non-emitting dirty-tree digest is bytes `591533`,
+records `7214`, SHA-256
+`2333FF68A8B51C64503BF5F4BA32B061F048342669A299C06425A5F819430053`;
+the large pre-existing dirty worktree is preserved.
+
+Live completion remains explicitly unclaimed. Founder-owned external readback
+is still required for Google/Firebase/Play signing; Apple Developer/Firebase
+return and revocation; X public client/redirect, Functions runtime values, App
+Check and abandoned-attempt Firestore TTL; Instagram professional-login app,
+redirect, app review/live mode and server runtime values; Facebook app ID,
+client token, package/activity, debug/release key hashes, redirect, privacy,
+data-deletion and exact versioned Graph endpoint. Real Email Link/SMS, founder
+private journeys, build, Internal Testing and OPPO acceptance remain later
+gated evidence and must not be inferred from this source qualification.
+
+## 2026-08-17 18:20 IST — C34L consolidated interfaces dual-host qualified; real release state still absent
+
+Task `17-08-2026` resumed the exact 14:50 checkpoint in the saved huge dirty
+workspace. Branch/HEAD remain
+`remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. C34K remains permanently
+rejected at `0/0/0/0` with
+`prebuild_rejected_consolidated_lifecycle_audit_gaps_successor_required`.
+C34L remains selection-only: the detailed state, aggregate state and real
+evidence root are all absent. No source seal, source cycle, founder input,
+launcher execution, AAB, Google Play write, OPPO action, journey, private-value
+inspection, deployment, commit, push, branch operation or external write
+occurred. All parallel sub-agents are stopped.
+
+The consolidated pre-state interfaces requested at 14:50 are now implemented,
+primary-reviewed and dual-host qualified:
+
+- `scripts/invoke-release-lifecycle-transition-c34l.ps1` has no
+  `Path.GetRelativePath`; it implements all 11 exact transition/phase mappings,
+  exact ticket/attempt/current-preimage proof binding, eight action counts,
+  four authorities, Play/OPPO/journey SHA+byte fields,
+  `prebuild-failed -FailureStage`, dual-host atomic replacement, and a sequence/chained crash
+  journal. Reconciliation re-confines and re-hashes every retained prerequisite
+  proof, validates its full schema against decoded preimages, requires identical
+  one-record-appended detailed/aggregate proof histories, reconciles only the
+  newest nonterminal transaction and rejects gap/fork/duplicate/older
+  nonterminal histories.
+- `scripts/check-release-lifecycle-transition-c34l.ps1` passes on PowerShell 7
+  and Windows PowerShell 5.1 with 11 positive transitions, nine negative
+  fixtures, exact evidence hashes/bytes, eight counts, four authorities,
+  existing/new atomic writes, a consecutive journal chain, wrong-attempt
+  rejection, fixture confinement and `realStateWrites=0; externalWrites=0`.
+- `scripts/check-release-transaction-journal-c34l.ps1` passes on both hosts with
+  five injected crash boundaries, three prepared reconciliations, one committed
+  recovery, five idempotent replays, five tamper rejections (including two
+  prerequisite-proof owners and one semantic journal-metadata case), and four
+  chain rejections.
+- `scripts/check-release-retained-evidence-c34l.ps1` and
+  `scripts/recover-uaw-c34l-r60-76-postbuild-lifecycle.ps1` bind `ticketId`,
+  attempt, exact detailed/aggregate hashes, all eight counts, all four
+  authorities and Play/OPPO cold+retained/journey SHA+bytes. Recovery derives
+  the exact immutable `11b-build-succeeded-proof-attempt-N.json` owner directly;
+  it has no impossible pretransition `phaseGateProofs` dependency.
+  `scripts/check-release-retained-evidence-fixtures-c34l.ps1` passes on both
+  hosts with one positive plus ten retained-evidence negatives and one positive
+  plus six recovery-boundary negatives. Real producer actions remain zero.
+- The generic wrapper, founder launcher and
+  `scripts/check-c34l-build-wrapper-terminal-state.ps1` propagate exact attempt
+  through every C34L proof/transition caller. The static gate passes on both
+  hosts with 14 post-start stages, nine cleanup fixtures, 15 fresh
+  current-preimage proofs, `wrongAttemptRejected=true`, scoped attempt inventory
+  `8/5/4/1`, one terminal `1/0/0/0` rejection, retained sanitized result,
+  historical C34J/C34K paths preserved and no secret/private value observed.
+  The launcher and the still-absent candidate gate were not invoked.
+
+Primary reran every behavioral suite independently on both hosts. The latest
+implementation regression-memory gate passes alone with `2729` registry
+entries and `1737` applicable lessons. Registry SHA-256 is
+`D83801574F1DDE225DD078144D0E8A88CB079AF3D156739163593263D27468E2`;
+the newest entry is REG2758. REG2733 through REG2758 truthfully retain every
+read, parser, fixture, review and handoff mistake before its retry. None changed
+candidate or external state.
+
+Current implementation-owner SHA-256 values:
+
+- transition `37BDA2D20F5B9A671894A22AA1EAC7778055CCFEDEDC0058EB6563B35F3E8EEE`
+- lifecycle fixtures `DC45B717189D496855EBA0360CCD478AF22FF1C025FC51E061F51339B2C0E488`
+- journal fixtures `5EE48EAAF45343652FDA782C7D90AD1EE3388F800D2AC4A71AC95A90C94E6EFE`
+- retained checker `304F257D5424C88A74DF617E34D303A55CB9190C9C2F678DE46D373537038EC4`
+- recovery `2D5CCD743BB240A0B022AB0C91BC6500AAB3DE08A47245A2E46118AE040C51A4`
+- retained/recovery fixtures `51C9636258C5A643E5BC89AFEDD5DDC1FDC0C9725D11C7AB0C9A8085C8A62FC8`
+- AAB wrapper `4786D8A397B1984E3022626382898DEF3FA435C2088D9C65D26B26F377C584DD`
+- founder launcher `5E713128AE02F4C96C2A0EF9F96AA31ACD517FC6F27BA7636E9A6A4F9ABC4C42`
+- wrapper terminal gate `5FAB5AA8BF328F4F66702EA6647FEA393A187334D35E8F3F8AE2E9A439032402`
+
+Next lawful work remains pre-AAB only: create the exact C34L detailed/aggregate
+state and the non-mutating candidate gate against these stable interfaces;
+create sanitized real Play/OPPO/journey evidence producers with the approved
+schema and exact transition wiring; then pass the complete dual-host
+preprompt/prebuild/build/postbuild/preupload/postupload/preinstall/postinstall/
+journey/rejection fixture audit. Do not create a source seal or run source
+cycles until those owners pass. Do not expose the founder launcher, build an
+AAB, write Play state or touch OPPO before the later retained gates authorize
+each exact action. OPPO remains preserved on Play-installed `1.0.0-r60.72` /
+`2026081372` with authoritative installer `com.android.vending`.
+
+## 2026-08-17 14:50 IST — C34L safe implementation checkpoint; release still blocked
+
+Branch/HEAD remain `remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. C34K remains permanently
+rejected at `0/0/0/0`. C34L remains selection-only: there is no detailed or
+aggregate C34L candidate state, source seal, source cycle, founder input,
+AAB, Play write, OPPO update, journey acceptance, deployment or secret access.
+
+Three founder-requested parallel implementation streams stopped at a safe
+checkpoint. The generic AAB wrapper now contains the C34L complete
+post-build-start terminal rejection path; the C34L launcher isolates each
+cleanup operation and retains a sanitized terminal result after cleanup; and
+`scripts/check-c34l-build-wrapper-terminal-state.ps1` passes on PowerShell 7
+and Windows PowerShell with 14 failure stages, nine cleanup fixtures and
+historical C34J/C34K paths preserved. The retained-evidence and recovery owners
+parse on both hosts and implement exact candidate/evidence identity,
+fixture-root confinement and attempt-aware recovery checks. The transaction
+owner parses and implements 11 transitions, full count/authority parity,
+prerequisite phase-proof binding and a durable reconciliation journal.
+
+C34L is **not qualified**. Before any seal or founder input, resume by:
+
+1. replacing the transaction owner's Windows PowerShell-incompatible
+   `[IO.Path]::GetRelativePath` usage;
+2. creating and passing
+   `scripts/check-release-lifecycle-transition-c34l.ps1` and
+   `scripts/check-release-transaction-journal-c34l.ps1` with positive and
+   injected crash-boundary fixtures on both PowerShell hosts;
+3. aligning recovery to the final proof schema (`ticketId`, state/aggregate
+   hashes, all eight action counts and all four authorities), and adopting the
+   strengthened SHA/byte fields in Play, OPPO and journey evidence producers;
+4. confirming whether the final transition owner accepts launcher
+   `prebuild-failed -FailureStage`;
+5. creating C34L state/aggregate and candidate-gate owners only after those
+   interfaces are stable, then running the full dual-host eight-phase fixtures
+   before source sealing or cycles.
+
+REG2730 records a read-only guessed registry-path diagnostic. REG2731 records a
+read-only ad hoc PowerShell parser-pipeline construction error. REG2732 records
+a read-only nested cross-host parser-command quoting error. None changed
+candidate, device or external state. The registry contains 2703 entries,
+SHA-256 `1CB791E6CA7381B0C5CBE567B7B6E18963AA174363696976D931738542215F98`.
+
+The OPPO remains untouched on Play-installed `1.0.0-r60.72` / `2026081372`.
+Do not launch the new C34L founder script: it is an unqualified integration
+owner until every item above passes.
+
+## 2026-08-17 14:36 IST — C34K rejected; C34L consolidated successor selected
+
+Branch/HEAD remain `remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. No commit, push, branch switch,
+worktree, AAB, Play write, OPPO mutation, secret access or private-identifier
+inspection occurred in this checkpoint.
+
+C34K `1.0.0-r60.75` / `2026081375` is permanently rejected at `0/0/0/0` with
+machine state
+`prebuild_rejected_consolidated_lifecycle_audit_gaps_successor_required`.
+REG2728 records the read-only PowerShell PID diagnostic error. REG2729 records
+the complete independent pre-AAB audit batch: fixture confinement, crash-safe
+dual-state transaction, prerequisite-gate proof binding, complete postbuild
+failure rejection, retained evidence identity, attempt-aware recovery,
+cleanup-safe terminal result, durable dual-host eight-phase proof, mutable C33G
+ledger separation and mandatory preupload browser-route proof. The initially
+suspected web-build issue was withdrawn after `apps/web` build+8-test evidence.
+
+Selected successor:
+`UAW-C34L-R60-76-CONSOLIDATED-RELEASE-TRANSACTION-EVIDENCE-PLAY-OPPO-ACCEPTANCE`,
+`1.0.0-r60.76` / `2026081376`, classification `mvp_required`, ticket SHA-256
+`3EDB08C6248B16360ED8E55468757B30DB647ACD3E89F39A46441D9D247EA085`.
+The robustness checkpoint and MVP scope gate pass. C34L is selection-only:
+implementation, source seal, cycles, founder prompt, build, Play and OPPO
+authorities remain held. Implement and behaviorally qualify the entire REG2729
+batch before any source seal; do not clone only the last detected fix.
+
+Sanitized OPPO truth: `2b3e0f71` / `CPH2375` is connected and awake with
+MoolSocial `1.0.0-r60.72` / `2026081372`; authoritative `dumpsys package` proves
+installer `com.android.vending`; app is not running or foreground. Preserve it.
+Never uninstall, clear data, sideload or downgrade. A future manual Play update
+is lawful only after C34L postupload/preinstall authority and only when Play
+shows **Update**.
+
+## Founder-locked robust MVP 60–75-day delivery discipline
+
+State: `FOUNDER_LOCKED_PLANNING_ACTIVE_EXECUTION_NOT_STARTED`.
+
+The founder locked the robust founder-defined MVP to a controlled 60–75
+calendar-day public-go-live planning window from 5 August 2026: **4–19 October
+2026**. Codex must maximize useful approved-MVP capability through shared
+production owners, configuration and thin exact policy variants while blocking
+unnecessary duplicate code, screens, routes, services and backend owners.
+Exact actor/outcome tickets remain separately traceable acceptance units; their
+count does not imply an equal number of implementations or builds.
+
+Human lock:
+`docs/delivery/MVP-ROBUST-60-75-DAY-DELIVERY-LOCK-20260805.md`. Machine lock:
+`config/mvp-robust-60-75-day-delivery-lock.json`, SHA-256
+`D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544`.
+
+The founder also required a secondary fail-closed checkpoint before selecting
+or registering every successor ticket, whether it is a preauthorized child,
+another MVP ticket or a separately authorized beyond-MVP ticket. It inventories
+existing native/non-UI owners, maps acceptance tickets to shared implementation,
+searches duplicates, requires necessity proof for any new screen/route/backend
+owner and records robustness plus timeline impact. Human checkpoint:
+`docs/quality/MVP-PRE-TICKET-SELECTION-ROBUSTNESS-AND-REUSE-CHECKPOINT-20260805.md`.
+Machine checkpoint:
+`config/mvp-pre-ticket-selection-robustness-checkpoint.json`, SHA-256
+`4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A`.
+
+The current web/YouTube remediation ticket predates this selection checkpoint;
+its transition exception ends when that exact machine-state ticket is replaced
+and grants no new scope. No successor ticket or child was activated. Protected
+FIX7 and all three preauthorized manifest hashes remain unchanged. The lock is
+not runtime/backend/build/OPPO/provider/commit/push/deploy/promotion authority.
+
+## Unified Buy surface/value-chain correction — no duplicate buyer workspaces
+
+State: `FOUNDER_DIRECTED_PLANNING_REDUCTION_NOT_EXECUTING`.
+
+The founder clarified that Manufacturer, Retailer, Distributor and every other
+eligible buyer use the same native Buy main action. Exact workspace context
+changes eligible value-chain categories and commercial authority only; it does
+not create a separate catalogue, Cart, checkout, purchase tracking, bill or
+receipt presentation.
+
+Repository inspection confirmed ten direct older buyer-route duplicates: one
+Manufacturer procurement route plus nine Retailer wholesale/purchase routes.
+They remain preserved but are not rebuilt for MVP. At least seventeen broad
+Manufacturer/Retailer ERP, growth, POS, books, services, customers, campaigns
+or team route implementations are also outside the smallest complete current
+MVP. Exact workspaces retain only their bounded selling, offer/stock,
+readiness, incoming-order decision, packing, dispatch/handover, compliance and
+recovery responsibilities.
+
+Durable directive:
+`docs/delivery/MVP-UNIFIED-BUY-SURFACE-AND-VALUE-CHAIN-CATEGORY-DIRECTIVE-20260805.md`.
+Assessment:
+`docs/quality/MVP-60-DAY-UNIFIED-BUY-SURFACE-COMPRESSION-ASSESSMENT-20260805.md`.
+Machine mirror:
+`config/mvp-unified-buy-surface-value-chain-category-directive.json`.
+
+Revised target: approximately 35-48 canonical routes, 32-40 route-level V2
+screens, 730-1,000 active Codex hours and 42-52 elapsed engineering days when
+dependencies are available. Existing preauthorized manifest files/hashes,
+protected FIX7 source/APK and current execution state are unchanged. No
+screenbook/runtime/backend/build/OPPO/external/commit/push/deploy/promotion
+action occurred.
+
+## Universal action/workspace batch preauthorized — start still closed
+
+State: `45_CHILD_PORTFOLIO_PREAUTHORIZED_NOT_EXECUTING_AWAITING_NONSTOP_START`.
+
+The founder approved and preauthorized the exact 45-child manifest at SHA-256
+`45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8` for
+bounded implementation/execution and later machine-gated OPPO testing. Durable
+authorization is
+`docs/quality/MVP-UNIVERSAL-ACTION-WORKSPACE-ROUTING-REFERENCE-BATCH-AUTHORIZATION-20260805.md`;
+machine state is
+`config/mvp-universal-action-workspace-routing-reference-batch-authorization.json`.
+
+The founder explicitly deferred the non-stop start until after receiving a
+time, final-output and remaining-go-live-gap answer. No child is active. The
+current approved manifest retains one connected HTML founder `FINAL` before
+native Flutter; the founder's requested single final review requires an exact
+sequencing choice/amendment before start and is not inferred as a gate waiver.
+No screenbook, Flutter, backend, build, OPPO, external-service, commit, push,
+deploy or promotion action occurred.
+
+## Universal action/workspace ticket-making checkpoint — superseded by authorization above
+
+State: `45_CHILD_TICKET_WAS_READY_FOR_REVIEW_SUBSEQUENTLY_PREAUTHORIZED_NOT_EXECUTING`.
+
+The complete production-grade ticket is
+`MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH`.
+Human authority:
+`docs/delivery/MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH-TICKET-20260805.md`.
+Machine manifest:
+`config/mvp-universal-action-workspace-routing-reference-batch.json`, SHA-256
+`45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8`.
+
+The batch contains 45 exact units: 43 `mvp_required`, 2 `mvp_supporting`, 0
+`beyond_mvp`. It preserves the normal Personal-user app after login, reduces
+Universal to the founder-refined MVP actions, removes postponed promises,
+contains legacy links, reopens existing exact workspaces first and defines
+Admin-published progressive exact-type selection, preview, complete details,
+authoritative request state and lifecycle recovery. Sixteen exact workspace
+types are mapped separately; Manufacturer and Local Porter are supporting/
+dependency-held, and both creator types remain YouTube/Social-held.
+
+This section records the earlier ticket-making checkpoint. The later
+preauthorization is recorded in the section above. The screenbook remains
+read-only and no child is registered for execution or active. No Flutter,
+backend, build, OPPO install/test, external-service, commit, push, deploy or
+promotion action was performed by ticket making or preauthorization.
+
+## Git/Flutter/OPPO action and workspace reconciliation — 5 August 2026
+
+State: `EXACT_FIX7_INSTALLED_SURFACE_AUDITED_PENDING_NEW_REFERENCE_TICKET`.
+
+Direct remote Git, local HEAD and origin tracking all equal
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. Connected OPPO CPH2375
+`2b3e0f71` runs exact protected `1.0.0-r58.23 (2026080419)` at on-device APK
+SHA-256 `F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9`.
+Read-only replay confirmed the old broad surface remains installed: Tiffin,
+Get It Done, standalone Pay and Work Delivery/Onboard/Verify are still
+universal choices. After login, the useful two-step Earn/Grow narrowing exists,
+but broad combined profiles and a premature `complete setup path` claim remain.
+
+Exact audit, workable progressive workspace decision, complete pending
+ticket-family map and next bounded planning candidate:
+`docs/quality/MVP-GIT-FLUTTER-OPPO-ACTION-WORKSPACE-RECONCILIATION-20260805.md`.
+No successor is registered or executing; no build, install, app-data clear,
+backend/payment/provider or external-service write occurred.
+
+## Founder-refined MVP action and exact provider surface — 5 August 2026
+
+State: `MVP_ACTION_PROVIDER_SURFACE_REFINED_PLANNING_AUTHORITY_NOT_EXECUTING`.
+
+The founder retained Social as Shorts, Videos, Feed and Create, with Shorts/
+Videos and final Social activation held until the current YouTube API sequence;
+Feed is bounded to native text and image-carousel posts. Buy retains Shop,
+Wholesale, Medicine and Orders with complete exact provider-type coverage.
+Eat keeps Order Food and Book Table while Tiffin is postponed. Ride keeps Bike,
+Auto and Cab and now requires separate Bike Captain, Auto Captain and Cab / Car
+Captain capabilities. Book keeps Salon and Individual Doctor while Get It Done
+is postponed. Standalone Pay and its universal sub-actions are postponed;
+approved payment integration remains embedded inside authorized transaction
+journeys. Universal Work keeps Earn Today and Workspace; Delivery, Onboard and
+Verify move inside the exact owning workspace. Chat remains global for
+individual, shared/group and journey-context continuity.
+
+Human authority is
+`docs/delivery/MVP-FOUNDER-ACTION-PROVIDER-SURFACE-DIRECTIVE-20260805.md`;
+machine mirror is `config/mvp-founder-action-provider-surface.json`. The exact
+29-profile disposition is reconciled in
+`config/mvp-exact-user-type-scope-matrix.json`. The preauthorized 47-child Buy
+portfolio is unchanged, with its generic provider terms now bound to Grocery /
+Kirana Shop, enabled General Retail Shop / Dukaan, FMCG Supplier / Distributor,
+bounded enabled FMCG Manufacturer, Medical Store / Pharmacy, Delivery Partner
+and eligible Local Porter / Goods Transporter roles as applicable.
+
+This is planning/project memory only. It registers no successor ticket and
+authorizes no runtime/backend write, reference change, build, device install,
+external-service action, deployment, promotion, commit or push. Protected
+R58.8.8 FIX7 remains unchanged.
+
 ## Repository recovery seal — 5 August 2026
 
 State: `MOOLSOCIAL_GIT_CHECKPOINT_REMOTE_RECOVERY_VERIFIED_AFTER_R58_8_8_FIX7_APPROVAL`.
@@ -21,6 +614,27 @@ manifest. A clean GitHub clone at
 `C:\GUARANTEED OUTCOME\MOOLSOCIAL-GIT-RECOVERY-VERIFY-20260805` passed the
 source, APK, LFS, Git-object and remote-ref recovery gates. No GCP/Firebase
 promotion is authorized by the repository seal.
+
+## Founder-directed MVP scope gate — 5 August 2026
+
+State: `MVP_SCOPE_GATE_ACTIVE_AWAITING_NEXT_TICKET_CLASSIFICATION`.
+
+The founder directed all resumed development to remain limited to the MVP and
+required Codex to explain every ticket before execution. The machine authority
+is `config/mvp-scope-gate-state.json`; the stable policy is
+`config/mvp-scope-policy.json`; the human contract is
+`docs/delivery/MVP-SCOPE-EXECUTION-POLICY.md`. Before any successor runtime or
+backend write, build, install or external-service action, Codex must tell the
+founder the customer outcome, `mvp_required` / `mvp_supporting` / `beyond_mvp`
+classification and reason, minimum complete scope, explicit exclusions,
+dependencies and test/evidence plan. Beyond-MVP work fails closed without a
+separate exact founder authorization. MVP classification does not bypass any
+existing authorization or protected-boundary rule.
+
+No successor ticket is registered or authorized at this checkpoint. The
+approved R58.8.8 FIX7 APK machine state remains unchanged and protected; the
+new MVP state governs only future work. New-chat authority is
+`docs/quality/MOOLSOCIAL-NEW-CHAT-HANDOFF-20260805.md`.
 
 ## Live 5 August 2026 — R58.8.8 FIX7 founder approved/protected
 
@@ -8068,3 +8682,1457 @@ Handoff:
 `docs/quality/BUY-FV2-R58-8-3-ORDER-DELIVERY-ADDRESS-CONTEXT-HANDOFF-20260804.md`.
 Technical/device qualification is not founder approval. FIX1 remains rejected;
 no live order address/backend/provider/payment/fulfilment fact is authorized.
+
+## Founder sequencing — Social after current YouTube compliance step
+
+On 5 August 2026 the founder directed that
+`SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-END-TO-END-JOURNEY` remain deferred
+until the current YouTube API Services compliance email/review step is handled
+and its resulting status is recorded. The 42-ticket Social portfolio remains
+proposed, not preauthorized and not executing; no Social child, runtime/backend
+write, build or OPPO authority is active. The prepared Gmail reply remains
+unsent and this directive does not authorize sending or provider/build access.
+
+The earlier vague `Business-Admin` planning label is withdrawn. The corrected
+next independent planning candidate is
+`SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-AND-CONTROL-END-TO-END-JOURNEY`.
+Every executable child must name the exact participant and capability: Grocery
+/ Kirana Shop, approved General Retail Shop / Dukaan, Medical Store / Pharmacy,
+FMCG Supplier / Distributor, bounded FMCG Manufacturer, Restaurant / Dhaba /
+Cafe, Individual Doctor, Salon / Parlour, Bike Captain, Auto Captain, Cab / Car
+Captain, Delivery Partner, eligible Local Porter / Goods Transporter,
+Freelancer / Field Partner, exact Work funder/reviewer or an exact Superadmin
+reviewer/operator role. Creator lanes remain dependency-held by the Social/
+YouTube sequence.
+
+All 29 approved profile targets remain explicit. The later founder action/
+provider directive makes the bounded Restaurant, Individual Doctor, Salon,
+Bike-Captain, Auto-Captain and Cab-Captain journeys MVP planning scope. Cloud
+Kitchen, Tiffin, Clinic, Hospital, home beauty, fleet, generic service and
+other deferred profiles remain registered disabled rather than hidden behind a
+vague `business` label. The corrected candidate remains `mvp_required`
+planning only and is not registered, preauthorized or executing.
+
+Permanent specificity rule:
+`docs/delivery/MVP-EXACT-USER-TYPE-TICKET-AND-JOURNEY-RULE-20260805.md`.
+Machine-readable 29-profile matrix:
+`config/mvp-exact-user-type-scope-matrix.json`.
+
+Durable directive:
+`docs/quality/SOCIAL-MVP-YOUTUBE-COMPLIANCE-SEQUENCING-DIRECTIVE-20260805.md`.
+Machine-readable state:
+`config/social-mvp-youtube-compliance-sequencing-state.json`.
+# Overnight restart pointer — 5 August 2026 23:39 IST
+
+Before any resumed MoolSocial action, read
+`docs/quality/MOOLSOCIAL-OVERNIGHT-RESTART-CHECKPOINT-20260805-2339.md` and
+`config/moolsocial-overnight-restart-checkpoint.json`. The exact active point is
+UAW-R07 after its Ride configuration/router patch but before format/tests. The
+founder-authorized overnight window ends 6 August 2026 at 09:00 IST.
+
+## UAW-R07 Personal Ride exposure completed locally — 5 August 2026
+
+State: `UAW_R07_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R07-PERSONAL-RIDE-EXPOSURE` now exposes exactly Bike, Auto and Cab through
+the shared native action-choice owner. Each one-tap route reaches the existing
+Ride booking owner with its matching `RideType`; direct-entry system Back
+returns to Personal Mool. No screen, route, session, model or backend owner was
+added.
+
+Focused R07 passed 5/5, full Flutter analysis is clean, and the R06 shared-
+owner, R03 Personal Mool and existing Ride vertical regressions passed 30/30.
+MVP delivery/scope and Personal action-projection gates passed. The protected
+APK machine state is unchanged and no build, install, launch or OPPO mutation
+occurred. The approved-UI lock retains the checkpointed pre-existing Screen 01
+hash mismatch; R07 has no diff to that file and did not regenerate a baseline.
+
+Completion:
+`docs/quality/UAW-R07-PERSONAL-RIDE-EXPOSURE-COMPLETION-20260805.md`.
+Evidence:
+`artifacts/quality/uaw-r07-personal-ride-exposure-20260805-01/00-evidence-summary.md`.
+
+## UAW-R08 Personal Book exposure completed locally — 6 August 2026
+
+State: `UAW_R08_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R08-PERSONAL-BOOK-EXPOSURE` now exposes exactly Doctor and Salon through
+the existing shared action-choice root. Each one-tap choice reaches its
+existing Book booking owner. Get It Done, Clinic, Hospital and Home Beauty are
+absent from the new Personal Book root; their historical files remain
+preserved for the later containment contract.
+
+Focused R08 passed 3/3, full Flutter analysis is clean, and R03/R06/R07 plus
+the existing Book vertical regressions passed 36/36. MVP delivery/scope and
+Personal action-projection gates passed. No build, install, launch or OPPO
+mutation occurred. The approved-UI lock retains the checkpointed pre-existing
+Screen 01 mismatch; R08 has no diff to that file.
+
+Completion:
+`docs/quality/UAW-R08-PERSONAL-BOOK-EXPOSURE-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r08-personal-book-exposure-20260806-01/00-evidence-summary.md`.
+
+## UAW-R09 Personal standalone Pay absence completed locally — 6 August 2026
+
+State: `UAW_R09_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R09-PERSONAL-STANDALONE-PAY-ABSENCE` now proves that Personal Mool and
+every shared action-choice root expose no standalone Pay action. The declared
+projection retains Pay as removed with transaction-owned recovery; existing
+Pay vertical and direct-route owners remain unchanged for later central
+containment.
+
+Focused R09 passed 1/1, full Flutter analysis is clean, and the R03 Personal
+Mool plus existing Pay vertical regressions passed 21/21. MVP delivery/scope
+and Personal action-projection gates passed. This was a test-only absence
+contract: the Pay production feature diff is empty. No build, install, launch
+or OPPO mutation occurred. The approved-UI lock retains the checkpointed
+pre-existing Screen 01 mismatch; R09 has no diff to that file.
+
+Completion:
+`docs/quality/UAW-R09-PERSONAL-STANDALONE-PAY-ABSENCE-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r09-personal-standalone-pay-absence-20260806-01/00-evidence-summary.md`.
+
+## UAW-R10 Personal Work exposure completed locally — 6 August 2026
+
+State: `UAW_R10_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R10-PERSONAL-WORK-EXPOSURE` now exposes exactly Earn Today and Workspace
+through the existing shared action-choice root. Each choice reaches its
+existing bounded Work owner. Delivery Work, Onboard and Verify are absent as
+separate launcher actions. The duplicate exact `/app/work` presentation route
+was retired; the same public path now uses the consolidated `/app/:section`
+router owner. Existing Work screens, session and deeper routes are unchanged.
+
+Focused R10 passed 4/4, full Flutter analysis is clean, and R03/R06-R09 plus
+the existing Work vertical regressions passed 41/41 independently of R10
+(45/45 combined). MVP delivery/scope and Personal action-projection gates
+passed. No build, install, launch or OPPO mutation occurred. The approved-UI
+lock retains the checkpointed pre-existing Screen 01 mismatch; R10 has no diff
+to that file.
+
+Completion:
+`docs/quality/UAW-R10-PERSONAL-WORK-EXPOSURE-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r10-personal-work-exposure-20260806-01/00-evidence-summary.md`.
+
+## UAW-R11 Personal global Chat continuity completed locally — 6 August 2026
+
+State: `UAW_R11_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R11-PERSONAL-GLOBAL-CHAT-CONTINUITY` now has exact acceptance evidence
+that Personal Mool plus Eat, Ride, Book and Work open the existing in-app Chat
+owner and return to the exact permitted origin. No Chat production Dart or
+backend owner changed. Four stale legacy-key assertions in the parent Chat
+suite were aligned with the accepted Personal Mool and Buy V2 owners.
+
+Focused R11 passed 6/6, the existing Chat flow passed 6/6, full Flutter
+analysis is clean, and R03/R06-R10 plus Chat regressions passed 39/39
+independently of R11 (45/45 combined). MVP delivery/scope and Personal action-
+projection gates passed. No build, install, launch or OPPO mutation occurred.
+The approved-UI lock retains the checkpointed pre-existing Screen 01 mismatch;
+R11 has no diff to that file.
+
+Completion:
+`docs/quality/UAW-R11-PERSONAL-GLOBAL-CHAT-CONTINUITY-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r11-personal-global-chat-continuity-20260806-01/00-evidence-summary.md`.
+
+## UAW-R12 Personal legacy-route containment completed locally — 6 August 2026
+
+State: `UAW_R12_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT` now sends old Tiffin, Get It Done,
+standalone Pay, generic Delivery, Onboard and Verify paths/query aliases to one
+truthful shared recovery owner. It names the unavailable intent and offers the
+current owning root plus Mool without silent substitution. Exact transaction-
+owned Pay and funded Work paths remain preserved. Valid internal Work setup now
+uses canonical `/app/work/workspace/choose` and `/proof` paths; old aliases are
+contained. Historical components remain available only to the existing test-
+only legacy harness.
+
+Focused R12 passed 12/12, full Flutter analysis is clean, shared-root/Chat
+regressions passed 45/45, affected verticals passed 44/44 and support/Social
+cross-suite tests passed 14/14 (115/115 unique cases). MVP delivery/scope and
+Personal action-projection gates passed. No build, install, launch or OPPO
+mutation occurred. The approved-UI lock retains the checkpointed pre-existing
+Screen 01 mismatch; R12 has no diff to that file.
+
+Completion:
+`docs/quality/UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r12-personal-legacy-route-containment-20260806-01/00-evidence-summary.md`.
+
+## UAW-R13 Personal exposure failure states completed locally — 6 August 2026
+
+State: `UAW_R13_REFERENCE_NATIVE_PRESENTATION_COMPLETE_RUNTIME_INTEGRATION_DEPENDENCY_HELD_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R13-PERSONAL-EXPOSURE-FAILURE-STATES` now has one exact shared native
+presentation contract for loading, held, disabled, stale, offline and denied.
+Every non-active state retains the last safe context, exposes no committing
+action and avoids success/capability claims. Retry belongs only to stale and
+offline, safe return only to held/disabled/denied, and loading has no synthetic
+action. No screen, route or backend owner was added.
+
+Focused R13 passed 15/15, full Flutter analysis is clean and accumulated
+R03/R06-R13 shared Personal regressions passed 66/66. MVP delivery/scope and
+Personal projection gates passed; the projection self-test passed one positive
+and six expected-negative cases. No build, install, launch or OPPO mutation
+occurred. The approved-UI lock retains only the checkpointed pre-existing
+Screen 01 mismatch; R13 has no diff to that file.
+
+R01 remains a static reference fixture, not runtime authority. Live projection,
+connectivity, authorization, capability and root/router integration remain
+dependency-held until a separately gated `launch_policy_owner` exists.
+
+Completion:
+`docs/quality/UAW-R13-PERSONAL-EXPOSURE-FAILURE-STATES-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r13-personal-exposure-failure-states-20260806-01/00-evidence-summary.md`.
+
+## UAW-R14 Personal context restore completed locally — 6 August 2026
+
+State: `UAW_R14_DETERMINISTIC_LOCAL_COMPLETION_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R14-PERSONAL-CONTEXT-RESTORE` now extends the existing central
+`JourneySession` persisted-ready-route policy so Back, Chat return, process
+interruption and relaunch restore an exact safe Personal action/sub-action
+context. Deeper workflow locations reduce to an identifier-free owning
+context. Removed, malformed, external, nested-Chat and unknown routes fail
+closed; R12 recovery reasons retain only their current safe root. No screen,
+route, store, service or backend owner was added.
+
+Focused R14 passed 7/7, full Flutter analysis is clean, session/Buy/Chat/shared
+regressions passed 102/102 and legacy journey/universal-intent suites passed
+30/30 (132/132 unique cases). Two stale harness assertions were aligned with
+the accepted R08/R10 Book and consolidated Work roots. MVP delivery/scope and
+Personal projection gates passed; the projection self-test passed one positive
+and six expected-negative cases. No build, install, launch or OPPO mutation
+occurred. The approved-UI lock retains only the checkpointed pre-existing
+Screen 01 mismatch; R14 has no diff to that file.
+
+Completion:
+`docs/quality/UAW-R14-PERSONAL-CONTEXT-RESTORE-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r14-personal-context-restore-20260806-01/00-evidence-summary.md`.
+
+## UAW-R15 Personal copy fitment accessibility completed locally — 6 August 2026
+
+State: `UAW_R15_LOCAL_REFERENCE_NATIVE_COMPLETION_DEVICE_QUALIFICATION_LATER_GATED_FOUNDER_CUMULATIVE_REVIEW_PENDING`.
+
+`UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY` now verifies five current
+Personal roots, six R13 projection states and six R12 legacy recovery reasons
+at all seven founder-defined viewports and 100%/140% text: 238/238 rendered
+owner/state/row combinations. Copy is checked for render failure and actual
+max-line truncation. Compact 320x568 at 140% verifies accessible names, 44x44
+targets, callbacks, safe areas and reduced motion.
+
+The matrix proved and corrected two shared defects: Work supporting copy was
+clipped by a two-line limit, and standalone Pay recovery exposed two identical
+`Open Mool` actions. The shared limit was removed and only the redundant same-
+destination secondary recovery action was suppressed. No new screen, route,
+wrapper, service or backend owner was added.
+
+Focused R15 passed 16/16, full Flutter analysis is clean and accumulated
+R03/R06-R15 exposure/recovery regressions passed 89/89. MVP delivery/scope and
+Personal projection gates passed; the projection self-test passed one positive
+and six expected-negative cases. No build, install, launch or OPPO mutation
+occurred. Device accessibility remains later machine-gated. The approved-UI
+lock retains only the checkpointed pre-existing Screen 01 mismatch; R15 has no
+diff to that file.
+
+Completion:
+`docs/quality/UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY-COMPLETION-20260806.md`.
+Evidence:
+`artifacts/quality/uaw-r15-personal-copy-fitment-accessibility-20260806-01/00-evidence-summary.md`.
+
+## Universal action/workspace overnight manifest sealed — 6 August 2026
+
+State: `NO_AUTHORIZED_EXECUTABLE_CHILD_REMAINS_FOUNDER_AND_DEPENDENCY_INPUT_PENDING`.
+
+The 45-child manifest is fully dispositioned: R01–R03 and R05–R15 are locally
+complete; R04 remains YouTube-held; R16–R40 are individually dependency- or
+reference-held; and R41–R45 are downstream founder/reference/native/device
+gates that cannot start without those inputs. Thirty new hold records cover
+R16–R45 in exact order. No held child was selected into the execution machine.
+
+At the 01:35 IST seal, the branch and HEAD remained
+`remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; 1,020 dirty status entries were
+preserved. `git diff --check` passed, the protected APK machine state and
+Screen01 source had zero diff, and the existing approved-UI Screen01 mismatch
+remained unchanged. OPPO `2b3e0f71` was connected read-only; no build, install,
+launch or device mutation occurred.
+
+Morning checkpoint:
+`docs/quality/MOOLSOCIAL-OVERNIGHT-MORNING-CHECKPOINT-20260806.md`.
+Machine checkpoint:
+`config/moolsocial-overnight-morning-checkpoint-20260806.json`.
+
+## C10E global navigation motion containment host-qualified — 7 August 2026
+
+State:
+`HOST_IMPLEMENTED_TWO_AFFECTED_CYCLES_AND_STATIC_GATES_PASSED_BUILD_INSTALL_DEVICE_PENDING`.
+
+The founder's three 15:39 IST OPPO screenshots were ingested and retained.
+They confirm that rejected r60.9 opened retained Workspace and exposed three
+competing bottom-navigation models across Work, Mool and Social. The active
+C10E child now uses one shared global rail, keeps Eat/Ride/Book/Work/Shared
+subactions inside content, removes first-level top Back, applies finite 240 ms
+main-destination motion with reduced-motion containment, and statically rejects
+the retired destination dock owners. Ride type switching stays in the existing
+booking owner rather than pushing a duplicate page.
+
+Two identical 25-file affected cycles passed 229/229 each. Analyzer, customer
+copy, C10B, C10C, C10D, global navigation, MVP scope, delivery and permanent
+regression gates passed. Full host evidence and retained logs:
+`artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-20260807-01/C10E-HOST-QUALIFICATION-20260807.md`.
+
+The approved-UI gate still independently rejects the pre-existing committed
+Screen 01 hash; path status and diff remain clean and the protected file was not
+changed. Branch/HEAD remain
+`remediation/prototype-conformance-2026-07-20` /
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. OPPO `2b3e0f71` remains
+connected with rejected r60.9 untouched. C10E build and install authorization
+remain false; the next lawful step is a separately machine-gated unique
+successor APK and checksum-matched OPPO replay.
+
+## C10A-C10E r60.10 OPPO-qualified — 7 August 2026
+
+State: `R60_10_CHECKSUM_MATCHED_OPPO_QUALIFIED_FOUNDER_REVIEW_PENDING`.
+
+The founder authorized one production-grade successor build and in-place OPPO
+install. The sole r60.10 wrapper invocation timed out while its original Gradle
+descendant continued; no second wrapper/build was invoked. The late output was
+accepted only after stable checksum, exact badging, v2 signature, predecessor
+certificate and authored-source checks. Reserved APK and installed base both
+match SHA-256
+`666810333E99531592145ADA8B04EFDE608C796C39BB21DE3DEF78269993A947`.
+
+Exactly one `adb install -r` succeeded on OPPO CPH2375 `2b3e0f71`.
+First-install time stayed `2026-08-04 02:51:59`; uninstall, data clear,
+downgrade, second build and second install remain false. The exact C10E runtime
+marker reached ready authenticated state.
+
+Real-user OPPO replay passed fresh Social launch; Social-Mool-Social-Mool and
+exact Back; Buy-Mool-Back; all global roots; Eat/Ride/Book/Work local actions;
+Ride in-place type switching; Chat unsent draft/focus/IME interruption; and
+byte-identical Buy scroll restoration. The temporary Chat draft was cleared
+and no message was sent. OPPO is left on Mool Home for founder review.
+
+Device matrix:
+`artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/19-oppo-real-user-navigation-matrix.md`.
+
+Founder review list:
+`artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/20-founder-oppo-review-list.md`.
+
+The approved Screen 01 lock retains the same independent committed-baseline
+mismatch; protected path status/diff remain clean and C10E does not touch it.
+No commit, push, deploy, promotion, credential, Production, provider, message,
+call, payment or funds action occurred.
+
+## C10A-C10E bottom rail founder-approved — 7 August 2026
+
+The founder reviewed the connected r60.10 OPPO result and stated, “bottom rail
+approved from founder.” C10E and its C10 parent are now recorded as OPPO
+qualified and founder-approved for the bottom-rail outcome. The installed APK,
+device state and evidence remain unchanged; no rebuild or reinstall occurred.
+
+Acceptance:
+`docs/quality/UAW-C10E-R60-10-FOUNDER-BOTTOM-RAIL-ACCEPTANCE-20260807.md`.
+
+## C30Q Play signer rejection and founder r60.40 removal — 12 August 2026
+
+State:
+`R60_40_FOUNDER_REMOVED_C30Q_PLAY_CANDIDATE_NOT_INSTALLED_EXACT_SUCCESSOR_RECOVERY_REQUIRED`.
+
+Google Play Internal Testing release `1.0.0-r60.43` (`2026081243`) remains
+active for package `com.moolsocial.app`, Play app `4974778280277295872`, only
+on the Internal track. Its sealed AAB SHA-256 is
+`E7E7DF249C71195FF9EDF8FD0247AEB64C91FEC3DD541F4A5A8FD11690AD8A69`.
+No second build or upload occurred.
+
+The first OPPO update attempt could not replace r60.40 because the installed
+predecessor used Android Debug signer SHA-256
+`CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25`,
+while Google Play distributes C30Q with Play App Signing SHA-256
+`47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9`.
+The founder-captured OPPO screenshot showed `Can't install
+com.moolsocial.app (unreviewed)`.
+
+The exact r60.40 (`2026081240`) base APK remains preserved with SHA-256
+`50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121`.
+At 22:43 IST the founder reported uninstalling it. Read-only ADB then proved
+that `com.moolsocial.app` has no installed or uninstalled package-list entry and
+no package path for owner user `0`. Its former private local app data must be
+treated as removed and is not restorable from the retained identity record.
+Codex did not perform the uninstall. The separate `com.moolsocial.app.test`
+package remains untouched.
+
+C30Q candidate install count remains zero. Do not claim a Play-installed OPPO,
+App Check acceptance or live reviewer-journey pass. Do not use ADB sideload,
+rebuild, re-upload, Production/open/public rollout, Staging/Production backend,
+email or quota submission. Before one fresh Google Play installation, register
+and machine-qualify an exact recovery successor that reuses the already active
+C30Q Internal release and performs no new build or upload.
+
+Preservation record:
+`docs/quality/UAW-C30Q-OPPO-R60-40-PRE-REMOVAL-PRESERVATION-RECORD-20260812.md`.
+Removal readback:
+`docs/quality/UAW-C30Q-FOUNDER-R60-40-REMOVAL-READBACK-20260812.md`.
+
+## C30R r60.43 Play install identity passed; cold launch rejected — 12 August 2026
+
+State:
+`R60_43_PLAY_INSTALLED_IDENTITY_QUALIFIED_RUNTIME_REJECTED_MISSING_CRASHLYTICS_BUILD_ID`.
+
+The founder installed the already active Internal Testing release after the
+r60.40 removal. OPPO CPH2375 `2b3e0f71` now has `com.moolsocial.app`
+`1.0.0-r60.43` (`2026081243`), installer `com.android.vending`, first-install
+time `2026-08-12 22:49:56`, and Play App Signing SHA-256
+`47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9`.
+Four Play-delivered split APKs were pulled read-only and checksummed. Their
+relationship to the sealed C30Q AAB is proved by exact Internal release version,
+Play installer, registered Play signer and Play-generated split topology; the
+split checksums are not misrepresented as equal to the AAB checksum.
+
+Runtime is rejected before the first Flutter frame. The resumed live activity
+shows only the solid-blue Android launch surface and exports zero Flutter
+semantic nodes. Bounded error-only logcat, excluding nonce/token/Integrity/App
+Check/private-verdict patterns before output, proves an uncaught
+`Firebase.initializeApp()` exception at `main.dart:58`: the Crashlytics build
+ID is missing. The same bounded log reports missing `google_app_id` and disabled
+Analytics measurement. This is a release packaging/configuration defect, not a
+private attestation finding.
+
+C30R install count is exactly one and consumed. Preserve r60.43 installed in
+place. Do not uninstall, clear data, downgrade, sideload, repeat install, launch
+journeys, attempt Create writes, rebuild, re-upload, use another track, deploy a
+provider/backend, send email or submit quota under C30R. C28D, App Check,
+YouTube, Feed/Create and navigation remain unstarted/blocked; Create writes are
+zero. A separately disclosed, classified and founder-authorized release
+successor must add a release Crashlytics/Firebase resource and first-frame smoke
+gate before any new build or upload.
+
+Identity and rejection evidence:
+`docs/quality/UAW-C30R-PLAY-R60-43-COLD-SCREEN-MISSING-CRASHLYTICS-BUILD-ID-REJECTION-20260812.md`.
+Machine state:
+`config/play-internal-install-recovery-gate-state-c30r.json`.
+
+## C30S r60.44 Play recovery and C30T pre-AAB audit passed — 13 August 2026
+
+State:
+`C30T_PRE_AAB_AUDIT_PASSED_FOUNDER_AAB_AUTHORIZATION_REQUIRED`.
+
+C30S corrected release Firebase/Crashlytics packaging and produced the current
+Google Play Internal Testing predecessor. OPPO CPH2375 `2b3e0f71` has
+`com.moolsocial.app` `1.0.0-r60.44` (`2026081244`) installed by
+`com.android.vending` with Play App Signing SHA-256
+`47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9`.
+It remains installed and must not be uninstalled, data-cleared, downgraded or
+ADB-sideloaded.
+
+Founder-authorized C30T implementation completed the bounded YouTube public
+read, MoolSocial Feed/Create, production Chat and global-navigation corrections.
+Qualified Dev revisions remain `moolsocialcontent-00004-gig`,
+`moolsocialchat-00001-yaf`, `youtubeprovider-00036-qer` and
+`youtubeoauthcallback-00035-cir`. No additional backend deployment is
+authorized or pending.
+
+The founder-directed comprehensive pre-AAB audit resolved stale Chat visual
+baselines through `ChatSession.production()` empty, unavailable and
+provider-owned states; repaired authenticated C29E lifecycle and durable C10B
+Feed/navigation assertions; and corrected specialized Social rail ownership in
+the current six-domain journeys. Historical superseded global-navigation tests
+remain preserved and are dispositioned against their later C24-C30 acceptance
+owners. Permanent C30T regression memory has zero open entries.
+
+Two clean no-build qualification cycles passed the identical 817-file source
+manifest, exactly 49 focused Flutter test files, all 503 backend tests, release
+format/analyzer/dependency/manifest gates, exact 15-plugin release registrant,
+five expected permissions, four provider revisions and unchanged APK/AAB
+snapshots. Accepted source fingerprint:
+`2C34A0EF3ABAD56F990E99274B8F7206A051E8D5F89AA0D48ADDB6449776C467`.
+Evidence root:
+`artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-02`.
+
+Machine state is
+`pre_aab_audit_passed_founder_aab_authorization_required`. Build, upload and
+install authorization remain false/held and all three action counts remain
+zero. No r60.45 AAB has been built, uploaded or installed. The next lawful step
+requires a separate explicit founder authorization for the one sealed r60.45
+AAB; Play Internal upload and in-place OPPO update remain separately gated by
+that future authorization. Email/quota submission and every public/Production
+track remain forbidden.
+
+## C30T r60.45 Internal candidate installed; live acceptance rejected — 13 August 2026
+
+The one authorized r60.45 AAB was built, uploaded only to Google Play Internal
+Testing and installed in place through Play on OPPO `2b3e0f71`. Exact counts
+are `1/1/1`; package/version/installer/Play signer and installed base APK are
+sealed. No second build/upload/install is authorized.
+
+Live acceptance has not passed. Real-device evidence currently rejects the
+candidate for YouTube Shorts top-system-inset collision; signed-out YouTube
+channel dead-end; Play-installed social sign-in package-certificate-hash
+failure and wrong provider identity; founder-confirmed Google/YouTube/X/
+Instagram/Facebook, Email OTP and Mobile OTP failures; zero-bounds `Choose
+another method`; unclear MoolSocial-versus-existing-YouTube-account handoff;
+and Android Back exiting MoolSocial from auth instead of returning to the
+originating Social route. Testing continues for public Feed, Create/Chat
+blocked states, refresh/offline/relaunch and global navigation.
+
+The permanent founder practice is now owned by
+`config/moolsocial-production-grade-real-user-release-practice.json` and
+`docs/quality/MOOLSOCIAL-PRODUCTION-GRADE-REAL-USER-EXPLORATORY-RELEASE-PRACTICE-20260813.md`:
+tests are necessary but never sufficient, unexpected issue hunting is
+mandatory, and no production-grade/reviewer-ready/go-live-ready claim is
+permitted until the exact Play candidate passes every required live journey
+with zero unresolved MVP blocker.
+
+## C30Z and C31E source qualified; r60.48 and YouTube reviewer send held — 15 August 2026
+
+The OPPO Play-installed candidate is `1.0.0-r60.48+2026081348`, with exact
+build/upload/install counts `1/1/1`. Founder real-user testing rejected it:
+Social protected actions redirect to authentication, while the attempted
+Google/provider account handoff cannot complete. r60.48 remains failed; do not
+claim runtime, production or YouTube reviewer success.
+
+C30Z repaired authentication-method truth and guest Feed recovery in source.
+It passed two identical source cycles, but live provider readiness and a
+separately authorized Play successor remain required. The accepted Screen 03
+v2 presentation remains unchanged; the proposed availability presentation
+requires founder review. Email remains a founder decision between the prior
+Firebase passwordless email-link plan and a separately scoped numeric-OTP
+backend.
+
+C31E implemented the bounded production Chat photo journey by reusing the
+existing Chat route, session, endpoint, message collection, private bucket and
+media picker. It adds member-gated short-lived private upload/read access,
+create-only and metadata/signature validation, idempotent finalize, explicit
+send, retry continuity, participant-only rendering and photo reply/reaction/read
+continuity. Photo forwarding remains excluded. No live function, IAM, CORS,
+lifecycle, backend, Play or OPPO mutation occurred.
+
+C31E source manifest:
+`artifacts/quality/uaw-c31e-personal-mvp-chat-photo-attachment-continuity-20260815-01/source-manifest-c31e.txt`.
+It binds 49 files with source fingerprint SHA-256
+`401C5C59F9522C173379AD5D17C140E1CFB76C362910674E683C5B57E57C4DF5`.
+Two identical cycles each passed all 24 backend tests, all 47 cumulative Chat
+Flutter tests, the whole-mobile analyzer and required PowerShell/MVP/UI gates.
+Qualification:
+`docs/quality/UAW-C31E-PERSONAL-MVP-CHAT-PHOTO-ATTACHMENT-CONTINUITY-QUALIFICATION-20260815.md`.
+
+The current YouTube reviewer package is intentionally held at
+`not_ready_r60_48_failed_successor_Play_acceptance_screencast_and_founder_send_approval_pending`.
+The exact private Internal Testing opt-in link is
+`https://play.google.com/apps/internaltest/4700716609720808604`. No Gmail draft,
+email or quota submission was created or sent. A reviewer still needs Internal
+Testing eligibility/opt-in, OAuth test-user eligibility if the OAuth app remains
+in Testing, a Play-accepted successor and truthful screencast, then founder
+approval for final communication.
+
+The post-YouTube whole-app audit is now staged, not executable, in
+`config/post-youtube-whole-app-production-audit-backlog-20260815.json` and
+`docs/quality/POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815.md`.
+At staging it covered 13 Personal-user vertical journeys, 16 exact
+launch/supporting actor workspaces and all 12 beyond-MVP profile registrations
+without altering the then-active C31E gate or granting provider, release,
+device, funds or communication authority. The later C32I transition below was
+an exact source-gate finding ticket under the founder's autonomous audit and
+implementation direction.
+
+## C32I post-YouTube audit finding repaired and source-qualified — 15 August 2026
+
+The first bounded whole-app source smoke passed 216 Flutter tests across 20
+identity/session, shared-shell, Personal vertical and representative workspace
+files. The independent C27D six-family static gate then rejected the current
+Social projection after `videos`. REG-2246 was registered before diagnosis or
+retry.
+
+C29E is the later accepted source authority: Social opens Home first and its
+focused dock order is Home (`videos`), Shorts, Create, Feed. C27D still required
+the superseded Shorts, Videos, Feed, Create order and `Videos` label even though
+C27E, C28C and C28E qualification continue to invoke that gate. Exact
+`mvp_supporting` ticket
+`UAW-C32I-PERSONAL-MVP-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-RECONCILIATION`
+changed only the stale C27D literals and added a successor checker. No runtime
+Flutter or approved-reference byte changed.
+
+C32I passed two identical cycles on a sealed 9-file fingerprint
+`0CACB094CA6D6E816E80783516BDCAB46A56F24B501A7627D9D92C760BA2A644`.
+Each cycle passed C27D and C32I on PowerShell 7 and Windows PowerShell, the
+Personal action projection, MVP scope/delivery and approved UI locks, all 3
+focused Flutter tests and targeted analyzer. Qualification:
+`docs/quality/UAW-C32I-PERSONAL-MVP-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-RECONCILIATION-QUALIFICATION-20260815.md`.
+
+The active MVP source ticket is now C32I in
+`source_gate_repair_two_identical_cycles_qualified_live_and_release_actions_held`.
+C31E and C30Z remain preserved source-qualified predecessors. Regression
+memory passes at 2,218 entries and 1,302 implementation-applicable entries.
+r60.48 remains failed at `1/1/1`; C32I authorizes no build, Play, OPPO, backend,
+provider, credential, funds or external communication action.
+
+## C32J-C32P navigation and protected Buy audit — 15 August 2026
+
+C32J-C32M repaired four stale historical navigation/source gates without
+changing runtime Flutter or references. C32M passed two final focused cycles on
+the exact 20-file fingerprint
+`F206A95FA9A77E4715C1A0D2249F6FEC206962747CC6B5447B2788C610EA0AA3`.
+This is focused validation only; the complete C28E preflight remains held.
+Evidence:
+`docs/quality/UAW-C32M-CHAINED-SUCCESSOR-GATE-HISTORICAL-SCOPE-BINDING-FOCUSED-VALIDATION-20260815.md`.
+
+C32N then attributed the Buy protected-tree hold exactly. The approved FSC06
+43-file tree is
+`6e2c18af399d8c2e0a3ab8cb63d76d5e32228f2ea69d26f0d1df662c3f3bbd8e`;
+the current tree is
+`12a9880a51c172f060133a90bcffc38d84f68959ff1caf88e13be43e86631bc5`.
+Substituting only the historical `journey_router.dart` hash
+`a98bc91ffaff2d5205e14d258097650d2de7e2a67c214c51ca00ebb312a71429`
+for the current hash
+`758eb64038abc04e6e85a4bf053c2148f180d93964c998165d4cbf6744f2319f`
+reconstructs FSC06 exactly. The other 42 current protected owners, including
+all Buy business owners, already reconstruct the approved tree. No baseline
+was changed or resealed.
+
+The focused audit also found an old Buy router test that predated the accepted
+compact launcher and C26D family-root/local-rail topology. C32O/C32P changed
+only that test and added fail-closed successor checkers. All nine Buy router
+cases now pass. Two final identical cycles each passed 49 connected Flutter
+tests, C32N/C32O/C32P on both PowerShell hosts, MVP/UI/memory gates and clean
+seven-file analysis. Exact 61-file fingerprint:
+`A9B630FE467488B72F3E8EECAF60FC3ED8FF2B180939CD96F7570ED44B73AD05`.
+Qualification:
+`docs/quality/UAW-C32N-C32P-BUY-SHARED-ROUTER-ATTRIBUTION-AND-TEST-SUCCESSORS-FOCUSED-VALIDATION-20260815.md`.
+
+The active source ticket is C32P. Regression memory passed at 2,236 entries
+and 1,320 implementation-applicable entries during the final cycles. Full C28E
+qualification, a Buy successor baseline, build, Play, OPPO, backend/provider,
+credential and external communication authority all remain false. r60.48 is
+still the failed Play-installed candidate at counts `1/1/1`.
+
+After C32P closeout, a read-only backend check discovered the exact package at
+`backend/functions`. TypeScript `--noEmit` passed, and the existing 53-file
+compiled corpus passed 528 Node tests with zero failures or skips. The declared
+test wrapper was intentionally not used because it begins by deleting and
+rebuilding `lib`; therefore this is not a fresh source-to-generated-lib build
+claim. No backend file, emulator, provider or live service was mutated.
+Evidence: `docs/quality/POST-C32P-BACKEND-READONLY-REGRESSION-20260815.md`.
+
+## C32Q Retailer Business Services compact accessibility repair — 15 August 2026
+
+The post-C32P 17-file cross-vertical audit exposed the previously deferred
+Retailer Business Services compact overflow: 183 cases passed before one
+`320x700`, text-scale-1.3 case reported a 16-pixel right overflow. Phase
+assertions and a temporary render-tree diagnostic identified the exact shared
+owner: `MoolOutcomeDock` had 216 pixels for three fixed 72-pixel capsules plus
+two 8-pixel gaps, requiring 232 pixels.
+
+C32Q changes only those three middle capsules to flexible, maximum-72-pixel
+controls. At the failing width they remain about 66.7 pixels wide, above the
+44-point minimum. The non-causal empty-state experiment and all diagnostic-only
+code were removed. Copy, semantics, routes, business rules and backend behavior
+are unchanged.
+
+Three complete post-repair cross-vertical cycles passed `185/185` each. The
+Retailer Business Services file passed `8/8`, applicable direct dock suites
+passed `7/7`, analyzer was clean, and C32P/C32Q passed on both PowerShell hosts.
+Exact 32-file fingerprint:
+`FA2546C71453C29DBD825C9AF9CCCA05A53088E424A5BA3F6CA310CB53BA87F9`.
+Qualification:
+`docs/quality/UAW-C32Q-RETAILER-BUSINESS-SERVICES-COMPACT-ACCESSIBILITY-OVERFLOW-QUALIFICATION-20260815.md`.
+
+The exploratory eight-file predecessor navigation batch is preserved as
+non-qualifying evidence (`15` passed, `30` failed) and was not retried. Its
+obsolete launcher/geometry/copy-fit expectations do not override later
+accepted navigation authorities. Regression memory now passes at 2,246
+entries. r60.48 remains failed and Play-installed at `1/1/1`; no build, Play,
+OPPO, backend/provider, credential, email or external action occurred.
+
+## C32R-C32X historical navigation applicability and test successors — 15 August 2026
+
+C32R reconciled the five failing files from the preserved exploratory batch.
+Individually they reproduced 6 passes and 30 failures, while seven exact later
+navigation authorities produced 33 passes, 1 declared skip and 0 failures.
+Each stale owner was registered and migrated under a separate test-only
+successor; no production Flutter owner changed.
+
+C32S-C32V qualified C22F, C23C, C07 and C20F against their exact current
+authorities. C32W migrated only the known Mool Home portions of R15 and
+preserved its 15-pass/1-hidden-failure intermediate state. C32X then migrated
+the separately registered hidden action-choice block. Its final R15 run passed
+16/16 with zero warnings; FIX2 passed 25/25, R03 passed 11/11 and C24B2 passed
+4 with 1 declared capture skip. Both C32W and C32X gates passed on PowerShell 7
+and Windows PowerShell. Final R15 SHA256:
+`F0AD3D0E6DCBE68C8C6BFEBD0AE19CF184A59DADA5118C3A165E0DA716A3DC88`.
+The bounded five-file successor batch passed 36/36 and all five files analyzed
+clean together. The exact C32P-C32X nine-gate chain passed on both PowerShell
+hosts. The ordered C32R-C32X manifest contains 62 exact owners with real tab
+separators and no malformed, stale or duplicate rows.
+Qualification:
+`docs/quality/UAW-C32X-R15-ACTION-CHOICE-NAVIGATION-ACCESSIBILITY-TEST-SUCCESSOR-QUALIFICATION-20260815.md`.
+
+Regression memory now contains 2,262 entries. r60.48 remains the failed
+Play-installed candidate at counts `1/1/1`; no build, Play, OPPO, backend or
+provider deployment, credential access, email, quota submission or other
+external action occurred.
+
+## Post-seal Eat and shared local-destination audit — 15 August 2026
+
+The C32R-C32X 63-owner fingerprint remains immutable historical evidence. The
+post-seal transition is explicit in
+`docs/quality/POST-SEAL-C32R-C32X-MANIFEST-TRANSITION-20260815.md`; subsequent
+registry and scope changes do not silently reuse that fingerprint as current.
+
+The bounded Personal Eat audit passed the current vertical slice 10/10, C16D
+2/2, C24C 5 with 2 declared capture skips and R06 12/12. It exposed two stale
+shared historical navigation owners:
+
+- C20E initially passed 1 and failed 5 on centered glass-capsule assumptions.
+  C33A migrated only that test to the current compact-leading destination rail.
+  C20E now passes 6/6; its bounded C20E/C27B/C27D/R06 batch passes 24/24.
+- C17D/C21E initially failed 10/10 on centered 200/268-pixel optical-glass
+  assumptions. C33B migrated only that matrix. It now passes 10/10; the bounded
+  C17D/C20E/C27B/C27D batch passes 22/22.
+
+All four-file analyzers are clean. C33A and C33B pass on PowerShell 7 and
+Windows PowerShell with lifecycle-safe predecessor binding. Production design
+remains unchanged at SHA256
+`D66C9A8E34E49FF58DF25EF6DC0694B22DB91E5C33B6A04CA5CD7A63C7F76BFE`.
+Tiffin remains inventory-only; no provider confirmation was enabled.
+
+Regression memory now contains 2,276 entries. r60.48 remains failed and
+Play-installed at `1/1/1`; no build, Play, OPPO, backend/provider, credential,
+funds, email, quota or external action occurred.
+
+## C33C Ride compact four-action navigation recovery — 15 August 2026
+
+The Ride audit preserved a C16E `0/2` failure at 320x568 and text scale 1.4:
+the shared destination row reserved Mool, Ride home and Chat, leaving the four
+local actions below `clusterWidth`'s 182-pixel minimum. The build assertion
+prevented the Ride controls from rendering, including under reduced motion.
+
+Exact `mvp_required` ticket
+`UAW-C33C-PERSONAL-MVP-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY`
+adds bounded horizontal overflow only when the local cluster cannot retain
+44-pixel actions. Fit-width destination rails are unchanged. No screen, route,
+session, service, backend owner or provider scope was added.
+
+C16E now passes 2/2. C24D passes 6 with 1 declared capture skip, R07 8/8,
+Ride vertical slice 10/10, C20E 6/6, C17D 10/10, C27B 5/5 and C27D 1/1:
+48 passed, 1 declared skip and 0 failures. The 17-owner analyzer is clean.
+C33A, C33B and C33C pass on PowerShell 7 and Windows PowerShell with exact
+successor lifecycle binding. Runtime-write authority is closed.
+
+Qualification:
+`docs/quality/UAW-C33C-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY-QUALIFICATION-20260815.md`.
+The Play-installed r60.48 remains failed at `1/1/1`; no build, Play, OPPO,
+backend/provider, credential, email, quota, funds or external action occurred.
+
+## C33D Book/Travel exact-fit destination recovery — 15 August 2026
+
+The post-C33C Book audit preserved a C16F `1/2` result: at the intended 320dp
+viewport the fourth Travel action, Bus, was placed off-screen, so the direct
+Ride-to-Bus/Book journey could not open `bus-booking-home`. A diagnostic then
+proved the historical C16E/C16F harness constrained the render surface without
+setting the test View, leaving MediaQuery on 54-pixel controls and a 152-pixel
+local rail.
+
+Exact `mvp_required` ticket
+`UAW-C33D-PERSONAL-MVP-FOUR-ACTION-EXACT-FIT-DESTINATION-RAIL-RECOVERY`
+now gives C16E and C16F a true 320x568 View at DPR 1. The shared rail uses four
+44-pixel actions edge-to-edge when the physical width is the exact 182-pixel
+minimum and retains horizontal overflow only below that real minimum. No new
+screen, route, session, service, backend owner or provider scope was added.
+
+C16E passes 3/3 and C16F 2/2. C24E passes 9 with 2 declared capture skips,
+C24F 6 with 2 declared skips, R08 8/8, Book vertical 11/11, C20E 6/6, C17D
+10/10, C27B 5/5 and C27D 1/1: 61 passed, 4 declared skips and 0 failures. The
+whole-mobile analyzer is clean. C33A through C33D pass independently on
+Windows PowerShell 5.1 and PowerShell 7 in the final preserved-qualified
+lifecycle.
+
+The MVP scope is closed at `awaiting_next_ticket_classification`, with no
+active ticket and all eight execution flags false. Qualification:
+`docs/quality/UAW-C33D-FOUR-ACTION-EXACT-FIT-DESTINATION-RAIL-RECOVERY-QUALIFICATION-20260815.md`.
+The implementation-phase regression-memory gate passes. r60.48 remains the
+failed Play-installed predecessor at `1/1/1`; no build, Play, OPPO, backend/provider,
+credential, email, quota, funds or external action occurred.
+
+## C33H FIX1 Firebase Phone Auth independent source qualification — 15 August 2026
+
+Exact `mvp_required` ticket
+`UAW-C30T-R60-45-MOBILE-OTP-GATE-NONFUNCTIONAL` is source-qualified without
+mutating the locked Screen 03 presentation. Automatic and manual Firebase
+Phone credential paths now sign out a partially authenticated Firebase user
+when MoolSocial account bootstrap fails, retain the exact protected return
+intent and remain retryable.
+
+The focused Phone matrix passes `6/6`; the six-file affected authentication,
+guest Feed and protected-return matrix passes `54/54`; whole-mobile analysis
+is clean. The C33H source gate passes on PowerShell 7 and Windows PowerShell,
+and approved UI, MVP scope and delivery-discipline locks pass. Qualification:
+`docs/quality/UAW-C33H-FIX1-FIREBASE-PHONE-AUTH-INDEPENDENT-JOURNEY-QUALIFICATION-20260815.md`.
+
+With exact founder authority, Firebase Phone sign-in was enabled in
+`moolsocial-dev-503018` and one fictional test pair was registered. No real SMS
+was sent, and the fictional number/code are not persisted in repository state
+or evidence. The Firebase console provider table verified Phone `Enabled`.
+
+The candidate-independent C33G release ledger now retains six open blockers.
+Phone OTP is now `source_qualified_candidate_device_pending`. With exact
+founder authority, the existing Firebase SMS `Allow` mode was preserved and
+qualified with India (`IN`) as its only region. Firebase reported the update
+successful; no real SMS was sent. Play Integrity/reCAPTCHA return and OPPO
+send/verify remain post-install candidate evidence and are not circular
+prebuild requirements.
+
+r60.49 remains failed at build/upload/install/device-acceptance counts
+`1/1/1/0`. No AAB, Play action, OPPO mutation, deployment, credential access,
+real SMS, email send, quota submission or production claim occurred under
+C33H FIX1/FIX2. Potential real SMS use and billing remain separately closed.
+
+## C33I Screen 03 passwordless email-link reference proposal — 15 August 2026
+
+The founder authorized a separately versioned Screen 03 successor proposal
+for Firebase passwordless email-link authentication while preserving Google
+and Mobile OTP. Exact `mvp_required` ticket
+`UAW-C33I-SCREEN03-PASSWORDLESS-EMAIL-LINK-REFERENCE-SUCCESSOR` is selected.
+
+The additive local proposal is
+`C:\GUARANTEED OUTCOME\supermandi-uiux-screenbook\screens\03-login-account-handoff-v5-passwordless-email-link.html`
+at SHA-256
+`3B9F5C1CA82A379BAEF3782CBD9EA9A6A0CF39B3052FD2EF222E541A5BFD54C0`.
+It passed 84/84 responsive/state combinations and nine focused interactions
+with zero overflow, short-control or severe-console finding. Qualification:
+`docs/quality/UAW-C33I-SCREEN03-PASSWORDLESS-EMAIL-LINK-REFERENCE-PROPOSAL-QUALIFICATION-20260815.md`.
+
+This is not founder `FINAL`, not an immutable v5 reference and not Flutter or
+live authentication completion. Accepted Screen 03 v2 and the approved
+manifest remain byte-exact. Firebase configuration, Android App Links,
+Hosting, email send/test, build, Play and OPPO remain held.
+
+Founder correction: the first proposal was rejected because it reinterpreted
+the approved login surface and initially removed the six-provider grid outside
+the email-only scope. `REG-20260815-2478-C33I-SOCIAL-PROVIDER-GRID-REMOVED-OUTSIDE-EMAIL-SUCCESSOR-SCOPE`
+is retained. The corrected additive proposal now uses the approved Screen 03
+choose-method structure and provider order, changing only `Email OTP` to
+`Email link`; its SHA-256 is
+`1E4DB8FA47E42FD065E8A404D78C17DA2A0023D39F724C6A55A1562467F1A6AB`.
+Current qualification is
+`docs/quality/UAW-C33I-FIX1-APPROVED-PROTOTYPE-STRUCTURE-RESTORATION-QUALIFICATION-20260815.md`.
+Earlier C33I rendered screenshots are stale first-proposal evidence. Founder
+visual review and `FINAL` remain required.
+
+The founder subsequently reviewed the corrected local v5 choose-method screen,
+stated `ui ,design approved`, and supplied exact `FINAL`. Durable authority is
+`docs/quality/UAW-C33I-FINAL-FOUNDER-AUTHORIZATION-20260815.md`. The approved
+source remains SHA-256
+`1E4DB8FA47E42FD065E8A404D78C17DA2A0023D39F724C6A55A1562467F1A6AB`.
+Immutable v5 freeze and native successor implementation are held only for one
+current founder-supplied reference screenshot; stale rejected screenshots may
+not be relabeled. All external-service, build, Play and OPPO boundaries remain
+closed.
+
+## C33M r60.51 rejection, FIX4/FIX5 source qualification and 11:40 IST boundary — 16 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. The founder/user dirty tree was
+preserved without branch, commit, push, merge, rebase, reset, clean, clone or
+worktree action.
+
+The one founder-authorized r60.51 AAB build completed before these repairs:
+`1.0.0-r60.51` / `2026081351`, SHA-256
+`6C4C402DAA5CD813F66DF1ECE895A7FE39936F6D6413FC2D771667E274A7CA24`,
+94,751,465 bytes. Its authority is consumed and the launcher is closed. The
+artifact is permanently rejected at build/upload/install/device-acceptance
+counts `1/0/0/0` under REG2583 and REG2585. It was not uploaded, activated,
+installed, repaired, rebuilt or promoted. Never relaunch its founder script.
+
+C33M FIX4 is source-qualified. Public review now uses the existing
+`SharedPreferencesJourneyStore` behind one seed-if-empty adapter, so a real
+fresh process retains bounded protected destination, cancellation origin and
+authentication purpose while an empty store still boots public Videos. Its
+final counted registry-2570 cycles each passed Flutter `496` with `3` declared
+skips, whole-mobile analyzer clean, backend typecheck plus `537/537`, web
+production build plus `8/8`, all dual-host prevention gates and an unchanged
+1,215-file source fingerprint
+`B9D58704A4C689E6038F43C3E32B56DDE376DFC7D6A7DD1AB2E0FDBBF009FDFC`.
+Qualification:
+`docs/quality/UAW-C33M-FIX4-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-PERSISTENCE-QUALIFICATION-20260816.md`.
+
+The FIX4 prevention gate's active-ticket-only lifecycle was registered as
+REG2602 and repaired under gate-only FIX8. Historical FIX4 `1/1`, generic
+successor `1/1`, negative `6/6` and live replay `1/1` pass in PowerShell 7 and
+Windows PowerShell 5.1. Qualification:
+`docs/quality/UAW-C33M-FIX8-FIX4-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY-QUALIFICATION-20260816.md`.
+
+C33M FIX5 is source-qualified. The existing email runtime configuration owner
+now selects the existing Firebase email-link gateway for qualified public
+review, fails closed when that runtime configuration is invalid, and retains
+the simulated review gateway only for isolated non-public device review. Its
+focused selector matrix passed `5/5`; the affected authentication/runtime
+batch passed `52/52`; analyzer was clean. Both final registry-2574 cycles each
+passed Flutter `501` with `3` declared skips and all malformed-event counters
+zero, backend typecheck plus `537/537`, web production build plus `8/8`, and
+FIX5/FIX6/FIX7/FIX8 in both PowerShell hosts. The unchanged 1,218-file cycle
+fingerprint is
+`03D7565A534FD1E259182064819C03345CA92800244BA30D7C75063D9239A0F5`;
+the 73-file focused manifest SHA-256 is
+`BC2CCD7E69CDC2D5817A9B772BF923E6A641AC8783C3BA657E9F729E836F2620`.
+Qualification:
+`docs/quality/UAW-C33M-FIX5-PUBLIC-REVIEW-FIREBASE-PASSWORDLESS-EMAIL-GATEWAY-QUALIFICATION-20260816.md`.
+
+Regression memory contains 2,574 entries with SHA-256
+`B7A8D3B161B0977905BB50B86FFEBE492023D6DD8F6A2D8F3D8A7FBCA65EF365`.
+REG2596-REG2603 truthfully retain the continuation's path, runner, ticket,
+owner-inventory, gate-lifecycle and patch-target mistakes. Superseded seals and
+failed evidence remain retained and are not counted. Qualification metadata
+was updated only after both source cycles, so the counted source fingerprints
+are immutable cycle evidence and no later successor source seal is claimed.
+
+Key current owners are:
+
+- `apps/mobile/lib/features/journey01/journey_services.dart`
+- `apps/mobile/lib/core/config/email_link_runtime_configuration.dart`
+- `apps/mobile/lib/main.dart`
+- `apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart`
+- `apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart`
+- `scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1`
+- `scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1`
+- `scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1`
+- `artifacts/quality/uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence-20260816-01/`
+- `artifacts/quality/uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway-20260816-01/`
+
+The current approval boundary is genuine: FIX4 and FIX5 source are qualified,
+but no corrected release successor is selected and no build authority exists.
+The founder must separately decide whether to authorize preparation and
+selection of one new Internal Testing successor candidate. Only after that
+ticket, a fresh source seal and its exact prebuild gates may a new hidden-input
+launcher or AAB be considered. Play upload/activation, one OPPO in-place Play
+update, device journeys, provider/deployment writes, email/SMS, secret access
+and production-readiness claims all remain closed.
+
+## C33N r60.52 corrected successor prepared and selected — 16 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`. The founder/user dirty tree was
+preserved without branch, commit, push, merge, rebase, reset, clean, clone or
+worktree action.
+
+The selected ticket is
+`UAW-C33N-R60-52-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`,
+version `1.0.0-r60.52` / `2026081352`, package `com.moolsocial.app`, project
+`moolsocial-dev-503018`, Google Play Internal Testing only, and the existing
+OPPO `2b3e0f71` / `CPH2375`. The ticket SHA-256 is
+`D23622ED31AED04533F72576AEF0D2E6E646C8D4A98660E36142F071B8AF9F81`.
+r60.49 remains failed at `1/1/1/0`; r60.50 remains rejected at `1/0/0/0`
+with AAB SHA-256 `541F02EA0F7C1C8B9067B31D50AE3CE0BB495E16746A3E4E2FF4AEAA28354F99`;
+and r60.51 remains rejected at `1/0/0/0` with AAB SHA-256
+`6C4C402DAA5CD813F66DF1ECE895A7FE39936F6D6413FC2D771667E274A7CA24`.
+None may be rebuilt, uploaded, repaired, reused or promoted.
+
+The C33M FIX5 predecessor gate's active-selection lifecycle was registered as
+REG2605 and repaired under gate-only
+`UAW-C33N-FIX1-C33M-FIX5-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY`.
+Historical FIX5 `1/1`, generic successor `1/1`, negative `6/6` and live replay
+`1/1` pass in PowerShell 7 and Windows PowerShell 5.1. The FIX1 ticket SHA-256
+is `39F5640A6C4EB8BA3D530DCC796E0A0E9007CB647DED8F62852E51245E69698F`;
+its checker SHA-256 is
+`E2DFF06020FDCA756E2EDA6370235B4202E5EA64E850E008640E49EC56F4A067`;
+and qualification SHA-256 is
+`591C795792CE3541DE1C0D29DB489668432A3F81A60FF24C4F9C375D99F965D4`.
+
+The final C33N registry seal contains 2,581 entries with SHA-256
+`F3F450AE9D248583BDE26A8C89CF089E731BAF20F1AC954D48A6FDAE1DB58DD9`.
+The 1,235-file source manifest SHA-256 is
+`77ACAF7CC79833714B08670000B9D4CB0E7238B3FEC85C0E13897BFB7DDA1260`;
+protected accounting is 210 total, 206 retained historical and four qualified
+successors, with zero missing or unexpected owners. The 73-file focused
+manifest SHA-256 is
+`BC2CCD7E69CDC2D5817A9B772BF923E6A641AC8783C3BA657E9F729E836F2620`.
+
+Two independent complete cycles passed. Each recorded Flutter 501 passed,
+three declared skips and zero failed/error/blank/null/non-JSON/untyped events;
+a clean whole-mobile analyzer; backend typecheck plus 537 tests; web production
+build plus eight tests; both PowerShell-host C33N source gates; and an unchanged
+source manifest. Retained qualification is
+`docs/quality/UAW-C33N-R60-52-AUTHENTICATION-NO-REGRESSION-PREPARATION-QUALIFICATION-20260816.md`
+with SHA-256
+`66303F5AAC09226A32A85335746599C3441350DB1455C01ED25046AEAA4B1842`.
+REG2604 through REG2610 permanently preserve every C33N composition, evidence
+ordering, session capture, inspection, manifest-count and static-orchestration
+mistake; no failed attempt is counted.
+
+Detailed and aggregate C33N state both say
+`source_regression_memory_two_identical_cycles_qualified_founder_aab_authorization_required`,
+cycles `2/2`, build authorization `held_founder_aab_authorization`, counts
+`0/0/0/0`, and hidden inputs false. The prepared launcher is
+`tmp/run-c33n-r60-52-single-aab-founder.ps1`, SHA-256
+`AABF4B90B01C70C043ED9C41B3DC668FC285ECC56B435F392D166E88EE5E7C6E`.
+It has not been launched and must not be launched until the founder separately
+authorizes exactly one C33N AAB and hidden-input entry. Upload/activation,
+OPPO update, device journeys, provider/deployment writes, email/SMS, secret
+access, another track and production-readiness claims remain closed and require
+their later exact gates and authorities.
+
+## C33N staged end-to-end authority granted — 16 August 2026
+
+The founder subsequently stated `I AUTHORISE TO CODEX FOR END TO END` for the
+already prepared and selected C33N r60.52 candidate. Exact durable authority is
+`docs/quality/UAW-C33N-END-TO-END-FOUNDER-AUTHORIZATION-20260816.md`.
+
+Detailed and aggregate machine state now say
+`source_regression_memory_two_identical_cycles_qualified_founder_prompt_required`.
+The one AAB build authority is `available_once`; Internal Testing upload is
+held until postbuild qualification; the one in-place OPPO Play update is held
+until postupload qualification. Counts remain `0/0/0/0` and hidden inputs are
+false. The founder alone must enter the three hidden values in the visible
+PowerShell 7 launcher. No other track, ADB mutation, deployment, Codex secret
+access, SMS, quota submission, funds or premature readiness claim is allowed.
+
+## C33N r60.52 AAB success followed by mandatory postbuild rejection — 16 August 2026
+
+The one authorized r60.52 AAB succeeded with SHA-256
+`E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3`
+and 94,797,520 bytes. Both PowerShell hosts passed the postbuild gate, founder
+transients were absent after cleanup, and Codex observed no secret value.
+
+Before any Play action, REG2611 registered a postbuild workflow-discovery path
+mistake and REG2612 retained the first rejected compound persistence patch. The
+AAB was sealed against registry 2,581 / SHA-256
+`F3F450AE9D248583BDE26A8C89CF089E731BAF20F1AC954D48A6FDAE1DB58DD9`,
+while the truthful registry is now 2,583 / SHA-256
+`810D4D54F29816BF0A6A6EEA98E1DDEDB0BD70012F7A08AAE728E0878F468005`.
+The candidate's post-seal registry rule therefore rejects r60.52 at counts
+`1/0/0/0`. Its AAB must never be uploaded, installed, reused, repaired,
+rebuilt or promoted. Exact rejection evidence is
+`docs/quality/UAW-C33N-R60-52-POSTBUILD-REGISTRY-CHANGE-REJECTION-20260816.md`.
+
+No Play, OPPO, provider, deployment, email or SMS action occurred. A separately
+prepared, selected, sealed, twice-qualified and founder-approved successor is
+required. No waiver applies.
+
+## C33O r60.53 selected; source seal held at founder Internal Testing navigation — 16 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`, with the full founder/user dirty
+tree preserved. The selected ticket is
+`UAW-C33O-R60-53-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`, version
+`1.0.0-r60.53` / `2026081353`, package `com.moolsocial.app`, Internal Testing
+only, and existing OPPO `2b3e0f71` / `CPH2375`. Its ticket SHA-256 is
+`FB82AD3116D324DB891B08CE1F7D049484455580BCF5F0A4BBD9F66B6C68F0FD`.
+
+C33O reuses all runtime, authentication, Firebase, Social and generic build
+owners. Candidate-specific state, aggregate, gate, recovery, founder launcher,
+focused 73-file manifest, pre-sealed upload runbook and exact staged founder
+authority are prepared. Detailed and aggregate state remain
+`prebuild_composition_registered_two_fresh_cycles_required`, cycles `0/2`,
+counts `0/0/0/0`, hidden inputs false and all build/upload/install actions
+held. The C33O source-composition gate passed in PowerShell 7 and Windows
+PowerShell before the browser-prequalification incidents. Current registry is
+2,591 / SHA-256
+`03BC53B47AF2AAE58EF5C79B9215E5860BAE6249739CD714846AE8FC5AE90643`;
+no source seal is claimed against any earlier registry.
+
+The founder completed visible Google sign-in. Read-only browser checks proved
+the signed-in MoolSocial app dashboard and exact package `com.moolsocial.app`
+without exposing an account or app identifier. REG2617 through REG2620 preserve
+the stopped text, parent-anchor, coordinate and keyboard navigation attempts;
+the page stayed on the dashboard and no Play write occurred. Codex browser
+navigation is now stopped. The signed-in Chrome task is left on MoolSocial with
+Testing expanded. The founder must click the visible `Internal testing` item
+once and report `opened`. Codex may then perform only the read-only route and
+heading verification. Only after that proof may the pending browser
+qualification evidence be closed, registry/source sealed and the two full
+cycles begin.
+
+No source seal, full C33O cycle, AAB, Play draft/upload/activation, OPPO action,
+provider/deployment, email or SMS action has occurred. After the future source
+seal, repository discovery and source/registry mutation are prohibited; only
+the prequalified phase gates and exact runbook may execute.
+
+## C34B r60.66 rejected; C34C r60.67 phase-split successor selected — 16 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; the founder/user dirty tree is
+preserved without branch, commit, push, merge, rebase, reset, clean, clone or
+worktree action.
+
+C34B r60.66 passed its registry-2628 source seal and two fresh full cycles. In
+the founder-owned launcher, all three hidden values were locally validated and
+then erased, but the launcher stopped before wrapper or Flutter invocation.
+Repository reconciliation proved no retained C34B AAB or release
+`google-services.json`, build/wrapper/upload/install/device counts `0/0/0/0`,
+and restored false founder-qualification and agent-read flags. REG2658 proves
+that C34B reused one `build` phase for opposite preprompt and postinput flag
+invariants. C34B is permanently rejected and must not be retried, repaired,
+uploaded, installed or promoted. Rejection evidence is
+`docs/quality/UAW-C34B-R60-66-POSTINPUT-BUILD-GATE-PHASE-CONTRADICTION-REJECTION-20260816.md`.
+
+The selected exact successor is
+`UAW-C34C-R60-67-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`, version
+`1.0.0-r60.67` / `2026081367`, package `com.moolsocial.app`, Google Play
+Internal Testing only, and the existing OPPO `2b3e0f71` / `CPH2375`. It is
+`mvp_required` release qualification and changes no mobile runtime, UI, route,
+service, backend or provider owner. It reuses the generic build and cleanup
+owners and adds only distinct `preprompt` and postinput `build` contracts. The
+postinput machine state is exactly
+`founder_inputs_validated_single_aab_build_required`.
+
+Registry memory contains 2,629 entries with SHA-256
+`44900CC7C029FA031258EB048F1044CA5B66FEEBA7758EFB2C52D53E7EDFDA96`.
+The C34C ticket SHA-256 is
+`19F242BE868D3E0398A66A20DD08BD320B0D16186D777A0557A2E64EE60788E4`.
+The focused 73-file manifest SHA-256 is
+`7250DE7887F1517F9F8CDFC4830D50138D2092A02C499CA561EB4CE0DCFCDAF0`.
+The MVP scope gate and initial C34C source-composition gate pass, while state
+and aggregate remain `prebuild_composition_registered_two_fresh_cycles_required`,
+cycles `0/2`, counts `0/0/0/0`, hidden inputs false and all build/Play/OPPO
+authorities held.
+
+Before any source seal, the remaining bounded work is to finish dual-host
+parsing/static phase-transition validation, generate and bind the fresh C34C
+source manifest, then run two complete independent source cycles. Only after
+both cycles and final dual-host source replay may one `preprompt` authority be
+exposed. Codex must not launch the founder console. AAB, Play upload/activation,
+OPPO update, device journeys, deployments, email/SMS, credentials and any
+readiness claim remain held behind their exact later gates.
+
+## C34C r60.67 rejected; C34D r60.68 pre-seal transition matrix selected — 16 August 2026
+
+C34C retained two identical passing cycles and dual-host `preprompt` passes,
+but REG2659 rejects it at `0/0/0/0` because a non-secret transition-fixture
+patch was attempted after its source seal. The patch failed atomically; no
+hidden input, wrapper, Flutter build, AAB, Play or OPPO action occurred. C34C
+must not be retried, repaired or promoted.
+
+The selected exact successor is C34D r60.68 / `2026081368`, ticket
+`UAW-C34D-R60-68-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`.
+Registry memory contains 2,632 entries with SHA-256
+`490F6FDEDCD805FD44DF4126F6779C20205B0AEB70BA9285E367C43EF3814200`.
+REG2660 and REG2661 retain the atomically rejected pre-seal scope and handoff
+patches. Their corrections use exact one-hunk readback; neither is counted as a
+gate pass.
+
+C34D changes no mobile runtime, UI, backend or provider owner. Before its
+official source seal it has fully created and parsed separate non-secret
+preprompt and postinput state/aggregate fixtures plus two fixture-only summary
+markers. Preprompt has false founder-qualification flags and hidden-entry false;
+postinput has those three flags true, hidden-entry true and both agent-read
+flags false. The real candidate remains at cycles `0/2`, counts `0/0/0/0`,
+hidden inputs false and all release authorities held. Both PowerShell hosts
+passed the registry-2631 source-composition gate before REG2661; those passes
+are superseded and must be replayed against registry 2632. The remaining
+pre-seal work is to bind a complete draft manifest into the fixtures and pass
+the full positive/negative phase matrix before promoting the unchanged draft
+bytes to the official source seal.
+
+## C34E r60.69 rejected at preupload; C34F r60.70 selected pre-seal — 17 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`, with the complete founder/user
+dirty tree preserved. C34E r60.69 built one AAB, SHA-256
+`8FDB9A5CC6D925A7D5E79FEBA169703A5177D5B4E6B5BFB767E06DC0D7542213`,
+and passed postbuild and preupload. Before any Play write, REG2664 proved that
+raw Chrome open-tab enumeration repeated REG1863 by emitting an unrelated
+authenticated Cloud-tab query value. The value is not retained or reproduced.
+C34E is permanently rejected at `1/0/0/0`; its AAB cannot be uploaded,
+installed, promoted, repaired or reused.
+
+The founder selected and phase-gated end-to-end authorized C34F r60.70 /
+`2026081370`, ticket
+`UAW-C34F-R60-70-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`, package
+`com.moolsocial.app`, Google Play Internal Testing only, and the existing OPPO
+`2b3e0f71` / `CPH2375`. Ticket SHA-256 is
+`8C89D3948212A4B16428A2CA6FD02A8D9C2E514C9840C56F6A1756D087B8D3F2`.
+C34F is `mvp_required` release qualification and changes no mobile product,
+UI, route, service, backend or provider owner. Its browser contract opens one
+fresh known MoolSocial Internal Testing route and emits only a query-free
+allowlisted Play host/path projection; raw tab inventory, history, unrelated
+metadata, query/fragment, account/tester, private-link, cookie, storage and
+session reads are prohibited.
+
+REG2665 through REG2675 retain the pre-seal aggregate patch, Windows `rg`
+wildcard, PowerShell empty-pipe inventory, empty-pipe recurrence and wrapped
+runbook static-assertion failures. None changed product source or performed a
+build, browser, Play or OPPO action. Their corrections use exact small patches,
+explicit `--glob`, an exact fixture-path array piped through `ForEach-Object`
+with scalar reconciliation kept separate, and whitespace-tolerant semantic
+runbook assertions, complete yielding-gate result retention and exact
+registry-numbered prerequisite reporting and the exact C34F-dated browser
+evidence paths in every transition fixture and the exact expected-absent
+transient reference-audit allowlist and labeled manifest-exclusion projection.
+
+Current registry memory is 2,646 entries, SHA-256
+`5DB74D0BDBEAAB4B9A57D414CA56C90906E368033AF46E429010ADAE7B743C9B`.
+The focused 73-file manifest SHA-256 is
+`7250DE7887F1517F9F8CDFC4830D50138D2092A02C499CA561EB4CE0DCFCDAF0`.
+The robust-delivery and MVP scope gates pass in PowerShell 7 and Windows
+PowerShell for C34F. Real state and aggregate remain
+`prebuild_composition_registered_two_fresh_cycles_required`, cycles `0/2`,
+counts `0/0/0/0`, hidden inputs false and all build/upload/install/device
+authorities held. No C34F source seal, full source cycle, founder prompt, AAB,
+Play write, OPPO action, deployment, email or SMS has occurred.
+
+Before the official seal, bind the registry-2646 draft manifest into all four
+preprompt/postinput fixtures, prove real/fixture history parity, pass the full
+dual-host positive and crossed fail-closed phase matrix and the runner
+prerequisite-only preflight, then promote unchanged draft bytes. After the
+official seal, repository discovery and source/registry/ticket/runbook/gate
+mutation are prohibited.
+
+## C34F r60.70 rejected in sealed source cycle 1 — 17 August 2026
+
+The exact branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; the complete founder/user dirty
+tree remains preserved. C34F sealed against registry 2,646 / SHA-256
+`5DB74D0BDBEAAB4B9A57D414CA56C90906E368033AF46E429010ADAE7B743C9B`
+with official 1,297-file source manifest SHA-256
+`811E2E7CB4A64E0BA403757AB1D3D66FE68F1304402D312043EF27B517960AF5`.
+
+The first sealed source cycle stopped before any authoritative Flutter result.
+Its retained log reports that
+`tmp/run-c30t-authoritative-flutter-manifest-audit.ps1` read `$event` while it
+was unset. Bounded read-only diagnosis proves the script's nested `switch`
+uses unlabeled `continue` for blank, non-JSON and JSON-null classifications;
+those branches can reach the later event-type access without assigning
+`$event`. The registry contains one exact instance of this defect: REG2676.
+The smallest complete successor repair is an explicit outer event-loop label,
+labeled skips for every non-object classification and a focused executable
+prevention covering blank, non-JSON and JSON-null input before a fresh seal.
+
+C34F is permanently rejected at build/upload/install/device counts
+`0/0/0/0`. State and aggregate agree on all 12 shared rejection fields,
+action counts, machine state and release authorities. No founder hidden input,
+AAB, browser, Play, OPPO, backend/provider/deployment, email or SMS action
+occurred. C34F must not be retried, repaired, uploaded, installed or promoted.
+REG2677 retains the atomically rejected first rejection-state patch. REG2678
+through REG2682 retain the truncated source search, overbroad reconstruction,
+Windows path-filter mismatch, literal-`??` status misclassification and false
+full-object parity diagnostic; none changed candidate or external state.
+
+Current diagnostic registry memory contains 2,653 entries with SHA-256
+`4D4701AF0FEC77C7C6D43D8373AA732F3F103E3A70C63BB512DC1AD91F7C3407`.
+Exact failure evidence is
+`artifacts/quality/uaw-c34f-r60-70-authentication-no-regression-preparation-20260817-01/c34f-cycle-01-flutter.log`,
+`docs/quality/REG-20260817-2676-C34F-CYCLE1-AUTHORITATIVE-FLUTTER-AUDIT-UNSET-EVENT.md`
+and
+`docs/quality/UAW-C34F-R60-70-CYCLE-01-FLUTTER-AUDIT-UNSET-EVENT-REJECTION-20260817.md`.
+
+No successor is selected. C34G r60.71 would be a new exact implementation and
+release boundary: it requires founder authorization for its repair ticket,
+MVP disclosure and scope selection before any source mutation, qualification,
+hidden input, AAB, Internal Testing or OPPO action.
+
+## C34G r60.71 rejected after cycle 1; C34H r60.72 authorized for exact lifecycle repair — 17 August 2026
+
+The branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; all founder/user tracked and
+untracked files remain preserved.
+
+C34G sealed registry 2,664 with SHA-256
+`832FFF89B6D7BD8E990878267252F6B58FBE085337E5990B4F68D3F8859EA2D7`
+and its 1,301-file source manifest SHA-256
+`2DAF466AF4FA0F78ACEB710E19E90B36D69312284E535F96E5A0C23AA7F635B5`.
+Its first full cycle passed Flutter `501` with 3 declared skips, backend 537,
+web 8 and unchanged source. REG2694 rejects C34G because state was advanced to
+`1/2` before cycle 2, contrary to the sealed lifecycle requiring both cycle
+invocations to start from real state `0/2` and one later atomic `2/2`
+persistence. Cycle 2 did not start and cycle 1 cannot qualify a successor.
+C34G is permanently rejected at authoritative build/upload/install/device
+counts `0/0/0/0`; no founder input, AAB, Play or OPPO action occurred.
+
+REG2695 records a truncated plan-tool result as unknown advisory state.
+REG2696 records that C34G's rejected aggregate nested candidate block retained
+a predecessor build/hash even though its authoritative action counts and
+rejection are zero. Rejected C34G is not repaired or reinterpreted.
+
+The founder has continuously authorized the smallest exact `mvp_required`
+successor C34H r60.72 / `2026081372`, Google Play Internal Testing only and one
+Play in-place update on OPPO `2b3e0f71` / `CPH2375` after each exact gate. C34H
+reuses the qualified audit loop-control repair and changes no mobile product,
+UI, route, backend or provider owner. It adds only explicit zeroed candidate
+lifecycle owners and must run two fresh complete cycles while real state
+remains `0/2`, then atomically persist `2/2`, pass dual-host replay and only
+then expose founder-only hidden-input authority.
+
+No C34H source seal, cycle, hidden input, AAB, Play write, OPPO action,
+deployment, email or SMS action has yet occurred.
+
+### C34H pre-seal qualification update
+
+C34H is now bound to regression registry 2,674 / SHA-256
+`B6BCD44D884BEFB8C3B031DA79B76785EA875197C6E69C72618FFE58A055748E`.
+Its ticket SHA-256 is
+`14B1A98228CEAA93A6E8A39C7399B66FE454AAD5F3CE86ABCE6EE7C50D13F897`.
+REG2697 records an atomically rejected stale-anchor patch; REG2698 records the
+active-ticket binding of the qualified C34G focused gate and the new thin C34H
+successor-replay checker; REG2699 records a poll-wrapper syntax error with the
+retained source-gate session subsequently reconciled; REG2700 corrects cloned
+browser evidence to label immutable C34G workflow provenance instead of
+claiming a new C34H browser action.
+REG2701 records and prevents an exact-`Contains` false rejection caused by
+ordinary Markdown wrapping in that truthful browser-composition marker.
+REG2702 corrects a superseded-draft sentence fragment; REG2703 records a
+second undelivered poll wrapper and requires minimal single-call polling.
+
+Both PowerShell hosts pass the selected C34H MVP scope, delivery, memory,
+focused successor-replay and complete source-composition gates. The fresh
+73-file focused manifest remains SHA-256
+`7250DE7887F1517F9F8CDFC4830D50138D2092A02C499CA561EB4CE0DCFCDAF0`.
+The superseded 1,305-file registry-2671 draft remains retained. A fresh
+registry-2674 draft must be generated after the REG2701 gate repair and
+REG2702 documentation correction. Four phase fixtures have 23
+historical candidates ending in rejected C34G r60.71 at authoritative
+`0/0/0/0`; both positive phases passed in both PowerShell hosts and all four
+crossed phase cases failed closed.
+
+Real state and aggregate remain cycles `0/2`, counts `0/0/0/0`, nested
+candidate artifact fields zero/null, hidden inputs false and all release
+authorities held. Before the official seal, replay the final registry-2674
+phase matrix if required, promote unchanged draft bytes, bind official
+manifest SHA/count to real state and aggregate, and run prerequisite-only plus
+dual-host cycles-zero replay. After that point no source, registry, ticket,
+runbook or gate mutation is permitted.
+
+## C34H r60.72 built, activated and Play-updated; rejected at device acceptance — 17 August 2026
+
+The branch remains `remediation/prototype-conformance-2026-07-20` at
+`f6dfe7587aa02d782e94282d14af8bafff48ded0`; all founder/user tracked and
+untracked files remain preserved.
+
+C34H completed two fresh source cycles against registry 2,674 / SHA-256
+`B6BCD44D884BEFB8C3B031DA79B76785EA875197C6E69C72618FFE58A055748E`.
+Each cycle passed Flutter 501 with 3 declared skips and zero failures, the
+whole-mobile analyzer, backend typecheck plus 537 tests, web production build
+plus 8 tests, and unchanged-source verification. The official 1,305-file
+source manifest SHA-256 is
+`EA20A36B3327BF56D9B32DA6C2BD9C4584794F94A81FD2F0DB039C53D707D765`;
+the focused 73-file manifest SHA-256 is
+`7250DE7887F1517F9F8CDFC4830D50138D2092A02C499CA561EB4CE0DCFCDAF0`.
+
+The one founder-input AAB succeeded for `1.0.0-r60.72` / `2026081372` at
+94,797,738 bytes and SHA-256
+`16749163C8840FF447C0470F0D2592E309D6EF7F6CAE01F3BECB5E62F4B0CA66`.
+Google Play Internal Testing upload and activation completed once. The founder
+then performed the approved Play in-place OPPO update. Read-only package proof
+confirmed `com.moolsocial.app`, version code `2026081372`, version name
+`1.0.0-r60.72`, installer `com.android.vending`, an interactive first frame
+and no fatal-priority lines for the current app process. Public Guest Feed,
+protected Social Create gateway, unavailable Mobile OTP recovery and
+unavailable Apple-provider recovery were observed without a crash, real SMS or
+completed authentication.
+
+C34H is nevertheless permanently rejected at authoritative counts `1/1/1/0`.
+During the YouTube provider truth check, the Android system account chooser
+opened and displayed private account identifiers. No account was selected and
+no authentication completed; the founder closed the chooser. REG2704 through
+REG2709 retain all post-seal workflow mistakes, with REG2709 recording this
+privacy-boundary recurrence. At C34H rejection, regression memory had 2,680
+entries at SHA-256
+`30F23D679B9BC9DF6ABAF925AA22CF039C762FB9701CAB31A3A8F062A6CE9048`.
+The later C34I preparation mistakes are REG2710 through REG2713. Current
+memory has 2,685 entries at SHA-256
+`82C4FCFB2B64951BD562481641BDAE59F0BD5340BED2B278A34F64E876F5FC72`,
+and its machine gate passes.
+
+Detailed and aggregate C34H state agree on
+`postinstall_rejected_account_chooser_private_identifier_exposure_successor_required`,
+counts `1/1/1/0`, consumed build/upload/install authorities, rejected device
+acceptance, non-reusable artifact and a true private-account-identifier
+privacy flag. Exact rejection evidence is
+`docs/quality/UAW-C34H-R60-72-POSTINSTALL-ACCOUNT-CHOOSER-PRIVACY-REJECTION-20260817.md`;
+Play and OPPO evidence are retained as files `07`, `08` and `09` in the C34H
+evidence directory.
+
+C34H must not be retried, rebuilt, re-uploaded, promoted or claimed accepted.
+No production, other Play track, backend/provider deployment, email, SMS or
+credential action is authorized or implied. No successor is selected at this
+handoff. The smallest lawful successor is a no-product-source acceptance-
+workflow candidate that makes every account-capable provider founder-only,
+predeclares device-journey actor ownership and prevents Codex from opening any
+system account surface; it requires the robustness/reuse checkpoint, exact MVP
+ticket/state, fresh registry/source seal and two fresh full cycles before any
+new founder-input AAB.
+
+## C34I r60.73 privacy-safe successor selected and pre-seal qualified — 17 August 2026
+
+The exact selected ticket is
+`UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE`,
+version `1.0.0-r60.73` / `2026081373`, package `com.moolsocial.app`, Google
+Play Internal Testing only, and existing OPPO `2b3e0f71` / `CPH2375`.
+Ticket SHA-256 is
+`279EF1EF0D91B7152190B50EA0D6F0F01E93D8FC651E96D7E51C77601287AD9E`.
+It is `mvp_required` privacy and release qualification, with zero new screens,
+routes, services, backend owners, provider owners or product behavior.
+
+The robustness/reuse checkpoint and authorized MVP scope gate pass. C34I
+reuses all product, authentication, Firebase, Social, browser, generic AAB,
+Play and OPPO owners. Its only new shared behavior is the test-only device-
+actor policy at SHA-256
+`3C677017FCC49EA3F9892F937660F27381C5B5F7F613070BA848981B79E0CDD2`.
+Both PowerShell hosts pass that policy with seven Codex prohibitions, seven
+founder-only actions, seven ordered journey stages and three fail-closed
+negative fixtures. Every account-capable provider, system chooser, account
+selection, private identifier, private link, email, phone, OTP, credential and
+hidden build input is founder-only. Codex may perform only sanitized package/
+runtime checks and predeclared non-auth public or generic-gateway journeys.
+
+REG2710 through REG2714 preserve the pre-ticket empty-pipe parser recurrence,
+JavaScript string-method wrapper error, case-insensitive generator hash-key
+error, generated cycle-owner semantic substitution gap and the unbound mutable-
+state manifest self-reference draft. All occurred before cycles or external
+actions and are corrected in the current owners. Regression memory is 2,685
+entries at SHA-256
+`82C4FCFB2B64951BD562481641BDAE59F0BD5340BED2B278A34F64E876F5FC72`.
+
+Detailed and aggregate C34I state agree on
+`prebuild_composition_registered_two_fresh_cycles_required`, cycles `0/2`,
+counts `0/0/0/0`, false hidden-input/secret/private-identifier flags and held
+build/upload/install/device authorities. Their 24th historical candidate is
+the exact C34H rejection at `1/1/1/0`, non-reusable. Both PowerShell hosts pass
+the compact C34I source-composition gate, including ticket/scope hash, C34H
+history, privacy policy, launcher/wrapper/recovery/cycle semantic bindings,
+browser workflow, regression memory and C33G blocker-ledger prebuild replay.
+
+The focused 73-file manifest is prepared. The whole-source manifest is not yet
+sealed and neither full source cycle has started. No C34I hidden input, AAB,
+browser write, Play write, OPPO action, deployment, email or SMS action has
+occurred. Before any founder prompt, generate and bind the registry-2685 source
+manifest, pass prerequisite-only and cycles-zero replay, run two independent
+complete cycles while real state remains `0/2`, verify both summaries, then
+atomically persist `2/2` and pass dual-host source replay. After the source
+seal, no source, registry, ticket, runbook or gate mutation is allowed.
+
+## C34I r60.73 source seal and founder-prompt checkpoint — 17 August 2026
+
+The official registry-2685 source manifest is
+`artifacts/quality/uaw-c34i-r60-73-authentication-privacy-safe-preparation-20260817-01/source-manifest-c34i-registry-2685.txt`.
+It contains 1,318 files and has SHA-256/fingerprint
+`9ED04DB02100DA1AD132839560CB4E42D871BE51F615580AB47A58BF156860E1`,
+with 210 protected owners, 206 retained historical owners, four qualified
+successor owners, and zero missing or unexpected protected owners. The focused
+manifest remains 73 files at SHA-256
+`BC2CCD7E69CDC2D5817A9B772BF923E6A641AC8783C3BA657E9F729E836F2620`.
+
+Two independent full source cycles passed. Each retained summary proves 501
+Flutter passes, three declared skips, zero failures/errors/non-JSON/blank/null/
+untyped events, clean whole-mobile analyzer, backend typecheck plus 537 tests,
+web production build plus eight tests, dual PowerShell hosts, zero Play writes
+and unchanged sealed source. Detailed and aggregate state now agree on
+`source_regression_memory_two_identical_cycles_qualified_founder_prompt_required`,
+cycles `2/2`, counts `0/0/0/0`, build authority `available_once`, later
+authorities held, hidden inputs not entered, and no secret or private value
+observed. The official manifest comparison, source gate and preprompt gate pass
+in both PowerShell 7 and Windows PowerShell.
+
+The only lawful next action is founder execution of the already sealed visible
+launcher `tmp/run-c34i-r60-73-single-aab-founder.ps1`, followed by founder-only
+entry of the three hidden values. Codex must not launch it, inspect its terminal
+or inputs, or perform any browser, Play, OPPO, account, deployment, email or SMS
+action before the launcher returns a retained sanitized result. No second
+launcher or retry is authorized if the launcher stops or any seal changes.

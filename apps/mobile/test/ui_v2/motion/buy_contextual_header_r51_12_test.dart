@@ -16,10 +16,10 @@ void main() {
     await tester.pumpWidget(_app(session, disableAnimations: true));
     await tester.pump();
 
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(
-      tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))),
-      const Size(104, 56),
+      tester.getSize(find.byKey(const ValueKey('buy-header-context-slot'))),
+      const Size(44, 56),
     );
     expect(find.text('Plan basket'), findsNothing);
 
@@ -30,7 +30,13 @@ void main() {
     ]) {
       session.openDestination(entry.$1);
       await tester.pump();
-      expect(find.text(entry.$2), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-contextual-glass-header')),
+          matching: find.text(entry.$2),
+        ),
+        findsNothing,
+      );
     }
 
     expect(tester.binding.transientCallbackCount, 0);
@@ -53,7 +59,7 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('buy-contextual-glass-header'))),
       const Size(320, 66),
     );
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.text('Plan basket'), findsNothing);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);
@@ -67,7 +73,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('buy-header-signature-shop')), findsOne);
-    expect(find.bySemanticsLabel('MoolSocial'), findsOne);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.bySemanticsLabel('Plan a household basket'), findsOne);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);

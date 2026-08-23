@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "lockId": "MOOLSOCIAL-GOOGLE-AUTH-PRODUCTION-BASELINE-R60-87-LOCK-20260823",
+  "baselinePath": "config/google-authentication-production-baseline-r60-87.json",
+  "baselineSha256": "1EFCD2907CB28EA011377DB906BE2ECA1858A9781639B403D9D21233A31ABD6C",
+  "checkerPath": "scripts/check-google-authentication-production-baseline-r60-87.ps1",
+  "checkerSha256": "61F50B49571E1B3C45F2C09DE121B01113E3ADD6698B430707A1A3B926FCF5B4",
+  "status": "LOCKED",
+  "scope": "google_sign_in_only",
+  "mutationRule": "Do not modify this baseline, its checker, accepted artifact, source manifest, or sealed components. Create a uniquely versioned successor baseline only after an explicitly authorized Google authentication change and new real-device acceptance.",
+  "privacy": "No credential, token, API-key, certificate, account, email, UID, or private identifier value may be added."
+}

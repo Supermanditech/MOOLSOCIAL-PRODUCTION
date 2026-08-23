@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/design/mool_design_system.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
@@ -281,50 +282,65 @@ class _SearchProductResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (products.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.search_off_rounded,
-                size: 38,
-                color: BuyV2Colors.muted,
-              ),
-              const SizedBox(height: 9),
-              Text(
-                'No matches for “$query”',
-                textAlign: TextAlign.center,
-                style: context.buyTitle.copyWith(fontSize: 17),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Check the spelling or try a product, brand, seller or code.',
-                textAlign: TextAlign.center,
-                style: context.buyMeta,
-              ),
-              if (session.hasNarrowedProductSearchScope) ...[
-                const SizedBox(height: 14),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 280),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      key: ValueKey(
-                        'buy-search-all-${session.destination.name}',
-                      ),
-                      onPressed: session.broadenProductSearchScope,
-                      icon: const Icon(Icons.travel_explore_rounded, size: 20),
-                      label: Text('Search all ${session.destination.label}'),
-                    ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final centeredHeight = constraints.maxHeight > 48
+              ? constraints.maxHeight - 48
+              : 0.0;
+          return SingleChildScrollView(
+            key: const ValueKey('buy-search-empty-scroll'),
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: centeredHeight),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.search_off_rounded,
+                    size: 38,
+                    color: BuyV2Colors.muted,
                   ),
-                ),
-              ],
-            ],
-          ),
-        ),
+                  const SizedBox(height: 9),
+                  Text(
+                    'No matches for “$query”',
+                    textAlign: TextAlign.center,
+                    style: context.buyTitle.copyWith(fontSize: 17),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Check the spelling or try a product, brand, seller or code.',
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta,
+                  ),
+                  if (session.hasNarrowedProductSearchScope) ...[
+                    const SizedBox(height: 14),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          key: ValueKey(
+                            'buy-search-all-${session.destination.name}',
+                          ),
+                          onPressed: session.broadenProductSearchScope,
+                          icon: const Icon(
+                            Icons.travel_explore_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            'Search all ${session.destination.label}',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       );
     }
     return LayoutBuilder(
@@ -649,7 +665,9 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
         child: FractionallySizedBox(
           heightFactor: BuyV2CategorySheetPolicy.heightFactorFor(context),
           child: Padding(
-            padding: const EdgeInsets.only(bottom: BuyV2Metrics.dockHeight),
+            padding: const EdgeInsets.only(
+              bottom: MoolMetrics.compactTapTarget,
+            ),
             child: ClipRRect(
               key: const ValueKey('buy-category-sheet-surface'),
               borderRadius: const BorderRadius.vertical(

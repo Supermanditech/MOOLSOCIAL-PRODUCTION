@@ -25,7 +25,7 @@ class EatCompletedScreen extends StatelessWidget {
         session: session,
         title: 'Meal delivered',
         subtitle: orderId,
-        activeDock: 'order',
+        activeLocalAction: 'order',
         fallbackBackRoute: '/app/eat/order/$orderId',
         body: ListView(
           padding: const EdgeInsets.fromLTRB(

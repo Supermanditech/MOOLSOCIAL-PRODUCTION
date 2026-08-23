@@ -30,6 +30,22 @@ void main() {
       },
     );
 
+    test('global social login audit activates the same Dev provider', () async {
+      var activationCount = 0;
+
+      final activated = await activateYouTubePrivateDevAppCheckIfEnabled(
+        useEmulators: false,
+        firebaseProjectId: youtubePrivateDevProjectId,
+        globalSocialLoginAuditEnabled: true,
+        activate: () async {
+          activationCount += 1;
+        },
+      );
+
+      expect(activated, isTrue);
+      expect(activationCount, 1);
+    });
+
     test('is a no-op unless the explicit proof flag is enabled', () async {
       var activationCount = 0;
 
@@ -152,6 +168,31 @@ void main() {
       );
       expect(credentials.idTokenCalls, 0);
     });
+
+    test(
+      'loads the shared Shorts catalogue without an explicit query',
+      () async {
+        transport.queueJson(<String, Object?>{
+          'ok': true,
+          'data': <String, Object?>{
+            'items': <Object?>[_videoJson()],
+            'source': 'cache',
+          },
+        });
+
+        final page = await client.sharedShortsCatalogue();
+
+        expect(page.items.single.videoId, 'abc123XYZ09');
+        expect(transport.posts.single.body, <String, Object?>{
+          'operation': 'publicShortsCatalogue',
+        });
+        expect(
+          credentials.appCheckModes.single,
+          YouTubeAppCheckTokenMode.standard,
+        );
+        expect(credentials.idTokenCalls, 0);
+      },
+    );
 
     test(
       'parses channel activity without claiming a personalized feed',
@@ -693,6 +734,45 @@ void main() {
         isTrue,
       );
       expect(progress, [262144, 524288]);
+    });
+
+    test('cancels before sending the next resumable chunk', () async {
+      final transport = _FakeTransport()
+        ..queuePut(
+          const YouTubeHttpResponse(
+            statusCode: 308,
+            headers: <String, String>{},
+            body: '',
+          ),
+        )
+        ..queuePut(
+          const YouTubeHttpResponse(
+            statusCode: 308,
+            headers: <String, String>{'range': 'bytes=0-262143'},
+            body: '',
+          ),
+        );
+      final cancellation = YouTubeUploadCancellation();
+      final bytes = List<int>.generate(524288, (i) => i % 251);
+
+      await expectLater(
+        YouTubeDirectUploader(transport).upload(
+          session: _session(bytes: bytes),
+          source: _MemoryUploadSource(bytes),
+          chunkSize: 262144,
+          cancellation: cancellation,
+          onProgress: (accepted, _) {
+            if (accepted == 262144) cancellation.cancel();
+          },
+        ),
+        throwsA(isA<YouTubeUploadCancelledException>()),
+      );
+
+      expect(transport.puts, hasLength(2));
+      expect(
+        transport.puts.last.headers['content-range'],
+        'bytes 0-262143/524288',
+      );
     });
 
     test('rejects a non-Google session before reading media', () async {

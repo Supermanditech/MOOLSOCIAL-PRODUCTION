@@ -184,8 +184,11 @@ void main() {
     ]) {
       change();
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-brand-tile')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-dock-mool')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-header-context-slot')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
   });

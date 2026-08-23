@@ -194,7 +194,7 @@ void main() {
 
       session.openDestination(BuyV2Destination.shop);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-dock-mool')));
+      await tester.tap(find.byKey(const ValueKey('mool-root-selected')));
       await tester.pumpAndSettle();
       await _capture(tester, 'mool-rail');
 

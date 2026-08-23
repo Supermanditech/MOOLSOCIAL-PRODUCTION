@@ -41,7 +41,6 @@ class _BuyCatalogScreenState extends State<BuyCatalogScreen> {
           subtitle: widget.session.fulfilment == BuyFulfilment.homeDelivery
               ? widget.session.deliveryPromise
               : 'Collect from ${widget.session.pickupStore}',
-          showBack: true,
           fallbackBackRoute: '/app/buy',
           body: CustomScrollView(
             slivers: [

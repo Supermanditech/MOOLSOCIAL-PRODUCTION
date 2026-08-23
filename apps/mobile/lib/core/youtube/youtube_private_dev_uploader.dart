@@ -58,6 +58,27 @@ class YouTubeDirectUploadResult {
 
 typedef YouTubeUploadProgress = void Function(int bytesAccepted, int total);
 
+class YouTubeUploadCancellation {
+  bool _cancelled = false;
+
+  bool get isCancelled => _cancelled;
+
+  void cancel() {
+    _cancelled = true;
+  }
+
+  void throwIfCancelled() {
+    if (_cancelled) throw const YouTubeUploadCancelledException();
+  }
+}
+
+class YouTubeUploadCancelledException implements Exception {
+  const YouTubeUploadCancelledException();
+
+  @override
+  String toString() => 'YouTube upload cancelled';
+}
+
 class YouTubeDirectUploader {
   const YouTubeDirectUploader(this._transport);
 
@@ -68,7 +89,9 @@ class YouTubeDirectUploader {
     required YouTubeUploadSource source,
     int chunkSize = _defaultChunkSize,
     YouTubeUploadProgress? onProgress,
+    YouTubeUploadCancellation? cancellation,
   }) async {
+    cancellation?.throwIfCancelled();
     _validateSession(session);
     _validateChunkSize(chunkSize);
     late final YouTubeUploadFileIdentity sourceIdentity;
@@ -80,6 +103,7 @@ class YouTubeDirectUploader {
         message: 'The selected video could not be read.',
       );
     }
+    cancellation?.throwIfCancelled();
     final total = sourceIdentity.byteLength;
     if (!session.fileIdentity.matches(sourceIdentity) ||
         total != session.contentLength) {
@@ -95,7 +119,8 @@ class YouTubeDirectUploader {
       );
     }
 
-    final initialStatus = await _probe(session, total);
+    final initialStatus = await _probe(session, total, cancellation);
+    cancellation?.throwIfCancelled();
     if (initialStatus.complete) {
       onProgress?.call(total, total);
       return YouTubeDirectUploadResult(
@@ -107,6 +132,7 @@ class YouTubeDirectUploader {
     if (offset > 0) onProgress?.call(offset, total);
     var stalledResponses = 0;
     while (offset < total) {
+      cancellation?.throwIfCancelled();
       final endExclusive = (offset + chunkSize).clamp(0, total);
       final response = await _transport.putStream(
         session.sessionUrl,
@@ -114,9 +140,13 @@ class YouTubeDirectUploader {
           'content-type': session.contentType,
           'content-range': 'bytes $offset-${endExclusive - 1}/$total',
         },
-        body: source.openRead(offset, endExclusive),
+        body: _withCancellation(
+          source.openRead(offset, endExclusive),
+          cancellation,
+        ),
         contentLength: endExclusive - offset,
       );
+      cancellation?.throwIfCancelled();
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         onProgress?.call(total, total);
@@ -165,7 +195,8 @@ class YouTubeDirectUploader {
       );
     }
 
-    final completionStatus = await _probe(session, total);
+    final completionStatus = await _probe(session, total, cancellation);
+    cancellation?.throwIfCancelled();
     if (completionStatus.complete) {
       onProgress?.call(total, total);
       return YouTubeDirectUploadResult(
@@ -183,13 +214,16 @@ class YouTubeDirectUploader {
   Future<_UploadProbe> _probe(
     YouTubePrivateUploadSession session,
     int total,
+    YouTubeUploadCancellation? cancellation,
   ) async {
+    cancellation?.throwIfCancelled();
     final response = await _transport.putStream(
       session.sessionUrl,
       headers: <String, String>{'content-range': 'bytes */$total'},
       body: const Stream<List<int>>.empty(),
       contentLength: 0,
     );
+    cancellation?.throwIfCancelled();
     if (response.statusCode == 200 || response.statusCode == 201) {
       return _UploadProbe(
         complete: true,
@@ -220,6 +254,17 @@ class YouTubeDirectUploader {
           response.statusCode == 429 ||
           response.statusCode >= 500,
     );
+  }
+
+  Stream<List<int>> _withCancellation(
+    Stream<List<int>> source,
+    YouTubeUploadCancellation? cancellation,
+  ) async* {
+    await for (final chunk in source) {
+      cancellation?.throwIfCancelled();
+      yield chunk;
+    }
+    cancellation?.throwIfCancelled();
   }
 
   void _validateSession(YouTubePrivateUploadSession session) {

@@ -3440,6 +3440,11 @@ class BuyV2TrackingView extends StatelessWidget {
             const SizedBox(width: 6),
             Expanded(
               child: _TrackingAction(
+                key: ValueKey(
+                  order.status == BuyV2OrderStatus.delivered
+                      ? 'buy-tracking-reorder'
+                      : 'buy-tracking-help',
+                ),
                 onPressed: order.status == BuyV2OrderStatus.delivered
                     ? () => session.reorder(order)
                     : session.openAssist,

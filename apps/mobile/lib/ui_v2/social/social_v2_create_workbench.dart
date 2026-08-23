@@ -9,7 +9,55 @@ import 'social_v2_public_content.dart';
 
 enum SocialCreateFormatV2 { reel, carousel, post }
 
+enum SocialCreateIntentV2 { text, image, carousel, imagePoll, quickPoll, quiz }
+
 enum _SocialPostTool { none, image, imagePoll, quickPoll, quiz }
+
+class SocialCreateDraftV2 {
+  bool _initialized = false;
+  SocialCreateFormatV2 _format = SocialCreateFormatV2.post;
+  _SocialPostTool _postTool = _SocialPostTool.none;
+  String _body = '';
+  final List<String> _choices = List<String>.filled(4, '');
+  final List<SocialPickedMedia> _media = <SocialPickedMedia>[];
+  final List<SocialPickedMedia?> _imagePollMedia = <SocialPickedMedia?>[
+    null,
+    null,
+    null,
+    null,
+  ];
+  int _correctChoice = 0;
+  SocialQuotedPost? _quotedPost;
+
+  SocialQuotedPost? get quotedPost => _quotedPost;
+
+  String? get quotedPostId => _quotedPost?.id;
+
+  void prepareQuotedPost(SocialPublishedItem item) {
+    _initialized = true;
+    _format = SocialCreateFormatV2.post;
+    _postTool = _SocialPostTool.none;
+    _quotedPost = SocialQuotedPost(
+      id: item.id,
+      authorName: item.authorName,
+      authorHandle: item.authorHandle,
+      body: item.body,
+      mediaPath: item.mediaPaths.firstOrNull,
+    );
+  }
+
+  void _clear() {
+    _initialized = true;
+    _format = SocialCreateFormatV2.post;
+    _postTool = _SocialPostTool.none;
+    _body = '';
+    _choices.fillRange(0, _choices.length, '');
+    _media.clear();
+    _imagePollMedia.fillRange(0, _imagePollMedia.length, null);
+    _correctChoice = 0;
+    _quotedPost = null;
+  }
+}
 
 class SocialCreateWorkbenchV2 extends StatefulWidget {
   const SocialCreateWorkbenchV2({
@@ -18,7 +66,12 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
     required this.authorName,
     required this.authorHandle,
     required this.onPublished,
+    this.draft,
     this.initialFormat = SocialCreateFormatV2.post,
+    this.initialIntent,
+    this.allowReel = true,
+    this.onCreateYouTubeShort,
+    this.onClose,
     super.key,
   });
 
@@ -27,7 +80,12 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
   final String authorName;
   final String authorHandle;
   final ValueChanged<SocialPublishedItem> onPublished;
+  final SocialCreateDraftV2? draft;
   final SocialCreateFormatV2 initialFormat;
+  final SocialCreateIntentV2? initialIntent;
+  final bool allowReel;
+  final VoidCallback? onCreateYouTubeShort;
+  final VoidCallback? onClose;
 
   @override
   State<SocialCreateWorkbenchV2> createState() =>
@@ -36,43 +94,157 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
 
 class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   late SocialCreateFormatV2 _format;
-  _SocialPostTool _postTool = _SocialPostTool.none;
+  late _SocialPostTool _postTool;
+  late final SocialCreateDraftV2 _draft;
   final TextEditingController _body = TextEditingController();
-  final TextEditingController _firstChoice = TextEditingController();
-  final TextEditingController _secondChoice = TextEditingController();
+  final List<TextEditingController> _choiceControllers =
+      List<TextEditingController>.generate(4, (_) => TextEditingController());
   final FocusNode _bodyFocus = FocusNode();
-  final List<SocialPickedMedia> _media = <SocialPickedMedia>[];
-  final List<SocialPickedMedia?> _imagePollMedia = <SocialPickedMedia?>[
-    null,
-    null,
-  ];
+  late final List<SocialPickedMedia> _media;
+  late final List<SocialPickedMedia?> _imagePollMedia;
   int _correctChoice = 0;
   bool _selectingMedia = false;
+  int _mediaSelectionRequest = 0;
 
   @override
   void initState() {
     super.initState();
-    _format = widget.initialFormat;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_format == SocialCreateFormatV2.post) _bodyFocus.requestFocus();
-      _recoverInterruptedSelection();
+    _draft = widget.draft ?? SocialCreateDraftV2();
+    final freshDraft = !_draft._initialized;
+    final intent = widget.initialIntent;
+    if (freshDraft) {
+      _draft._format = intent == SocialCreateIntentV2.carousel
+          ? SocialCreateFormatV2.carousel
+          : !widget.allowReel &&
+                widget.initialFormat == SocialCreateFormatV2.reel
+          ? SocialCreateFormatV2.post
+          : widget.initialFormat;
+      _draft._postTool = switch (intent) {
+        SocialCreateIntentV2.image => _SocialPostTool.image,
+        SocialCreateIntentV2.imagePoll => _SocialPostTool.imagePoll,
+        SocialCreateIntentV2.quickPoll => _SocialPostTool.quickPoll,
+        SocialCreateIntentV2.quiz => _SocialPostTool.quiz,
+        _ => _SocialPostTool.none,
+      };
+      _draft._initialized = true;
+    }
+    _format = _draft._format;
+    _postTool = _draft._postTool;
+    _media = _draft._media;
+    _imagePollMedia = _draft._imagePollMedia;
+    _correctChoice = _draft._correctChoice;
+    _body.text = _draft._body;
+    for (var index = 0; index < _choiceControllers.length; index++) {
+      _choiceControllers[index].text = _draft._choices[index];
+      _choiceControllers[index].addListener(_persistTextDraft);
+    }
+    _body.addListener(_persistTextDraft);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _recoverInterruptedSelection();
+      if (!mounted || widget.initialIntent != intent) return;
+      if (freshDraft && intent == SocialCreateIntentV2.image) {
+        await _choosePostImage();
+      } else if (freshDraft && intent == SocialCreateIntentV2.carousel) {
+        await _chooseCarousel();
+      }
     });
   }
 
   @override
+  void didUpdateWidget(covariant SocialCreateWorkbenchV2 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final intent = widget.initialIntent;
+    if (intent == null || oldWidget.initialIntent == intent) return;
+    final selectionWasPending = _selectingMedia;
+    setState(() {
+      _invalidateMediaSelection();
+      _format = intent == SocialCreateIntentV2.carousel
+          ? SocialCreateFormatV2.carousel
+          : SocialCreateFormatV2.post;
+      _postTool = switch (intent) {
+        SocialCreateIntentV2.image => _SocialPostTool.image,
+        SocialCreateIntentV2.imagePoll => _SocialPostTool.imagePoll,
+        SocialCreateIntentV2.quickPoll => _SocialPostTool.quickPoll,
+        SocialCreateIntentV2.quiz => _SocialPostTool.quiz,
+        _ => _SocialPostTool.none,
+      };
+      _persistDraftState();
+    });
+    if (!selectionWasPending &&
+        intent == SocialCreateIntentV2.image &&
+        _media.isEmpty) {
+      _choosePostImage();
+    } else if (!selectionWasPending &&
+        intent == SocialCreateIntentV2.carousel &&
+        _media.length < 2) {
+      _chooseCarousel();
+    }
+  }
+
+  @override
   void dispose() {
+    _body.removeListener(_persistTextDraft);
     _body.dispose();
-    _firstChoice.dispose();
-    _secondChoice.dispose();
+    for (final controller in _choiceControllers) {
+      controller.removeListener(_persistTextDraft);
+      controller.dispose();
+    }
     _bodyFocus.dispose();
     super.dispose();
   }
 
+  void _persistTextDraft() {
+    _draft._body = _body.text;
+    for (var index = 0; index < _choiceControllers.length; index++) {
+      _draft._choices[index] = _choiceControllers[index].text;
+    }
+  }
+
+  void _persistDraftState() {
+    _draft
+      .._initialized = true
+      .._format = _format
+      .._postTool = _postTool
+      .._correctChoice = _correctChoice;
+    _persistTextDraft();
+  }
+
+  void _invalidateMediaSelection() {
+    _mediaSelectionRequest += 1;
+    _selectingMedia = false;
+  }
+
+  bool _mediaSelectionIsCurrent(
+    int request, {
+    required SocialCreateFormatV2 format,
+    _SocialPostTool? postTool,
+  }) {
+    return mounted &&
+        request == _mediaSelectionRequest &&
+        _format == format &&
+        (postTool == null || _postTool == postTool);
+  }
+
   Future<void> _recoverInterruptedSelection() async {
-    final recovered = await widget.mediaPicker.recoverInterruptedSelection();
-    if (!mounted || recovered.isEmpty) return;
+    final request = ++_mediaSelectionRequest;
+    late final List<SocialPickedMedia> recovered;
+    try {
+      recovered = await widget.mediaPicker.recoverInterruptedSelection();
+    } on Object {
+      if (mounted && request == _mediaSelectionRequest) {
+        showSocialV2Message(
+          context,
+          'Your previous media selection could not be restored. Your draft is still here.',
+        );
+      }
+      return;
+    }
+    if (!mounted || request != _mediaSelectionRequest || recovered.isEmpty) {
+      return;
+    }
     setState(() {
       if (recovered.first.kind == SocialMediaKind.video) {
+        if (!widget.allowReel) return;
         _format = SocialCreateFormatV2.reel;
         _media
           ..clear()
@@ -88,14 +260,18 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           ..clear()
           ..addAll(recovered.take(10));
       }
+      _persistDraftState();
     });
   }
 
   Future<void> _selectFormat(SocialCreateFormatV2 format) async {
+    if (format == SocialCreateFormatV2.reel && !widget.allowReel) return;
     HapticFeedback.selectionClick();
     setState(() {
+      _invalidateMediaSelection();
       _format = format;
       if (format != SocialCreateFormatV2.post) _postTool = _SocialPostTool.none;
+      _persistDraftState();
     });
     if (format == SocialCreateFormatV2.post) {
       _bodyFocus.requestFocus();
@@ -106,74 +282,166 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
 
   Future<void> _chooseReel(SocialMediaSource source) async {
     if (_selectingMedia) return;
+    final request = ++_mediaSelectionRequest;
     setState(() => _selectingMedia = true);
     try {
       final selected = await widget.mediaPicker.pickReel(source);
-      if (!mounted || selected == null) return;
+      if (!_mediaSelectionIsCurrent(
+            request,
+            format: SocialCreateFormatV2.reel,
+          ) ||
+          selected == null) {
+        return;
+      }
       setState(() {
         _media
           ..clear()
           ..add(selected);
+        _persistDraftState();
       });
+    } on Object {
+      if (!mounted) return;
+      if (_mediaSelectionIsCurrent(
+        request,
+        format: SocialCreateFormatV2.reel,
+      )) {
+        showSocialV2Message(
+          context,
+          'Videos could not be opened. Your draft is still here.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _selectingMedia = false);
+      if (mounted && request == _mediaSelectionRequest) {
+        setState(() => _selectingMedia = false);
+      }
     }
   }
 
   Future<void> _chooseCarousel() async {
     if (_selectingMedia) return;
+    final request = ++_mediaSelectionRequest;
     setState(() => _selectingMedia = true);
     try {
       final selected = await widget.mediaPicker.pickCarousel(limit: 10);
-      if (!mounted || selected.isEmpty) return;
+      if (!_mediaSelectionIsCurrent(
+            request,
+            format: SocialCreateFormatV2.carousel,
+          ) ||
+          selected.isEmpty) {
+        return;
+      }
       setState(() {
         _media
           ..clear()
           ..addAll(selected.take(10));
+        _persistDraftState();
       });
+    } on Object {
+      if (!mounted) return;
+      if (_mediaSelectionIsCurrent(
+        request,
+        format: SocialCreateFormatV2.carousel,
+      )) {
+        showSocialV2Message(
+          context,
+          'Photos could not be opened. Your draft is still here.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _selectingMedia = false);
+      if (mounted && request == _mediaSelectionRequest) {
+        setState(() => _selectingMedia = false);
+      }
     }
   }
 
   Future<void> _choosePostImage() async {
     if (_selectingMedia) return;
+    final request = ++_mediaSelectionRequest;
     setState(() => _selectingMedia = true);
     try {
       final selected = await widget.mediaPicker.pickImage(
         SocialMediaSource.gallery,
       );
-      if (!mounted || selected == null) return;
+      if (!_mediaSelectionIsCurrent(
+            request,
+            format: SocialCreateFormatV2.post,
+            postTool: _SocialPostTool.image,
+          ) ||
+          selected == null) {
+        return;
+      }
       setState(() {
         _media
           ..clear()
           ..add(selected);
+        _persistDraftState();
       });
+    } on Object {
+      if (!mounted) return;
+      if (_mediaSelectionIsCurrent(
+        request,
+        format: SocialCreateFormatV2.post,
+        postTool: _SocialPostTool.image,
+      )) {
+        showSocialV2Message(
+          context,
+          'Photos could not be opened. Your draft is still here.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _selectingMedia = false);
+      if (mounted && request == _mediaSelectionRequest) {
+        setState(() => _selectingMedia = false);
+      }
     }
   }
 
   Future<void> _chooseImagePollMedia(int index) async {
     if (_selectingMedia) return;
+    final request = ++_mediaSelectionRequest;
     setState(() => _selectingMedia = true);
     try {
       final selected = await widget.mediaPicker.pickImage(
         SocialMediaSource.gallery,
       );
-      if (!mounted || selected == null) return;
-      setState(() => _imagePollMedia[index] = selected);
+      if (!_mediaSelectionIsCurrent(
+            request,
+            format: SocialCreateFormatV2.post,
+            postTool: _SocialPostTool.imagePoll,
+          ) ||
+          selected == null) {
+        return;
+      }
+      setState(() {
+        _imagePollMedia[index] = selected;
+        _persistDraftState();
+      });
+    } on Object {
+      if (!mounted) return;
+      if (_mediaSelectionIsCurrent(
+        request,
+        format: SocialCreateFormatV2.post,
+        postTool: _SocialPostTool.imagePoll,
+      )) {
+        showSocialV2Message(
+          context,
+          'Photos could not be opened. Your draft is still here.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _selectingMedia = false);
+      if (mounted && request == _mediaSelectionRequest) {
+        setState(() => _selectingMedia = false);
+      }
     }
   }
 
   void _selectPostTool(_SocialPostTool tool) {
     HapticFeedback.selectionClick();
     setState(() {
+      _invalidateMediaSelection();
       _format = SocialCreateFormatV2.post;
       _postTool = _postTool == tool ? _SocialPostTool.none : tool;
       if (_postTool != _SocialPostTool.image) _media.clear();
+      _persistDraftState();
     });
     if (_postTool == _SocialPostTool.image) {
       _choosePostImage();
@@ -185,14 +453,26 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   void _openReelSourcePicker() {
     HapticFeedback.selectionClick();
     setState(() {
+      _invalidateMediaSelection();
       _format = SocialCreateFormatV2.reel;
       _postTool = _SocialPostTool.none;
       _media.clear();
+      _persistDraftState();
     });
   }
 
   Future<void> _publish() async {
-    if (widget.session.busy) return;
+    if (widget.session.busy || _selectingMedia) return;
+    if (_draft.quotedPost != null && _body.text.trim().isEmpty) {
+      showSocialV2Message(
+        context,
+        'Add your thoughts before sharing this post.',
+      );
+      _bodyFocus.requestFocus();
+      return;
+    }
+    final session = widget.session;
+    final submittedDraftFingerprint = _draftFingerprint();
     final type = switch (_format) {
       SocialCreateFormatV2.reel => SocialPublishedContentType.reel,
       SocialCreateFormatV2.carousel => SocialPublishedContentType.carousel,
@@ -205,27 +485,34 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     };
     final choices = switch (type) {
       SocialPublishedContentType.imagePoll => <SocialPublishedChoice>[
-        for (var index = 0; index < 2; index++)
+        for (var index = 0; index < _choiceControllers.length; index++)
           SocialPublishedChoice(
-            label: index == 0 ? _firstChoice.text : _secondChoice.text,
+            label: _choiceControllers[index].text,
             imagePath: _imagePollMedia[index]?.path,
             imageIsAsset: _imagePollMedia[index]?.isAsset ?? false,
           ),
       ],
       SocialPublishedContentType.quickPoll ||
       SocialPublishedContentType.quiz => <SocialPublishedChoice>[
-        SocialPublishedChoice(label: _firstChoice.text),
-        SocialPublishedChoice(label: _secondChoice.text),
+        for (final controller in _choiceControllers)
+          SocialPublishedChoice(label: controller.text),
       ],
       _ => const <SocialPublishedChoice>[],
     };
-    final mediaPaths = switch (type) {
-      SocialPublishedContentType.imagePoll => const <String>[],
-      _ => _media.map((item) => item.path).toList(growable: false),
+    final publishedMedia = switch (type) {
+      SocialPublishedContentType.reel ||
+      SocialPublishedContentType.carousel => _media,
+      SocialPublishedContentType.post when _postTool == _SocialPostTool.image =>
+        _media,
+      _ => const <SocialPickedMedia>[],
     };
+    final mediaPaths = publishedMedia
+        .map((item) => item.path)
+        .toList(growable: false);
     final mediaAreAssets =
-        _media.isNotEmpty && _media.every((item) => item.isAsset);
-    final published = await widget.session.publishSocialContent(
+        publishedMedia.isNotEmpty &&
+        publishedMedia.every((item) => item.isAsset);
+    final published = await session.publishSocialContent(
       type: type,
       authorName: widget.authorName,
       authorHandle: widget.authorHandle,
@@ -242,110 +529,170 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               type == SocialPublishedContentType.quiz
           ? DateTime.now().add(const Duration(days: 7))
           : null,
+      quotedPostId: _draft.quotedPostId,
     );
-    if (!mounted) return;
+    if (!mounted || !identical(session, widget.session)) return;
     if (published == null) {
       showSocialV2Message(
         context,
-        widget.session.errorMessage ?? 'Your content was not posted.',
+        session.errorMessage ?? 'Your content was not posted.',
       );
       return;
     }
-    _clearComposer();
+    if (_draftFingerprint() == submittedDraftFingerprint) {
+      _clearComposer();
+    } else {
+      _persistDraftState();
+    }
     widget.onPublished(published);
   }
 
+  String _draftFingerprint() {
+    return <Object?>[
+      _format.name,
+      _postTool.name,
+      _body.text,
+      for (final item in _media)
+        '${item.path}|${item.kind.name}|${item.isAsset}',
+      for (final item in _imagePollMedia)
+        item == null ? null : '${item.path}|${item.kind.name}|${item.isAsset}',
+      for (final controller in _choiceControllers) controller.text,
+      _correctChoice,
+      _draft.quotedPostId,
+    ].join('\u001e');
+  }
+
   void _clearComposer() {
+    _invalidateMediaSelection();
+    _draft._clear();
     _body.clear();
-    _firstChoice.clear();
-    _secondChoice.clear();
+    for (final controller in _choiceControllers) {
+      controller.clear();
+    }
     setState(() {
       _format = SocialCreateFormatV2.post;
       _media.clear();
       _imagePollMedia
         ..clear()
-        ..addAll(<SocialPickedMedia?>[null, null]);
+        ..addAll(<SocialPickedMedia?>[null, null, null, null]);
       _postTool = _SocialPostTool.none;
       _correctChoice = 0;
+      _persistDraftState();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
+    return DecoratedBox(
       key: const ValueKey('social-v2-create-workbench'),
-      builder: (context, constraints) {
-        final preferredDockHeight = switch ((_format, _postTool)) {
-          (
-            SocialCreateFormatV2.post,
-            _SocialPostTool.imagePoll ||
-                _SocialPostTool.quickPoll ||
-                _SocialPostTool.quiz,
-          ) =>
-            510.0,
-          (SocialCreateFormatV2.post, _SocialPostTool.image) => 420.0,
-          (SocialCreateFormatV2.reel, _) => 350.0,
-          (SocialCreateFormatV2.carousel, _) => 390.0,
-          _ => 295.0,
-        };
-        final dockHeight = preferredDockHeight
-            .clamp(170.0, (constraints.maxHeight - 96).clamp(170.0, 510.0))
-            .toDouble();
-        return Column(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 5),
-                child: _ContentLibrary(
-                  session: widget.session,
-                  fillAvailable: true,
-                ),
-              ),
-            ),
-            SizedBox(
-              height: dockHeight,
-              child: DecoratedBox(
-                key: const Key('screen04-create-thumb-workbench'),
-                decoration: const BoxDecoration(
-                  color: Color(0xF8FFFFFF),
-                  border: Border(
-                    top: BorderSide(color: SocialV2Colors.line),
-                    bottom: BorderSide(color: SocialV2Colors.saffron, width: 3),
+      decoration: const BoxDecoration(color: SocialV2Colors.canvas),
+      child: Column(
+        children: [
+          Material(
+            key: const Key('screen04-create-composer-header'),
+            color: Colors.white,
+            elevation: 1,
+            shadowColor: const Color(0x22000050),
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 58,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      if (widget.onClose != null)
+                        IconButton(
+                          key: const Key('screen04-create-close'),
+                          tooltip: 'Close composer',
+                          onPressed: widget.onClose,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      Expanded(
+                        child: Text(
+                          _composerTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SocialV2Colors.navy,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 96,
+                        height: 44,
+                        child: FilledButton.icon(
+                          key: const Key('screen04-create-publish-post'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(96, 44),
+                            maximumSize: const Size(96, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          onPressed: widget.session.busy || _selectingMedia
+                              ? null
+                              : _publish,
+                          icon: const Icon(
+                            Icons.arrow_upward_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            widget.session.busy ? 'Posting…' : 'Post',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x24000050),
-                      blurRadius: 26,
-                      offset: Offset(0, -9),
-                    ),
-                  ],
                 ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              key: const Key('screen04-create-scrollable-composer'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+              child: _buildWorkbenchCard(),
+            ),
+          ),
+          Material(
+            key: const Key('screen04-create-thumb-workbench'),
+            color: Colors.white,
+            elevation: 12,
+            shadowColor: const Color(0x26000050),
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 20),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(8, 7, 8, 5),
-                        child: _buildWorkbenchCard(),
-                      ),
-                    ),
-                    if (_format == SocialCreateFormatV2.post)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 2, 8, 3),
-                        child: _buildPostToolActions(),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 2, 8, 7),
-                      child: _buildFormatActions(),
-                    ),
+                    if (_format == SocialCreateFormatV2.post) ...[
+                      _buildPostToolActions(),
+                      const SizedBox(height: 5),
+                    ],
+                    _buildFormatActions(),
                   ],
                 ),
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
+
+  String get _composerTitle => switch ((_format, _postTool)) {
+    (SocialCreateFormatV2.carousel, _) => 'New carousel',
+    (SocialCreateFormatV2.reel, _) => 'New Reel',
+    (SocialCreateFormatV2.post, _SocialPostTool.image) => 'New image post',
+    (SocialCreateFormatV2.post, _SocialPostTool.imagePoll) => 'New image poll',
+    (SocialCreateFormatV2.post, _SocialPostTool.quickPoll) => 'New quick poll',
+    (SocialCreateFormatV2.post, _SocialPostTool.quiz) => 'New quiz',
+    _ => 'New text post',
+  };
 
   Widget _buildWorkbenchCard() {
     return SocialV2Card(
@@ -357,19 +704,40 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           const Row(
             children: [
               Expanded(
-                child: Text(
-                  'Create',
-                  style: TextStyle(
-                    color: SocialV2Colors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'MoolSocial post',
+                      style: TextStyle(
+                        color: SocialV2Colors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Share text, photos, polls or a quiz in Feed',
+                      style: TextStyle(
+                        color: SocialV2Colors.muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               _PublicBadge(),
             ],
           ),
           const SizedBox(height: 9),
+          if (_draft.quotedPost case final quotedPost?) ...[
+            SocialQuotedPostPreviewV2(
+              key: const Key('social-create-quoted-post'),
+              quotedPost: quotedPost,
+            ),
+            const SizedBox(height: 9),
+          ],
           _buildPost(),
         ],
       ),
@@ -379,16 +747,30 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   Widget _buildFormatActions() {
     return Row(
       children: [
-        Expanded(
-          child: _FormatAction(
-            key: const Key('screen04-create-tool-reel'),
-            icon: Icons.play_arrow_rounded,
-            label: 'Reel',
-            selected: _format == SocialCreateFormatV2.reel,
-            onTap: _openReelSourcePicker,
+        if (widget.onCreateYouTubeShort != null) ...[
+          Expanded(
+            child: _FormatAction(
+              key: const Key('screen04-create-youtube-short'),
+              icon: Icons.play_circle_outline_rounded,
+              label: 'YouTube Short',
+              selected: false,
+              onTap: widget.onCreateYouTubeShort!,
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
+          const SizedBox(width: 6),
+        ],
+        if (widget.allowReel) ...[
+          Expanded(
+            child: _FormatAction(
+              key: const Key('screen04-create-tool-reel'),
+              icon: Icons.play_arrow_rounded,
+              label: 'Reel',
+              selected: _format == SocialCreateFormatV2.reel,
+              onTap: _openReelSourcePicker,
+            ),
+          ),
+          const SizedBox(width: 6),
+        ],
         Expanded(
           child: _FormatAction(
             key: const Key('screen04-create-tool-carousel'),
@@ -400,12 +782,15 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: _FormatAction(
-            key: const Key('screen04-create-tool-post'),
-            icon: Icons.add_rounded,
-            label: 'Post',
-            selected: _format == SocialCreateFormatV2.post,
-            onTap: () => _selectFormat(SocialCreateFormatV2.post),
+          child: KeyedSubtree(
+            key: const Key('social-create-moolsocial-post'),
+            child: _FormatAction(
+              key: const Key('screen04-create-tool-post'),
+              icon: Icons.edit_note_rounded,
+              label: 'Text',
+              selected: _format == SocialCreateFormatV2.post,
+              onTap: () => _selectFormat(SocialCreateFormatV2.post),
+            ),
           ),
         ),
       ],
@@ -560,38 +945,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           const SizedBox(height: 9),
           _buildTextChoices(quiz: _postTool == _SocialPostTool.quiz),
         ],
-        const SizedBox(height: 9),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => showSocialV2Message(
-                  context,
-                  'Choose when this post should appear.',
-                ),
-                icon: const Icon(Icons.schedule_rounded),
-                label: const Text('Post now'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('screen04-create-publish-post'),
-                onPressed: widget.session.busy ? null : _publish,
-                icon: const Icon(Icons.arrow_upward_rounded),
-                label: Text(
-                  widget.session.busy
-                      ? 'Posting…'
-                      : switch (_format) {
-                          SocialCreateFormatV2.reel => 'Post Reel',
-                          SocialCreateFormatV2.carousel => 'Post Carousel',
-                          SocialCreateFormatV2.post => 'Post',
-                        },
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -671,13 +1024,17 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              for (var index = 0; index < 2; index++) ...[
-                if (index > 0) const SizedBox(width: 8),
-                Expanded(child: _imagePollChoiceEditor(index)),
-              ],
-            ],
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 10,
+              childAspectRatio: .72,
+            ),
+            itemCount: _choiceControllers.length,
+            itemBuilder: (_, index) => _imagePollChoiceEditor(index),
           ),
         ],
       ),
@@ -686,7 +1043,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
 
   Widget _imagePollChoiceEditor(int index) {
     final media = _imagePollMedia[index];
-    final controller = index == 0 ? _firstChoice : _secondChoice;
+    final controller = _choiceControllers[index];
     return Column(
       children: [
         AspectRatio(
@@ -751,11 +1108,20 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           RadioGroup<int>(
             groupValue: _correctChoice,
             onChanged: (value) {
-              if (quiz) setState(() => _correctChoice = value ?? 0);
+              if (quiz) {
+                setState(() {
+                  _correctChoice = value ?? 0;
+                  _persistDraftState();
+                });
+              }
             },
             child: Column(
               children: [
-                for (var index = 0; index < 2; index++) ...[
+                for (
+                  var index = 0;
+                  index < _choiceControllers.length;
+                  index++
+                ) ...[
                   Row(
                     children: [
                       if (quiz) Radio<int>(value: index),
@@ -764,7 +1130,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                           key: Key(
                             'screen04-create-${quiz ? 'quiz' : 'quick-poll'}-choice-$index',
                           ),
-                          controller: index == 0 ? _firstChoice : _secondChoice,
+                          controller: _choiceControllers[index],
                           style: const TextStyle(fontSize: 12.5, height: 1.25),
                           decoration: InputDecoration(
                             hintText: quiz
@@ -776,7 +1142,8 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                       ),
                     ],
                   ),
-                  if (index == 0) const SizedBox(height: 7),
+                  if (index < _choiceControllers.length - 1)
+                    const SizedBox(height: 7),
                 ],
               ],
             ),
@@ -968,6 +1335,8 @@ class _ToolAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final additionalHeight = textScale > 1 ? (textScale - 1) * 14.0 : 0.0;
     return Semantics(
       button: true,
       selected: selected,
@@ -984,7 +1353,7 @@ class _ToolAction extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(15),
           child: SizedBox(
-            height: 56,
+            height: 56.0 + additionalHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
               child: Column(
@@ -1013,203 +1382,3 @@ class _ToolAction extends StatelessWidget {
     );
   }
 }
-
-class _ContentLibrary extends StatefulWidget {
-  const _ContentLibrary({required this.session, this.fillAvailable = false});
-
-  final SharedSession session;
-  final bool fillAvailable;
-
-  @override
-  State<_ContentLibrary> createState() => _ContentLibraryState();
-}
-
-class _ContentLibraryState extends State<_ContentLibrary> {
-  String _selected = 'Drafts';
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.session,
-      builder: (_, _) {
-        final items = _selected == 'Published'
-            ? widget.session.socialPublishedItems.take(6).toList()
-            : const <SocialPublishedItem>[];
-        final emptyState = Container(
-          constraints: const BoxConstraints(minHeight: 78),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: SocialV2Colors.canvas,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SocialV2Colors.line),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.bookmark_border_rounded,
-                color: SocialV2Colors.navy,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      switch (_selected) {
-                        'Scheduled' => 'Nothing scheduled',
-                        'Published' => 'No published content yet',
-                        'Archived' => 'No archived content',
-                        _ => 'No drafts yet',
-                      },
-                      style: const TextStyle(
-                        color: SocialV2Colors.navy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      switch (_selected) {
-                        'Scheduled' => 'Schedule a post for a future time.',
-                        'Published' => 'Posts you publish will appear here.',
-                        'Archived' =>
-                          'Content you archive will remain available here.',
-                        _ => 'Your unfinished content will stay here.',
-                      },
-                      style: const TextStyle(
-                        color: SocialV2Colors.muted,
-                        fontSize: 10,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-        final tabs = SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final label in const [
-                'Drafts',
-                'Scheduled',
-                'Published',
-                'Archived',
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 5),
-                  child: TextButton(
-                    key: Key('screen04-create-library-${label.toLowerCase()}'),
-                    onPressed: () => setState(() => _selected = label),
-                    style: TextButton.styleFrom(
-                      foregroundColor: _selected == label
-                          ? SocialV2Colors.navy
-                          : SocialV2Colors.muted,
-                      minimumSize: const Size(76, 44),
-                      side: BorderSide(
-                        color: _selected == label
-                            ? SocialV2Colors.saffron
-                            : Colors.transparent,
-                      ),
-                    ),
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-
-        Widget itemTile(SocialPublishedItem item) => ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(
-            backgroundColor: SocialV2Colors.navy,
-            foregroundColor: Colors.white,
-            child: Icon(_contentIcon(item.type), size: 18),
-          ),
-          title: Text(
-            item.body.isEmpty ? _contentLabel(item.type) : item.body,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: SocialV2Colors.ink,
-              fontSize: 12,
-              height: 1.18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          subtitle: Text(
-            '${_contentLabel(item.type)} · Published',
-            style: const TextStyle(
-              color: SocialV2Colors.muted,
-              fontSize: 10.5,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-        );
-
-        return SocialV2Card(
-          key: const Key('screen04-create-content-library'),
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-          child: widget.fillAvailable
-              ? CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(child: tabs),
-                    const SliverToBoxAdapter(child: SizedBox(height: 7)),
-                    if (items.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: emptyState,
-                      )
-                    else
-                      SliverList.builder(
-                        itemCount: items.length,
-                        itemBuilder: (_, index) => itemTile(items[index]),
-                      ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    tabs,
-                    const SizedBox(height: 7),
-                    if (items.isEmpty)
-                      emptyState
-                    else
-                      for (final item in items) itemTile(item),
-                  ],
-                ),
-        );
-      },
-    );
-  }
-}
-
-String _contentLabel(SocialPublishedContentType type) => switch (type) {
-  SocialPublishedContentType.reel => 'Reel',
-  SocialPublishedContentType.carousel => 'Carousel',
-  SocialPublishedContentType.post => 'Post',
-  SocialPublishedContentType.imagePoll => 'Image Poll',
-  SocialPublishedContentType.quickPoll => 'Quick Poll',
-  SocialPublishedContentType.quiz => 'Quiz',
-};
-
-IconData _contentIcon(SocialPublishedContentType type) => switch (type) {
-  SocialPublishedContentType.reel => Icons.play_arrow_rounded,
-  SocialPublishedContentType.carousel => Icons.view_carousel_outlined,
-  SocialPublishedContentType.post => Icons.article_outlined,
-  SocialPublishedContentType.imagePoll => Icons.grid_view_rounded,
-  SocialPublishedContentType.quickPoll => Icons.poll_outlined,
-  SocialPublishedContentType.quiz => Icons.check_circle_outline_rounded,
-};

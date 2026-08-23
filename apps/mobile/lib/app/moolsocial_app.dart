@@ -170,6 +170,31 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   }
 
   @override
+  Future<bool> didPushRouteInformation(
+    RouteInformation routeInformation,
+  ) async {
+    final location = routeInformation.uri.toString();
+    final socialHandled = await _session.prepareSocialAuthReturn(location);
+    if (socialHandled) {
+      final completedRoute = _session.takeCompletedSocialAuthReturnRoute();
+      if (!mounted) return true;
+      _router.go(
+        _session.isReady ? completedRoute ?? _session.readyRoute() : '/sign-in',
+      );
+      return true;
+    }
+    final handled = await _session.prepareEmailLinkReturn(location);
+    if (!handled) return false;
+    final completedRoute = _session.takeCompletedEmailLinkReturnRoute();
+    if (!mounted) return true;
+
+    _router.go(
+      _session.isReady ? completedRoute ?? _session.readyRoute() : '/sign-in',
+    );
+    return true;
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _router.dispose();

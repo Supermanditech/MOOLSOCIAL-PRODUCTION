@@ -12,19 +12,24 @@
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test \"lib/**/*.test.js\"",
+    "test:emulator:social": "npm run build && node --test lib/social/firebase_rules.emulator.js",
+    "review-corpus:dev": "npm run build && node lib/social/dev_review_corpus_runner.js",
     "verify": "npm run typecheck && npm test"
   },
   "dependencies": {
     "firebase-admin": "14.2.0",
-    "firebase-functions": "7.3.0"
+    "firebase-functions": "7.3.2"
   },
   "overrides": {
+    "brace-expansion": "5.0.9",
     "google-gax": {
       "rimraf": "6.1.3"
     }
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
     "@types/node": "22.19.19",
+    "firebase": "12.17.1",
     "typescript": "5.9.3"
   }
 }

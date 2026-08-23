@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../chat_models.dart';
+import '../chat_services.dart';
 import '../chat_session.dart';
 import '../widgets/chat_widgets.dart';
 
@@ -12,12 +14,14 @@ class ChatThreadScreen extends StatefulWidget {
     required this.session,
     required this.threadId,
     required this.returnRoute,
+    this.initialMessageDraft,
     super.key,
   });
 
   final ChatSession session;
   final String threadId;
   final String returnRoute;
+  final String? initialMessageDraft;
 
   @override
   State<ChatThreadScreen> createState() => _ChatThreadScreenState();
@@ -25,18 +29,134 @@ class ChatThreadScreen extends StatefulWidget {
 
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _messageController = TextEditingController();
-  String _mode = 'Chat';
+  final Map<String, String> _draftTextByThread = {};
+  int _threadLoadRequest = 0;
 
   @override
   void initState() {
     super.initState();
+    _applyInitialDraftIfEmpty(widget.initialMessageDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.session.markRead(widget.threadId);
+      if (mounted) {
+        unawaited(_recoverInterruptedPhoto(widget.threadId));
+        unawaited(_loadThread(widget.threadId));
+      }
     });
   }
 
   @override
+  void didUpdateWidget(covariant ChatThreadScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.threadId != widget.threadId) {
+      if (identical(oldWidget.session, widget.session)) {
+        _storeDraft(oldWidget.threadId);
+      } else {
+        _draftTextByThread.clear();
+      }
+      _restoreDraft(widget.threadId);
+      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+      unawaited(_recoverInterruptedPhoto(widget.threadId));
+      unawaited(_loadThread(widget.threadId));
+    } else if (oldWidget.initialMessageDraft != widget.initialMessageDraft) {
+      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+    }
+  }
+
+  void _applyInitialDraftIfEmpty(String? initialDraft) {
+    final draft = initialDraft?.trim();
+    if (draft == null || draft.isEmpty || _messageController.text.isNotEmpty) {
+      return;
+    }
+    _messageController.value = TextEditingValue(
+      text: draft,
+      selection: TextSelection.collapsed(offset: draft.length),
+    );
+  }
+
+  void _storeDraft(String threadId) {
+    final draft = _messageController.text;
+    if (draft.isEmpty) {
+      _draftTextByThread.remove(threadId);
+    } else {
+      _draftTextByThread[threadId] = draft;
+    }
+  }
+
+  void _restoreDraft(String threadId) {
+    final draft = _draftTextByThread[threadId] ?? '';
+    _messageController.value = TextEditingValue(
+      text: draft,
+      selection: TextSelection.collapsed(offset: draft.length),
+    );
+  }
+
+  Future<void> _sendCurrentMessage() async {
+    final session = widget.session;
+    final threadId = widget.threadId;
+    final draft = _messageController.text;
+    final sent = await session.send(threadId, draft);
+    if (!sent || !identical(session, widget.session)) return;
+    if (_draftTextByThread[threadId] == draft) {
+      _draftTextByThread.remove(threadId);
+    }
+    if (mounted &&
+        threadId == widget.threadId &&
+        _messageController.text == draft) {
+      _messageController.clear();
+    }
+  }
+
+  Future<void> _sendCurrentPhoto() async {
+    final session = widget.session;
+    final threadId = widget.threadId;
+    final draft = _messageController.text;
+    final selected = session.selectedPhoto(threadId);
+    if (selected == null) return;
+    final sent = await session.sendSelectedPhoto(threadId, draft);
+    if (!sent || !identical(session, widget.session)) return;
+    if (_draftTextByThread[threadId] == draft) {
+      _draftTextByThread.remove(threadId);
+    }
+    if (mounted &&
+        threadId == widget.threadId &&
+        _messageController.text == draft) {
+      _messageController.clear();
+    }
+  }
+
+  Future<void> _recoverInterruptedPhoto(String threadId) async {
+    final session = widget.session;
+    if (!session.photoSharingAvailable ||
+        session.selectedPhoto(threadId) != null) {
+      return;
+    }
+    await session.recoverInterruptedPhotoSelection(threadId);
+  }
+
+  Future<void> _loadThread(String threadId) async {
+    final request = ++_threadLoadRequest;
+    final session = widget.session;
+    await session.loadThreads();
+    if (!mounted ||
+        request != _threadLoadRequest ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId) {
+      return;
+    }
+    final loaded = await session.loadMessages(threadId, refresh: true);
+    if (!mounted ||
+        request != _threadLoadRequest ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId) {
+      return;
+    }
+    if (loaded) await session.markRead(threadId);
+  }
+
+  @override
   void dispose() {
+    _threadLoadRequest += 1;
     _messageController.dispose();
     super.dispose();
   }
@@ -62,60 +182,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           title: thread.title,
           subtitle: thread.subtitle,
           returnRoute: backRoute,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                key: const Key('chat-thread-call'),
-                tooltip: 'Start audio call',
-                onPressed: () => _showCallChoice(
-                  context,
-                  widget.session,
-                  thread,
-                  video: false,
-                ),
-                icon: const Icon(Icons.call_outlined),
-              ),
-              IconButton(
-                key: const Key('chat-thread-video'),
-                tooltip: 'Start video call',
-                onPressed: () => _showCallChoice(
-                  context,
-                  widget.session,
-                  thread,
-                  video: true,
-                ),
-                icon: const Icon(Icons.videocam_outlined),
-              ),
-              IconButton(
-                key: const Key('chat-thread-more'),
-                tooltip: 'More conversation options',
-                onPressed: () =>
-                    _showMoreOptions(context, widget.session, thread),
-                icon: const Icon(Icons.more_horiz_rounded),
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              _ModeStrip(
-                type: thread.type,
-                selected: _mode,
-                onChanged: (value) => setState(() => _mode = value),
-              ),
-              Expanded(
-                child: _ThreadBody(
-                  session: widget.session,
-                  thread: thread,
-                  mode: _mode,
-                ),
-              ),
-            ],
-          ),
+          showContentBack: true,
+          messageThreadId: thread.id,
+          body:
+              widget.session.loadingMessageThreads.contains(thread.id) &&
+                  widget.session.messages(thread.id).isEmpty
+              ? const _ThreadLoadingState()
+              : widget.session.messageLoadError(thread.id) != null &&
+                    widget.session.messages(thread.id).isEmpty
+              ? _ThreadErrorState(
+                  message: widget.session.messageLoadError(thread.id)!,
+                  onRetry: () =>
+                      widget.session.loadMessages(thread.id, refresh: true),
+                )
+              : _ThreadBody(session: widget.session, thread: thread),
           bottom: _Composer(
             session: widget.session,
             threadId: thread.id,
             controller: _messageController,
+            onSend: _sendCurrentMessage,
+            onSendPhoto: _sendCurrentPhoto,
           ),
         );
       },
@@ -123,68 +209,64 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 }
 
-class _ModeStrip extends StatelessWidget {
-  const _ModeStrip({
-    required this.type,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final ChatThreadType type;
-  final String selected;
-  final ValueChanged<String> onChanged;
+class _ThreadLoadingState extends StatelessWidget {
+  const _ThreadLoadingState();
 
   @override
-  Widget build(BuildContext context) {
-    final modes = type == ChatThreadType.business
-        ? const ['Chat', 'Catalog', 'Quote', 'Orders', 'Pay']
-        : type == ChatThreadType.people
-        ? const ['Chat', 'Media', 'Basket', 'Poll', 'Invite']
-        : const ['Chat', 'Details', 'Updates'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.md,
-        0,
-        MoolSpacing.md,
-        MoolSpacing.xs,
+  Widget build(BuildContext context) => const Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(),
+        SizedBox(height: MoolSpacing.sm),
+        Text('Loading messages'),
+      ],
+    ),
+  );
+}
+
+class _ThreadErrorState extends StatelessWidget {
+  const _ThreadErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(MoolSpacing.xl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 44, color: MoolColors.muted),
+          const SizedBox(height: MoolSpacing.sm),
+          const Text(
+            'Messages could not load',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton.icon(
+            key: const Key('chat-retry-messages'),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try again'),
+          ),
+        ],
       ),
-      child: SizedBox(
-        height: MoolMetrics.minimumTapTarget,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: modes.length,
-          separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
-          itemBuilder: (context, index) {
-            final mode = modes[index];
-            return ChoiceChip(
-              key: Key('chat-mode-${mode.toLowerCase()}'),
-              label: Text(mode),
-              selected: selected == mode,
-              onSelected: (_) => onChanged(mode),
-            );
-          },
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }
 
 class _ThreadBody extends StatelessWidget {
-  const _ThreadBody({
-    required this.session,
-    required this.thread,
-    required this.mode,
-  });
+  const _ThreadBody({required this.session, required this.thread});
 
   final ChatSession session;
   final ChatThread thread;
-  final String mode;
 
   @override
   Widget build(BuildContext context) {
-    if (mode != 'Chat') {
-      return _ContextPanel(session: session, thread: thread, mode: mode);
-    }
     final messages = session.messages(thread.id);
     return ListView.builder(
       key: const Key('chat-message-list'),
@@ -218,6 +300,8 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final failed = message.deliveryState == ChatDeliveryState.failed;
+    final reply = message.replyTo;
+    final photo = message.photo;
     return Align(
       alignment: message.mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -254,6 +338,154 @@ class _MessageBubble extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+            if (message.forwarded) ...[
+              const SizedBox(height: 3),
+              Semantics(
+                label: 'Forwarded message',
+                child: Row(
+                  key: Key('chat-forwarded-${message.id}'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.forward_rounded,
+                      size: 14,
+                      color: message.mine
+                          ? Colors.white.withValues(alpha: .78)
+                          : MoolColors.muted,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Forwarded',
+                      style: TextStyle(
+                        color: message.mine
+                            ? Colors.white.withValues(alpha: .78)
+                            : MoolColors.muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (reply != null) ...[
+              const SizedBox(height: 3),
+              Semantics(
+                label: 'Reply to ${reply.sender}: ${reply.text}',
+                child: Container(
+                  key: Key('chat-reply-context-${message.id}'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(MoolSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: message.mine
+                        ? Colors.white.withValues(alpha: .12)
+                        : const Color(0xFFF0F1F8),
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                    border: const Border(
+                      left: BorderSide(color: MoolColors.orange, width: 3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        reply.sender,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: message.mine ? Colors.white : MoolColors.navy,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        reply.text,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: message.mine
+                              ? Colors.white.withValues(alpha: .78)
+                              : MoolColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+            ],
+            if (photo != null) ...[
+              const SizedBox(height: 3),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(MoolRadii.control),
+                child: Semantics(
+                  label: 'Photo ${photo.name}',
+                  image: true,
+                  child: Image.network(
+                    photo.readUrl.toString(),
+                    key: Key('chat-photo-${message.id}'),
+                    width: 280,
+                    height: 210,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const SizedBox(
+                        width: 280,
+                        height: 210,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => SizedBox(
+                      width: 280,
+                      height: 210,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.broken_image_outlined,
+                              color: message.mine
+                                  ? Colors.white
+                                  : MoolColors.navy,
+                            ),
+                            const SizedBox(height: MoolSpacing.xs),
+                            Text(
+                              'Photo could not load.',
+                              style: TextStyle(
+                                color: message.mine
+                                    ? Colors.white
+                                    : MoolColors.ink,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            TextButton(
+                              key: Key('chat-photo-refresh-${message.id}'),
+                              onPressed: session.busy
+                                  ? null
+                                  : () => unawaited(
+                                      session.loadMessages(
+                                        threadId,
+                                        refresh: true,
+                                      ),
+                                    ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: message.mine
+                                    ? Colors.white
+                                    : MoolColors.navy,
+                              ),
+                              child: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+            ],
             if (message.attachmentLabel != null) ...[
               const SizedBox(height: 3),
               Material(
@@ -262,7 +494,7 @@ class _MessageBubble extends StatelessWidget {
                     : const Color(0xFFF0F1F8),
                 borderRadius: BorderRadius.circular(MoolRadii.control),
                 child: ListTile(
-                  key: Key('chat-open-attachment-${message.id}'),
+                  key: Key('chat-attachment-reference-${message.id}'),
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: MoolSpacing.xs,
@@ -279,19 +511,19 @@ class _MessageBubble extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  onTap: () =>
-                      session.showNotice('${message.attachmentLabel} opened.'),
+                  subtitle: const Text('Attachment reference'),
                 ),
               ),
               const SizedBox(height: MoolSpacing.xs),
             ],
-            Text(
-              message.text,
-              style: TextStyle(
-                color: message.mine ? Colors.white : MoolColors.ink,
-                fontWeight: FontWeight.w600,
+            if (message.text.trim().isNotEmpty)
+              Text(
+                message.text,
+                style: TextStyle(
+                  color: message.mine ? Colors.white : MoolColors.ink,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
             const SizedBox(height: MoolSpacing.xs),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -307,59 +539,114 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 if (message.mine) ...[
                   const SizedBox(width: 4),
-                  Icon(
-                    _deliveryIcon(message.deliveryState),
-                    color: failed
-                        ? const Color(0xFFFFB4AB)
-                        : Colors.white.withValues(alpha: .82),
-                    size: 14,
+                  Tooltip(
+                    message: _deliveryLabel(message.deliveryState),
+                    child: Icon(
+                      _deliveryIcon(message.deliveryState),
+                      color: failed
+                          ? const Color(0xFFFFB4AB)
+                          : message.deliveryState == ChatDeliveryState.read
+                          ? MoolColors.orange
+                          : Colors.white.withValues(alpha: .82),
+                      size: 14,
+                    ),
                   ),
                 ],
               ],
             ),
             const SizedBox(height: 3),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              children: [
-                TextButton(
-                  key: Key('chat-like-${message.id}'),
-                  onPressed: () => session.toggleReaction(threadId, message.id),
-                  style: TextButton.styleFrom(
-                    foregroundColor: message.mine
-                        ? Colors.white
-                        : MoolColors.navy,
-                    minimumSize: const Size(
-                      MoolMetrics.minimumTapTarget,
-                      MoolMetrics.minimumTapTarget,
-                    ),
-                  ),
-                  child: Text(
-                    message.reactionCount == 0
-                        ? 'Like'
-                        : 'Like ${message.reactionCount}',
-                  ),
+            if (failed)
+              TextButton(
+                key: Key('chat-retry-${message.id}'),
+                onPressed: session.busy
+                    ? null
+                    : () => session.retry(threadId, message.id),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFB4AB),
                 ),
-                TextButton(
-                  key: Key('chat-reply-${message.id}'),
-                  onPressed: () => session.startReply(message.id),
-                  style: TextButton.styleFrom(
-                    foregroundColor: message.mine
-                        ? Colors.white
-                        : MoolColors.navy,
-                  ),
-                  child: const Text('Reply'),
-                ),
-                if (failed)
-                  TextButton(
-                    key: Key('chat-retry-${message.id}'),
-                    onPressed: () => session.retry(threadId, message.id),
+                child: const Text('Retry'),
+              ),
+            if (message.isSettled)
+              Wrap(
+                spacing: MoolSpacing.xs,
+                runSpacing: 2,
+                children: [
+                  TextButton.icon(
+                    key: Key('chat-reply-${message.id}'),
+                    onPressed: session.busy
+                        ? null
+                        : () => session.startReply(threadId, message.id),
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFFFB4AB),
+                      minimumSize: const Size(
+                        MoolMetrics.minimumTapTarget,
+                        MoolMetrics.minimumTapTarget,
+                      ),
+                      foregroundColor: message.mine
+                          ? Colors.white
+                          : MoolColors.navy,
                     ),
-                    child: const Text('Retry'),
+                    icon: const Icon(Icons.reply_rounded, size: 18),
+                    label: const Text('Reply'),
                   ),
-              ],
-            ),
+                  TextButton.icon(
+                    key: Key('chat-react-${message.id}'),
+                    onPressed: session.busy
+                        ? null
+                        : () => unawaited(
+                            session.toggleReaction(threadId, message.id),
+                          ),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(
+                        MoolMetrics.minimumTapTarget,
+                        MoolMetrics.minimumTapTarget,
+                      ),
+                      foregroundColor: message.mine
+                          ? Colors.white
+                          : MoolColors.navy,
+                    ),
+                    icon: Icon(
+                      message.reactedByMe
+                          ? Icons.thumb_up_rounded
+                          : Icons.thumb_up_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      message.reactionCount == 0
+                          ? 'React'
+                          : '${message.reactionCount}',
+                    ),
+                  ),
+                  if (message.photo == null &&
+                      message.attachmentLabel == null &&
+                      message.text.trim().isNotEmpty)
+                    TextButton.icon(
+                      key: Key('chat-forward-${message.id}'),
+                      onPressed:
+                          session.busy ||
+                              session.availableForwardTargets(threadId).isEmpty
+                          ? null
+                          : () => unawaited(
+                              _chooseForwardTarget(
+                                context,
+                                session,
+                                threadId,
+                                message,
+                              ),
+                            ),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(
+                          MoolMetrics.minimumTapTarget,
+                          MoolMetrics.minimumTapTarget,
+                        ),
+                        foregroundColor: message.mine
+                            ? Colors.white
+                            : MoolColors.navy,
+                      ),
+                      icon: const Icon(Icons.forward_rounded, size: 18),
+                      label: const Text('Forward'),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -367,147 +654,89 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _ContextPanel extends StatelessWidget {
-  const _ContextPanel({
-    required this.session,
-    required this.thread,
-    required this.mode,
-  });
-
-  final ChatSession session;
-  final ChatThread thread;
-  final String mode;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      key: Key('chat-context-${mode.toLowerCase()}'),
-      padding: const EdgeInsets.all(MoolSpacing.md),
-      children: [
-        ChatSurfaceCard(
-          color: const Color(0xFFEDEEFF),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _contextTitle(mode),
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-              Text(_contextDetail(mode, thread.type)),
-              const SizedBox(height: MoolSpacing.md),
-              FilledButton.icon(
-                key: Key('chat-context-primary-${mode.toLowerCase()}'),
-                onPressed: () =>
-                    _completeContextAction(context, session, thread, mode),
-                icon: Icon(_contextIcon(mode)),
-                label: Text(_contextAction(mode)),
-              ),
-            ],
-          ),
-        ),
-        if (mode == 'Poll') ...[
-          const SizedBox(height: MoolSpacing.sm),
-          _PollCard(session: session),
-        ],
-        if (mode == 'Invite' && session.invitedMembers.isNotEmpty) ...[
-          const SizedBox(height: MoolSpacing.sm),
-          ChatSurfaceCard(
-            key: const Key('chat-invited-members'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Prepared invitations',
-                  style: TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                for (final member in session.invitedMembers)
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.person_add_alt_rounded),
-                    title: Text(member),
-                    subtitle: const Text(
-                      'Confirm recipient permission before sending',
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-        if (mode == 'Basket' || mode == 'Quote') ...[
-          const SizedBox(height: MoolSpacing.sm),
-          ChatSurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mode == 'Basket'
-                      ? 'Shared household list'
-                      : 'Mahadev Fresh Mart quote',
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text('Tomatoes · atta · rice · cooking oil'),
-                const SizedBox(height: MoolSpacing.sm),
-                OutlinedButton(
-                  key: Key('chat-${mode.toLowerCase()}-buy'),
-                  onPressed: () => context.go('/app/buy/grocery'),
-                  child: Text(
-                    mode == 'Basket'
-                        ? 'Find current prices'
-                        : 'Review products',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _PollCard extends StatelessWidget {
-  const _PollCard({required this.session});
-
-  final ChatSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChatSurfaceCard(
+Future<void> _chooseForwardTarget(
+  BuildContext context,
+  ChatSession session,
+  String sourceThreadId,
+  ChatMessage message,
+) async {
+  final targets = session.availableForwardTargets(sourceThreadId);
+  if (targets.isEmpty) return;
+  final target = await showModalBottomSheet<ChatThread>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
       child: Column(
+        key: const Key('chat-forward-picker'),
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Which delivery time works?',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontWeight: FontWeight.w900,
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: MoolSpacing.md),
+            child: Text(
+              'Forward message',
+              style: TextStyle(
+                color: MoolColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          for (final option in session.pollOptions)
-            ListTile(
-              key: Key(
-                'chat-poll-${option.toLowerCase().replaceAll(' ', '-')}',
-              ),
-              title: Text(option),
-              trailing: const Icon(Icons.radio_button_unchecked_rounded),
-              onTap: () => session.showNotice('Vote recorded for $option.'),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              MoolSpacing.md,
+              MoolSpacing.xs,
+              MoolSpacing.md,
+              MoolSpacing.sm,
             ),
+            child: Text(
+              'Choose one existing conversation.',
+              style: TextStyle(color: MoolColors.muted),
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: targets.length,
+              itemBuilder: (context, index) {
+                final target = targets[index];
+                return ListTile(
+                  key: Key('chat-forward-target-${target.id}'),
+                  leading: const Icon(Icons.chat_bubble_outline_rounded),
+                  title: Text(target.title),
+                  subtitle: Text(target.subtitle),
+                  onTap: () => Navigator.of(sheetContext).pop(target),
+                );
+              },
+            ),
+          ),
         ],
       ),
-    );
+    ),
+  );
+  if (target == null || !context.mounted) return;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      key: const Key('chat-forward-confirmation'),
+      title: const Text('Forward message?'),
+      content: Text('Send this message to ${target.title}?'),
+      actions: [
+        TextButton(
+          key: const Key('chat-forward-cancel'),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('chat-forward-confirm'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Forward'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await session.forwardMessage(sourceThreadId, message.id, target.id);
   }
 }
 
@@ -516,16 +745,65 @@ class _Composer extends StatelessWidget {
     required this.session,
     required this.threadId,
     required this.controller,
+    required this.onSend,
+    required this.onSendPhoto,
   });
 
   final ChatSession session;
   final String threadId;
   final TextEditingController controller;
+  final Future<void> Function() onSend;
+  final Future<void> Function() onSendPhoto;
+
+  Future<void> _choosePhoto(BuildContext context) async {
+    final source = await showModalBottomSheet<ChatPhotoSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          key: const Key('chat-attach-sheet'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Share a photo',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              subtitle: Text('JPEG, PNG or WebP up to 4 MB.'),
+            ),
+            ListTile(
+              key: const Key('chat-gallery'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(ChatPhotoSource.gallery),
+            ),
+            ListTile(
+              key: const Key('chat-camera'),
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(ChatPhotoSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !context.mounted) return;
+    await session.selectPhoto(threadId, source);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final reply = session.replyTarget(threadId);
+    final photo = session.selectedPhoto(threadId);
     return SafeArea(
       top: false,
+      bottom: false,
       child: Material(
         color: Colors.white,
         elevation: 10,
@@ -539,57 +817,149 @@ class _Composer extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (session.replyingTo != null)
-                _ComposerChip(
-                  key: const Key('chat-reply-preview'),
-                  icon: Icons.reply_rounded,
-                  label: 'Replying to a message',
-                  onRemove: session.cancelReply,
+              if (photo != null) ...[
+                Container(
+                  key: const Key('chat-selected-photo'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(MoolSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F1F8),
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                        child: Image.memory(
+                          photo.bytes,
+                          key: const Key('chat-selected-photo-image'),
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox(
+                                width: 72,
+                                height: 72,
+                                child: Icon(Icons.broken_image_outlined),
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: MoolSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Photo ready to send',
+                              style: TextStyle(
+                                color: MoolColors.navy,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              photo.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: MoolColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('chat-remove-photo'),
+                        tooltip: 'Remove photo',
+                        onPressed: session.busy
+                            ? null
+                            : () => session.cancelSelectedPhoto(threadId),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
                 ),
-              if (session.pendingAttachment != null)
-                _ComposerChip(
-                  key: const Key('chat-attachment-preview'),
-                  icon: Icons.attach_file_rounded,
-                  label: session.pendingAttachment!,
-                  onRemove: session.removeAttachment,
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              if (reply != null) ...[
+                Container(
+                  key: const Key('chat-composer-reply-context'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(
+                    MoolSpacing.sm,
+                    MoolSpacing.xs,
+                    MoolSpacing.xs,
+                    MoolSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F1F8),
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                    border: const Border(
+                      left: BorderSide(color: MoolColors.orange, width: 3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Replying to ${reply.sender}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MoolColors.navy,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              reply.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MoolColors.muted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('chat-cancel-reply'),
+                        tooltip: 'Cancel reply',
+                        onPressed: () => session.cancelReply(threadId),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton.filledTonal(
-                    key: const Key('chat-thread-mool'),
-                    tooltip: 'Open Mool',
-                    onPressed: () => context.go('/app/mool'),
-                    icon: const Text(
-                      'Mool',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  if (session.photoSharingAvailable) ...[
+                    IconButton(
+                      key: const Key('chat-attach'),
+                      tooltip: 'Share a photo',
+                      onPressed: session.busy
+                          ? null
+                          : () => unawaited(_choosePhoto(context)),
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
                     ),
-                  ),
-                  IconButton(
-                    key: const Key('chat-attach'),
-                    tooltip: 'Attach',
-                    onPressed: () => _showAttachments(context, session),
-                    icon: const Icon(Icons.attach_file_rounded),
-                  ),
-                  IconButton(
-                    key: const Key('chat-camera'),
-                    tooltip: 'Open camera',
-                    onPressed: () => session.attach('Camera photo'),
-                    icon: const Icon(Icons.camera_alt_outlined),
-                  ),
+                    const SizedBox(width: MoolSpacing.xs),
+                  ],
                   Expanded(
                     child: TextField(
                       key: const Key('chat-message-field'),
                       controller: controller,
                       minLines: 1,
                       maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Message',
-                        contentPadding: EdgeInsets.symmetric(
+                      decoration: InputDecoration(
+                        hintText: photo == null
+                            ? 'Message'
+                            : 'Add a caption (optional)',
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: MoolSpacing.sm,
                           vertical: MoolSpacing.sm,
                         ),
@@ -598,17 +968,13 @@ class _Composer extends StatelessWidget {
                   ),
                   const SizedBox(width: MoolSpacing.xs),
                   IconButton.filled(
-                    key: const Key('chat-send'),
-                    tooltip: 'Send message',
+                    key: Key(photo == null ? 'chat-send' : 'chat-send-photo'),
+                    tooltip: photo == null ? 'Send message' : 'Send photo',
                     onPressed: session.busy
                         ? null
-                        : () async {
-                            final sent = await session.send(
-                              threadId,
-                              controller.text,
-                            );
-                            if (sent) controller.clear();
-                          },
+                        : () => unawaited(
+                            photo == null ? onSend() : onSendPhoto(),
+                          ),
                     icon: session.busy
                         ? const SizedBox.square(
                             dimension: 20,
@@ -629,523 +995,16 @@ class _Composer extends StatelessWidget {
   }
 }
 
-class _ComposerChip extends StatelessWidget {
-  const _ComposerChip({
-    required this.icon,
-    required this.label,
-    required this.onRemove,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: MoolSpacing.xs),
-      padding: const EdgeInsets.only(left: MoolSpacing.sm),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEDEEFF),
-        borderRadius: BorderRadius.circular(MoolRadii.control),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: MoolColors.navy),
-          const SizedBox(width: MoolSpacing.xs),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Remove',
-            onPressed: onRemove,
-            icon: const Icon(Icons.close_rounded, size: 18),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> _showAttachments(BuildContext context, ChatSession session) {
-  const options = [
-    ('Camera', Icons.camera_alt_outlined),
-    ('Gallery', Icons.photo_library_outlined),
-    ('Video', Icons.videocam_outlined),
-    ('File', Icons.description_outlined),
-    ('Location', Icons.location_on_outlined),
-    ('Contact', Icons.person_outline_rounded),
-    ('Poll', Icons.poll_outlined),
-    ('Household basket', Icons.shopping_basket_outlined),
-  ];
-  return showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Add to this message',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: [
-                for (final option in options)
-                  ActionChip(
-                    key: Key(
-                      'chat-attachment-${option.$1.toLowerCase().replaceAll(' ', '-')}',
-                    ),
-                    avatar: Icon(option.$2, color: MoolColors.navy, size: 19),
-                    label: Text(option.$1),
-                    onPressed: () {
-                      session.attach(option.$1);
-                      Navigator.of(sheetContext).pop();
-                    },
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Future<void> _showCallChoice(
-  BuildContext context,
-  ChatSession session,
-  ChatThread thread, {
-  required bool video,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${video ? 'Video call' : 'Call'} ${thread.title}?',
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          Text(
-            video
-                ? 'Camera and microphone permission will be requested when needed.'
-                : 'The call uses a protected number for business and support chats.',
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton.icon(
-            key: Key(video ? 'chat-confirm-video' : 'chat-confirm-call'),
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              session.showNotice(
-                '${video ? 'Video call' : 'Call'} started with ${thread.title}.',
-              );
-            },
-            icon: Icon(video ? Icons.videocam_outlined : Icons.call_outlined),
-            label: Text(video ? 'Start video call' : 'Call now'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Future<void> _showMoreOptions(
-  BuildContext context,
-  ChatSession session,
-  ChatThread thread,
-) {
-  return showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final option in const [
-            ('search', Icons.search_rounded, 'Search this conversation'),
-            ('mute', Icons.notifications_off_outlined, 'Mute notifications'),
-            ('media', Icons.photo_library_outlined, 'Shared media and files'),
-            ('block', Icons.block_outlined, 'Block and report'),
-          ])
-            ListTile(
-              key: Key('chat-more-${option.$1}'),
-              leading: Icon(option.$2, color: MoolColors.navy),
-              title: Text(option.$3),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                session.showNotice(
-                  '${option.$3} selected for ${thread.title}.',
-                );
-              },
-            ),
-        ],
-      ),
-    ),
-  );
-}
-
 IconData _deliveryIcon(ChatDeliveryState state) => switch (state) {
   ChatDeliveryState.sending => Icons.schedule_rounded,
-  ChatDeliveryState.delivered => Icons.done_all_rounded,
+  ChatDeliveryState.delivered => Icons.done_rounded,
+  ChatDeliveryState.read => Icons.done_all_rounded,
   ChatDeliveryState.failed => Icons.error_outline_rounded,
 };
 
-String _contextTitle(String mode) => switch (mode) {
-  'Catalog' => 'Shop catalog',
-  'Quote' => 'Basket quote',
-  'Orders' => 'Linked orders',
-  'Pay' => 'Pay after confirmation',
-  'Media' => 'Shared media',
-  'Basket' => 'Shared household basket',
-  'Poll' => 'Group poll',
-  'Invite' => 'Invite members',
-  'Details' => 'Conversation details',
-  'Updates' => 'Status updates',
-  _ => mode,
+String _deliveryLabel(ChatDeliveryState state) => switch (state) {
+  ChatDeliveryState.sending => 'Sending',
+  ChatDeliveryState.delivered => 'Delivered',
+  ChatDeliveryState.read => 'Read',
+  ChatDeliveryState.failed => 'Not sent',
 };
-
-String _contextDetail(String mode, ChatThreadType type) => switch (mode) {
-  'Catalog' => 'Browse verified products without leaving the business chat.',
-  'Quote' => 'Confirm items, price and home delivery before checkout.',
-  'Orders' => 'Open orders already linked to this conversation.',
-  'Pay' => 'Payment opens only after the final amount is confirmed.',
-  'Media' => 'Review photos, voice notes and documents shared here.',
-  'Basket' => 'Edit a list together, then find current product prices.',
-  'Poll' => 'Vote once and use the result for the group action.',
-  'Invite' => 'Invite a person after confirming who can see this chat.',
-  'Details' => 'Review the linked ${type.label.toLowerCase()} context.',
-  'Updates' => 'See status changes in one chronological list.',
-  _ => 'Complete this conversation action.',
-};
-
-String _contextAction(String mode) => switch (mode) {
-  'Catalog' => 'Open products',
-  'Quote' => 'Review quote',
-  'Orders' => 'Open order conversation',
-  'Pay' => 'Review payment',
-  'Media' => 'View shared files',
-  'Basket' => 'Find current prices',
-  'Poll' => 'Add poll option',
-  'Invite' => 'Invite a member',
-  'Details' => 'View linked details',
-  'Updates' => 'Refresh updates',
-  _ => 'Continue',
-};
-
-IconData _contextIcon(String mode) => switch (mode) {
-  'Catalog' => Icons.storefront_outlined,
-  'Quote' => Icons.request_quote_outlined,
-  'Orders' => Icons.shopping_bag_outlined,
-  'Pay' => Icons.account_balance_wallet_outlined,
-  'Media' => Icons.photo_library_outlined,
-  'Basket' => Icons.shopping_basket_outlined,
-  'Poll' => Icons.poll_outlined,
-  'Invite' => Icons.person_add_alt_outlined,
-  'Details' => Icons.info_outline_rounded,
-  'Updates' => Icons.refresh_rounded,
-  _ => Icons.arrow_forward_rounded,
-};
-
-void _completeContextAction(
-  BuildContext context,
-  ChatSession session,
-  ChatThread thread,
-  String mode,
-) {
-  if (const {'Catalog', 'Quote', 'Basket'}.contains(mode)) {
-    context.go('/app/buy/grocery');
-    return;
-  }
-  if (mode == 'Pay') {
-    context.go('/app/pay/home');
-    return;
-  }
-  if (mode == 'Orders') {
-    context.go(
-      chatRoute(
-        '/app/chat/thread/order-support',
-        returnRoute: '/app/chat/thread/${thread.id}',
-      ),
-    );
-    return;
-  }
-  if (mode == 'Media') {
-    _showSharedMedia(context, session);
-    return;
-  }
-  if (mode == 'Poll') {
-    _showPollOption(context, session);
-    return;
-  }
-  if (mode == 'Invite') {
-    _showInviteMember(context, session);
-    return;
-  }
-  if (mode == 'Details') {
-    _showLinkedDetails(context, thread);
-    return;
-  }
-  if (mode == 'Updates') {
-    session.showNotice('Conversation updates refreshed just now.');
-    return;
-  }
-}
-
-Future<void> _showSharedMedia(BuildContext context, ChatSession session) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('chat-media-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Shared files',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          for (final item in const [
-            ('kitchen-list', Icons.image_outlined, 'Kitchen list.jpg'),
-            ('staples-file', Icons.description_outlined, 'Monthly Staples.pdf'),
-          ])
-            ListTile(
-              key: Key('chat-media-open-${item.$1}'),
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(item.$2, color: MoolColors.navy),
-              title: Text(item.$3),
-              trailing: const Icon(Icons.arrow_forward_rounded),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                session.showNotice('${item.$3} opened.');
-              },
-            ),
-          TextButton(
-            key: const Key('chat-media-close'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Future<void> _showPollOption(BuildContext context, ChatSession session) {
-  final controller = TextEditingController();
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('chat-poll-option-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Add a poll option',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          TextField(
-            key: const Key('chat-poll-option-field'),
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Enter one clear choice',
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          FilledButton(
-            key: const Key('chat-poll-option-add'),
-            onPressed: () {
-              if (session.addPollOption(controller.text)) {
-                Navigator.of(sheetContext).pop();
-              }
-            },
-            child: const Text('Add option'),
-          ),
-          TextButton(
-            key: const Key('chat-poll-option-cancel'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Future<void> _showInviteMember(BuildContext context, ChatSession session) {
-  final controller = TextEditingController();
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('chat-invite-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Invite a member',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text(
-            'Enter a name or mobile number. Nothing is sent until the '
-            'recipient and access are confirmed.',
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          TextField(
-            key: const Key('chat-invite-field'),
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Name or mobile number',
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          FilledButton(
-            key: const Key('chat-invite-prepare'),
-            onPressed: () {
-              if (session.inviteMember(controller.text)) {
-                Navigator.of(sheetContext).pop();
-              }
-            },
-            child: const Text('Prepare invite'),
-          ),
-          TextButton(
-            key: const Key('chat-invite-cancel'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Future<void> _showLinkedDetails(BuildContext context, ChatThread thread) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('chat-linked-details-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            thread.title,
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          Text(thread.subtitle),
-          const SizedBox(height: MoolSpacing.md),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.verified_user_outlined),
-            title: Text('Linked context verified'),
-            subtitle: Text(
-              'Messages, status and support remain attached to this reference.',
-            ),
-          ),
-          FilledButton(
-            key: const Key('chat-linked-details-done'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    ),
-  );
-}

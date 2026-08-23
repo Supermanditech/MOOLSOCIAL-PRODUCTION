@@ -51,7 +51,7 @@ class _RideSupportScreenState extends State<RideSupportScreen> {
         session: session,
         title: 'Ride help',
         subtitle: 'Trip, route and receipt evidence attached',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/ride/trip/${widget.tripId}',
         bottomAction: FilledButton.icon(
           key: const Key('ride-submit-support'),

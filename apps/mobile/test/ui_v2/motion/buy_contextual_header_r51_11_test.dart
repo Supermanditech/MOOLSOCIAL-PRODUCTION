@@ -16,8 +16,12 @@ void main() {
     await tester.pumpWidget(_app(session, disableAnimations: true));
     await tester.pump();
 
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
-    expect(find.text('Plan basket'), findsNothing);
+    final header = find.byKey(const ValueKey('buy-contextual-glass-header'));
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('Plan basket')),
+      findsNothing,
+    );
     await tester.tap(find.byKey(const ValueKey('buy-header-context-cta-shop')));
     await tester.pumpAndSettle();
     expect(find.text('Monthly home basket'), findsOneWidget);
@@ -26,7 +30,10 @@ void main() {
 
     session.openDestination(BuyV2Destination.wholesale);
     await tester.pump();
-    expect(find.text('Flexible packs'), findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('Flexible packs')),
+      findsNothing,
+    );
     await tester.tap(
       find.byKey(const ValueKey('buy-header-context-cta-wholesale')),
     );
@@ -35,7 +42,10 @@ void main() {
 
     session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
-    expect(find.text('Prescription centre'), findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('Prescription centre')),
+      findsNothing,
+    );
     await tester.tap(
       find.byKey(const ValueKey('buy-header-context-cta-medicine')),
     );
@@ -46,7 +56,10 @@ void main() {
 
     session.openDestination(BuyV2Destination.orders);
     await tester.pump();
-    expect(find.text('Track active order'), findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('Track active order')),
+      findsNothing,
+    );
     await tester.tap(
       find.byKey(const ValueKey('buy-header-context-cta-orders')),
     );
@@ -57,7 +70,10 @@ void main() {
     session.openDestination(BuyV2Destination.shop);
     session.openAccount();
     await tester.pump();
-    expect(find.text('View purchases'), findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('View purchases')),
+      findsNothing,
+    );
     await tester.tap(find.byKey(const ValueKey('buy-header-context-cta-shop')));
     await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.orders);
@@ -78,14 +94,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      tester.getSize(find.byKey(const ValueKey('buy-brand-tile'))),
-      const Size(104, 56),
+      tester.getSize(find.byKey(const ValueKey('buy-header-context-slot'))),
+      const Size(44, 56),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-contextual-glass-header'))),
       const Size(320, 66),
     );
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.text('Plan basket'), findsNothing);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);
@@ -99,7 +115,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('buy-header-signature-shop')), findsOne);
-    expect(find.bySemanticsLabel('MoolSocial'), findsOne);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.bySemanticsLabel('Plan a household basket'), findsOne);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);

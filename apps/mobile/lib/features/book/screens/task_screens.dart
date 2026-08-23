@@ -252,7 +252,7 @@ class TaskLiveScreen extends StatelessWidget {
         session: session,
         title: 'Live task',
         subtitle: 'Helper accepted · payment protected',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/task/review',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -371,7 +371,7 @@ class TaskProofScreen extends StatelessWidget {
         session: session,
         title: 'Review proof',
         subtitle: 'Release only if the task is correct',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/task/live',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -469,7 +469,7 @@ class TaskCompletedScreen extends StatelessWidget {
         session: session,
         title: 'Task completed',
         subtitle: 'Receipt and proof saved',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/task/proof',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -590,7 +590,7 @@ class _TaskSupportScreenState extends State<TaskSupportScreen> {
         session: session,
         title: 'Task help',
         subtitle: 'Payment and saved evidence stay protected',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/book/task/proof',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -680,7 +680,7 @@ class TaskCaseScreen extends StatelessWidget {
         session: session,
         title: 'Case in review',
         subtitle: 'Payment stays protected',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/book/task/support',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -760,7 +760,7 @@ class TaskResolutionScreen extends StatelessWidget {
         session: session,
         title: 'Review resolution',
         subtitle: 'No money moves before your action',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/book/task/case',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -858,7 +858,7 @@ class TaskResolutionCompleteScreen extends StatelessWidget {
         session: session,
         title: 'Resolution complete',
         subtitle: 'Result, receipt and proof saved',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/book/task/resolution',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),

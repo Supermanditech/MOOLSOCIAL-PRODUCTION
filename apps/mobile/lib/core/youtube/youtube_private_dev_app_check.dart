@@ -17,10 +17,11 @@ typedef YouTubeAppCheckActivator = Future<void> Function();
 Future<bool> activateYouTubePrivateDevAppCheckIfEnabled({
   required bool useEmulators,
   required String firebaseProjectId,
+  bool globalSocialLoginAuditEnabled = false,
   YouTubeAppCheckActivator? activate,
 }) async {
   return _activateYouTubePrivateDevAppCheck(
-    enabled: youtubePrivateDevProofEnabled,
+    enabled: youtubePrivateDevProofEnabled || globalSocialLoginAuditEnabled,
     useEmulators: useEmulators,
     firebaseProjectId: firebaseProjectId,
     activate: activate,

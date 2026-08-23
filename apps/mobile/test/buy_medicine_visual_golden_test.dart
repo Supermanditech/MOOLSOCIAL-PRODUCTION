@@ -48,7 +48,7 @@ void main() {
   testWidgets('Medicine search phone visual baseline', (tester) async {
     await verifyScreen(
       tester,
-      golden: 'goldens/buy-medicine-search-412x915.png',
+      golden: 'goldens/buy-medicine-search-c24f-412x915.png',
     );
   });
 
@@ -57,7 +57,7 @@ void main() {
   ) async {
     await verifyScreen(
       tester,
-      golden: 'goldens/buy-medicine-prescription-412x915.png',
+      golden: 'goldens/buy-medicine-prescription-c24f-412x915.png',
       prepare: (session) {
         session
           ..medicinePath = BuyMedicinePath.prescription
@@ -73,7 +73,7 @@ void main() {
   ) async {
     await verifyScreen(
       tester,
-      golden: 'goldens/buy-medicine-pharmacist-412x915.png',
+      golden: 'goldens/buy-medicine-pharmacist-c24f-412x915.png',
       prepare: (session) {
         session
           ..medicinePath = BuyMedicinePath.pharmacist

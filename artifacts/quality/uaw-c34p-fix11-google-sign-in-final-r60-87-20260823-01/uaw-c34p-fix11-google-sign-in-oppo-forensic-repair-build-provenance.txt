@@ -1,0 +1,14 @@
+CandidateId=UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR
+RuntimeProfile=PublicAuthSideloadPreflight
+RuntimeDefines=PublicAuthSideloadPreflight;FirebaseAndroidSdkConfig=present_not_logged;SigningInputs=present_not_logged;MetaInputs=absent_fail_closed;PlaySigningQualified=false;AppleEnabled=false;MobileOtpAttestationQualified=false
+Version=1.0.0-r60.87
+VersionCode=2026082387
+BuildMode=release
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\config\apk-regression-gate-state.json
+Branch=remediation/prototype-conformance-2026-07-20
+HEAD=f6dfe7587aa02d782e94282d14af8bafff48ded0
+SourceFingerprint=5194D6C5A9F391D8678A5A64283D71F1AD2173FAF9DFB4DB8F13F2BA29C3F0B0
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-PRODUCTION\artifacts\quality\uaw-c34p-fix11-google-sign-in-final-r60-87-20260823-01\uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-device-review-release.apk
+Bytes=104047340
+SHA256=EF80600A99FDB9991F7C1763F049863D60F9A9320127FBC179149494757670D8
+BuiltAt=2026-08-23T15:45:36.6485569+05:30

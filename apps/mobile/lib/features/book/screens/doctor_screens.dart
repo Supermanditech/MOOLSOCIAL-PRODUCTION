@@ -3,116 +3,202 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../book_models.dart';
 import '../book_session.dart';
 import '../widgets/book_widgets.dart';
 
-class DoctorBookingScreen extends StatelessWidget {
+class DoctorBookingScreen extends StatefulWidget {
   const DoctorBookingScreen({required this.session, super.key});
 
   final BookSession session;
 
   @override
+  State<DoctorBookingScreen> createState() => _DoctorBookingScreenState();
+}
+
+class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
+  static const _accent = Color(0xFF087F5B);
+  static const _needs = [
+    'Fever',
+    'Dental',
+    'Child',
+    'Skin',
+    'Women',
+    'Reports',
+  ];
+
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    final normalizedQuery = _query.trim().toLowerCase();
+    final visibleNeeds = normalizedQuery.isEmpty
+        ? _needs
+        : _needs
+              .where((need) => need.toLowerCase().contains(normalizedQuery))
+              .toList();
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) => BookPageScaffold(
         session: session,
         title: 'Doctor',
-        subtitle: 'Appointment, OPD, video or follow-up',
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            MoolSpacing.md,
-            MoolSpacing.sm,
-            MoolSpacing.md,
-            MoolSpacing.xl,
-          ),
-          children: [
-            const BookSectionTitle(
-              'Choose care',
-              detail: 'Fee and proof shown',
+        subtitle: 'Find care and book directly',
+        showBack: false,
+        body: ColoredBox(
+          color: MoolServiceHomeTokens.page,
+          child: ListView(
+            key: const Key('doctor-discovery-home'),
+            padding: const EdgeInsets.fromLTRB(
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.sm,
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.xl,
             ),
-            const SizedBox(height: MoolSpacing.sm),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: DoctorCare.values
-                  .map(
-                    (care) => MoolSegment(
-                      key: Key('doctor-care-${care.name}'),
-                      label: care.label,
-                      selected: session.doctorCare == care,
-                      onPressed: () => session.chooseDoctorCare(care),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: MoolSpacing.lg),
-            const BookSectionTitle(
-              'Tell us the need',
-              detail: 'Short is enough',
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: ['Fever', 'Dental', 'Child', 'Skin', 'Women', 'Reports']
-                  .map(
-                    (need) => MoolSegment(
-                      key: Key('doctor-need-${need.toLowerCase()}'),
-                      label: need,
-                      selected: session.doctorNeed == need,
-                      onPressed: () => session.chooseDoctorNeed(need),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: MoolSpacing.lg),
-            const BookSectionTitle(
-              'Best appointment',
-              detail: 'Today · 6:20 PM',
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            const BookCard(
-              child: Column(
-                children: [
-                  BookFact(
-                    icon: Icons.medical_services_outlined,
-                    title: 'Dr. Kavita Sharma',
-                    detail:
-                        'General physician · verified registration and Sardarpura Clinic',
+            children: [
+              MoolServiceSearchField(
+                fieldKey: const Key('doctor-search'),
+                hintText: 'Search specialty or symptom',
+                semanticLabel: 'Search doctor specialty or symptom',
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'How would you like care?',
+                subtitle: 'Choose once; fee and availability update together.',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              Wrap(
+                spacing: MoolSpacing.xs,
+                runSpacing: MoolSpacing.xs,
+                children: DoctorCare.values
+                    .map(
+                      (care) => MoolServiceChoice(
+                        key: Key('doctor-care-${care.name}'),
+                        label: care.label,
+                        icon: switch (care) {
+                          DoctorCare.clinic => Icons.local_hospital_outlined,
+                          DoctorCare.opd => Icons.apartment_outlined,
+                          DoctorCare.video => Icons.video_call_outlined,
+                          DoctorCare.followUp => Icons.event_repeat_outlined,
+                        },
+                        accent: _accent,
+                        selected: session.doctorCare == care,
+                        onSelected: (_) => session.chooseDoctorCare(care),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              MoolServiceSectionHeader(
+                title: 'Specialties',
+                subtitle: normalizedQuery.isEmpty
+                    ? 'Select the closest need.'
+                    : '${visibleNeeds.length} matching choice${visibleNeeds.length == 1 ? '' : 's'}',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              if (visibleNeeds.isEmpty)
+                const MoolServiceCard(
+                  key: Key('doctor-search-empty'),
+                  title: 'No matching specialty',
+                  subtitle: 'Try Fever, Dental, Child, Skin, Women or Reports.',
+                  icon: Icons.search_off_rounded,
+                )
+              else
+                Wrap(
+                  spacing: MoolSpacing.xs,
+                  runSpacing: MoolSpacing.xs,
+                  children: visibleNeeds
+                      .map(
+                        (need) => MoolServiceChoice(
+                          key: Key('doctor-need-${need.toLowerCase()}'),
+                          label: need,
+                          accent: _accent,
+                          selected: session.doctorNeed == need,
+                          onSelected: (_) => session.chooseDoctorNeed(need),
+                        ),
+                      )
+                      .toList(),
+                ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              MoolServiceSectionHeader(
+                title: session.appointment == null
+                    ? 'Available today'
+                    : 'Upcoming appointment',
+                subtitle: session.appointment == null
+                    ? 'Trusted provider with fee and wait time shown.'
+                    : 'Your confirmed care stays one tap away.',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              MoolServiceCard(
+                key: const Key('doctor-top-provider'),
+                title: 'Dr. Kavita Sharma',
+                subtitle:
+                    'General physician · Sardarpura Clinic · ${session.doctorCare.label}',
+                icon: Icons.medical_services_outlined,
+                accent: _accent,
+                emphasized: true,
+                metadata: [
+                  const MoolServiceMeta(
+                    icon: Icons.verified_rounded,
+                    label: 'Registration verified',
                   ),
-                  Divider(height: 24),
-                  BookFact(
+                  MoolServiceMeta(
+                    icon: session.appointment == null
+                        ? Icons.schedule_rounded
+                        : Icons.event_available_rounded,
+                    label: session.appointment == null
+                        ? 'Today · 6:20 PM'
+                        : 'Confirmed · 6:20 PM',
+                  ),
+                  const MoolServiceMeta(
+                    icon: Icons.timer_outlined,
+                    label: 'Approx. 12 min wait',
+                  ),
+                  const MoolServiceMeta(
                     icon: Icons.currency_rupee_rounded,
-                    title: '₹300 consultation fee',
-                    detail:
-                        'Approx. 12 minute wait · 7-day follow-up if offered',
+                    label: '₹300',
+                  ),
+                  const MoolServiceMeta(
+                    icon: Icons.event_repeat_outlined,
+                    label: '7-day follow-up if offered',
                   ),
                 ],
+                semanticLabel:
+                    'Dr. Kavita Sharma, verified general physician, today at 6:20 PM, ₹300, approximately 12 minute wait',
+                onTap: () {
+                  session.clearMessages();
+                  context.go('/app/book/doctor/details');
+                },
               ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            OutlinedButton.icon(
-              key: const Key('doctor-ask-clinic'),
-              onPressed: () => context.go(
-                Uri(
-                  path: '/app/chat/thread/clinic-care',
-                  queryParameters: {'return': '/app/book/doctor'},
-                ).toString(),
+              const SizedBox(height: MoolSpacing.sm),
+              OutlinedButton.icon(
+                key: const Key('doctor-ask-clinic'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(44, 48),
+                ),
+                onPressed: () => context.go(
+                  Uri(
+                    path: '/app/chat/thread/clinic-care',
+                    queryParameters: {'return': '/app/book/doctor'},
+                  ).toString(),
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                label: const Text('Ask clinic'),
               ),
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              label: const Text('Ask clinic'),
-            ),
-          ],
+            ],
+          ),
         ),
-        bottomAction: FilledButton(
+        bottomAction: MoolServicePrimaryButton(
           key: const Key('book-doctor'),
+          accent: _accent,
+          icon: Icons.event_available_outlined,
+          label: 'Continue with ${session.doctorCare.label}',
           onPressed: () {
             session.clearMessages();
             context.go('/app/book/doctor/details');
           },
-          child: Text('Continue with ${session.doctorCare.label}'),
         ),
       ),
     );
@@ -457,8 +543,8 @@ class PatientFollowUpScreen extends StatelessWidget {
         session: session,
         title: 'Follow-up',
         subtitle: 'Your reports, reminders and clinic access',
-        activeDock: 'activity',
-        fallbackBackRoute: '/app/book/home',
+        activeLocalAction: 'activity',
+        fallbackBackRoute: '/app/book',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
           children: [

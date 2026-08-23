@@ -3,10 +3,48 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
+import { getDataConnect } from "firebase-admin/data-connect";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
-import { defineSecret } from "firebase-functions/params";
+import { defineSecret, defineString } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
+
+import {
+  FetchXProviderTransport,
+  FirebaseAdminXTokenIssuer,
+  FirestoreXAttemptStore,
+  HmacXSubjectProjector,
+  parseXPublicAuthRequest,
+  X_PUBLIC_AUTH_MAX_REQUEST_BODY_BYTES,
+  XPublicAuthBroker,
+  XPublicAuthError,
+} from "./auth/x_pkce_broker.js";
+import {
+  FetchInstagramProviderTransport,
+  FirebaseAdminInstagramTokenIssuer,
+  FirestoreInstagramAttemptStore,
+  HmacInstagramSubjectProjector,
+  InstagramPublicAuthBroker,
+  InstagramPublicAuthError,
+  parseInstagramPublicAuthRequest,
+} from "./auth/instagram_oauth_broker.js";
+import {
+  InstagramMetaCallbackError,
+  InstagramMetaCallbackService,
+} from "./auth/instagram_meta_callbacks.js";
+import {
+  FacebookMetaCallbackError,
+  FacebookMetaCallbackService,
+} from "./auth/facebook_meta_callbacks.js";
+import {
+  MetaAccountErasureCoordinator,
+  MetaAccountErasureError,
+} from "./auth/meta_account_erasure.js";
+import {
+  FirebaseMetaAccountErasureWorker,
+  FirestoreMetaAccountErasureStore,
+} from "./auth/meta_account_erasure_firebase.js";
 
 import {
   ProcessYouTubeCache,
@@ -32,6 +70,7 @@ import {
   readCapabilities,
   requireCapability,
   requireConnectPurposeCapability,
+  requireOwnerConnectionStatusCapability,
 } from "./youtube/config.js";
 import { YouTubeProviderError } from "./youtube/errors.js";
 import {
@@ -41,6 +80,11 @@ import {
 import { YouTubeOwnerClient } from "./youtube/owner_client.js";
 import { youtubeOAuthReturnPage } from "./youtube/oauth_return_page.js";
 import { YouTubeProviderService } from "./youtube/provider_service.js";
+import {
+  FirestoreSharedShortsCatalogueStore,
+  SharedShortsCatalogueCoordinator,
+  sharedShortsCatalogueContract,
+} from "./youtube/shared_catalogue.js";
 import type {
   CreatorChannelBrandingPatch,
   CreatorChannelSectionInput,
@@ -67,6 +111,14 @@ import {
 import { FetchHttpTransport } from "./youtube/transport.js";
 import type { YouTubeUploadMetadata } from "./youtube/types.js";
 import type { YouTubeUploadFileIdentityInput } from "./youtube/upload_identity.js";
+import { ChatError, type ChatProfile } from "./chat/contracts.js";
+import { GoogleCloudStorageChatPhotoStore } from "./chat/attachment_store.js";
+import { FirestoreChatRepository } from "./chat/firestore_store.js";
+import { ChatService } from "./chat/service.js";
+import { SocialContentError } from "./social/contracts.js";
+import { FirestoreSocialContentRepository } from "./social/firestore_store.js";
+import { verifySocialInvocation } from "./social/request_security.js";
+import { SocialContentService } from "./social/service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -77,8 +129,22 @@ const youtubeTokenEncryptionKeyV1 = defineSecret(
 const youtubeTokenEncryptionKeyV2 = defineSecret(
   "YOUTUBE_TOKEN_ENCRYPTION_KEY_V2",
 );
+const xPublicClientId = defineString("X_PUBLIC_CLIENT_ID");
+const xRedirectUri = defineString("X_REDIRECT_URI");
+const xSubjectProjectionKey = defineSecret("X_SUBJECT_PROJECTION_KEY");
+const instagramPublicClientId = defineString("INSTAGRAM_PUBLIC_CLIENT_ID");
+const instagramRedirectUri = defineString("INSTAGRAM_REDIRECT_URI");
+const instagramClientSecret = defineSecret("INSTAGRAM_CLIENT_SECRET");
+const instagramSubjectProjectionKey = defineSecret(
+  "INSTAGRAM_SUBJECT_PROJECTION_KEY",
+);
+const facebookAppSecret = defineSecret("FACEBOOK_APP_SECRET");
 const youtubeProviderRuntimeServiceAccount =
   "youtube-provider-runtime@moolsocial-dev-503018.iam.gserviceaccount.com";
+const socialContentRuntimeServiceAccount =
+  "social-content-runtime@moolsocial-dev-503018.iam.gserviceaccount.com";
+const publicAuthRuntimeServiceAccount =
+  "public-auth-runtime@moolsocial-dev-503018.iam.gserviceaccount.com";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -86,6 +152,181 @@ if (getApps().length === 0) {
 
 let providerService: YouTubeProviderService | undefined;
 let providerStores: FirestoreYouTubeStores | undefined;
+let socialContentService: SocialContentService | undefined;
+let chatRuntimeService: ChatService | undefined;
+let xAuthRuntimeService: XPublicAuthBroker | undefined;
+let instagramAuthRuntimeService: InstagramPublicAuthBroker | undefined;
+let instagramMetaCallbackRuntimeService:
+  | InstagramMetaCallbackService
+  | undefined;
+let facebookMetaCallbackRuntimeService:
+  | FacebookMetaCallbackService
+  | undefined;
+let metaAccountErasureRuntimeService:
+  | MetaAccountErasureCoordinator
+  | undefined;
+
+function publicAuthProjectId(): string {
+  const projectId =
+    getApps()[0]?.options.projectId?.trim() ??
+    process.env.GCLOUD_PROJECT?.trim() ??
+    process.env.GCP_PROJECT?.trim();
+  if (!projectId) throw new Error("Public authentication is not configured.");
+  return projectId;
+}
+
+function metaAccountErasureCoordinator(): MetaAccountErasureCoordinator {
+  if (metaAccountErasureRuntimeService) {
+    return metaAccountErasureRuntimeService;
+  }
+  const firestore = getFirestore();
+  metaAccountErasureRuntimeService = new MetaAccountErasureCoordinator({
+    store: new FirestoreMetaAccountErasureStore(firestore),
+    worker: new FirebaseMetaAccountErasureWorker(
+      firestore,
+      getStorage().bucket(),
+      getAuth(),
+      getDataConnect({
+        location: "asia-south1",
+        serviceId: "moolsocial-core",
+        connector: "provider",
+      }),
+      {
+        async revokeAndDelete(userId: string): Promise<void> {
+          const connection = await stores().connections.getByUser(userId);
+          if (!connection) return;
+          const result = await service().disconnect(userId);
+          if (!result.providerRevocationConfirmed) {
+            throw new Error("YouTube provider revocation was not confirmed.");
+          }
+        },
+      },
+    ),
+    completionTargetDays: 30,
+  });
+  return metaAccountErasureRuntimeService;
+}
+
+function xPublicAuthBroker(): XPublicAuthBroker {
+  if (xAuthRuntimeService) return xAuthRuntimeService;
+  xAuthRuntimeService = new XPublicAuthBroker({
+    clientId: xPublicClientId.value(),
+    redirectUri: xRedirectUri.value(),
+    attemptStore: new FirestoreXAttemptStore(getFirestore()),
+    transport: new FetchXProviderTransport(),
+    subjectProjector: new HmacXSubjectProjector(
+      publicAuthProjectId(),
+      xSubjectProjectionKey.value(),
+    ),
+    tokenIssuer: new FirebaseAdminXTokenIssuer(getAuth()),
+  });
+  return xAuthRuntimeService;
+}
+
+function instagramPublicAuthBroker(): InstagramPublicAuthBroker {
+  if (instagramAuthRuntimeService) return instagramAuthRuntimeService;
+  instagramAuthRuntimeService = new InstagramPublicAuthBroker({
+    clientId: instagramPublicClientId.value(),
+    redirectUri: instagramRedirectUri.value(),
+    attemptStore: new FirestoreInstagramAttemptStore(getFirestore()),
+    transport: new FetchInstagramProviderTransport(
+      instagramClientSecret.value(),
+    ),
+    subjectProjector: new HmacInstagramSubjectProjector(
+      publicAuthProjectId(),
+      instagramSubjectProjectionKey.value(),
+    ),
+    tokenIssuer: new FirebaseAdminInstagramTokenIssuer(getAuth()),
+  });
+  return instagramAuthRuntimeService;
+}
+
+function instagramMetaCallbackService(): InstagramMetaCallbackService {
+  if (instagramMetaCallbackRuntimeService) {
+    return instagramMetaCallbackRuntimeService;
+  }
+  instagramMetaCallbackRuntimeService = new InstagramMetaCallbackService({
+    appSecret: instagramClientSecret.value(),
+    subjectProjector: new HmacInstagramSubjectProjector(
+      publicAuthProjectId(),
+      instagramSubjectProjectionKey.value(),
+    ),
+    firebaseUserDeleter: getAuth(),
+    accountEraser: {
+      async requestAccountErasure(
+        firebaseUid: string,
+        confirmationCode: string,
+      ): Promise<void> {
+        await metaAccountErasureCoordinator().request({
+          provider: "instagram",
+          confirmationCode,
+          firebaseUserIds: [firebaseUid],
+        });
+      },
+    },
+  });
+  return instagramMetaCallbackRuntimeService;
+}
+
+function firebaseAuthErrorCode(value: unknown): string | undefined {
+  return typeof value === "object" &&
+      value !== null &&
+      "code" in value &&
+      typeof value.code === "string"
+    ? value.code
+    : undefined;
+}
+
+function facebookMetaCallbackService(): FacebookMetaCallbackService {
+  if (facebookMetaCallbackRuntimeService) {
+    return facebookMetaCallbackRuntimeService;
+  }
+  facebookMetaCallbackRuntimeService = new FacebookMetaCallbackService({
+    appSecret: facebookAppSecret.value(),
+    accountCleaner: {
+      async removeProviderAccess(providerUid: string): Promise<void> {
+        const firebaseAuth = getAuth();
+        const lookup = await firebaseAuth.getUsers([
+          { providerId: "facebook.com", providerUid },
+        ]);
+        for (const user of lookup.users) {
+          try {
+            const providers = user.providerData.map((item) => item.providerId);
+            const facebookOnly = providers.length === 1 &&
+              providers[0] === "facebook.com";
+            if (facebookOnly) {
+              await firebaseAuth.deleteUser(user.uid);
+            } else {
+              await firebaseAuth.updateUser(user.uid, {
+                providersToUnlink: ["facebook.com"],
+              });
+            }
+          } catch (error) {
+            if (firebaseAuthErrorCode(error) !== "auth/user-not-found") {
+              throw error;
+            }
+          }
+        }
+      },
+    },
+    accountEraser: {
+      async requestAccountErasure(
+        providerUid: string,
+        confirmationCode: string,
+      ): Promise<void> {
+        const lookup = await getAuth().getUsers([
+          { providerId: "facebook.com", providerUid },
+        ]);
+        await metaAccountErasureCoordinator().request({
+          provider: "facebook",
+          confirmationCode,
+          firebaseUserIds: lookup.users.map((user) => user.uid),
+        });
+      },
+    },
+  });
+  return facebookMetaCallbackRuntimeService;
+}
 
 function stores(): FirestoreYouTubeStores {
   if (providerStores) return providerStores;
@@ -95,6 +336,56 @@ function stores(): FirestoreYouTubeStores {
 
 function auditStore() {
   return stores().audit;
+}
+
+function socialService(): SocialContentService {
+  if (socialContentService) return socialContentService;
+  socialContentService = new SocialContentService(
+    new FirestoreSocialContentRepository(getFirestore(), getStorage().bucket()),
+    async (userId) => {
+      const user = await getAuth().getUser(userId);
+      const emailPrefix = user.email?.split("@")[0]?.replace(/[^A-Za-z0-9._-]/gu, "") ?? "";
+      return {
+        userId,
+        name: user.displayName?.trim() || "MoolSocial member",
+        handle: emailPrefix ? `@${emailPrefix}` : `@${userId.slice(0, 12)}`,
+      };
+    },
+  );
+  return socialContentService;
+}
+
+async function resolveChatProfile(userId: string): Promise<ChatProfile> {
+  try {
+    const user = await getAuth().getUser(userId);
+    const emailPrefix = user.email
+      ?.split("@")[0]
+      ?.replace(/[^A-Za-z0-9._-]/gu, "") ?? "";
+    return {
+      userId,
+      name: user.displayName?.trim() || "MoolSocial member",
+      handle: emailPrefix ? `@${emailPrefix}` : `@${userId.slice(0, 12)}`,
+    };
+  } catch {
+    throw new ChatError(
+      "not_found",
+      "That MoolSocial member is not available for Chat.",
+      404,
+    );
+  }
+}
+
+function chatService(): ChatService {
+  if (chatRuntimeService) return chatRuntimeService;
+  chatRuntimeService = new ChatService(
+    new FirestoreChatRepository(
+      getFirestore(),
+      undefined,
+      new GoogleCloudStorageChatPhotoStore(getStorage().bucket()),
+    ),
+    resolveChatProfile,
+  );
+  return chatRuntimeService;
 }
 
 function requiredEnvironment(name: string): string {
@@ -132,6 +423,24 @@ function service(): YouTubeProviderService {
   const quotaPort = new YouTubeQuotaGovernorAdapter(quota);
   const transport = new FetchHttpTransport();
   const cache = new ProcessYouTubeCache();
+  const dataClient = new YouTubeDataClient({
+    transport,
+    quota: quotaPort,
+    cache,
+    serverApiKey: youtubeServerApiKey.value(),
+  });
+  const sharedShortsCatalogue = new SharedShortsCatalogueCoordinator({
+    store: new FirestoreSharedShortsCatalogueStore(persistence.database),
+    loadPage: (requestId, pageToken) => dataClient.sharedCatalogueSearch(
+      requestId,
+      {
+        query: sharedShortsCatalogueContract.query,
+        regionCode: sharedShortsCatalogueContract.regionCode,
+        maxResults: sharedShortsCatalogueContract.pageSize,
+        ...(pageToken === undefined ? {} : { pageToken }),
+      },
+    ),
+  });
   const previousKey = encryptionKey(
     youtubeTokenEncryptionKeyV1.value(),
     "YOUTUBE_TOKEN_ENCRYPTION_KEY_V1",
@@ -169,12 +478,8 @@ function service(): YouTubeProviderService {
   );
   providerService = new YouTubeProviderService({
     capabilities,
-    dataClient: new YouTubeDataClient({
-      transport,
-      quota: quotaPort,
-      cache,
-      serverApiKey: youtubeServerApiKey.value(),
-    }),
+    dataClient,
+    sharedShortsCatalogue,
     publicDiscoveryClient: new YouTubePublicDiscoveryClient({
       transport,
       quota: quotaPort,
@@ -615,6 +920,69 @@ async function verifyApp(
   }
 }
 
+async function verifyPublicAuthApp(
+  headers: Readonly<Record<string, string | string[] | undefined>>,
+): Promise<void> {
+  if (localEmulatorBypass()) return;
+  const token = header(headers, "x-firebase-appcheck");
+  if (!token) {
+    throw new XPublicAuthError(
+      "app_check_required",
+      "App verification is required.",
+      401,
+      false,
+    );
+  }
+  try {
+    const verified = await getAppCheck().verifyToken(token, { consume: true });
+    if (verified.alreadyConsumed) {
+      throw new XPublicAuthError(
+        "app_check_required",
+        "App verification has expired. Try again.",
+        401,
+        true,
+      );
+    }
+  } catch (error) {
+    if (error instanceof XPublicAuthError) throw error;
+    throw new XPublicAuthError(
+      "app_check_required",
+      "App verification is required.",
+      401,
+      false,
+    );
+  }
+}
+
+function assertPublicAuthBody(
+  rawBody: unknown,
+  contentType: string | undefined,
+): void {
+  if (!contentType || !/^application\/json(?:\s*;.*)?$/iu.test(contentType)) {
+    throw new XPublicAuthError(
+      "invalid_request",
+      "A JSON request body is required.",
+      415,
+      false,
+    );
+  }
+  if (
+    !Buffer.isBuffer(rawBody) ||
+    rawBody.byteLength === 0 ||
+    rawBody.byteLength > X_PUBLIC_AUTH_MAX_REQUEST_BODY_BYTES
+  ) {
+    throw new XPublicAuthError(
+      "invalid_request",
+      "The authentication request body is invalid.",
+      rawBody instanceof Uint8Array &&
+        rawBody.byteLength > X_PUBLIC_AUTH_MAX_REQUEST_BODY_BYTES
+        ? 413
+        : 400,
+      false,
+    );
+  }
+}
+
 async function userId(
   headers: Readonly<Record<string, string | string[] | undefined>>,
 ): Promise<string> {
@@ -745,6 +1113,10 @@ export const youtubeProvider = onRequest(
             text(body, "query")!,
             text(body, "pageToken", false),
           );
+          break;
+        case "publicShortsCatalogue":
+          requireCapability(readCapabilities(), "publicData");
+          result = await service().publicShortsCatalogue(id);
           break;
         case "publicVideoDetails":
           requireCapability(readCapabilities(), "publicData");
@@ -2007,7 +2379,7 @@ export const youtubeProvider = onRequest(
           break;
         }
         case "ownerConnectionStatus":
-          requireCapability(readCapabilities(), "ownerConnect");
+          requireOwnerConnectionStatusCapability(readCapabilities());
           result = await service().connectionStatus(
             ownerUserId!,
             id,
@@ -2108,6 +2480,249 @@ export const youtubeProvider = onRequest(
   },
 );
 
+export const moolSocialContent = onRequest(
+  {
+    region: "asia-south1",
+    timeoutSeconds: 120,
+    memory: "512MiB",
+    minInstances: 0,
+    maxInstances: 4,
+    concurrency: 20,
+    serviceAccount: socialContentRuntimeServiceAccount,
+  },
+  async (request, response) => {
+    const id = requestId(request.headers);
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", id);
+    try {
+      if (request.method !== "POST") {
+        throw new SocialContentError(
+          "bad_request",
+          "Only POST requests are supported.",
+          405,
+        );
+      }
+      if (request.rawBody.byteLength > 29 * 1024 * 1024) {
+        throw new SocialContentError(
+          "payload_too_large",
+          "The selected images are too large to publish.",
+          413,
+        );
+      }
+      if (
+        request.body === null ||
+        typeof request.body !== "object" ||
+        Array.isArray(request.body)
+      ) {
+        throw new SocialContentError(
+          "bad_request",
+          "A valid request body is required.",
+          400,
+        );
+      }
+      const body = request.body as Record<string, unknown>;
+      const operation = typeof body.operation === "string"
+        ? body.operation.trim()
+        : "";
+      const mutation = operation === "publish" || operation === "interact" || operation === "reply" || operation === "follow";
+      const authenticated = operation !== "feed" && operation !== "comments" && operation !== "author";
+      const ownerUserId = await verifySocialInvocation(
+        request.headers,
+        {
+          verifyAppCheck: async (token, consume) =>
+            getAppCheck().verifyToken(
+              token,
+              consume ? { consume: true } : undefined,
+            ),
+          verifyIdToken: async (token) => getAuth().verifyIdToken(token),
+        },
+        mutation,
+        authenticated,
+      );
+      if (authenticated && ownerUserId === undefined) {
+        throw new SocialContentError(
+          "authentication_required",
+          "Sign in to continue.",
+          401,
+        );
+      }
+      const result = operation === "publish"
+        ? await socialService().publish(ownerUserId!, body)
+        : operation === "feed"
+          ? await socialService().feed(ownerUserId, body)
+          : operation === "comments"
+            ? await socialService().comments(body)
+          : operation === "author"
+            ? await socialService().author(ownerUserId, body)
+          : operation === "interact"
+            ? await socialService().interact(ownerUserId!, body)
+            : operation === "reply"
+              ? await socialService().reply(ownerUserId!, body)
+            : operation === "follow"
+              ? await socialService().follow(ownerUserId!, body)
+            : (() => {
+                throw new SocialContentError(
+                  "bad_request",
+                  "Unsupported Social content operation.",
+                  400,
+                );
+              })();
+      logger.info("MoolSocial content request completed.", {
+        operation,
+        requestId: id,
+      });
+      response.status(200).json({ ok: true, data: result });
+    } catch (error) {
+      const contentError = error instanceof SocialContentError
+        ? error
+        : new SocialContentError(
+            "internal",
+            "The MoolSocial content request could not be completed.",
+            500,
+            true,
+          );
+      logger.error("MoolSocial content request failed.", {
+        requestId: id,
+        code: contentError.code,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      response.status(contentError.httpStatus).json({
+        ok: false,
+        error: {
+          code: contentError.code,
+          message: contentError.message,
+          retryable: contentError.retryable,
+        },
+      });
+    }
+  },
+);
+
+export const moolSocialChat = onRequest(
+  {
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    memory: "256MiB",
+    minInstances: 0,
+    maxInstances: 4,
+    concurrency: 40,
+    serviceAccount: socialContentRuntimeServiceAccount,
+  },
+  async (request, response) => {
+    const id = requestId(request.headers);
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", id);
+    try {
+      if (request.method !== "POST") {
+        throw new ChatError(
+          "bad_request",
+          "Only POST requests are supported.",
+          405,
+        );
+      }
+      if (request.rawBody.byteLength > 32 * 1024) {
+        throw new ChatError(
+          "payload_too_large",
+          "The Chat request is too large.",
+          413,
+        );
+      }
+      if (
+        request.body === null ||
+        typeof request.body !== "object" ||
+        Array.isArray(request.body)
+      ) {
+        throw new ChatError(
+          "bad_request",
+          "A valid request body is required.",
+          400,
+        );
+      }
+      const body = request.body as Record<string, unknown>;
+      const operation = typeof body.operation === "string"
+        ? body.operation.trim()
+        : "";
+      const mutation = operation === "createDirectThread" ||
+        operation === "sendMessage" ||
+        operation === "preparePhotoUpload" ||
+        operation === "sendPhotoMessage" ||
+        operation === "setReaction" ||
+        operation === "forwardMessage" ||
+        operation === "markThreadRead";
+      const ownerUserId = await verifySocialInvocation(
+        request.headers,
+        {
+          verifyAppCheck: async (token, consume) =>
+            getAppCheck().verifyToken(
+              token,
+              consume ? { consume: true } : undefined,
+            ),
+          verifyIdToken: async (token) => getAuth().verifyIdToken(token),
+        },
+        mutation,
+        true,
+      );
+      if (!ownerUserId) {
+        throw new ChatError("authentication_required", "Sign in to use Chat.", 401);
+      }
+      const result = operation === "listThreads"
+        ? await chatService().listThreads(ownerUserId, body)
+        : operation === "listMessages"
+          ? await chatService().listMessages(ownerUserId, body)
+          : operation === "createDirectThread"
+            ? await chatService().createDirectThread(ownerUserId, body)
+            : operation === "sendMessage"
+            ? await chatService().sendMessage(ownerUserId, body)
+            : operation === "preparePhotoUpload"
+              ? await chatService().preparePhotoUpload(ownerUserId, body)
+              : operation === "sendPhotoMessage"
+                ? await chatService().sendPhotoMessage(ownerUserId, body)
+              : operation === "setReaction"
+                ? await chatService().setReaction(ownerUserId, body)
+                : operation === "forwardMessage"
+                  ? await chatService().forwardMessage(ownerUserId, body)
+                : operation === "markThreadRead"
+                  ? await chatService().markThreadRead(ownerUserId, body)
+              : (() => {
+                  throw new ChatError(
+                    "bad_request",
+                    "Unsupported Chat operation.",
+                    400,
+                  );
+                })();
+      logger.info("MoolSocial Chat request completed.", {
+        operation,
+        requestId: id,
+      });
+      response.status(200).json({ ok: true, data: result });
+    } catch (error) {
+      const chatError = error instanceof ChatError || error instanceof SocialContentError
+        ? error
+        : new ChatError(
+            "internal",
+            "Chat could not complete that request.",
+            500,
+            true,
+          );
+      logger.error("MoolSocial Chat request failed.", {
+        requestId: id,
+        code: chatError.code,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      response.status(chatError.httpStatus).json({
+        ok: false,
+        error: {
+          code: chatError.code,
+          message: chatError.message,
+          retryable: chatError.retryable,
+        },
+      });
+    }
+  },
+);
+
 export const youtubeOAuthCallback = onRequest(
   {
     region: "asia-south1",
@@ -2196,6 +2811,186 @@ export const youtubeOAuthCallback = onRequest(
         .status(providerError.httpStatus)
         .type("text/html")
         .send(returnPage.html);
+    }
+  },
+);
+
+export const moolSocialPublicAuth = onRequest(
+  {
+    region: "asia-south1",
+    serviceAccount: publicAuthRuntimeServiceAccount,
+    timeoutSeconds: 45,
+    memory: "256MiB",
+    minInstances: 0,
+    maxInstances: 5,
+    concurrency: 10,
+    secrets: [
+      xSubjectProjectionKey,
+      instagramClientSecret,
+      instagramSubjectProjectionKey,
+      facebookAppSecret,
+      youtubeServerApiKey,
+      youtubeOauthClientId,
+      youtubeOauthClientSecret,
+      youtubeTokenEncryptionKeyV1,
+      youtubeTokenEncryptionKeyV2,
+    ],
+  },
+  async (request, response) => {
+    const id = requestId(request.headers);
+    let operation = "invalid";
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("pragma", "no-cache");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", id);
+    try {
+      if (
+        request.method === "GET" &&
+        (
+          request.path === "/meta/data-deletion/status" ||
+          request.path === "/api/meta/data-deletion/status"
+        )
+      ) {
+        operation = "meta_data_deletion_status";
+        const confirmationCode = queryText(
+          request.query.confirmation_code,
+        );
+        const status = await metaAccountErasureCoordinator().status(
+          confirmationCode ?? "",
+        );
+        response.status(200).json({ ok: true, data: status });
+        return;
+      }
+      if (request.method !== "POST") {
+        response.setHeader("allow", "GET, POST");
+        throw new XPublicAuthError(
+          "invalid_request",
+          "Only POST requests are supported.",
+          405,
+          false,
+        );
+      }
+      if (
+        request.path === "/instagram/deauthorize" ||
+        request.path === "/instagram/data-deletion"
+      ) {
+        operation = request.path === "/instagram/deauthorize"
+          ? "instagram_deauthorize"
+          : "instagram_data_deletion";
+        const callback = await instagramMetaCallbackService().execute(
+          request.path,
+          request.rawBody,
+          header(request.headers, "content-type"),
+        );
+        logger.info("Instagram Meta callback completed.", {
+          requestId: id,
+          operation,
+        });
+        if (callback.operation === "data_deletion") {
+          response.status(200).json({
+            url: callback.statusUrl,
+            confirmation_code: callback.confirmationCode,
+          });
+        } else {
+          response.status(200).json({ ok: true });
+        }
+        return;
+      }
+      if (
+        request.path === "/facebook/deauthorize" ||
+        request.path === "/facebook/data-deletion"
+      ) {
+        operation = request.path === "/facebook/deauthorize"
+          ? "facebook_deauthorize"
+          : "facebook_data_deletion";
+        const callback = await facebookMetaCallbackService().execute(
+          request.path,
+          request.rawBody,
+          header(request.headers, "content-type"),
+        );
+        logger.info("Facebook Meta callback completed.", {
+          requestId: id,
+          operation,
+        });
+        if (callback.operation === "data_deletion") {
+          response.status(200).json({
+            url: callback.statusUrl,
+            confirmation_code: callback.confirmationCode,
+          });
+        } else {
+          response.status(200).json({ ok: true });
+        }
+        return;
+      }
+      assertPublicAuthBody(
+        request.rawBody,
+        header(request.headers, "content-type"),
+      );
+      await verifyPublicAuthApp(request.headers);
+
+      let result:
+        | Awaited<ReturnType<XPublicAuthBroker["execute"]>>
+        | Awaited<ReturnType<InstagramPublicAuthBroker["execute"]>>;
+      if (request.path === "/x/begin" || request.path === "/x/complete") {
+        const parsed = parseXPublicAuthRequest(request.path, request.body);
+        operation = `x_${parsed.operation}`;
+        result = await xPublicAuthBroker().execute(parsed);
+      } else if (
+        request.path === "/instagram/begin" ||
+        request.path === "/instagram/complete"
+      ) {
+        const parsed = parseInstagramPublicAuthRequest(
+          request.path,
+          request.body,
+        );
+        operation = `instagram_${parsed.operation}`;
+        result = await instagramPublicAuthBroker().execute(parsed);
+      } else {
+        throw new XPublicAuthError(
+          "invalid_request",
+          "The authentication request is invalid.",
+          404,
+          false,
+        );
+      }
+      const data = result.operation === "begin"
+        ? {
+            authorizationUrl: result.authorizationUrl,
+            expiresAt: result.expiresAt,
+          }
+        : { firebaseCustomToken: result.firebaseCustomToken };
+      logger.info("Public authentication request completed.", {
+        requestId: id,
+        operation,
+      });
+      response.status(200).json({ ok: true, data });
+    } catch (error) {
+      const authError =
+        error instanceof XPublicAuthError ||
+        error instanceof InstagramPublicAuthError ||
+        error instanceof InstagramMetaCallbackError ||
+        error instanceof FacebookMetaCallbackError ||
+        error instanceof MetaAccountErasureError
+          ? error
+          : new XPublicAuthError(
+              "internal",
+              "The authentication request could not be completed.",
+              500,
+              true,
+            );
+      logger.error("Public authentication request failed.", {
+        requestId: id,
+        operation,
+        code: authError.code,
+      });
+      response.status(authError.httpStatus).json({
+        ok: false,
+        error: {
+          code: authError.code,
+          message: authError.message,
+          retryable: authError.retryable,
+        },
+      });
     }
   },
 );

@@ -97,7 +97,7 @@ void main() {
   }
 
   testWidgets(
-    'inbox completes search, filters, new chat and protected return route',
+    'inbox completes search, filters, consent-safe new chat and protected return route',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final journey = await readyJourney();
@@ -130,9 +130,13 @@ void main() {
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-new'));
-      await tapVisible(tester, const Key('chat-new-business'));
-      expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
-      expect(find.byKey(const Key('chat-open-thread-rasoi')), findsNothing);
+      expect(find.byKey(const Key('chat-new-open-feed')), findsOneWidget);
+      expect(
+        find.textContaining('Open a public MoolSocial post'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-new-business')), findsNothing);
+      await tapVisible(tester, const Key('chat-new-cancel'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
       await tapVisible(tester, const Key('chat-voice-search'));
@@ -152,8 +156,65 @@ void main() {
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       await tapVisible(tester, const Key('chat-back'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-      await tapVisible(tester, const Key('chat-back'));
-      expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
+      expect(find.byKey(const Key('chat-back')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Chat keeps a high-contrast new-chat action and compact global edges',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/social',
+        journey: journey,
+        chat: chat,
+        size: const Size(360, 800),
+      );
+
+      final newChat = tester.widget<IconButton>(
+        find.byKey(const Key('chat-new')),
+      );
+      final background = newChat.style?.backgroundColor?.resolve(
+        const <WidgetState>{},
+      );
+      final foreground = newChat.style?.foregroundColor?.resolve(
+        const <WidgetState>{},
+      );
+      expect(background, isNotNull);
+      expect(foreground, Colors.white);
+      expect(background, isNot(foreground));
+
+      expect(
+        find.byKey(const Key('chat-global-edge-navigation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('chat-compact-global-edge-rail')),
+        findsOneWidget,
+      );
+      final mool = find.byKey(const Key('mool-compact-launcher'));
+      final chatEdge = find.byKey(const Key('chat-global-chat-edge'));
+      expect(mool, findsOneWidget);
+      expect(chatEdge, findsOneWidget);
+      expect(tester.getSize(mool).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(mool).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(chatEdge).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(chatEdge).height, greaterThanOrEqualTo(44));
+      expect(tester.getCenter(mool).dx, lessThan(72));
+      expect(tester.getCenter(chatEdge).dx, greaterThan(288));
       expect(tester.takeException(), isNull);
     },
   );
@@ -188,7 +249,7 @@ void main() {
   });
 
   testWidgets(
-    'people chat completes reactions, reply, attachment and nested actions',
+    'people chat supports reply and reaction while excluded actions stay absent',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final journey = await readyJourney();
@@ -204,110 +265,76 @@ void main() {
         chat: chat,
       );
 
-      await tapVisible(tester, const Key('chat-like-m1'));
-      expect(find.text('Like 1'), findsOneWidget);
-      await tapVisible(tester, const Key('chat-reply-m1'));
-      expect(find.byKey(const Key('chat-reply-preview')), findsOneWidget);
-      await tester.tap(find.byTooltip('Remove'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('chat-reply-preview')), findsNothing);
+      expect(
+        find.byKey(const Key('chat-attachment-reference-m2')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-open-attachment-m2')), findsNothing);
+      expect(find.text('Attachment reference'), findsOneWidget);
 
-      await tapVisible(tester, const Key('chat-attach'));
-      await tapVisible(tester, const Key('chat-attachment-file'));
-      expect(find.byKey(const Key('chat-attachment-preview')), findsOneWidget);
+      for (final key in const [
+        Key('chat-like-m1'),
+        Key('chat-attach'),
+        Key('chat-camera'),
+        Key('chat-thread-call'),
+        Key('chat-thread-video'),
+        Key('chat-thread-more'),
+        Key('chat-mode-media'),
+        Key('chat-mode-poll'),
+        Key('chat-mode-invite'),
+        Key('chat-mode-basket'),
+      ]) {
+        expect(find.byKey(key), findsNothing, reason: '$key');
+      }
+
+      await tapVisible(tester, const Key('chat-react-m1'));
+      expect(chat.messages('home-basket').first.reactionCount, 3);
+      expect(chat.messages('home-basket').first.reactedByMe, isTrue);
+      await tapVisible(tester, const Key('chat-react-m1'));
+      expect(chat.messages('home-basket').first.reactionCount, 2);
+      expect(chat.messages('home-basket').first.reactedByMe, isFalse);
+
+      await tapVisible(tester, const Key('chat-reply-m1'));
+      expect(
+        find.byKey(const Key('chat-composer-reply-context')),
+        findsOneWidget,
+      );
+      expect(find.text('Replying to Amit'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('chat-message-field')),
+        'Please add rice to the household list.',
+      );
       await tapVisible(tester, const Key('chat-send'));
       expect(find.text('Message delivered.'), findsOneWidget);
-      expect(chat.messages('home-basket').last.attachmentLabel, 'File');
+      expect(
+        chat.messages('home-basket').last.text,
+        'Please add rice to the household list.',
+      );
+      expect(
+        chat.messages('home-basket').last.deliveryState,
+        ChatDeliveryState.delivered,
+      );
+      expect(chat.messages('home-basket').last.replyTo?.messageId, 'm1');
+      expect(
+        find.byKey(const Key('chat-composer-reply-context')),
+        findsNothing,
+      );
 
       await tapVisible(tester, const Key('chat-send'));
+      expect(find.text('Write a message.'), findsOneWidget);
+      await tapVisible(tester, const Key('mool-compact-launcher'));
       expect(
-        find.text('Write a message or add an attachment.'),
+        find.byKey(const Key('mool-connected-action-navigator')),
         findsOneWidget,
       );
-
-      await tapVisible(tester, const Key('chat-thread-call'));
-      await tapVisible(tester, const Key('chat-confirm-call'));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       expect(
-        find.textContaining('Call started with Home Basket'),
-        findsOneWidget,
+        find.byKey(const Key('mool-connected-action-navigator')),
+        findsNothing,
       );
-      await tapVisible(tester, const Key('chat-thread-video'));
-      await tapVisible(tester, const Key('chat-confirm-video'));
-      expect(
-        find.textContaining('Video call started with Home Basket'),
-        findsOneWidget,
-      );
-      await tapVisible(tester, const Key('chat-thread-more'));
-      await tapVisible(tester, const Key('chat-more-mute'));
-      expect(
-        find.textContaining('Mute notifications selected'),
-        findsOneWidget,
-      );
-
-      await tapVisible(tester, const Key('chat-mode-media'));
-      await tapVisible(tester, const Key('chat-context-primary-media'));
-      expect(find.byKey(const Key('chat-media-sheet')), findsOneWidget);
-      await tapVisible(tester, const Key('chat-media-open-staples-file'));
-      expect(find.text('Monthly Staples.pdf opened.'), findsOneWidget);
-
-      await tapVisible(tester, const Key('chat-mode-poll'));
-      await tapVisible(tester, const Key('chat-context-primary-poll'));
-      await tapVisible(tester, const Key('chat-poll-option-add'));
-      expect(chat.errorMessage, 'Enter a clear poll option.');
-      await tester.enterText(
-        find.byKey(const Key('chat-poll-option-field')),
-        'Later this week',
-      );
-      await tapVisible(tester, const Key('chat-poll-option-add'));
-      expect(chat.pollOptions, contains('Later this week'));
-      await tapVisible(tester, const Key('chat-poll-later-this-week'));
-      expect(find.textContaining('Vote recorded for Later'), findsOneWidget);
-
-      await tapVisible(tester, const Key('chat-context-primary-poll'));
-      await tester.enterText(
-        find.byKey(const Key('chat-poll-option-field')),
-        'Later this week',
-      );
-      await tapVisible(tester, const Key('chat-poll-option-add'));
-      expect(chat.errorMessage, 'This poll option is already included.');
-      await tapVisible(tester, const Key('chat-poll-option-cancel'));
-
-      await tapVisible(tester, const Key('chat-mode-invite'));
-      await tapVisible(tester, const Key('chat-context-primary-invite'));
-      await tapVisible(tester, const Key('chat-invite-prepare'));
-      expect(chat.errorMessage, 'Enter a name or mobile number.');
-      await tester.enterText(
-        find.byKey(const Key('chat-invite-field')),
-        'Riya Sharma',
-      );
-      await tapVisible(tester, const Key('chat-invite-prepare'));
-      expect(chat.invitedMembers, ['Riya Sharma']);
-      expect(find.byKey(const Key('chat-invited-members')), findsOneWidget);
-
-      await tapVisible(tester, const Key('chat-context-primary-invite'));
-      await tester.enterText(
-        find.byKey(const Key('chat-invite-field')),
-        'Riya Sharma',
-      );
-      await tapVisible(tester, const Key('chat-invite-prepare'));
-      expect(chat.errorMessage, 'This person is already invited.');
-      await tapVisible(tester, const Key('chat-invite-cancel'));
-
-      await tapVisible(tester, const Key('chat-mode-poll'));
-      await tapVisible(tester, const Key('chat-poll-today-evening'));
-      expect(find.textContaining('Vote recorded for Today'), findsOneWidget);
-      await tapVisible(tester, const Key('chat-thread-mool'));
-      expect(find.byKey(const Key('mool-command-palette')), findsOneWidget);
-
-      await mount(
-        tester,
-        route: '/app/chat/thread/home-basket?return=/app/social',
-        journey: journey,
-        chat: chat,
-      );
-      await tapVisible(tester, const Key('chat-mode-basket'));
-      await tapVisible(tester, const Key('chat-context-primary-basket'));
-      expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -355,20 +382,12 @@ void main() {
     expect(replayed.single.deliveryState, ChatDeliveryState.delivered);
     expect(find.text('Message delivered.'), findsOneWidget);
 
-    await tapVisible(tester, const Key('chat-mode-details'));
-    await tapVisible(tester, const Key('chat-context-primary-details'));
-    expect(find.byKey(const Key('chat-linked-details-sheet')), findsOneWidget);
-    await tapVisible(tester, const Key('chat-linked-details-done'));
-    await tapVisible(tester, const Key('chat-mode-updates'));
-    await tapVisible(tester, const Key('chat-context-primary-updates'));
-    expect(
-      find.text('Conversation updates refreshed just now.'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('chat-mode-details')), findsNothing);
+    expect(find.byKey(const Key('chat-mode-updates')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('business and order context actions reach their next intent', (
+  testWidgets('business and support conversations keep truthful identities', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -385,27 +404,23 @@ void main() {
       chat: chat,
     );
 
-    await tapVisible(tester, const Key('chat-mode-orders'));
-    await tapVisible(tester, const Key('chat-context-primary-orders'));
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-    expect(find.text('Order Support'), findsOneWidget);
+    expect(find.text('Mahadev Fresh Mart'), findsWidgets);
+    expect(find.byKey(const Key('chat-mode-orders')), findsNothing);
+    expect(find.byKey(const Key('chat-mode-quote')), findsNothing);
+    expect(find.byKey(const Key('chat-mode-pay')), findsNothing);
 
     await tapVisible(tester, const Key('chat-back'));
-    expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
-    await tapVisible(tester, const Key('chat-mode-quote'));
-    expect(find.text('Mahadev Fresh Mart quote'), findsOneWidget);
-    await tapVisible(tester, const Key('chat-quote-buy'));
-    expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
 
     await mount(
       tester,
-      route: '/app/chat/thread/mahadev?return=/app/social',
+      route: '/app/chat/thread/order-support?return=/app/social',
       journey: journey,
       chat: chat,
     );
-    await tapVisible(tester, const Key('chat-mode-pay'));
-    await tapVisible(tester, const Key('chat-context-primary-pay'));
-    expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
+    expect(find.text('Order Support'), findsWidgets);
+    expect(find.text('Case MS-CASE-204'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -431,12 +446,8 @@ void main() {
 
     for (final key in const [
       Key('chat-back'),
-      Key('chat-thread-call'),
-      Key('chat-thread-video'),
-      Key('chat-thread-more'),
-      Key('chat-thread-mool'),
-      Key('chat-attach'),
-      Key('chat-camera'),
+      Key('mool-compact-launcher'),
+      Key('chat-global-chat-edge'),
       Key('chat-send'),
     ]) {
       final size = tester.getSize(find.byKey(key));

@@ -139,9 +139,9 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-wholesale')));
+    session.openDestination(BuyV2Destination.wholesale);
     await tester.pump(const Duration(milliseconds: 40));
-    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
+    session.openDestination(BuyV2Destination.medicine);
     await tester.pump(const Duration(milliseconds: 40));
 
     expect(session.destination, BuyV2Destination.medicine);
@@ -162,7 +162,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('buy-persistent-dock')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
+      findsNothing,
+    );
 
     await tester.pumpAndSettle();
     expect(
@@ -179,7 +182,7 @@ void main() {
     await tester.pumpWidget(app(session, disableAnimations: true));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('buy-dock-medicine')));
+    session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
 
     expect(session.destination, BuyV2Destination.medicine);
@@ -263,12 +266,32 @@ void main() {
       await tester.pumpWidget(app(session, textScale: 1.4));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('buy-dock-orders')));
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs-overflow-cue')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('mool-home-launcher')));
+      await tester.pumpAndSettle();
+      for (final action in const ['shop', 'wholesale', 'medicine', 'orders']) {
+        final target = find.byKey(ValueKey('mool-navigator-buy-$action'));
+        expect(target, findsOneWidget);
+        expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+      }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      session.openOrders();
       await tester.pumpAndSettle();
 
       expect(session.destination, BuyV2Destination.orders);
       expect(find.byKey(const ValueKey('buy-shared-header')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-persistent-dock')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs')),
+        findsNothing,
+      );
       expect(
         find.byKey(const ValueKey('buy-orders-tab-active')),
         findsOneWidget,

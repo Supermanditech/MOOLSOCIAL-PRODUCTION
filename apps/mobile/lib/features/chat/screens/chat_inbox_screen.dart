@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,12 +14,16 @@ class ChatInboxScreen extends StatefulWidget {
     required this.session,
     required this.returnRoute,
     this.initialFilter,
+    this.initialTargetUserId,
+    this.initialMessageDraft,
     super.key,
   });
 
   final ChatSession session;
   final String returnRoute;
   final ChatThreadType? initialFilter;
+  final String? initialTargetUserId;
+  final String? initialMessageDraft;
 
   @override
   State<ChatInboxScreen> createState() => _ChatInboxScreenState();
@@ -25,23 +31,104 @@ class ChatInboxScreen extends StatefulWidget {
 
 class _ChatInboxScreenState extends State<ChatInboxScreen> {
   final _searchController = TextEditingController();
+  int _routeRequest = 0;
+  bool _applyingRoute = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final filter = widget.initialFilter;
-      if (filter == null) {
-        widget.session.chooseAll();
-      } else {
-        widget.session.chooseFilter(filter);
-      }
+      if (mounted) _queueRouteApplication();
     });
   }
 
   @override
+  void didUpdateWidget(covariant ChatInboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.initialFilter != widget.initialFilter ||
+        oldWidget.initialTargetUserId != widget.initialTargetUserId ||
+        oldWidget.initialMessageDraft != widget.initialMessageDraft ||
+        oldWidget.returnRoute != widget.returnRoute) {
+      _queueRouteApplication();
+    }
+  }
+
+  void _queueRouteApplication() {
+    _routeRequest += 1;
+    if (!_applyingRoute) unawaited(_applyLatestRoute());
+  }
+
+  Future<void> _applyLatestRoute() async {
+    if (_applyingRoute) return;
+    _applyingRoute = true;
+    try {
+      while (mounted) {
+        final request = _routeRequest;
+        final session = widget.session;
+        final filter = widget.initialFilter;
+        final targetUserId = widget.initialTargetUserId?.trim();
+        final messageDraft = widget.initialMessageDraft;
+        final returnRoute = widget.returnRoute;
+        if (filter == null) {
+          session.chooseAll();
+        } else {
+          session.chooseFilter(filter);
+        }
+        await session.loadThreads(refresh: true);
+        if (!_routeIsCurrent(
+          request: request,
+          session: session,
+          filter: filter,
+          targetUserId: targetUserId,
+          messageDraft: messageDraft,
+          returnRoute: returnRoute,
+        )) {
+          continue;
+        }
+        if (targetUserId == null || targetUserId.isEmpty) return;
+        final thread = await session.createDirectThread(targetUserId);
+        if (!_routeIsCurrent(
+          request: request,
+          session: session,
+          filter: filter,
+          targetUserId: targetUserId,
+          messageDraft: messageDraft,
+          returnRoute: returnRoute,
+        )) {
+          continue;
+        }
+        if (!mounted) return;
+        if (thread != null) {
+          _openThread(context, thread.id, returnRoute, draft: messageDraft);
+        }
+        return;
+      }
+    } finally {
+      _applyingRoute = false;
+    }
+  }
+
+  bool _routeIsCurrent({
+    required int request,
+    required ChatSession session,
+    required ChatThreadType? filter,
+    required String? targetUserId,
+    required String? messageDraft,
+    required String returnRoute,
+  }) {
+    return mounted &&
+        request == _routeRequest &&
+        identical(session, widget.session) &&
+        filter == widget.initialFilter &&
+        targetUserId == widget.initialTargetUserId?.trim() &&
+        messageDraft == widget.initialMessageDraft &&
+        returnRoute == widget.returnRoute;
+  }
+
+  @override
   void dispose() {
+    _routeRequest += 1;
     _searchController.dispose();
     super.dispose();
   }
@@ -58,130 +145,128 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           title: 'Chat',
           subtitle: 'People, businesses, orders and support',
           returnRoute: widget.returnRoute,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton.outlined(
-                key: const Key('chat-open-mool'),
-                tooltip: 'Open Mool',
-                onPressed: () => context.go('/app/mool'),
-                icon: const Icon(MoolBrand.moolLauncherIcon),
-              ),
-              const SizedBox(width: MoolSpacing.xs),
-              IconButton.filled(
-                key: const Key('chat-new'),
-                tooltip: 'Start a new chat',
-                onPressed: () => _showNewChat(context, widget.session),
-                icon: const Icon(Icons.edit_square),
-              ),
-            ],
+          trailing: IconButton.filled(
+            key: const Key('chat-new'),
+            tooltip: 'Start a new chat',
+            style: IconButton.styleFrom(
+              backgroundColor: MoolColors.navy,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.square(MoolMetrics.compactTapTarget),
+              disabledBackgroundColor: MoolColors.navy.withValues(alpha: .38),
+              disabledForegroundColor: Colors.white.withValues(alpha: .72),
+            ),
+            onPressed: () => _showNewChat(context, widget.session),
+            icon: const Icon(Icons.edit_square),
           ),
-          body: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  MoolSpacing.md,
-                  MoolSpacing.xs,
-                  MoolSpacing.md,
-                  0,
-                ),
-                sliver: SliverList.list(
-                  children: [
-                    TextField(
-                      key: const Key('chat-search-field'),
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Search conversations',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          key: const Key('chat-voice-search'),
-                          tooltip: 'Voice search',
-                          onPressed: () async {
-                            final query = await _showVoiceSearch(context);
-                            if (query == null || !context.mounted) return;
-                            _searchController.text = query;
-                            setState(() {});
-                          },
-                          icon: const Icon(Icons.mic_none_rounded),
-                        ),
+          body: widget.session.loadingThreads && !widget.session.threadsLoaded
+              ? const _ChatLoadingState()
+              : widget.session.errorMessage != null && threads.isEmpty
+              ? _ChatErrorState(
+                  message: widget.session.errorMessage!,
+                  onRetry: () => widget.session.loadThreads(refresh: true),
+                )
+              : CustomScrollView(
+                  key: const PageStorageKey('chat-inbox-scroll'),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolSpacing.md,
+                        MoolSpacing.xs,
+                        MoolSpacing.md,
+                        0,
+                      ),
+                      sliver: SliverList.list(
+                        children: [
+                          TextField(
+                            key: const Key('chat-search-field'),
+                            controller: _searchController,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              hintText: 'Search conversations',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              suffixIcon: IconButton(
+                                key: const Key('chat-voice-search'),
+                                tooltip: 'Voice search',
+                                onPressed: () async {
+                                  final query = await _showVoiceSearch(context);
+                                  if (query == null || !context.mounted) return;
+                                  _searchController.text = query;
+                                  setState(() {});
+                                },
+                                icon: const Icon(Icons.mic_none_rounded),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: MoolSpacing.sm),
+                          _FilterStrip(session: widget.session),
+                          const SizedBox(height: MoolSpacing.sm),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Conversations',
+                                  style: TextStyle(
+                                    color: MoolColors.ink,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${threads.length}',
+                                style: const TextStyle(
+                                  color: MoolColors.muted,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: MoolSpacing.xs),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: MoolSpacing.sm),
-                    _FilterStrip(session: widget.session),
-                    const SizedBox(height: MoolSpacing.sm),
-                    if (widget.session.selectedFilter == null &&
-                        !widget.session.unreadOnly) ...[
-                      _PriorityCard(
-                        onOpen: () => _openThread(
-                          context,
-                          'order-support',
-                          widget.returnRoute,
+                    if (threads.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyInbox(
+                          hasQuery:
+                              _searchController.text.trim().isNotEmpty ||
+                              widget.session.selectedFilter != null ||
+                              widget.session.unreadOnly,
+                          onReset: () {
+                            _searchController.clear();
+                            widget.session.chooseAll();
+                            setState(() {});
+                          },
+                          onOpenFeed: () => context.go('/app/social?sub=feed'),
                         ),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                    ],
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Conversations',
-                            style: TextStyle(
-                              color: MoolColors.ink,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          0,
+                          MoolSpacing.md,
+                          MoolSpacing.xxl,
+                        ),
+                        sliver: SliverList.separated(
+                          itemCount: threads.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: MoolSpacing.xs),
+                          itemBuilder: (context, index) => _ThreadCard(
+                            thread: threads[index],
+                            unread: widget.session.unreadFor(threads[index]),
+                            onTap: () => _openThread(
+                              context,
+                              threads[index].id,
+                              widget.returnRoute,
+                              draft: widget.initialMessageDraft,
                             ),
                           ),
                         ),
-                        Text(
-                          '${threads.length}',
-                          style: const TextStyle(
-                            color: MoolColors.muted,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: MoolSpacing.xs),
+                      ),
                   ],
                 ),
-              ),
-              if (threads.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyInbox(
-                    onReset: () {
-                      _searchController.clear();
-                      widget.session.chooseAll();
-                      setState(() {});
-                    },
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                    MoolSpacing.md,
-                    0,
-                    MoolSpacing.md,
-                    MoolSpacing.xxl,
-                  ),
-                  sliver: SliverList.separated(
-                    itemCount: threads.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: MoolSpacing.xs),
-                    itemBuilder: (context, index) => _ThreadCard(
-                      thread: threads[index],
-                      unread: widget.session.unreadFor(threads[index]),
-                      onTap: () => _openThread(
-                        context,
-                        threads[index].id,
-                        widget.returnRoute,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
         );
       },
     );
@@ -221,54 +306,6 @@ class _FilterStrip extends StatelessWidget {
           selected: values[index].$2,
           onSelected: (_) => values[index].$3(),
         ),
-      ),
-    );
-  }
-}
-
-class _PriorityCard extends StatelessWidget {
-  const _PriorityCard({required this.onOpen});
-
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChatSurfaceCard(
-      color: const Color(0xFFFFF1DF),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            backgroundColor: MoolColors.orange,
-            child: Icon(Icons.priority_high_rounded, color: MoolColors.ink),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order problem needs your reply',
-                  style: TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  'Case MS-CASE-204 · support is waiting',
-                  style: TextStyle(color: MoolColors.muted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          FilledButton(
-            key: const Key('chat-open-priority'),
-            onPressed: onOpen,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(72, MoolMetrics.minimumTapTarget),
-            ),
-            child: const Text('Reply'),
-          ),
-        ],
       ),
     );
   }
@@ -352,9 +389,15 @@ class _ThreadCard extends StatelessWidget {
 }
 
 class _EmptyInbox extends StatelessWidget {
-  const _EmptyInbox({required this.onReset});
+  const _EmptyInbox({
+    required this.hasQuery,
+    required this.onReset,
+    required this.onOpenFeed,
+  });
 
+  final bool hasQuery;
   final VoidCallback onReset;
+  final VoidCallback onOpenFeed;
 
   @override
   Widget build(BuildContext context) {
@@ -370,8 +413,8 @@ class _EmptyInbox extends StatelessWidget {
               color: MoolColors.muted,
             ),
             const SizedBox(height: MoolSpacing.sm),
-            const Text(
-              'No matching conversations',
+            Text(
+              hasQuery ? 'No matching conversations' : 'No conversations yet',
               style: TextStyle(
                 color: MoolColors.ink,
                 fontSize: 20,
@@ -379,15 +422,17 @@ class _EmptyInbox extends StatelessWidget {
               ),
             ),
             const SizedBox(height: MoolSpacing.xs),
-            const Text(
-              'Clear the search or show every conversation.',
+            Text(
+              hasQuery
+                  ? 'Clear the search or show every conversation.'
+                  : 'Open a public Feed profile to start a private conversation.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: MoolSpacing.md),
             OutlinedButton(
-              key: const Key('chat-reset-search'),
-              onPressed: onReset,
-              child: const Text('Show all conversations'),
+              key: Key(hasQuery ? 'chat-reset-search' : 'chat-open-feed'),
+              onPressed: hasQuery ? onReset : onOpenFeed,
+              child: Text(hasQuery ? 'Show all conversations' : 'Open Feed'),
             ),
           ],
         ),
@@ -396,8 +441,19 @@ class _EmptyInbox extends StatelessWidget {
   }
 }
 
-void _openThread(BuildContext context, String threadId, String returnRoute) {
-  context.go(chatRoute('/app/chat/thread/$threadId', returnRoute: returnRoute));
+void _openThread(
+  BuildContext context,
+  String threadId,
+  String returnRoute, {
+  String? draft,
+}) {
+  context.push(
+    chatRoute(
+      '/app/chat/thread/$threadId',
+      returnRoute: returnRoute,
+      draft: draft,
+    ),
+  );
 }
 
 Future<void> _showNewChat(BuildContext context, ChatSession session) {
@@ -423,18 +479,26 @@ Future<void> _showNewChat(BuildContext context, ChatSession session) {
                 fontWeight: FontWeight.w900,
               ),
             ),
+            const SizedBox(height: MoolSpacing.xs),
+            const Text(
+              'Open a public MoolSocial post, choose its author, then start Chat. '
+              'This prevents unsolicited contact and keeps the recipient clear.',
+            ),
             const SizedBox(height: MoolSpacing.md),
-            for (final type in ChatThreadType.values)
-              ListTile(
-                key: Key('chat-new-${type.name}'),
-                leading: Icon(_threadIcon(type), color: MoolColors.navy),
-                title: Text(type.label),
-                subtitle: Text(_newChatDetail(type)),
-                onTap: () {
-                  session.chooseFilter(type);
-                  Navigator.of(sheetContext).pop();
-                },
-              ),
+            FilledButton.icon(
+              key: const Key('chat-new-open-feed'),
+              onPressed: () {
+                Navigator.of(sheetContext).pop();
+                context.go('/app/social?sub=feed');
+              },
+              icon: const Icon(Icons.dynamic_feed_outlined),
+              label: const Text('Open Feed'),
+            ),
+            TextButton(
+              key: const Key('chat-new-cancel'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Cancel'),
+            ),
           ],
         ),
       ),
@@ -513,9 +577,52 @@ IconData _threadIcon(ChatThreadType type) => switch (type) {
   ChatThreadType.support => Icons.support_agent_rounded,
 };
 
-String _newChatDetail(ChatThreadType type) => switch (type) {
-  ChatThreadType.people => 'Find a person or create a group',
-  ChatThreadType.business => 'Message a shop or service',
-  ChatThreadType.order => 'Open a conversation linked to an order',
-  ChatThreadType.support => 'Continue a case or ask for help',
-};
+class _ChatLoadingState extends StatelessWidget {
+  const _ChatLoadingState();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(),
+        SizedBox(height: MoolSpacing.sm),
+        Text('Loading conversations'),
+      ],
+    ),
+  );
+}
+
+class _ChatErrorState extends StatelessWidget {
+  const _ChatErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(MoolSpacing.xl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 44, color: MoolColors.muted),
+          const SizedBox(height: MoolSpacing.sm),
+          const Text(
+            'Chat could not load',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton.icon(
+            key: const Key('chat-retry-load'),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try again'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

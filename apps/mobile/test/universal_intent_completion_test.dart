@@ -39,9 +39,44 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> openProductionSection(
+    WidgetTester tester,
+    JourneySession session,
+    String section,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    await tester.pumpWidget(
+      MoolSocialApp(
+        key: UniqueKey(),
+        session: session,
+        initialLocation: '/app/$section',
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   Future<void> tapVisible(WidgetTester tester, Key key) async {
     final finder = find.byKey(key);
     expect(finder, findsOneWidget, reason: 'Missing tap target $key');
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tapRidePackage(WidgetTester tester, Key key) async {
+    final finder = find.byKey(key);
+    final content = find.byKey(const Key('ride-booking-screen'));
+    for (
+      var attempt = 0;
+      attempt < 20 && finder.evaluate().isEmpty;
+      attempt++
+    ) {
+      expect(content, findsOneWidget);
+      await tester.drag(content, const Offset(0, -220));
+      await tester.pumpAndSettle();
+    }
+    expect(finder, findsOneWidget, reason: 'Missing Ride package $key');
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
@@ -117,13 +152,17 @@ void main() {
     await tapVisible(tester, const Key('open-intent-grocery'));
     expect(find.byKey(const Key('buy-catalog-screen')), findsOneWidget);
 
-    await tapVisible(tester, const Key('buy-back'));
+    expect(find.byKey(const Key('buy-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('section-buy')), findsOneWidget);
     await tapVisible(tester, const Key('sub-action-buy-medicine'));
     await tapVisible(tester, const Key('open-intent-medicine'));
     expect(find.byKey(const Key('buy-medicine-screen')), findsOneWidget);
 
-    await tapVisible(tester, const Key('buy-back'));
+    expect(find.byKey(const Key('buy-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('section-buy')), findsOneWidget);
     final horizontalActions = find.byWidgetPredicate(
       (widget) =>
@@ -136,16 +175,16 @@ void main() {
     expect(find.byKey(const Key('buy-basket-screen')), findsOneWidget);
   });
 
-  testWidgets('Eat production entries open order, table and tiffin routes', (
+  testWidgets('Eat production entries open only Order Food and Book Table', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openSection(tester, session, 'eat');
+    await openProductionSection(tester, session, 'eat');
 
-    await tapVisible(tester, const Key('sub-action-eat-order-food'));
-    await tapVisible(tester, const Key('open-intent-order-food'));
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('eat-restaurant-spice-darbar'));
     expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
 
     await tapVisible(tester, const Key('eat-back'));
@@ -153,8 +192,8 @@ void main() {
     await tapVisible(tester, const Key('eat-home-table'));
     expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
 
-    await tapVisible(tester, const Key('eat-dock-tiffin'));
-    expect(find.byKey(const Key('eat-tiffin-screen')), findsOneWidget);
+    expect(find.byKey(const Key('eat-local-tiffin')), findsNothing);
+    expect(find.text('Tiffin'), findsNothing);
   });
 
   testWidgets('Ride production entries open bike, auto and cab booking', (
@@ -163,45 +202,42 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openSection(tester, session, 'ride');
+    await openProductionSection(tester, session, 'ride');
 
-    await tapVisible(tester, const Key('sub-action-ride-bike'));
-    await tapVisible(tester, const Key('open-intent-bike'));
     expect(find.byKey(const Key('ride-booking-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('ride-package-bike-saver'));
+    await tapRidePackage(tester, const Key('ride-package-bike-saver'));
 
-    await tapVisible(tester, const Key('ride-back'));
-    await tapVisible(tester, const Key('sub-action-ride-auto'));
-    await tapVisible(tester, const Key('open-intent-auto'));
-    await tapVisible(tester, const Key('ride-package-auto'));
+    await tapVisible(tester, const Key('ride-local-auto'));
+    await tapRidePackage(tester, const Key('ride-package-auto'));
 
-    await tapVisible(tester, const Key('ride-back'));
-    await tapVisible(tester, const Key('sub-action-ride-cab'));
-    await tapVisible(tester, const Key('open-intent-cab'));
-    await tapVisible(tester, const Key('ride-package-cab-mini'));
+    await tapVisible(tester, const Key('ride-local-cab'));
+    await tapRidePackage(tester, const Key('ride-package-cab-mini'));
   });
 
-  testWidgets('Book production entries open task, doctor and salon routes', (
+  testWidgets('Care and Travel open Doctor, Medicine, Salon and Bus routes', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openSection(tester, session, 'book');
+    await openProductionSection(tester, session, 'book');
 
-    await tapVisible(tester, const Key('sub-action-book-get-done'));
-    expect(find.text('Book a task with clear terms'), findsOneWidget);
-    await tapVisible(tester, const Key('open-intent-get-done'));
-    expect(find.text('Get It Done'), findsWidgets);
-    expect(find.byKey(const Key('task-detail')), findsOneWidget);
-
-    await tapVisible(tester, const Key('book-back'));
-    await tapVisible(tester, const Key('book-home-doctor'));
-    expect(find.text('Choose care'), findsOneWidget);
-
-    await tapVisible(tester, const Key('book-back'));
-    await tapVisible(tester, const Key('book-home-salon'));
-    expect(find.text('1. Select service'), findsOneWidget);
+    expect(find.byKey(const Key('book-doctor')), findsOneWidget);
+    expect(find.byKey(const Key('mvp-action-root-book')), findsNothing);
+    expect(find.text('Get It Done'), findsNothing);
+    await tapVisible(tester, const Key('care-local-salon'));
+    expect(find.byKey(const Key('salon-discovery-home')), findsOneWidget);
+    expect(find.byKey(const Key('salon-search')), findsOneWidget);
+    await tapVisible(tester, const Key('care-local-doctor'));
+    expect(find.byKey(const Key('book-doctor')), findsOneWidget);
+    await tapVisible(tester, const Key('care-local-medicine'));
+    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    expect(find.text('Medicine'), findsWidgets);
+    await tapVisible(tester, const Key('mool-compact-launcher'));
+    await tapVisible(tester, const Key('mool-navigator-family-ride'));
+    await tapVisible(tester, const Key('ride-local-bus'));
+    expect(find.byKey(const Key('bus-booking-home')), findsOneWidget);
+    expect(find.byKey(const Key('bus-search')), findsOneWidget);
   });
 
   testWidgets(
@@ -235,12 +271,13 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openSection(tester, session, 'work');
+    await openProductionSection(tester, session, 'work');
 
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('work-dock-my-work'));
+    expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);
+    await tapVisible(tester, const Key('work-local-workspace'));
     expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('work-dock-earn'));
+    await tapVisible(tester, const Key('work-local-earn'));
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
 
@@ -272,43 +309,28 @@ void main() {
     },
   );
 
-  testWidgets('Mool palette reaches every main action and returns safely', (
+  testWidgets('Book Doctor connected chooser Back restores the exact owner', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openSection(tester, session, 'social');
+    await openProductionSection(tester, session, 'book/doctor');
+    expect(find.byKey(const Key('book-doctor')), findsOneWidget);
 
-    await tapVisible(tester, const Key('nav-mool'));
-    for (final section in const [
-      'buy',
-      'eat',
-      'ride',
-      'book',
-      'pay',
-      'work',
-      'social',
-    ]) {
-      expect(find.byKey(Key('mool-action-$section')), findsOneWidget);
-      await tapVisible(tester, Key('mool-action-$section'));
-      if (section == 'book') {
-        expect(find.byKey(const Key('book-search')), findsOneWidget);
-        await tapVisible(tester, const Key('book-dock-mool'));
-      } else if (section == 'pay') {
-        expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
-        await tapVisible(tester, const Key('pay-dock-mool'));
-      } else if (section == 'work') {
-        expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
-        await tapVisible(tester, const Key('work-dock-mool'));
-      } else {
-        expect(find.byKey(Key('section-$section')), findsOneWidget);
-        await tapVisible(tester, const Key('nav-mool'));
-      }
-    }
-
-    await tapVisible(tester, const Key('close-mool'));
-    expect(find.byKey(const Key('section-social')), findsOneWidget);
+    await tapVisible(tester, const Key('mool-compact-launcher'));
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('book-doctor')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('book-doctor')), findsOneWidget);
   });
 
   testWidgets('Social completes every tab, card action and action-rail tap', (
@@ -496,7 +518,8 @@ void main() {
       'book a doctor',
     );
     await tapVisible(tester, const Key('continue-voice-search'));
-    expect(find.text('Choose care'), findsOneWidget);
+    expect(find.byKey(const Key('doctor-discovery-home')), findsOneWidget);
+    expect(find.byKey(const Key('doctor-search')), findsOneWidget);
 
     await openSection(tester, session, 'social');
 
@@ -523,7 +546,9 @@ void main() {
     await tapVisible(tester, const Key('close-profile'));
     await tapVisible(tester, const Key('nav-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('section-social')), findsOneWidget);
   });
 

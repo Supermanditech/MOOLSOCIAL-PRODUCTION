@@ -269,10 +269,117 @@ void main() {
       expect(session.manualArea, 'Sardarpura');
     },
   );
+
+  test(
+    'social callback fails closed when another account is authenticated',
+    () async {
+      final callbackGateway = _CallbackSocialAuthGateway(signedIn: true);
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+            setupExperienceVersion: approvedSetupExperienceVersion,
+          ),
+        ),
+        socialAuthGateway: callbackGateway,
+      );
+      addTearDown(session.dispose);
+
+      final handled = await session.prepareSocialAuthReturn(
+        'moolsocial://auth/x?code=provider-code&state=provider-state',
+      );
+
+      expect(handled, isTrue);
+      expect(session.stage, JourneyStage.ready);
+      expect(session.socialAuthState, SocialAuthState.failed);
+      expect(
+        session.socialAuthReceiptCode,
+        'auth-callback-already-authenticated',
+      );
+      expect(callbackGateway.callbackCompletionCount, 0);
+    },
+  );
+
+  test('provider denial remains a failed callback, not cancellation', () async {
+    final callbackGateway = _CallbackSocialAuthGateway(
+      callbackFailure: const JourneyServiceException(
+        'X did not authorize this sign-in.',
+        code: 'auth-authorization-denied',
+      ),
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+          setupExperienceVersion: approvedSetupExperienceVersion,
+        ),
+      ),
+      socialAuthGateway: callbackGateway,
+    );
+    addTearDown(session.dispose);
+
+    final handled = await session.prepareSocialAuthReturn(
+      'moolsocial://auth/x?error=access_denied&state=provider-state',
+    );
+
+    expect(handled, isTrue);
+    expect(session.socialAuthState, SocialAuthState.failed);
+    expect(session.socialAuthReceiptCode, 'auth-authorization-denied');
+    expect(callbackGateway.callbackCompletionCount, 1);
+  });
 }
 
 class _NeverCompletesAccountBootstrap implements AccountBootstrapGateway {
   @override
-  Future<void> prepareAuthenticatedAccount() =>
+  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) =>
       Future<void>.delayed(const Duration(days: 1));
+}
+
+class _CallbackSocialAuthGateway
+    implements SocialAuthGateway, SocialAuthCallbackGateway {
+  _CallbackSocialAuthGateway({this.signedIn = false, this.callbackFailure});
+
+  bool signedIn;
+  final JourneyServiceException? callbackFailure;
+  int callbackCompletionCount = 0;
+
+  @override
+  Future<bool> hasAuthenticatedUser() async => signedIn;
+
+  @override
+  Future<SocialAuthResult> signIn(SocialAuthProvider provider) async =>
+      const SocialAuthResult.cancelled();
+
+  @override
+  Future<void> signOut() async {
+    signedIn = false;
+  }
+
+  @override
+  SocialAuthProvider? providerForCallback(Uri callbackUri) =>
+      callbackUri.host == 'auth' && callbackUri.path == '/x'
+      ? SocialAuthProvider.x
+      : null;
+
+  @override
+  Future<SocialAuthResult> completeForegroundCallback(Uri callbackUri) =>
+      _completeCallback();
+
+  @override
+  Future<SocialAuthResult> completeColdStartCallback(Uri callbackUri) =>
+      _completeCallback();
+
+  Future<SocialAuthResult> _completeCallback() async {
+    callbackCompletionCount += 1;
+    if (callbackFailure case final failure?) throw failure;
+    signedIn = true;
+    return const SocialAuthResult.authenticated(
+      'callback-user',
+      code: 'auth-provider-credential-complete',
+    );
+  }
 }

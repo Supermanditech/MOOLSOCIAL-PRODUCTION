@@ -37,6 +37,8 @@ void main() {
         session: journey,
         bookSession: book,
         initialLocation: route,
+        legacyPresentationForTestsOnly:
+            route == '/app/book/home' || route.startsWith('/app/book/task'),
       ),
     );
     await tester.pumpAndSettle();
@@ -385,7 +387,9 @@ void main() {
       await tapVisible(tester, const Key('task-live-chat'));
       expect(find.text('Ramesh Kumar'), findsWidgets);
       await tapVisible(tester, const Key('chat-back'));
-      await tapVisible(tester, const Key('chat-back'));
+      expect(find.byKey(const Key('chat-back')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       expect(find.text('Live task'), findsWidgets);
       await tapVisible(tester, const Key('task-proof-arrived'));
       await tapVisible(tester, const Key('release-task-payment'));
@@ -506,7 +510,9 @@ void main() {
       await tapVisible(tester, const Key('task-resolution-chat'));
       expect(find.text('Order Support'), findsWidgets);
       await tapVisible(tester, const Key('chat-back'));
-      await tapVisible(tester, const Key('chat-back'));
+      expect(find.byKey(const Key('chat-back')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       expect(find.text('Choose resolution'), findsWidgets);
       await tapVisible(tester, const Key('accept-task-resolution'));
       expect(find.textContaining('No money moved'), findsOneWidget);
@@ -544,11 +550,7 @@ void main() {
       Key('book-home-task'),
       Key('book-home-doctor'),
       Key('book-home-salon'),
-      Key('book-dock-mool'),
-      Key('book-dock-book'),
-      Key('book-dock-activity'),
-      Key('book-dock-help'),
-      Key('book-dock-chat'),
+      Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);
       for (
@@ -568,6 +570,10 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('care-local-doctor')), findsOneWidget);
+    expect(find.byKey(const Key('care-local-medicine')), findsOneWidget);
+    expect(find.byKey(const Key('care-local-salon')), findsOneWidget);
+    expect(find.byKey(const Key('mool-root-chat')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

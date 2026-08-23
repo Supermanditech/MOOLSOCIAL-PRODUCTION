@@ -783,6 +783,40 @@ void main() {
       }
     });
 
+    test(
+      'lifecycle pause failure detaches and exposes terminal recovery',
+      () async {
+        final lease = YouTubePlayerLease();
+        final port = _FakePlayerPort()..failPauseCommand = true;
+        final controller = _enabledController(port: port, lease: lease);
+        await controller.select(record: _video(), availableWidth: 320);
+        await controller.onBridgeEvent(
+          YouTubePlayerEvent.decode(
+            '{"version":1,"kind":"event","type":"ready","payload":{}}',
+          ),
+        );
+        await controller.onBridgeEvent(
+          YouTubePlayerEvent.decode(
+            '{"version":1,"kind":"event","type":"state",'
+            '"payload":{"code":1}}',
+          ),
+        );
+
+        await controller.onAppActiveChanged(false);
+
+        expect(controller.snapshot.mounted, isFalse);
+        expect(controller.snapshot.status, YouTubeEmbeddedPlayerStatus.failed);
+        expect(
+          controller.snapshot.platformFailure?.code,
+          'lifecycle_pause_failed',
+        );
+        expect(controller.snapshot.failure, isNull);
+        expect(await controller.retryPlayerFailureFromUser(), isFalse);
+        expect(port.detachCount, 1);
+        expect(lease.hasOwner, isFalse);
+      },
+    );
+
     test('keeps Shorts autoplay behind all future-proof gates', () async {
       final disabledPort = _FakePlayerPort();
       final disabledAutoplay = _enabledController(port: disabledPort);
@@ -1078,6 +1112,7 @@ class _FakePlayerPort implements YouTubeEmbeddedPlayerPort {
   final commands = <YouTubePlayerCommand>[];
   var detachCount = 0;
   var failDisposeCommand = false;
+  var failPauseCommand = false;
   Future<void> Function()? onMount;
   Future<void> Function()? onDetach;
   Future<void> Function(YouTubePlayerEvent event)? _onEvent;
@@ -1132,6 +1167,9 @@ class _FakePlayerPort implements YouTubeEmbeddedPlayerPort {
     if (failDisposeCommand &&
         command.type == YouTubePlayerCommandType.dispose) {
       throw StateError('dispose command failed');
+    }
+    if (failPauseCommand && command.type == YouTubePlayerCommandType.pause) {
+      throw StateError('pause command failed');
     }
   }
 

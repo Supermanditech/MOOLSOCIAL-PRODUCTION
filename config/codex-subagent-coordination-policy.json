@@ -1,0 +1,589 @@
+{
+  "schemaVersion": 1,
+  "policyId": "MOOLSOCIAL-CODEX-SUBAGENT-COORDINATION-001",
+  "effectiveDate": "2026-08-18",
+  "state": "mandatory_before_every_subagent_action",
+  "registryBinding": {
+    "entryCount": 3551,
+    "sha256": "53CA3BE180A5B48A1DCF99729DA1B8877641738B89958824837C8855AC5B1196"
+  },
+  "mandatoryReads": [
+    "../AGENTS.md",
+    "AGENTS.md",
+    "docs/quality/ACTIVE-CODEX-HANDOFF.md",
+    "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
+    "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
+    "config/codex-development-regression-registry.json",
+    "config/codex-subagent-coordination-policy.json",
+    "config/mvp-scope-gate-state.json"
+  ],
+  "primaryOnlyOwners": [
+    "AGENTS.md",
+    "config/codex-development-regression-registry.json",
+    "config/codex-subagent-coordination-policy.json",
+    "config/mvp-scope-gate-state.json",
+    "config/successor-aab-regression-hard-gate-state-c34l.json",
+    "config/successor-aab-regression-hard-gate-aggregate-c34l.json",
+    "docs/quality/ACTIVE-CODEX-HANDOFF.md",
+    "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-uaw-c34l-r60-76-consolidated-release-transaction-evidence-readiness.ps1"
+  ],
+  "activeClaims": [
+    {
+      "task": "/root",
+      "role": "primary",
+      "owners": [
+        "AGENTS.md",
+        "apps/web/public/delete-account/index.html",
+        "apps/web/public/delete-account/status.js",
+        "apps/web/public/privacy/index.html",
+        "apps/web/public/sitemap.xml",
+        "apps/web/tests/firebase-public-site.test.mjs",
+        "apps/mobile/android/app/build.gradle.kts",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+        "apps/mobile/android/app/src/main/AndroidManifest.xml",
+        "apps/mobile/android/app/src/main/res/xml/data_extraction_rules.xml",
+        "apps/mobile/test/pre_apk_android_production_audit_test.dart",
+        "apps/mobile/ios/Flutter/Debug.xcconfig",
+        "apps/mobile/ios/Flutter/Release.xcconfig",
+        "apps/mobile/ios/Runner/Info.plist",
+        "apps/mobile/ios/Runner/Runner.entitlements",
+        "apps/mobile/ios/Runner.xcodeproj/project.pbxproj",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/core/auth/facebook_login_contract.dart",
+        "apps/mobile/lib/core/auth/facebook_native_sdk_adapter.dart",
+        "apps/mobile/lib/core/auth/public_auth_failure.dart",
+        "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
+        "apps/mobile/lib/core/auth/x_oauth2_pkce.dart",
+        "apps/mobile/lib/features/journey01/journey_services.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/main.dart",
+        "apps/mobile/test/firebase_social_auth_gateway_test.dart",
+        "apps/mobile/test/uaw_c34p_facebook_login_contract_test.dart",
+        "apps/mobile/test/uaw_c34p_facebook_native_sdk_adapter_test.dart",
+        "apps/mobile/test/uaw_c34p_fix1a_apple_instagram_public_login_integration_test.dart",
+        "apps/mobile/test/uaw_c34p_public_auth_failure_and_availability_test.dart",
+        "apps/mobile/test/uaw_c34p_x_oauth2_pkce_test.dart",
+        "backend/functions/src/auth/facebook_meta_callbacks.ts",
+        "backend/functions/src/auth/facebook_meta_callbacks.test.ts",
+        "backend/functions/src/auth/instagram_meta_callbacks.ts",
+        "backend/functions/src/auth/instagram_meta_callbacks.test.ts",
+        "backend/functions/src/auth/meta_account_erasure.emulator.ts",
+        "backend/functions/src/auth/meta_account_erasure.ts",
+        "backend/functions/src/auth/meta_account_erasure.test.ts",
+        "backend/functions/src/auth/meta_account_erasure_firebase.ts",
+        "backend/functions/src/index.ts",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "config/public-auth-live-provider-readiness-state-c34p-fix5.json",
+        "config/uaw-c34p-fix1-public-auth-live-adapter-blocker-resolution-ticket.json",
+        "config/uaw-c34p-fix1a-all-eight-public-auth-live-adapter-blocker-resolution-ticket.json",
+        "config/uaw-c34p-fix1-x-native-pkce-firebase-custom-token-broker-ticket.json",
+        "config/uaw-c34p-fix2-facebook-native-sdk-public-login-adapter-ticket.json",
+        "config/uaw-c34p-fix3-apple-firebase-public-login-adapter-ticket.json",
+        "config/uaw-c34p-fix4-instagram-professional-oauth-public-login-adapter-ticket.json",
+        "config/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-ticket.json",
+        "config/uaw-c34p-fix6-pre-aab-public-auth-production-hardening-ticket.json",
+        "config/uaw-c34p-fix7-meta-account-data-erasure-ticket.json",
+        "dataconnect/provider/youtube.gql",
+        "firebase.json",
+        "docs/quality/ACTIVE-CODEX-HANDOFF.md",
+        "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
+        "docs/quality/MVP-MODULE-INTEGRATION-READINESS-20260820.md",
+        "docs/quality/REG-20260818-2948-C34P-STALE-AUTH-INVENTORY-CLAIM-MISSING-OWNER.md",
+        "docs/quality/REG-20260818-2949-C34P-DESIGN-MEMORY-RAW-READ-TRUNCATION.md",
+        "docs/quality/REG-20260818-2950-C34P-MVP-STATE-LINE-LOCATOR-INPUT-SHAPE.md",
+        "docs/quality/REG-20260818-2951-C34P-MVP-STATE-COMBINED-PATCH-CONTEXT-REJECTION.md",
+        "docs/quality/REG-20260818-2952-C34P-MVP-STATE-NONUNIQUE-HUNK-WRONG-HISTORICAL-TARGET.md",
+        "docs/quality/REG-20260818-2953-C34P-MVP-STATE-DEPENDENCY-TOKEN-TRANSCRIPTION.md",
+        "docs/quality/REG-20260818-2954-C34P-MVP-STATE-DEPENDENCY-LINE-BYTE-MISMATCH.md",
+        "docs/quality/REG-20260818-2955-C34P-POWERSHELL-INTERPOLATED-COLON-PARSER-RECURRENCE.md",
+        "docs/quality/REG-20260818-2956-C34P-FACEBOOK-STATUS-DIGEST-VOIDTASKRESULT-RECURRENCE.md",
+        "docs/quality/REG-20260818-2957-C34P-FACEBOOK-OVERSIZED-SINGLE-PATCH-SOURCE-CREATION.md",
+        "docs/quality/REG-20260818-2958-C34P-PRIMARY-ANALYZER-UNUSED-FAKE-PARAMETER.md",
+        "docs/quality/REG-20260818-2959-C34P-X-ANALYZER-NULL-AWARE-ELEMENT-INFOS.md",
+        "docs/quality/REG-20260818-2960-C34P-POWERSHELL-OBJECT-PROPERTY-STATEMENT-IF-PARSER.md",
+        "docs/quality/REG-20260818-2961-C34P-X-URI-REPLACE-NULL-QUERY-WRONG-REDIRECT.md",
+        "docs/quality/REG-20260818-2962-C34P-X-REVOCATION-MISSING-PUBLIC-CLIENT-ID-FIELD.md",
+        "docs/quality/REG-20260818-2963-C34P-X-DUPLICATE-MANUAL-SHA256-IMPLEMENTATION.md",
+        "docs/quality/REG-20260818-2964-C34P-STATIC-GATE-CRYPTO-IMPORT-ALIAS-FALSE-REJECTION.md",
+        "docs/quality/REG-20260818-2965-C34P-RESUME-COMBINED-MANDATORY-AGENTS-READ.md",
+        "docs/quality/REG-20260818-2966-C34P-FACEBOOK-DIGEST-PROCESS-DISPOSED-BEFORE-EXITCODE.md",
+        "docs/quality/REG-20260818-2967-C34P-FACEBOOK-DIGEST-VOIDTASKRESULT-RETRY-RECURRENCE.md",
+        "docs/quality/REG-20260818-2968-C34P-FIX1A-MVP-STATE-COMBINED-PATCH-REJECTION.md",
+        "docs/quality/REG-20260818-2969-C34P-FIX1A-CHECKPOINT-PROJECTION-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260818-2970-C34P-FIX1A-RAW-CHECKPOINT-TOKEN-TRANSCRIPTION.md",
+        "docs/quality/REG-20260818-2971-C34P-FIX1A-PROVIDER-STATE-RAW-LINE-MISMATCH.md",
+        "docs/quality/REG-20260818-2972-C34P-COORDINATION-POLICY-APPLY-PATCH-OUTPUT-TRUNCATION.md",
+        "docs/quality/REG-20260818-2973-C34P-COORDINATION-GATE-MISSING-REQUIRED-PARAMETERS.md",
+        "docs/quality/REG-20260818-2974-C34P-X-BROKER-BOUNDED-PATCH-RESULT-AMBIGUITY.md",
+        "docs/quality/REG-20260818-2975-C34P-FIX1-DELIVERY-GATE-CLAIMED-PATH-MISSING.md",
+        "docs/quality/REG-20260818-2976-C34P-REGISTRY-MISSING-PATH-EVIDENCE-REFERENCE.md",
+        "docs/quality/REG-20260818-2977-C34P-RG-PROVEN-ABSENT-OWNER-INPUT.md",
+        "docs/quality/REG-20260818-2978-C34P-X-BROKER-RECONCILIATION-ZERO-OUTPUT.md",
+        "docs/quality/REG-20260818-2979-C34P-X-MOBILE-SCAFFOLD-RESULT-AMBIGUITY.md",
+        "docs/quality/REG-20260818-2980-C34P-AMBIGUOUS-OWNER-EVIDENCE-RECURRENCE.md",
+        "docs/quality/REG-20260818-2981-C34P-FACEBOOK-PINNED-SDK-ACCESS-TOKEN-API-MISMATCH.md",
+        "docs/quality/REG-20260818-2982-C34P-FACEBOOK-CONSTRUCTOR-REDIRECTION-ANALYZER-ERRORS.md",
+        "docs/quality/REG-20260818-2983-C34P-X-BROKER-TEST-SCAFFOLD-RESULT-AMBIGUITY.md",
+        "docs/quality/REG-20260818-2984-C34P-FACEBOOK-CONSTRUCTOR-STALE-FORMAT-CONTEXT-REJECTION.md",
+        "docs/quality/REG-20260818-2985-C34P-X-MOBILE-WRONG-PACKAGE-IMPORT-AND-CONSTRUCTOR-INFOS.md",
+        "docs/quality/REG-20260818-2986-C34P-FACEBOOK-ASYNC-CATCH-BOUNDARY-MISSING-AWAIT.md",
+        "docs/quality/REG-20260818-2987-C34P-SHARED-AUTH-INTEGRATION-FIRST-ANALYZER-SIX-ISSUES.md",
+        "docs/quality/REG-20260818-2988-C34P-COLD-SOCIAL-PROTECTED-RETURN-QUERY-CANONICALIZATION.md",
+        "docs/quality/REG-20260818-2989-C34P-CLAIMED-FIX1-QUALIFICATION-PATH-MISSING.md",
+        "docs/quality/REG-20260818-2990-C34P-FACEBOOK-DEFAULT-HTTPS-PORT-NORMALIZATION-FIXTURE.md",
+        "docs/quality/REG-20260818-2991-C34P-FIX1A-GATE-MVP-CURRENT-TICKET-SCHEMA-MISMATCH.md",
+        "docs/quality/REG-20260818-2992-C34P-FIX1A-GATE-X-REVOCATION-TOKEN-SPELLING-MISMATCH.md",
+        "docs/quality/REG-20260818-2993-C34P-HISTORICAL-C30X-SCREEN03-CREATION-GATE-WRONG-REPLAY.md",
+        "docs/quality/REG-20260820-2994-C34P-RECONSTRUCTION-GROUPED-PROHIBITED-OUTPUT-RECURRENCE.md",
+        "docs/quality/REG-20260820-2995-C34P-DIRTY-DIGEST-DISPOSED-EXITCODE-RECURRENCE.md",
+        "docs/quality/REG-20260820-2996-C34P-REGISTRY-TAIL-PROJECTION-TRUNCATION.md",
+        "docs/quality/REG-20260820-2997-C34P-RECORDED-CLAIM-MISSING-OWNER-ESCAPE.md",
+        "docs/quality/REG-20260820-2998-C34P-APP-CHECK-SESSION-TOKEN-REPLAY-PROTECTION-MISMATCH.md",
+        "docs/quality/REG-20260820-2999-C34P-POLICY-READBACK-NOT-CMDLET-PARSER.md",
+        "docs/quality/REG-20260820-3000-C34P-X-PURE-CONTRACT-FORBIDDEN-OFFLINE-ACCESS-FALSE-PASS.md",
+        "docs/quality/REG-20260820-3001-C34P-AFFECTED-MANIFEST-EXPECTED-TOTAL-INFERENCE.md",
+        "docs/quality/REG-20260820-3002-CURSOR-FULL-STATUS-OUTPUT-INCIDENT.md",
+        "docs/quality/REG-20260820-3003-MVP-MODULE-READINESS-INTERPOLATED-COLON-PARSER.md",
+        "docs/quality/REG-20260820-3004-C34P-FIX5-MVP-SELECTED-ASSESSMENT-LONG-PATCH-REJECTION.md",
+        "docs/quality/REG-20260820-3005-PRE-BUY-B0-GIT-DIFF-CRLF-WARNING-STREAM.md",
+        "docs/quality/REG-20260820-3006-C34P-FIX5-PENDING-GATE-INCREMENTAL-PROVIDER-WRITE-COUNT.md",
+        "docs/quality/REG-20260820-3007-REG3006-EVIDENCE-READBACK-EMPTY-OUTPUT.md",
+        "docs/quality/REG-20260820-3008-POST-OUTAGE-EVIDENCE-WRITE-BEFORE-COORDINATION-REPLAY.md",
+        "docs/quality/REG-20260820-3009-META-QUICKSTART-POWERSHELL-PLACEHOLDER-PIPELINE-PARSER.md",
+        "docs/quality/REG-20260820-3010-FACEBOOK-DEBUG-HASH-KEYTOOL-NOT-ON-PATH.md",
+        "docs/quality/REG-20260820-3011-DEBUG-KEYSTORE-WRONG-PASSWORD-BEFORE-SUCCESSFUL-RETRY.md",
+        "docs/quality/REG-20260820-3012-CUMULATIVE-POWERSHELL-TRANSCRIPT-LATEST-HASH-ATTEMPT-AMBIGUOUS.md",
+        "docs/quality/REG-20260820-3013-POWERSHELL-FINALLY-SEPARATED-TEMP-CERT-CLEANUP-NOT-RUN.md",
+        "docs/quality/REG-20260820-3014-TEMP-CERT-AUTOMATED-CLEANUP-POLICY-REJECTION.md",
+        "docs/quality/REG-20260820-3015-FACEBOOK-STATE-NONUNIQUE-ANDROID-FIELD-PATCH-CONTEXT.md",
+        "docs/quality/REG-20260820-3016-WINDOWS-POWERSHELL-EMPTY-CLIPBOARD-NULL-REJECTION.md",
+        "docs/quality/REG-20260820-3017-FACEBOOK-META-CALLBACK-TEST-TUPLE-ARRAY-ANNOTATION.md",
+        "docs/quality/REG-20260820-3018-EMAIL-LINK-CONTINUE-APP-LIVE-404.md",
+        "docs/quality/REG-20260820-3019-SMS-REGION-PATCH-MISSING-QUOTA-PROJECT.md",
+        "docs/quality/REG-20260820-3020-WINDOWS-RG-WILDCARD-PATH-TEST-LOOKUP.md",
+        "docs/quality/REG-20260820-3021-FIRESTORE-TTL-WAIT-INTERRUPTED-AFTER-REQUEST.md",
+        "docs/quality/REG-20260820-3022-LOCAL-GCLOUD-PREDEFINED-ROLE-DESCRIBE-ALL-FALSE.md",
+        "docs/quality/REG-20260820-3023-FACEBOOK-APP-SECRET-REVEALED-SCREENSHOT-ROTATION-REQUIRED.md",
+        "docs/quality/REG-20260820-3024-VISIBLE-DEV-DEPLOYMENT-WINDOW-DISAPPEARED.md",
+        "docs/quality/REG-20260820-3025-FIREBASE-DEPLOY-LOCAL-CREDENTIALS-EXPIRED.md",
+        "docs/quality/REG-20260820-3026-FIREBASE-REAUTH-PRIVATE-OAUTH-URL-TRANSCRIPT.md",
+        "docs/quality/REG-20260820-3027-FIREBASE-DEPLOY-FUNCTION-FILTER-MISSING-CODEBASE.md",
+        "docs/quality/REG-20260820-3028-FIREBASE-PRIVATE-REAUTH-TRANSCRIPT-RECURRENCE.md",
+        "docs/quality/REG-20260820-3029-PUBLIC-AUTH-FUNCTION-CREATED-DEPLOY-COMMAND-FINAL-ERROR.md",
+        "docs/quality/REG-20260820-3030-FIREBASE-PRIVATE-REAUTH-TRANSCRIPT-SECOND-RECURRENCE.md",
+        "docs/quality/REG-20260820-3031-PUBLIC-INVOKER-BLOCKED-DOMAIN-RESTRICTED-SHARING.md",
+        "docs/quality/REG-20260820-3032-CLOUD-RUN-INVOKER-DISABLE-READBACK-WRONG-FIELD.md",
+        "docs/quality/REG-20260820-3033-INSTAGRAM-DEAUTHORIZE-URL-PASTED-IN-WEBHOOK-FIELD.md",
+        "docs/quality/REG-20260820-3034-FACEBOOK-BASIC-SAVE-APP-DOMAIN-PLATFORM-MISMATCH.md",
+        "docs/quality/REG-20260820-3035-FACEBOOK-ANDROID-KEYHASH-INSTALL-REFERRER-SCREENSHOT-EXPOSURE.md",
+        "docs/quality/REG-20260820-3036-CURSOR-B2-JAVASCRIPT-TEMPLATE-POWERSHELL-BACKTICK-TAB-PARSER.md",
+        "docs/quality/REG-20260820-3037-CURSOR-B2-TRACKED-OWNER-MATCHED-BROAD-SECRET-EXCLUSION.md",
+        "docs/quality/REG-20260820-3038-TRACKED-SECRET-MATCH-CLASSIFIER-SINGLETON-JSON-SHAPE.md",
+        "docs/quality/REG-20260820-3039-PROCESS-CENSUS-SELF-MATCHED-DIAGNOSTIC-COMMAND.md",
+        "docs/quality/REG-20260820-3040-REGISTRY-TAIL-PROJECTION-SERIALIZED-TOP-LEVEL-OBJECT.md",
+        "docs/quality/REG-20260820-3041-MVP-EXECUTION-GATE-OBSOLETE-SCRIPT-NAME-LOOKUP.md",
+        "docs/quality/REG-20260820-3042-PUBLIC-AUTH-RUNTIME-LOOKUP-STALE-BACKEND-SOURCE-PATH.md",
+        "docs/quality/REG-20260820-3043-PUBLIC-AUTH-BROKER-SEMANTIC-FILENAME-FILTER-EMPTY.md",
+        "docs/quality/REG-20260820-3044-CURSOR-B2-CENSUS-OUTPUT-BARE-TRUE-POWERSHELL-NAME.md",
+        "docs/quality/REG-20260820-3045-META-OFFICIAL-DOCUMENTATION-DIRECT-FETCH-HTTP-429.md",
+        "docs/quality/REG-20260820-3046-FROZEN-DIRTY-DIGEST-COMPRESSED-FOREACH-WHITESPACE-PARSER.md",
+        "docs/quality/REG-20260820-3047-CURSOR-B2-COMPLETED-AFTER-PRIMARY-REGISTRY-GENERATION-MOVED.md",
+        "docs/quality/REG-20260820-3048-FILE-EXPLORER-HOME-ACCESSIBILITY-UNRELATED-RECENT-ITEM-EXPOSURE.md",
+        "docs/quality/REG-20260820-3049-FIREBASE-RUNTIME-FINALLY-PASTED-SEPARATELY-AFTER-SUCCESS.md",
+        "docs/quality/REG-20260821-3050-C34L-FINAL-READINESS-GATE-MISAPPLIED-TO-AUTH-BOOTSTRAP-AAB.md",
+        "docs/quality/REG-20260821-3051-AUTH-AUDIT-OWNER-INVENTORY-BROAD-TEST-TREE-AND-GUESSED-PATHS.md",
+        "docs/quality/REG-20260821-3052-AUTH-CALLBACK-TRACE-BROAD-RG-AND-WINDOWS-WILDCARD-PATH.md",
+        "docs/quality/REG-20260821-3053-SECURE-BUILD-SESSION-WRONG-UPLOAD-KEYSTORE-ENVIRONMENT-NAME.md",
+        "docs/quality/REG-20260821-3054-FIX6-COMBINED-TEST-PATCH-INSTAGRAM-TITLE-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260821-3055-FLUTTER-ANALYZE-YIELDED-SESSION-HANDLE-NOT-PRESERVED.md",
+        "docs/quality/REG-20260821-3056-C34P-SHARED-AUTH-GATE-REJECTS-AUTHORIZED-FIX5-CHILD-TICKET.md",
+        "docs/quality/REG-20260821-3057-C34P-SHARED-AUTH-GATE-STALE-SOURCE-ONLY-EXECUTION-AUTHORITY.md",
+        "docs/quality/REG-20260821-3058-C34P-SHARED-AUTH-GATE-PASS-STALE-EXTERNAL-WRITES-ZERO-CLAIM.md",
+        "docs/quality/REG-20260821-3059-C34P-FIX1A-GATE-REJECTS-AUTHORIZED-FIX5-DESCENDANT.md",
+        "docs/quality/REG-20260821-3060-FIX7-MULTIFILE-PATCH-INVALID-HUNK-FILE-BOUNDARY.md",
+        "docs/quality/REG-20260821-3061-OPPO-PACKAGE-READBACK-POWERSHELL-PID-RESERVED-VARIABLE.md",
+        "docs/quality/REG-20260821-3062-PLAY-UPLOAD-CERT-CLIPBOARD-EXACT-HEX-LENGTH-ASSUMPTION.md",
+        "docs/quality/REG-20260821-3063-UPLOAD-STORE-PASSWORD-PROMPT-AND-SUCCESS-MARKER-INTERLEAVED.md",
+        "docs/quality/REG-20260821-3064-PLAY-UPLOAD-KEY-RESET-SUBMITTED-BEFORE-CONFIRMATION-CHECKPOINT.md",
+        "docs/quality/REG-20260821-3065-CODEX-REMINDER-DIRECT-CREATE-REJECTED-TIMEZONE-DTSTART.md",
+        "docs/quality/REG-20260821-3066-FIREBASE-FINGERPRINT-FIELD-RECEIVED-PAGE-URL-FROM-OVERWRITTEN-CLIPBOARD.md",
+        "docs/quality/REG-20260821-3067-SIDELOAD-SECRET-PROMPT-WINDOW-CREATE-BLOCKED-BY-LOCAL-POLICY.md",
+        "docs/quality/REG-20260821-3068-SIDELOAD-PREFLIGHT-SCRIPT-PARSE-WRONG-WORKING-DIRECTORY.md",
+        "docs/quality/REG-20260821-3069-SIDELOAD-SELF-TEST-OWNER-POLICY-PATCH-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260821-3070-SIDELOAD-SELF-TEST-OWNER-POLICY-SECOND-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260821-3071-COORDINATION-GATE-MISSING-CLAIMED-SIDELOAD-SELF-TEST.md",
+        "docs/quality/REG-20260821-3072-MVP-GATE-SELECTED-TICKET-HASH-STALE-AFTER-SIDELOAD-AUTHORITY.md",
+        "docs/quality/REG-20260821-3073-APK-GATE-RUNTIME-DEFINE-ARRAY-LOST-THROUGH-NESTED-PWSH.md",
+        "docs/quality/REG-20260821-3074-RELEASE-APK-ANDROID-CUSTOM-RESOURCE-VALUES-FEATURE-DISABLED.md",
+        "docs/quality/REG-20260821-3075-RELEASE-APK-STALE-IGNORED-INTEGRATION-TEST-PLUGIN-REGISTRANT.md",
+        "docs/quality/REG-20260821-3076-REGRESSION-MEMORY-REQUIRES-STALE-REGISTRANT-EVIDENCE-PATH.md",
+        "docs/quality/REG-20260821-3077-AGP9-KOTLIN-DSL-JAVA-SOURCE-EXCLUDE-UNSUPPORTED.md",
+        "docs/quality/REG-20260821-3078-RELEASE-APK-UPLOAD-KEY-PASSWORD-CANNOT-RECOVER-ALIAS.md",
+        "docs/quality/REG-20260821-3079-OPPO-INSTALLED-APK-SIGNER-PULL-DIAGNOSTIC-BLOCKED-BEFORE-EXECUTION.md",
+        "docs/quality/REG-20260821-3080-OPPO-PREDECESSOR-PACKAGE-ABSENT-BEFORE-AUTHORIZED-UNINSTALL.md",
+        "docs/quality/REG-20260821-3081-OPPO-PACKAGE-PRESENCE-FALSE-ABSENCE-RAW-ADB-COUNT.md",
+        "docs/quality/REG-20260821-3082-OPPO-INCIDENT-CORRECTION-MULTI-OWNER-PATCH.md",
+        "docs/quality/REG-20260821-3083-PUBLIC-AUTH-SIDELOAD-REJECTED-BY-YOUTUBE-ONLY-RUNTIME-MODE-GATE.md",
+        "docs/quality/REG-20260821-3084-R60-78-AFFECTED-CYCLE-OUTPUT-TRUNCATED-BEFORE-TERMINAL-LINE.md",
+        "docs/quality/REG-20260821-3085-R60-78-COLD-START-BLANK-NATIVE-FRAME-BEFORE-FLUTTER-RUNAPP.md",
+        "docs/quality/REG-20260821-3086-BOOTSTRAP-TIMEOUT-PATCH-AUTH-RETURN-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260821-3087-SOURCE-PATCHES-RESUMED-BEFORE-GENERATION-3057-GATE-REPLAY.md",
+        "docs/quality/REG-20260821-3088-BOOTSTRAP-FIRST-FRAME-SEMANTIC-LABEL-MERGED-AWAY.md",
+        "docs/quality/REG-20260821-3089-R60-79-COLD-START-RECOVERY-REPEATED-WITHOUT-STAGE-RECEIPT.md",
+        "docs/quality/REG-20260821-3090-R60-79-COLD-START-QUALIFICATION-OWNER-CLAIMED-BEFORE-CREATION.md",
+        "docs/quality/REG-20260821-3091-R60-79-TIMING-SCREENSHOTS-CLAIMED-BEFORE-CAPTURE.md",
+        "docs/quality/REG-20260821-3092-R60-80-APK-MISSING-GENERATED-REGISTRANT-AND-FIREBASE-CORE-PLUGIN.md",
+        "docs/quality/REG-20260821-3093-BOOTSTRAP-HELPER-DEFINITION-BROKE-LITERAL-SOURCE-ORDER-GATES.md",
+        "docs/quality/REG-20260821-3094-FLUTTER-TEST-REGENERATED-INTEGRATION-TEST-REGISTRANT.md",
+        "docs/quality/REG-20260821-3095-FULL-MOBILE-SUITE-247-VISUAL-GOLDEN-FAILURES.md",
+        "docs/quality/REG-20260821-3096-BACKEND-VERIFY-EXIT-ZERO-SUMMARY-PARSER-NO-COUNTS.md",
+        "docs/quality/REG-20260821-3097-ANDROID-LINT-RELEASE-6-ERRORS-2-WARNINGS.md",
+        "docs/quality/REG-20260821-3098-DATA-EXTRACTION-RULE-OWNER-POLICY-CONTEXT-MISMATCH.md",
+        "docs/quality/REG-20260821-3099-LINT-FIXES-RESUMED-BEFORE-GENERATION-3069-GATE-REPLAY.md",
+        "docs/quality/REG-20260821-3100-YOUTUBE-RETURN-TEST-FORBID-ALL-MOOLSOCIAL-SCHEMES.md",
+        "docs/quality/REG-20260821-3101-YOUTUBE-OAUTH-RETURN-HTML-TEST-OLD-TRIPLE-SLASH-PARSER.md",
+        "docs/quality/REG-20260821-3102-CURSOR-B2-MANIFEST-READ-OUTPUT-TRUNCATED.md",
+        "docs/quality/REG-20260821-3103-AUDIT-EDITS-CHANGED-IMMUTABLE-PLATFORM-CONFIGURATION-TEST.md",
+      "docs/quality/REG-20260821-3104-FLUTTER-REWROTE-LOCAL-PROPERTIES-ESCAPING.md",
+      "docs/quality/REG-20260821-3105-CURSOR-WORKTREE-PARENT-WORKSPACE-AGENTS-MISSING.md",
+      "docs/quality/REG-20260821-3106-CURSOR-WORKTREE-HISTORICAL-REGISTERED-EVIDENCE-MISSING.md",
+      "docs/quality/REG-20260821-3107-CURSOR-WORKTREE-GLOBAL-ACTIVE-CLAIMS-REQUIRE-DESKTOP-SOURCE.md",
+      "docs/quality/REG-20260821-3108-ANDROID-LINT-RELEASE-DIRECT-GRADLE-OUTPUT-TRUNCATED.md",
+      "docs/quality/REG-20260821-3109-CURSOR-WORKTREE-FIX7-MANDATORY-TICKET-MISSING.md",
+      "docs/quality/REG-20260821-3110-FIX7-STATUS-PAGE-SEARCH-GUESSED-HOSTING-ROOT.md",
+      "docs/quality/REG-20260821-3111-FIX7-PUBLIC-DELETION-SLA-SEVEN-VERSUS-THIRTY-DAYS.md",
+      "docs/quality/REG-20260821-3112-CURSOR-WORKTREE-GLOBAL-CLAIM-RECURRENCE.md",
+      "docs/quality/REG-20260821-3113-DATACONNECT-ADAPTER-FILE-LIST-INPUTSTREAM-PROJECTION.md",
+      "docs/quality/REG-20260821-3114-FIX7-PRIMARY-OWNER-CLAIM-PATCH-STALE-SCRIPT-CONTEXT.md",
+      "docs/quality/REG-20260821-3115-FIX7-INDEX-OWNER-CLAIM-OVERLAP.md",
+      "docs/quality/REG-20260821-3116-FIX7-TEST-STORE-EXACT-OPTIONAL-UNDEFINED.md",
+      "docs/quality/REG-20260821-3117-SUBAGENT-POLICY-ACTIVETASKS-VERSUS-ACTIVECLAIMS.md",
+      "docs/quality/REG-20260821-3118-SUBAGENT-REGISTRY-ENTRIES-NESTED-PROJECTION.md",
+      "docs/quality/REG-20260821-3119-FIX7-INTEGRATION-FIRST-TYPECHECK-THREE-ERRORS.md",
+      "docs/quality/REG-20260821-3120-WEB-COPY-DIGEST-INLINE-NODE-POWERSHELL-PARSER.md",
+      "docs/quality/REG-20260821-3121-FIX7-EMULATOR-FIRST-WRAPPER-EXIT-ONE.md",
+      "docs/quality/REG-20260821-3122-FIX7-EMULATOR-JAVA-NOT-ON-CHILD-PATH.md",
+      "docs/quality/REG-20260821-3123-DATACONNECT-EMULATOR-EXIT-ZERO-ECONNRESET-SHUTDOWN.md",
+      "docs/quality/REG-20260821-3124-DATACONNECT-SQL-DIFF-READ-EXIT-ONE.md",
+      "docs/quality/REG-20260821-3125-MOBILE-TEST-INVENTORY-TOOL-WRAPPER-FIELD-TYPO.md",
+      "docs/quality/REG-20260821-3126-APK-INTEGRITY-GATE-SINGLE-TOOL-PATH-COUNT.md",
+      "docs/quality/REG-20260821-3127-FIX7-DATACONNECT-DEV-READBACK-AUTHENTICATION.md",
+      "docs/quality/REG-20260821-3128-FIX7-DATACONNECT-DEV-READBACK-UNCLASSIFIED.md",
+      "docs/quality/REG-20260821-3129-FIX7-HOSTING-SITE-READBACK-SCHEMA.md",
+      "docs/quality/REG-20260821-3130-FIX7-GCLOUD-DEFAULT-PROJECT-MISMATCH.md",
+      "docs/quality/REG-20260821-3131-FIX7-EXPLICIT-DEV-GCLOUD-AUTHENTICATION.md",
+      "docs/quality/REG-20260822-3132-FIX7-IAM-TROUBLESHOOTER-AUTHENTICATION.md",
+      "docs/quality/REG-20260822-3133-FIX7-UNNECESSARY-DATACONNECT-ROLE-GRANT-GUIDANCE.md",
+      "docs/quality/REG-20260822-3134-REGISTRY-ENTRY-LOCATOR-MULTIMATCH.md",
+      "docs/quality/REG-20260822-3135-DATACONNECT-COMPILE-AUTHENTICATION.md",
+      "docs/quality/REG-20260822-3136-APK-STATE-INLINE-IF-CONCAT-PARSER.md",
+      "docs/quality/REG-20260822-3141-FIX8-MVP-SELECTED-ASSESSMENT-CONTEXT.md",
+      "docs/quality/REG-20260822-3142-FIX8-MVP-ROBUSTNESS-ARRAY-CONTEXT.md",
+      "docs/quality/REG-20260822-3143-FIX8-PARTIAL-MVP-SELECTION-GATE.md",
+      "docs/quality/REG-20260822-3144-FIX8-MVP-TOP-TICKET-CONTEXT.md",
+      "docs/quality/REG-20260822-3145-FIX8-MVP-ROBUSTNESS-WHOLE-ARRAY-RECURRENCE.md",
+      "docs/quality/REG-20260822-3146-FIX8-MVP-ROBUSTNESS-SCALAR-TRANSCRIPTION.md",
+      "docs/quality/REG-20260822-3147-FIX5-GATE-REJECTS-FIX8-SUCCESSOR.md",
+      "docs/quality/REG-20260822-3148-BACKEND-DOT-REPORTER-OPTION-ORDER.md",
+      "docs/quality/REG-20260822-3149-SHARED-AUTH-GATE-REJECTS-FIX8.md",
+      "docs/quality/REG-20260822-3150-FIX1A-GATE-REJECTS-FIX8.md",
+      "docs/quality/REG-20260822-3151-UNATTENDED-MACHINE-STATE-PATCH-NOT-DURABLE.md",
+      "docs/quality/REG-20260822-3152-REGISTRY-FILENAME-GUESS.md",
+      "docs/quality/REG-20260822-3153-BROAD-REGISTRY-SEARCH-OUTPUT-TRUNCATION.md",
+      "docs/quality/REG-20260822-3154-UNATTENDED-STATE-READBACK-WRONG-OBJECT-DEPTH.md",
+      "docs/quality/REG-20260822-3155-OPPO-RESOLVE-ACTIVITY-COMPONENT-SHAPE-GUARD.md",
+      "docs/quality/REG-20260822-3156-OPPO-R60-80-COLD-LAUNCH-RESUMED-MARKER-ABSENT.md",
+      "docs/quality/REG-20260822-3157-POWERSHELL-PATH-LINE-COLON-INTERPOLATION-RECURRENCE.md",
+      "docs/quality/REG-20260822-3158-POWERSHELL-SINGLE-NESTED-RANGE-FLATTENING.md",
+      "docs/quality/REG-20260822-3159-MOOLSOCIAL-PUBLIC-URL-WEB-SAFETY-OPEN-REJECTION.md",
+      "docs/quality/REG-20260822-3160-PUBLIC-DELETE-PAGE-THIRTY-DAY-MAXIMUM-ABSENT.md",
+      "docs/quality/REG-20260822-3161-THIRTY-DAY-COMPLIANCE-MATCHER-TOO-NARROW.md",
+      "docs/quality/REG-20260822-3162-REG3160-CORRECTION-PATCH-DUPLICATE-ANCHOR.md",
+      "docs/quality/REG-20260822-3163-LIVE-DELETE-PAGE-BEHIND-THIRTY-DAY-SOURCE.md",
+      "docs/quality/REG-20260822-3164-MOBILE-YOUTUBE-SURFACE-NO-DIRECT-YOUTUBE-TERMS-LINK.md",
+      "docs/quality/REG-20260822-3165-BROAD-GIT-STATUS-LONG-PATH-WARNINGS-AND-TRUNCATION.md",
+      "docs/quality/REG-20260822-3166-MVP-SELECTED-MANIFEST-WRONG-PROPERTY-DEPTH.md",
+      "docs/quality/REG-20260822-3167-MVP-CURRENT-TICKET-OPTIONAL-PROJECTION-REPEATED-PATH-GUESS.md",
+      "docs/quality/REG-20260822-3168-FIX8-STABLE-SOURCE-MANIFEST-OWNER-LIST-INFERENCE-MISMATCH.md",
+      "config/uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-ticket.json",
+      "config/uaw-c34p-fix11-google-sign-in-oppo-forensic-repair-ticket.json",
+      "config/google-authentication-production-baseline-r60-87.json",
+      "config/google-authentication-production-baseline-r60-87.lock.json",
+      "scripts/check-google-authentication-production-baseline-r60-87.ps1",
+      "config/uaw-c34p-fix9-cross-provider-return-truth-hard-gate-ticket.json",
+      "config/uaw-c34p-fix9a-youtube-shared-google-identity-return-truth-ticket.json",
+      "config/uaw-c34p-fix9b-facebook-native-sdk-return-truth-ticket.json",
+      "config/uaw-c34p-fix9c-x-oauth2-pkce-return-truth-ticket.json",
+      "config/uaw-c34p-fix9d-instagram-oauth-broker-return-truth-ticket.json",
+      "apps/mobile/test/uaw_c34p_fix8_global_social_login_runtime_composition_test.dart",
+      "docs/quality/UAW-C34P-GLOBAL-SOCIAL-LOGIN-SUCCESSOR-COMPREHENSIVE-AUDIT-20260822.md",
+      "docs/quality/UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-ROBUSTNESS-REUSE-ASSESSMENT-20260822.md",
+      "docs/quality/UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-SOURCE-QUALIFICATION-20260822.md",
+      "docs/quality/UAW-C34P-FIX11-GOOGLE-SIGN-IN-ROBUSTNESS-REUSE-ASSESSMENT-20260823.md",
+      "docs/quality/UAW-C34P-FIX8-OPPO-R60-80-UNATTENDED-READONLY-EXPLORATION-20260822.md",
+      "docs/quality/UAW-YOUTUBE-API-TEAM-SUBMISSION-READINESS-PACK-20260822.md",
+      "docs/quality/UAW-C34P-ALL-PUBLIC-AUTHENTICATION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md",
+        "docs/quality/UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SOURCE-QUALIFICATION-20260818.md",
+        "docs/quality/UAW-C34P-ALL-EIGHT-PUBLIC-AUTH-FOUNDER-CORRECTION-20260818.md",
+        "docs/quality/UAW-C34P-ALL-EIGHT-PUBLIC-AUTH-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md",
+        "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-FOUNDER-AUTHORIZATION-20260818.md",
+        "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md",
+        "docs/quality/UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION-QUALIFICATION-20260818.md",
+        "docs/quality/UAW-C34P-FIX5-ALL-EIGHT-PUBLIC-AUTH-LIVE-PROVIDER-ROBUSTNESS-REUSE-ASSESSMENT-20260820.md",
+        "docs/quality/UAW-C34P-FIX5-FOUNDER-LIVE-PROVIDER-CONFIGURATION-RUNBOOK-20260820.md",
+        "docs/quality/UAW-C34P-FIX6-PRE-AAB-PUBLIC-AUTH-PRODUCTION-HARDENING-QUALIFICATION-20260821.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-production-plugin-integrity.ps1",
+      "scripts/check-android-plugin-manifest-namespace-readiness.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/test-release-production-plugin-integrity.ps1",
+      "scripts/check-aab-production-plugin-integrity.ps1",
+      "config/apk-regression-gate-state.json",
+      "scripts/recover-fix8-r60-81-postbuild-artifact.ps1",
+      "scripts/check-android-release-kotlin-plugin-readiness.ps1",
+      "scripts/new-fix8-r60-81-build-input-manifest.ps1",
+      "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1",
+        "scripts/check-uaw-c34p-fix1-public-auth-live-adapter-blocker-resolution.ps1"
+        ,"scripts/check-uaw-c34p-fix6-pre-aab-public-auth-production-hardening.ps1"
+        ,"scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+        ,"scripts/prepare-moolsocial-sideload-build-environment.ps1"
+        ,"scripts/test-public-auth-sideload-build-controls.ps1"
+        ,"scripts/check-google-android-oauth-signing-readiness.ps1"
+        ,"scripts/test-google-android-oauth-signing-readiness.ps1"
+        ,"scripts/check-google-android-identity-bridge-readiness.ps1"
+        ,"scripts/test-google-android-identity-bridge-readiness.ps1"
+        ,"scripts/check-full-social-founder-dev-readiness.ps1"
+        ,"scripts/check-approved-ui-locks.ps1"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/focused-cross-provider-tests.jsonl"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/focused-cross-provider-tests.stderr.log"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/focused-cross-provider-tests-cycle-2.jsonl"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/focused-cross-provider-tests-cycle-2.stderr.log"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/source-aggregate-manifest-r60-83-final.txt"
+        ,"scripts/refresh-moolsocial-upload-signing-environment.ps1"
+        ,"docs/quality/UAW-C34P-FIX5-PUBLIC-AUTH-SIDELOAD-PREFLIGHT-QUALIFICATION-20260821.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/00-source-qualifying-cycle-1.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/01-source-qualifying-cycle-2.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/preserved-stale-GeneratedPluginRegistrant.java"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-device-review-release.apk"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-build-provenance.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/04-artifact-qualification.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/05-installed-identity.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-77-20260821-01/06-first-launch.png"
+        ,"docs/quality/UAW-C34P-FIX5-PUBLIC-AUTH-SIDELOAD-R60-78-SUCCESSOR-QUALIFICATION-20260821.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/00-source-qualifying-cycle-1.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/01-source-qualifying-cycle-2.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-device-review-release.apk"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-build-provenance.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/04-artifact-qualification.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/05-installed-identity.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-78-20260821-01/06-first-launch.png"
+        ,"docs/quality/UAW-C34P-FIX5-PUBLIC-AUTH-SIDELOAD-R60-79-COLD-START-QUALIFICATION-20260821.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/00-source-qualifying-cycle-1.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/01-source-qualifying-cycle-2.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-device-review-release.apk"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-build-provenance.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/04-artifact-qualification.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/05-installed-identity.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/06-cold-start-first-flutter-frame.png"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/07-cold-start-terminal-frame.png"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/08-cold-start-qualification.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/09-cold-start-timing-1s.png"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-79-20260821-01/10-cold-start-timing-6s.png"
+        ,"docs/quality/UAW-C34P-FIX5-PUBLIC-AUTH-SIDELOAD-R60-80-FIREBASE-BOOTSTRAP-QUALIFICATION-20260821.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/00-source-qualifying-cycle-1.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/01-source-qualifying-cycle-2.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-device-review-release.apk"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness-build-provenance.txt"
+        ,"artifacts/quality/uaw-c34p-fix5-public-auth-sideload-preflight-r60-80-20260821-01/04-artifact-qualification.json"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-01/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-01/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-02/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-02/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-02/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-03/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-03/02-prebuild-readonly-inventory.json"
+        ,"artifacts/quality/uaw-c34p-fix8-global-social-login-oppo-successor-r60-81-20260822-03/03-prebuild-validation-seal.md"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-01/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-02/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-03/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-04/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-05/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-06/source-aggregate-manifest.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-06/uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-device-review-release.apk"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-06/uaw-c34p-fix8-global-social-login-oppo-successor-audit-repair-build-provenance.txt"
+        ,"artifacts/quality/uaw-c34p-fix8-google-only-oppo-successor-r60-82-20260822-06/05-installed-identity.json"
+      ]
+    },
+    {
+      "task": "/root/auth_x_broker",
+      "role": "subagent",
+      "owners": [
+        "backend/functions/src/auth/x_pkce_broker.ts",
+        "backend/functions/src/auth/x_pkce_broker.test.ts"
+        ,"backend/functions/src/auth/instagram_oauth_broker.ts"
+        ,"backend/functions/src/auth/instagram_oauth_broker.test.ts"
+      ]
+    },
+    {
+      "task": "/root/auth_x_mobile",
+      "role": "subagent",
+      "owners": [
+        "apps/mobile/lib/core/auth/x_oauth2_pkce_network_adapter.dart",
+        "apps/mobile/test/uaw_c34p_x_oauth2_pkce_network_adapter_test.dart",
+        "apps/mobile/lib/core/auth/instagram_oauth_network_adapter.dart",
+        "apps/mobile/test/uaw_c34p_instagram_oauth_network_adapter_test.dart"
+      ]
+    },
+    {
+      "task": "/root/auth_facebook_native",
+      "role": "subagent",
+      "owners": [
+        "apps/mobile/pubspec.lock",
+        "apps/mobile/pubspec.yaml"
+      ]
+    },
+    {
+      "task": "/root/pre_buy_baseline_b0",
+      "role": "subagent",
+      "owners": [
+        "artifacts/quality/pre-buy-baseline-cutover-20260820-01/source-manifest-pre-buy.txt",
+        "config/pre-buy-baseline-cutover-state-20260820.json",
+        "docs/quality/PRE-BUY-BASELINE-AUDIT-20260820.md",
+        "docs/quality/PRE-BUY-BASELINE-CUTOVER-QUALIFICATION-20260820.md"
+      ]
+    },
+    {
+      "task": "/root/cursor_pre_apk_non_auth_fix7_audit",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/CURSOR-PRE-APK-NON-AUTH-FIX7-COMPREHENSIVE-AUDIT-20260821.md"
+      ]
+    },
+    {
+      "task": "/root/fix7_schema_audit",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/FIX7-SCHEMA-ERASURE-COVERAGE-AUDIT-20260821.md"
+      ]
+    },
+    {
+      "task": "/root/android_release_audit",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/ANDROID-STARTUP-POSTBUILD-INTEGRITY-AUDIT-20260821.md"
+      ]
+    },
+    {
+      "task": "/root/auth_journey_audit",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/EIGHT-METHOD-AUTH-JOURNEY-GAP-AUDIT-20260821.md"
+      ]
+    },
+    {
+      "task": "/root/apk_recovery_audit",
+      "role": "subagent",
+      "owners": [
+        "apps/mobile/build/app/outputs/flutter-apk/app-release.apk"
+      ]
+    },
+    {
+      "task": "/root/android_warning_audit",
+      "role": "subagent",
+      "owners": [
+        "apps/mobile/build/reports/problems/problems-report.html"
+      ]
+    },
+    {
+      "task": "/root/google_youtube_readiness",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/UAW-C34P-FIX8-GOOGLE-YOUTUBE-READINESS-AUDIT-20260822.md"
+      ]
+    },
+    {
+      "task": "/root/facebook_readiness",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/UAW-C34P-FIX8-FACEBOOK-READINESS-AUDIT-20260822.md"
+      ]
+    },
+    {
+      "task": "/root/x_readiness",
+      "role": "subagent",
+      "owners": [
+        "docs/quality/UAW-C34P-FIX8-X-READINESS-AUDIT-20260822.md"
+      ]
+    }
+  ],
+  "incidentProtocol": {
+    "subagentAllocatesRegressionId": false,
+    "subagentWritesRegistry": false,
+    "stopAtFirstUnexpected": true,
+    "laterDiagnosticBeforeRegistration": false,
+    "primaryProvidesLiteralIdPathAndGeneration": true,
+    "externalHelpRequestedImmediately": true,
+    "silentStandbyOrSidebyOnExternalBlockerAllowed": false
+  },
+  "generationRules": {
+    "registryMovementInvalidatesPendingMutationAndTests": true,
+    "registryMovementInvalidatesBoundReadinessPins": true,
+    "freezeRegistryDuringFinalPin": true,
+    "oneAuthoritativeGatePerShellCall": true,
+    "retainFullSessionAndExitMetadata": true
+  },
+  "releaseSerialization": {
+    "primaryIsSingleActionCoordinator": true,
+    "parallelRealActionsAllowed": false,
+    "founderOwnsPrivateAccountInputs": true,
+    "allowedPlayTrack": "internal",
+    "forbiddenDeviceActions": [
+      "adb_install",
+      "sideload",
+      "uninstall",
+      "data_clear",
+      "downgrade"
+    ]
+  },
+  "requiredPreventionClasses": [
+    "regression_number_collision",
+    "duplicate_registry_numeric_prefix",
+    "stale_registry_generation",
+    "overlapping_owner_claim",
+    "primary_only_owner_violation",
+    "stale_patch_context",
+    "cross_owner_schema_drift",
+    "guessed_path_property_or_schema",
+    "output_truncation_or_semantic_incompleteness",
+    "yielded_session_handle_loss_or_orphan",
+    "power_outage_or_ambiguous_session",
+    "file_directory_or_reparse_confinement",
+    "fixture_root_collision_or_cleanup_gap",
+    "powershell_quoting_pipeline_or_host_coercion",
+    "false_oracle_or_validation_order_masking",
+    "caller_authored_evidence_or_replay",
+    "secret_private_or_account_surface",
+    "duplicate_or_out_of_order_release_action",
+    "branch_head_workspace_or_git_drift"
+  ]
+}

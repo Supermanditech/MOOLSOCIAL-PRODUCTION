@@ -1,5 +1,3 @@
-import 'dart:ui' show SemanticsAction, Tristate;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -10,6 +8,13 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> settleVisibleImages(WidgetTester tester) async {
+    for (final image in tester.widgetList<Image>(find.byType(Image))) {
+      await precacheImage(image.image, tester.element(find.byWidget(image)));
+    }
+    await tester.pumpAndSettle();
+  }
 
   Widget app(
     BuyV2Session session, {
@@ -58,24 +63,14 @@ void main() {
     return session;
   }
 
-  void expectDockSelection(WidgetTester tester, BuyV2Destination expected) {
-    final destinations = {
-      BuyV2Destination.shop: 'shop',
-      BuyV2Destination.wholesale: 'wholesale',
-      BuyV2Destination.medicine: 'medicine',
-      BuyV2Destination.orders: 'orders',
-    };
-    for (final entry in destinations.entries) {
-      final node = tester.getSemantics(
-        find.byKey(ValueKey('buy-dock-${entry.value}')),
-      );
-      expect(
-        node.flagsCollection.isSelected,
-        entry.key == expected ? Tristate.isTrue : Tristate.isFalse,
-        reason: '${entry.key.name} for ${expected.name}',
-      );
-      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    }
+  void expectConnectedOwner(
+    WidgetTester tester,
+    BuyV2Session session,
+    BuyV2Destination expected,
+  ) {
+    expect(session.activeDockDestination, expected);
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
   }
 
   const cases = [
@@ -129,42 +124,44 @@ void main() {
     },
   );
 
-  testWidgets(
-    'scoped Cart and Checkout expose one truthful selected dock item',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final semantics = tester.ensureSemantics();
+  testWidgets('scoped Cart and Checkout retain one truthful connected owner', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final semantics = tester.ensureSemantics();
 
-      for (final testCase in cases) {
-        final session = mixedSession();
-        addTearDown(session.dispose);
-        session.openDestination(testCase.last);
-        session.openCart(scope: testCase.scope);
+    for (final testCase in cases) {
+      final session = mixedSession();
+      addTearDown(session.dispose);
+      session.openDestination(testCase.last);
+      session.openCart(scope: testCase.scope);
 
-        await tester.pumpWidget(app(session));
-        await tester.pumpAndSettle();
-        expectDockSelection(tester, testCase.expected);
-        expect(session.destination, testCase.last);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expectConnectedOwner(tester, session, testCase.expected);
+      expect(session.destination, testCase.last);
 
-        expect(session.openCheckout(), isTrue);
-        await tester.pumpAndSettle();
-        expectDockSelection(tester, testCase.expected);
-        expect(session.destination, testCase.last);
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+      expectConnectedOwner(tester, session, testCase.expected);
+      expect(session.destination, testCase.last);
 
-        await tester.tap(
-          find.byKey(ValueKey('buy-dock-${testCase.expected.name}')),
-        );
-        await tester.pumpAndSettle();
-        expect(session.view, BuyV2View.catalogue);
-        expect(session.destination, testCase.expected);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.destination, testCase.last);
 
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
-      semantics.dispose();
-    },
-  );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.destination, testCase.last);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+    semantics.dispose();
+  });
 
   testWidgets('combined scope retains its valid entry vertical', (
     tester,
@@ -179,10 +176,10 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expectDockSelection(tester, BuyV2Destination.shop);
+    expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.openCheckout(), isTrue);
     await tester.pumpAndSettle();
-    expectDockSelection(tester, BuyV2Destination.shop);
+    expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.destination, BuyV2Destination.shop);
     semantics.dispose();
   });
@@ -208,90 +205,93 @@ void main() {
       ),
     );
     await tester.pump();
-    expectDockSelection(tester, BuyV2Destination.shop);
+    expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.destination, BuyV2Destination.medicine);
     expect(find.textContaining('Shop fulfilment ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
 
-  testWidgets('R58.8.7 responsive Android and iOS candidate captures', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'R58.8.7 responsive Android and iOS candidate captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    for (final viewport in const [
-      (
-        size: Size(320, 568),
-        safe: EdgeInsets.symmetric(vertical: 24),
-        textScale: 1.0,
-        reduced: false,
-        checkout: true,
-        label: '320x568-android-checkout',
-      ),
-      (
-        size: Size(360, 800),
-        safe: EdgeInsets.symmetric(vertical: 24),
-        textScale: 1.0,
-        reduced: false,
-        checkout: false,
-        label: '360x800-android-cart',
-      ),
-      (
-        size: Size(390, 844),
-        safe: EdgeInsets.only(top: 47, bottom: 34),
-        textScale: 1.0,
-        reduced: false,
-        checkout: true,
-        label: '390x844-ios-checkout',
-      ),
-      (
-        size: Size(430, 932),
-        safe: EdgeInsets.only(top: 59, bottom: 34),
-        textScale: 1.0,
-        reduced: false,
-        checkout: false,
-        label: '430x932-ios-cart',
-      ),
-      (
-        size: Size(320, 568),
-        safe: EdgeInsets.symmetric(vertical: 24),
-        textScale: 1.4,
-        reduced: true,
-        checkout: true,
-        label: '320x568-a11y140-reduced',
-      ),
-    ]) {
-      tester.view.physicalSize = viewport.size;
-      final session = mixedSession();
-      session.openDestination(BuyV2Destination.medicine);
-      session.openCart(scope: BuyV2CartScope.shop);
-      if (viewport.checkout) {
-        expect(session.openCheckout(), isTrue);
+      for (final viewport in const [
+        (
+          size: Size(320, 568),
+          safe: EdgeInsets.symmetric(vertical: 24),
+          textScale: 1.0,
+          reduced: false,
+          checkout: true,
+          label: '320x568-android-checkout',
+        ),
+        (
+          size: Size(360, 800),
+          safe: EdgeInsets.symmetric(vertical: 24),
+          textScale: 1.0,
+          reduced: false,
+          checkout: false,
+          label: '360x800-android-cart',
+        ),
+        (
+          size: Size(390, 844),
+          safe: EdgeInsets.only(top: 47, bottom: 34),
+          textScale: 1.0,
+          reduced: false,
+          checkout: true,
+          label: '390x844-ios-checkout',
+        ),
+        (
+          size: Size(430, 932),
+          safe: EdgeInsets.only(top: 59, bottom: 34),
+          textScale: 1.0,
+          reduced: false,
+          checkout: false,
+          label: '430x932-ios-cart',
+        ),
+        (
+          size: Size(320, 568),
+          safe: EdgeInsets.symmetric(vertical: 24),
+          textScale: 1.4,
+          reduced: true,
+          checkout: true,
+          label: '320x568-a11y140-reduced',
+        ),
+      ]) {
+        tester.view.physicalSize = viewport.size;
+        final session = mixedSession();
+        session.openDestination(BuyV2Destination.medicine);
+        session.openCart(scope: BuyV2CartScope.shop);
+        if (viewport.checkout) {
+          expect(session.openCheckout(), isTrue);
+        }
+
+        await tester.pumpWidget(
+          app(
+            session,
+            size: viewport.size,
+            textScale: viewport.textScale,
+            reducedMotion: viewport.reduced,
+            safeArea: viewport.safe,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await settleVisibleImages(tester);
+        expectConnectedOwner(tester, session, BuyV2Destination.shop);
+        await expectLater(
+          find.byType(BuyV2Screen),
+          matchesGoldenFile(
+            'candidate_captures/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+          ),
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
       }
-
-      await tester.pumpWidget(
-        app(
-          session,
-          size: viewport.size,
-          textScale: viewport.textScale,
-          reducedMotion: viewport.reduced,
-          safeArea: viewport.safe,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expectDockSelection(tester, BuyV2Destination.shop);
-      await expectLater(
-        find.byType(BuyV2Screen),
-        matchesGoldenFile(
-          'candidate_captures/buy-v2-r58-8-7-${viewport.label}.png',
-        ),
-      );
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      session.dispose();
-    }
-  });
+    },
+    tags: 'protected-reference',
+  );
 }

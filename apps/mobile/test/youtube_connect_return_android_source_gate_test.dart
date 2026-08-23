@@ -42,11 +42,13 @@ void main() {
     expect(returnStart, greaterThan(mainStart));
     final mainBlock = manifest.substring(mainStart, returnStart);
     final returnBlock = manifest.substring(returnStart);
-    expect(mainBlock, isNot(contains('android:scheme="moolsocial"')));
-    expect(returnBlock, contains('android:scheme="moolsocial"'));
+    expect(mainBlock, isNot(contains('android:host="app"')));
     expect(
-      returnBlock,
-      contains('android:path="/app/creator/youtube-connect"'),
+      mainBlock,
+      isNot(contains('android:path="/creator/youtube-connect"')),
     );
+    expect(returnBlock, contains('android:scheme="moolsocial"'));
+    expect(returnBlock, contains('android:host="app"'));
+    expect(returnBlock, contains('android:path="/creator/youtube-connect"'));
   });
 }

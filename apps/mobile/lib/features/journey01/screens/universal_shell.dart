@@ -12,7 +12,6 @@ import '../../../core/design/mool_theme.dart';
 import '../journey_session.dart';
 import '../universal_intent_catalog.dart';
 import '../widgets/intent_completion_sheet.dart';
-import '../widgets/journey_frame.dart';
 
 class UniversalShell extends StatefulWidget {
   const UniversalShell({
@@ -108,10 +107,7 @@ class _UniversalShellState extends State<UniversalShell> {
                         color: const Color(0xFFF6F8FB),
                         child: Column(
                           children: [
-                            _UniversalHeader(
-                              session: widget.session,
-                              section: activeSection,
-                            ),
+                            _UniversalHeader(session: widget.session),
                             Expanded(
                               child: AnimatedSwitcher(
                                 duration: MoolMotion.accessible(
@@ -185,10 +181,9 @@ class _UniversalShellState extends State<UniversalShell> {
 }
 
 class _UniversalHeader extends StatelessWidget {
-  const _UniversalHeader({required this.session, required this.section});
+  const _UniversalHeader({required this.session});
 
   final JourneySession session;
-  final String section;
 
   @override
   Widget build(BuildContext context) {
@@ -200,24 +195,7 @@ class _UniversalHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'MoolSocial',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        height: .95,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 5),
-                    PrototypeIdentityLine(width: 118, height: 3),
-                  ],
-                ),
-              ),
+              const Spacer(),
               Semantics(
                 key: const Key('open-profile'),
                 button: true,
@@ -279,7 +257,7 @@ class _UniversalHeader extends StatelessWidget {
                 ),
                 _HeaderAction(
                   key: const Key('open-search'),
-                  label: 'Search MoolSocial',
+                  label: 'Search social content',
                   icon: Icons.search_rounded,
                   onTap: () => _showSearch(context),
                 ),

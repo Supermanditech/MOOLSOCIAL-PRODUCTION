@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep the Android root fallback disabled in dark mode as well; Flutter
+         continues to render the focused state of each interactive control. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/mool_navy</item>
+        <item name="android:defaultFocusHighlightEnabled">false</item>
+    </style>
+</resources>

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'shared_models.dart';
 import 'shared_services.dart';
+import 'social_content_gateway.dart';
 
 class SharedIntentResult {
   const SharedIntentResult({
@@ -18,10 +19,15 @@ class SharedIntentResult {
 }
 
 class SharedSession extends ChangeNotifier {
-  SharedSession({ReviewSharedGateway? gateway})
-    : gateway = gateway ?? ReviewSharedGateway();
+  SharedSession({
+    ReviewSharedGateway? gateway,
+    SocialContentGateway? socialContentGateway,
+  }) : gateway = gateway ?? ReviewSharedGateway(),
+       _socialContentGateway =
+           socialContentGateway ?? buildSocialContentGateway();
 
   final ReviewSharedGateway gateway;
+  final SocialContentGateway _socialContentGateway;
 
   bool busy = false;
   bool online = true;
@@ -40,16 +46,360 @@ class SharedSession extends ChangeNotifier {
   final Set<String> _completedActions = <String>{};
   final List<SocialPublishedItem> _socialPublishedItems =
       <SocialPublishedItem>[];
+  final Set<String> _socialInteractionsInFlight = <String>{};
+  final Map<String, String> _socialInteractionErrors = <String, String>{};
   int _socialPublishSequence = 0;
+  String? _pendingSocialPublishFingerprint;
+  String? _pendingSocialPublishKey;
+  String? _socialFeedCursor;
+  bool socialFeedLoading = false;
+  bool socialFeedLoaded = false;
+  bool socialFeedHasMore = false;
+  String? socialFeedError;
+  bool _socialFeedFailureWasRefresh = true;
+  final Map<String, List<SocialComment>> _socialComments = {};
+  final Map<String, String?> _socialCommentCursors = {};
+  final Set<String> _socialCommentsLoaded = {};
+  final Set<String> _socialCommentsLoading = {};
+  final Set<String> _socialRepliesInFlight = {};
+  final Map<String, String> _socialCommentErrors = {};
+  final Map<String, String> _socialReplyDrafts = {};
+  final Map<String, String> _pendingSocialReplyFingerprints = {};
+  final Map<String, String> _pendingSocialReplyKeys = {};
+  int _socialReplySequence = 0;
+  final Map<String, SocialAuthorProfile> _socialAuthorProfiles = {};
+  final Set<String> _socialAuthorsLoading = {};
+  final Set<String> _socialFollowsInFlight = {};
+  final Map<String, String> _socialAuthorErrors = {};
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
+
+  bool get socialContentAvailable =>
+      _socialContentGateway is! UnavailableSocialContentGateway;
+
+  SocialCommentGateway? get _socialCommentGateway =>
+      _socialContentGateway is SocialCommentGateway
+      ? _socialContentGateway as SocialCommentGateway
+      : null;
+
+  SocialAuthorGateway? get _socialAuthorGateway =>
+      _socialContentGateway is SocialAuthorGateway
+      ? _socialContentGateway as SocialAuthorGateway
+      : null;
+
+  bool socialInteractionBusy(String postId) =>
+      _socialInteractionsInFlight.contains(postId);
+
+  String? socialInteractionError(String postId) =>
+      _socialInteractionErrors[postId];
+
+  List<SocialComment> socialComments(String postId) =>
+      List.unmodifiable(_socialComments[postId] ?? const <SocialComment>[]);
+
+  bool socialCommentsLoaded(String postId) =>
+      _socialCommentsLoaded.contains(postId);
+
+  bool socialCommentsLoading(String postId) =>
+      _socialCommentsLoading.contains(postId);
+
+  bool socialCommentsHasMore(String postId) =>
+      _socialCommentCursors[postId] != null;
+
+  bool socialReplyBusy(String postId) =>
+      _socialRepliesInFlight.contains(postId);
+
+  String? socialCommentError(String postId) => _socialCommentErrors[postId];
+
+  String socialReplyDraft(String postId) => _socialReplyDrafts[postId] ?? '';
+
+  SocialAuthorProfile? socialAuthorProfile(String authorId) =>
+      _socialAuthorProfiles[authorId];
+
+  bool socialAuthorLoading(String authorId) =>
+      _socialAuthorsLoading.contains(authorId);
+
+  bool socialFollowBusy(String authorId) =>
+      _socialFollowsInFlight.contains(authorId);
+
+  String? socialAuthorError(String authorId) => _socialAuthorErrors[authorId];
+
+  void saveSocialReplyDraft(String postId, String value) {
+    if (value.isEmpty) {
+      _socialReplyDrafts.remove(postId);
+    } else {
+      _socialReplyDrafts[postId] = value;
+    }
+  }
 
   SocialPublishedItem? get latestPublishedReel {
     for (final item in _socialPublishedItems) {
       if (item.type == SocialPublishedContentType.reel) return item;
     }
     return null;
+  }
+
+  Future<bool> loadSocialFeed({bool refresh = false}) async {
+    if (socialFeedLoading) return false;
+    if (!online) {
+      _socialFeedFailureWasRefresh = refresh;
+      socialFeedError =
+          'You are offline. Your last loaded Feed is still available.';
+      notifyListeners();
+      return false;
+    }
+    socialFeedLoading = true;
+    socialFeedError = null;
+    notifyListeners();
+    try {
+      final page = await _socialContentGateway.feed(
+        cursor: refresh ? null : _socialFeedCursor,
+      );
+      if (refresh) _socialPublishedItems.clear();
+      for (final item in page.items) {
+        _upsertSocialItem(item, append: true);
+      }
+      _socialFeedCursor = page.nextCursor;
+      socialFeedHasMore = page.nextCursor != null;
+      socialFeedLoaded = true;
+      socialFeedError = null;
+      _socialFeedFailureWasRefresh = true;
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialFeedFailureWasRefresh = refresh;
+      socialFeedError = error.message;
+      return false;
+    } on Object {
+      _socialFeedFailureWasRefresh = refresh;
+      socialFeedError =
+          'Feed is unavailable right now. Your last loaded posts remain visible.';
+      return false;
+    } finally {
+      socialFeedLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> retrySocialFeed() =>
+      loadSocialFeed(refresh: _socialFeedFailureWasRefresh);
+
+  Future<bool> loadSocialComments(String postId, {bool refresh = false}) async {
+    if (_socialCommentsLoading.contains(postId)) return false;
+    if (!online) {
+      _socialCommentErrors[postId] =
+          'You are offline. Previously loaded replies remain available.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialCommentGateway;
+    if (gateway == null) {
+      _socialCommentErrors[postId] =
+          'Replies are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    _socialCommentsLoading.add(postId);
+    _socialCommentErrors.remove(postId);
+    notifyListeners();
+    try {
+      final page = await gateway.comments(
+        postId: postId,
+        cursor: refresh ? null : _socialCommentCursors[postId],
+      );
+      final comments = _socialComments.putIfAbsent(
+        postId,
+        () => <SocialComment>[],
+      );
+      if (refresh) comments.clear();
+      for (final comment in page.items) {
+        if (!comments.any((item) => item.id == comment.id)) {
+          comments.add(comment);
+        }
+      }
+      _socialCommentCursors[postId] = page.nextCursor;
+      _socialCommentsLoaded.add(postId);
+      _socialCommentErrors.remove(postId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialCommentErrors[postId] = error.message;
+      return false;
+    } on Object {
+      _socialCommentErrors[postId] =
+          'Replies could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      _socialCommentsLoading.remove(postId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> postSocialReply(String postId, String body) async {
+    final normalized = body.trim();
+    if (normalized.isEmpty) {
+      _socialCommentErrors[postId] = 'Write a reply before posting.';
+      notifyListeners();
+      return false;
+    }
+    if (normalized.length > 500) {
+      _socialCommentErrors[postId] = 'Keep your reply within 500 characters.';
+      notifyListeners();
+      return false;
+    }
+    if (_socialRepliesInFlight.contains(postId)) return false;
+    if (!online) {
+      _socialCommentErrors[postId] =
+          'You are offline. Your reply is still here. Reconnect and try again.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      _socialCommentErrors[postId] = 'Sign in again before posting this reply.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialCommentGateway;
+    if (gateway == null) {
+      _socialCommentErrors[postId] =
+          'Replies are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    final fingerprint = '$postId\u001f$normalized';
+    if (_pendingSocialReplyFingerprints[postId] != fingerprint ||
+        _pendingSocialReplyKeys[postId] == null) {
+      _socialReplySequence += 1;
+      _pendingSocialReplyFingerprints[postId] = fingerprint;
+      _pendingSocialReplyKeys[postId] =
+          'social-reply-${DateTime.now().microsecondsSinceEpoch}-$_socialReplySequence';
+    }
+    _socialRepliesInFlight.add(postId);
+    _socialCommentErrors.remove(postId);
+    notifyListeners();
+    try {
+      final result = await gateway.reply(
+        SocialReplyDraft(
+          postId: postId,
+          idempotencyKey: _pendingSocialReplyKeys[postId]!,
+          body: normalized,
+        ),
+      );
+      final comments = _socialComments.putIfAbsent(
+        postId,
+        () => <SocialComment>[],
+      );
+      comments.removeWhere((item) => item.id == result.comment.id);
+      comments.insert(0, result.comment);
+      _socialCommentsLoaded.add(postId);
+      _upsertSocialItem(result.post);
+      _pendingSocialReplyFingerprints.remove(postId);
+      _pendingSocialReplyKeys.remove(postId);
+      _socialReplyDrafts.remove(postId);
+      _socialCommentErrors.remove(postId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialCommentErrors[postId] = error.message;
+      return false;
+    } on Object {
+      _socialCommentErrors[postId] =
+          'Your reply could not be posted. It is still here. Please try again.';
+      return false;
+    } finally {
+      _socialRepliesInFlight.remove(postId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadSocialAuthor(
+    String authorId, {
+    bool authenticated = false,
+  }) async {
+    if (_socialAuthorsLoading.contains(authorId)) return false;
+    if (!online) {
+      _socialAuthorErrors[authorId] =
+          'You are offline. Previously loaded author details remain available.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialAuthorGateway;
+    if (gateway == null) {
+      _socialAuthorErrors[authorId] =
+          'This author profile is unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    _socialAuthorsLoading.add(authorId);
+    _socialAuthorErrors.remove(authorId);
+    notifyListeners();
+    try {
+      final profile = await gateway.author(
+        authorId: authorId,
+        authenticated: authenticated,
+      );
+      _socialAuthorProfiles[authorId] = profile;
+      _socialAuthorErrors.remove(authorId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialAuthorErrors[authorId] = error.message;
+      return false;
+    } on Object {
+      _socialAuthorErrors[authorId] =
+          'This author profile could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      _socialAuthorsLoading.remove(authorId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> setSocialFollow(String authorId, bool followed) async {
+    if (_socialFollowsInFlight.contains(authorId)) return false;
+    if (!online) {
+      _socialAuthorErrors[authorId] =
+          'You are offline. Nothing changed. Reconnect and try again.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      _socialAuthorErrors[authorId] =
+          'Sign in again before changing this relationship.';
+      notifyListeners();
+      return false;
+    }
+    if (_socialAuthorProfiles[authorId]?.isSelf == true) {
+      _socialAuthorErrors[authorId] =
+          'You cannot follow your own MoolSocial profile.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialAuthorGateway;
+    if (gateway == null) {
+      _socialAuthorErrors[authorId] =
+          'Follow is unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    _socialFollowsInFlight.add(authorId);
+    _socialAuthorErrors.remove(authorId);
+    notifyListeners();
+    try {
+      final profile = await gateway.follow(
+        authorId: authorId,
+        followed: followed,
+      );
+      _socialAuthorProfiles[authorId] = profile;
+      _socialAuthorErrors.remove(authorId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialAuthorErrors[authorId] = error.message;
+      return false;
+    } on Object {
+      _socialAuthorErrors[authorId] =
+          'Follow could not be updated. Nothing changed. Please try again.';
+      return false;
+    } finally {
+      _socialFollowsInFlight.remove(authorId);
+      notifyListeners();
+    }
   }
 
   String filterFor(SharedScreenSpec spec) =>
@@ -339,6 +689,7 @@ class SharedSession extends ChangeNotifier {
     List<SocialPublishedChoice> choices = const <SocialPublishedChoice>[],
     int? correctChoiceIndex,
     DateTime? closesAt,
+    String? quotedPostId,
   }) async {
     final normalizedBody = body.trim();
     final normalizedChoices = choices
@@ -351,6 +702,12 @@ class SharedSession extends ChangeNotifier {
           ),
         )
         .toList(growable: false);
+    if (quotedPostId != null && normalizedBody.isEmpty) {
+      errorMessage = 'Add your thoughts before sharing this post.';
+      noticeMessage = null;
+      notifyListeners();
+      return null;
+    }
     final validation = _validateSocialContent(
       type: type,
       body: normalizedBody,
@@ -387,35 +744,54 @@ class SharedSession extends ChangeNotifier {
     busy = true;
     clearMessages();
     notifyListeners();
-    final nextSequence = _socialPublishSequence + 1;
-    final id = 'MS-SOCIAL-${nextSequence.toString().padLeft(4, '0')}';
+    final fingerprint = <Object?>[
+      type.name,
+      normalizedBody,
+      audience,
+      ...mediaPaths,
+      for (final choice in normalizedChoices)
+        '${choice.label}|${choice.imagePath ?? ''}',
+      correctChoiceIndex,
+      quotedPostId,
+    ].join('\u001f');
+    if (_pendingSocialPublishFingerprint != fingerprint ||
+        _pendingSocialPublishKey == null) {
+      _socialPublishSequence += 1;
+      _pendingSocialPublishFingerprint = fingerprint;
+      _pendingSocialPublishKey =
+          'social-${DateTime.now().microsecondsSinceEpoch}-$_socialPublishSequence';
+    }
     try {
-      await gateway.execute('SOCIAL-PUBLISH-$id');
-      final item = SocialPublishedItem(
-        id: id,
-        type: type,
-        authorName: authorName.trim().isEmpty ? 'Your profile' : authorName,
-        authorHandle: authorHandle.trim().isEmpty
-            ? 'Public profile'
-            : authorHandle,
-        body: normalizedBody,
-        audience: audience,
-        publishedAt: DateTime.now(),
-        mediaPaths: List<String>.unmodifiable(mediaPaths),
-        mediaAreAssets: mediaAreAssets,
-        choices: List<SocialPublishedChoice>.unmodifiable(normalizedChoices),
-        correctChoiceIndex: correctChoiceIndex,
-        closesAt: closesAt,
+      final item = await _socialContentGateway.publish(
+        SocialPublishDraft(
+          idempotencyKey: _pendingSocialPublishKey!,
+          type: type,
+          authorName: authorName.trim().isEmpty ? 'Your profile' : authorName,
+          authorHandle: authorHandle.trim().isEmpty
+              ? 'Public profile'
+              : authorHandle,
+          body: normalizedBody,
+          audience: audience,
+          mediaPaths: List<String>.unmodifiable(mediaPaths),
+          mediaAreAssets: mediaAreAssets,
+          choices: List<SocialPublishedChoice>.unmodifiable(normalizedChoices),
+          correctChoiceIndex: correctChoiceIndex,
+          quotedPostId: quotedPostId,
+        ),
       );
-      _socialPublishSequence = nextSequence;
-      _socialPublishedItems.insert(0, item);
+      _upsertSocialItem(item);
+      _pendingSocialPublishFingerprint = null;
+      _pendingSocialPublishKey = null;
       errorMessage = null;
-      noticeMessage = type == SocialPublishedContentType.reel
-          ? 'Reel posted to Shorts and your public profile.'
-          : 'Posted to Feed and your public profile.';
+      noticeMessage = 'Posted to Feed and your public profile.';
       return item;
-    } on SharedGatewayException catch (error) {
+    } on SocialContentGatewayException catch (error) {
       errorMessage = error.message;
+      noticeMessage = null;
+      return null;
+    } on Object {
+      errorMessage =
+          'Your content could not be posted. It is still here. Please try again.';
       noticeMessage = null;
       return null;
     } finally {
@@ -433,10 +809,7 @@ class SharedSession extends ChangeNotifier {
   }) {
     switch (type) {
       case SocialPublishedContentType.reel:
-        if (mediaPaths.length != 1) {
-          return 'Record or choose one Reel before posting.';
-        }
-        break;
+        return 'MoolSocial does not host Shorts or Reels. Use the YouTube creator option for YouTube-hosted Shorts.';
       case SocialPublishedContentType.carousel:
         if (mediaPaths.length < 2 || mediaPaths.length > 10) {
           return 'Choose between 2 and 10 photos for your carousel.';
@@ -449,26 +822,26 @@ class SharedSession extends ChangeNotifier {
         break;
       case SocialPublishedContentType.imagePoll:
         if (body.isEmpty) return 'Add a question for your Image Poll.';
-        if (choices.length < 2 ||
+        if (choices.length != 4 ||
             choices.any(
               (choice) =>
                   choice.label.isEmpty || choice.imagePath?.isEmpty != false,
             )) {
-          return 'Add a name and image for at least two choices.';
+          return 'Add a name and image for all four choices.';
         }
         break;
       case SocialPublishedContentType.quickPoll:
         if (body.isEmpty) return 'Add a question for your Quick Poll.';
-        if (choices.length < 2 ||
+        if (choices.length != 4 ||
             choices.any((choice) => choice.label.isEmpty)) {
-          return 'Add at least two choices.';
+          return 'Add all four choices.';
         }
         break;
       case SocialPublishedContentType.quiz:
         if (body.isEmpty) return 'Add a question for your Quiz.';
-        if (choices.length < 2 ||
+        if (choices.length != 4 ||
             choices.any((choice) => choice.label.isEmpty)) {
-          return 'Add at least two answers.';
+          return 'Add all four answers.';
         }
         if (correctChoiceIndex == null ||
             correctChoiceIndex < 0 ||
@@ -480,75 +853,83 @@ class SharedSession extends ChangeNotifier {
     return null;
   }
 
-  void toggleSocialLike(String id) {
-    _updateSocialItem(id, (item) {
-      final liked = !item.liked;
-      return item.copyWith(
-        liked: liked,
-        likeCount: (item.likeCount + (liked ? 1 : -1))
-            .clamp(0, 1 << 31)
-            .toInt(),
-      );
-    });
+  Future<bool> toggleSocialLike(String id) => _runSocialInteraction(id, 'like');
+
+  Future<bool> toggleSocialSave(String id) => _runSocialInteraction(id, 'save');
+
+  Future<bool> toggleSocialRepost(String id) =>
+      _runSocialInteraction(id, 'repost');
+
+  Future<bool> voteOnSocialContent(String id, int choiceIndex) =>
+      _runSocialInteraction(id, 'vote', choiceIndex: choiceIndex);
+
+  void rejectUnsupportedSocialInteraction(String action) {
+    errorMessage = '$action is not available yet. Nothing changed.';
+    noticeMessage = null;
+    notifyListeners();
   }
 
-  void toggleSocialSave(String id) {
-    _updateSocialItem(id, (item) => item.copyWith(saved: !item.saved));
-  }
-
-  void recordSocialReply(String id) {
-    _updateSocialItem(
-      id,
-      (item) => item.copyWith(replyCount: item.replyCount + 1),
-    );
-  }
-
-  void recordSocialShare(String id) {
-    _updateSocialItem(
-      id,
-      (item) => item.copyWith(shareCount: item.shareCount + 1),
-    );
-  }
-
-  void recordSocialRepost(String id) {
-    _updateSocialItem(
-      id,
-      (item) => item.copyWith(repostCount: item.repostCount + 1),
-    );
-  }
-
-  bool voteOnSocialContent(String id, int choiceIndex) {
-    final index = _socialPublishedItems.indexWhere((item) => item.id == id);
-    if (index < 0) return false;
-    final item = _socialPublishedItems[index];
-    if (item.selectedChoiceIndex != null ||
-        choiceIndex < 0 ||
-        choiceIndex >= item.choices.length) {
+  Future<bool> _runSocialInteraction(
+    String id,
+    String interaction, {
+    int? choiceIndex,
+  }) async {
+    if (_socialInteractionsInFlight.contains(id)) {
       return false;
     }
-    final choices = <SocialPublishedChoice>[
-      for (var choice = 0; choice < item.choices.length; choice++)
-        item.choices[choice].copyWith(
-          votes: item.choices[choice].votes + (choice == choiceIndex ? 1 : 0),
-        ),
-    ];
-    _socialPublishedItems[index] = item.copyWith(
-      choices: List<SocialPublishedChoice>.unmodifiable(choices),
-      selectedChoiceIndex: choiceIndex,
-    );
+    if (!online) {
+      const message = 'You are offline. Nothing changed.';
+      _socialInteractionErrors[id] = message;
+      errorMessage = message;
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    _socialInteractionsInFlight.add(id);
+    _socialInteractionErrors.remove(id);
     clearMessages();
     notifyListeners();
-    return true;
+    try {
+      final updated = await _socialContentGateway.interact(
+        postId: id,
+        interaction: interaction,
+        choiceIndex: choiceIndex,
+      );
+      _upsertSocialItem(updated);
+      _socialInteractionErrors.remove(id);
+      clearMessages();
+      notifyListeners();
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialInteractionErrors[id] = error.message;
+      errorMessage = error.message;
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    } on Object {
+      const message =
+          'That Feed action could not be completed. Nothing changed. Please try again.';
+      _socialInteractionErrors[id] = message;
+      errorMessage = message;
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    } finally {
+      _socialInteractionsInFlight.remove(id);
+      notifyListeners();
+    }
   }
 
-  void _updateSocialItem(
-    String id,
-    SocialPublishedItem Function(SocialPublishedItem item) update,
-  ) {
-    final index = _socialPublishedItems.indexWhere((item) => item.id == id);
-    if (index < 0) return;
-    _socialPublishedItems[index] = update(_socialPublishedItems[index]);
-    clearMessages();
-    notifyListeners();
+  void _upsertSocialItem(SocialPublishedItem item, {bool append = false}) {
+    final index = _socialPublishedItems.indexWhere(
+      (candidate) => candidate.id == item.id,
+    );
+    if (index >= 0) {
+      _socialPublishedItems[index] = item;
+    } else if (append) {
+      _socialPublishedItems.add(item);
+    } else {
+      _socialPublishedItems.insert(0, item);
+    }
   }
 }

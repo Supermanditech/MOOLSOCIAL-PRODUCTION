@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+  "priority": "P0",
+  "scope": "google_sign_in_only",
+  "state": "closed_proven_gap_corrected_and_verified",
+  "requirement": "Verify Identity Toolkit API availability and the effective API-key restrictions for the production FirebaseAuth.signInWithCredential request.",
+  "affectedLayer": "Google Cloud API availability and Firebase Android API-key restrictions",
+  "evidence": [
+    "The package, release signer, Android OAuth client, server/web client, and packaged Firebase project tuple are already matched.",
+    "The live request still rejects at FirebaseAuth.signInWithCredential.",
+    "Local packaged configuration cannot prove the current server-side API enabled state or effective API-key restrictions.",
+    "Read-only Google Cloud Console verification on 2026-08-23 proves Identity Toolkit API is enabled.",
+    "The Firebase Android API key is restricted to Android apps, contains com.moolsocial.app, and allows Identity Toolkit API.",
+    "A non-emitting comparison proves the installed r60.86 APK signer is missing from the Firebase Android API-key certificate restrictions. No key or certificate value was retained.",
+    "The first authorized save attempt is inadmissible: the browser verifier reloaded after a fixed delay without first waiting for the Cloud Console save-success signal, and the restriction was not present after reload. No second save was attempted before recording this harness defect.",
+    "The founder saved the prepared single-row correction. A subsequent independent reload and non-emitting comparison proves packageMatched=true, identityToolkitAllowed=true, and installedApkSignerMatched=true."
+  ],
+  "classification": "PROVEN_GAP_FIXED_EXTERNALLY",
+  "correctiveAction": "Add the existing current authorized release signing certificate to the com.moolsocial.app Android application restrictions on the existing Firebase Android API key. Do not create or replace a key, change the package, remove existing certificates, or change the allowed API list.",
+  "founderActionRequired": false,
+  "testPlan": [
+    "Verify Identity Toolkit API is enabled in the Firebase project.",
+    "Verify the effective API key permits the exact Android package/release certificate and required authentication API path.",
+    "If a mismatch is fixed, rerun focused preflight and a single real-device exchange."
+  ],
+  "acceptanceCriteria": [
+    "API availability and effective key restrictions are proven aligned, or a proven mismatch is corrected and verified."
+  ],
+  "regressionRisk": "Changing API-key restrictions without exact evidence can break Firebase services or broaden credential use.",
+  "exclusions": [
+    "Never print, store, or request an API-key value.",
+    "No OAuth-client or signer changes."
+  ]
+}

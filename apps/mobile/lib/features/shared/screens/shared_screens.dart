@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/mool_design_system.dart';
 import '../../../../core/design/mool_theme.dart';
+import '../../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../shared_models.dart';
 import '../shared_session.dart';
 
@@ -100,14 +101,25 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
             const SizedBox(width: MoolSpacing.xs),
           ],
         ),
-        bottomNavigationBar: _SharedDock(
-          activeId: switch (spec.screen) {
-            157 => 'activity',
-            162 => 'workspaces',
-            165 => 'settings',
-            _ => '',
-          },
-          returnRoute: _routeForScreen(spec.screen),
+        bottomNavigationBar: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            MoolGlobalNavigationV2(
+              activeId: '',
+              onOpenMool: () => context.push('/app/mool'),
+              onOpenAction: (action) => context.push(action.route),
+              onOpenChat: _openChat,
+            ),
+            Positioned(
+              right: MoolSpacing.xs,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: MoolSpacing.xs),
+                child: MoolGlobalChatNavigationV2(onOpenChat: _openChat),
+              ),
+            ),
+          ],
         ),
         body: ListView(
           key: Key('shared-${spec.screen}-list'),
@@ -119,6 +131,48 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
           ),
           children: [
             _SharedHero(spec: spec),
+            const SizedBox(height: MoolSpacing.sm),
+            MoolLocalNavigationRail(
+              key: const Key('shared-local-navigation'),
+              familyId: 'mool',
+              semanticLabel: 'Account choices',
+              activeId: switch (spec.screen) {
+                157 => 'activity',
+                162 => 'workspaces',
+                165 => 'settings',
+                _ => '',
+              },
+              actions: [
+                MoolLocalNavigationAction(
+                  keyName: 'shared-local-activity',
+                  id: 'activity',
+                  label: 'Activity',
+                  icon: Icons.notifications_none_rounded,
+                  onPressed: spec.screen == 157
+                      ? null
+                      : () => context.push('/app/activity'),
+                ),
+                MoolLocalNavigationAction(
+                  keyName: 'shared-local-workspaces',
+                  id: 'workspaces',
+                  label: 'Spaces',
+                  icon: Icons.grid_view_rounded,
+                  onPressed: spec.screen == 162
+                      ? null
+                      : () => context.push('/app/account/workspaces'),
+                ),
+                MoolLocalNavigationAction(
+                  keyName: 'shared-local-settings',
+                  id: 'settings',
+                  label: 'Controls',
+                  icon: Icons.tune_rounded,
+                  onPressed: spec.screen == 165
+                      ? null
+                      : () =>
+                            context.push('/app/account/workspaces/preferences'),
+                ),
+              ],
+            ),
             const SizedBox(height: MoolSpacing.sm),
             Row(
               children: [
@@ -221,6 +275,15 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
     },
   );
 
+  void _openChat() {
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {'return': _routeForScreen(spec.screen)},
+      ).toString(),
+    );
+  }
+
   Future<void> _openItem(SharedItem item) {
     return showModalBottomSheet<void>(
       context: context,
@@ -246,7 +309,7 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
         await _addFileSheet();
         return;
       case 162:
-        context.go('/app/work/choose');
+        context.go('/app/work/workspace/choose');
         return;
       default:
         return;
@@ -1312,63 +1375,6 @@ class _AgentAuthorityBoundary extends StatelessWidget {
           ),
         ),
     ],
-  );
-}
-
-class _SharedDock extends StatelessWidget {
-  const _SharedDock({required this.activeId, required this.returnRoute});
-
-  final String activeId;
-  final String returnRoute;
-
-  @override
-  Widget build(BuildContext context) => MoolOutcomeDock(
-    semanticLabel: 'Shared account navigation',
-    activeId: activeId,
-    mool: MoolDockAction(
-      keyName: 'shared-dock-mool',
-      id: 'mool',
-      label: 'Mool',
-      icon: MoolBrand.moolLauncherIcon,
-      onPressed: () => context.go('/app/social'),
-    ),
-    actions: [
-      MoolDockAction(
-        keyName: 'shared-dock-activity',
-        id: 'activity',
-        label: 'Activity',
-        icon: Icons.notifications_none_rounded,
-        badgeCount: 2,
-        onPressed: () => context.go('/app/activity'),
-      ),
-      MoolDockAction(
-        keyName: 'shared-dock-workspaces',
-        id: 'workspaces',
-        label: 'Spaces',
-        icon: Icons.grid_view_rounded,
-        onPressed: () => context.go('/app/account/workspaces'),
-      ),
-      MoolDockAction(
-        keyName: 'shared-dock-settings',
-        id: 'settings',
-        label: 'Controls',
-        icon: Icons.tune_rounded,
-        onPressed: () => context.go('/app/account/workspaces/preferences'),
-      ),
-    ],
-    chat: MoolDockAction(
-      keyName: 'shared-dock-chat',
-      id: 'chat',
-      label: 'Chat',
-      icon: Icons.chat_bubble_outline_rounded,
-      badgeCount: 2,
-      onPressed: () => context.go(
-        Uri(
-          path: '/app/chat/inbox',
-          queryParameters: {'return': returnRoute},
-        ).toString(),
-      ),
-    ),
   );
 }
 

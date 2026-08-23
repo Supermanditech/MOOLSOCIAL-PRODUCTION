@@ -459,11 +459,7 @@ void main() {
       Key('ride-type-bike'),
       Key('ride-type-auto'),
       Key('ride-type-cab'),
-      Key('ride-dock-mool'),
-      Key('ride-dock-book'),
-      Key('ride-dock-trip'),
-      Key('ride-dock-help'),
-      Key('ride-dock-chat'),
+      Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);
       for (
@@ -479,6 +475,11 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('ride-local-bike')), findsOneWidget);
+    expect(find.byKey(const Key('ride-local-auto')), findsOneWidget);
+    expect(find.byKey(const Key('ride-local-cab')), findsOneWidget);
+    expect(find.byKey(const Key('ride-local-bus')), findsOneWidget);
+    expect(find.byKey(const Key('mool-root-chat')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

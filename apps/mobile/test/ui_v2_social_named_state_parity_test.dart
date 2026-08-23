@@ -19,9 +19,9 @@ void main() {
       const states = <String?, Key>{
         null: Key('screen04-create-post-text'),
         'post': Key('screen04-create-post-text'),
-        'reel-source': Key('screen04-create-reel-camera'),
-        'reel-camera': Key('screen04-create-reel-camera'),
-        'reel-edit': Key('screen04-create-reel-camera'),
+        'reel-source': Key('screen04-create-post-text'),
+        'reel-camera': Key('screen04-create-post-text'),
+        'reel-edit': Key('screen04-create-post-text'),
         'carousel': Key('screen04-create-carousel-add'),
         'drafts': Key('screen04-create-post-text'),
         'publishing': Key('screen04-create-post-text'),
@@ -38,100 +38,112 @@ void main() {
           reason: '${entry.key}',
         );
         expect(find.byKey(entry.value), findsOneWidget, reason: '${entry.key}');
+        expect(
+          find.byKey(const Key('screen04-create-tool-reel')),
+          findsNothing,
+          reason: '${entry.key}',
+        );
         expect(tester.takeException(), isNull, reason: '${entry.key}');
       }
     },
   );
 
-  testWidgets('Screens 05 and 07 own filters, recovery and nested actions', (
+  testWidgets('Shorts and Feed fail closed with truthful recovery states', (
     tester,
   ) async {
     final owners = _Owners();
     addTearDown(owners.dispose);
-    await _pump(tester, owners.consumer());
-    expect(find.text('Fresh basket packed this morning'), findsOneWidget);
+    await _pump(tester, owners.consumer(sub: 'shorts'));
+    expect(
+      find.byKey(const Key('screen04-youtube-shorts-state-provider-access')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('YouTube Shorts are unavailable right now'),
+      findsOneWidget,
+    );
+    expect(find.text('Please try again later.'), findsOneWidget);
+    expect(find.text('Fresh basket packed this morning'), findsNothing);
+    expect(find.text('Comment'), findsNothing);
 
-    await tester.tap(find.text('Comment'));
-    await tester.pumpAndSettle();
-    expect(find.text('Add to the conversation'), findsOneWidget);
-    await tester.tap(find.byTooltip('Close'));
-    await tester.pumpAndSettle();
-
-    await _pump(tester, owners.consumer(state: 'promoted'));
-    expect(find.text('Meet Rajasthan makers this week'), findsOneWidget);
-    await _pump(tester, owners.consumer(state: 'unavailable'));
-    expect(find.text('This Short cannot be shown right now'), findsOneWidget);
+    await _pump(tester, owners.consumer(sub: 'shorts', state: 'promoted'));
+    expect(
+      find.byKey(const Key('screen04-youtube-shorts-state-provider-access')),
+      findsOneWidget,
+    );
+    expect(find.text('Meet Rajasthan makers this week'), findsNothing);
+    await _pump(tester, owners.consumer(sub: 'shorts', state: 'unavailable'));
+    expect(
+      find.byKey(const Key('screen04-youtube-shorts-state-unavailable')),
+      findsOneWidget,
+    );
+    expect(find.text('YouTube Shorts are unavailable'), findsOneWidget);
 
     await _pump(tester, owners.consumer(sub: 'feed'));
-    if (find.text('Meera Rathore').evaluate().isEmpty) {
-      await tester.drag(find.byType(ListView).last, const Offset(0, -420));
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.text('Meera Rathore'));
-    await tester.pumpAndSettle();
-    expect(find.text('Public MoolSocial profile'), findsOneWidget);
-    await tester.tap(find.byTooltip('Close'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('More Post actions'));
-    await tester.pumpAndSettle();
-    expect(find.text('Report this Post'), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+      findsOneWidget,
+    );
+    expect(find.text('Meera Rathore'), findsNothing);
+    expect(find.text('Explore featured products'), findsNothing);
+    expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
 
-    await _pump(tester, owners.consumer(sub: 'feed', state: 'promoted'));
-    await tester.drag(find.byType(ListView).last, const Offset(0, -650));
+    await _pump(tester, owners.consumer(sub: 'feed', state: 'loading'));
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-state-loading')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-loading')),
+      findsOneWidget,
+    );
+
+    await _pump(tester, owners.consumer(sub: 'feed', state: 'error'));
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-state-error')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('screen04-feed-retry')));
     await tester.pumpAndSettle();
-    expect(find.text('Explore featured products'), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+      findsOneWidget,
+    );
+
     await _pump(tester, owners.consumer(sub: 'feed', state: 'unavailable'));
-    expect(find.text('This Post cannot be shown right now'), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-state-unavailable')),
+      findsOneWidget,
+    );
+    expect(find.text('Feed isn’t available right now'), findsOneWidget);
   });
 
   testWidgets(
-    'Screen 06 owns watch, channel, details and MoolSocial discussion',
+    'Screen 06 shows finished recovery copy without an eligible video',
     (tester) async {
       final owners = _Owners();
       addTearDown(owners.dispose);
       await _pump(tester, owners.consumer(sub: 'videos'));
-      await _tapVisible(tester, find.text('5-minute morning mobility'));
-      expect(find.byKey(const Key('social-v2-youtube-play')), findsOneWidget);
-      expect(find.byKey(const Key('screen04-video-back')), findsNothing);
-
-      await tester.tap(find.byKey(const Key('screen04-video-details-trigger')));
-      await tester.pumpAndSettle();
-      expect(find.text('Description'), findsOneWidget);
-      expect(find.text('38K likes'), findsOneWidget);
-
-      await _tapVisible(
-        tester,
-        find.byKey(const Key('screen04-video-channel-details-sheet')),
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-state-provider-access')),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-      expect(find.text('Move With Asha'), findsWidgets);
-      expect(find.text('86M'), findsOneWidget);
-      expect(find.text('Views'), findsWidgets);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.text('Description'), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('social-v2-youtube-play')), findsOneWidget);
-
-      await tester.tap(find.text('Details'));
-      await tester.pumpAndSettle();
-      expect(find.text('Description'), findsOneWidget);
-      await tester.tap(find.byTooltip('Close'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Discuss'));
-      await tester.pumpAndSettle();
-      expect(find.text('MoolSocial discussion'), findsWidgets);
-      await tester.tap(find.byTooltip('Close'));
-      await tester.pumpAndSettle();
-
+      expect(
+        find.text('YouTube Videos are unavailable right now'),
+        findsOneWidget,
+      );
+      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(find.text('5-minute morning mobility'), findsNothing);
+      expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
       expect(find.text('Subscribe'), findsNothing);
-      expect(find.textContaining('like, comment or subscribe'), findsNothing);
-      expect(find.text('MoolSocial discussion'), findsOneWidget);
+      expect(find.text('Upload'), findsNothing);
 
       await _pump(tester, owners.consumer(sub: 'videos', state: 'unavailable'));
-      expect(find.text('This Video cannot be shown right now'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-state-unavailable')),
+        findsOneWidget,
+      );
+      expect(find.text('YouTube Videos are unavailable'), findsOneWidget);
     },
   );
 
@@ -386,7 +398,7 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
       home: child,
     ),
   );
-  await tester.pumpAndSettle();
+  await tester.pump();
 }
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {

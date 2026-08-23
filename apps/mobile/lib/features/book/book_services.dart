@@ -7,6 +7,12 @@ class BookServiceException implements Exception {
 }
 
 abstract interface class BookGateway {
+  Future<List<BusTrip>> searchBusTrips({
+    required String from,
+    required String to,
+    required DateTime date,
+  });
+
   Future<DoctorAppointment> confirmDoctorAppointment({
     required String patient,
     required DoctorCare care,
@@ -50,6 +56,7 @@ abstract interface class BookGateway {
 
 class ReviewBookGateway implements BookGateway {
   ReviewBookGateway({
+    this.failNextBus = false,
     this.failNextDoctor = false,
     this.failNextSalon = false,
     this.failNextSalonPayment = false,
@@ -61,6 +68,7 @@ class ReviewBookGateway implements BookGateway {
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
+  bool failNextBus;
   bool failNextDoctor;
   bool failNextSalon;
   bool failNextSalonPayment;
@@ -71,6 +79,7 @@ class ReviewBookGateway implements BookGateway {
   final Duration latency;
   final DateTime Function() _now;
   int _sequence = 2047;
+  int busSearchCalls = 0;
   int doctorCalls = 0;
   int salonCalls = 0;
   int salonPaymentCalls = 0;
@@ -81,6 +90,50 @@ class ReviewBookGateway implements BookGateway {
 
   Future<void> _wait() async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
+  }
+
+  @override
+  Future<List<BusTrip>> searchBusTrips({
+    required String from,
+    required String to,
+    required DateTime date,
+  }) async {
+    busSearchCalls += 1;
+    await _wait();
+    if (failNextBus) {
+      failNextBus = false;
+      throw const BookServiceException(
+        'Bus results could not refresh. Your route and date are saved. Try again.',
+      );
+    }
+    final dateId =
+        '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+    return [
+      BusTrip(
+        id: 'BUS-$dateId-1',
+        operatorName: 'BlueCity Express',
+        from: from,
+        to: to,
+        departure: '06:30',
+        arrival: '12:15',
+        duration: '5h 45m',
+        availableSeats: 12,
+        rating: 4.5,
+        fare: 649,
+      ),
+      BusTrip(
+        id: 'BUS-$dateId-2',
+        operatorName: 'Rajputana Travels',
+        from: from,
+        to: to,
+        departure: '22:10',
+        arrival: '05:40',
+        duration: '7h 30m',
+        availableSeats: 7,
+        rating: 4.3,
+        fare: 799,
+      ),
+    ];
   }
 
   @override

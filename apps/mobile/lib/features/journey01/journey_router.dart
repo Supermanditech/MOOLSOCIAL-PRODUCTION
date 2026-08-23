@@ -1,8 +1,10 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../book/book_session.dart';
 import '../book/screens/book_home_screen.dart';
+import '../book/screens/bus_booking_screen.dart';
 import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
@@ -90,12 +92,17 @@ import '../../ui_v2/launch/launch_presentation_gate.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
+import '../../ui_v2/screens/screen03_login/login_screen_v5.dart';
 import '../../ui_v2/screens/screen03_login/otp_screen_v2.dart';
 import '../../ui_v2/social/social_v2_consumer.dart';
 import '../../ui_v2/social/social_v2_creator.dart';
 import '../../ui_v2/social/social_v2_plans_promotion.dart';
-import '../../ui_v2/social/social_v2_youtube_connect.dart';
+import '../../ui_v2/social/social_v2_youtube_creator_upload.dart';
 import '../../ui_v2/buy/buy_v2_screen.dart';
+import '../../ui_v2/universal/legacy_route_containment_screen_v2.dart';
+import '../../ui_v2/universal/mool_global_navigation_v2.dart';
+import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
+import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
 import 'screens/universal_shell.dart';
 
@@ -121,12 +128,17 @@ GoRouter createJourneyRouter(
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
   late final GoRouter router;
-  VoidCallback buyExit(GoRouterState state) =>
-      () => router.go(
-        session.buyExitRoute(
-          requestedRoute: state.uri.queryParameters['return'],
-        ),
-      );
+  VoidCallback buyExit(BuildContext context, GoRouterState state) => () {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    router.go(
+      session.buyExitRoute(requestedRoute: state.uri.queryParameters['return']),
+    );
+  };
+  VoidCallback openMoolFromBuy(BuildContext context) =>
+      () => context.push('/app/mool?from=buy');
   void rememberBuyDestination(BuyV2Destination destination) {
     final location = '/app/buy?sub=${destination.name}';
     session.confirmReadyRoute(location);
@@ -149,6 +161,21 @@ GoRouter createJourneyRouter(
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
       final returnLocation = state.uri.toString();
+      final authenticatedRoute =
+          location.startsWith('/app/chat') ||
+          (location == '/app/social' &&
+              state.uri.queryParameters['sub'] == 'create');
+
+      if (protected &&
+          session.isReady &&
+          authenticatedRoute &&
+          !session.isAuthenticated) {
+        session.beginSignIn(
+          returnLocation: returnLocation,
+          cancelLocation: session.authenticationCancelFallback,
+        );
+        return '/sign-in';
+      }
 
       if (protected && !session.isReady) {
         session.captureReturnTo(returnLocation);
@@ -173,6 +200,12 @@ GoRouter createJourneyRouter(
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
           if (!protected) return session.readyRoute();
+          final containment = legacyPresentationForTestsOnly
+              ? null
+              : legacyRouteContainmentFor(state.uri);
+          if (containment != null) {
+            return containment.recoveryLocation;
+          }
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (session.isReady &&
                 router.routeInformationProvider.value.uri.path == location) {
@@ -196,20 +229,33 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/sign-in',
-        builder: (context, state) => LoginScreenV2(session: session),
+        builder: (context, state) => legacyPresentationForTestsOnly
+            ? LoginScreenV2(session: session)
+            : LoginScreenV5(session: session),
       ),
       GoRoute(
         path: '/verify',
         builder: (context, state) => OtpScreenV2(session: session),
       ),
       GoRoute(
+        path: '/app/action-unavailable',
+        builder: (context, state) => LegacyRouteContainmentScreenV2(
+          spec: legacyRouteContainmentSpecForReason(
+            state.uri.queryParameters['reason'],
+          ),
+        ),
+      ),
+      GoRoute(
         path: '/app/buy',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           if (legacyPresentationForTestsOnly) {
-            return UniversalShell(
-              session: session,
-              section: 'buy',
-              initialSubAction: state.uri.queryParameters['sub'],
+            return moolMainDestinationPage(
+              state: state,
+              child: UniversalShell(
+                session: session,
+                section: 'buy',
+                initialSubAction: state.uri.queryParameters['sub'],
+              ),
             );
           }
           final destination = _buyV2Destination(
@@ -223,16 +269,22 @@ GoRouter createJourneyRouter(
                 state.uri.queryParameters['sub'] ??
                 state.uri.queryParameters['context'],
           );
-          return BuyV2Screen(
-            session: buyV2Session,
-            initialDestination: destination,
-            initialView: view,
-            initialCartScope: cartScope,
-            productId: state.uri.queryParameters['product'],
-            orderId: state.uri.queryParameters['order'],
-            recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
-            onExit: buyExit(state),
-            onDestinationChanged: rememberBuyDestination,
+          return moolMainDestinationPage(
+            state: state,
+            child: BuyV2Screen(
+              session: buyV2Session,
+              initialDestination: destination,
+              initialView: view,
+              initialCartScope: cartScope,
+              productId: state.uri.queryParameters['product'],
+              orderId: state.uri.queryParameters['order'],
+              recoveryKind: _buyV2Recovery(
+                state.uri.queryParameters['recovery'],
+              ),
+              onExit: buyExit(context, state),
+              onOpenMool: openMoolFromBuy(context),
+              onDestinationChanged: rememberBuyDestination,
+            ),
           );
         },
       ),
@@ -243,7 +295,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.shop,
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -254,7 +307,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.medicine,
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -270,7 +324,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.product,
                 productId: state.pathParameters['productId'],
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -287,7 +342,8 @@ GoRouter createJourneyRouter(
                 initialCartScope: _buyV2CartScope(
                   state.uri.queryParameters['scope'],
                 ),
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -299,7 +355,8 @@ GoRouter createJourneyRouter(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.checkout,
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -315,7 +372,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -331,7 +389,8 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -345,7 +404,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.orders,
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -359,7 +419,8 @@ GoRouter createJourneyRouter(
             : BuyV2Screen(
                 session: buyV2Session,
                 initialDestination: BuyV2Destination.orders,
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
@@ -375,13 +436,17 @@ GoRouter createJourneyRouter(
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.assist,
                 orderId: state.pathParameters['orderId'],
-                onExit: buyExit(state),
+                onExit: buyExit(context, state),
+                onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
               ),
       ),
       GoRoute(
         path: '/app/eat/home',
-        builder: (context, state) => EatHomeScreen(session: eatSession),
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: EatHomeScreen(session: eatSession),
+        ),
       ),
       GoRoute(
         path: '/app/eat/order',
@@ -433,28 +498,38 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/chat',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final filter = _chatFilter(
             state.uri.queryParameters['type'] ??
                 state.uri.queryParameters['sub'],
           );
-          return ChatInboxScreen(
-            key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
-            session: chatSession,
-            initialFilter: filter,
-            returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          return moolMainDestinationPage(
+            state: state,
+            child: ChatInboxScreen(
+              key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
+              session: chatSession,
+              initialFilter: filter,
+              initialTargetUserId: state.uri.queryParameters['start'],
+              initialMessageDraft: state.uri.queryParameters['draft'],
+              returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+            ),
           );
         },
       ),
       GoRoute(
         path: '/app/chat/inbox',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final filter = _chatFilter(state.uri.queryParameters['type']);
-          return ChatInboxScreen(
-            key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
-            session: chatSession,
-            initialFilter: filter,
-            returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          return moolMainDestinationPage(
+            state: state,
+            child: ChatInboxScreen(
+              key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
+              session: chatSession,
+              initialFilter: filter,
+              initialTargetUserId: state.uri.queryParameters['start'],
+              initialMessageDraft: state.uri.queryParameters['draft'],
+              returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+            ),
           );
         },
       ),
@@ -463,19 +538,23 @@ GoRouter createJourneyRouter(
         builder: (context, state) => ChatThreadScreen(
           session: chatSession,
           threadId: state.pathParameters['threadId'] ?? 'home-basket',
+          initialMessageDraft: state.uri.queryParameters['draft'],
           returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
         ),
       ),
       GoRoute(
         path: '/app/ride/book',
-        builder: (context, state) => RideBookingScreen(
-          session: rideSession,
-          initialType: switch (state.uri.queryParameters['type']) {
-            'bike' => RideType.bike,
-            'cab' => RideType.cab,
-            'auto' => RideType.auto,
-            _ => null,
-          },
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: RideBookingScreen(
+            session: rideSession,
+            initialType: switch (state.uri.queryParameters['type']) {
+              'bike' => RideType.bike,
+              'cab' => RideType.cab,
+              'auto' => RideType.auto,
+              _ => null,
+            },
+          ),
         ),
       ),
       GoRoute(
@@ -500,8 +579,18 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/book/bus',
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: BusBookingScreen(session: bookSession),
+        ),
+      ),
+      GoRoute(
         path: '/app/book/doctor',
-        builder: (context, state) => DoctorBookingScreen(session: bookSession),
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: DoctorBookingScreen(session: bookSession),
+        ),
       ),
       GoRoute(
         path: '/app/book/doctor/details',
@@ -676,8 +765,7 @@ GoRouter createJourneyRouter(
         path: '/app/creator/youtube-connect',
         builder: (context, state) => legacyPresentationForTestsOnly
             ? CreatorYouTubeConnectScreen(session: creatorSession)
-            : SocialYouTubeConnectV2Screen(
-                session: creatorSession,
+            : SocialYouTubeCreatorUploadScreen(
                 youtubeConnectResult:
                     state.uri.queryParameters['youtubeConnect'],
               ),
@@ -1285,10 +1373,6 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
-        path: '/app/work',
-        builder: (context, state) => WorkEarnScreen(session: workSession),
-      ),
-      GoRoute(
         path: '/app/work/mool',
         builder: (context, state) {
           session.openMoolFrom('work');
@@ -1297,7 +1381,10 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/earn',
-        builder: (context, state) => WorkEarnScreen(session: workSession),
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: WorkEarnScreen(session: workSession),
+        ),
       ),
       GoRoute(
         path: '/app/work/opportunity/:opportunityId',
@@ -1312,12 +1399,12 @@ GoRouter createJourneyRouter(
         builder: (context, state) => MyWorkScreen(session: workSession),
       ),
       GoRoute(
-        path: '/app/work/choose',
+        path: '/app/work/workspace/choose',
         builder: (context, state) =>
             WorkChooseActivityScreen(session: workSession),
       ),
       GoRoute(
-        path: '/app/work/proof',
+        path: '/app/work/workspace/proof',
         builder: (context, state) =>
             WorkProfileProofScreen(session: workSession),
       ),
@@ -1336,8 +1423,92 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/:section',
-        builder: (context, state) {
+        redirect: (context, state) {
+          if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
+          final actionChoiceRoot = personalMvpActionChoiceRoots[section];
+          if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
+            return null;
+          }
+          return actionChoiceRoot.actions.first.route;
+        },
+        pageBuilder: (context, state) {
+          final section = state.pathParameters['section'] ?? 'social';
+          final requestedOrigin = state.uri.queryParameters['from'];
+          final moolOrigin =
+              section == 'mool' &&
+                  const {
+                    'social',
+                    'buy',
+                    'eat',
+                    'ride',
+                    'book',
+                    'work',
+                  }.contains(requestedOrigin)
+              ? requestedOrigin
+              : null;
+          if (moolOrigin != null) {
+            session.openMoolFrom(moolOrigin);
+          }
+          if (!legacyPresentationForTestsOnly && section == 'mool') {
+            void leaveMool() {
+              if (context.canPop()) {
+                context.pop();
+              } else if (moolOrigin != null) {
+                context.go('/app/$moolOrigin');
+              } else {
+                SystemNavigator.pop();
+              }
+            }
+
+            return moolMainDestinationPage(
+              state: state,
+              child: PersonalMoolRootV2(
+                onBack: leaveMool,
+                onOpenAction: (action) => context.go(action.route),
+                onOpenRoute: (route) {
+                  if (moolOrigin == null) {
+                    context.push(route);
+                  } else {
+                    context.pushReplacement(route);
+                  }
+                },
+                onOpenChat: () =>
+                    context.push('/app/chat/inbox?return=/app/mool'),
+                areaLabel: session.currentAreaLabel ?? session.manualArea,
+              ),
+            );
+          }
+          final actionChoiceRoot = personalMvpActionChoiceRoots[section];
+          if (legacyPresentationForTestsOnly && actionChoiceRoot != null) {
+            void leaveActionChoiceRoot() {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/app/mool?from=$section');
+              }
+            }
+
+            return moolMainDestinationPage(
+              state: state,
+              child: MvpActionChoiceRootV2(
+                sectionLabel: actionChoiceRoot.sectionLabel,
+                headline: actionChoiceRoot.headline,
+                supportingText: actionChoiceRoot.supportingText,
+                actions: actionChoiceRoot.actions,
+                onBack: leaveActionChoiceRoot,
+                onOpenAction: (action) => context.push(action.route),
+                onOpenMainAction: (action) => openMoolConnectedRoute(
+                  context,
+                  activeFamilyId: section,
+                  route: action.route,
+                ),
+                onOpenMool: () => context.push('/app/mool?from=$section'),
+                onOpenChat: () =>
+                    context.push('/app/chat/inbox?return=/app/$section'),
+              ),
+            );
+          }
           if (!legacyPresentationForTestsOnly &&
               const {
                 'social',
@@ -1348,24 +1519,37 @@ GoRouter createJourneyRouter(
                 'pay',
                 'work',
               }.contains(section)) {
-            return SocialUniversalV2(
-              session: session,
-              creatorSession: creatorSession,
-              retailerSession: retailerSession,
-              sharedSession: sharedSession,
-              initialWorld: state.uri.queryParameters['world'] ?? section,
-              initialSubAction: state.uri.queryParameters['sub'],
-              initialState:
-                  state.uri.queryParameters['state'] ??
-                  state.uri.queryParameters['mode'],
-              initialItem: state.uri.queryParameters['item'],
-              initialMoolOpen: state.uri.queryParameters['openMool'] == '1',
+            return moolMainDestinationPage(
+              state: state,
+              child: SocialUniversalV2(
+                session: session,
+                creatorSession: creatorSession,
+                retailerSession: retailerSession,
+                sharedSession: sharedSession,
+                initialWorld: section,
+                initialSubAction: state.uri.queryParameters['sub'],
+                initialState:
+                    state.uri.queryParameters['state'] ??
+                    state.uri.queryParameters['mode'],
+                initialItem: state.uri.queryParameters['item'],
+                initialAction: state.uri.queryParameters['action'],
+                initialChoice: state.uri.queryParameters['choice'],
+                onOpenMool: () => context.push('/app/mool?from=social'),
+                onOpenMainAction: (action) => openMoolConnectedRoute(
+                  context,
+                  activeFamilyId: section,
+                  route: action.route,
+                ),
+              ),
             );
           }
-          return UniversalShell(
-            session: session,
-            section: section,
-            initialSubAction: state.uri.queryParameters['sub'],
+          return moolMainDestinationPage(
+            state: state,
+            child: UniversalShell(
+              session: session,
+              section: section,
+              initialSubAction: state.uri.queryParameters['sub'],
+            ),
           );
         },
       ),

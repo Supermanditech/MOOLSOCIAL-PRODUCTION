@@ -2,99 +2,200 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../book_models.dart';
 import '../book_session.dart';
 import '../widgets/book_widgets.dart';
 
-class SalonBookingScreen extends StatelessWidget {
+class SalonBookingScreen extends StatefulWidget {
   const SalonBookingScreen({required this.session, super.key});
 
   final BookSession session;
 
   @override
+  State<SalonBookingScreen> createState() => _SalonBookingScreenState();
+}
+
+class _SalonBookingScreenState extends State<SalonBookingScreen> {
+  static const _accent = Color(0xFF6D28D9);
+  static const _services = [
+    'Haircut',
+    'Beard',
+    'Facial',
+    'Colour',
+    'Massage',
+    'Bridal',
+  ];
+
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    final normalizedQuery = _query.trim().toLowerCase();
+    final visibleServices = normalizedQuery.isEmpty
+        ? _services
+        : _services
+              .where(
+                (service) => service.toLowerCase().contains(normalizedQuery),
+              )
+              .toList();
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) => BookPageScaffold(
         session: session,
         title: 'Salon',
-        subtitle: 'Service, place, price and slot',
-        body: ListView(
-          padding: const EdgeInsets.all(MoolSpacing.md),
-          children: [
-            const BookSectionTitle('1. Select service'),
-            const SizedBox(height: MoolSpacing.sm),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children:
-                  ['Haircut', 'Beard', 'Facial', 'Colour', 'Massage', 'Bridal']
+        subtitle: 'Choose a service and book directly',
+        showBack: false,
+        body: ColoredBox(
+          color: MoolServiceHomeTokens.page,
+          child: ListView(
+            key: const Key('salon-discovery-home'),
+            padding: const EdgeInsets.fromLTRB(
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.sm,
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.xl,
+            ),
+            children: [
+              MoolServiceSearchField(
+                fieldKey: const Key('salon-search'),
+                hintText: 'Search salon service',
+                semanticLabel: 'Search salon service',
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              MoolServiceSectionHeader(
+                title: 'Services',
+                subtitle: normalizedQuery.isEmpty
+                    ? 'Select one to see the exact starting price.'
+                    : '${visibleServices.length} matching service${visibleServices.length == 1 ? '' : 's'}',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              if (visibleServices.isEmpty)
+                const MoolServiceCard(
+                  key: Key('salon-search-empty'),
+                  title: 'No matching service',
+                  subtitle:
+                      'Try Haircut, Beard, Facial, Colour, Massage or Bridal.',
+                  icon: Icons.search_off_rounded,
+                )
+              else
+                Wrap(
+                  spacing: MoolSpacing.xs,
+                  runSpacing: MoolSpacing.xs,
+                  children: visibleServices
                       .map(
-                        (service) => MoolSegment(
+                        (service) => MoolServiceChoice(
                           key: Key('salon-service-${service.toLowerCase()}'),
                           label: service,
+                          accent: _accent,
                           selected: session.salonService == service,
-                          onPressed: () => session.chooseSalonService(service),
+                          onSelected: (_) =>
+                              session.chooseSalonService(service),
                         ),
                       )
                       .toList(),
-            ),
-            const SizedBox(height: MoolSpacing.lg),
-            const BookSectionTitle('2. Choose how'),
-            const SizedBox(height: MoolSpacing.sm),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: SalonMode.values
-                  .map(
-                    (mode) => MoolSegment(
-                      key: Key('salon-mode-${mode.name}'),
-                      label: mode.label,
-                      selected: session.salonMode == mode,
-                      onPressed: () => session.chooseSalonMode(mode),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: MoolSpacing.lg),
-            const BookSectionTitle('3. Best match', detail: 'Today · 5:40 PM'),
-            const SizedBox(height: MoolSpacing.sm),
-            BookCard(
-              child: Column(
-                children: [
-                  const BookFact(
-                    icon: Icons.storefront_outlined,
-                    title: 'Royal Touch Salon',
-                    detail:
-                        '800 m · rating and shop photos verified · 35 minute slot',
+                ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Where should it happen?',
+                subtitle: 'Availability and price stay visible before booking.',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              Wrap(
+                spacing: MoolSpacing.xs,
+                runSpacing: MoolSpacing.xs,
+                children: SalonMode.values
+                    .map(
+                      (mode) => MoolServiceChoice(
+                        key: Key('salon-mode-${mode.name}'),
+                        label: mode.label,
+                        icon: switch (mode) {
+                          SalonMode.salon => Icons.storefront_outlined,
+                          SalonMode.home => Icons.home_outlined,
+                          SalonMode.makeup => Icons.face_retouching_natural,
+                          SalonMode.package => Icons.inventory_2_outlined,
+                        },
+                        accent: _accent,
+                        selected: session.salonMode == mode,
+                        onSelected: (_) => session.chooseSalonMode(mode),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+              const MoolServiceSectionHeader(
+                title: 'Available today',
+                subtitle:
+                    'One trusted match with price and cancellation shown.',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              MoolServiceCard(
+                key: const Key('salon-top-provider'),
+                title: 'Royal Touch Salon',
+                subtitle:
+                    '${session.salonService} · ${session.salonMode.label}',
+                icon: Icons.content_cut_rounded,
+                accent: _accent,
+                emphasized: true,
+                metadata: [
+                  const MoolServiceMeta(
+                    icon: Icons.verified_rounded,
+                    label: 'Shop and photos verified',
                   ),
-                  const Divider(height: 24),
-                  BookFact(
+                  const MoolServiceMeta(
+                    icon: Icons.near_me_outlined,
+                    label: '800 m',
+                  ),
+                  const MoolServiceMeta(
+                    icon: Icons.schedule_rounded,
+                    label: 'Today · 5:40 PM',
+                  ),
+                  const MoolServiceMeta(
+                    icon: Icons.timer_outlined,
+                    label: '35 min',
+                  ),
+                  MoolServiceMeta(
                     icon: Icons.currency_rupee_rounded,
-                    title: '${bookMoney(session.salonAmount)} shown price',
-                    detail:
-                        '${session.salonService} · ${session.salonMode.label} · free cancellation till 30 min before',
+                    label: bookMoney(session.salonAmount),
+                  ),
+                  const MoolServiceMeta(
+                    icon: Icons.event_busy_outlined,
+                    label: 'Free cancel until 5:10 PM',
                   ),
                 ],
+                semanticLabel:
+                    'Royal Touch Salon, verified, ${session.salonService}, ${session.salonMode.label}, today at 5:40 PM, ${bookMoney(session.salonAmount)}, free cancellation until 5:10 PM',
+                onTap: () {
+                  session.clearMessages();
+                  context.go('/app/book/salon/confirm');
+                },
               ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () => session.showNotice(
-                'Salon chat opened with service and slot attached.',
+              const SizedBox(height: MoolSpacing.sm),
+              OutlinedButton.icon(
+                key: const Key('salon-ask-provider'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(44, 48),
+                ),
+                onPressed: () => session.showNotice(
+                  'Salon chat opened with service and slot attached.',
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                label: const Text('Ask salon'),
               ),
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              label: const Text('Ask salon'),
-            ),
-          ],
+            ],
+          ),
         ),
-        bottomAction: FilledButton(
+        bottomAction: MoolServicePrimaryButton(
           key: const Key('review-salon-slot'),
+          accent: _accent,
+          icon: Icons.event_available_outlined,
+          label: 'Review ${bookMoney(session.salonAmount)} slot',
           onPressed: () {
             session.clearMessages();
             context.go('/app/book/salon/confirm');
           },
-          child: const Text('Review slot'),
         ),
       ),
     );
@@ -216,7 +317,7 @@ class SalonConfirmedScreen extends StatelessWidget {
         session: session,
         title: 'Salon confirmed',
         subtitle: 'Reminder, route and changes',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/salon/confirm',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -341,7 +442,7 @@ class SalonVisitScreen extends StatelessWidget {
         session: session,
         title: 'Salon visit',
         subtitle: 'Checked in · stylist preparing',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/salon/confirmed',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -416,7 +517,7 @@ class SalonCompleteScreen extends StatelessWidget {
         session: session,
         title: 'Finish salon visit',
         subtitle: 'Review bill · pay · rate',
-        activeDock: 'activity',
+        activeLocalAction: 'activity',
         fallbackBackRoute: '/app/book/salon/visit',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),
@@ -525,7 +626,7 @@ class _SalonSupportScreenState extends State<SalonSupportScreen> {
         session: session,
         title: 'Salon help',
         subtitle: 'Saved bill and visit evidence attached',
-        activeDock: 'help',
+        activeLocalAction: 'help',
         fallbackBackRoute: '/app/book/salon/complete',
         body: ListView(
           padding: const EdgeInsets.all(MoolSpacing.md),

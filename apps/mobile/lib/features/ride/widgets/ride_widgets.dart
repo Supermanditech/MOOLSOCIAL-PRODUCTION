@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../ride_models.dart';
 import '../ride_session.dart';
 
@@ -15,7 +16,7 @@ class RidePageScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.body,
-    this.activeDock = 'ride',
+    this.activeLocalAction = '',
     this.fallbackBackRoute = '/app/ride',
     this.showBack = true,
     this.trailing,
@@ -27,7 +28,7 @@ class RidePageScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget body;
-  final String activeDock;
+  final String activeLocalAction;
   final String fallbackBackRoute;
   final bool showBack;
   final Widget? trailing;
@@ -35,108 +36,261 @@ class RidePageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        leadingWidth: showBack ? 64 : 16,
-        leading: showBack
-            ? Padding(
-                padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('ride-back'),
-                  tooltip: 'Go back',
-                  onPressed: () {
-                    session.clearMessages();
-                    context.go(fallbackBackRoute);
-                  },
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    final tripId = session.trip?.id;
+    final activeSubAction =
+        const {'bike', 'auto', 'cab'}.contains(activeLocalAction)
+        ? activeLocalAction
+        : session.selectedType.name;
+
+    void leaveContentDepth() {
+      session.clearMessages();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(fallbackBackRoute);
+      }
+    }
+
+    void openRideType(RideType type) {
+      session.clearMessages();
+      if (tripId != null) {
+        session.showNotice(
+          'Your ${session.selectedType.label} ride is still active. '
+          'Finish or cancel it before starting ${type.label}.',
+        );
+        return;
+      }
+      session.chooseType(type);
+      if (const {'bike', 'auto', 'cab'}.contains(activeLocalAction)) return;
+      context.push('/app/ride/book?type=${type.name}');
+    }
+
+    void openGlobal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openChat() {
+      final routeState = GoRouterState.of(context);
+      final current = routeState.uri.path == '/app/ride/book'
+          ? Uri(
+              path: routeState.uri.path,
+              queryParameters: {
+                ...routeState.uri.queryParameters,
+                'type': session.selectedType.name,
+              },
+            ).toString()
+          : routeState.uri.toString();
+      openGlobal(
+        Uri(
+          path: '/app/chat/inbox',
+          queryParameters: {'return': current},
+        ).toString(),
+      );
+    }
+
+    void switchGlobalDestination(String route) {
+      session.clearMessages();
+      openMoolConnectedRoute(context, activeFamilyId: 'ride', route: route);
+    }
+
+    void openConnectedAction(String route) {
+      final uri = Uri.tryParse(route);
+      final rideType = uri?.path == '/app/ride/book'
+          ? switch (uri?.queryParameters['type']) {
+              'bike' => RideType.bike,
+              'auto' => RideType.auto,
+              'cab' => RideType.cab,
+              _ => null,
+            }
+          : null;
+      if (rideType != null) {
+        openRideType(rideType);
+        return;
+      }
+      switchGlobalDestination(route);
+    }
+
+    void openTravelAction(String actionId) {
+      if (actionId == 'bus') {
+        switchGlobalDestination('/app/book/bus');
+        return;
+      }
+      openRideType(RideType.values.firstWhere((type) => type.name == actionId));
+    }
+
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          leaveContentDepth();
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          leadingWidth: showBack ? 64 : 16,
+          leading: showBack
+              ? Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: IconButton.outlined(
+                    key: const Key('ride-back'),
+                    tooltip: 'Go back',
+                    onPressed: leaveContentDepth,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                    ),
+                  ),
+                )
+              : null,
+          titleSpacing: showBack ? 4 : MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
                 ),
-              )
-            : null,
-        titleSpacing: showBack ? 4 : MoolSpacing.md,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
               ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            MoolGlobalChatShortcut(
+              keyName: 'ride-global-chat',
+              onPressed: openChat,
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: MoolSpacing.sm),
+              child:
+                  trailing ??
+                  IconButton.outlined(
+                    key: const Key('ride-safety-shortcut'),
+                    tooltip: 'Open safety centre',
+                    onPressed: () => showRideSafetyCentre(
+                      context,
+                      session,
+                      tripId: session.trip?.id,
+                    ),
+                    icon: const Icon(Icons.shield_outlined),
+                  ),
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: MoolSpacing.sm),
-            child:
-                trailing ??
-                IconButton.outlined(
-                  key: const Key('ride-safety-shortcut'),
-                  tooltip: 'Open safety centre',
-                  onPressed: () => showRideSafetyCentre(
-                    context,
-                    session,
-                    tripId: session.trip?.id,
-                  ),
-                  icon: const Icon(Icons.shield_outlined),
-                ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                RideMessageBanner(session: session),
-                Expanded(child: body),
-                if (bottomAction != null)
-                  Material(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolSpacing.md,
-                        MoolSpacing.sm,
-                        MoolSpacing.md,
-                        MoolSpacing.xs,
-                      ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: bottomAction,
+        body: SafeArea(
+          top: false,
+          bottom: true,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  RideMessageBanner(session: session),
+                  Expanded(child: body),
+                  if (bottomAction != null)
+                    Material(
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          MoolSpacing.sm,
+                          MoolSpacing.md,
+                          MoolSpacing.xs,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: bottomAction,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+        bottomNavigationBar: MoolDestinationNavigationV2(
+          activeId: 'ride',
+          destinationLabel: 'Travel',
+          selectedLocalIndex: switch (activeSubAction) {
+            'auto' => 1,
+            'cab' => 2,
+            _ => 0,
+          },
+          localActionCount: 4,
+          localNavigation: MoolLocalNavigationRail(
+            key: const Key('ride-local-navigation'),
+            familyId: 'ride',
+            surfaceTone: MoolLocalNavigationSurfaceTone.light,
+            semanticLabel: 'Travel choices: Bike, Auto, Cab and Bus.',
+            activeId: activeSubAction,
+            actions: [
+              for (final type in RideType.values)
+                MoolLocalNavigationAction(
+                  keyName: 'ride-local-${type.name}',
+                  id: type.name,
+                  label: type.label,
+                  icon: switch (type) {
+                    RideType.bike => Icons.two_wheeler_outlined,
+                    RideType.auto => Icons.electric_rickshaw_outlined,
+                    RideType.cab => Icons.local_taxi_outlined,
+                  },
+                  onPressed: activeSubAction == type.name
+                      ? null
+                      : () => openRideType(type),
+                ),
+              MoolLocalNavigationAction(
+                keyName: 'ride-local-bus',
+                id: 'bus',
+                label: 'Bus',
+                icon: Icons.directions_bus_filled_outlined,
+                onPressed: () => openTravelAction('bus'),
+              ),
+            ],
+          ),
+          onOpenMool: () => openGlobal('/app/mool?from=ride'),
+          onOpenAction: (action) => openConnectedAction(action.route),
+          onPreviousLocalAction: () {
+            const actions = ['bike', 'auto', 'cab', 'bus'];
+            final current = actions.indexOf(activeSubAction);
+            openTravelAction(
+              actions[(current - 1 + actions.length) % actions.length],
+            );
+          },
+          onNextLocalAction: () {
+            const actions = ['bike', 'auto', 'cab', 'bus'];
+            final current = actions.indexOf(activeSubAction);
+            openTravelAction(actions[(current + 1) % actions.length]);
+          },
+          onOpenChat: openChat,
+        ),
       ),
-      bottomNavigationBar: RideBottomDock(session: session, active: activeDock),
     );
   }
 }
@@ -316,93 +470,6 @@ class RideQuickAction extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class RideBottomDock extends StatelessWidget {
-  const RideBottomDock({
-    required this.session,
-    required this.active,
-    super.key,
-  });
-
-  final RideSession session;
-  final String active;
-
-  @override
-  Widget build(BuildContext context) {
-    final tripId = session.trip?.id;
-    void clear() => session.clearMessages();
-    return MoolOutcomeDock(
-      semanticLabel: 'Ride navigation',
-      activeId: active,
-      mool: MoolDockAction(
-        keyName: 'ride-dock-mool',
-        id: 'mool',
-        label: 'Mool',
-        icon: MoolBrand.moolLauncherIcon,
-        onPressed: () {
-          clear();
-          context.go('/app/mool');
-        },
-      ),
-      actions: [
-        MoolDockAction(
-          keyName: 'ride-dock-book',
-          id: 'ride',
-          label: 'Book',
-          icon: Icons.local_taxi_outlined,
-          onPressed: () {
-            clear();
-            context.go('/app/ride/book');
-          },
-        ),
-        MoolDockAction(
-          keyName: 'ride-dock-trip',
-          id: 'trip',
-          label: 'Trip',
-          icon: Icons.route_outlined,
-          onPressed: () {
-            clear();
-            context.go(
-              tripId == null ? '/app/ride/book' : '/app/ride/trip/$tripId',
-            );
-          },
-        ),
-        MoolDockAction(
-          keyName: 'ride-dock-help',
-          id: 'help',
-          label: 'Help',
-          icon: Icons.support_agent_rounded,
-          onPressed: () {
-            clear();
-            if (tripId == null) {
-              session.showNotice(
-                'Book a ride first so help can attach its route and receipt.',
-              );
-            } else {
-              context.go('/app/ride/trip/$tripId/support');
-            }
-          },
-        ),
-      ],
-      chat: MoolDockAction(
-        keyName: 'ride-dock-chat',
-        id: 'chat',
-        label: 'Chat',
-        icon: Icons.chat_bubble_outline_rounded,
-        onPressed: () {
-          final current = GoRouterState.of(context).uri.toString();
-          clear();
-          context.go(
-            Uri(
-              path: '/app/chat/inbox',
-              queryParameters: {'return': current},
-            ).toString(),
-          );
-        },
       ),
     );
   }

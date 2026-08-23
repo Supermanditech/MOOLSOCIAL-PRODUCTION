@@ -25,7 +25,7 @@ class EatReviewScreen extends StatelessWidget {
           subtitle: empty
               ? 'Add food before payment'
               : 'Final total ${eatMoney(session.orderTotal)}',
-          activeDock: 'order',
+          activeLocalAction: 'order',
           fallbackBackRoute: '/app/eat/basket',
           body: empty
               ? Center(

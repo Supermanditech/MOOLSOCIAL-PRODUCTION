@@ -121,7 +121,7 @@ class SocialV2Header extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Expanded(child: SocialV2Wordmark()),
+                const Spacer(),
                 SocialV2IconButton(
                   icon: Icons.notifications_none_rounded,
                   label: 'Open notifications',

@@ -71,6 +71,9 @@ void main() {
 
   test('release builds require live Firebase configuration', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
+    final configurationSource = File(
+      'lib/core/config/release_runtime_configuration.dart',
+    ).readAsStringSync();
 
     expect(mainSource, contains("const _useEmulators = bool.fromEnvironment("));
     expect(mainSource, contains('defaultValue: kDebugMode'));
@@ -78,17 +81,53 @@ void main() {
     expect(mainSource, contains('MOOLSOCIAL_DEVICE_REVIEW'));
     expect(
       mainSource,
-      contains('Device review mode requires the isolated local emulator'),
+      contains('runApp(const ReleaseConfigurationFailureApp());'),
+      reason: 'Invalid release setup must render a safe first frame.',
     );
-    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
-    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
-    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'));
-    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
+    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
+    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
+    expect(
+      configurationSource,
+      contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'),
+    );
+    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
+    expect(
+      configurationSource,
+      contains('MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID'),
+      reason:
+          'Google identity is part of the same fail-closed release contract.',
+    );
+    expect(
+      mainSource.indexOf('runApp(const ReleaseConfigurationFailureApp());'),
+      lessThan(mainSource.indexOf('Firebase.initializeApp')),
+      reason: 'Configuration must be checked before Firebase bootstrap.',
+    );
+  });
+
+  test('profile device-review builds retain candidate provenance markers', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final journeySource = File(
+      'lib/features/journey01/journey_session.dart',
+    ).readAsStringSync();
+
     expect(
       mainSource,
-      contains('Release configuration is incomplete. Missing:'),
-      reason:
-          'A release must fail closed instead of silently using demo services.',
+      contains('if (kDebugMode || _deviceReviewMode)'),
+      reason: 'Profile review builds must emit the exact candidate identity.',
+    );
+    expect(mainSource, contains('MOOLSOCIAL_CANDIDATE'));
+    expect(
+      journeySource,
+      contains(
+        "const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');",
+      ),
+    );
+    expect(
+      RegExp(
+        r'if \(kDebugMode \|\| _deviceReviewMode\) \{\s*debugPrint\([\s\S]*?MOOLSOCIAL_STARTUP',
+      ).allMatches(journeySource).length,
+      2,
+      reason: 'Ready and boot-failure startup outcomes must remain observable.',
     );
   });
 

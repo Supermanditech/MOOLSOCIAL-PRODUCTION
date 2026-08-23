@@ -398,7 +398,9 @@ void main() {
 
       await tapVisible(tester, const Key('chat-back'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-      await tapVisible(tester, const Key('chat-back'));
+      expect(find.byKey(const Key('chat-back')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('business-service-menu'));
       await tapVisible(tester, const Key('business-menu-cancel'));
       await tapVisible(tester, const Key('business-cancel-confirm'));
@@ -467,11 +469,21 @@ void main() {
         find.byKey(const Key('business-services-role-denied')),
         findsOneWidget,
       );
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'The compact access-denied shell must not overflow.',
+      );
 
       retailer.businessServicesAuthorized = true;
       retailer.notifyListeners();
       await settle(tester);
       expect(find.byKey(const Key('business-services-screen')), findsOneWidget);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'The compact authorized service catalogue must not overflow.',
+      );
       expect(await retailer.refreshBusinessServices(), isFalse);
 
       final service = retailerBusinessServiceByName('delivery');
@@ -479,7 +491,11 @@ void main() {
       retailer.setBusinessServiceCommercialConsent(true);
       expect(await retailer.activateBusinessService(), isFalse);
       expect(retailer.activeBusinessServiceCount, 0);
-      expect(tester.takeException(), isNull);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'Offline activation must not introduce a compact overflow.',
+      );
     },
   );
 

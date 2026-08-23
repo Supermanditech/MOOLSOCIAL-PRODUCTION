@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
@@ -40,10 +41,11 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
         final opportunities = widget.session.filteredOpportunities;
         return WorkPageScaffold(
           session: widget.session,
-          title: 'Work',
-          subtitle: 'Earn from verified, funded outcomes',
+          title: 'Earn Today',
+          subtitle: 'Pay, location and timing before you apply',
+          fallbackBackRoute: '/app/work',
           showBack: false,
-          activeDock: 'earn',
+          activeLocalAction: 'earn',
           trailing: IconButton.outlined(
             key: const Key('work-refresh-feed'),
             tooltip: 'Refresh work',
@@ -55,148 +57,58 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
             child: ListView(
               key: const Key('work-earn-screen'),
               padding: const EdgeInsets.fromLTRB(
-                MoolSpacing.md,
-                MoolSpacing.sm,
-                MoolSpacing.md,
-                MoolSpacing.xl,
+                MoolServiceHomeTokens.pagePadding,
+                MoolSpacing.xs,
+                MoolServiceHomeTokens.pagePadding,
+                MoolSpacing.xxl,
               ),
               children: [
-                WorkCard(
-                  color: MoolColors.navy,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Earn from verified work',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 21,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          WorkPill(
-                            label: 'Updated live',
-                            color: Color(0xFF9EE89B),
-                            icon: Icons.verified_rounded,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      const Text(
-                        'Payment, requirement, location and deadline are shown before Apply.',
-                        style: TextStyle(
-                          color: Color(0xFFD9DAFF),
-                          height: 1.4,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: MoolSpacing.md),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Monthly earning potential',
-                                  style: TextStyle(
-                                    color: Color(0xFFD9DAFF),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  '₹35,000–₹80,000',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            key: const Key('work-earning-info'),
-                            tooltip: 'How this range is calculated',
-                            onPressed: () => _showEarningInfo(context),
-                            style: IconButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Color(0x55FFFFFF)),
-                            ),
-                            icon: const Icon(Icons.info_outline_rounded),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      const Text(
-                        '10,248 funded actions matched',
-                        style: TextStyle(
-                          color: Color(0xFF9EE89B),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                TextField(
-                  key: const Key('work-search'),
+                MoolServiceSearchField(
+                  key: const Key('work-search-surface'),
+                  fieldKey: const Key('work-search'),
                   controller: _search,
                   onChanged: widget.session.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search jobs, freelance work or campaigns',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            key: const Key('work-clear-search'),
-                            tooltip: 'Clear search',
-                            onPressed: () {
-                              _search.clear();
-                              widget.session.search('');
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                  ),
+                  hintText: 'Search work, publisher or location',
+                  semanticLabel: 'Search work opportunities',
+                  trailing: _search.text.isEmpty
+                      ? null
+                      : IconButton(
+                          key: const Key('work-clear-search'),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _search.clear();
+                            widget.session.search('');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),
-                SizedBox(
-                  height: 52,
-                  child: ListView.separated(
-                    key: const Key('work-filter-list'),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: WorkFeedFilter.values.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: MoolSpacing.xs),
-                    itemBuilder: (context, index) {
-                      final value = WorkFeedFilter.values[index];
-                      return MoolSegment(
+                Wrap(
+                  key: const Key('work-filter-list'),
+                  spacing: MoolSpacing.xs,
+                  runSpacing: MoolSpacing.xs,
+                  children: [
+                    for (final value in WorkFeedFilter.values)
+                      MoolServiceChoice(
                         key: Key('work-filter-${value.name}'),
                         label: value.label,
                         selected: widget.session.filter == value,
-                        onPressed: () => widget.session.setFilter(value),
-                      );
-                    },
-                  ),
+                        onSelected: (_) => widget.session.setFilter(value),
+                        accent: _workAccent,
+                      ),
+                  ],
                 ),
-                const SizedBox(height: MoolSpacing.sm),
-                WorkSectionTitle(
-                  title: 'Paid work for you',
-                  detail: opportunities.isEmpty
-                      ? 'No live opportunity matches this view'
-                      : '${opportunities.length} live · approval and eligibility apply',
+                const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+                MoolServiceSectionHeader(
+                  title: 'Work matching this view',
+                  subtitle: opportunities.isEmpty
+                      ? 'Try another filter or clear the search'
+                      : '${opportunities.length} opportunities · eligibility and approval apply',
                 ),
                 const SizedBox(height: MoolSpacing.sm),
                 if (opportunities.isEmpty)
                   WorkEmptyState(
-                    title: 'No live opportunities in this view',
+                    title: 'No opportunities in this view',
                     detail:
                         'Choose For You or clear the search. You can also start a verified work profile.',
                     actionLabel: 'Show all work',
@@ -210,37 +122,23 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                   for (final opportunity in opportunities) ...[
                     _OpportunityCard(
                       opportunity: opportunity,
-                      expanded:
-                          widget.session.expandedOpportunityId ==
-                          opportunity.id,
-                      onToggle: () =>
-                          widget.session.toggleOpportunity(opportunity.id),
                       onReview: () => _openOpportunity(context, opportunity),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                   ],
-                WorkCard(
-                  color: const Color(0xFFEDEEFF),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const WorkSectionTitle(
-                        title: 'Start My Work',
-                        detail:
-                            'Add one verified activity without changing your personal account.',
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                      WorkPrimaryButton(
-                        keyName: 'work-start-my-work',
-                        label: 'Start My Work',
-                        onPressed: () {
-                          widget.session.startMyWork();
-                          context.go('/app/work/my-work');
-                        },
-                        icon: Icons.add_rounded,
-                      ),
-                    ],
-                  ),
+                MoolServiceCard(
+                  key: const Key('work-start-my-work'),
+                  title: 'Need a verified Workspace?',
+                  subtitle:
+                      'Set up one existing work or business profile, then return to an opportunity.',
+                  icon: Icons.work_outline_rounded,
+                  accent: _workAccent,
+                  emphasized: true,
+                  semanticLabel: 'Open Workspace setup',
+                  onTap: () {
+                    widget.session.startMyWork();
+                    context.go('/app/work/my-work');
+                  },
                 ),
               ],
             ),
@@ -249,180 +147,153 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
       },
     );
   }
-
-  Future<void> _showEarningInfo(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          0,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'How this range is calculated',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            const Text(
-              'Current funded opportunities × realistic monthly capacity. Approval, availability and eligibility apply. This is not guaranteed income.',
-              style: TextStyle(color: MoolColors.muted, height: 1.45),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            const _InfoRow(label: 'Eligible funded work', value: '₹2,40,000'),
-            const _InfoRow(label: 'Reserved payout', value: '₹0'),
-            const SizedBox(height: MoolSpacing.md),
-            FilledButton(
-              key: const Key('work-close-earning-info'),
-              onPressed: () => Navigator.pop(sheetContext),
-              child: const Text('Got it'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
+const _workAccent = Color(0xFF4D46A8);
+
 class _OpportunityCard extends StatelessWidget {
-  const _OpportunityCard({
-    required this.opportunity,
-    required this.expanded,
-    required this.onToggle,
-    required this.onReview,
-  });
+  const _OpportunityCard({required this.opportunity, required this.onReview});
 
   final WorkOpportunity opportunity;
-  final bool expanded;
-  final VoidCallback onToggle;
   final VoidCallback onReview;
 
   @override
   Widget build(BuildContext context) {
     return WorkCard(
+      keyName: 'work-opportunity-${opportunity.id}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            key: Key('work-opportunity-${opportunity.id}'),
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(MoolRadii.control),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: MoolSpacing.xxs),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: MoolColors.navy,
-                      borderRadius: BorderRadius.circular(MoolRadii.control),
-                    ),
-                    child: Icon(opportunity.icon, color: Colors.white),
-                  ),
-                  const SizedBox(width: MoolSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${opportunity.kind.toUpperCase()} · VERIFIED',
-                          style: const TextStyle(
-                            color: MoolColors.success,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          opportunity.title,
-                          style: const TextStyle(
-                            color: MoolColors.ink,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          '${opportunity.publisher} · ${opportunity.location} · ${opportunity.capacity}',
-                          style: const TextStyle(
-                            color: MoolColors.muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: MoolSpacing.xs),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        opportunity.payment.split(' per ').first,
-                        style: const TextStyle(
-                          color: MoolColors.success,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _workAccent.withValues(alpha: .11),
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                ),
+                child: Icon(opportunity.icon, color: _workAccent, size: 22),
+              ),
+              const SizedBox(width: MoolSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${opportunity.kind} · ${opportunity.publisherType}',
+                      style: const TextStyle(
+                        color: MoolColors.success,
+                        fontSize: MoolServiceHomeTokens.metadataSize,
+                        fontWeight: FontWeight.w800,
                       ),
-                      Icon(
-                        expanded
-                            ? Icons.expand_less_rounded
-                            : Icons.expand_more_rounded,
-                        color: MoolColors.navy,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      opportunity.title,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: MoolServiceHomeTokens.cardTitleSize,
+                        height: 1.2,
+                        fontWeight: FontWeight.w900,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      opportunity.publisher,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: MoolServiceHomeTokens.metadataSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          Text(
+            opportunity.summary,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: MoolServiceHomeTokens.bodySize,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          Wrap(
+            spacing: MoolSpacing.sm,
+            runSpacing: MoolSpacing.xs,
+            children: [
+              _WorkFact(
+                icon: Icons.payments_outlined,
+                label: opportunity.payment,
+              ),
+              _WorkFact(
+                icon: Icons.place_outlined,
+                label: opportunity.location,
+              ),
+              _WorkFact(
+                icon: Icons.schedule_rounded,
+                label: opportunity.deadline,
+              ),
+              _WorkFact(
+                icon: Icons.verified_outlined,
+                label: opportunity.fundingNote,
+              ),
+              _WorkFact(
+                icon: Icons.account_balance_wallet_outlined,
+                label: opportunity.payout,
+              ),
+            ],
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          SizedBox(
+            key: Key('work-review-${opportunity.id}'),
+            width: double.infinity,
+            child: MoolServicePrimaryButton(
+              label: 'Review opportunity',
+              onPressed: onReview,
+              accent: _workAccent,
+              icon: Icons.arrow_forward_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkFact extends StatelessWidget {
+  const _WorkFact({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 24),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: MoolColors.muted),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: MoolColors.muted,
+                fontSize: MoolServiceHomeTokens.metadataSize,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          if (expanded) ...[
-            const Divider(height: MoolSpacing.lg),
-            Text(
-              opportunity.summary,
-              style: const TextStyle(color: MoolColors.muted, height: 1.4),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            Wrap(
-              spacing: MoolSpacing.xs,
-              runSpacing: MoolSpacing.xs,
-              children: [
-                WorkPill(label: opportunity.requiredWork),
-                WorkPill(label: opportunity.payout, color: MoolColors.orange),
-                WorkPill(label: opportunity.deadline, color: MoolColors.royal),
-              ],
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            Text(
-              opportunity.fundingNote,
-              style: const TextStyle(
-                color: MoolColors.success,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: Key('work-review-${opportunity.id}'),
-                onPressed: onReview,
-                child: const Text('Review & Apply'),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -456,7 +327,7 @@ class WorkOpportunityScreen extends StatelessWidget {
               ? 'Terms and payout remain saved'
               : 'Review outcome and terms',
           fallbackBackRoute: '/app/work/earn',
-          activeDock: 'earn',
+          activeLocalAction: 'earn',
           bottomAction: applied
               ? WorkPrimaryButton(
                   keyName: 'work-open-my-work-after-apply',

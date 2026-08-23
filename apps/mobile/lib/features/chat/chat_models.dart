@@ -1,6 +1,36 @@
 enum ChatThreadType { people, business, order, support }
 
-enum ChatDeliveryState { sending, delivered, failed }
+enum ChatDeliveryState { sending, delivered, read, failed }
+
+class ChatPhotoAttachment {
+  const ChatPhotoAttachment({
+    required this.id,
+    required this.name,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.readUrl,
+    required this.readUrlExpiresAt,
+  });
+
+  final String id;
+  final String name;
+  final String contentType;
+  final int sizeBytes;
+  final Uri readUrl;
+  final DateTime readUrlExpiresAt;
+}
+
+class ChatReplyReference {
+  const ChatReplyReference({
+    required this.messageId,
+    required this.sender,
+    required this.text,
+  });
+
+  final String messageId;
+  final String sender;
+  final String text;
+}
 
 class ChatThread {
   const ChatThread({
@@ -34,6 +64,11 @@ class ChatMessage {
     this.deliveryState = ChatDeliveryState.delivered,
     this.attachmentLabel,
     this.reactionCount = 0,
+    this.reactedByMe = false,
+    this.replyTo,
+    this.readCount = 0,
+    this.forwarded = false,
+    this.photo,
   });
 
   final String id;
@@ -44,8 +79,17 @@ class ChatMessage {
   final ChatDeliveryState deliveryState;
   final String? attachmentLabel;
   final int reactionCount;
+  final bool reactedByMe;
+  final ChatReplyReference? replyTo;
+  final int readCount;
+  final bool forwarded;
+  final ChatPhotoAttachment? photo;
 
-  ChatMessage copyWith({ChatDeliveryState? deliveryState, int? reactionCount}) {
+  ChatMessage copyWith({
+    ChatDeliveryState? deliveryState,
+    int? reactionCount,
+    bool? reactedByMe,
+  }) {
     return ChatMessage(
       id: id,
       sender: sender,
@@ -55,8 +99,17 @@ class ChatMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       attachmentLabel: attachmentLabel,
       reactionCount: reactionCount ?? this.reactionCount,
+      reactedByMe: reactedByMe ?? this.reactedByMe,
+      replyTo: replyTo,
+      readCount: readCount,
+      forwarded: forwarded,
+      photo: photo,
     );
   }
+
+  bool get isSettled =>
+      deliveryState == ChatDeliveryState.delivered ||
+      deliveryState == ChatDeliveryState.read;
 }
 
 extension ChatThreadTypeCopy on ChatThreadType {

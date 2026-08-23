@@ -4,13 +4,29 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
-        android:label="MoolSocial"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token" />
+        <meta-data
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="false" />
+        <meta-data
+            android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -41,6 +57,42 @@
                     android:host="moolsocial.com"
                     android:pathPrefix="/app"/>
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="moolsocial-dev-503018.firebaseapp.com"
+                    android:pathPrefix="/__/auth/links"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="moolsocial.com"
+                    android:pathPrefix="/__/auth/links"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="moolsocial"
+                    android:host="auth"
+                    android:path="/x"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="moolsocial"
+                    android:host="auth"
+                    android:path="/instagram"/>
+            </intent-filter>
         </activity>
         <activity
             android:name=".YouTubeConnectReturnActivity"
@@ -54,7 +106,8 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
                     android:scheme="moolsocial"
-                    android:path="/app/creator/youtube-connect"/>
+                    android:host="app"
+                    android:path="/creator/youtube-connect"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -69,6 +122,8 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <provider
+            android:authorities="com.facebook.katana.provider.PlatformProvider" />
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

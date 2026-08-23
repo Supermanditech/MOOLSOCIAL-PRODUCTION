@@ -386,16 +386,44 @@ void main() {
       await tap(tester, const Key('open-profile'));
       await tap(tester, const Key('profile-workspace'));
       expect(location(tester), '/app/account/workspaces');
-      await tap(tester, const Key('shared-dock-activity'));
+      await tap(tester, const Key('shared-local-activity'));
       expect(location(tester), '/app/activity');
-      await tap(tester, const Key('shared-dock-settings'));
+      await tap(tester, const Key('shared-local-settings'));
       expect(location(tester), '/app/account/workspaces/preferences');
-      await tap(tester, const Key('shared-dock-workspaces'));
+      await tap(tester, const Key('shared-local-workspaces'));
       expect(location(tester), '/app/account/workspaces');
-      await tap(tester, const Key('shared-dock-chat'));
+      await tap(tester, const Key('mool-global-chat'));
       expect(location(tester), contains('/app/chat/inbox'));
     },
   );
+
+  testWidgets('compact shared hub keeps Mool and Chat distinct and tappable', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await mount(
+      tester,
+      route: '/app/account/workspaces',
+      size: const Size(320, 568),
+    );
+
+    const moolKey = Key('mool-home-launcher');
+    const chatKey = Key('mool-global-chat');
+    expect(find.byKey(moolKey), findsOneWidget);
+    expect(find.byKey(chatKey), findsOneWidget);
+    final moolRect = tester.getRect(find.byKey(moolKey));
+    final chatRect = tester.getRect(find.byKey(chatKey));
+    expect(moolRect.width, greaterThanOrEqualTo(48));
+    expect(moolRect.height, greaterThanOrEqualTo(48));
+    expect(chatRect.width, greaterThanOrEqualTo(48));
+    expect(chatRect.height, greaterThanOrEqualTo(48));
+    expect(moolRect.overlaps(chatRect), isFalse);
+
+    await tap(tester, chatKey);
+    expect(location(tester), contains('/app/chat/inbox'));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 String _slug(String value) => value

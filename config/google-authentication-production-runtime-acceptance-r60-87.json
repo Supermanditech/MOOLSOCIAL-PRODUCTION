@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "acceptanceId": "MOOLSOCIAL-GOOGLE-AUTH-R60-87-OPPO-ACCEPTANCE-20260823",
+  "scope": "google_sign_in_only",
+  "candidate": {
+    "versionName": "1.0.0-r60.87",
+    "versionCode": "2026082387",
+    "artifactSha256": "EF80600A99FDB9991F7C1763F049863D60F9A9320127FBC179149494757670D8",
+    "buildCount": 1,
+    "inPlaceInstallCount": 1
+  },
+  "deviceResult": {
+    "founderGoogleAttemptCount": 2,
+    "googleOwnedPrivateActionPerformedByFounder": true,
+    "googleOwnedPrivateActionPerformedByAgent": false,
+    "moolSocialAuthenticatedStateReached": true,
+    "sanitizedRuntimeStage": "ready",
+    "sanitizedRuntimeAuthenticated": true,
+    "coldRelaunchAuthenticatedStateRestored": true,
+    "returnedToUnauthenticatedSignInAfterRelaunch": false,
+    "fatalOrAnrCount": 0,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false
+  },
+  "acceptanceRequirements": [
+    {
+      "requirementId": "G10",
+      "status": "PASS",
+      "evidence": "The founder's Google action entered MoolSocial Social Home. The runtime then emitted ready with authenticated=true; the release state machine cannot enter authenticated ready without an accepted Firebase user/session."
+    },
+    {
+      "requirementId": "G29",
+      "status": "PASS",
+      "evidence": "A non-private force-stop and cold relaunch restored ready with authenticated=true and did not return to unauthenticated sign-in."
+    },
+    {
+      "requirementId": "G31",
+      "status": "PASS",
+      "evidence": "Founder-observed navigation reached the authenticated Social Home; sanitized runtime state independently reported authenticated=true."
+    },
+    {
+      "requirementId": "G40",
+      "status": "PASS",
+      "evidence": "Real OPPO flow reached authenticated MoolSocial state and retained it across a cold relaunch with zero fatal errors or ANRs."
+    }
+  ],
+  "screenshotEvidence": {
+    "count": 2,
+    "storage": "local_laptop_only",
+    "privateAccountValuesRecorded": false,
+    "finding": "Screenshots show authenticated Social surfaces and the intentionally unavailable optional YouTube integration. They do not evidence a Google authentication failure."
+  },
+  "youtubeDisposition": {
+    "status": "OUT_OF_SCOPE_HELD",
+    "finding": "Google Firebase authentication does not automatically authorize YouTube API/channel access. The Google-only r60.87 runtime intentionally keeps YouTube provider inputs disabled and fail-closed.",
+    "changesAuthorized": false
+  },
+  "privacy": "No tokens, credentials, API keys, certificate values, account names, email addresses, Firebase UIDs, or private identifiers were collected or recorded.",
+  "decision": "GOOGLE_SIGN_IN_ACCEPTED_ON_OPPO",
+  "nextAction": "Stop Google repair work. Do not touch another provider until the founder explicitly authorizes it."
+}

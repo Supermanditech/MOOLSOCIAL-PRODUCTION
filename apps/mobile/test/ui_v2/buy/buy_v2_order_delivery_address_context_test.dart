@@ -182,7 +182,15 @@ void main() {
     await tester.scrollUntilVisible(
       address,
       180,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.descendant(
+        of: find.byKey(const PageStorageKey('buy-tracking-MS-240782')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              (widget.axisDirection == AxisDirection.down ||
+                  widget.axisDirection == AxisDirection.up),
+        ),
+      ),
     );
     await tester.pump();
     await tester.tap(address);

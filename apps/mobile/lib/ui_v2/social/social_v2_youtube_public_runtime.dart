@@ -3,8 +3,47 @@ import '../../core/youtube/youtube_private_dev_models.dart';
 import '../../core/youtube/youtube_private_dev_transport.dart';
 
 const screen04YouTubeRegionCode = 'IN';
-const screen04YouTubeShortsQuery = 'India #Shorts';
 const screen04YouTubeShortMaximumSeconds = 180;
+const screen04YouTubeCatalogueTarget = 20;
+const screen04YouTubeCatalogueMaximumPages = 4;
+
+typedef Screen04YouTubePageLoader =
+    Future<YouTubeVideoPage> Function(String? pageToken);
+typedef Screen04YouTubeVideoEligibility =
+    bool Function(YouTubeVideoSummary video);
+
+class Screen04YouTubeCreationCapabilities {
+  const Screen04YouTubeCreationCapabilities({
+    required this.ownerConnect,
+    required this.privateUpload,
+    required this.publicOrUnlistedUpload,
+  });
+
+  final bool ownerConnect;
+  final bool privateUpload;
+  final bool publicOrUnlistedUpload;
+
+  bool get creatorDistributionProviderReady =>
+      ownerConnect && privateUpload && publicOrUnlistedUpload;
+}
+
+Future<Screen04YouTubeCreationCapabilities>
+loadScreen04YouTubeCreationCapabilities() async {
+  final transport = IoYouTubeHttpTransport();
+  try {
+    final client = YouTubePrivateDevClient.fromBuildConfiguration(
+      transport: transport,
+    );
+    final capabilities = await client.capabilities();
+    return Screen04YouTubeCreationCapabilities(
+      ownerConnect: capabilities.ownerConnect,
+      privateUpload: capabilities.privateUpload,
+      publicOrUnlistedUpload: capabilities.publicOrUnlistedUpload,
+    );
+  } finally {
+    transport.close(force: true);
+  }
+}
 
 class Screen04YouTubePublicVideo {
   const Screen04YouTubePublicVideo({
@@ -52,6 +91,98 @@ class Screen04YouTubePublicVideo {
   final String? channelViewCount;
 }
 
+final screen04YouTubeCatalogueSnapshots =
+    Screen04YouTubeCatalogueSnapshotStore();
+
+class Screen04YouTubeCatalogueSnapshotStore {
+  Screen04YouTubeCatalogueSnapshotStore({
+    this.timeToLive = const Duration(minutes: 5),
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
+
+  final Duration timeToLive;
+  final DateTime Function() _now;
+  _Screen04YouTubeCatalogueSnapshot? _videos;
+  _Screen04YouTubeCatalogueSnapshot? _shorts;
+
+  List<Screen04YouTubePublicVideo>? readFreshVideos() => _readFresh(_videos);
+
+  List<Screen04YouTubePublicVideo>? readFreshShorts() => _readFresh(_shorts);
+
+  void replaceVideos(List<Screen04YouTubePublicVideo> videos) {
+    _videos = _capture(videos);
+  }
+
+  void replaceShorts(List<Screen04YouTubePublicVideo> shorts) {
+    _shorts = _capture(shorts);
+  }
+
+  _Screen04YouTubeCatalogueSnapshot _capture(
+    List<Screen04YouTubePublicVideo> items,
+  ) => _Screen04YouTubeCatalogueSnapshot(
+    items: List<Screen04YouTubePublicVideo>.unmodifiable(items),
+    capturedAt: _now(),
+  );
+
+  List<Screen04YouTubePublicVideo>? _readFresh(
+    _Screen04YouTubeCatalogueSnapshot? snapshot,
+  ) {
+    if (snapshot == null) return null;
+    final age = _now().difference(snapshot.capturedAt);
+    if (age.isNegative || age > timeToLive) return null;
+    return snapshot.items;
+  }
+}
+
+class _Screen04YouTubeCatalogueSnapshot {
+  const _Screen04YouTubeCatalogueSnapshot({
+    required this.items,
+    required this.capturedAt,
+  });
+
+  final List<Screen04YouTubePublicVideo> items;
+  final DateTime capturedAt;
+}
+
+Future<List<YouTubeVideoSummary>> collectScreen04YouTubeCatalogue({
+  required Screen04YouTubePageLoader loadPage,
+  required Screen04YouTubeVideoEligibility isEligible,
+  int target = screen04YouTubeCatalogueTarget,
+  int maximumPages = screen04YouTubeCatalogueMaximumPages,
+}) async {
+  if (target < 1) {
+    throw ArgumentError.value(target, 'target', 'must be positive');
+  }
+  if (maximumPages < 1) {
+    throw ArgumentError.value(maximumPages, 'maximumPages', 'must be positive');
+  }
+
+  final collected = <YouTubeVideoSummary>[];
+  final videoIds = <String>{};
+  final requestedPageTokens = <String>{};
+  String? pageToken;
+
+  for (var pageIndex = 0; pageIndex < maximumPages; pageIndex += 1) {
+    final requestIdentity = pageToken ?? '__first_page__';
+    if (!requestedPageTokens.add(requestIdentity)) break;
+
+    final page = await loadPage(pageToken);
+    for (final video in page.items) {
+      if (!isEligible(video) || !videoIds.add(video.videoId)) continue;
+      collected.add(video);
+      if (collected.length == target) {
+        return List<YouTubeVideoSummary>.unmodifiable(collected);
+      }
+    }
+
+    final nextPageToken = page.nextPageToken?.trim();
+    if (nextPageToken == null || nextPageToken.isEmpty) break;
+    pageToken = nextPageToken;
+  }
+
+  return List<YouTubeVideoSummary>.unmodifiable(collected);
+}
+
 Future<List<Screen04YouTubePublicVideo>>
 loadScreen04YouTubePublicVideos() async {
   final transport = IoYouTubeHttpTransport();
@@ -64,16 +195,13 @@ loadScreen04YouTubePublicVideos() async {
       throw StateError('Public video viewing is unavailable.');
     }
 
-    final page = await client.mostPopular(
-      regionCode: screen04YouTubeRegionCode,
+    final eligible = await collectScreen04YouTubeCatalogue(
+      loadPage: (pageToken) => client.mostPopular(
+        regionCode: screen04YouTubeRegionCode,
+        pageToken: pageToken,
+      ),
+      isEligible: _isEligiblePublicVideo,
     );
-    final eligible = page.items
-        .where(_isEligiblePublicVideo)
-        .take(12)
-        .toList(growable: false);
-    if (eligible.isEmpty) {
-      throw StateError('No public videos are available.');
-    }
 
     final channels = <String, YouTubePublicChannelDetails>{};
     for (final item in eligible) {
@@ -101,6 +229,33 @@ loadScreen04YouTubePublicVideos() async {
   }
 }
 
+Future<List<Screen04YouTubePublicVideo>> loadScreen04YouTubePublicSearch(
+  String query,
+) async {
+  final submittedQuery = query.trim();
+  if (submittedQuery.isEmpty) return const [];
+
+  final transport = IoYouTubeHttpTransport();
+  try {
+    final client = YouTubePrivateDevClient.fromBuildConfiguration(
+      transport: transport,
+    );
+    final capabilities = await client.capabilities();
+    if (!capabilities.publicData) {
+      throw StateError('Public YouTube search is unavailable.');
+    }
+
+    final page = await client.search(query: submittedQuery);
+    return page.items
+        .where(_isEligiblePublicVideo)
+        .take(screen04YouTubeCatalogueTarget)
+        .map(mapScreen04YouTubePublicVideo)
+        .toList(growable: false);
+  } finally {
+    transport.close(force: true);
+  }
+}
+
 Future<List<Screen04YouTubePublicVideo>>
 loadScreen04YouTubePublicShorts() async {
   final transport = IoYouTubeHttpTransport();
@@ -113,16 +268,15 @@ loadScreen04YouTubePublicShorts() async {
       throw StateError('Public YouTube Shorts viewing is unavailable.');
     }
 
-    final page = await client.search(query: screen04YouTubeShortsQuery);
-    final eligible = page.items
-        .where(_isEligiblePublicVideo)
-        .where(isScreen04CreatorDeclaredYouTubeShort)
-        .take(8)
+    final catalogue = await client.sharedShortsCatalogue();
+    final eligible = catalogue.items
+        .where(
+          (video) =>
+              _isEligiblePublicVideo(video) &&
+              isScreen04CreatorDeclaredYouTubeShort(video),
+        )
+        .take(screen04YouTubeCatalogueTarget)
         .toList(growable: false);
-    if (eligible.isEmpty) {
-      throw StateError('No confirmed YouTube Shorts are available.');
-    }
-
     return eligible.map(mapScreen04YouTubePublicVideo).toList(growable: false);
   } finally {
     transport.close(force: true);

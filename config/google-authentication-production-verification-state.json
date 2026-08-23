@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "recordId": "GOOGLE-AUTH-PRODUCTION-VERIFICATION-STATE-20260823",
+  "scope": "google_sign_in_only",
+  "lastVerifiedAt": "2026-08-23",
+  "privacy": "Stores normalized status only. API keys, certificate fingerprints, account identities, OAuth values, tokens, UIDs, and raw credential payloads are prohibited.",
+  "usageRule": "Future Codex runs must reuse PASS and NOT_APPLICABLE results below and must not repeat the console check unless a listed reverify trigger occurs. FAIL items remain release blockers until their fix ticket records direct correction evidence.",
+  "requirements": [
+    {
+      "requirementId": "GOOGLE-P0-APPCHECK-AUTH-ENFORCEMENT",
+      "productionRequirement": "Firebase Authentication App Check enforcement must be aligned with the Google-only Android runtime.",
+      "authoritativeSource": "Firebase Console App Check API enforcement state and current Google-only runtime composition",
+      "requirementLevel": "conditional",
+      "evidenceLocation": "Firebase Console > App Check > APIs > Authentication; apps/mobile/lib/main.dart",
+      "automatedCheck": "Google-only runtime composition proves App Check activation is disabled for this lane.",
+      "externalConsoleCheck": "Authentication status is Unenforced.",
+      "runtimeCheck": "Not required while Authentication remains Unenforced.",
+      "status": "NOT_APPLICABLE",
+      "blockingSeverity": "none_current_configuration",
+      "fixTicketId": "UAW-C34P-FIX13-GOOGLE-FIREBASE-AUTH-APP-CHECK-ALIGNMENT",
+      "reverifyWhen": [
+        "Firebase Authentication App Check enforcement changes",
+        "Google-only runtime App Check activation changes"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-IDENTITY-TOOLKIT-API",
+      "productionRequirement": "Identity Toolkit API must be enabled in the Firebase project receiving the credential exchange.",
+      "authoritativeSource": "Google Cloud API Library",
+      "requirementLevel": "mandatory",
+      "evidenceLocation": "Google Cloud Console > APIs and services > Identity Toolkit API",
+      "automatedCheck": "None without authenticated Cloud read access.",
+      "externalConsoleCheck": "API Enabled.",
+      "runtimeCheck": "Firebase credential exchange remains the acceptance boundary.",
+      "status": "PASS",
+      "blockingSeverity": "P0",
+      "fixTicketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+      "reverifyWhen": [
+        "Identity Toolkit API service state changes",
+        "Firebase project changes"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-FIREBASE-ANDROID-KEY-API-ALLOWLIST",
+      "productionRequirement": "The Firebase Android API key must allow Identity Toolkit API.",
+      "authoritativeSource": "Google Cloud API-key restrictions",
+      "requirementLevel": "mandatory_when_api_restricted",
+      "evidenceLocation": "Google Cloud Console > APIs and services > Credentials > Firebase Android key",
+      "automatedCheck": "Read-only page inspection returns only the normalized allowlist result.",
+      "externalConsoleCheck": "Identity Toolkit API is included in the restricted API allowlist.",
+      "runtimeCheck": "Firebase credential exchange remains the acceptance boundary.",
+      "status": "PASS",
+      "blockingSeverity": "P0",
+      "fixTicketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+      "reverifyWhen": [
+        "API-key API restrictions change",
+        "Firebase Android key changes"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-FIREBASE-ANDROID-KEY-PACKAGE",
+      "productionRequirement": "The Firebase Android API key must allow the exact installed application package.",
+      "authoritativeSource": "Google Cloud Android application restrictions and installed APK identity",
+      "requirementLevel": "mandatory",
+      "evidenceLocation": "Google Cloud Console > Firebase Android key > Android restrictions; verified release APK",
+      "automatedCheck": "Read-only page inspection confirms only exact package presence.",
+      "externalConsoleCheck": "com.moolsocial.app is present.",
+      "runtimeCheck": "Installed r60.86 package is com.moolsocial.app.",
+      "status": "PASS",
+      "blockingSeverity": "P0",
+      "fixTicketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+      "reverifyWhen": [
+        "Android application ID changes",
+        "API-key Android application restrictions change"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-FIREBASE-ANDROID-KEY-RELEASE-SIGNER",
+      "productionRequirement": "The Firebase Android API key must allow the exact signing certificate of the installed release APK.",
+      "authoritativeSource": "Google Cloud Android application restrictions and verified APK signature",
+      "requirementLevel": "mandatory",
+      "evidenceLocation": "Non-emitting comparison of the Firebase Android key restriction rows with the r60.86 APK signer",
+      "automatedCheck": "Comparison emits MATCHED or MISSING only and clears the transient certificate value.",
+      "externalConsoleCheck": "Current r60.86 signer is present after the authorized single-row correction and independent reload verification.",
+      "runtimeCheck": "r60.86 reaches FirebaseAuth.signInWithCredential and is rejected.",
+      "status": "PASS",
+      "blockingSeverity": "P0",
+      "fixTicketId": "UAW-C34P-FIX14-GOOGLE-FIREBASE-IDENTITY-TOOLKIT-AVAILABILITY",
+      "reverifyWhen": [
+        "The FIX14 restriction correction is saved",
+        "Release signer changes",
+        "A new diagnostic or final APK is signed"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-IDENTITY-PLATFORM-BLOCKING-FUNCTIONS",
+      "productionRequirement": "Identity Platform blocking functions must not reject the Google creation/sign-in path.",
+      "authoritativeSource": "Firebase Console Authentication settings",
+      "requirementLevel": "conditional",
+      "evidenceLocation": "Firebase Console > Authentication > Settings > Blocking functions",
+      "automatedCheck": "None without authenticated console read access.",
+      "externalConsoleCheck": "Before-account-creation and before-sign-in hooks are both unconfigured.",
+      "runtimeCheck": "No blocking-function rejection control applies.",
+      "status": "NOT_APPLICABLE",
+      "blockingSeverity": "none_current_configuration",
+      "fixTicketId": "UAW-C34P-FIX15-GOOGLE-IDENTITY-PLATFORM-REJECTION-CONTROLS",
+      "reverifyWhen": [
+        "Either Identity Platform blocking hook is configured"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-IDENTITY-PLATFORM-USER-CREATION",
+      "productionRequirement": "Identity Platform user actions must permit Google account creation/sign-in.",
+      "authoritativeSource": "Firebase Console Authentication settings",
+      "requirementLevel": "mandatory",
+      "evidenceLocation": "Firebase Console > Authentication > Settings > User actions",
+      "automatedCheck": "None without authenticated console read access.",
+      "externalConsoleCheck": "Enable create (sign-up) is enabled.",
+      "runtimeCheck": "Firebase may create or authenticate the Google user.",
+      "status": "PASS",
+      "blockingSeverity": "P0",
+      "fixTicketId": "UAW-C34P-FIX15-GOOGLE-IDENTITY-PLATFORM-REJECTION-CONTROLS",
+      "reverifyWhen": [
+        "Identity Platform user-action settings change"
+      ]
+    },
+    {
+      "requirementId": "GOOGLE-P0-IDENTITY-PLATFORM-TENANT",
+      "productionRequirement": "The Google sign-in exchange must target the configured Identity Platform tenant or the default project when multi-tenancy is disabled.",
+      "authoritativeSource": "Google Cloud Identity Platform tenant settings",
+      "requirementLevel": "conditional",
+      "evidenceLocation": "Google Cloud Console > Identity Platform > Tenants",
+      "automatedCheck": "None without authenticated console read access.",
+      "externalConsoleCheck": "Multi-tenancy is disabled.",
+      "runtimeCheck": "Default-project FirebaseAuth exchange applies; no tenant identifier is required.",
+      "status": "NOT_APPLICABLE",
+      "blockingSeverity": "none_current_configuration",
+      "fixTicketId": "UAW-C34P-FIX15-GOOGLE-IDENTITY-PLATFORM-REJECTION-CONTROLS",
+      "reverifyWhen": [
+        "Identity Platform multi-tenancy is enabled",
+        "Runtime Firebase tenant assignment is introduced"
+      ]
+    }
+  ],
+  "runtimeAcceptanceOverlay": "config/google-authentication-production-runtime-acceptance-r60-87.json",
+  "lockedBaseline": "config/google-authentication-production-baseline-r60-87.json",
+  "lockedBaselineChecker": "scripts/check-google-authentication-production-baseline-r60-87.ps1",
+  "lockedBaselineSeal": "config/google-authentication-production-baseline-r60-87.lock.json",
+  "currentDecision": "GOOGLE_SIGN_IN_ACCEPTED_ON_OPPO_R60_87",
+  "currentReleaseBlocker": "NONE_GOOGLE_SIGN_IN_ACCEPTED",
+  "nextAction": "Stop Google repair work. Run the locked r60.87 baseline checker before any future Google-authentication change, reuse stable PASS and NOT_APPLICABLE evidence, and do not touch another provider until the founder explicitly authorizes it."
+}

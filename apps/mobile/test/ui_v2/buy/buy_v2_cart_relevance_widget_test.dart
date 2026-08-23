@@ -303,7 +303,10 @@ void main() {
       expect(session.isSaved(secondShop.id), isFalse);
       expect(session.isSaved(shop.id), isTrue);
 
-      await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
+      final clearSaved = find.byKey(const ValueKey('buy-saved-clear'));
+      await tester.ensureVisible(clearSaved);
+      await tester.pumpAndSettle();
+      await tester.tap(clearSaved);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('buy-saved-clear-sheet')),

@@ -424,7 +424,9 @@ void main() {
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
     await tapVisible(tester, const Key('chat-back'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('retailer-order-review-screen')),
       findsOneWidget,

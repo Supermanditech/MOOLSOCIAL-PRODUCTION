@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX13-GOOGLE-FIREBASE-AUTH-APP-CHECK-ALIGNMENT",
+  "priority": "P0",
+  "scope": "google_sign_in_only",
+  "state": "closed_not_applicable_no_change",
+  "requirement": "Verify whether Firebase Authentication App Check enforcement applies to the Google credential-exchange path and whether the installed release app is aligned with that enforcement.",
+  "affectedLayer": "Firebase Authentication App Check enforcement and Android attestation",
+  "evidence": [
+    "The release app includes the Firebase App Check plugin.",
+    "The live Google identity stage succeeds but Firebase credential exchange rejects.",
+    "The Google-only forensic runtime explicitly does not activate App Check.",
+    "Read-only Firebase Console verification on 2026-08-23 reports Authentication App Check status Unenforced."
+  ],
+  "classification": "NOT_APPLICABLE_CURRENT_REJECTION_PATH",
+  "correctiveAction": "Read back the Firebase Authentication App Check enforcement state and the registered Android provider; change configuration or implementation only if a mismatch is proven.",
+  "founderActionRequired": false,
+  "testPlan": [
+    "Classify Authentication enforcement as enforced, monitoring, or off.",
+    "If enforced, prove a valid release App Check token is available before Google Firebase credential exchange.",
+    "If not applicable, record the console evidence and close without code changes."
+  ],
+  "acceptanceCriteria": [
+    "Enforcement applicability is proven.",
+    "Any proven mismatch is corrected and directly verified, or the ticket is closed PASS/NOT_APPLICABLE with evidence."
+  ],
+  "regressionRisk": "Changing enforcement without evidence could weaken protection or block all production authentication.",
+  "exclusions": [
+    "No production configuration mutation without a proven gap and explicit authorization.",
+    "No other Firebase product or provider changes."
+  ]
+}

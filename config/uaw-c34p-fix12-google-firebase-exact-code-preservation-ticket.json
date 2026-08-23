@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX12-GOOGLE-FIREBASE-EXACT-CODE-PRESERVATION",
+  "priority": "P0",
+  "scope": "google_sign_in_only",
+  "state": "local_implementation_and_focused_tests_passed",
+  "requirement": "Preserve the exact safe FirebaseAuthException.code and a safe normalized cause category at the Google Firebase credential-exchange boundary without emitting private or credential-bearing data.",
+  "affectedLayer": "Flutter Google-to-Firebase exception telemetry",
+  "evidence": [
+    "The r60.86 OPPO attempt reached auth-google-firebase-credential-started and failed at FirebaseAuth.signInWithCredential.",
+    "The same attempt emitted auth-google-firebase-exception-code-unavailable.",
+    "The prior sanitizer accepted only canceled/cancelled as one-word codes, so legitimate safe one-word values such as unknown were discarded.",
+    "Focused Flutter verification passed 112 tests, including exact one-word/hyphenated code retention, unsafe payload rejection, safe cause categories, Firebase exchange, and authenticated session transition.",
+    "Focused Flutter analysis completed with no issues."
+  ],
+  "classification": "PROVEN_GAP_FIXED_LOCALLY",
+  "correctiveAction": "Allow only an explicit bounded set of safe one-word Firebase codes plus the existing bounded hyphenated grammar; emit a bounded normalized cause category derived from code/message while never emitting the raw message.",
+  "founderActionRequired": false,
+  "testPlan": [
+    "Prove documented safe one-word and hyphenated codes are retained exactly.",
+    "Prove unsafe code payloads are replaced with unavailable.",
+    "Prove safe cause categories are emitted without raw Firebase messages or private values.",
+    "Run the focused Google Firebase gateway and public-auth failure tests."
+  ],
+  "acceptanceCriteria": [
+    "Safe one-word and hyphenated Firebase codes survive unchanged.",
+    "Unsafe or unbounded values never appear in telemetry.",
+    "A safe bounded cause category accompanies Firebase exchange failures.",
+    "Focused tests pass."
+  ],
+  "regressionRisk": "Incorrectly broad acceptance could expose an unsafe exception value; incorrect narrowing could again hide the live Firebase code.",
+  "exclusions": [
+    "No OAuth, signer, provider, Firebase Console, or unrelated authentication changes.",
+    "No APK build until all P0 tickets are resolved or explicitly blocked and focused preflight passes."
+  ]
+}

@@ -384,7 +384,7 @@ void main() {
     addTearDown(buy.dispose);
     await mount(tester, route: '/app/buy/grocery', journey: journey, buy: buy);
 
-    await tapVisible(tester, const Key('buy-dock-orders'));
+    await tapVisible(tester, const Key('buy-local-flow-orders'));
     expect(find.byKey(const Key('buy-collection-screen')), findsOneWidget);
     expect(find.byKey(const Key('buy-tracking-screen')), findsNothing);
   });
@@ -408,20 +408,16 @@ void main() {
     );
 
     for (final key in const [
-      Key('buy-back'),
       Key('buy-open-basket'),
       Key('buy-change-address'),
       Key('buy-choose-store-pickup'),
-      Key('buy-dock-mool'),
-      Key('buy-dock-shop'),
-      Key('buy-dock-basket'),
-      Key('buy-dock-orders'),
-      Key('buy-dock-chat'),
+      Key('mool-home-launcher'),
     ]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

@@ -32,6 +32,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> tapConnectedAction(
+    WidgetTester tester,
+    String family,
+    String action,
+  ) async {
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('mool-navigator-family-$family')));
+    await tester.pumpAndSettle();
+    if (action != 'shop') {
+      await tester.tap(find.byKey(ValueKey('buy-local-tab-$action')));
+      await tester.pumpAndSettle();
+    }
+  }
+
   testWidgets('production Buy entry mounts V2 and never the legacy shell', (
     tester,
   ) async {
@@ -39,9 +54,15 @@ void main() {
 
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     expect(find.byKey(const Key('buy-catalog-screen')), findsNothing);
-    for (final label in ['shop', 'wholesale', 'medicine', 'orders']) {
-      expect(find.byKey(Key('buy-dock-$label')), findsOneWidget);
-    }
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('buy-local-destination-tabs')), findsOneWidget);
+    expect(find.byKey(const Key('buy-local-tab-wholesale')), findsOneWidget);
+    expect(find.byKey(const Key('buy-local-tab-orders')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('mool-navigator-family-buy')), findsOneWidget);
+    expect(find.byKey(const Key('mool-navigator-buy-shop')), findsNothing);
+    expect(find.byKey(const Key('mool-navigator-buy-orders')), findsNothing);
   });
 
   testWidgets('historical Buy deep links resolve to V2 destinations', (
@@ -60,8 +81,7 @@ void main() {
     await mountRoute(tester, '/app/buy?sub=wholesale');
     expect(find.text('Search bulk products and suppliers'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('buy-dock-orders')));
-    await tester.pumpAndSettle();
+    await tapConnectedAction(tester, 'buy', 'orders');
     expect(find.text('PURCHASES'), findsOneWidget);
     expect(find.text('Orders'), findsWidgets);
   });
@@ -122,10 +142,7 @@ void main() {
   ) async {
     await mountRoute(tester, '/app/social');
 
-    await tester.tap(find.byKey(const Key('screen04-mool')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-rail-buy')));
-    await tester.pumpAndSettle();
+    await tapConnectedAction(tester, 'buy', 'shop');
 
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     expect(find.byKey(const Key('buy-catalog-screen')), findsNothing);

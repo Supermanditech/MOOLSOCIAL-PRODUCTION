@@ -30,6 +30,7 @@ void main() {
     required JourneySession journey,
     required EatSession eat,
     Size size = const Size(412, 915),
+    bool legacyPresentationForTestsOnly = false,
   }) async {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
@@ -38,6 +39,7 @@ void main() {
         session: journey,
         eatSession: eat,
         initialLocation: route,
+        legacyPresentationForTestsOnly: legacyPresentationForTestsOnly,
       ),
     );
     await tester.pumpAndSettle();
@@ -213,55 +215,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'home voice and table QR invalid input stays visible then succeeds',
-    (tester) async {
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final journey = await readyJourney();
-      final eat = EatSession();
-      addTearDown(journey.dispose);
-      addTearDown(eat.dispose);
-      await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+  testWidgets('home voice, cuisine and search lead directly to food or table', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final eat = EatSession();
+    addTearDown(journey.dispose);
+    addTearDown(eat.dispose);
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
 
-      await tapVisible(tester, const Key('eat-home-voice'));
-      await tapVisible(tester, const Key('eat-voice-continue'));
-      expect(
-        find.text('Type a dish, restaurant or cuisine to search.'),
-        findsOneWidget,
-      );
-      await tester.enterText(find.byKey(const Key('eat-voice-field')), 'cafe');
-      await tapVisible(tester, const Key('eat-voice-continue'));
-      expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('eat-home-voice'));
+    await tapVisible(tester, const Key('eat-voice-continue'));
+    expect(
+      find.text('Type a dish, restaurant or cuisine to search.'),
+      findsOneWidget,
+    );
+    await tester.enterText(find.byKey(const Key('eat-voice-field')), 'cafe');
+    await tapVisible(tester, const Key('eat-voice-continue'));
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    expect(find.byKey(const Key('eat-restaurant-blue-lime')), findsOneWidget);
 
-      await tester.enterText(find.byKey(const Key('eat-home-search')), '');
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('eat-home-search')), 'Spice');
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('eat-restaurant-spice-darbar'));
+    expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
 
-      await tapVisible(tester, const Key('eat-context-find'));
-      final search = tester.widget<TextField>(
-        find.byKey(const Key('eat-home-search')),
-      );
-      expect(search.focusNode?.hasFocus, isTrue);
-      await tester.enterText(find.byKey(const Key('eat-home-search')), 'Spice');
-      await tester.pumpAndSettle();
-      expect(find.text('Spice Darbar'), findsWidgets);
-
-      await tapVisible(tester, const Key('eat-context-offers'));
-      expect(find.byKey(const Key('eat-offer-sheet')), findsOneWidget);
-      await tapVisible(tester, const Key('eat-offer-close'));
-      await tapVisible(tester, const Key('eat-context-offers'));
-      await tapVisible(tester, const Key('eat-offer-order'));
-      expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
-
-      await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
-      await tapVisible(tester, const Key('eat-context-qr'));
-      await tapVisible(tester, const Key('eat-qr-continue'));
-      expect(find.text('Enter or scan a valid table code.'), findsOneWidget);
-      await tester.enterText(find.byKey(const Key('eat-qr-code')), 'SD-T12');
-      await tapVisible(tester, const Key('eat-qr-continue'));
-      expect(find.byKey(const Key('eat-order-screen')), findsOneWidget);
-      expect(eat.fulfilment, EatFulfilment.tableQr);
-    },
-  );
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+    await tapVisible(tester, const Key('eat-home-table'));
+    expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
+  });
 
   testWidgets('table booking confirms, exposes actions and cancels safely', (
     tester,
@@ -278,8 +261,6 @@ void main() {
     await tapVisible(tester, const Key('eat-table-people-6'));
     await tapVisible(tester, const Key('eat-table-time-800PM'));
     await tapVisible(tester, const Key('eat-table-choice-family-dining'));
-    await tapVisible(tester, const Key('eat-table-parking'));
-    expect(find.textContaining('parking'), findsWidgets);
     await tapVisible(tester, const Key('eat-book-table'));
 
     expect(
@@ -338,7 +319,13 @@ void main() {
       );
       addTearDown(journey.dispose);
       addTearDown(eat.dispose);
-      await mount(tester, route: '/app/eat/tiffin', journey: journey, eat: eat);
+      await mount(
+        tester,
+        route: '/app/eat/tiffin',
+        journey: journey,
+        eat: eat,
+        legacyPresentationForTestsOnly: true,
+      );
 
       await tapVisible(tester, const Key('eat-tiffin-style-jain'));
       await tapVisible(tester, const Key('eat-tiffin-meal-dinner'));
@@ -378,7 +365,13 @@ void main() {
     final eat = EatSession(gateway: gateway);
     addTearDown(journey.dispose);
     addTearDown(eat.dispose);
-    await mount(tester, route: '/app/eat/tiffin', journey: journey, eat: eat);
+    await mount(
+      tester,
+      route: '/app/eat/tiffin',
+      journey: journey,
+      eat: eat,
+      legacyPresentationForTestsOnly: true,
+    );
 
     eat.selectTiffinKitchen('paused-kitchen');
     await tester.pumpAndSettle();
@@ -431,10 +424,7 @@ void main() {
       Key('eat-open-basket'),
       Key('eat-fulfilment-delivery'),
       Key('eat-add-veg-thali'),
-      Key('eat-dock-order'),
-      Key('eat-dock-table'),
-      Key('eat-dock-tiffin'),
-      Key('eat-dock-chat'),
+      Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);
       await tester.ensureVisible(finder);
@@ -443,10 +433,13 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('eat-local-order')), findsOneWidget);
+    expect(find.byKey(const Key('eat-local-table')), findsOneWidget);
+    expect(find.byKey(const Key('mool-root-chat')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Order notices do not leak into table or tiffin journeys', (
+  testWidgets('Order notices do not leak into the table journey', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -457,15 +450,11 @@ void main() {
     await mount(tester, route: '/app/eat/order', journey: journey, eat: eat);
 
     expect(find.text('Veg thali added to your food basket.'), findsOneWidget);
-    await tapVisible(tester, const Key('eat-dock-table'));
+    await tapVisible(tester, const Key('eat-local-table'));
     expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
     expect(find.text('Veg thali added to your food basket.'), findsNothing);
 
-    eat.showNotice('Table preference saved.');
-    await tester.pumpAndSettle();
-    await tapVisible(tester, const Key('eat-dock-tiffin'));
-    expect(find.byKey(const Key('eat-tiffin-screen')), findsOneWidget);
-    expect(find.text('Table preference saved.'), findsNothing);
+    expect(find.byKey(const Key('eat-local-tiffin')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

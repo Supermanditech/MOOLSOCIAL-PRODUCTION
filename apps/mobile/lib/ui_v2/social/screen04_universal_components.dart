@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/design/mool_design_system.dart';
 import 'social_v2_design.dart';
 
 @immutable
@@ -38,74 +38,61 @@ const screen04Worlds = <Screen04World>[
     prompt: 'Search videos, reels, people or posts',
     choices: [
       Screen04Choice(
+        'videos',
+        'Home',
+        attributionAsset: 'assets/prototype/provider-youtube.svg',
+      ),
+      Screen04Choice(
         'shorts',
         'Shorts',
         attributionAsset: 'assets/prototype/provider-youtube.svg',
       ),
-      Screen04Choice(
-        'videos',
-        'Videos',
-        attributionAsset: 'assets/prototype/provider-youtube.svg',
-      ),
-      Screen04Choice('feed', 'Feed'),
       Screen04Choice('create', 'Create'),
+      Screen04Choice('feed', 'Feed'),
     ],
   ),
   Screen04World(
     id: 'buy',
-    label: 'Buy',
+    label: 'Shop',
     tagline: 'Retail and wholesale, in one place',
-    prompt: 'Search grocery, medicine or household needs',
+    prompt: 'Search products, wholesale or orders',
     choices: [
-      Screen04Choice('grocery', 'Grocery'),
-      Screen04Choice('categories', 'Categories'),
-      Screen04Choice('medicine', 'Medicine'),
-      Screen04Choice('basket', 'Basket'),
+      Screen04Choice('shop', 'Products'),
+      Screen04Choice('wholesale', 'Wholesale'),
+      Screen04Choice('orders', 'Orders'),
     ],
   ),
   Screen04World(
     id: 'eat',
-    label: 'Eat',
+    label: 'Food',
     tagline: 'Food and tables around you',
-    prompt: 'Search restaurants, tiffin or tables',
+    prompt: 'Search restaurants, food or tables',
     choices: [
       Screen04Choice('order-food', 'Order Food'),
       Screen04Choice('book-table', 'Book Table'),
-      Screen04Choice('tiffin', 'Tiffin'),
     ],
   ),
   Screen04World(
     id: 'ride',
-    label: 'Ride',
+    label: 'Travel',
     tagline: 'Choose how you want to travel',
-    prompt: 'Choose a bike, auto or cab',
+    prompt: 'Choose a bike, auto, cab or bus',
     choices: [
       Screen04Choice('bike', 'Bike'),
       Screen04Choice('auto', 'Auto'),
       Screen04Choice('cab', 'Cab'),
+      Screen04Choice('bus', 'Bus'),
     ],
   ),
   Screen04World(
     id: 'book',
-    label: 'Book',
+    label: 'Care',
     tagline: 'Trusted services, ready to book',
-    prompt: 'Find trusted help, doctors or salons',
+    prompt: 'Find doctors, medicine or salons',
     choices: [
-      Screen04Choice('get-done', 'Get It Done'),
       Screen04Choice('doctor', 'Doctor'),
+      Screen04Choice('medicine', 'Medicine'),
       Screen04Choice('salon', 'Salon'),
-    ],
-  ),
-  Screen04World(
-    id: 'pay',
-    label: 'Pay',
-    tagline: 'Everyday payments, clearly organised',
-    prompt: 'Recharge, pay bills or scan a code',
-    choices: [
-      Screen04Choice('recharge', 'Recharge'),
-      Screen04Choice('bills', 'Bills'),
-      Screen04Choice('scan-pay', 'Scan & Pay'),
-      Screen04Choice('receipts', 'Receipts'),
     ],
   ),
   Screen04World(
@@ -115,9 +102,6 @@ const screen04Worlds = <Screen04World>[
     prompt: 'Find nearby work or open your workspace',
     choices: [
       Screen04Choice('earn-today', 'Earn Today'),
-      Screen04Choice('delivery', 'Delivery'),
-      Screen04Choice('onboard', 'Onboard'),
-      Screen04Choice('verify', 'Verify'),
       Screen04Choice('workspace', 'Workspace'),
     ],
   ),
@@ -135,11 +119,13 @@ class Screen04Header extends StatelessWidget {
     required this.immersive,
     required this.onHome,
     required this.onArea,
+    required this.onChat,
     required this.onNotifications,
     required this.onProfile,
     required this.onSearch,
     required this.onScan,
     required this.onVoice,
+    this.showChat = true,
     super.key,
   });
 
@@ -148,17 +134,16 @@ class Screen04Header extends StatelessWidget {
   final bool immersive;
   final VoidCallback onHome;
   final VoidCallback onArea;
+  final VoidCallback onChat;
   final VoidCallback onNotifications;
   final VoidCallback onProfile;
   final VoidCallback onSearch;
   final VoidCallback onScan;
   final VoidCallback onVoice;
+  final bool showChat;
 
   @override
   Widget build(BuildContext context) {
-    if (immersive && MediaQuery.sizeOf(context).height <= 650) {
-      return const SizedBox.shrink();
-    }
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -186,12 +171,16 @@ class Screen04Header extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: SocialV2Wordmark(
-                    key: const Key('screen04-home'),
-                    onPressed: onHome,
+                const Spacer(),
+                if (showChat) ...[
+                  _HeaderRoundButton(
+                    key: const Key('social-global-chat'),
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: 'Open Chat',
+                    onPressed: onChat,
                   ),
-                ),
+                  const SizedBox(width: 6),
+                ],
                 _HeaderRoundButton(
                   key: const Key('screen04-notifications'),
                   icon: Icons.notifications_none_rounded,
@@ -345,6 +334,7 @@ class Screen04Header extends StatelessWidget {
 class Screen04VideoHeader extends StatefulWidget {
   const Screen04VideoHeader({
     required this.onHome,
+    required this.onChat,
     required this.onNotifications,
     required this.onProfile,
     required this.onQueryChanged,
@@ -353,6 +343,7 @@ class Screen04VideoHeader extends StatefulWidget {
   });
 
   final VoidCallback onHome;
+  final VoidCallback onChat;
   final VoidCallback onNotifications;
   final VoidCallback onProfile;
   final ValueChanged<String> onQueryChanged;
@@ -418,13 +409,14 @@ class _Screen04VideoHeaderState extends State<Screen04VideoHeader> {
                   onPressed: _toggleSearch,
                 ),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: SocialV2Wordmark(
-                    key: const Key('screen04-video-home'),
-                    compact: true,
-                    onPressed: widget.onHome,
-                  ),
+                const Spacer(),
+                _HeaderRoundButton(
+                  key: const Key('social-global-chat'),
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'Open Chat',
+                  onPressed: widget.onChat,
                 ),
+                const SizedBox(width: 5),
                 _HeaderRoundButton(
                   key: const Key('screen04-notifications'),
                   icon: Icons.notifications_none_rounded,
@@ -590,732 +582,54 @@ class _HeaderSquareButton extends StatelessWidget {
   }
 }
 
-class Screen04CapabilityRail extends StatelessWidget {
-  const Screen04CapabilityRail({
+class Screen04ContextTabs extends StatelessWidget {
+  const Screen04ContextTabs({
     required this.world,
     required this.choice,
-    required this.moolOpen,
-    required this.onMool,
-    required this.onWorld,
     required this.onChoice,
-    required this.onChat,
     super.key,
   });
 
   final Screen04World world;
   final String choice;
-  final bool moolOpen;
-  final VoidCallback onMool;
-  final ValueChanged<String> onWorld;
   final ValueChanged<String> onChoice;
-  final VoidCallback onChat;
 
   @override
   Widget build(BuildContext context) {
-    final items = moolOpen
-        ? screen04Worlds
-              .map((item) => Screen04Choice(item.id, item.label))
-              .toList(growable: false)
-        : world.choices;
-    final progressIndex = screen04Worlds.indexWhere(
-      (item) => item.id == world.id,
-    );
-    final progress = progressIndex < 0
-        ? 0.0
-        : progressIndex / (screen04Worlds.length - 1);
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(9, 0, 9, 7),
-      child: Container(
-        key: const Key('screen04-capability-rail'),
-        height: 70,
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: const Color(0xF7FFFFFF),
-          border: Border.all(color: const Color(0x1A000080)),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x2E000046),
-              blurRadius: 32,
-              offset: Offset(0, 13),
-            ),
-            BoxShadow(
-              color: Color(0x12000046),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 72,
-              right: 72,
-              top: 0,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: progress),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, _) => ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: SizedBox(
-                    height: 3,
-                    child: LinearProgressIndicator(
-                      value: value,
-                      color: SocialV2Colors.saffron,
-                      backgroundColor: const Color(0x15000080),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                _RailEdge(
-                  key: const Key('screen04-mool'),
-                  label: 'Mool',
-                  icon: Icons.grid_view_rounded,
-                  active: moolOpen,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onMool();
-                  },
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: _TrackingRailRibbon(
-                    items: items,
-                    activeId: moolOpen ? world.id : choice,
-                    root: moolOpen,
-                    onSelected: (id) {
-                      if (moolOpen) {
-                        HapticFeedback.lightImpact();
-                        onWorld(id);
-                      } else {
-                        HapticFeedback.selectionClick();
-                        onChoice(id);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 5),
-                _RailEdge(
-                  key: const Key('screen04-chat'),
-                  label: 'Chat',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  chat: true,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onChat();
-                  },
-                ),
-              ],
-            ),
-            const Positioned(
-              left: 65,
-              top: 23,
-              child: IgnorePointer(
-                child: Icon(
-                  Icons.chevron_left_rounded,
-                  size: 13,
-                  color: Color(0x59000080),
-                ),
-              ),
-            ),
-            const Positioned(
-              right: 65,
-              top: 23,
-              child: IgnorePointer(
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  size: 13,
-                  color: Color(0x59000080),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TrackingRailRibbon extends StatefulWidget {
-  const _TrackingRailRibbon({
-    required this.items,
-    required this.activeId,
-    required this.root,
-    required this.onSelected,
-  });
-
-  final List<Screen04Choice> items;
-  final String activeId;
-  final bool root;
-  final ValueChanged<String> onSelected;
-
-  @override
-  State<_TrackingRailRibbon> createState() => _TrackingRailRibbonState();
-}
-
-class _TrackingRailRibbonState extends State<_TrackingRailRibbon> {
-  static const _revealMargin = 6.0;
-
-  final ScrollController _controller = ScrollController();
-  final GlobalKey _viewportKey = GlobalKey();
-  final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
-  bool _needsReveal = true;
-  bool _revealScheduled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _scheduleReveal();
-  }
-
-  @override
-  void didUpdateWidget(covariant _TrackingRailRibbon oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final oldItems = oldWidget.items.map((item) => item.id).join('|');
-    final newItems = widget.items.map((item) => item.id).join('|');
-    if (oldWidget.activeId != widget.activeId ||
-        oldWidget.root != widget.root ||
-        oldItems != newItems) {
-      _needsReveal = true;
-      _itemKeys.removeWhere(
-        (id, _) => !widget.items.any((item) => item.id == id),
-      );
-      _scheduleReveal();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _scheduleReveal() {
-    if (!widget.root && widget.items.length <= 4) {
-      _needsReveal = false;
-      return;
-    }
-    if (_revealScheduled || !_needsReveal) return;
-    _revealScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _revealScheduled = false;
-      if (_revealActiveAndNext()) {
-        _needsReveal = false;
-      } else if (mounted) {
-        _scheduleReveal();
-      }
-    });
-  }
-
-  bool _revealActiveAndNext() {
-    if (!mounted || !_controller.hasClients || widget.items.isEmpty) {
-      return false;
-    }
-    final activeIndex = widget.items.indexWhere(
-      (item) => item.id == widget.activeId,
-    );
-    if (activeIndex < 0) return true;
-    final nextIndex = (activeIndex + 1).clamp(0, widget.items.length - 1);
-    final activeContext =
-        _itemKeys[widget.items[activeIndex].id]?.currentContext;
-    final nextContext = _itemKeys[widget.items[nextIndex].id]?.currentContext;
-    final viewportContext = _viewportKey.currentContext;
-    if (activeContext == null ||
-        nextContext == null ||
-        viewportContext == null) {
-      return false;
-    }
-
-    final activeBox = activeContext.findRenderObject() as RenderBox?;
-    final nextBox = nextContext.findRenderObject() as RenderBox?;
-    final viewportBox = viewportContext.findRenderObject() as RenderBox?;
-    if (activeBox == null || nextBox == null || viewportBox == null) {
-      return false;
-    }
-
-    final viewportLeft = viewportBox.localToGlobal(Offset.zero).dx;
-    final current = _controller.offset;
-    final activeStart =
-        current + activeBox.localToGlobal(Offset.zero).dx - viewportLeft;
-    final nextEnd =
-        current +
-        nextBox.localToGlobal(Offset(nextBox.size.width, 0)).dx -
-        viewportLeft;
-    final viewportWidth = viewportBox.size.width;
-    final minimumToShowNext = nextEnd - viewportWidth + _revealMargin;
-    final maximumToShowActive = activeStart - _revealMargin;
-
-    var target = current;
-    if (minimumToShowNext <= maximumToShowActive) {
-      target = target.clamp(minimumToShowNext, maximumToShowActive);
-    } else {
-      target = maximumToShowActive;
-    }
-    target = target.clamp(0.0, _controller.position.maxScrollExtent);
-    if ((target - current).abs() < 1) return true;
-    _controller.animateTo(
-      target,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
-    return true;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    _scheduleReveal();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final showAllChoices = !widget.root && widget.items.length <= 4;
-        if (showAllChoices) {
-          return SizedBox(
-            key: _viewportKey,
-            width: constraints.maxWidth,
-            child: Row(
-              key: const Key('screen04-choice-ribbon'),
-              children: widget.items
-                  .map(
-                    (item) => Expanded(
-                      child: _RailAction(
-                        key: Key('screen04-rail-${item.id}'),
-                        label: item.label,
-                        attributionAsset: item.attributionAsset,
-                        active: item.id == widget.activeId,
-                        root: false,
-                        fillWidth: true,
-                        onTap: () => widget.onSelected(item.id),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-          );
-        }
-        return SizedBox(
-          key: _viewportKey,
-          width: constraints.maxWidth,
-          child: SingleChildScrollView(
-            key: Key(
-              widget.root ? 'screen04-world-ribbon' : 'screen04-choice-ribbon',
-            ),
-            controller: _controller,
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: widget.items
-                  .map(
-                    (item) => SizedBox(
-                      key: _itemKeys.putIfAbsent(item.id, GlobalKey.new),
-                      child: _RailAction(
-                        key: Key('screen04-rail-${item.id}'),
-                        label: item.label,
-                        attributionAsset: item.attributionAsset,
-                        active: item.id == widget.activeId,
-                        root: widget.root,
-                        fillWidth: false,
-                        onTap: () => widget.onSelected(item.id),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RailEdge extends StatelessWidget {
-  const _RailEdge({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.active = false,
-    this.chat = false,
-    super.key,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool active;
-  final bool chat;
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient = chat
-        ? null
-        : active
-        ? const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFFE3C0), SocialV2Colors.saffron],
-          )
-        : const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF2020C8), SocialV2Colors.navy],
-          );
-    final foreground = active && !chat ? SocialV2Colors.navy : Colors.white;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: chat
-          ? 'Chat, 3 unread chats'
-          : (active ? 'Show $label choices' : 'Show all MoolSocial actions'),
-      child: AnimatedScale(
-        scale: active ? 1.018 : 1,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutBack,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            child: Ink(
-              width: 62,
-              height: 58,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                color: chat ? SocialV2Colors.green : null,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x33000080),
-                    blurRadius: 18,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, color: foreground, size: 21),
-                        const SizedBox(height: 2),
-                        Text(
-                          label,
-                          style: TextStyle(
-                            color: foreground,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!chat)
-                    Positioned(
-                      left: 9,
-                      right: 9,
-                      bottom: 3,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(99),
-                        child: const SizedBox(
-                          height: 3,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                flex: 45,
-                                child: ColoredBox(
-                                  color: SocialV2Colors.saffron,
-                                ),
-                              ),
-                              Expanded(
-                                flex: 14,
-                                child: ColoredBox(color: Colors.white),
-                              ),
-                              Expanded(
-                                flex: 41,
-                                child: ColoredBox(color: SocialV2Colors.green),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (chat)
-                    Positioned(
-                      right: 5,
-                      top: 3,
-                      child: Container(
-                        constraints: const BoxConstraints(
-                          minWidth: 19,
-                          minHeight: 19,
-                        ),
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: SocialV2Colors.saffron,
-                          border: Border.all(color: Colors.white, width: 2),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: const Text(
-                          '3',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RailAction extends StatefulWidget {
-  const _RailAction({
-    required this.label,
-    required this.attributionAsset,
-    required this.active,
-    required this.root,
-    required this.fillWidth,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final String? attributionAsset;
-  final bool active;
-  final bool root;
-  final bool fillWidth;
-  final VoidCallback onTap;
-
-  @override
-  State<_RailAction> createState() => _RailActionState();
-}
-
-class _RailActionState extends State<_RailAction>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _sheenController;
-
-  @override
-  void initState() {
-    super.initState();
-    _sheenController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 460),
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _RailAction oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!oldWidget.active && widget.active) {
-      _sheenController.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _sheenController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: widget.active,
-      label: widget.attributionAsset == null
-          ? widget.label
-          : 'YouTube ${widget.label}',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: AnimatedScale(
-            scale: widget.active ? 1.018 : 1,
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutBack,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutCubic,
-              width: widget.fillWidth
+    return SizedBox(
+      key: const Key('screen04-context-tabs'),
+      height: MoolLocalNavigationTokens.railHeight,
+      child: MoolLocalNavigationRail(
+        key: const Key('screen04-choice-ribbon'),
+        familyId: 'social',
+        surfaceTone: MoolLocalNavigationSurfaceTone.media,
+        semanticLabel: '${world.label} options',
+        activeId: choice,
+        actions: [
+          for (final item in world.choices)
+            MoolLocalNavigationAction(
+              keyName: 'screen04-rail-${item.id}',
+              id: item.id,
+              label: item.label,
+              semanticLabel: item.attributionAsset == null
+                  ? item.label
+                  : 'YouTube ${item.label}',
+              icon: switch (item.id) {
+                'shorts' => Icons.play_circle_outline_rounded,
+                'videos' => Icons.home_outlined,
+                'feed' => Icons.dynamic_feed_outlined,
+                'create' => Icons.add_circle_outline_rounded,
+                _ => Icons.circle_outlined,
+              },
+              iconAsset: item.attributionAsset,
+              onPressed: item.id == choice
                   ? null
-                  : widget.root
-                  ? 58
-                  : (widget.active ? 68 : 56),
-              constraints: const BoxConstraints(minHeight: 52),
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: widget.active
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: widget.root
-                            ? const [Color(0xFF2020C8), SocialV2Colors.navy]
-                            : const [Color(0xFF2020C8), SocialV2Colors.navy],
-                      )
-                    : null,
-                color: widget.active ? null : Colors.transparent,
-                border: Border.all(
-                  color: widget.active
-                      ? const Color(0x3DFFFFFF)
-                      : Colors.transparent,
-                ),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: widget.active
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x42000080),
-                          blurRadius: 18,
-                          offset: Offset(0, 7),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: SizedBox(
-                height: 38,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ExcludeSemantics(
-                        child: switch (widget.attributionAsset) {
-                          final asset? => Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SvgPicture.asset(
-                                asset,
-                                width: 14,
-                                height: 10,
-                                fit: BoxFit.contain,
-                              ),
-                              const SizedBox(height: 1),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  widget.label,
-                                  maxLines: 1,
-                                  softWrap: false,
-                                  style: TextStyle(
-                                    color: widget.active
-                                        ? Colors.white
-                                        : const Color(0xFF56596D),
-                                    fontSize: widget.fillWidth ? 8.4 : 10.2,
-                                    height: 1,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          null => Text(
-                            widget.label,
-                            textAlign: TextAlign.center,
-                            maxLines: widget.fillWidth ? 1 : 2,
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: !widget.fillWidth,
-                            style: TextStyle(
-                              color: widget.active
-                                  ? Colors.white
-                                  : const Color(0xFF56596D),
-                              fontSize: widget.fillWidth ? 8.8 : 10.8,
-                              height: 1.05,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        },
-                      ),
-                      if (widget.active)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: AnimatedBuilder(
-                              animation: _sheenController,
-                              builder: (context, _) {
-                                final progress = _sheenController.value;
-                                final x = -1.4 + (2.8 * progress);
-                                final opacity = progress == 0 || progress == 1
-                                    ? 0.0
-                                    : (1 - (progress - .5).abs() * 2) * .55;
-                                return FractionalTranslation(
-                                  translation: Offset(x, 0),
-                                  child: Opacity(
-                                    opacity: opacity.clamp(0, 1),
-                                    child: Transform.rotate(
-                                      angle: .24,
-                                      child: Align(
-                                        alignment: Alignment.center,
-                                        child: Container(
-                                          width: 18,
-                                          decoration: const BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Colors.transparent,
-                                                Color(0x8FFFFFFF),
-                                                Colors.transparent,
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      if (widget.active)
-                        const Positioned(
-                          left: 9,
-                          right: 9,
-                          bottom: 2,
-                          child: _RailIdentityLine(),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+                  : () {
+                      HapticFeedback.selectionClick();
+                      onChoice(item.id);
+                    },
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RailIdentityLine extends StatelessWidget {
-  const _RailIdentityLine();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(99),
-      child: const SizedBox(
-        height: 3,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 45,
-              child: ColoredBox(color: SocialV2Colors.saffron),
-            ),
-            Expanded(flex: 14, child: ColoredBox(color: Colors.white)),
-            Expanded(flex: 41, child: ColoredBox(color: SocialV2Colors.green)),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -1363,7 +677,7 @@ const _navy = SocialV2Colors.navy;
 
 const screen04Content = <String, Screen04ContentSpec>{
   'grocery': Screen04ContentSpec(
-    eyebrow: 'Buy · Grocery',
+    eyebrow: 'Shop · Products',
     title: 'Everyday essentials, nearby',
     detail:
         'Compare fresh items and household needs from stores serving your area.',
@@ -1384,7 +698,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF0A5E5A),
   ),
   'categories': Screen04ContentSpec(
-    eyebrow: 'Buy · Categories',
+    eyebrow: 'Shop · Categories',
     title: 'Find the right aisle faster',
     detail: 'Browse personal care, home, electronics and daily needs.',
     primary: 'Browse Categories',
@@ -1404,7 +718,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF2626A5),
   ),
   'medicine': Screen04ContentSpec(
-    eyebrow: 'Buy · Medicine',
+    eyebrow: 'Care · Medicine',
     title: 'Health needs with clear steps',
     detail:
         'Find medicines and wellness essentials, with prescription checks when needed.',
@@ -1424,7 +738,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF126B57),
   ),
   'basket': Screen04ContentSpec(
-    eyebrow: 'Buy · Basket',
+    eyebrow: 'Shop · Basket',
     title: 'Your basket is ready',
     detail:
         'Check quantities, delivery choices and the full price before you continue.',
@@ -1444,7 +758,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF4A2572),
   ),
   'order-food': Screen04ContentSpec(
-    eyebrow: 'Eat · Order Food',
+    eyebrow: 'Food · Order Food',
     title: 'Good food around you',
     detail: 'Explore trusted kitchens with clear delivery time and price.',
     primary: 'Find Food',
@@ -1464,7 +778,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF8D3E00),
   ),
   'book-table': Screen04ContentSpec(
-    eyebrow: 'Eat · Book Table',
+    eyebrow: 'Food · Book Table',
     title: 'A table for your moment',
     detail:
         'Choose a restaurant, time and party size before requesting a table.',
@@ -1480,7 +794,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF693C13),
   ),
   'tiffin': Screen04ContentSpec(
-    eyebrow: 'Eat · Tiffin',
+    eyebrow: 'Food · Tiffin',
     title: 'Homestyle meals, regularly',
     detail:
         'Compare meal plans, delivery days and pause rules before subscribing.',
@@ -1500,7 +814,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF5F4A00),
   ),
   'bike': Screen04ContentSpec(
-    eyebrow: 'Ride · Bike',
+    eyebrow: 'Travel · Bike',
     title: 'A quick ride across town',
     detail: 'Set your destination to see nearby bikes and an estimated fare.',
     primary: 'Book a Bike',
@@ -1519,7 +833,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF0E6161),
   ),
   'auto': Screen04ContentSpec(
-    eyebrow: 'Ride · Auto',
+    eyebrow: 'Travel · Auto',
     title: 'An auto when you need one',
     detail: 'Choose your destination and compare the fare before booking.',
     primary: 'Book an Auto',
@@ -1538,7 +852,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF496900),
   ),
   'cab': Screen04ContentSpec(
-    eyebrow: 'Ride · Cab',
+    eyebrow: 'Travel · Cab',
     title: 'More room for the journey',
     detail: 'Compare cab sizes, arrival time and fare for your trip.',
     primary: 'Book a Cab',
@@ -1552,8 +866,23 @@ const screen04Content = <String, Screen04ContentSpec>{
     actions: ['Save', 'Chat', 'Share'],
     gradientEnd: Color(0xFF36364A),
   ),
+  'bus': Screen04ContentSpec(
+    eyebrow: 'Travel · Bus',
+    title: 'Plan your bus journey',
+    detail: 'Choose your route and travel date before viewing available buses.',
+    primary: 'Find Buses',
+    section: 'Plan this trip',
+    note: 'Routes, seats and fares appear before booking',
+    cards: [
+      Screen04CardSpec('Choose route', 'Set departure and destination', _green),
+      Screen04CardSpec('Travel date', 'Pick when you want to leave', _saffron),
+    ],
+    chips: ['Route first', 'Fare first', 'Seat choice'],
+    actions: ['Save', 'Chat', 'Share'],
+    gradientEnd: Color(0xFF213A62),
+  ),
   'get-done': Screen04ContentSpec(
-    eyebrow: 'Book · Get It Done',
+    eyebrow: 'Care · Get It Done',
     title: 'Trusted help for everyday tasks',
     detail:
         'Choose the job, time and price range before requesting a professional.',
@@ -1574,7 +903,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF315A3A),
   ),
   'doctor': Screen04ContentSpec(
-    eyebrow: 'Book · Doctor',
+    eyebrow: 'Care · Doctor',
     title: 'Find the care you need',
     detail: 'Browse doctors by speciality, time and consultation type.',
     primary: 'Find a Doctor',
@@ -1594,7 +923,7 @@ const screen04Content = <String, Screen04ContentSpec>{
     gradientEnd: Color(0xFF006B72),
   ),
   'salon': Screen04ContentSpec(
-    eyebrow: 'Book · Salon',
+    eyebrow: 'Care · Salon',
     title: 'Care that fits your day',
     detail:
         'Choose a service, professional and time with the price shown first.',

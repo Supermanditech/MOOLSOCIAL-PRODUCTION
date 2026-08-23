@@ -60,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _capture(tester, 'r51-11-header-shop-320-140-stacked');
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);
   });

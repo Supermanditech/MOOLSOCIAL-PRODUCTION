@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 26+ can otherwise frame the entire Flutter root view when
+         hardware-keyboard focus reaches the native surface. Flutter keeps
+         ownership of its control-level focus visuals and semantics. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/mool_navy</item>
+        <item name="android:defaultFocusHighlightEnabled">false</item>
+    </style>
+</resources>

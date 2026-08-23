@@ -37,7 +37,7 @@ class _EatOrderScreenState extends State<EatOrderScreen> {
           title: widget.session.selectedRestaurant.name,
           subtitle:
               '${widget.session.selectedRestaurant.cuisine} · ${widget.session.fulfilmentPromise}',
-          activeDock: 'order',
+          activeLocalAction: 'order',
           body: CustomScrollView(
             slivers: [
               SliverPadding(

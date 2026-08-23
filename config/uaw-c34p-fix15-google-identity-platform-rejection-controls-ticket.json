@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX15-GOOGLE-IDENTITY-PLATFORM-REJECTION-CONTROLS",
+  "priority": "P0",
+  "scope": "google_sign_in_only",
+  "state": "closed_not_applicable_no_change",
+  "requirement": "Verify whether Identity Platform blocking functions, user actions, or tenant configuration can reject the MoolSocial Google sign-in exchange.",
+  "affectedLayer": "Firebase Authentication with Identity Platform server-side rejection controls",
+  "evidence": [
+    "The project uses Firebase Authentication with Identity Platform.",
+    "The live Google credential exchange rejects after identity return.",
+    "Read-only Firebase Console verification proves both blocking-function hooks are unconfigured.",
+    "Read-only Firebase Console verification proves user creation is enabled; deletion and email-enumeration controls do not reject this Google creation/sign-in path.",
+    "Read-only Google Cloud Identity Platform verification proves multi-tenancy is disabled and no tenant routing applies."
+  ],
+  "classification": "NOT_APPLICABLE_CURRENT_REJECTION_PATH",
+  "correctiveAction": "Read back blocking-function, user-action, and tenant state; fix only a proven rule, hook, or tenant mismatch affecting this Google flow.",
+  "founderActionRequired": false,
+  "testPlan": [
+    "Classify each rejection control as enabled/aligned, disabled, or not applicable.",
+    "If enabled, verify its safe logs/status for the single failed Google attempt without account identity or payloads.",
+    "If unused, record evidence and close without changes."
+  ],
+  "acceptanceCriteria": [
+    "All three server-side rejection-control states are proven.",
+    "Any proven mismatch is corrected and directly verified, or the ticket is closed PASS/NOT_APPLICABLE with evidence."
+  ],
+  "regressionRisk": "Changing a blocking function or tenant setting without evidence can alter authentication for every user.",
+  "exclusions": [
+    "No function deployment, tenant migration, or production change without a proven gap and explicit authorization.",
+    "No unrelated backend expansion."
+  ]
+}

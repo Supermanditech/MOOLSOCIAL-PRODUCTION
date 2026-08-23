@@ -254,6 +254,11 @@ class YouTubePrivateDevClient {
     return YouTubeVideoPage.fromJson(_asMap(data));
   }
 
+  Future<YouTubeVideoPage> sharedShortsCatalogue() async {
+    final data = await _invoke('publicShortsCatalogue');
+    return YouTubeVideoPage.fromJson(_asMap(data));
+  }
+
   Future<List<YouTubeVideoSummary>> videoDetails(List<String> videoIds) async {
     final data = await _invoke(
       'publicVideoDetails',

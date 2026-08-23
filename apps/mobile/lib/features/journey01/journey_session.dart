@@ -2,18 +2,40 @@ import 'package:flutter/foundation.dart';
 
 import 'journey_services.dart';
 
+const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+
 enum JourneyStage { booting, bootFailure, setup, signIn, verify, ready }
 
 enum AreaChoice { current, manual, skipped }
 
 enum SocialAuthState { idle, pending, cancelled, failed }
 
+enum EmailLinkState {
+  idle,
+  entering,
+  sending,
+  sent,
+  awaitingEmail,
+  completing,
+  invalid,
+  expired,
+  used,
+  failed,
+}
+
+enum JourneyAuthenticationPurpose { general, youtubeChannelConnection }
+
 class JourneySession extends ChangeNotifier {
   JourneySession({
     JourneyStore? store,
     OtpGateway? otpGateway,
     EmailOtpGateway? emailOtpGateway,
+    EmailLinkGateway? emailLinkGateway,
     SocialAuthGateway? socialAuthGateway,
+    Set<SocialAuthProvider>? availableSocialAuthProviders,
+    this.emailOtpAvailable = true,
+    this.emailLinkAvailable = false,
+    this.mobileOtpAvailable = true,
     AccountBootstrapGateway? accountBootstrapGateway,
     LocationPermissionGateway? locationGateway,
     CurrentAreaGateway? currentAreaGateway,
@@ -21,10 +43,17 @@ class JourneySession extends ChangeNotifier {
     this.otpValidity = const Duration(minutes: 2),
     this.resendCooldown = const Duration(seconds: 30),
     this.accountBootstrapTimeout = const Duration(seconds: 8),
+    this.socialAuthRollbackTimeout = const Duration(seconds: 8),
+    this.allowGuestReady = false,
   }) : _store = store ?? MemoryJourneyStore(),
        _otpGateway = otpGateway ?? ReviewOtpGateway(),
        _emailOtpGateway = emailOtpGateway ?? ReviewEmailOtpGateway(),
+       _emailLinkGateway =
+           emailLinkGateway ?? const UnavailableEmailLinkGateway(),
        _socialAuthGateway = socialAuthGateway ?? ReviewSocialAuthGateway(),
+       availableSocialAuthProviders = Set.unmodifiable(
+         availableSocialAuthProviders ?? SocialAuthProvider.values.toSet(),
+       ),
        _accountBootstrapGateway =
            accountBootstrapGateway ?? ReviewAccountBootstrapGateway(),
        _locationGateway = locationGateway ?? ReviewLocationPermissionGateway(),
@@ -34,7 +63,12 @@ class JourneySession extends ChangeNotifier {
   final JourneyStore _store;
   final OtpGateway _otpGateway;
   final EmailOtpGateway _emailOtpGateway;
+  final EmailLinkGateway _emailLinkGateway;
   final SocialAuthGateway _socialAuthGateway;
+  final Set<SocialAuthProvider> availableSocialAuthProviders;
+  final bool emailOtpAvailable;
+  final bool emailLinkAvailable;
+  final bool mobileOtpAvailable;
   final AccountBootstrapGateway _accountBootstrapGateway;
   final LocationPermissionGateway _locationGateway;
   final CurrentAreaGateway _currentAreaGateway;
@@ -42,6 +76,8 @@ class JourneySession extends ChangeNotifier {
   final Duration otpValidity;
   final Duration resendCooldown;
   final Duration accountBootstrapTimeout;
+  final Duration socialAuthRollbackTimeout;
+  final bool allowGuestReady;
 
   JourneyStage stage = JourneyStage.booting;
   String languageCode = 'en';
@@ -57,10 +93,18 @@ class JourneySession extends ChangeNotifier {
   OtpChannel? otpChannel;
   SocialAuthProvider? socialAuthProvider;
   SocialAuthState socialAuthState = SocialAuthState.idle;
+  String? socialAuthReceiptCode;
+  final List<String> socialAuthReceiptSequence = <String>[];
+  int socialAuthAttempt = 0;
+  EmailLinkState emailLinkState = EmailLinkState.idle;
+  String? emailLinkReceiptCode;
   String? errorMessage;
   String? noticeMessage;
   String? reviewCode;
   String? returnTo;
+  String? _authenticationCancelTo;
+  JourneyAuthenticationPurpose authenticationPurpose =
+      JourneyAuthenticationPurpose.general;
   String previousPrimarySection = 'social';
   String? _lastReadyRoute;
   DateTime? otpExpiresAt;
@@ -71,11 +115,26 @@ class JourneySession extends ChangeNotifier {
   bool _started = false;
   bool _storeRestored = false;
   bool _authenticatedAtBoot = false;
+  bool _isAuthenticated = false;
   bool _authenticationCompletionInProgress = false;
+  bool _socialAuthCleanupRequired = false;
+  String? _pendingEmailLink;
+  String? _completedEmailLinkReturnRoute;
+  String? _completedSocialAuthReturnRoute;
   int _completedSetupExperienceVersion = 0;
   Future<void> _persistenceTail = Future<void>.value();
 
   bool get isReady => stage == JourneyStage.ready;
+  bool get isAuthenticated => _isAuthenticated;
+  bool get socialAuthCleanupRequired => _socialAuthCleanupRequired;
+  bool isSocialAuthProviderAvailable(SocialAuthProvider provider) =>
+      availableSocialAuthProviders.contains(provider);
+  bool get canCancelSignIn =>
+      allowGuestReady &&
+      !_isAuthenticated &&
+      stage == JourneyStage.signIn &&
+      _authenticationCancelTo?.startsWith('/app/') == true;
+  String get authenticationCancelFallback => _lastReadyRoute ?? '/app/social';
   int get completedSetupExperienceVersion => _completedSetupExperienceVersion;
 
   bool get canResend => resendSeconds == 0 && !busy;
@@ -104,6 +163,17 @@ class JourneySession extends ChangeNotifier {
     final value = phoneNumber ?? '';
     if (value.length < 4) return value;
     return '+91 ******${value.substring(value.length - 4)}';
+  }
+
+  String get maskedEmailLinkDestination {
+    final value = emailAddress ?? '';
+    final separator = value.indexOf('@');
+    if (separator <= 0 || separator == value.length - 1) return '';
+    final local = value.substring(0, separator);
+    final domain = value.substring(separator);
+    final visible = local.substring(0, 1);
+    final hiddenCount = local.length <= 4 ? 3 : local.length - 1;
+    return '$visible${'•' * hiddenCount}$domain';
   }
 
   Future<void> start() async {
@@ -144,6 +214,21 @@ class JourneySession extends ChangeNotifier {
       final signedIn =
           await _otpGateway.hasAuthenticatedUser() ||
           await _socialAuthGateway.hasAuthenticatedUser();
+      _isAuthenticated = signedIn;
+      final pendingAuthenticationUri = _localAppUri(returnTo);
+      final resumesPersistedAuthentication =
+          !signedIn && _requiresAuthentication(pendingAuthenticationUri);
+      if (resumesPersistedAuthentication) {
+        authenticationPurpose = _restoredAuthenticationPurpose(
+          snapshot?.pendingAuthenticationPurpose,
+          pendingAuthenticationUri!,
+        );
+        _authenticationCancelTo = _restoredAuthenticationCancelRoute(
+          snapshot?.pendingAuthenticationCancelRoute,
+          pendingAuthenticationUri,
+          _lastReadyRoute,
+        );
+      }
       final requiresApprovedSetup =
           snapshot == null ||
           _completedSetupExperienceVersion < approvedSetupExperienceVersion;
@@ -154,7 +239,11 @@ class JourneySession extends ChangeNotifier {
         await _prepareAuthenticatedAccount();
         stage = JourneyStage.ready;
       } else if (snapshot.setupComplete) {
-        stage = JourneyStage.signIn;
+        stage = resumesPersistedAuthentication
+            ? JourneyStage.signIn
+            : allowGuestReady
+            ? JourneyStage.ready
+            : JourneyStage.signIn;
       } else {
         stage = JourneyStage.setup;
       }
@@ -163,7 +252,7 @@ class JourneySession extends ChangeNotifier {
           setupComplete: snapshot?.setupComplete ?? areaChoice != null,
         );
       }
-      if (kDebugMode) {
+      if (kDebugMode || _deviceReviewMode) {
         debugPrint(
           'MOOLSOCIAL_STARTUP '
           'stage=${stage.name} '
@@ -177,7 +266,7 @@ class JourneySession extends ChangeNotifier {
       noticeMessage = null;
     } on Object {
       stage = JourneyStage.bootFailure;
-      if (kDebugMode) {
+      if (kDebugMode || _deviceReviewMode) {
         debugPrint('MOOLSOCIAL_STARTUP stage=${stage.name}');
       }
       errorMessage =
@@ -416,6 +505,8 @@ class JourneySession extends ChangeNotifier {
       if (_authenticatedAtBoot) {
         await _prepareAuthenticatedAccount();
         stage = JourneyStage.ready;
+      } else if (allowGuestReady) {
+        stage = JourneyStage.ready;
       } else {
         stage = JourneyStage.signIn;
       }
@@ -435,8 +526,25 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> signInWithSocial(SocialAuthProvider provider) async {
     if (busy) return false;
+    if (_socialAuthCleanupRequired &&
+        !await _retrySocialAuthCleanup(provider)) {
+      return false;
+    }
+    _beginSocialAuthAttempt();
+    if (!isSocialAuthProviderAvailable(provider)) {
+      socialAuthProvider = provider;
+      socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, 'auth-provider-configuration');
+      errorMessage =
+          '${_socialProviderLabel(provider)} sign-in is not available right now. '
+          'Choose another method.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
     socialAuthProvider = provider;
     socialAuthState = SocialAuthState.pending;
+    _recordSocialAuthReceipt(provider, 'auth-started');
     errorMessage = null;
     noticeMessage = null;
     _setBusy(true);
@@ -444,21 +552,54 @@ class JourneySession extends ChangeNotifier {
       final result = await _socialAuthGateway.signIn(provider);
       if (result.outcome == SocialAuthOutcome.cancelled) {
         socialAuthState = SocialAuthState.cancelled;
-        errorMessage =
-            '${_socialProviderLabel(provider)} sign-in was cancelled. '
-            'Try again or choose another method.';
+        _recordSocialAuthReceipt(provider, result.code ?? 'auth-cancelled');
+        errorMessage = _socialAuthCancellationMessage(provider, result.code);
         notifyListeners();
         return false;
       }
-      await _completeAuthentication();
+      if (result.outcome == SocialAuthOutcome.authorizationPending) {
+        _recordSocialAuthReceipt(
+          provider,
+          result.code ?? 'auth-browser-opened',
+        );
+        noticeMessage =
+            'Complete ${_socialProviderLabel(provider)} sign-in in the secure browser.';
+        notifyListeners();
+        return false;
+      }
+      _recordSocialAuthReceipt(
+        provider,
+        result.code ?? 'auth-provider-credential-complete',
+      );
+      final expectedUserId = result.userId?.trim();
+      if (expectedUserId == null || expectedUserId.isEmpty) {
+        throw const JourneyServiceException(
+          'Your signed-in account could not be verified. Please sign in again.',
+          code: 'auth-session-missing',
+        );
+      }
+      try {
+        await _completeAuthentication(expectedUserId: expectedUserId);
+      } on Object {
+        if (!await _rollbackIncompleteSocialAuthentication()) {
+          throw const JourneyServiceException(
+            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
+            code: 'auth-rollback-failed',
+          );
+        }
+        rethrow;
+      }
+      _recordSocialAuthReceipt(provider, 'auth-session-ready');
       return true;
     } on JourneyServiceException catch (error) {
       socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, error.code ?? 'auth-unknown');
       errorMessage = error.userMessage;
       notifyListeners();
       return false;
     } on Object {
       socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, 'auth-unexpected');
       errorMessage =
           '${_socialProviderLabel(provider)} sign-in could not be completed. '
           'Check the connection and try again.';
@@ -469,16 +610,370 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
+  Future<bool> prepareSocialAuthReturn(String callbackLocation) async {
+    if (_socialAuthGateway is! SocialAuthCallbackGateway) return false;
+    final callbackGateway = _socialAuthGateway as SocialAuthCallbackGateway;
+    final callbackUri = Uri.tryParse(callbackLocation);
+    if (callbackUri == null) return false;
+    final provider = callbackGateway.providerForCallback(callbackUri);
+    if (provider == null) return false;
+
+    final coldStart = !_started;
+    await start();
+    final completionRoute = _canonicalPersistedReadyRoute(returnTo);
+    if (_isAuthenticated) {
+      _beginSocialAuthAttempt();
+      stage = JourneyStage.ready;
+      socialAuthProvider = provider;
+      socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, 'auth-callback-already-authenticated');
+      errorMessage =
+          'This sign-in return is no longer active. Sign out before connecting a different account.';
+      noticeMessage = null;
+      notifyListeners();
+      return true;
+    }
+
+    if (socialAuthReceiptSequence.isEmpty || socialAuthProvider != provider) {
+      _beginSocialAuthAttempt();
+    }
+    stage = JourneyStage.signIn;
+    socialAuthProvider = provider;
+    socialAuthState = SocialAuthState.pending;
+    _recordSocialAuthReceipt(provider, 'auth-callback-received');
+    errorMessage = null;
+    noticeMessage = null;
+    _setBusy(true);
+    try {
+      final result = coldStart
+          ? await callbackGateway.completeColdStartCallback(callbackUri)
+          : await callbackGateway.completeForegroundCallback(callbackUri);
+      if (result.outcome == SocialAuthOutcome.cancelled) {
+        socialAuthState = SocialAuthState.cancelled;
+        _recordSocialAuthReceipt(provider, result.code ?? 'auth-cancelled');
+        errorMessage = _socialAuthCancellationMessage(provider, result.code);
+        notifyListeners();
+        return true;
+      }
+      if (result.outcome == SocialAuthOutcome.authorizationPending) {
+        _recordSocialAuthReceipt(
+          provider,
+          result.code ?? 'auth-callback-incomplete',
+        );
+        throw const JourneyServiceException(
+          'The account provider returned an incomplete sign-in. Please try again.',
+          code: 'auth-provider-configuration',
+        );
+      }
+      _recordSocialAuthReceipt(
+        provider,
+        result.code ?? 'auth-provider-credential-complete',
+      );
+      final expectedUserId = result.userId?.trim();
+      if (expectedUserId == null || expectedUserId.isEmpty) {
+        throw const JourneyServiceException(
+          'Your signed-in account could not be verified. Please sign in again.',
+          code: 'auth-session-missing',
+        );
+      }
+      try {
+        await _completeAuthentication(expectedUserId: expectedUserId);
+      } on Object {
+        if (!await _rollbackIncompleteSocialAuthentication()) {
+          throw const JourneyServiceException(
+            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
+            code: 'auth-rollback-failed',
+          );
+        }
+        rethrow;
+      }
+      _recordSocialAuthReceipt(provider, 'auth-session-ready');
+      _completedSocialAuthReturnRoute = completionRoute;
+      return true;
+    } on JourneyServiceException catch (error) {
+      socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, error.code ?? 'auth-unknown');
+      errorMessage = error.userMessage;
+      notifyListeners();
+      return true;
+    } on Object {
+      socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, 'auth-unexpected');
+      errorMessage =
+          '${_socialProviderLabel(provider)} sign-in could not be completed. '
+          'Check the connection and try again.';
+      notifyListeners();
+      return true;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  String? takeCompletedSocialAuthReturnRoute() {
+    final route = _completedSocialAuthReturnRoute;
+    _completedSocialAuthReturnRoute = null;
+    return route;
+  }
+
   void clearSocialAuthResult() {
     socialAuthProvider = null;
     socialAuthState = SocialAuthState.idle;
+    socialAuthReceiptCode = null;
     errorMessage = null;
     noticeMessage = null;
     notifyListeners();
   }
 
+  void _recordSocialAuthReceipt(SocialAuthProvider provider, String code) {
+    socialAuthReceiptCode = code;
+    if (socialAuthReceiptSequence.length == 16) {
+      socialAuthReceiptSequence.removeAt(0);
+    }
+    socialAuthReceiptSequence.add(code);
+    if (kDebugMode || _deviceReviewMode) {
+      debugPrint(
+        'MOOLSOCIAL_SOCIAL_AUTH attempt=$socialAuthAttempt '
+        'provider=${provider.name} code=$code',
+      );
+    }
+  }
+
+  void _beginSocialAuthAttempt() {
+    socialAuthAttempt += 1;
+    socialAuthReceiptSequence.clear();
+  }
+
+  void openEmailLinkEntry() {
+    if (busy) return;
+    emailLinkState = EmailLinkState.entering;
+    emailLinkReceiptCode = null;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  void useDifferentEmailForLink() {
+    if (busy) return;
+    emailAddress = null;
+    _pendingEmailLink = null;
+    emailLinkState = EmailLinkState.entering;
+    emailLinkReceiptCode = null;
+    resendAvailableAt = null;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  void cancelEmailLink() {
+    if (busy) return;
+    emailAddress = null;
+    _pendingEmailLink = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    resendAvailableAt = null;
+    errorMessage = null;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  Future<bool> prepareEmailLinkReturn(String emailLink) async {
+    if (!emailLinkAvailable ||
+        emailLink.isEmpty ||
+        !_emailLinkGateway.isSignInLink(emailLink)) {
+      return false;
+    }
+
+    _pendingEmailLink = emailLink;
+    _recordEmailLinkReceipt('email-link-callback-received');
+    await start();
+    if (_isAuthenticated) {
+      _pendingEmailLink = null;
+      return false;
+    }
+
+    stage = JourneyStage.signIn;
+    errorMessage = null;
+    noticeMessage = null;
+    if (emailAddress == null) {
+      emailLinkState = EmailLinkState.awaitingEmail;
+      _recordEmailLinkReceipt('email-link-awaiting-address');
+      notifyListeners();
+      return true;
+    }
+
+    final completionRoute = _canonicalPersistedReadyRoute(returnTo);
+    final completed = await completeEmailLink(emailAddress!);
+    if (completed && isReady) {
+      _completedEmailLinkReturnRoute = completionRoute;
+    }
+    return true;
+  }
+
+  String? takeCompletedEmailLinkReturnRoute() {
+    final route = _completedEmailLinkReturnRoute;
+    _completedEmailLinkReturnRoute = null;
+    return route;
+  }
+
+  Future<bool> requestEmailLink(String value) async {
+    if (busy) return false;
+    if (!emailLinkAvailable) {
+      emailLinkState = EmailLinkState.failed;
+      _recordEmailLinkReceipt('email-link-unavailable');
+      errorMessage =
+          'Email link sign-in is not available right now. Choose another method.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+
+    final email = value.trim().toLowerCase();
+    if (!_isValidEmail(email)) {
+      emailLinkState = EmailLinkState.entering;
+      _recordEmailLinkReceipt('email-link-invalid-email');
+      errorMessage = 'Enter a valid email address.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+
+    emailAddress = email;
+    _pendingEmailLink = null;
+    emailLinkState = EmailLinkState.sending;
+    _recordEmailLinkReceipt('email-link-send-started');
+    _setBusy(true);
+    errorMessage = null;
+    noticeMessage = null;
+    try {
+      await _emailLinkGateway.sendSignInLink(email);
+      resendAvailableAt = _now().add(resendCooldown);
+      emailLinkState = EmailLinkState.sent;
+      _recordEmailLinkReceipt('email-link-sent');
+      noticeMessage = 'A secure sign-in link was sent.';
+      notifyListeners();
+      return true;
+    } on JourneyServiceException catch (error) {
+      _applyEmailLinkFailure(error);
+      return false;
+    } on Object {
+      _applyEmailLinkFailure(
+        const JourneyServiceException(
+          'The email service is unavailable. Check the connection and retry.',
+          code: 'email-link-bridge-failure',
+        ),
+      );
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<bool> resendEmailLink() async {
+    if (busy) return false;
+    final email = emailAddress;
+    if (email == null) {
+      openEmailLinkEntry();
+      return false;
+    }
+    if (!canResend) {
+      errorMessage = 'You can request a new link in $resendSeconds seconds.';
+      notifyListeners();
+      return false;
+    }
+    return requestEmailLink(email);
+  }
+
+  Future<bool> completeEmailLink(String value) async {
+    if (isReady || _authenticationCompletionInProgress) return true;
+    if (busy) return false;
+    final emailLink = _pendingEmailLink;
+    if (emailLink == null) {
+      _applyEmailLinkFailure(
+        const JourneyServiceException(
+          'This sign-in link is invalid. Request a new link.',
+          code: 'invalid-action-code',
+        ),
+      );
+      return false;
+    }
+    final email = value.trim().toLowerCase();
+    if (!_isValidEmail(email)) {
+      emailLinkState = EmailLinkState.awaitingEmail;
+      _recordEmailLinkReceipt('email-link-invalid-email');
+      errorMessage = 'Enter the email address that received this link.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+
+    emailAddress = email;
+    emailLinkState = EmailLinkState.completing;
+    _recordEmailLinkReceipt('email-link-completing');
+    _setBusy(true);
+    errorMessage = null;
+    noticeMessage = null;
+    try {
+      await _emailLinkGateway.signInWithEmailLink(
+        emailAddress: email,
+        emailLink: emailLink,
+      );
+      _recordEmailLinkReceipt('email-link-firebase-credential-complete');
+      try {
+        await _completeAuthentication();
+      } on Object {
+        await _rollbackIncompleteEmailLinkAuthentication();
+        rethrow;
+      }
+      _pendingEmailLink = null;
+      emailLinkState = EmailLinkState.idle;
+      _recordEmailLinkReceipt('email-link-session-ready');
+      return true;
+    } on JourneyServiceException catch (error) {
+      _applyEmailLinkFailure(error);
+      return false;
+    } on Object {
+      _applyEmailLinkFailure(
+        const JourneyServiceException(
+          'Sign-in could not be completed. Check the connection and retry.',
+          code: 'email-link-bridge-failure',
+        ),
+      );
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  void _applyEmailLinkFailure(JourneyServiceException error) {
+    _recordEmailLinkReceipt(error.code ?? 'email-link-unclassified');
+    emailLinkState = switch (error.code) {
+      'expired-action-code' => EmailLinkState.expired,
+      'email-link-already-used' => EmailLinkState.used,
+      'invalid-action-code' => EmailLinkState.invalid,
+      'invalid-email' => EmailLinkState.awaitingEmail,
+      _ => EmailLinkState.failed,
+    };
+    errorMessage = error.userMessage;
+    noticeMessage = null;
+    notifyListeners();
+  }
+
+  void _recordEmailLinkReceipt(String code) {
+    emailLinkReceiptCode = code;
+    if (kDebugMode || _deviceReviewMode) {
+      debugPrint('MOOLSOCIAL_EMAIL_LINK code=$code');
+    }
+  }
+
   Future<bool> requestOtp(String value) async {
     if (busy) return false;
+    if (!mobileOtpAvailable) {
+      errorMessage =
+          'Mobile OTP is not available right now. Choose another method.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
     final digits = value.replaceAll(RegExp(r'\D'), '');
     if (!_isValidIndianMobile(digits)) {
       errorMessage = 'Enter a valid 10-digit Indian mobile number.';
@@ -493,6 +988,13 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestEmailOtp(String value) async {
     if (busy) return false;
+    if (!emailOtpAvailable) {
+      errorMessage =
+          'Email OTP is not available right now. Choose another method.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
     final email = value.trim().toLowerCase();
     if (!_isValidEmail(email)) {
       errorMessage = 'Enter a valid email address.';
@@ -539,7 +1041,12 @@ class JourneySession extends ChangeNotifier {
     try {
       final result = await _otpGateway.requestCode(e164);
       if (result.automaticallyVerified) {
-        await _completeAuthentication();
+        try {
+          await _completeAuthentication();
+        } on Object {
+          await _rollbackIncompleteOtpAuthentication();
+          rethrow;
+        }
         return true;
       }
 
@@ -620,7 +1127,14 @@ class JourneySession extends ChangeNotifier {
       } else {
         await _otpGateway.verifyCode(code);
       }
-      await _completeAuthentication();
+      try {
+        await _completeAuthentication();
+      } on Object {
+        if (otpChannel == OtpChannel.mobile) {
+          await _rollbackIncompleteOtpAuthentication();
+        }
+        rethrow;
+      }
       return true;
     } on JourneyServiceException catch (error) {
       errorMessage = error.userMessage;
@@ -636,23 +1150,78 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
-  Future<void> _completeAuthentication() async {
+  Future<void> _completeAuthentication({String? expectedUserId}) async {
     if (stage == JourneyStage.ready || _authenticationCompletionInProgress) {
       return;
     }
     _authenticationCompletionInProgress = true;
     try {
-      await _prepareAuthenticatedAccount();
+      await _prepareAuthenticatedAccount(expectedUserId: expectedUserId);
       await _persist(setupComplete: true);
+      _isAuthenticated = true;
       stage = JourneyStage.ready;
       errorMessage = null;
       noticeMessage = null;
       reviewCode = null;
       socialAuthProvider = null;
       socialAuthState = SocialAuthState.idle;
+      _authenticationCancelTo = null;
+      authenticationPurpose = JourneyAuthenticationPurpose.general;
       notifyListeners();
     } finally {
       _authenticationCompletionInProgress = false;
+    }
+  }
+
+  Future<bool> _rollbackIncompleteSocialAuthentication() async {
+    _isAuthenticated = false;
+    _socialAuthCleanupRequired = true;
+    try {
+      await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      _socialAuthCleanupRequired = false;
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<bool> _retrySocialAuthCleanup(SocialAuthProvider provider) async {
+    socialAuthProvider = provider;
+    socialAuthState = SocialAuthState.pending;
+    errorMessage = null;
+    noticeMessage = null;
+    _setBusy(true);
+    try {
+      await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      _socialAuthCleanupRequired = false;
+      return true;
+    } on Object {
+      socialAuthState = SocialAuthState.failed;
+      _recordSocialAuthReceipt(provider, 'auth-rollback-failed');
+      errorMessage =
+          'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> _rollbackIncompleteOtpAuthentication() async {
+    _isAuthenticated = false;
+    try {
+      await _otpGateway.signOut();
+    } on Object {
+      // The original account-bootstrap failure remains the visible recovery.
+    }
+  }
+
+  Future<void> _rollbackIncompleteEmailLinkAuthentication() async {
+    _isAuthenticated = false;
+    try {
+      await _emailLinkGateway.signOut();
+    } on Object {
+      // The original account-bootstrap failure remains the visible recovery.
     }
   }
 
@@ -662,8 +1231,67 @@ class JourneySession extends ChangeNotifier {
     resendAvailableAt = null;
     reviewCode = null;
     otpChannel = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    _pendingEmailLink = null;
+    _completedEmailLinkReturnRoute = null;
+    _completedSocialAuthReturnRoute = null;
     errorMessage = null;
     noticeMessage = null;
+    notifyListeners();
+  }
+
+  void beginSignIn({
+    required String returnLocation,
+    String? cancelLocation,
+    JourneyAuthenticationPurpose purpose = JourneyAuthenticationPurpose.general,
+  }) {
+    if (_isAuthenticated) return;
+    returnTo = returnLocation;
+    _authenticationCancelTo = cancelLocation ?? returnLocation;
+    authenticationPurpose = purpose;
+    stage = JourneyStage.signIn;
+    errorMessage = null;
+    noticeMessage = null;
+    otpExpiresAt = null;
+    resendAvailableAt = null;
+    reviewCode = null;
+    otpChannel = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    _pendingEmailLink = null;
+    _completedEmailLinkReturnRoute = null;
+    _completedSocialAuthReturnRoute = null;
+    socialAuthProvider = null;
+    socialAuthState = SocialAuthState.idle;
+    if (_storeRestored) {
+      _persist(setupComplete: true);
+    }
+    notifyListeners();
+  }
+
+  void cancelSignIn() {
+    if (!canCancelSignIn) return;
+    final cancelLocation = _authenticationCancelTo;
+    stage = JourneyStage.ready;
+    returnTo = null;
+    _lastReadyRoute =
+        _canonicalPersistedReadyRoute(cancelLocation) ?? _lastReadyRoute;
+    errorMessage = null;
+    noticeMessage = null;
+    otpExpiresAt = null;
+    resendAvailableAt = null;
+    reviewCode = null;
+    otpChannel = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    _pendingEmailLink = null;
+    _completedEmailLinkReturnRoute = null;
+    _completedSocialAuthReturnRoute = null;
+    socialAuthProvider = null;
+    socialAuthState = SocialAuthState.idle;
+    authenticationPurpose = JourneyAuthenticationPurpose.general;
+    _persist(setupComplete: true);
     notifyListeners();
   }
 
@@ -673,12 +1301,20 @@ class JourneySession extends ChangeNotifier {
     try {
       await _otpGateway.signOut();
       await _socialAuthGateway.signOut();
-      stage = JourneyStage.signIn;
+      await _emailLinkGateway.signOut();
+      _isAuthenticated = false;
+      stage = allowGuestReady ? JourneyStage.ready : JourneyStage.signIn;
       phoneNumber = null;
       emailAddress = null;
       otpChannel = null;
+      emailLinkState = EmailLinkState.idle;
+      emailLinkReceiptCode = null;
+      _pendingEmailLink = null;
+      _completedEmailLinkReturnRoute = null;
+      _completedSocialAuthReturnRoute = null;
       socialAuthProvider = null;
       socialAuthState = SocialAuthState.idle;
+      authenticationPurpose = JourneyAuthenticationPurpose.general;
       errorMessage = null;
       noticeMessage =
           'You are signed out. Your language and area are retained.';
@@ -719,6 +1355,9 @@ class JourneySession extends ChangeNotifier {
           homeOrWorkAreaLabel: snapshot.homeOrWorkAreaLabel,
           setupComplete: snapshot.setupComplete,
           pendingRoute: location,
+          pendingAuthenticationCancelRoute:
+              snapshot.pendingAuthenticationCancelRoute,
+          pendingAuthenticationPurpose: snapshot.pendingAuthenticationPurpose,
           lastReadyRoute: snapshot.lastReadyRoute,
           setupExperienceVersion: snapshot.setupExperienceVersion,
         ),
@@ -728,13 +1367,16 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
-  String readyRoute() => returnTo ?? _lastReadyRoute ?? '/app/social';
+  String readyRoute() => _authenticationCancelTo ?? returnTo ?? '/app/social';
 
   void confirmReadyRoute(String location) {
     final nextReadyRoute = _canonicalPersistedReadyRoute(location);
     final readyRouteChanged = nextReadyRoute != _lastReadyRoute;
     _lastReadyRoute = nextReadyRoute;
     var returnRouteCleared = false;
+    if (_authenticationCancelTo == location) {
+      _authenticationCancelTo = null;
+    }
     if (returnTo == location) {
       returnTo = null;
       returnRouteCleared = true;
@@ -744,7 +1386,8 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
-  String buyExitRoute({String? requestedRoute}) => '/app/social?openMool=1';
+  String buyExitRoute({String? requestedRoute}) =>
+      requestedRoute == '/app/mool' ? '/app/mool' : '/app/mool?from=buy';
 
   void openMoolFrom(String section) {
     if (section != 'mool') previousPrimarySection = section;
@@ -762,6 +1405,12 @@ class JourneySession extends ChangeNotifier {
         homeOrWorkAreaLabel: homeOrWorkArea,
         setupComplete: setupComplete,
         pendingRoute: returnTo,
+        pendingAuthenticationCancelRoute: stage == JourneyStage.signIn
+            ? _authenticationCancelTo
+            : null,
+        pendingAuthenticationPurpose: stage == JourneyStage.signIn
+            ? authenticationPurpose.name
+            : null,
         lastReadyRoute: _lastReadyRoute,
         setupExperienceVersion: _completedSetupExperienceVersion,
       ),
@@ -804,6 +1453,19 @@ class JourneySession extends ChangeNotifier {
     };
   }
 
+  String _socialAuthCancellationMessage(
+    SocialAuthProvider provider,
+    String? code,
+  ) {
+    if (provider == SocialAuthProvider.google &&
+        code == 'auth-google-native-no-identity') {
+      return 'Google did not return an identity (GSI-N01). '
+          'If you did not close the account chooser, try once more.';
+    }
+    return '${_socialProviderLabel(provider)} sign-in wasn’t completed. '
+        'Try again or choose another method.';
+  }
+
   AreaChoice? _areaChoiceFromStorage(String? value) {
     if (value == null) return null;
     for (final choice in AreaChoice.values) {
@@ -823,27 +1485,167 @@ class JourneySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _prepareAuthenticatedAccount() {
-    return _accountBootstrapGateway.prepareAuthenticatedAccount().timeout(
-      accountBootstrapTimeout,
-      onTimeout: () => throw const JourneyServiceException(
-        'Your account service did not respond. Check the connection and try again.',
-      ),
-    );
+  Future<void> _prepareAuthenticatedAccount({String? expectedUserId}) {
+    return _accountBootstrapGateway
+        .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
+        .timeout(
+          accountBootstrapTimeout,
+          onTimeout: () => throw const JourneyServiceException(
+            'Your account service did not respond. Check the connection and try again.',
+            code: 'auth-session-timeout',
+          ),
+        );
   }
+}
+
+bool _requiresAuthentication(Uri? uri) {
+  if (uri == null) return false;
+  if (_isChatPath(uri.path)) return true;
+  if (uri.path == '/app/creator/youtube-connect') return true;
+  if (uri.path != '/app/social') return false;
+  final subAction = uri.queryParameters['sub'];
+  if (subAction == 'create') return true;
+  return subAction == 'feed' && uri.queryParameters.containsKey('action');
+}
+
+JourneyAuthenticationPurpose _restoredAuthenticationPurpose(
+  String? storedPurpose,
+  Uri uri,
+) {
+  if (uri.path == '/app/creator/youtube-connect' &&
+      storedPurpose ==
+          JourneyAuthenticationPurpose.youtubeChannelConnection.name) {
+    return JourneyAuthenticationPurpose.youtubeChannelConnection;
+  }
+  if (uri.path == '/app/creator/youtube-connect') {
+    return JourneyAuthenticationPurpose.youtubeChannelConnection;
+  }
+  return JourneyAuthenticationPurpose.general;
+}
+
+String _restoredAuthenticationCancelRoute(
+  String? storedCancelRoute,
+  Uri pendingUri,
+  String? lastReadyRoute,
+) {
+  final storedUri = _localAppUri(storedCancelRoute);
+  if (storedUri != null && !_requiresAuthentication(storedUri)) {
+    return storedCancelRoute!;
+  }
+  if (lastReadyRoute != null) return lastReadyRoute;
+  if (pendingUri.path == '/app/creator/youtube-connect') {
+    return '/app/social?sub=videos';
+  }
+  if (pendingUri.path == '/app/social' &&
+      pendingUri.queryParameters['sub'] == 'feed') {
+    final item = pendingUri.queryParameters['item'];
+    return item == null
+        ? '/app/social?sub=feed'
+        : Uri(
+            path: '/app/social',
+            queryParameters: {'sub': 'feed', 'item': item},
+          ).toString();
+  }
+  return '/app/social';
 }
 
 String? _canonicalPersistedReadyRoute(String? location) {
   final uri = _localAppUri(location);
   if (uri == null) return null;
-  if (uri.path.startsWith('/app/buy')) {
+  final path = uri.path;
+
+  if (_isChatPath(path)) {
+    final returnLocation = uri.queryParameters['return'];
+    final returnUri = _localAppUri(returnLocation);
+    if (returnUri == null || _isChatPath(returnUri.path)) {
+      return '/app/social';
+    }
+    return _canonicalPersistedReadyRoute(returnLocation) ?? '/app/social';
+  }
+  if (path.startsWith('/app/buy')) {
     return _canonicalBuyResumeRoute(uri);
   }
-  if (uri.path == '/app/social' && uri.queryParameters['openMool'] == '1') {
-    return '/app/social?openMool=1';
+  if (path == '/app/social') {
+    final subAction = uri.queryParameters['sub'];
+    if (const {'shorts', 'videos', 'feed', 'create'}.contains(subAction)) {
+      return '/app/social?sub=$subAction';
+    }
+    return '/app/social';
+  }
+  if (path == '/app/mool') {
+    final origin = uri.queryParameters['from'];
+    if (const {
+      'social',
+      'buy',
+      'eat',
+      'ride',
+      'book',
+      'work',
+    }.contains(origin)) {
+      return '/app/mool?from=$origin';
+    }
+    return '/app/mool';
+  }
+  if (path == '/app/eat') return '/app/eat';
+  if (const {
+        '/app/eat/home',
+        '/app/eat/order',
+        '/app/eat/basket',
+        '/app/eat/review',
+      }.contains(path) ||
+      path.startsWith('/app/eat/order/')) {
+    return '/app/eat/home';
+  }
+  if (path == '/app/eat/table' || path.startsWith('/app/eat/table/')) {
+    return '/app/eat/table';
+  }
+  if (path == '/app/ride') return '/app/ride';
+  if (path == '/app/ride/book') {
+    final type = uri.queryParameters['type'];
+    if (const {'bike', 'auto', 'cab'}.contains(type)) {
+      return '/app/ride/book?type=$type';
+    }
+    return type == null ? '/app/ride' : '/app/social';
+  }
+  if (path.startsWith('/app/ride/trip/')) return '/app/ride';
+  if (path == '/app/book') return '/app/book';
+  if (path == '/app/book/doctor' || path.startsWith('/app/book/doctor/')) {
+    return '/app/book/doctor';
+  }
+  if (path == '/app/book/salon' || path.startsWith('/app/book/salon/')) {
+    return '/app/book/salon';
+  }
+  if (path == '/app/work') return '/app/work';
+  if (path == '/app/work/earn' ||
+      (path.startsWith('/app/work/opportunity/') &&
+          path != '/app/work/opportunity/delivery')) {
+    return '/app/work/earn';
+  }
+  if (path == '/app/work/my-work' ||
+      path.startsWith('/app/work/workspace/') ||
+      const {
+        '/app/work/status',
+        '/app/work/ready',
+        '/app/work/retailer/setup',
+      }.contains(path)) {
+    return '/app/work/my-work';
+  }
+  if (path == '/app/action-unavailable') {
+    return switch (uri.queryParameters['reason']) {
+      'tiffin' => '/app/eat',
+      'get-it-done' => '/app/book',
+      'standalone-pay' => '/app/mool',
+      'delivery' || 'onboard' || 'verify' => '/app/work',
+      _ => '/app/social',
+    };
   }
   return '/app/social';
 }
+
+bool _isChatPath(String path) =>
+    path == '/app/chat' ||
+    path == '/app/chat/inbox' ||
+    path.startsWith('/app/chat/thread/');
 
 Uri? _localAppUri(String? location) {
   if (location == null || location.isEmpty || location.length > 512) {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../eat_session.dart';
 
 String eatMoney(int value) => '₹$value';
@@ -13,10 +14,11 @@ class EatPageScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.body,
-    this.activeDock = 'eat',
+    this.activeLocalAction = '',
     this.fallbackBackRoute = '/app/eat/home',
     this.showBack = true,
     this.trailing,
+    this.showTrailing = true,
     this.bottomAction,
     super.key,
   });
@@ -25,106 +27,200 @@ class EatPageScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget body;
-  final String activeDock;
+  final String activeLocalAction;
   final String fallbackBackRoute;
   final bool showBack;
   final Widget? trailing;
+  final bool showTrailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        leadingWidth: showBack ? 64 : 16,
-        leading: showBack
-            ? Padding(
-                padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('eat-back'),
-                  tooltip: 'Go back',
-                  onPressed: () => context.go(fallbackBackRoute),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    void leaveContentDepth() {
+      session.clearMessages();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(fallbackBackRoute);
+      }
+    }
+
+    void openLocal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openGlobal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openChat() {
+      final current = GoRouterState.of(context).uri.toString();
+      openGlobal(
+        Uri(
+          path: '/app/chat/inbox',
+          queryParameters: {'return': current},
+        ).toString(),
+      );
+    }
+
+    void switchGlobalDestination(String route) {
+      session.clearMessages();
+      openMoolConnectedRoute(context, activeFamilyId: 'eat', route: route);
+    }
+
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) leaveContentDepth();
+      },
+      child: Scaffold(
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          leadingWidth: showBack ? 64 : 16,
+          leading: showBack
+              ? Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: IconButton.outlined(
+                    key: const Key('eat-back'),
+                    tooltip: 'Go back',
+                    onPressed: leaveContentDepth,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                    ),
+                  ),
+                )
+              : null,
+          titleSpacing: showBack ? 4 : MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
                 ),
-              )
-            : null,
-        titleSpacing: showBack ? 4 : MoolSpacing.md,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+            ],
+          ),
+          actions: [
+            MoolGlobalChatShortcut(
+              keyName: 'eat-global-chat',
+              onPressed: openChat,
             ),
+            const SizedBox(width: 4),
+            if (showTrailing)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child: trailing ?? EatBasketButton(session: session),
+              ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: MoolSpacing.sm),
-            child: trailing ?? EatBasketButton(session: session),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                EatMessageBanner(session: session),
-                Expanded(child: body),
-                if (bottomAction != null)
-                  Material(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolSpacing.md,
-                        MoolSpacing.sm,
-                        MoolSpacing.md,
-                        MoolSpacing.xs,
-                      ),
-                      child: SafeArea(
-                        top: false,
-                        bottom: false,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: bottomAction,
+        body: SafeArea(
+          top: false,
+          bottom: true,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  EatMessageBanner(session: session),
+                  Expanded(child: body),
+                  if (bottomAction != null)
+                    Material(
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          MoolSpacing.sm,
+                          MoolSpacing.md,
+                          MoolSpacing.xs,
+                        ),
+                        child: SafeArea(
+                          top: false,
+                          bottom: false,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: bottomAction,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+        bottomNavigationBar: MoolDestinationNavigationV2(
+          activeId: 'eat',
+          destinationLabel: 'Food',
+          selectedLocalIndex: activeLocalAction == 'table' ? 1 : 0,
+          localActionCount: 2,
+          localNavigation: MoolLocalNavigationRail(
+            key: const Key('eat-local-navigation'),
+            familyId: 'eat',
+            surfaceTone: MoolLocalNavigationSurfaceTone.light,
+            semanticLabel: 'Food choices: Order Food and Book Table.',
+            activeId: activeLocalAction,
+            actions: [
+              MoolLocalNavigationAction(
+                keyName: 'eat-local-order',
+                id: 'order',
+                label: 'Order Food',
+                icon: Icons.restaurant_menu_rounded,
+                onPressed: activeLocalAction == 'order'
+                    ? null
+                    : () => openLocal('/app/eat/home'),
+              ),
+              MoolLocalNavigationAction(
+                keyName: 'eat-local-table',
+                id: 'table',
+                label: 'Book Table',
+                icon: Icons.table_restaurant_outlined,
+                onPressed: activeLocalAction == 'table'
+                    ? null
+                    : () => openLocal('/app/eat/table'),
+              ),
+            ],
+          ),
+          onOpenMool: () => openGlobal('/app/mool?from=eat'),
+          onOpenAction: (action) => switchGlobalDestination(action.route),
+          onPreviousLocalAction: () => openLocal(
+            activeLocalAction == 'table' ? '/app/eat/home' : '/app/eat/table',
+          ),
+          onNextLocalAction: () => openLocal(
+            activeLocalAction == 'table' ? '/app/eat/home' : '/app/eat/table',
+          ),
+          onOpenChat: openChat,
+        ),
       ),
-      bottomNavigationBar: EatBottomDock(session: session, active: activeDock),
     );
   }
 }
@@ -215,71 +311,6 @@ class EatBasketButton extends StatelessWidget {
         tooltip: 'Open food basket',
         onPressed: () => context.go('/app/eat/basket'),
         icon: const Icon(Icons.shopping_bag_outlined),
-      ),
-    );
-  }
-}
-
-class EatBottomDock extends StatelessWidget {
-  const EatBottomDock({required this.session, required this.active, super.key});
-
-  final EatSession session;
-  final String active;
-
-  @override
-  Widget build(BuildContext context) {
-    void open(String route) {
-      session.clearMessages();
-      context.go(route);
-    }
-
-    return MoolOutcomeDock(
-      semanticLabel: 'Eat navigation',
-      activeId: active,
-      mool: MoolDockAction(
-        keyName: 'eat-dock-mool',
-        id: 'mool',
-        label: 'Mool',
-        icon: MoolBrand.moolLauncherIcon,
-        onPressed: () => open('/app/mool'),
-      ),
-      actions: [
-        MoolDockAction(
-          keyName: 'eat-dock-order',
-          id: 'order',
-          label: 'Order',
-          icon: Icons.restaurant_menu_rounded,
-          onPressed: () => open('/app/eat/order'),
-        ),
-        MoolDockAction(
-          keyName: 'eat-dock-table',
-          id: 'table',
-          label: 'Table',
-          icon: Icons.table_restaurant_outlined,
-          onPressed: () => open('/app/eat/table'),
-        ),
-        MoolDockAction(
-          keyName: 'eat-dock-tiffin',
-          id: 'tiffin',
-          label: 'Tiffin',
-          icon: Icons.lunch_dining_outlined,
-          onPressed: () => open('/app/eat/tiffin'),
-        ),
-      ],
-      chat: MoolDockAction(
-        keyName: 'eat-dock-chat',
-        id: 'chat',
-        label: 'Chat',
-        icon: Icons.chat_bubble_outline_rounded,
-        onPressed: () {
-          final current = GoRouterState.of(context).uri.toString();
-          open(
-            Uri(
-              path: '/app/chat/inbox',
-              queryParameters: {'return': current},
-            ).toString(),
-          );
-        },
       ),
     );
   }

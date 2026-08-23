@@ -25,7 +25,7 @@ class EatBasketScreen extends StatelessWidget {
           subtitle: empty
               ? 'Add a meal to continue'
               : '${session.itemCount} items · ${session.fulfilmentPromise}',
-          activeDock: 'order',
+          activeLocalAction: 'order',
           fallbackBackRoute: '/app/eat/order',
           body: empty
               ? _EmptyBasket(onOrder: () => context.go('/app/eat/order'))

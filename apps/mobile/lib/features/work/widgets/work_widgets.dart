@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../work_session.dart';
 
 class WorkPageScaffold extends StatelessWidget {
@@ -13,7 +15,7 @@ class WorkPageScaffold extends StatelessWidget {
     required this.body,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
-    this.activeDock = 'earn',
+    this.activeLocalAction = 'earn',
     this.trailing,
     this.bottomAction,
     super.key,
@@ -25,118 +27,213 @@ class WorkPageScaffold extends StatelessWidget {
   final Widget body;
   final String fallbackBackRoute;
   final bool showBack;
-  final String activeDock;
+  final String activeLocalAction;
   final Widget? trailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        leadingWidth: showBack ? 64 : 16,
-        leading: showBack
-            ? Padding(
-                padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('work-back'),
-                  tooltip: 'Go back',
-                  onPressed: () {
-                    session.clearMessages();
-                    context.go(fallbackBackRoute);
-                  },
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    void leaveContentDepth() {
+      session.clearMessages();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(fallbackBackRoute);
+      }
+    }
+
+    void openGlobal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openChat() {
+      final current = GoRouterState.of(context).uri.toString();
+      openGlobal(
+        Uri(
+          path: '/app/chat/inbox',
+          queryParameters: {'return': current},
+        ).toString(),
+      );
+    }
+
+    void openLocal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void switchGlobalDestination(String route) {
+      session.clearMessages();
+      openMoolConnectedRoute(context, activeFamilyId: 'work', route: route);
+    }
+
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          leaveContentDepth();
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          leadingWidth: showBack ? 64 : 16,
+          leading: showBack
+              ? Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: IconButton.outlined(
+                    key: const Key('work-back'),
+                    tooltip: 'Go back',
+                    onPressed: leaveContentDepth,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                    ),
+                  ),
+                )
+              : null,
+          titleSpacing: showBack ? 4 : MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
                 ),
-              )
-            : null,
-        titleSpacing: showBack ? 4 : MoolSpacing.md,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
               ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            MoolGlobalChatShortcut(
+              keyName: 'work-global-chat',
+              onPressed: openChat,
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: MoolSpacing.sm),
+              child:
+                  trailing ??
+                  IconButton.outlined(
+                    key: const Key('work-help'),
+                    tooltip: 'Work help',
+                    onPressed: () => context.go(
+                      Uri(
+                        path: '/app/chat',
+                        queryParameters: {
+                          'type': 'support',
+                          'return': GoRouterState.of(context).uri.toString(),
+                        },
+                      ).toString(),
+                    ),
+                    icon: const Icon(Icons.support_agent_outlined),
+                  ),
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: MoolSpacing.sm),
-            child:
-                trailing ??
-                IconButton.outlined(
-                  key: const Key('work-help'),
-                  tooltip: 'Work help',
-                  onPressed: () => context.go(
-                    Uri(
-                      path: '/app/chat',
-                      queryParameters: {
-                        'type': 'support',
-                        'return': GoRouterState.of(context).uri.toString(),
-                      },
-                    ).toString(),
-                  ),
-                  icon: const Icon(Icons.support_agent_outlined),
-                ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                WorkMessageBanner(session: session),
-                Expanded(child: body),
-                if (bottomAction != null)
-                  Material(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolSpacing.md,
-                        MoolSpacing.sm,
-                        MoolSpacing.md,
-                        MoolSpacing.xs,
-                      ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: bottomAction,
+        body: SafeArea(
+          top: false,
+          bottom: true,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  WorkMessageBanner(session: session),
+                  Expanded(child: body),
+                  if (bottomAction != null)
+                    Material(
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          MoolSpacing.sm,
+                          MoolSpacing.md,
+                          MoolSpacing.xs,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: bottomAction,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+        bottomNavigationBar: MoolDestinationNavigationV2(
+          activeId: 'work',
+          destinationLabel: 'Work',
+          selectedLocalIndex: activeLocalAction == 'workspace' ? 1 : 0,
+          localActionCount: 2,
+          localNavigation: MoolLocalNavigationRail(
+            key: const Key('work-local-navigation'),
+            familyId: 'work',
+            surfaceTone: MoolLocalNavigationSurfaceTone.light,
+            semanticLabel: 'Work choices: Earn Today and Workspace.',
+            activeId: activeLocalAction,
+            actions: [
+              MoolLocalNavigationAction(
+                keyName: 'work-local-earn',
+                id: 'earn',
+                label: 'Earn Today',
+                icon: Icons.bolt_rounded,
+                onPressed: activeLocalAction == 'earn'
+                    ? null
+                    : () => openLocal('/app/work/earn'),
+              ),
+              MoolLocalNavigationAction(
+                keyName: 'work-local-workspace',
+                id: 'workspace',
+                label: 'Workspace',
+                icon: Icons.dashboard_customize_outlined,
+                onPressed: activeLocalAction == 'workspace'
+                    ? null
+                    : () => openLocal('/app/work/my-work'),
+              ),
+            ],
+          ),
+          onOpenMool: () => openGlobal('/app/mool?from=work'),
+          onOpenAction: (action) => switchGlobalDestination(action.route),
+          onPreviousLocalAction: () => openLocal(
+            activeLocalAction == 'workspace'
+                ? '/app/work/earn'
+                : '/app/work/my-work',
+          ),
+          onNextLocalAction: () => openLocal(
+            activeLocalAction == 'workspace'
+                ? '/app/work/earn'
+                : '/app/work/my-work',
+          ),
+          onOpenChat: openChat,
+        ),
       ),
-      bottomNavigationBar: WorkBottomDock(session: session, active: activeDock),
     );
   }
 }
@@ -306,16 +403,11 @@ class WorkPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
+    return MoolServicePrimaryButton(
       key: Key(keyName),
+      label: label,
       onPressed: busy ? null : onPressed,
-      icon: busy
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(icon),
-      label: Text(label),
+      icon: busy ? Icons.hourglass_top_rounded : icon,
     );
   }
 }
@@ -360,60 +452,6 @@ class WorkPill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class WorkBottomDock extends StatelessWidget {
-  const WorkBottomDock({
-    required this.session,
-    required this.active,
-    super.key,
-  });
-
-  final WorkSession session;
-  final String active;
-
-  @override
-  Widget build(BuildContext context) {
-    void open(String route) {
-      session.clearMessages();
-      context.go(route);
-    }
-
-    return MoolOutcomeDock(
-      semanticLabel: 'Work navigation',
-      activeId: active,
-      mool: MoolDockAction(
-        keyName: 'work-dock-mool',
-        id: 'mool',
-        label: 'Mool',
-        icon: MoolBrand.moolLauncherIcon,
-        onPressed: () => open('/app/work/mool'),
-      ),
-      actions: [
-        MoolDockAction(
-          keyName: 'work-dock-earn',
-          id: 'earn',
-          label: 'Earn',
-          icon: Icons.currency_rupee_rounded,
-          onPressed: () => open('/app/work/earn'),
-        ),
-        MoolDockAction(
-          keyName: 'work-dock-my-work',
-          id: 'my-work',
-          label: 'My Work',
-          icon: Icons.work_outline_rounded,
-          onPressed: () => open('/app/work/my-work'),
-        ),
-      ],
-      chat: MoolDockAction(
-        keyName: 'work-dock-chat',
-        id: 'chat',
-        label: 'Chat',
-        icon: Icons.chat_bubble_outline_rounded,
-        onPressed: () => open('/app/chat/inbox?return=/app/work/earn'),
       ),
     );
   }

@@ -228,25 +228,46 @@ void main() {
     addTearDown(session.dispose);
 
     await authenticate(tester, session, initialLocation: '/app/work');
-    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    expect(find.byKey(const Key('mvp-action-root-work')), findsOneWidget);
+    expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
     expect(session.returnTo, isNull);
   });
 
-  testWidgets('Mool returns to the previously focused primary section', (
+  testWidgets('Work connected chooser Back restores the exact owner', (
     tester,
   ) async {
-    final session = JourneySession();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
     addTearDown(session.dispose);
-
-    await authenticate(tester, session);
-    await tapVisible(tester, const Key('nav-mool'));
-    await tapVisible(tester, const Key('mool-action-work'));
+    await session.start();
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, initialLocation: '/app/work/earn'),
+    );
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
 
-    await tapVisible(tester, const Key('work-dock-mool'));
-    expect(find.byKey(const Key('mool-action-buy')), findsOneWidget);
-    await tapVisible(tester, const Key('close-mool'));
+    await tapVisible(tester, const Key('mool-compact-launcher'));
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsNothing,
+    );
   });
 
   testWidgets('universal screen visible controls complete their tap intents', (
@@ -275,19 +296,24 @@ void main() {
     await tester.enterText(find.byKey(const Key('search-field')), 'ride');
     await tester.pumpAndSettle();
     await tapVisible(tester, const Key('search-result-ride'));
-    expect(find.text('Book a bike ride'), findsOne);
+    expect(find.byKey(const Key('mvp-action-root-ride')), findsOneWidget);
 
-    await tapVisible(tester, const Key('nav-mool'));
-    await tapVisible(tester, const Key('mool-action-social'));
-    await tapVisible(tester, const Key('social-tab-shorts'));
+    await tapVisible(tester, const Key('mool-home-launcher'));
+    await tapVisible(tester, const Key('mool-navigator-family-social'));
+    expect(find.byKey(const Key('section-social')), findsOneWidget);
     expect(find.text('Short videos start instantly'), findsOneWidget);
-    await tapVisible(tester, const Key('nav-mool'));
-    await tapVisible(tester, const Key('mool-action-buy'));
-    expect(find.text('Groceries delivered to your home'), findsOne);
+
+    await tapVisible(tester, const Key('open-search'));
+    await tester.enterText(find.byKey(const Key('search-field')), 'buy');
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('search-result-buy'));
+    expect(find.byKey(const Key('section-buy')), findsOneWidget);
 
     await tapVisible(tester, const Key('nav-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('section-buy')), findsOneWidget);
   });
 

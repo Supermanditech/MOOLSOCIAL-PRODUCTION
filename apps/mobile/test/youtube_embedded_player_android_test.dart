@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/youtube/youtube_embedded_player_android.dart';
@@ -24,6 +26,54 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  test('packages the same closed player behind the release build flag', () {
+    final contract = File(
+      'lib/core/youtube/youtube_embedded_player_contract.dart',
+    ).readAsStringSync();
+    final adapter = File(
+      'lib/core/youtube/youtube_embedded_player_android.dart',
+    ).readAsStringSync();
+    final gradle = File(
+      'packages/youtube_embedded_player_private_dev/android/build.gradle.kts',
+    ).readAsStringSync();
+    final profileRegistrar = File(
+      'packages/youtube_embedded_player_private_dev/android/src/profile/'
+      'kotlin/com/moolsocial/youtube_embedded_player_private_dev/'
+      'YouTubeEmbeddedPlayerPrivateDevRegistrar.kt',
+    ).readAsStringSync();
+    final releaseRegistrar = File(
+      'packages/youtube_embedded_player_private_dev/android/src/release/'
+      'kotlin/com/moolsocial/youtube_embedded_player_private_dev/'
+      'YouTubeEmbeddedPlayerPrivateDevRegistrar.kt',
+    ).readAsStringSync();
+    final nativePlayer = File(
+      'packages/youtube_embedded_player_private_dev/android/src/debug/'
+      'kotlin/com/moolsocial/app/youtube/'
+      'YouTubeEmbeddedPlayerPlatformView.kt',
+    ).readAsStringSync();
+
+    expect(contract, contains('bool.fromEnvironment('));
+    expect(contract, contains('MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED'));
+    expect(contract, isNot(contains('kReleaseMode')));
+    expect(adapter, isNot(contains('kReleaseMode')));
+    expect(gradle, contains('create("profile")'));
+    expect(gradle, contains('buildConfig = true'));
+    expect(
+      'src/debug/kotlin/com/moolsocial/app/youtube'.allMatches(gradle),
+      hasLength(2),
+    );
+    expect(profileRegistrar, contains('registerViewFactory('));
+    expect(releaseRegistrar, contains('registerViewFactory('));
+    expect(
+      nativePlayer,
+      contains('WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)'),
+    );
+    expect(
+      nativePlayer,
+      isNot(contains('WebView.setWebContentsDebuggingEnabled(true)')),
+    );
   });
 
   test('sends only the closed mount, command and detach methods', () async {

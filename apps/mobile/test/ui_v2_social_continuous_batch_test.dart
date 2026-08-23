@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/creator/creator_models.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
@@ -11,12 +12,13 @@ import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_creator.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_plans_promotion.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_connect.dart';
+import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Social UI V2 consumer journeys', () {
-    testWidgets('Shorts engagement and filters change visible state', (
+    testWidgets('Shorts fail closed when provider access is unavailable', (
       tester,
     ) async {
       final owners = _Owners();
@@ -28,17 +30,25 @@ void main() {
           creatorSession: owners.creator,
           retailerSession: owners.retailer,
           sharedSession: owners.shared,
+          initialSubAction: 'shorts',
         ),
       );
 
-      expect(find.text('Fresh basket packed this morning'), findsOneWidget);
-      await tester.tap(find.text('Promoted'));
-      await tester.pumpAndSettle();
-      expect(find.text('Meet Rajasthan makers this week'), findsOneWidget);
-
-      await tester.tap(find.text('Like'));
-      await tester.pump();
-      expect(find.text('Liked'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-youtube-shorts-state-provider-access')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('YouTube Shorts are unavailable right now'),
+        findsOneWidget,
+      );
+      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(find.text('Fresh basket packed this morning'), findsNothing);
+      expect(find.text('Meet Rajasthan makers this week'), findsNothing);
+      expect(find.text('Promoted'), findsNothing);
+      expect(find.text('Like'), findsNothing);
+      expect(find.text('Remix'), findsNothing);
+      expect(find.text('Upload'), findsNothing);
     });
 
     testWidgets('Video, Feed and Create are one-tap destinations', (
@@ -56,30 +66,79 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-rail-videos')));
-      await tester.pumpAndSettle();
-      expect(find.text('Videos'), findsWidgets);
-      expect(find.text('India'), findsOneWidget);
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'videos',
+        ),
+      );
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-state-provider-access')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('YouTube Videos are unavailable right now'),
+        findsOneWidget,
+      );
+      expect(find.text('Please try again later.'), findsOneWidget);
       expect(find.text('Live'), findsNothing);
       expect(find.text('Learning'), findsNothing);
       expect(find.text('Local'), findsNothing);
       expect(find.text('Business'), findsNothing);
-      expect(find.text('5-minute morning mobility'), findsOneWidget);
+      expect(find.text('5-minute morning mobility'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('screen04-rail-feed')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Nearby'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('screen04-quick-post-feed')), findsOneWidget);
-      await tester.drag(find.byType(ListView).last, const Offset(0, -650));
-      await tester.pumpAndSettle();
-      expect(find.text('Fresh arrivals near Khema-Ka-Kuwa'), findsOneWidget);
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'feed',
+        ),
+      );
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-create-post')),
+        findsOneWidget,
+      );
+      expect(find.text('Nearby'), findsNothing);
+      expect(find.text('Fresh arrivals near Khema-Ka-Kuwa'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('screen04-rail-create')));
-      await tester.pumpAndSettle();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'create',
+        ),
+      );
       expect(
         find.byKey(const Key('screen04-create-workbench')),
         findsOneWidget,
+      );
+      for (final key in const [
+        'screen04-create-tool-post',
+        'screen04-create-tool-image',
+        'screen04-create-tool-carousel',
+        'screen04-create-tool-image-poll',
+        'screen04-create-tool-quick-poll',
+        'screen04-create-tool-quiz',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      }
+      expect(
+        find.byKey(const Key('screen04-create-youtube-short')),
+        findsNothing,
       );
       expect(
         find.byKey(const Key('screen04-create-post-text')),
@@ -101,10 +160,11 @@ void main() {
         find.byKey(const Key('screen04-create-tool-quiz')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
     });
 
     testWidgets(
-      'approved capability rail remains actionable from video detail',
+      'Videos provider gate keeps compact MoolSocial and direct Social rail',
       (tester) async {
         final owners = _Owners();
         addTearDown(owners.dispose);
@@ -119,25 +179,83 @@ void main() {
           ),
         );
 
-        await _scrollToAndTap(tester, find.text('5-minute morning mobility'));
-        expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
-        expect(find.byKey(const Key('screen04-mool')), findsOneWidget);
-        expect(find.byKey(const Key('screen04-rail-videos')), findsOneWidget);
-        expect(find.byKey(const Key('screen04-chat')), findsOneWidget);
-        expect(find.byKey(const Key('social-v2-tab-feed')), findsNothing);
-
-        await tester.tap(find.byKey(const Key('screen04-rail-feed')));
-        await tester.pumpAndSettle();
         expect(
-          find.byKey(const Key('screen04-quick-post-feed')),
+          find.byKey(
+            const Key('screen04-youtube-videos-state-provider-access'),
+          ),
           findsOneWidget,
         );
+        expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
+        expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+        expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
+        expect(find.byKey(const Key('screen04-rail-videos')), findsOneWidget);
+        expect(find.byKey(const Key('mool-root-chat')), findsNothing);
+        expect(find.byKey(const Key('social-v2-tab-feed')), findsNothing);
       },
     );
 
-    testWidgets('account exposes Creator workspace and Plans', (tester) async {
+    testWidgets('YouTube account action opens the channel-status owner', (
+      tester,
+    ) async {
       final owners = _Owners();
       addTearDown(owners.dispose);
+      await owners.journey.start();
+      expect(owners.journey.isAuthenticated, isTrue);
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MediaQuery(
+              data: const MediaQueryData(size: Size(390, 844)),
+              child: SocialUniversalV2(
+                session: owners.journey,
+                creatorSession: owners.creator,
+                retailerSession: owners.retailer,
+                sharedSession: owners.shared,
+                initialSubAction: 'videos',
+                youtubePublicAccessOverride: true,
+                youtubeVideosLoader: () async => [_accountVideo],
+                youtubeShortsLoader: () async => const [],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/app/creator/youtube-connect',
+            builder: (_, _) => const Scaffold(
+              body: Text(
+                'Authoritative YouTube channel status',
+                key: Key('continuous-youtube-status-owner'),
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: ThemeData(useMaterial3: true, fontFamily: 'Inter'),
+          routerConfig: router,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Account access video'), findsOneWidget);
+      expect(find.byTooltip('YouTube channel status'), findsOneWidget);
+      expect(find.byTooltip('MoolSocial account'), findsNothing);
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('continuous-youtube-status-owner')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('guest YouTube action explains the two account steps first', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
       await _pump(
         tester,
         SocialUniversalV2(
@@ -145,15 +263,145 @@ void main() {
           creatorSession: owners.creator,
           retailerSession: owners.retailer,
           sharedSession: owners.shared,
+          initialSubAction: 'videos',
+          youtubePublicAccessOverride: true,
+          youtubeVideosLoader: () async => [_accountVideo],
+          youtubeShortsLoader: () async => const [],
         ),
       );
-      await tester.tap(find.byKey(const Key('screen04-profile')));
+
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
       await tester.pumpAndSettle();
-      expect(find.text('Creator workspace'), findsOneWidget);
-      expect(find.text('Plans & access'), findsOneWidget);
+
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsOneWidget,
+      );
+      expect(find.text('Connect your YouTube channel'), findsOneWidget);
+      expect(
+        find.textContaining('sign in to your MoolSocial account'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('This is separate from YouTube'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('existing Google account'), findsOneWidget);
+      expect(find.textContaining('read-only access'), findsOneWidget);
+      expect(owners.journey.stage, JourneyStage.ready);
     });
 
-    testWidgets('Feed lays out with the production app theme', (tester) async {
+    testWidgets('guest can cancel YouTube explanation without entering auth', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'videos',
+          youtubePublicAccessOverride: true,
+          youtubeVideosLoader: () async => [_accountVideo],
+          youtubeShortsLoader: () async => const [],
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('youtube-connect-auth-cancel')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsNothing,
+      );
+      expect(owners.journey.stage, JourneyStage.ready);
+      expect(
+        owners.journey.authenticationPurpose,
+        JourneyAuthenticationPurpose.general,
+      );
+    });
+
+    testWidgets('guest can dismiss YouTube explanation through the barrier', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'videos',
+          youtubePublicAccessOverride: true,
+          youtubeVideosLoader: () async => [_accountVideo],
+          youtubeShortsLoader: () async => const [],
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsNothing,
+      );
+      expect(owners.journey.stage, JourneyStage.ready);
+      expect(owners.journey.isAuthenticated, isFalse);
+    });
+
+    testWidgets(
+      'guest YouTube continuation enters exact MoolSocial auth state',
+      (tester) async {
+        final owners = _GuestOwners();
+        addTearDown(owners.dispose);
+        await owners.journey.start();
+        await _pump(
+          tester,
+          SocialUniversalV2(
+            session: owners.journey,
+            creatorSession: owners.creator,
+            retailerSession: owners.retailer,
+            sharedSession: owners.shared,
+            initialSubAction: 'videos',
+            youtubePublicAccessOverride: true,
+            youtubeVideosLoader: () async => [_accountVideo],
+            youtubeShortsLoader: () async => const [],
+          ),
+        );
+
+        await tester.tap(
+          find.byKey(const Key('screen04-youtube-home-account')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('youtube-connect-auth-continue')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(owners.journey.stage, JourneyStage.signIn);
+        expect(owners.journey.returnTo, '/app/creator/youtube-connect');
+        expect(owners.journey.readyRoute(), '/app/social?sub=videos');
+        expect(
+          owners.journey.authenticationPurpose,
+          JourneyAuthenticationPurpose.youtubeChannelConnection,
+        );
+      },
+    );
+
+    testWidgets('Feed owns a truthful MoolSocial empty state and post action', (
+      tester,
+    ) async {
       final owners = _Owners();
       addTearDown(owners.dispose);
       await owners.journey.start();
@@ -169,11 +417,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.byKey(const Key('screen04-quick-post-feed')), findsOneWidget);
       expect(
-        find.byKey(const Key('screen04-quick-post-input-feed')),
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-brand')),
+        findsOneWidget,
+      );
+      expect(find.text('PUBLIC FEED'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-feed-create-post')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
     });
   });
 
@@ -306,15 +563,9 @@ void main() {
             creatorSession: owners.creator,
             retailerSession: owners.retailer,
             sharedSession: owners.shared,
-            initialLocation: '/app/social?sub=create',
+            initialLocation: '/app/creator/publish',
           ),
         );
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('screen04-profile')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Creator workspace'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Create'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Video'));
         await tester.pumpAndSettle();
@@ -327,7 +578,13 @@ void main() {
 
         await tester.tap(find.byKey(const Key('social-v2-tab-videos')));
         await tester.pumpAndSettle();
-        expect(find.text('5-minute morning mobility'), findsOneWidget);
+        expect(
+          find.byKey(
+            const Key('screen04-youtube-videos-state-provider-access'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('5-minute morning mobility'), findsNothing);
       },
     );
 
@@ -358,7 +615,10 @@ void main() {
 
       await tester.tap(find.byKey(const Key('social-v2-tab-feed')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('screen04-quick-post-feed')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('plan activation requires explicit launch-access consent', (
@@ -412,7 +672,10 @@ void main() {
           tester,
           find.byKey(const Key('social-v2-campaign-pay')),
         );
-        expect(find.byKey(const Key('pay-home-screen')), findsOneWidget);
+        expect(
+          find.byKey(const Key('legacy-route-containment-standalone-pay')),
+          findsOneWidget,
+        );
         expect(
           find.text('Campaign spend is separate from your MoolSocial plan'),
           findsNothing,
@@ -422,6 +685,24 @@ void main() {
     );
   });
 }
+
+final _accountVideo = Screen04YouTubePublicVideo(
+  videoId: 'account12345',
+  title: 'Account access video',
+  channelId: 'UCACCOUNT',
+  channelTitle: 'MoolSocial Review',
+  description: 'Public review video.',
+  thumbnailUrl: Uri.parse('https://i.ytimg.com/vi/account12345/hqdefault.jpg'),
+  publishedAt: DateTime.utc(2026, 8, 11),
+  duration: 'PT2M',
+  captionAvailable: true,
+  viewCount: '10',
+  likeCount: '1',
+  commentCount: '0',
+  embeddable: true,
+  hasKnownDeviceRegionExclusion: false,
+  hashtags: const ['#Review'],
+);
 
 class _Owners {
   final journey = JourneySession(
@@ -434,6 +715,30 @@ class _Owners {
       ),
     ),
     otpGateway: ReviewOtpGateway(signedIn: true),
+  );
+  final creator = CreatorSession()..creatorWorkspaceActive = true;
+  final retailer = RetailerSession();
+  final shared = SharedSession();
+
+  void dispose() {
+    journey.dispose();
+    creator.dispose();
+    retailer.dispose();
+    shared.dispose();
+  }
+}
+
+class _GuestOwners {
+  final journey = JourneySession(
+    store: MemoryJourneyStore(
+      snapshot: const JourneySnapshot(
+        languageCode: 'en',
+        areaMode: 'current',
+        areaLabel: 'Khema-Ka-Kuwa, Jodhpur, Rajasthan',
+        setupComplete: true,
+      ),
+    ),
+    allowGuestReady: true,
   );
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();

@@ -37,20 +37,26 @@ void main() {
     addTearDown(retailer.dispose);
     addTearDown(shared.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(useMaterial3: true, fontFamily: 'Inter'),
-        home: SocialUniversalV2(
-          session: journey,
-          creatorSession: creator,
-          retailerSession: retailer,
-          sharedSession: shared,
-          mediaPicker: const _CaptureMediaPicker(),
+    Future<void> mountSubaction(String subaction) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey('screen04-operational-$subaction'),
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(useMaterial3: true, fontFamily: 'Inter'),
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            mediaPicker: const _CaptureMediaPicker(),
+            initialSubAction: subaction,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await mountSubaction('videos');
     await tester.runAsync(
       () => precacheImage(
         const AssetImage('assets/prototype/social-market-grocery.png'),
@@ -59,8 +65,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('screen04-rail-videos')));
-    await tester.pumpAndSettle();
     await _capture(tester, 'screen04-operational-videos-discovery-390x844.png');
 
     await tester.tap(find.text('5-minute morning mobility'));
@@ -91,19 +95,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('screen04-rail-shorts')));
-    await tester.pumpAndSettle();
+    await mountSubaction('shorts');
     await _capture(tester, 'screen04-operational-shorts-390x844.png');
 
-    await tester.tap(find.byKey(const Key('screen04-rail-feed')));
-    await tester.pumpAndSettle();
+    await mountSubaction('feed');
     await _capture(tester, 'screen04-operational-feed-390x844.png');
 
-    await tester.tap(find.byKey(const Key('screen04-rail-create')));
-    await tester.pumpAndSettle();
+    await mountSubaction('create');
     await _capture(tester, 'screen04-operational-create-390x844.png');
     expect(tester.takeException(), isNull);
-  });
+  }, skip: true); // Immutable C28F/r60.28 predecessor capture; FSC02A/B
+  // provider-owned successors require fresh provider authority and APK evidence.
 }
 
 class _CaptureMediaPicker implements SocialMediaPicker {

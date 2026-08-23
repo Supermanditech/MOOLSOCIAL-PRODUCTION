@@ -1,16 +1,28 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../chat_session.dart';
 
 void chatGoBack(BuildContext context, String returnRoute) {
+  if (Navigator.of(context).canPop()) {
+    context.pop();
+    return;
+  }
   context.go(returnRoute.startsWith('/app/') ? returnRoute : '/app/social');
 }
 
-String chatRoute(String path, {required String returnRoute}) {
-  return Uri(path: path, queryParameters: {'return': returnRoute}).toString();
+String chatRoute(String path, {required String returnRoute, String? draft}) {
+  return Uri(
+    path: path,
+    queryParameters: {
+      'return': returnRoute,
+      if (draft != null && draft.trim().isNotEmpty) 'draft': draft,
+    },
+  ).toString();
 }
 
 class ChatPageScaffold extends StatelessWidget {
@@ -20,6 +32,8 @@ class ChatPageScaffold extends StatelessWidget {
     required this.subtitle,
     required this.returnRoute,
     required this.body,
+    this.showContentBack = false,
+    this.messageThreadId,
     this.trailing,
     this.bottom,
     super.key,
@@ -30,95 +44,179 @@ class ChatPageScaffold extends StatelessWidget {
   final String subtitle;
   final String returnRoute;
   final Widget body;
+  final bool showContentBack;
+  final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: MoolSpacing.sm),
-          child: IconButton.outlined(
-            key: const Key('chat-back'),
-            tooltip: 'Go back',
-            onPressed: () => chatGoBack(context, returnRoute),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    final view = View.of(context);
+    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+      viewPadding: EdgeInsets.fromViewPadding(
+        view.viewPadding,
+        view.devicePixelRatio,
+      ),
+      platform: defaultTargetPlatform,
+    );
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) chatGoBack(context, returnRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          leadingWidth: showContentBack ? 64 : 0,
+          leading: showContentBack
+              ? Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: IconButton.outlined(
+                    key: const Key('chat-back'),
+                    tooltip: 'Back to conversations',
+                    onPressed: () => chatGoBack(context, returnRoute),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                    ),
+                  ),
+                )
+              : null,
+          titleSpacing: showContentBack ? 4 : MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
+          actions: [
+            if (trailing != null)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child: trailing!,
+              ),
+          ],
         ),
-        titleSpacing: 4,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
+        body: SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  ChatMessageBanner(
+                    session: session,
+                    threadId: messageThreadId,
+                  ),
+                  Expanded(child: body),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          ),
+        ),
+        bottomNavigationBar: Column(
+          key: const Key('chat-bottom-navigation-stack'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ?bottom,
+            RepaintBoundary(
+              key: const Key('chat-global-edge-navigation'),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: MoolLocalNavigationTokens.destinationCanvas,
+                  border: Border(
+                    top: BorderSide(
+                      color: MoolLocalNavigationTokens.destinationDivider,
+                    ),
+                  ),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: exportedSemanticsClearance,
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      maintainBottomViewPadding: true,
+                      minimum: const EdgeInsets.only(bottom: 2),
+                      child: SizedBox(
+                        key: const Key('chat-compact-global-edge-rail'),
+                        height: MoolLocalNavigationTokens.destinationRailHeight,
+                        child: Row(
+                          children: [
+                            MoolGlobalNavigationV2(
+                              activeId: 'chat',
+                              onOpenMool: () =>
+                                  context.push('/app/mool?from=chat'),
+                              onOpenAction: (action) =>
+                                  context.push(action.route),
+                              onOpenChat: null,
+                              compact: true,
+                            ),
+                            const Spacer(),
+                            const MoolGlobalChatNavigationV2(
+                              controlKey: Key('chat-global-chat-edge'),
+                              onOpenChat: null,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
         ),
-        actions: [
-          if (trailing != null)
-            Padding(
-              padding: const EdgeInsets.only(right: MoolSpacing.sm),
-              child: trailing!,
-            ),
-        ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                ChatMessageBanner(session: session),
-                Expanded(child: body),
-              ],
-            ),
-          ),
-        ),
-      ),
-      bottomNavigationBar: bottom,
     );
   }
 }
 
 class ChatMessageBanner extends StatelessWidget {
-  const ChatMessageBanner({required this.session, super.key});
+  const ChatMessageBanner({required this.session, this.threadId, super.key});
 
   final ChatSession session;
+  final String? threadId;
 
   @override
   Widget build(BuildContext context) {
-    final error = session.errorMessage;
-    final notice = session.noticeMessage;
+    final error = threadId == null
+        ? session.errorMessage
+        : session.threadActionError(threadId!);
+    final notice = threadId == null
+        ? session.noticeMessage
+        : session.threadActionNotice(threadId!);
     if (error == null && notice == null) return const SizedBox.shrink();
     final isError = error != null;
     return Semantics(
@@ -168,7 +266,9 @@ class ChatMessageBanner extends StatelessWidget {
             IconButton(
               key: const Key('dismiss-chat-message'),
               tooltip: 'Dismiss message',
-              onPressed: session.clearMessages,
+              onPressed: threadId == null
+                  ? session.clearMessages
+                  : () => session.clearThreadMessages(threadId!),
               visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.close_rounded, size: 18),
             ),

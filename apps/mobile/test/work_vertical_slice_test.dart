@@ -235,7 +235,11 @@ void main() {
     (tester) async {
       final gateway = ReviewWorkGateway()..failOtp = true;
       final work = WorkSession(gateway: gateway);
-      await mount(tester, route: '/app/work/choose', workSession: work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        workSession: work,
+      );
 
       await tapVisible(tester, const Key('work-family-products-trade'));
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
@@ -279,7 +283,10 @@ void main() {
   testWidgets(
     'unsupported profile request validates and creates no workspace',
     (tester) async {
-      final (_, work) = await mount(tester, route: '/app/work/choose');
+      final (_, work) = await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+      );
       await tapVisible(tester, const Key('work-profile-not-shown'));
       await tapVisible(tester, const Key('work-send-profile-request'));
       expect(find.text('Describe the work profile you need.'), findsOneWidget);
@@ -304,7 +311,7 @@ void main() {
   testWidgets(
     'selected work profile is informative and does not advertise a no-op tap',
     (tester) async {
-      await mount(tester, route: '/app/work/choose');
+      await mount(tester, route: '/app/work/workspace/choose');
 
       await tapVisible(tester, const Key('work-family-products-trade'));
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
@@ -328,7 +335,11 @@ void main() {
       final work = WorkSession(gateway: gateway)
         ..selectFamily('products-trade')
         ..selectProfile('retailer-grocery');
-      await mount(tester, route: '/app/work/proof', workSession: work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
 
       await tapVisible(tester, const Key('work-details-continue'));
       expect(find.text('Enter the work or business name.'), findsOneWidget);
@@ -502,7 +513,9 @@ void main() {
 
     await tapVisible(tester, const Key('work-status-open-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-status-screen')), findsOneWidget);
   });
 
@@ -520,10 +533,7 @@ void main() {
       Key('work-refresh-feed'),
       Key('work-search'),
       Key('work-filter-forYou'),
-      Key('work-dock-mool'),
-      Key('work-dock-earn'),
-      Key('work-dock-my-work'),
-      Key('work-dock-chat'),
+      Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);
       if (finder.evaluate().isEmpty) {
@@ -554,7 +564,10 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
-    await tapVisible(tester, const Key('work-dock-my-work'));
+    expect(find.byKey(const Key('work-local-earn')), findsOneWidget);
+    expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
+    expect(find.byKey(const Key('mool-root-chat')), findsNothing);
+    await tapVisible(tester, const Key('work-local-workspace'));
     expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

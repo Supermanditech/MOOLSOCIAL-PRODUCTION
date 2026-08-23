@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../book_session.dart';
 
 String bookMoney(int value) => '₹$value';
@@ -13,8 +14,8 @@ class BookPageScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.body,
-    this.activeDock = 'book',
-    this.fallbackBackRoute = '/app/book/home',
+    this.activeLocalAction = '',
+    this.fallbackBackRoute = '/app/book',
     this.showBack = true,
     this.trailing,
     this.bottomAction,
@@ -25,7 +26,7 @@ class BookPageScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget body;
-  final String activeDock;
+  final String activeLocalAction;
   final String fallbackBackRoute;
   final bool showBack;
   final Widget? trailing;
@@ -33,112 +34,303 @@ class BookPageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MoolColors.canvas,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 72,
-        leadingWidth: showBack ? 64 : 16,
-        leading: showBack
-            ? Padding(
-                padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('book-back'),
-                  tooltip: 'Go back',
-                  onPressed: () {
-                    session.clearMessages();
-                    context.go(fallbackBackRoute);
-                  },
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+    final canPop = Navigator.of(context).canPop();
+    final currentPath = GoRouterState.of(context).uri.path;
+    final routeSubAction = currentPath.startsWith('/app/book/doctor')
+        ? 'doctor'
+        : currentPath.startsWith('/app/book/salon')
+        ? 'salon'
+        : currentPath.startsWith('/app/book/bus')
+        ? 'bus'
+        : '';
+    final activeSubAction = routeSubAction.isNotEmpty
+        ? routeSubAction
+        : const {'doctor', 'salon', 'bus'}.contains(activeLocalAction)
+        ? activeLocalAction
+        : '';
+    final travelNavigation = activeSubAction == 'bus';
+    final navigationFamilyId = travelNavigation ? 'ride' : 'book';
+
+    void leaveContentDepth() {
+      session.clearMessages();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(fallbackBackRoute);
+      }
+    }
+
+    void openLocal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openGlobal(String route) {
+      session.clearMessages();
+      context.push(route);
+    }
+
+    void openChat() {
+      final current = GoRouterState.of(context).uri.toString();
+      openGlobal(
+        Uri(
+          path: '/app/chat/inbox',
+          queryParameters: {'return': current},
+        ).toString(),
+      );
+    }
+
+    void switchGlobalDestination(String route) {
+      session.clearMessages();
+      openMoolConnectedRoute(
+        context,
+        activeFamilyId: navigationFamilyId,
+        route: route,
+      );
+    }
+
+    return PopScope<Object?>(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          leaveContentDepth();
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: MoolColors.canvas,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          toolbarHeight: 72,
+          leadingWidth: showBack ? 64 : 16,
+          leading: showBack
+              ? Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: IconButton.outlined(
+                    key: const Key('book-back'),
+                    tooltip: 'Go back',
+                    onPressed: leaveContentDepth,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                    ),
+                  ),
+                )
+              : null,
+          titleSpacing: showBack ? 4 : MoolSpacing.md,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
                 ),
-              )
-            : null,
-        titleSpacing: showBack ? 4 : MoolSpacing.md,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.35,
               ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            MoolGlobalChatShortcut(
+              keyName: travelNavigation
+                  ? 'ride-global-chat'
+                  : 'care-global-chat',
+              onPressed: openChat,
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: MoolSpacing.sm),
+              child:
+                  trailing ??
+                  IconButton.outlined(
+                    key: const Key('book-help'),
+                    tooltip: 'Booking support',
+                    onPressed: () => context.go(
+                      Uri(
+                        path: '/app/chat',
+                        queryParameters: {
+                          'type': 'support',
+                          'return': GoRouterState.of(context).uri.toString(),
+                        },
+                      ).toString(),
+                    ),
+                    icon: const Icon(Icons.support_agent_rounded),
+                  ),
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: MoolSpacing.sm),
-            child:
-                trailing ??
-                IconButton.outlined(
-                  key: const Key('book-help'),
-                  tooltip: 'Booking support',
-                  onPressed: () => context.go(
-                    Uri(
-                      path: '/app/chat',
-                      queryParameters: {
-                        'type': 'support',
-                        'return': GoRouterState.of(context).uri.toString(),
-                      },
-                    ).toString(),
-                  ),
-                  icon: const Icon(Icons.support_agent_rounded),
-                ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: MoolMetrics.maximumContentWidth,
-            ),
-            child: Column(
-              children: [
-                BookMessageBanner(session: session),
-                Expanded(child: body),
-                if (bottomAction != null)
-                  Material(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolSpacing.md,
-                        MoolSpacing.sm,
-                        MoolSpacing.md,
-                        MoolSpacing.xs,
-                      ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: bottomAction,
+        body: SafeArea(
+          top: false,
+          bottom: true,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: MoolMetrics.maximumContentWidth,
+              ),
+              child: Column(
+                children: [
+                  BookMessageBanner(session: session),
+                  Expanded(child: body),
+                  if (bottomAction != null)
+                    Material(
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          MoolSpacing.sm,
+                          MoolSpacing.md,
+                          MoolSpacing.xs,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: bottomAction,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+        bottomNavigationBar: MoolDestinationNavigationV2(
+          activeId: navigationFamilyId,
+          destinationLabel: travelNavigation ? 'Travel' : 'Care',
+          selectedLocalIndex: travelNavigation
+              ? 3
+              : activeSubAction == 'salon'
+              ? 2
+              : 0,
+          localActionCount: travelNavigation ? 4 : 3,
+          localNavigation: travelNavigation
+              ? MoolLocalNavigationRail(
+                  key: const Key('travel-bus-local-navigation'),
+                  familyId: 'ride',
+                  surfaceTone: MoolLocalNavigationSurfaceTone.light,
+                  semanticLabel: 'Travel choices: Bike, Auto, Cab and Bus.',
+                  activeId: 'bus',
+                  actions: [
+                    for (final entry in const [
+                      ('bike', 'Bike', Icons.two_wheeler_outlined),
+                      ('auto', 'Auto', Icons.electric_rickshaw_outlined),
+                      ('cab', 'Cab', Icons.local_taxi_outlined),
+                    ])
+                      MoolLocalNavigationAction(
+                        keyName: 'travel-local-${entry.$1}',
+                        id: entry.$1,
+                        label: entry.$2,
+                        icon: entry.$3,
+                        onPressed: () => switchGlobalDestination(
+                          '/app/ride/book?type=${entry.$1}',
+                        ),
+                      ),
+                    const MoolLocalNavigationAction(
+                      keyName: 'travel-local-bus',
+                      id: 'bus',
+                      label: 'Bus',
+                      icon: Icons.directions_bus_filled_outlined,
+                    ),
+                  ],
+                )
+              : MoolLocalNavigationRail(
+                  key: const Key('care-book-local-navigation'),
+                  familyId: 'book',
+                  surfaceTone: MoolLocalNavigationSurfaceTone.light,
+                  semanticLabel: 'Care choices: Doctor, Medicine and Salon.',
+                  activeId: activeSubAction,
+                  actions: [
+                    MoolLocalNavigationAction(
+                      keyName: 'care-local-doctor',
+                      id: 'doctor',
+                      label: 'Doctor',
+                      icon: Icons.medical_services_outlined,
+                      onPressed: activeSubAction == 'doctor'
+                          ? null
+                          : () => openLocal('/app/book/doctor'),
+                    ),
+                    MoolLocalNavigationAction(
+                      keyName: 'care-local-medicine',
+                      id: 'medicine',
+                      label: 'Medicine',
+                      icon: Icons.medication_outlined,
+                      onPressed: () =>
+                          switchGlobalDestination('/app/buy?sub=medicine'),
+                    ),
+                    MoolLocalNavigationAction(
+                      keyName: 'care-local-salon',
+                      id: 'salon',
+                      label: 'Salon',
+                      icon: Icons.content_cut_rounded,
+                      onPressed: activeSubAction == 'salon'
+                          ? null
+                          : () => openLocal('/app/book/salon'),
+                    ),
+                  ],
+                ),
+          onOpenMool: () => openGlobal('/app/mool?from=$navigationFamilyId'),
+          onOpenAction: (action) => switchGlobalDestination(action.route),
+          onPreviousLocalAction: () {
+            final routes = travelNavigation
+                ? const [
+                    '/app/ride/book?type=bike',
+                    '/app/ride/book?type=auto',
+                    '/app/ride/book?type=cab',
+                    '/app/book/bus',
+                  ]
+                : const [
+                    '/app/book/doctor',
+                    '/app/buy?sub=medicine',
+                    '/app/book/salon',
+                  ];
+            final current = travelNavigation
+                ? 3
+                : activeSubAction == 'salon'
+                ? 2
+                : 0;
+            switchGlobalDestination(
+              routes[(current - 1 + routes.length) % routes.length],
+            );
+          },
+          onNextLocalAction: () {
+            final routes = travelNavigation
+                ? const [
+                    '/app/ride/book?type=bike',
+                    '/app/ride/book?type=auto',
+                    '/app/ride/book?type=cab',
+                    '/app/book/bus',
+                  ]
+                : const [
+                    '/app/book/doctor',
+                    '/app/buy?sub=medicine',
+                    '/app/book/salon',
+                  ];
+            final current = travelNavigation
+                ? 3
+                : activeSubAction == 'salon'
+                ? 2
+                : 0;
+            switchGlobalDestination(routes[(current + 1) % routes.length]);
+          },
+          onOpenChat: openChat,
+        ),
       ),
-      bottomNavigationBar: BookBottomDock(session: session, active: activeDock),
     );
   }
 }
@@ -334,102 +526,6 @@ class BookFact extends StatelessWidget {
           trailing!,
         ],
       ],
-    );
-  }
-}
-
-class BookBottomDock extends StatelessWidget {
-  const BookBottomDock({
-    required this.session,
-    required this.active,
-    super.key,
-  });
-
-  final BookSession session;
-  final String active;
-
-  @override
-  Widget build(BuildContext context) {
-    void clear() => session.clearMessages();
-    return MoolOutcomeDock(
-      semanticLabel: 'Booking navigation',
-      activeId: active,
-      mool: MoolDockAction(
-        keyName: 'book-dock-mool',
-        id: 'mool',
-        label: 'Mool',
-        icon: MoolBrand.moolLauncherIcon,
-        onPressed: () {
-          clear();
-          context.go('/app/mool');
-        },
-      ),
-      actions: [
-        MoolDockAction(
-          keyName: 'book-dock-book',
-          id: 'book',
-          label: 'Book',
-          icon: Icons.calendar_month_outlined,
-          onPressed: () {
-            clear();
-            context.go('/app/book/home');
-          },
-        ),
-        MoolDockAction(
-          keyName: 'book-dock-activity',
-          id: 'activity',
-          label: 'Activity',
-          icon: Icons.event_available_outlined,
-          onPressed: () {
-            clear();
-            if (session.task != null) {
-              context.go('/app/book/task/live');
-            } else if (session.salonBooking != null) {
-              context.go('/app/book/salon/confirmed');
-            } else if (session.appointment != null) {
-              context.go('/app/book/doctor/followup');
-            } else {
-              session.showNotice(
-                'Your confirmed appointments and tasks will appear here.',
-              );
-            }
-          },
-        ),
-        MoolDockAction(
-          keyName: 'book-dock-help',
-          id: 'help',
-          label: 'Help',
-          icon: Icons.support_agent_rounded,
-          onPressed: () {
-            clear();
-            if (session.task != null) {
-              context.go('/app/book/task/support');
-            } else if (session.salonBooking != null) {
-              context.go('/app/book/salon/support');
-            } else {
-              session.showNotice(
-                'Open a confirmed appointment or task to attach its saved evidence.',
-              );
-            }
-          },
-        ),
-      ],
-      chat: MoolDockAction(
-        keyName: 'book-dock-chat',
-        id: 'chat',
-        label: 'Chat',
-        icon: Icons.chat_bubble_outline_rounded,
-        onPressed: () {
-          final current = GoRouterState.of(context).uri.toString();
-          clear();
-          context.go(
-            Uri(
-              path: '/app/chat/inbox',
-              queryParameters: {'return': current},
-            ).toString(),
-          );
-        },
-      ),
     );
   }
 }

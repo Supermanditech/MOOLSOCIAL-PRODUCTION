@@ -36,6 +36,7 @@ void main() {
         session: journey,
         chatSession: chat,
         initialLocation: route,
+        legacyPresentationForTestsOnly: true,
       ),
     );
     await tester.pumpAndSettle();

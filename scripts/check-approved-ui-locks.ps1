@@ -62,6 +62,76 @@ function Assert-Hash {
   throw "Approved UI lock changed for $Label. Expected $Expected but found $actual at $Path"
 }
 
+function Assert-ProductionHash {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Expected,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+
+  $resolved = [IO.Path]::GetFullPath($Path)
+  $mainActivity = [IO.Path]::GetFullPath((Join-Path $root (
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/" +
+    "MainActivity.kt"
+  )))
+  if (-not $resolved.Equals(
+    $mainActivity,
+    [StringComparison]::OrdinalIgnoreCase
+  )) {
+    Assert-Hash -Path $Path -Expected $Expected -Label $Label
+    return
+  }
+
+  $source = [IO.File]::ReadAllText($resolved).Replace("`r`n", "`n")
+  foreach ($name in @(
+    'FILE',
+    'IMPORTS',
+    'STATE',
+    'REGISTRATION',
+    'CALLBACK',
+    'DESTROY',
+    'IMPLEMENTATION'
+  )) {
+    $begin = "MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_${name}_BEGIN"
+    $end = "MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_${name}_END"
+    if (
+      ([regex]::Matches($source, [regex]::Escape($begin))).Count -ne 1 -or
+      ([regex]::Matches($source, [regex]::Escape($end))).Count -ne 1
+    ) {
+      throw "Approved UI lock changed for $Label. Provider seam markers changed."
+    }
+    $pattern = (
+      "(?ms)^[ \t]*// " + [regex]::Escape($begin) + "\n.*?" +
+      "^[ \t]*// " + [regex]::Escape($end) + "\n?"
+    )
+    if ([regex]::Matches($source, $pattern).Count -ne 1) {
+      throw "Approved UI lock changed for $Label. Provider seam shape changed."
+    }
+    $source = [regex]::Replace($source, $pattern, '')
+  }
+
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $projected = [BitConverter]::ToString(
+      $sha.ComputeHash($utf8.GetBytes($source))
+    ).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+  }
+  if ($projected -ne $Expected.ToLowerInvariant()) {
+    throw "Approved UI lock changed for $Label. Accepted projection drifted."
+  }
+
+  $bridgeGate = Join-Path $root (
+    'scripts/check-google-android-identity-bridge-readiness.ps1'
+  )
+  & $bridgeGate -RepositoryRoot $root | Out-Null
+  if (-not $?) {
+    throw "Approved UI lock changed for $Label. Provider seam gate failed."
+  }
+}
+
 foreach ($screen in $manifest.screens) {
   $screenRoot = Join-Path $approvedRoot $screen.root
 
@@ -101,7 +171,7 @@ foreach ($screen in $manifest.screens) {
     if ($screen.status -eq "production-accepted") {
       foreach ($lockedFile in $acceptance.lockedFiles) {
         $relative = $lockedFile.path.Replace("/", [IO.Path]::DirectorySeparatorChar)
-        Assert-Hash `
+        Assert-ProductionHash `
           -Path (Join-Path $root $relative) `
           -Expected $lockedFile.sha256 `
           -Label "$($screen.screenId) accepted production file $($lockedFile.path)"

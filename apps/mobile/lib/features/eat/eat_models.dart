@@ -19,6 +19,8 @@ class EatRestaurant {
     required this.distance,
     required this.rating,
     required this.status,
+    required this.orderStartingPrice,
+    required this.deliveryTime,
     required this.offer,
     required this.bookingPrice,
     required this.bookingPriceLabel,
@@ -35,6 +37,8 @@ class EatRestaurant {
   final String distance;
   final double rating;
   final String status;
+  final int orderStartingPrice;
+  final String deliveryTime;
   final String offer;
   final int bookingPrice;
   final String bookingPriceLabel;

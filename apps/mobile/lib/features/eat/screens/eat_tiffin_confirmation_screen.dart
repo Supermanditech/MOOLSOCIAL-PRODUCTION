@@ -29,7 +29,7 @@ class EatTiffinConfirmationScreen extends StatelessWidget {
             session: session,
             title: 'Plan not found',
             subtitle: 'Choose a meal plan',
-            activeDock: 'tiffin',
+            activeLocalAction: 'tiffin',
             body: Center(
               child: FilledButton(
                 key: const Key('eat-tiffin-missing-return'),
@@ -49,7 +49,7 @@ class EatTiffinConfirmationScreen extends StatelessWidget {
           session: session,
           title: 'Tiffin plan $status',
           subtitle: receipt.id,
-          activeDock: 'tiffin',
+          activeLocalAction: 'tiffin',
           fallbackBackRoute: '/app/eat/tiffin',
           body: ListView(
             padding: const EdgeInsets.fromLTRB(

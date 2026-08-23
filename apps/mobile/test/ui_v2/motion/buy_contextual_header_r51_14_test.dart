@@ -94,7 +94,7 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('buy-contextual-glass-header'))),
       const Size(320, 66),
     );
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.text('Plan basket'), findsNothing);
     expect(
       find.bySemanticsLabel(
@@ -116,7 +116,7 @@ void main() {
       const ValueKey('buy-header-promo-stage-action-shop-4'),
     );
     expect(finalPromo, findsOneWidget);
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     await tester.tap(finalPromo);
     await tester.pumpAndSettle();
     expect(find.text('Monthly home basket'), findsOneWidget);

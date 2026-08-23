@@ -19,10 +19,10 @@ typedef AndroidYouTubePlatformFailureListener =
     FutureOr<void> Function(YouTubeEmbeddedPlayerPlatformFailure failure);
 typedef AndroidYouTubePlatformFailure = YouTubeEmbeddedPlayerPlatformFailure;
 
-/// Debug/private-Dev Android boundary for the provider-only WebView.
+/// Android boundary for the provider-only official embedded-player WebView.
 ///
-/// The matching native factory is not registered in release builds, while the
-/// shared feature flag remains disabled unless a private-Dev build explicitly
+/// The matching native factory is registered for release, while the shared
+/// feature flag remains disabled unless an authorized build explicitly
 /// enables it.
 class AndroidYouTubeEmbeddedPlayerSurface extends StatefulWidget {
   const AndroidYouTubeEmbeddedPlayerSurface({
@@ -43,11 +43,9 @@ class _AndroidYouTubeEmbeddedPlayerSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    if (!kDebugMode ||
-        kIsWeb ||
-        defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       throw UnsupportedError(
-        'The private-Dev YouTube player probe is Android-only.',
+        'The official YouTube player is available only on Android.',
       );
     }
     return AndroidView(

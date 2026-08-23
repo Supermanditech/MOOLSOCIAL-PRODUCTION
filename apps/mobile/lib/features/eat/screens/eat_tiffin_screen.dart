@@ -47,7 +47,7 @@ class EatTiffinScreen extends StatelessWidget {
           session: session,
           title: 'Tiffin plans',
           subtitle: 'Trial, weekly or monthly daily meals',
-          activeDock: 'tiffin',
+          activeLocalAction: 'tiffin',
           body: ListView(
             padding: const EdgeInsets.fromLTRB(
               MoolSpacing.md,

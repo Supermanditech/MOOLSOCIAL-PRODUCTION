@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_session.dart';
+
+const _workAccent = Color(0xFF4D46A8);
 
 class MyWorkScreen extends StatelessWidget {
   const MyWorkScreen({required this.session, super.key});
@@ -20,19 +23,20 @@ class MyWorkScreen extends StatelessWidget {
         final workspace = session.activeWorkspace;
         return WorkPageScaffold(
           session: session,
-          title: 'My Work',
+          title: 'Workspace',
           subtitle: workspace == null
               ? 'Start and operate verified work'
               : workspace.name,
-          fallbackBackRoute: '/app/work/earn',
-          activeDock: 'my-work',
+          fallbackBackRoute: '/app/work',
+          showBack: false,
+          activeLocalAction: 'workspace',
           body: ListView(
             key: const Key('my-work-screen'),
             padding: const EdgeInsets.fromLTRB(
-              MoolSpacing.md,
-              MoolSpacing.sm,
-              MoolSpacing.md,
-              MoolSpacing.xl,
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.xs,
+              MoolServiceHomeTokens.pagePadding,
+              MoolSpacing.xxl,
             ),
             children: [
               if (session.savedOpportunity case final opportunity?) ...[
@@ -82,7 +86,7 @@ class MyWorkScreen extends StatelessWidget {
               if (workspace == null)
                 _NewWorkState(session: session)
               else ...[
-                _ActiveWorkspaceCard(session: session, workspace: workspace),
+                _ActiveWorkspaceCard(workspace: workspace),
                 const SizedBox(height: MoolSpacing.md),
                 const WorkSectionTitle(
                   title: 'Needs attention',
@@ -127,51 +131,29 @@ class MyWorkScreen extends StatelessWidget {
                     detail: 'Your current workspace stays selected',
                   ),
                   const SizedBox(height: MoolSpacing.sm),
-                  SizedBox(
-                    height: 132,
-                    child: ListView.separated(
-                      key: const Key('my-work-other-list'),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: session.otherWorkspaces.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(width: MoolSpacing.xs),
-                      itemBuilder: (context, index) {
-                        final other = session.otherWorkspaces[index];
-                        return SizedBox(
-                          width: 220,
-                          child: WorkCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const WorkPill(
-                                  label: 'Verified',
-                                  icon: Icons.verified_rounded,
-                                ),
-                                const SizedBox(height: MoolSpacing.xs),
-                                Text(
-                                  other.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: MoolColors.ink,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                Text(
-                                  other.profileLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: MoolColors.muted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  Column(
+                    key: const Key('my-work-other-list'),
+                    children: [
+                      for (final other in session.otherWorkspaces)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: MoolServiceHomeTokens.cardGap,
                           ),
-                        );
-                      },
-                    ),
+                          child: MoolServiceCard(
+                            key: Key('my-work-other-${other.id}'),
+                            title: other.name,
+                            subtitle: '${other.profileLabel} · ${other.area}',
+                            icon: Icons.verified_user_outlined,
+                            accent: _workAccent,
+                            metadata: const [
+                              MoolServiceMeta(
+                                icon: Icons.verified_rounded,
+                                label: 'Verified workspace',
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: MoolSpacing.md),
@@ -179,7 +161,7 @@ class MyWorkScreen extends StatelessWidget {
                   key: const Key('my-work-add-another'),
                   onPressed: () {
                     session.startAnotherWork();
-                    context.go('/app/work/choose');
+                    context.go('/app/work/workspace/choose');
                   },
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add Another Work'),
@@ -204,34 +186,21 @@ class _NewWorkState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         WorkCard(
-          color: MoolColors.navy,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Start My Work',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-              const Text(
-                'Choose the exact work or business you operate. Your personal MoolSocial account stays active.',
-                style: TextStyle(
-                  color: Color(0xFFD9DAFF),
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                ),
+              const MoolServiceSectionHeader(
+                title: 'Set up your Workspace',
+                subtitle:
+                    'Use one verified profile for opportunities or an existing business.',
               ),
               const SizedBox(height: MoolSpacing.md),
               WorkPrimaryButton(
                 keyName: 'my-work-start',
-                label: 'Start My Work',
+                label: 'Start Workspace setup',
                 onPressed: () {
                   session.startMyWork();
-                  context.go('/app/work/choose');
+                  context.go('/app/work/workspace/choose');
                 },
                 icon: Icons.arrow_forward_rounded,
               ),
@@ -239,234 +208,54 @@ class _NewWorkState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: MoolSpacing.md),
-        const WorkCard(
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Color(0xFFEAF7E8),
-                foregroundColor: MoolColors.success,
-                child: Icon(Icons.verified_user_outlined),
-              ),
-              SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Verified account contact',
-                      style: TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '+91 98••• ••321 · Google account',
-                      style: TextStyle(color: MoolColors.muted),
-                    ),
-                  ],
-                ),
-              ),
-              WorkPill(label: 'Verified'),
-            ],
-          ),
-        ),
-        const SizedBox(height: MoolSpacing.md),
-        const WorkSectionTitle(
-          title: 'How do you want to begin?',
-          detail: 'Choose one. You can add another work later.',
-        ),
-        const SizedBox(height: MoolSpacing.sm),
-        _StartChoice(
-          keyName: 'my-work-choice-earn',
-          icon: Icons.currency_rupee_rounded,
-          title: 'Earn with MoolSocial',
-          detail: 'Freelancer, delivery, captain or service work',
-          onTap: () {
-            session.selectFamily('create-work');
-            context.go('/app/work/choose');
-          },
-        ),
-        const SizedBox(height: MoolSpacing.xs),
-        _StartChoice(
-          keyName: 'my-work-choice-business',
-          icon: Icons.storefront_outlined,
-          title: 'Grow my business',
-          detail: 'Shop, food, health, salon, transport or supply',
-          onTap: () => context.go('/app/work/choose'),
-        ),
-        const SizedBox(height: MoolSpacing.xs),
-        _StartChoice(
-          keyName: 'my-work-choice-create',
-          icon: Icons.video_camera_front_outlined,
-          title: 'Create or promote',
-          detail: 'Creator work and funded campaigns',
-          onTap: () {
-            session.selectFamily('create-work');
-            context.go('/app/work/choose');
-          },
+        const MoolServiceCard(
+          key: Key('my-work-account-context'),
+          title: 'Verified account contact',
+          subtitle:
+              'Your personal account stays active while Workspace setup is reviewed.',
+          icon: Icons.verified_user_outlined,
+          accent: MoolColors.success,
+          metadata: [
+            MoolServiceMeta(
+              icon: Icons.phone_android_rounded,
+              label: '+91 98••• ••321',
+            ),
+            MoolServiceMeta(
+              icon: Icons.lock_outline_rounded,
+              label: 'No account change',
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _StartChoice extends StatelessWidget {
-  const _StartChoice({
-    required this.keyName,
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.onTap,
-  });
-
-  final String keyName;
-  final IconData icon;
-  final String title;
-  final String detail;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      keyName: keyName,
-      onTap: onTap,
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEDEEFF),
-            foregroundColor: MoolColors.navy,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
-        ],
-      ),
-    );
-  }
-}
-
 class _ActiveWorkspaceCard extends StatelessWidget {
-  const _ActiveWorkspaceCard({required this.session, required this.workspace});
+  const _ActiveWorkspaceCard({required this.workspace});
 
-  final WorkSession session;
   final WorkWorkspace workspace;
 
   @override
   Widget build(BuildContext context) {
-    return WorkCard(
-      color: MoolColors.navy,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: MoolColors.orange,
-                foregroundColor: MoolColors.navy,
-                child: Text(
-                  'MF',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      workspace.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '${workspace.profileLabel} · ${workspace.area}',
-                      style: const TextStyle(
-                        color: Color(0xFFD9DAFF),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const WorkPill(label: 'Verified', color: Color(0xFF9EE89B)),
-            ],
+    return MoolServiceCard(
+      key: const Key('my-work-active-workspace'),
+      title: workspace.name,
+      subtitle: '${workspace.profileLabel} · ${workspace.area}',
+      icon: Icons.storefront_outlined,
+      accent: _workAccent,
+      emphasized: true,
+      metadata: [
+        const MoolServiceMeta(
+          icon: Icons.verified_rounded,
+          label: 'Verified workspace',
+        ),
+        if (workspace.gstReminder)
+          const MoolServiceMeta(
+            icon: Icons.schedule_rounded,
+            label: 'GST reminder active',
           ),
-          const SizedBox(height: MoolSpacing.md),
-          Row(
-            children: [
-              _Metric(label: 'Today', value: '18 orders'),
-              _Metric(label: 'Sales', value: '₹12,840'),
-              _Metric(label: 'To procure', value: '7 items'),
-            ],
-          ),
-          if (workspace.gstReminder) ...[
-            const SizedBox(height: MoolSpacing.sm),
-            const WorkPill(
-              label: 'GST reminder active',
-              color: MoolColors.orange,
-              icon: Icons.schedule_rounded,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFFBFC2F7),
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -642,7 +431,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
           title: 'Choose Your Work',
           subtitle: 'Select one exact profile at a time',
           fallbackBackRoute: '/app/work/my-work',
-          activeDock: 'my-work',
+          activeLocalAction: 'workspace',
           bottomAction: profile == null
               ? null
               : WorkPrimaryButton(
@@ -651,7 +440,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   busy: widget.session.busy,
                   onPressed: () {
                     if (widget.session.continueToProof()) {
-                      context.go('/app/work/proof');
+                      context.go('/app/work/workspace/proof');
                     }
                   },
                 ),
@@ -1188,8 +977,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
         session: widget.session,
         title: 'Verify Your Work',
         subtitle: widget.session.selectedProfile?.label ?? 'Work profile',
-        fallbackBackRoute: '/app/work/choose',
-        activeDock: 'my-work',
+        fallbackBackRoute: '/app/work/workspace/choose',
+        activeLocalAction: 'workspace',
         bottomAction: switch (_step) {
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
@@ -1614,7 +1403,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
           title: approved ? 'Work approved' : 'Work profile review',
           subtitle: session.reviewCaseId ?? 'Review status',
           fallbackBackRoute: '/app/work/my-work',
-          activeDock: 'my-work',
+          activeLocalAction: 'workspace',
           bottomAction: approved
               ? WorkPrimaryButton(
                   keyName: 'work-open-ready',
@@ -1957,7 +1746,7 @@ class WorkspaceReadyScreen extends StatelessWidget {
           title: 'Workspace ready',
           subtitle: 'Approval creates no public listing',
           fallbackBackRoute: '/app/work/status',
-          activeDock: 'my-work',
+          activeLocalAction: 'workspace',
           bottomAction: WorkPrimaryButton(
             keyName: 'work-set-up-shop',
             label: 'Set up my shop',
@@ -2228,7 +2017,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
               ? 'Available products are now visible'
               : 'Stock, price and fulfilment',
           fallbackBackRoute: complete ? '/app/work/my-work' : '/app/work/ready',
-          activeDock: 'my-work',
+          activeLocalAction: 'workspace',
           bottomAction: WorkPrimaryButton(
             keyName: complete
                 ? 'retailer-setup-open-my-work'

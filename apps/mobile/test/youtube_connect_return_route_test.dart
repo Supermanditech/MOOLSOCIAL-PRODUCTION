@@ -5,14 +5,14 @@ void main() {
   test('accepts only the exact token-free MoolSocial YouTube return', () {
     expect(
       youtubeConnectReturnLocation(
-        'moolsocial:///app/creator/youtube-connect'
+        'moolsocial://app/creator/youtube-connect'
         '?youtubeConnect=complete',
       ),
       '/app/creator/youtube-connect?youtubeConnect=complete',
     );
     expect(
       youtubeConnectReturnLocation(
-        'moolsocial:///app/creator/youtube-connect'
+        'moolsocial://app/creator/youtube-connect'
         '?youtubeConnect=failed',
       ),
       '/app/creator/youtube-connect?youtubeConnect=failed',
@@ -28,17 +28,17 @@ void main() {
 
   test('rejects secrets, unknown results, origins and routes', () {
     for (final route in <String>[
-      'moolsocial:///app/creator/youtube-connect'
+      'moolsocial://app/creator/youtube-connect'
           '?youtubeConnect=complete&code=secret',
-      'moolsocial:///app/creator/youtube-connect'
+      'moolsocial://app/creator/youtube-connect'
           '?youtubeConnect=complete&youtubeConnect=failed',
-      'moolsocial:///app/creator/youtube-connect'
+      'moolsocial://app/creator/youtube-connect'
           '?youtubeConnect=complete#state',
-      'moolsocial:///app/creator/youtube-connect'
+      'moolsocial://app/creator/youtube-connect'
           '?youtubeConnect=unknown',
       'https://example.com/app/creator/youtube-connect'
           '?youtubeConnect=complete',
-      'moolsocial:///app/social?youtubeConnect=complete',
+      'moolsocial://app/social?youtubeConnect=complete',
     ]) {
       expect(youtubeConnectReturnLocation(route), isNull, reason: route);
     }

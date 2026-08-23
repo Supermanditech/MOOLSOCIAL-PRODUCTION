@@ -62,7 +62,7 @@ void main() {
     await tester.pumpWidget(_reviewApp(session, disableAnimations: true));
     await tester.pumpAndSettle();
     await _capture(tester, 'r51-13-header-shop-reduced-motion-final');
-    expect(find.bySemanticsLabel('MoolSocial'), findsOneWidget);
+    expect(find.bySemanticsLabel('MoolSocial'), findsNothing);
     expect(find.text('Plan basket'), findsNothing);
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);

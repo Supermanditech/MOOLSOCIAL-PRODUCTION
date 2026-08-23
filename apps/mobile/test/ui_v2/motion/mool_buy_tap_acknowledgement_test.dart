@@ -207,9 +207,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('screen04-mool')));
+    await tester.tap(find.byKey(const Key('mool-root-selected')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-rail-buy')));
+    await tester.tap(find.byKey(const Key('mool-action-buy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
     expect(

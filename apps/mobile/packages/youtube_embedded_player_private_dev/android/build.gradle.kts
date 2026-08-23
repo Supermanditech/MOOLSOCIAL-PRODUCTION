@@ -34,15 +34,34 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        create("profile") {
+            initWith(getByName("release"))
+        }
+    }
+
     sourceSets {
         getByName("main") {
-            java.srcDirs("src/main/kotlin")
+            java.directories.add("src/main/kotlin")
         }
         getByName("debug") {
-            java.srcDirs("src/debug/kotlin")
+            java.directories.add("src/debug/kotlin")
+        }
+        getByName("profile") {
+            java.directories.addAll(listOf(
+                "src/profile/kotlin",
+                "src/debug/kotlin/com/moolsocial/app/youtube",
+            ))
         }
         getByName("release") {
-            java.srcDirs("src/release/kotlin")
+            java.directories.addAll(listOf(
+                "src/release/kotlin",
+                "src/debug/kotlin/com/moolsocial/app/youtube",
+            ))
         }
     }
 

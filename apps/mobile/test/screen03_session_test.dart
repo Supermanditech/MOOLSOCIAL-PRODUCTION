@@ -99,6 +99,111 @@ void main() {
   );
 
   test(
+    'a provider outside the production allow-list never reaches auth',
+    () async {
+      final social = ReviewSocialAuthGateway(
+        defaultResult: const SocialAuthResult.authenticated('must-not-run'),
+      );
+      final session = JourneySession(
+        store: completedSetupStore(),
+        socialAuthGateway: social,
+        availableSocialAuthProviders: const {
+          SocialAuthProvider.google,
+          SocialAuthProvider.youtube,
+        },
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.facebook),
+        isFalse,
+      );
+      expect(social.signInCount, 0);
+      expect(session.socialAuthProvider, SocialAuthProvider.facebook);
+      expect(session.socialAuthState, SocialAuthState.failed);
+      expect(session.errorMessage, contains('not available'));
+    },
+  );
+
+  test(
+    'successful auth ignores the cancellation origin and opens requested route',
+    () async {
+      final social = ReviewSocialAuthGateway(
+        defaultResult: const SocialAuthResult.authenticated('user-1'),
+      );
+      final session = JourneySession(
+        store: completedSetupStore(),
+        socialAuthGateway: social,
+        allowGuestReady: true,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+      session.beginSignIn(
+        returnLocation: '/app/social?sub=create',
+        cancelLocation: '/app/social?sub=feed',
+        purpose: JourneyAuthenticationPurpose.youtubeChannelConnection,
+      );
+
+      expect(
+        session.authenticationPurpose,
+        JourneyAuthenticationPurpose.youtubeChannelConnection,
+      );
+
+      expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+      expect(session.readyRoute(), '/app/social?sub=create');
+      expect(
+        session.authenticationPurpose,
+        JourneyAuthenticationPurpose.general,
+      );
+    },
+  );
+
+  test(
+    'mandatory first-open sign-in cannot be cancelled into guest mode',
+    () async {
+      final session = JourneySession(store: completedSetupStore());
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.canCancelSignIn, isFalse);
+      session.cancelSignIn();
+      expect(session.stage, JourneyStage.signIn);
+    },
+  );
+
+  test(
+    'YouTube channel handoff restores its purpose and cancel route after restart',
+    () async {
+      final store = completedSetupStore();
+      final first = JourneySession(store: store, allowGuestReady: true);
+      await first.start();
+      first.beginSignIn(
+        returnLocation: '/app/creator/youtube-connect',
+        cancelLocation: '/app/social?sub=videos',
+        purpose: JourneyAuthenticationPurpose.youtubeChannelConnection,
+      );
+      await Future<void>.delayed(Duration.zero);
+      first.dispose();
+
+      final restarted = JourneySession(store: store, allowGuestReady: true);
+      addTearDown(restarted.dispose);
+      await restarted.start();
+
+      expect(restarted.stage, JourneyStage.signIn);
+      expect(
+        restarted.authenticationPurpose,
+        JourneyAuthenticationPurpose.youtubeChannelConnection,
+      );
+      expect(restarted.returnTo, '/app/creator/youtube-connect');
+      expect(restarted.canCancelSignIn, isTrue);
+      restarted.cancelSignIn();
+      expect(restarted.readyRoute(), '/app/social?sub=videos');
+    },
+  );
+
+  test(
     'process death during OTP returns to sign-in without skipping auth',
     () async {
       final store = completedSetupStore();
@@ -138,6 +243,73 @@ void main() {
     expect(session.stage, JourneyStage.ready);
     expect(bootstrap.prepareCount, 1);
   });
+
+  test('unavailable auth methods fail before gateway dispatch', () async {
+    final otp = ReviewOtpGateway();
+    final email = ReviewEmailOtpGateway();
+    final social = ReviewSocialAuthGateway(
+      defaultResult: const SocialAuthResult.authenticated('google-user'),
+    );
+    final session = JourneySession(
+      store: completedSetupStore(),
+      otpGateway: otp,
+      emailOtpGateway: email,
+      socialAuthGateway: social,
+      availableSocialAuthProviders: const {SocialAuthProvider.google},
+      emailOtpAvailable: false,
+      mobileOtpAvailable: false,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    expect(await session.signInWithSocial(SocialAuthProvider.x), isFalse);
+    expect(social.signInCount, 0);
+    expect(session.errorMessage, contains('X sign-in is not available'));
+
+    expect(await session.requestEmailOtp('person@example.com'), isFalse);
+    expect(email.requestCount, 0);
+    expect(session.errorMessage, contains('Email OTP is not available'));
+
+    expect(await session.requestOtp('9876543210'), isFalse);
+    expect(otp.requestCount, 0);
+    expect(session.errorMessage, contains('Mobile OTP is not available'));
+
+    expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+    expect(social.signInCount, 1);
+    expect(session.isAuthenticated, isTrue);
+  });
+
+  test(
+    'account bootstrap failure rolls back partial social identity',
+    () async {
+      final social = ReviewSocialAuthGateway(
+        defaultResult: const SocialAuthResult.authenticated('google-user'),
+      );
+      final bootstrap = ReviewAccountBootstrapGateway(
+        failure: const JourneyServiceException(
+          'Your account service is unavailable. Please retry.',
+        ),
+      );
+      final session = JourneySession(
+        store: completedSetupStore(),
+        socialAuthGateway: social,
+        accountBootstrapGateway: bootstrap,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.google),
+        isFalse,
+      );
+      expect(bootstrap.prepareCount, 1);
+      expect(social.signOutCount, 1);
+      expect(social.signedIn, isFalse);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.errorMessage, contains('account service is unavailable'));
+    },
+  );
 }
 
 class _CompletingSocialGateway implements SocialAuthGateway {

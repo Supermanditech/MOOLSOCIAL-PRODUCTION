@@ -3,13 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:permission_handler/permission_handler.dart'
     as permission_handler
     show openAppSettings;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/auth/facebook_login_contract.dart';
+import '../../core/auth/instagram_oauth_network_adapter.dart';
+import '../../core/auth/public_auth_failure.dart';
+import '../../core/auth/x_oauth2_pkce_network_adapter.dart';
 import '../../data/generated/mobile.dart';
 import 'journey_services.dart';
 
@@ -28,6 +35,10 @@ class SharedPreferencesJourneyStore implements JourneyStore {
   static const _setupExperienceVersionKey =
       'journey01.setup_experience_version';
   static const _pendingRouteKey = 'journey01.pending_route';
+  static const _pendingAuthenticationCancelRouteKey =
+      'journey01.pending_authentication_cancel_route';
+  static const _pendingAuthenticationPurposeKey =
+      'journey01.pending_authentication_purpose';
   static const _lastReadyRouteKey = 'journey01.last_ready_route';
 
   final SharedPreferences _preferences;
@@ -47,6 +58,12 @@ class SharedPreferencesJourneyStore implements JourneyStore {
       homeOrWorkAreaLabel: _preferences.getString(_homeOrWorkAreaLabelKey),
       setupComplete: _preferences.getBool(_setupCompleteKey) ?? false,
       pendingRoute: _preferences.getString(_pendingRouteKey),
+      pendingAuthenticationCancelRoute: _preferences.getString(
+        _pendingAuthenticationCancelRouteKey,
+      ),
+      pendingAuthenticationPurpose: _preferences.getString(
+        _pendingAuthenticationPurposeKey,
+      ),
       lastReadyRoute: _preferences.getString(_lastReadyRouteKey),
       setupExperienceVersion:
           _preferences.getInt(_setupExperienceVersionKey) ?? 1,
@@ -66,6 +83,14 @@ class SharedPreferencesJourneyStore implements JourneyStore {
     await _setNullable(_currentAreaLabelKey, snapshot.currentAreaLabel);
     await _setNullable(_homeOrWorkAreaLabelKey, snapshot.homeOrWorkAreaLabel);
     await _setNullable(_pendingRouteKey, snapshot.pendingRoute);
+    await _setNullable(
+      _pendingAuthenticationCancelRouteKey,
+      snapshot.pendingAuthenticationCancelRoute,
+    );
+    await _setNullable(
+      _pendingAuthenticationPurposeKey,
+      snapshot.pendingAuthenticationPurpose,
+    );
     await _setNullable(_lastReadyRouteKey, snapshot.lastReadyRoute);
   }
 
@@ -102,6 +127,8 @@ class FirebaseOtpGateway implements OtpGateway {
   String? _verificationId;
   int? _resendToken;
   String? _directEmulatorUserId;
+  final PhoneVerificationCompletionGate _phoneVerificationGate =
+      PhoneVerificationCompletionGate();
 
   @override
   Future<bool> hasAuthenticatedUser() async =>
@@ -122,12 +149,14 @@ class FirebaseOtpGateway implements OtpGateway {
         ? (await _latestEmulatorVerification(phoneNumber))?.sessionInfo
         : null;
     final completer = Completer<OtpRequestResult>();
+    final requestGeneration = _phoneVerificationGate.beginAttempt();
 
     await _auth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
       timeout: const Duration(seconds: 60),
       forceResendingToken: _resendToken,
       verificationCompleted: (credential) async {
+        if (!_phoneVerificationGate.claimTerminal(requestGeneration)) return;
         try {
           final result = await _auth.signInWithCredential(credential);
           if (!completer.isCompleted) {
@@ -142,14 +171,25 @@ class FirebaseOtpGateway implements OtpGateway {
           if (!completer.isCompleted) {
             completer.completeError(_friendlyAuthError(error));
           }
+        } on Object {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              const JourneyServiceException(
+                'Verification could not be completed. Please retry.',
+                code: 'auth-unknown',
+              ),
+            );
+          }
         }
       },
       verificationFailed: (error) {
+        if (!_phoneVerificationGate.claimTerminal(requestGeneration)) return;
         if (!completer.isCompleted) {
           completer.completeError(_friendlyAuthError(error));
         }
       },
       codeSent: (verificationId, resendToken) {
+        if (!_phoneVerificationGate.claimTerminal(requestGeneration)) return;
         _verificationId = verificationId;
         _resendToken = resendToken;
         if (!completer.isCompleted) {
@@ -157,6 +197,7 @@ class FirebaseOtpGateway implements OtpGateway {
         }
       },
       codeAutoRetrievalTimeout: (verificationId) {
+        if (!_phoneVerificationGate.isCurrent(requestGeneration)) return;
         _verificationId = verificationId;
       },
     );
@@ -167,10 +208,13 @@ class FirebaseOtpGateway implements OtpGateway {
       );
     }
     return completer.future.timeout(
-      const Duration(seconds: 20),
-      onTimeout: () => throw const JourneyServiceException(
-        'The verification service did not respond. Check the connection and retry.',
-      ),
+      const Duration(seconds: 70),
+      onTimeout: () {
+        _phoneVerificationGate.invalidate(requestGeneration);
+        throw const JourneyServiceException(
+          'The verification service did not respond. Check the connection and retry.',
+        );
+      },
     );
   }
 
@@ -445,95 +489,620 @@ class FirebaseOtpGateway implements OtpGateway {
       'invalid-phone-number' => const JourneyServiceException(
         'Enter a valid 10-digit mobile number.',
       ),
-      _ => JourneyServiceException(
-        error.message ?? 'Verification could not be completed. Please retry.',
+      'app-not-authorized' ||
+      'captcha-check-failed' ||
+      'invalid-app-credential' ||
+      'missing-app-credential' => const JourneyServiceException(
+        'Mobile sign-in is not available right now. Choose another method.',
+        code: 'auth-provider-configuration',
+      ),
+      'quota-exceeded' => const JourneyServiceException(
+        'Mobile sign-in has reached its temporary limit. Try again later.',
+        code: 'auth-throttled',
+      ),
+      _ => const JourneyServiceException(
+        'Verification could not be completed. Please retry.',
+        code: 'auth-unknown',
       ),
     };
   }
 }
 
-class FirebaseSocialAuthGateway implements SocialAuthGateway {
-  FirebaseSocialAuthGateway(this._auth);
+final class PhoneVerificationCompletionGate {
+  int _generation = 0;
+  bool _terminalClaimed = false;
+
+  int beginAttempt() {
+    _generation += 1;
+    _terminalClaimed = false;
+    return _generation;
+  }
+
+  bool isCurrent(int generation) => generation == _generation;
+
+  bool claimTerminal(int generation) {
+    if (!isCurrent(generation) || _terminalClaimed) return false;
+    _terminalClaimed = true;
+    return true;
+  }
+
+  void invalidate(int generation) {
+    if (!isCurrent(generation)) return;
+    _generation += 1;
+    _terminalClaimed = true;
+  }
+}
+
+typedef GoogleAuthStageObserver = void Function(String code);
+
+const _googleAuthDeviceReviewMode = bool.fromEnvironment(
+  'MOOLSOCIAL_DEVICE_REVIEW',
+);
+
+void _emitSanitizedGoogleAuthStage(String code) {
+  if (kDebugMode || _googleAuthDeviceReviewMode) {
+    debugPrint('MOOLSOCIAL_GOOGLE_AUTH code=$code');
+  }
+}
+
+String _safeFirebaseAuthExceptionCode(String code) {
+  const safeOneWordCodes = <String>{'canceled', 'cancelled', 'unknown'};
+  if (code.length > 64 ||
+      (!safeOneWordCodes.contains(code) &&
+          !RegExp(r'^[a-z]+(?:-[a-z0-9]+){1,7}$').hasMatch(code))) {
+    return 'unavailable';
+  }
+  return code;
+}
+
+String _safeFirebaseAuthCauseCategory({required String code, String? message}) {
+  final normalizedCode = _safeFirebaseAuthExceptionCode(code);
+  final normalizedMessage = message?.toLowerCase() ?? '';
+
+  if (normalizedMessage.length <= 1024) {
+    if (normalizedMessage.contains('app check') ||
+        normalizedMessage.contains('appcheck') ||
+        normalizedMessage.contains('app attestation')) {
+      return 'app-check-rejected';
+    }
+    if (normalizedMessage.contains('api key') ||
+        normalizedMessage.contains('api-key') ||
+        normalizedMessage.contains('api_key') ||
+        normalizedMessage.contains('android client application') &&
+            normalizedMessage.contains('blocked')) {
+      return 'api-key-restriction';
+    }
+    if (normalizedMessage.contains('identity toolkit') ||
+        normalizedMessage.contains('identitytoolkit') ||
+        normalizedMessage.contains('service_disabled') ||
+        normalizedMessage.contains('service disabled')) {
+      return 'identity-toolkit-unavailable';
+    }
+    if (normalizedMessage.contains('blocking function') ||
+        normalizedMessage.contains('beforecreate') ||
+        normalizedMessage.contains('beforesignin') ||
+        normalizedMessage.contains('before-create') ||
+        normalizedMessage.contains('before-sign-in')) {
+      return 'blocking-function-rejected';
+    }
+    if (normalizedMessage.contains('tenant')) {
+      return 'tenant-configuration';
+    }
+  }
+
+  return switch (normalizedCode) {
+    'canceled' || 'cancelled' => 'cancelled',
+    'account-exists-with-different-credential' ||
+    'credential-already-in-use' => 'account-collision',
+    'network-request-failed' || 'web-network-request-failed' => 'network',
+    'too-many-requests' => 'throttled',
+    'user-disabled' => 'account-disabled',
+    'operation-not-allowed' ||
+    'provider-already-linked' ||
+    'invalid-oauth-provider' => 'provider-configuration',
+    'invalid-credential' ||
+    'invalid-idp-response' ||
+    'invalid-custom-token' ||
+    'custom-token-mismatch' ||
+    'missing-or-invalid-nonce' => 'credential-rejected',
+    'expired-action-code' || 'session-expired' => 'credential-expired',
+    'blocking-function-error-response' => 'blocking-function-rejected',
+    'unknown' => 'firebase-unknown',
+    _ => 'unavailable',
+  };
+}
+
+abstract interface class GoogleIdentityGateway {
+  Future<String?> authenticateIdToken();
+
+  Future<void> signOut();
+}
+
+class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
+  NativeGoogleIdentityGateway({
+    required this.serverClientId,
+    this.authenticationTimeout = const Duration(seconds: 45),
+    Future<void> Function(String serverClientId)? initialize,
+    bool Function()? supportsAuthenticate,
+    Future<String?> Function()? authenticateIdToken,
+    Future<void> Function()? signOut,
+    GoogleAuthStageObserver? stageObserver,
+  }) : _initialize =
+           initialize ??
+           ((serverClientId) => GoogleSignIn.instance.initialize(
+             serverClientId: serverClientId,
+           )),
+       _supportsAuthenticate =
+           supportsAuthenticate ?? GoogleSignIn.instance.supportsAuthenticate,
+       _authenticateIdToken =
+           authenticateIdToken ??
+           (() async {
+             final account = await GoogleSignIn.instance.authenticate();
+             return account.authentication.idToken;
+           }),
+       _signOut = signOut ?? GoogleSignIn.instance.signOut,
+       _stageObserver = stageObserver ?? _emitSanitizedGoogleAuthStage;
+
+  final String serverClientId;
+  final Duration authenticationTimeout;
+  final Future<void> Function(String serverClientId) _initialize;
+  final bool Function() _supportsAuthenticate;
+  final Future<String?> Function() _authenticateIdToken;
+  final Future<void> Function() _signOut;
+  final GoogleAuthStageObserver _stageObserver;
+  Future<void>? _initialization;
+
+  @override
+  Future<String?> authenticateIdToken() async {
+    final clientId = serverClientId.trim();
+    if (clientId.isEmpty) {
+      _stageObserver('auth-google-native-client-configuration');
+      throw _googleFailure('clientConfigurationError');
+    }
+    try {
+      _stageObserver('auth-google-native-initialize-started');
+      await _ensureInitialized(clientId);
+      _stageObserver('auth-google-native-initialize-complete');
+      if (!_supportsAuthenticate()) {
+        _stageObserver('auth-google-native-ui-unavailable');
+        throw _googleFailure('uiUnavailable');
+      }
+      _stageObserver('auth-google-native-ui-requested');
+      final idToken = await _authenticateIdToken().timeout(
+        authenticationTimeout,
+      );
+      if (idToken == null || idToken.isEmpty) {
+        _stageObserver('auth-google-native-identity-missing');
+        throw _googleFailure('missing-id-token');
+      }
+      _stageObserver('auth-google-native-identity-returned');
+      return idToken;
+    } on TimeoutException {
+      _stageObserver('auth-google-native-return-timeout');
+      throw const JourneyServiceException(
+        'Google sign-in took too long. Please try again.',
+        code: 'auth-native-return-timeout',
+      );
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        _stageObserver('auth-google-native-no-identity');
+        return null;
+      }
+      _stageObserver('auth-google-native-provider-failed');
+      throw _googleFailure(error.code.name);
+    } on JourneyServiceException {
+      rethrow;
+    } on Object {
+      _stageObserver('auth-google-native-unexpected');
+      throw _googleFailure('nativeBridgeFailure');
+    }
+  }
+
+  Future<void> _ensureInitialized(String clientId) async {
+    final initialization = _initialization ??= _initialize(clientId);
+    try {
+      await initialization;
+    } on Object {
+      if (identical(_initialization, initialization)) {
+        _initialization = null;
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    if (_initialization == null) return;
+    await _signOut();
+  }
+
+  JourneyServiceException _googleFailure(String code) {
+    final failure = sanitizedGoogleIdentityFailure(code);
+    return JourneyServiceException(failure.publicMessage, code: failure.code);
+  }
+}
+
+abstract interface class FirebaseSocialAuthClient {
+  String? get currentUserId;
+
+  Future<String?> signInWithGoogleIdToken(String idToken);
+
+  Future<String?> signInWithProvider(AuthProvider provider);
+
+  Future<void> signOut();
+}
+
+class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
+  FirebaseAuthSocialClient(this._auth);
 
   final FirebaseAuth _auth;
 
   @override
-  Future<bool> hasAuthenticatedUser() async => _auth.currentUser != null;
+  String? get currentUserId => _auth.currentUser?.uid;
 
   @override
-  Future<SocialAuthResult> signIn(SocialAuthProvider provider) async {
-    if (provider == SocialAuthProvider.instagram) {
-      throw const JourneyServiceException(
-        'Instagram sign-in is not available right now. Choose another method.',
-      );
-    }
+  Future<String?> signInWithGoogleIdToken(String idToken) async {
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    return (await _auth.signInWithCredential(credential)).user?.uid;
+  }
 
-    final authProvider = switch (provider) {
-      SocialAuthProvider.google ||
-      SocialAuthProvider.youtube => GoogleAuthProvider(),
-      SocialAuthProvider.apple => AppleAuthProvider(),
-      SocialAuthProvider.x => TwitterAuthProvider(),
-      SocialAuthProvider.facebook => FacebookAuthProvider(),
-      SocialAuthProvider.instagram => throw StateError('Handled above.'),
-    };
-
-    try {
-      final credential = await _auth.signInWithProvider(authProvider);
-      final user = credential.user;
-      if (user == null) {
-        throw const JourneyServiceException(
-          'Sign-in could not be completed. Please try again.',
-        );
-      }
-      return SocialAuthResult.authenticated(user.uid);
-    } on FirebaseAuthException catch (error) {
-      if (_isCancelled(error.code)) return const SocialAuthResult.cancelled();
-      throw _friendlySocialAuthError(error);
-    } on JourneyServiceException {
-      rethrow;
-    } on Object {
-      throw const JourneyServiceException(
-        'The account provider did not respond. Check the connection and try again.',
-      );
-    }
+  @override
+  Future<String?> signInWithProvider(AuthProvider provider) async {
+    return (await _auth.signInWithProvider(provider)).user?.uid;
   }
 
   @override
   Future<void> signOut() => _auth.signOut();
+}
 
-  bool _isCancelled(String code) {
-    return const {
-      'canceled',
-      'cancelled',
-      'popup-closed-by-user',
-      'web-context-cancelled',
-      'user-cancelled',
-    }.contains(code);
+class FirebaseSocialAuthGateway
+    implements SocialAuthGateway, SocialAuthCallbackGateway {
+  FirebaseSocialAuthGateway(
+    FirebaseAuth auth, {
+    required String googleServerClientId,
+    Duration firebaseCredentialTimeout = const Duration(seconds: 30),
+    GoogleIdentityGateway? googleIdentityGateway,
+    GoogleAuthStageObserver? googleStageObserver,
+    XOAuth2PkceNetworkAdapter? xAdapter,
+    InstagramOAuthNetworkAdapter? instagramAdapter,
+    FacebookNativeSdkAdapter? facebookAdapter,
+  }) : this._(
+         FirebaseAuthSocialClient(auth),
+         googleIdentityGateway ??
+             NativeGoogleIdentityGateway(
+               serverClientId: googleServerClientId,
+               stageObserver:
+                   googleStageObserver ?? _emitSanitizedGoogleAuthStage,
+             ),
+         xAdapter,
+         instagramAdapter,
+         facebookAdapter,
+         firebaseCredentialTimeout,
+         googleStageObserver ?? _emitSanitizedGoogleAuthStage,
+       );
+
+  FirebaseSocialAuthGateway.forTesting({
+    required FirebaseSocialAuthClient authClient,
+    required GoogleIdentityGateway googleIdentityGateway,
+    Duration firebaseCredentialTimeout = const Duration(seconds: 30),
+    GoogleAuthStageObserver? googleStageObserver,
+    XOAuth2PkceNetworkAdapter? xAdapter,
+    InstagramOAuthNetworkAdapter? instagramAdapter,
+    FacebookNativeSdkAdapter? facebookAdapter,
+  }) : this._(
+         authClient,
+         googleIdentityGateway,
+         xAdapter,
+         instagramAdapter,
+         facebookAdapter,
+         firebaseCredentialTimeout,
+         googleStageObserver ?? _emitSanitizedGoogleAuthStage,
+       );
+
+  FirebaseSocialAuthGateway._(
+    this._authClient,
+    this._googleIdentityGateway,
+    this._xAdapter,
+    this._instagramAdapter,
+    this._facebookAdapter,
+    this.firebaseCredentialTimeout,
+    this._googleStageObserver,
+  );
+
+  final FirebaseSocialAuthClient _authClient;
+  final GoogleIdentityGateway _googleIdentityGateway;
+  final XOAuth2PkceNetworkAdapter? _xAdapter;
+  final InstagramOAuthNetworkAdapter? _instagramAdapter;
+  final FacebookNativeSdkAdapter? _facebookAdapter;
+  final Duration firebaseCredentialTimeout;
+  final GoogleAuthStageObserver _googleStageObserver;
+
+  @override
+  Future<bool> hasAuthenticatedUser() async =>
+      _authClient.currentUserId != null;
+
+  @override
+  Future<SocialAuthResult> signIn(SocialAuthProvider provider) async {
+    try {
+      if (provider == SocialAuthProvider.x) {
+        final adapter = _xAdapter;
+        if (adapter == null) throw _configurationFailure('X');
+        return _brokeredResult(
+          await adapter.beginAuthorization(),
+          allowAuthorizationPending: true,
+        );
+      }
+      if (provider == SocialAuthProvider.instagram) {
+        final adapter = _instagramAdapter;
+        if (adapter == null) throw _configurationFailure('Instagram');
+        return _brokeredResult(
+          await adapter.beginAuthorization(),
+          allowAuthorizationPending: true,
+        );
+      }
+      if (provider == SocialAuthProvider.facebook) {
+        final adapter = _facebookAdapter;
+        if (adapter == null || !adapter.isConfigured) {
+          throw _configurationFailure('Facebook');
+        }
+        return _facebookResult(await adapter.signIn());
+      }
+
+      final String? userId;
+      if (provider == SocialAuthProvider.google ||
+          provider == SocialAuthProvider.youtube) {
+        userId = await _signInWithGoogleIdentity();
+        if (userId == null) {
+          return SocialAuthResult.cancelled(
+            code: provider == SocialAuthProvider.google
+                ? 'auth-google-native-no-identity'
+                : 'auth-youtube-shared-google-native-no-identity',
+          );
+        }
+      } else {
+        userId = switch (provider) {
+          SocialAuthProvider.apple => await _authClient.signInWithProvider(
+            AppleAuthProvider(),
+          ),
+          SocialAuthProvider.google ||
+          SocialAuthProvider.youtube ||
+          SocialAuthProvider.x ||
+          SocialAuthProvider.instagram ||
+          SocialAuthProvider.facebook => throw StateError('Handled above.'),
+        };
+      }
+      if (userId == null) return const SocialAuthResult.cancelled();
+      final authenticatedUserId = userId;
+      if (authenticatedUserId.isEmpty) {
+        throw const JourneyServiceException(
+          'Sign-in could not be completed. Please try again.',
+          code: 'auth-firebase-session-missing',
+        );
+      }
+      final completionCode = switch (provider) {
+        SocialAuthProvider.google => 'auth-google-firebase-credential-complete',
+        SocialAuthProvider.youtube =>
+          'auth-youtube-shared-google-firebase-credential-complete',
+        SocialAuthProvider.apple => 'auth-apple-firebase-credential-complete',
+        SocialAuthProvider.x ||
+        SocialAuthProvider.instagram ||
+        SocialAuthProvider.facebook => throw StateError('Handled above.'),
+      };
+      return SocialAuthResult.authenticated(
+        authenticatedUserId,
+        code: completionCode,
+      );
+    } on FirebaseAuthException catch (error) {
+      final failure = sanitizedFirebaseAuthFailure(
+        error.code,
+        providerLabel: _providerLabel(provider),
+      );
+      if (provider == SocialAuthProvider.google ||
+          provider == SocialAuthProvider.youtube) {
+        _googleStageObserver(
+          'auth-google-firebase-exception-code-'
+          '${_safeFirebaseAuthExceptionCode(error.code)}',
+        );
+        _googleStageObserver(
+          'auth-google-firebase-cause-'
+          '${_safeFirebaseAuthCauseCategory(code: error.code, message: error.message)}',
+        );
+      }
+      if (failure.failureClass == PublicAuthFailureClass.cancelled) {
+        if (provider == SocialAuthProvider.google ||
+            provider == SocialAuthProvider.youtube) {
+          _googleStageObserver('auth-google-firebase-cancelled');
+        }
+        return SocialAuthResult.cancelled(code: failure.code);
+      }
+      if (provider == SocialAuthProvider.google ||
+          provider == SocialAuthProvider.youtube) {
+        _googleStageObserver('auth-google-firebase-credential-failed');
+      }
+      throw JourneyServiceException(failure.publicMessage, code: failure.code);
+    } on JourneyServiceException {
+      rethrow;
+    } on Object {
+      throw JourneyServiceException(
+        'The account provider did not respond. Check the connection and try again.',
+        code: 'auth-${provider.name}-unexpected',
+      );
+    }
   }
 
-  JourneyServiceException _friendlySocialAuthError(
-    FirebaseAuthException error,
-  ) {
-    return switch (error.code) {
-      'account-exists-with-different-credential' => const JourneyServiceException(
-        'This account already uses another sign-in method. Choose that method to continue.',
-      ),
-      'network-request-failed' => const JourneyServiceException(
-        'You appear to be offline. Reconnect and try again.',
-      ),
-      'operation-not-allowed' ||
-      'provider-already-linked' ||
-      'invalid-oauth-provider' => const JourneyServiceException(
-        'This sign-in method is not available right now. Choose another method.',
-      ),
-      'too-many-requests' => const JourneyServiceException(
-        'Too many attempts. Wait a moment before trying again.',
-      ),
-      _ => JourneyServiceException(
-        error.message ?? 'Sign-in could not be completed. Please try again.',
+  @override
+  SocialAuthProvider? providerForCallback(Uri callbackUri) {
+    final xRecognized = _xAdapter?.recognizesCallback(callbackUri) ?? false;
+    final instagramRecognized =
+        _instagramAdapter?.recognizesCallback(callbackUri) ?? false;
+    if (xRecognized == instagramRecognized) return null;
+    return xRecognized ? SocialAuthProvider.x : SocialAuthProvider.instagram;
+  }
+
+  @override
+  Future<SocialAuthResult> completeForegroundCallback(Uri callbackUri) =>
+      _completeBrokeredCallback(callbackUri, coldStart: false);
+
+  @override
+  Future<SocialAuthResult> completeColdStartCallback(Uri callbackUri) =>
+      _completeBrokeredCallback(callbackUri, coldStart: true);
+
+  Future<SocialAuthResult> _completeBrokeredCallback(
+    Uri callbackUri, {
+    required bool coldStart,
+  }) async {
+    final provider = providerForCallback(callbackUri);
+    if (provider == null) {
+      throw _configurationFailure('The account provider');
+    }
+    final result = switch (provider) {
+      SocialAuthProvider.x =>
+        coldStart
+            ? await _xAdapter!.completeColdStartCallback(callbackUri)
+            : await _xAdapter!.completeForegroundCallback(callbackUri),
+      SocialAuthProvider.instagram =>
+        coldStart
+            ? await _instagramAdapter!.completeColdStartCallback(callbackUri)
+            : await _instagramAdapter!.completeForegroundCallback(callbackUri),
+      SocialAuthProvider.google ||
+      SocialAuthProvider.youtube ||
+      SocialAuthProvider.apple ||
+      SocialAuthProvider.facebook => throw StateError(
+        'Only brokered providers own callbacks.',
       ),
     };
+    return _brokeredResult(result, allowAuthorizationPending: false);
   }
+
+  SocialAuthResult _brokeredResult(
+    BrokeredPublicAuthResult result, {
+    required bool allowAuthorizationPending,
+  }) {
+    switch (result.outcome) {
+      case BrokeredPublicAuthOutcome.browserOpened:
+        if (allowAuthorizationPending) {
+          return SocialAuthResult.authorizationPending(code: result.code);
+        }
+        throw _configurationFailure('The account provider');
+      case BrokeredPublicAuthOutcome.authenticated:
+        final userId = result.userId;
+        if (userId == null || userId.isEmpty) {
+          throw const JourneyServiceException(
+            'Sign-in could not be completed. Please try again.',
+            code: 'auth-invalid-credential',
+          );
+        }
+        return SocialAuthResult.authenticated(userId, code: result.code);
+      case BrokeredPublicAuthOutcome.cancelled:
+        return SocialAuthResult.cancelled(code: result.code);
+      case BrokeredPublicAuthOutcome.denied:
+      case BrokeredPublicAuthOutcome.expired:
+      case BrokeredPublicAuthOutcome.replayRejected:
+      case BrokeredPublicAuthOutcome.accountIneligible:
+      case BrokeredPublicAuthOutcome.configurationFailure:
+      case BrokeredPublicAuthOutcome.networkFailure:
+      case BrokeredPublicAuthOutcome.timeout:
+      case BrokeredPublicAuthOutcome.providerFailure:
+        throw JourneyServiceException(result.publicMessage, code: result.code);
+    }
+  }
+
+  SocialAuthResult _facebookResult(FacebookLoginResult result) {
+    final outcome = result.outcome;
+    if (outcome == FacebookLoginOutcome.cancelled) {
+      return SocialAuthResult.cancelled(code: result.safeCode);
+    }
+    if (outcome == FacebookLoginOutcome.success) {
+      final userId = _authClient.currentUserId;
+      if (userId != null && userId.isNotEmpty) {
+        return SocialAuthResult.authenticated(userId, code: result.safeCode);
+      }
+      throw const JourneyServiceException(
+        'Facebook sign-in could not confirm the account. Please try again.',
+        code: 'auth-facebook-session-missing',
+      );
+    }
+    throw JourneyServiceException(outcome.safeMessage, code: result.safeCode);
+  }
+
+  JourneyServiceException _configurationFailure(String providerLabel) =>
+      JourneyServiceException(
+        '$providerLabel sign-in is not available right now. '
+        'Choose another method.',
+        code: 'auth-provider-configuration',
+      );
+
+  @override
+  Future<void> signOut() async {
+    Object? firstFailure;
+    StackTrace? firstFailureStackTrace;
+    try {
+      await _authClient.signOut();
+    } on Object catch (error, stackTrace) {
+      firstFailure = error;
+      firstFailureStackTrace = stackTrace;
+    }
+    try {
+      await _googleIdentityGateway.signOut();
+    } on Object catch (error, stackTrace) {
+      firstFailure ??= error;
+      firstFailureStackTrace ??= stackTrace;
+    }
+    final facebookAdapter = _facebookAdapter;
+    if (facebookAdapter != null && facebookAdapter.isConfigured) {
+      try {
+        final outcome = await facebookAdapter.logOut();
+        if (outcome != FacebookLoginOutcome.success) {
+          throw JourneyServiceException(
+            outcome.safeMessage,
+            code: 'auth-provider-unavailable',
+          );
+        }
+      } on Object catch (error, stackTrace) {
+        firstFailure ??= error;
+        firstFailureStackTrace ??= stackTrace;
+      }
+    }
+    if (firstFailure case final failure?) {
+      Error.throwWithStackTrace(failure, firstFailureStackTrace!);
+    }
+  }
+
+  Future<String?> _signInWithGoogleIdentity() async {
+    try {
+      _googleStageObserver('auth-google-native-request-started');
+      final idToken = await _googleIdentityGateway.authenticateIdToken();
+      if (idToken == null) {
+        _googleStageObserver('auth-google-native-no-identity');
+        return null;
+      }
+      _googleStageObserver('auth-google-firebase-credential-started');
+      final userId = await _authClient
+          .signInWithGoogleIdToken(idToken)
+          .timeout(firebaseCredentialTimeout);
+      _googleStageObserver('auth-google-firebase-credential-complete');
+      return userId;
+    } on TimeoutException {
+      _googleStageObserver('auth-google-firebase-credential-timeout');
+      throw const JourneyServiceException(
+        'Google sign-in could not confirm the account in time. Please try again.',
+        code: 'auth-firebase-credential-timeout',
+      );
+    } on FirebaseAuthException {
+      rethrow;
+    } on JourneyServiceException {
+      _googleStageObserver('auth-google-native-request-failed');
+      rethrow;
+    }
+  }
+
+  String _providerLabel(SocialAuthProvider provider) => switch (provider) {
+    SocialAuthProvider.google || SocialAuthProvider.youtube => 'Google',
+    SocialAuthProvider.apple => 'Apple',
+    SocialAuthProvider.x => 'X',
+    SocialAuthProvider.instagram => 'Instagram',
+    SocialAuthProvider.facebook => 'Facebook',
+  };
 }
 
 class HttpEmailOtpGateway implements EmailOtpGateway {
@@ -596,9 +1165,11 @@ class HttpEmailOtpGateway implements EmailOtpGateway {
       }
       return user.uid;
     } on FirebaseAuthException catch (error) {
-      throw JourneyServiceException(
-        error.message ?? 'We could not finish verification. Please try again.',
+      final failure = sanitizedFirebaseAuthFailure(
+        error.code,
+        providerLabel: 'Email',
       );
+      throw JourneyServiceException(failure.publicMessage, code: failure.code);
     }
   }
 
@@ -626,11 +1197,10 @@ class HttpEmailOtpGateway implements EmailOtpGateway {
           ? <String, dynamic>{}
           : jsonDecode(responseBody) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final message =
-            decoded['userMessage']?.toString() ??
-            decoded['message']?.toString() ??
-            'Email verification could not be completed. Please try again.';
-        throw JourneyServiceException(message);
+        throw const JourneyServiceException(
+          'Email verification could not be completed. Please try again.',
+          code: 'email-verification-rejected',
+        );
       }
       return decoded;
     } on JourneyServiceException {
@@ -649,6 +1219,139 @@ class HttpEmailOtpGateway implements EmailOtpGateway {
       );
     }
   }
+}
+
+class FirebaseEmailLinkGateway implements EmailLinkGateway {
+  FirebaseEmailLinkGateway(
+    this._auth, {
+    required String continueUrl,
+    String? linkDomain,
+  }) : _actionCodeSettings = ActionCodeSettings(
+         url: continueUrl,
+         handleCodeInApp: true,
+         androidPackageName: 'com.moolsocial.app',
+         androidInstallApp: true,
+         androidMinimumVersion: '1',
+         linkDomain: linkDomain?.trim().isEmpty == true
+             ? null
+             : linkDomain?.trim(),
+       );
+
+  final FirebaseAuth _auth;
+  final ActionCodeSettings _actionCodeSettings;
+
+  @override
+  Future<void> sendSignInLink(String emailAddress) async {
+    try {
+      await _auth.sendSignInLinkToEmail(
+        email: emailAddress,
+        actionCodeSettings: _actionCodeSettings,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw _emailLinkError(error);
+    } on PlatformException catch (error) {
+      throw sanitizedEmailLinkFailure(error.code);
+    } on Object {
+      throw const JourneyServiceException(
+        'Email sign-in could not reach the device authentication service.',
+        code: 'email-link-bridge-failure',
+      );
+    }
+  }
+
+  @override
+  bool isSignInLink(String emailLink) => _auth.isSignInWithEmailLink(emailLink);
+
+  @override
+  Future<String> signInWithEmailLink({
+    required String emailAddress,
+    required String emailLink,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailLink(
+        email: emailAddress,
+        emailLink: emailLink,
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw const JourneyServiceException(
+          'Sign-in could not be completed. Request a new link.',
+          code: 'email-link-missing-user',
+        );
+      }
+      return user.uid;
+    } on FirebaseAuthException catch (error) {
+      throw _emailLinkError(error);
+    } on PlatformException catch (error) {
+      throw sanitizedEmailLinkFailure(error.code);
+    } on Object {
+      throw const JourneyServiceException(
+        'Email sign-in could not reach the device authentication service.',
+        code: 'email-link-bridge-failure',
+      );
+    }
+  }
+
+  @override
+  Future<void> signOut() => _auth.signOut();
+
+  JourneyServiceException _emailLinkError(FirebaseAuthException error) {
+    return sanitizedEmailLinkFailure(error.code);
+  }
+}
+
+JourneyServiceException sanitizedEmailLinkFailure(String code) {
+  return switch (code.trim().toLowerCase()) {
+    'expired-action-code' => const JourneyServiceException(
+      'This sign-in link has expired. Request a new link.',
+      code: 'expired-action-code',
+    ),
+    'invalid-action-code' => const JourneyServiceException(
+      'This sign-in link is invalid or has already been used. Request a new link.',
+      code: 'invalid-action-code',
+    ),
+    'invalid-email' ||
+    'invalid-recipient-email' ||
+    'missing-email' => const JourneyServiceException(
+      'Enter the email address that received this link.',
+      code: 'invalid-email',
+    ),
+    'user-disabled' => const JourneyServiceException(
+      'This account cannot sign in right now. Choose another method.',
+      code: 'user-disabled',
+    ),
+    'operation-not-allowed' => const JourneyServiceException(
+      'Email link sign-in is not available right now. Choose another method.',
+      code: 'operation-not-allowed',
+    ),
+    'too-many-requests' => const JourneyServiceException(
+      'Too many attempts. Wait a moment before trying again.',
+      code: 'too-many-requests',
+    ),
+    'network-request-failed' ||
+    'web-network-request-failed' => const JourneyServiceException(
+      'Email sign-in could not connect. Check your connection and retry.',
+      code: 'email-link-network-failure',
+    ),
+    'invalid-continue-uri' ||
+    'missing-continue-uri' ||
+    'unauthorized-continue-uri' ||
+    'unauthorized-domain' ||
+    'missing-android-pkg-name' ||
+    'dynamic-link-not-activated' ||
+    'invalid-dynamic-link-domain' => const JourneyServiceException(
+      'Email link sign-in is not available right now. Choose another method.',
+      code: 'email-link-configuration',
+    ),
+    'internal-error' || 'web-internal-error' => const JourneyServiceException(
+      'Email sign-in is temporarily unavailable. Please try again.',
+      code: 'email-link-provider-internal',
+    ),
+    _ => const JourneyServiceException(
+      'Email sign-in could not be classified safely. Please try again.',
+      code: 'email-link-firebase-unclassified',
+    ),
+  };
 }
 
 class SharedPreferencesReviewEmailOtpGateway implements EmailOtpGateway {
@@ -797,6 +1500,77 @@ class DeviceCurrentAreaGateway implements CurrentAreaGateway {
   }
 }
 
+class FirebaseAuthenticatedSessionBootstrapGateway
+    implements AccountBootstrapGateway {
+  FirebaseAuthenticatedSessionBootstrapGateway(FirebaseAuth auth)
+    : this._(
+        interactiveVerifiedUserId: () async {
+          final user = auth.currentUser;
+          if (user == null) return null;
+          final token = await user.getIdToken();
+          if (token == null || token.trim().isEmpty) return null;
+          return user.uid;
+        },
+        revalidatedUserId: () async {
+          final user = auth.currentUser;
+          if (user == null) return null;
+          await user.reload();
+          final refreshed = auth.currentUser;
+          if (refreshed == null) return null;
+          final token = await refreshed.getIdToken();
+          if (token == null || token.trim().isEmpty) return null;
+          return refreshed.uid;
+        },
+      );
+
+  @visibleForTesting
+  FirebaseAuthenticatedSessionBootstrapGateway.forTesting({
+    required Future<String?> Function() verifiedUserId,
+    Future<String?> Function()? interactiveVerifiedUserId,
+  }) : this._(
+         interactiveVerifiedUserId: interactiveVerifiedUserId ?? verifiedUserId,
+         revalidatedUserId: verifiedUserId,
+       );
+
+  FirebaseAuthenticatedSessionBootstrapGateway._({
+    required this._interactiveVerifiedUserId,
+    required this._revalidatedUserId,
+  });
+
+  final Future<String?> Function() _interactiveVerifiedUserId;
+  final Future<String?> Function() _revalidatedUserId;
+
+  @override
+  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
+    try {
+      final expected = expectedUserId?.trim();
+      final userId = expected == null || expected.isEmpty
+          ? await _revalidatedUserId()
+          : await _interactiveVerifiedUserId();
+      if (userId == null || userId.trim().isEmpty) {
+        throw const JourneyServiceException(
+          'Your signed-in account could not be verified. Please sign in again.',
+          code: 'auth-session-missing',
+        );
+      }
+      if (expected != null && expected.isNotEmpty && userId != expected) {
+        throw const JourneyServiceException(
+          'Your signed-in account changed before it could be verified. Please sign in again.',
+          code: 'auth-session-user-mismatch',
+        );
+      }
+    } on JourneyServiceException {
+      rethrow;
+    } on Object {
+      throw const JourneyServiceException(
+        'Your account session could not be verified. '
+        'Check the connection and try again.',
+        code: 'auth-session-verification',
+      );
+    }
+  }
+}
+
 class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
   DataConnectAccountBootstrapGateway({String? emulatorHost, this.port = 9399}) {
     if (emulatorHost != null) {
@@ -810,7 +1584,7 @@ class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
   final int port;
 
   @override
-  Future<void> prepareAuthenticatedAccount() async {
+  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
     await MobileConnector.instance.upsertMyAccount().execute();
   }
 }

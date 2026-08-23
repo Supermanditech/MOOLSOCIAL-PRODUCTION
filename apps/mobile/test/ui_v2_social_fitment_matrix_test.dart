@@ -84,7 +84,8 @@ void main() {
       ('videos', 'video-watch'),
       ('videos', 'unavailable'),
       ('feed', null),
-      ('feed', 'promoted'),
+      ('feed', 'loading'),
+      ('feed', 'error'),
       ('feed', 'unavailable'),
       ('create', null),
       ('create', 'post'),
@@ -271,5 +272,5 @@ Future<void> _pumpAt(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  await tester.pump();
 }

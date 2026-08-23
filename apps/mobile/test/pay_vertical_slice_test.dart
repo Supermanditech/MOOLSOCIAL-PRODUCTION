@@ -39,6 +39,7 @@ void main() {
         session: journey,
         paySession: pay,
         initialLocation: location,
+        legacyPresentationForTestsOnly: true,
       ),
     );
     await tester.pumpAndSettle();
@@ -379,6 +380,7 @@ void main() {
         session: journey,
         paySession: pay,
         initialLocation: '/app/pay/home',
+        legacyPresentationForTestsOnly: true,
       ),
     );
     await tester.pumpAndSettle();

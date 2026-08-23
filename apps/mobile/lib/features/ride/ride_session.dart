@@ -173,13 +173,13 @@ class RideSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void prepareBooking(RideType value) {
-    reset();
+  void prepareBooking(RideType value, {bool notifyChange = true}) {
+    _resetBookingState();
     selectedType = value;
     selectedPackageId = packages.firstWhere((item) => item.type == value).id;
     fare = selectedPackage.fare;
     noticeMessage = null;
-    notifyListeners();
+    if (notifyChange) notifyListeners();
   }
 
   void choosePackage(String id) {
@@ -443,13 +443,18 @@ class RideSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearMessages() {
+  void clearMessages({bool notifyChange = true}) {
     errorMessage = null;
     noticeMessage = null;
-    notifyListeners();
+    if (notifyChange) notifyListeners();
   }
 
   void reset() {
+    _resetBookingState();
+    notifyListeners();
+  }
+
+  void _resetBookingState() {
     trip = null;
     stage = RideTripStage.captainArriving;
     rideCancelled = false;
@@ -463,6 +468,5 @@ class RideSession extends ChangeNotifier {
     missingItem = 'Phone';
     errorMessage = null;
     noticeMessage = null;
-    notifyListeners();
   }
 }

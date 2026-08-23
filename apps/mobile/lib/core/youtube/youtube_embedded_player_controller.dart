@@ -624,7 +624,33 @@ class YouTubeEmbeddedPlayerController {
   Future<void> _pauseIfLifecycleRequires() async {
     if (!_mounted || !_ready || _safeToPlay) return;
     final nativeSessionGeneration = _nativeSessionGeneration;
-    await _port.send(const YouTubePlayerCommand.pause());
+    try {
+      await _port.send(const YouTubePlayerCommand.pause());
+    } on Object {
+      if (!_isCurrentNativeSession(nativeSessionGeneration)) return;
+      final failedVideoId = _selection?.videoId;
+      final failure = const YouTubeEmbeddedPlayerPlatformFailure(
+        code: 'lifecycle_pause_failed',
+        message: 'The player could not pause safely.',
+      );
+      ++_selectionGeneration;
+      _failure = null;
+      _failureVideoId = null;
+      _platformFailure = failure;
+      try {
+        await _detachForNativeState();
+      } on Object {
+        // Detach still releases the shared lease in its own finally block.
+      }
+      if (_disposed ||
+          _selection?.videoId != failedVideoId ||
+          !identical(_platformFailure, failure)) {
+        return;
+      }
+      _status = YouTubeEmbeddedPlayerStatus.failed;
+      _emit();
+      return;
+    }
     if (!_isCurrentNativeSession(nativeSessionGeneration)) return;
     if (_status == YouTubeEmbeddedPlayerStatus.playing ||
         _status == YouTubeEmbeddedPlayerStatus.buffering) {

@@ -1,5 +1,5 @@
 name: youtube_embedded_player_private_dev
-description: Isolated debug-only native registration for the provider player probe.
+description: Isolated debug/profile-review native registration for the provider player probe.
 version: 0.0.1
 publish_to: none
 

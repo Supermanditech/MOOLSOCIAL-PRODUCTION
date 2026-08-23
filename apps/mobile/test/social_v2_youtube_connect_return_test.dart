@@ -87,7 +87,7 @@ void main() {
   });
 
   testWidgets(
-    'cold protected callback preserves the safe result through app startup',
+    'cold callback never converts a return flag into channel authority',
     (tester) async {
       final session = JourneySession(
         store: MemoryJourneyStore(
@@ -113,27 +113,15 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(
-        find.byKey(const ValueKey('youtube-connect-source')),
+        find.byKey(const Key('social-youtube-creator-screen')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('youtube-creator-connected')), findsNothing);
       expect(
-        find.byKey(const Key('youtube-connect-return-message')),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          'YouTube is connected to your MoolSocial account. '
-          'You can now use eligible YouTube videos and Shorts in MoolSocial.',
-        ),
+        find.byKey(const Key('youtube-creator-unavailable')),
         findsOneWidget,
       );
       expect(session.returnTo, isNull);
-
-      await tester.pump(const Duration(seconds: 6));
-      expect(
-        find.byKey(const Key('youtube-connect-return-message')),
-        findsNothing,
-      );
     },
   );
 }
