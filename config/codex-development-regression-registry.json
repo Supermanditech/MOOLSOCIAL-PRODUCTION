@@ -41057,6 +41057,26 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3677-V43-PUSH-DESTINATION-REFSPEC-TYPO-CREATED-UNINTENDED-REMOTE-BRANCH",
+      "status": "registered_feature_worktree_untouched_and_exact_accidental_ref_cleanup_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "The first v43 push used the correct local remediation source but mistyped the remote destination as remediation/prototype-conformance-20260824-v43, potentially creating one unintended remote branch; main and the feature worktree were untouched.",
+      "rootCause": "A manually typed literal destination ref substituted the tag date/version for the required remediation/prototype-conformance-2026-07-20 branch name, while stderr suppression hid the remote creation message.",
+      "prevention": "Bind this registry generation, verify the exact unintended ref with ls-remote, delete only that exact accidental remote branch, use full literal intended branch and tag refspecs, read back both expected SHAs, and never suppress safe Git push stderr.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
