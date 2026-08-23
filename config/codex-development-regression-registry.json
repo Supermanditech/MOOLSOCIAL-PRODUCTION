@@ -40518,6 +40518,49 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3652-C33M-COMBINED-GATE-HISTORICAL-LAUNCHER-MISSING-IN-CLEAN-WORKTREE",
+      "status": "registered_root_cause_proven_preserved_launcher_restore_and_canonical_fallback_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate",
+        "worktree"
+      ],
+      "mistake": "The first corrected combined source-phase replay passed current-ticket selection but stopped before nested gates because tmp/run-c33m-r60-51-single-aab-founder.ps1 is absent from the clean feature worktree.",
+      "rootCause": "The historical founder launcher is absent from both active worktrees because it was an ignored production-untracked owner, but its exact preserved copy exists at MS-PRESERVE/R6087-20260823-01/production-untracked/tmp/run-c33m-r60-51-single-aab-founder.ps1. The combined gate resolves historical dependencies only beneath its feature RepositoryRoot.",
+      "prevention": "Bind this registry generation, verify and restore the exact preserved launcher locally to the canonical production checkout without tracking it, do not rerun provider gates, and let the combined gate resolve missing historical dependencies read-only from that configured production checkout while still requiring active source/gate owners in the feature worktree; then replay source phase once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3653-REG3652-COORDINATION-BINDING-PATCH-ASSUMED-INTERMEDIATE-VALUE",
+      "status": "registered_atomic_rejection_and_exact_current_binding_patch_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first REG3652 coordination-binding patch expected a nonexistent intermediate 3623 value and was rejected atomically.",
+      "rootCause": "The primary updated and classified the registry twice without first reading the still-3622 coordination binding before constructing the final patch anchor.",
+      "prevention": "Count the rejected patch as zero change, bind the final registry generation directly from the exact current policy value, and avoid assumed intermediate binding anchors.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
