@@ -40755,6 +40755,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3663-C33M-GOOGLE-PROVIDER-EVIDENCE-MISSING-IN-BOTH-ACTIVE-WORKTREES",
+      "status": "registered_no_later_action_and_exact_preserved_artifact_lookup_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate",
+        "worktree"
+      ],
+      "mistake": "After artifacts/quality production fallback was enabled, the combined source gate stopped because the Google-provider-enabled evidence is absent from both feature and canonical production paths.",
+      "rootCause": "The exact artifact may exist only in the approved preservation vault and must be located after registration; no later action followed.",
+      "prevention": "Bind this registry generation, locate only artifacts/quality/uaw-c33e-firebase-google-provider-enabled-evidence-20260815.json in the authorized workspace, verify and restore an exact preserved copy locally to production if present, keep it ignored/untracked, and replay source once; otherwise report an external evidence blocker.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
