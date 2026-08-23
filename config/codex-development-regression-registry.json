@@ -40358,6 +40358,27 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3645-FIX4-HASH-COMPARISON-FOREACH-TOKEN-ADJACENCY-SYNTAX",
+      "status": "registered_zero_readback_and_one_corrected_scalar_comparison_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first read-only FIX4/FIX8/selected-manifest hash comparison failed at parse time because the foreach in token was concatenated to the collection variable.",
+      "rootCause": "A compressed PowerShell command omitted required whitespace between the in keyword and the collection variable; no hash readback or repository mutation occurred.",
+      "prevention": "Bind this registry generation and perform one corrected scalar comparison with ordinary spaced PowerShell syntax before finalizing REG3644 root cause; do not compress control-flow tokens.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
