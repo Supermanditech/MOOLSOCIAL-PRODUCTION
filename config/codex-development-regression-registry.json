@@ -40928,6 +40928,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3671-APP-SPLASH-PRODUCTION-SOURCE-EXPECTED-DIGEST-NOT-RAW-OR-CANONICAL",
+      "status": "registered_no_later_action_and_semantic_history_comparison_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "ui_lock",
+        "failure_handling"
+      ],
+      "mistake": "After text baselines were allowed to match unchanged expected raw or canonical hashes, app_splash_screen_v2.dart still rejected because neither current production raw nor canonical text equals its expected digest.",
+      "rootCause": "The difference may be semantic source drift rather than line-ending materialization and must be compared to the accepted repository history after registration.",
+      "prevention": "Do not weaken the lock or alter UI/reference content. Bind this registry generation, compare only the current file's canonical content against the accepted historical blob that matches the expected digest, and stop for founder UI-baseline direction if the delta is semantic.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }

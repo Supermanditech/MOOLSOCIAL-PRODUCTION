@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3641,
-    "sha256": "AD11C33B775576F4CCF2A9A24D5B9480CAC7F4D410AABE210540CC5987E36785"
+    "entryCount": 3642,
+    "sha256": "D7BABD84D2447F235C536904EB6F3954568757C95AB1421226E4F1A297AC5376"
   },
   "mandatoryReads": [
     "../AGENTS.md",
