@@ -40475,7 +40475,7 @@
     },
     {
       "id": "REG-20260824-3650-EMAIL-LINK-C33K-CURRENT-TOP-SELECTED-TICKET-BINDING-REJECTION",
-      "status": "registered_no_later_action_and_exact_C33K_successor_portability_correction_required",
+      "status": "registered_root_cause_proven_and_C33K_gate_checker_canonical_successor_boundary_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40484,8 +40484,8 @@
         "failure_handling"
       ],
       "mistake": "After v24, the next distinct no-build C33K Firebase passwordless email-link live-readiness gate exited one at line 41 because current, top-level or selected ticket binding changed.",
-      "rootCause": "The C33K selection function, selected-manifest hash and current-successor authority boundary must be classified after registration; no later action followed.",
-      "prevention": "Bind this registry generation, do not rerun C33J, FIX4 or FIX5, claim only C33K and one existing focused checker, preserve historical bindings and every live/external/build/device/private/secret prohibition, add exact evidence-bound email-link positive and wrong-ticket/hash/authority negatives, then replay C33K once.",
+      "rootCause": "C33K, its existing C33M FIX7 compatibility checker and the selected email-link manifest use raw byte hashes. Each feature-worktree CRLF hash differs from its pinned production hash, while canonical UTF-8/LF hashing matches all pins. The generic mode preserves historical C33K evidence but lacks an explicit current email-link authority boundary.",
+      "prevention": "Bind this registry generation, do not rerun C33J, FIX4 or FIX5, claim only C33K and the existing C33M FIX7 checker, canonicalize their ticket and selected-manifest hashes, preserve historical bindings and all live/external/build/device/private/secret prohibitions, add exact current email-link positive and wrong-ticket/hash/authority negatives, then replay C33K once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
