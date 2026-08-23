@@ -950,7 +950,9 @@ class JourneySession extends ChangeNotifier {
       'expired-action-code' => EmailLinkState.expired,
       'email-link-already-used' => EmailLinkState.used,
       'invalid-action-code' => EmailLinkState.invalid,
-      'invalid-email' => EmailLinkState.awaitingEmail,
+      'invalid-email' ||
+      'invalid-recipient-email' ||
+      'missing-email' => EmailLinkState.awaitingEmail,
       _ => EmailLinkState.failed,
     };
     errorMessage = error.userMessage;

@@ -22,6 +22,19 @@ function Assert-C33K {
   }
 }
 
+function Get-C33KCanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally { $sha256.Dispose() }
+}
+
 function Get-C33KGenericSuccessorMode {
   param(
     [Parameter(Mandatory)][object]$Scope,
@@ -63,6 +76,35 @@ function Get-C33KGenericSuccessorMode {
   return 'qualified_generic_successor_replay'
 }
 
+function Test-C33KExecutionBoundary {
+  param(
+    [Parameter(Mandatory)][object]$Scope,
+    [Parameter(Mandatory)][string]$SelectionMode
+  )
+  $selected = $Scope.preTicketSelectionCheckpoint.selectedTicketAssessment
+  $historical = $SelectionMode -ceq 'C33K_active'
+  $emailLink = (
+    $SelectionMode -ceq 'qualified_generic_successor_replay' -and
+    [string]$Scope.ticket.id -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.ticketId -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.manifestPath -ceq
+      'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md' -and
+    [string]$selected.manifestSha256 -ceq
+      '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A' -and
+    [bool]$Scope.execution.runtimeWriteAuthorized -and
+    -not [bool]$Scope.execution.backendWriteAuthorized
+  )
+  return (
+    [bool]$Scope.execution.testOrGateWriteAuthorized -and
+    ($historical -or $emailLink) -and
+    -not [bool]$Scope.execution.externalServiceWriteAuthorized -and
+    -not [bool]$Scope.execution.liveEmailSendAuthorized -and
+    -not [bool]$Scope.execution.buildAuthorized -and
+    -not [bool]$Scope.execution.deviceInstallAuthorized -and
+    -not [bool]$Scope.execution.secretValueAccessAuthorized
+  )
+}
+
 $statePath = Join-Path $RepositoryRoot `
   'config/firebase-passwordless-email-link-live-readiness-state-c33k.json'
 $ticketPath = Join-Path $RepositoryRoot `
@@ -78,7 +120,7 @@ $state = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
 $ticket = Get-Content -Raw -LiteralPath $ticketPath | ConvertFrom-Json
 $scope = Get-Content -Raw -LiteralPath $scopePath | ConvertFrom-Json
 $expectedTicket = 'UAW-C33K-FIREBASE-PASSWORDLESS-EMAIL-LINK-LIVE-READINESS'
-$ticketHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash
+$ticketHash = Get-C33KCanonicalTextSha256 -Path $ticketPath
 $selectedManifestRelative =
   [string]$scope.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestPath
 Assert-C33K (-not [IO.Path]::IsPathRooted($selectedManifestRelative)) `
@@ -97,12 +139,14 @@ $c33kEvidencePath = Join-Path $RepositoryRoot `
   'docs/quality/UAW-C33K-FIREBASE-PASSWORDLESS-EMAIL-LINK-LIVE-READINESS-QUALIFICATION-20260815.md'
 $selectionMode = Get-C33KGenericSuccessorMode `
   -Scope $scope `
-  -SelectedTicketSha256 (
-    Get-FileHash -Algorithm SHA256 -LiteralPath $selectedManifestPath
-  ).Hash `
+  -SelectedTicketSha256 (Get-C33KCanonicalTextSha256 `
+    -Path $selectedManifestPath) `
   -C33KEvidenceExists (
     Test-Path -LiteralPath $c33kEvidencePath -PathType Leaf
   )
+Assert-C33K (
+  Test-C33KExecutionBoundary -Scope $scope -SelectionMode $selectionMode
+) 'current email-link successor or historical execution boundary changed.'
 
 Assert-C33K (
   [int]$state.schemaVersion -eq 1 -and

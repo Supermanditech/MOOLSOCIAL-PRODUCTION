@@ -34,6 +34,19 @@ function Resolve-C33NFix1File {
   return $resolved
 }
 
+function Get-C33NFix1CanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally { $sha256.Dispose() }
+}
+
 function Get-C33NFix1SelectionMode {
   param(
     [Parameter(Mandatory)][object]$Scope,
@@ -80,7 +93,7 @@ $ticketPath = Resolve-C33NFix1File `
   -Path 'config/uaw-c33n-fix1-c33m-fix5-gate-generic-successor-replay-compatibility-ticket.json' `
   -Label 'FIX1 ticket'
 Assert-C33NFix1 -Condition (
-  (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash -ceq
+  (Get-C33NFix1CanonicalTextSha256 -Path $ticketPath) -ceq
     '39F5640A6C4EB8BA3D530DCC796E0A0E9007CB647DED8F62852E51245E69698F'
 ) -Message 'FIX1 ticket bytes changed.'
 $ticket = Get-Content -Raw -LiteralPath $ticketPath | ConvertFrom-Json
@@ -109,9 +122,8 @@ $fix1EvidencePath = Join-Path $root `
   'docs/quality/UAW-C33N-FIX1-C33M-FIX5-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY-QUALIFICATION-20260816.md'
 $selectionMode = Get-C33NFix1SelectionMode `
   -Scope $scope `
-  -SelectedTicketSha256 (
-    Get-FileHash -Algorithm SHA256 -LiteralPath $selectedManifestPath
-  ).Hash `
+  -SelectedTicketSha256 (Get-C33NFix1CanonicalTextSha256 `
+    -Path $selectedManifestPath) `
   -Fix1EvidenceExists (
     Test-Path -LiteralPath $fix1EvidencePath -PathType Leaf
   )
@@ -151,10 +163,24 @@ $functions = @($ast.FindAll(
 Assert-C33NFix1 -Condition ($functions.Count -eq 1) `
   -Message 'FIX5 generic successor function is missing or duplicated.'
 Invoke-Expression $functions[0].Extent.Text
+$boundaryFunctions = @($ast.FindAll(
+  {
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Test-C33MFix5ExecutionBoundary'
+  },
+  $true
+))
+Assert-C33NFix1 -Condition ($boundaryFunctions.Count -eq 1) `
+  -Message 'FIX5 execution-boundary function is missing or duplicated.'
+Invoke-Expression $boundaryFunctions[0].Extent.Text
 
 $fix5Id = 'UAW-C33M-FIX5-PUBLIC-REVIEW-FIREBASE-PASSWORDLESS-EMAIL-GATEWAY'
 $fix5Hash = '05FD94BC8FF515700BBBFF20C2AE8748C20AC1C1AFC6167E8042C0748A7552DD'
 $fix5State = 'source_repair_two_identical_cycles_qualified_registry_2574_flutter_501_3_backend_537_web_8_dual_host_FIX5_FIX6_FIX7_FIX8_passed_source_unchanged_build_Play_OPPO_provider_email_and_external_actions_held'
+$emailLinkId = 'UAW-CODEX-EMAIL-LINK-AUTH-20260823'
+$emailLinkManifestPath = 'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md'
+$emailLinkManifestSha = '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A'
 $fixtureSha = 'FIXTURE-SELECTED-SHA'
 function New-C33NFix1Fixture {
   param(
@@ -162,8 +188,10 @@ function New-C33NFix1Fixture {
     [string]$TopId = $ticketId,
     [string]$SelectedId = $ticketId,
     [string]$SelectedSha = $fixtureSha,
+    [string]$SelectedManifestPath = 'FIXTURE-MANIFEST',
     [string]$Fix5Hash = $fix5Hash,
-    [string]$Fix5State = $fix5State
+    [string]$Fix5State = $fix5State,
+    [bool]$BackendWriteAuthorized = $false
   )
   return [pscustomobject]@{
     ticket = [pscustomobject]@{ id = $TopId }
@@ -172,6 +200,7 @@ function New-C33NFix1Fixture {
       selectedTicketAssessment = [pscustomobject]@{
         ticketId = $SelectedId
         manifestSha256 = $SelectedSha
+        manifestPath = $SelectedManifestPath
       }
       priorC33MFix5SelectedTicketAssessment = [pscustomobject]@{
         ticketId = $fix5Id
@@ -180,6 +209,15 @@ function New-C33NFix1Fixture {
         implementationState = $Fix5State
         evidencePath = 'docs/quality/UAW-C33M-FIX5-PUBLIC-REVIEW-FIREBASE-PASSWORDLESS-EMAIL-GATEWAY-QUALIFICATION-20260816.md'
       }
+    }
+    execution = [pscustomobject]@{
+      testOrGateWriteAuthorized = $true
+      runtimeWriteAuthorized = $true
+      backendWriteAuthorized = $BackendWriteAuthorized
+      externalServiceWriteAuthorized = $false
+      liveEmailSendAuthorized = $false
+      buildAuthorized = $false
+      deviceInstallAuthorized = $false
     }
   }
 }
@@ -202,6 +240,34 @@ $historicalMode = Get-C33MFix5GenericSuccessorMode `
   -Fix5EvidenceExists $true
 Assert-C33NFix1 -Condition ($historicalMode -ceq 'FIX5_active') `
   -Message 'historical FIX5 mode changed.'
+
+$emailLinkScope = New-C33NFix1Fixture `
+  -CurrentId $emailLinkId -TopId $emailLinkId -SelectedId $emailLinkId `
+  -SelectedSha $emailLinkManifestSha `
+  -SelectedManifestPath $emailLinkManifestPath
+Assert-C33NFix1 -Condition (
+  Test-C33MFix5ExecutionBoundary `
+    -Scope $emailLinkScope -SelectionMode 'qualified_generic_successor_replay'
+) -Message 'current email-link FIX5 successor boundary failed.'
+$wrongTicket = New-C33NFix1Fixture `
+  -CurrentId 'WRONG' -TopId 'WRONG' -SelectedId 'WRONG' `
+  -SelectedSha $emailLinkManifestSha -SelectedManifestPath $emailLinkManifestPath
+$wrongHash = New-C33NFix1Fixture `
+  -CurrentId $emailLinkId -TopId $emailLinkId -SelectedId $emailLinkId `
+  -SelectedSha 'WRONG' -SelectedManifestPath $emailLinkManifestPath
+$wrongAuthority = New-C33NFix1Fixture `
+  -CurrentId $emailLinkId -TopId $emailLinkId -SelectedId $emailLinkId `
+  -SelectedSha $emailLinkManifestSha -SelectedManifestPath $emailLinkManifestPath `
+  -BackendWriteAuthorized $true
+$boundaryRejected = 0
+foreach ($case in @($wrongTicket, $wrongHash, $wrongAuthority)) {
+  if (-not (Test-C33MFix5ExecutionBoundary `
+      -Scope $case -SelectionMode 'qualified_generic_successor_replay')) {
+    $boundaryRejected++
+  }
+}
+Assert-C33NFix1 -Condition ($boundaryRejected -eq 3) `
+  -Message 'one or more current email-link FIX5 boundary negatives passed.'
 
 $negativeCases = @(
   [pscustomobject]@{ Scope = (New-C33NFix1Fixture -TopId 'WRONG'); Sha = $fixtureSha; Evidence = $true },
@@ -235,6 +301,7 @@ Assert-C33NFix1 -Condition (
 
 Write-Output (
   'C33N FIX1 FIX5 generic successor replay passed: historical=1/1; ' +
-  "selectionMode=$selectionMode; generic=1/1; negative=6/6; live=1/1; " +
+  "selectionMode=$selectionMode; generic=1/1; negative=6/6; " +
+  "emailLinkBoundary=1/1; boundaryNegative=3/3; live=1/1; " +
   'runtimeBuildPlayDeviceProviderExternal=false; secretValuesObserved=false.'
 )

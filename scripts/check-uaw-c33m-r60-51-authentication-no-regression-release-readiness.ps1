@@ -15,6 +15,12 @@ $ErrorActionPreference = 'Stop'
 if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
 $root = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([char[]]@('\', '/'))
 $prefix = $root + [IO.Path]::DirectorySeparatorChar
+$coordinationPath = Join-Path $root 'config/codex-subagent-coordination-policy.json'
+$coordination = Get-Content -Raw -LiteralPath $coordinationPath | ConvertFrom-Json
+$productionRoot = [IO.Path]::GetFullPath(
+  [string]$coordination.productionGitDiscipline.productionCheckout
+).TrimEnd([char[]]@('\', '/'))
+$productionPrefix = $productionRoot + [IO.Path]::DirectorySeparatorChar
 
 function Assert-C33M {
   param(
@@ -38,11 +44,111 @@ function Resolve-C33MFile {
   } else {
     [IO.Path]::GetFullPath((Join-Path $root $Path))
   }
+  $historicalLauncher = 'tmp/run-c33m-r60-51-single-aab-founder.ps1'
+  $normalizedPath = $Path.Replace('\', '/')
+  $historicalEvidence = $normalizedPath.StartsWith(
+    'artifacts/quality/',
+    [StringComparison]::Ordinal
+  )
+  if (
+    -not (Test-Path -LiteralPath $resolved -PathType Leaf) -and
+    -not [IO.Path]::IsPathRooted($Path) -and
+    ($normalizedPath -ceq $historicalLauncher -or $historicalEvidence)
+  ) {
+    $resolved = [IO.Path]::GetFullPath((Join-Path $productionRoot $Path))
+  }
   Assert-C33M -Condition (
-    $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -and
+    (
+      $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+      (
+        ($normalizedPath -ceq $historicalLauncher -or $historicalEvidence) -and
+        $resolved.StartsWith(
+          $productionPrefix,
+          [StringComparison]::OrdinalIgnoreCase
+        )
+      )
+    ) -and
     (Test-Path -LiteralPath $resolved -PathType Leaf)
   ) -Message "$Label is missing or escaped the repository: $Path"
   return $resolved
+}
+
+function Get-C33MCanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally { $sha256.Dispose() }
+}
+
+function Get-C33MReleaseSelectionMode {
+  param(
+    [Parameter(Mandatory)][object]$Scope,
+    [Parameter(Mandatory)][string]$SelectedTicketSha256,
+    [Parameter(Mandatory)][bool]$PriorEvidenceExists
+  )
+  $releaseId = 'UAW-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE'
+  $releaseHash = 'B24E40B0E8A23EC08584AFF82A5E2DDCD37E6E26D4BFF80053DA0C9015FD53DB'
+  $checkpoint = $Scope.preTicketSelectionCheckpoint
+  $currentId = [string]$checkpoint.currentTicketId
+  if (
+    $currentId -cne [string]$Scope.ticket.id -or
+    $currentId -cne [string]$checkpoint.selectedTicketAssessment.ticketId -or
+    [string]$checkpoint.selectedTicketAssessment.manifestSha256 -cne
+      $SelectedTicketSha256
+  ) { throw 'C33M current, top-level or selected ticket binding changed.' }
+  if ($currentId -ceq $releaseId) {
+    if ($SelectedTicketSha256 -cne $releaseHash) {
+      throw 'C33M direct release selection hash changed.'
+    }
+    return 'C33M_active'
+  }
+  $prior = $checkpoint.priorC33MSelectedTicketAssessment
+  if (
+    [string]$prior.ticketId -cne $releaseId -or
+    [string]$prior.manifestPath -cne
+      'config/uaw-c33m-r60-51-authentication-no-regression-play-oppo-acceptance-ticket.json' -or
+    [string]$prior.manifestSha256 -cne $releaseHash -or
+    [string]$prior.implementationState -cne
+      'reselected_after_C33M_FIX1_FIX2_FIX3_qualification_fresh_registry_source_seal_and_two_complete_cycles_required_build_Play_OPPO_email_and_external_actions_held' -or
+    [string]$prior.evidencePath -cne
+      'docs/quality/UAW-C33M-FIX3-C33L-FIX3-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY-QUALIFICATION-20260816.md' -or
+    -not $PriorEvidenceExists
+  ) { throw 'C33M generic successor qualification binding changed.' }
+  return 'qualified_generic_successor_replay'
+}
+
+function Test-C33MReleaseExecutionBoundary {
+  param(
+    [Parameter(Mandatory)][object]$Scope,
+    [Parameter(Mandatory)][string]$SelectionMode,
+    [Parameter(Mandatory)][string]$CurrentPhase
+  )
+  if ($SelectionMode -ceq 'C33M_active') { return $true }
+  $selected = $Scope.preTicketSelectionCheckpoint.selectedTicketAssessment
+  return (
+    $CurrentPhase -ceq 'source' -and
+    $SelectionMode -ceq 'qualified_generic_successor_replay' -and
+    [string]$Scope.ticket.id -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.ticketId -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.manifestPath -ceq
+      'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md' -and
+    [string]$selected.manifestSha256 -ceq
+      '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A' -and
+    [bool]$Scope.execution.runtimeWriteAuthorized -and
+    [bool]$Scope.execution.testOrGateWriteAuthorized -and
+    -not [bool]$Scope.execution.backendWriteAuthorized -and
+    -not [bool]$Scope.execution.buildAuthorized -and
+    -not [bool]$Scope.execution.deviceInstallAuthorized -and
+    -not [bool]$Scope.execution.playUploadAuthorized -and
+    -not [bool]$Scope.execution.externalServiceWriteAuthorized -and
+    -not [bool]$Scope.execution.secretValueAccessAuthorized
+  )
 }
 
 function Assert-C33MSanitizedText {
@@ -98,7 +204,7 @@ $ticketPath = Resolve-C33MFile `
 $ticketRaw = Get-Content -Raw -LiteralPath $ticketPath
 Assert-C33MSanitizedText -Text $ticketRaw -Label 'C33M ticket'
 Assert-C33M -Condition (
-  (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash -ceq
+  (Get-C33MCanonicalTextSha256 -Path $ticketPath) -ceq
     'B24E40B0E8A23EC08584AFF82A5E2DDCD37E6E26D4BFF80053DA0C9015FD53DB'
 ) -Message 'ticket bytes changed.'
 $ticket = $ticketRaw | ConvertFrom-Json
@@ -130,6 +236,53 @@ Assert-C33M -Condition (
   -not [bool]$ticket.authority.youtubeQuotaOrEmailSubmissionAuthorized -and
   -not [bool]$ticket.authority.fundsAuthorized
 ) -Message 'ticket identity, no-regression rule or authority changed.'
+
+$mvpStatePath = Resolve-C33MFile -Path $ScopePath -Label 'MVP state'
+$mvpState = Get-Content -Raw -LiteralPath $mvpStatePath | ConvertFrom-Json
+$selectedManifestPath = Resolve-C33MFile `
+  -Path ([string]$mvpState.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestPath) `
+  -Label 'selected ticket manifest'
+$priorC33M = $mvpState.preTicketSelectionCheckpoint.priorC33MSelectedTicketAssessment
+$priorC33MEvidencePath = Resolve-C33MFile `
+  -Path ([string]$priorC33M.evidencePath) `
+  -Label 'qualified prior C33M evidence'
+$selectionMode = Get-C33MReleaseSelectionMode `
+  -Scope $mvpState `
+  -SelectedTicketSha256 (Get-C33MCanonicalTextSha256 `
+    -Path $selectedManifestPath) `
+  -PriorEvidenceExists (Test-Path -LiteralPath $priorC33MEvidencePath -PathType Leaf)
+Assert-C33M -Condition (
+  Test-C33MReleaseExecutionBoundary `
+    -Scope $mvpState -SelectionMode $selectionMode -CurrentPhase $Phase
+) -Message 'current email-link source successor or historical execution boundary changed.'
+
+$fixtureJson = $mvpState | ConvertTo-Json -Depth 30
+$wrongTicketFixture = $fixtureJson | ConvertFrom-Json
+$wrongTicketFixture.ticket.id = 'WRONG'
+$wrongHashFixture = $fixtureJson | ConvertFrom-Json
+$wrongHashFixture.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = 'WRONG'
+$wrongAuthorityFixture = $fixtureJson | ConvertFrom-Json
+$wrongAuthorityFixture.execution.buildAuthorized = $true
+$boundaryNegativeRejected = 0
+foreach ($fixture in @(
+  $wrongTicketFixture,
+  $wrongHashFixture,
+  $wrongAuthorityFixture
+)) {
+  if (-not (Test-C33MReleaseExecutionBoundary `
+      -Scope $fixture `
+      -SelectionMode 'qualified_generic_successor_replay' `
+      -CurrentPhase 'source')) {
+    $boundaryNegativeRejected++
+  }
+}
+Assert-C33M -Condition ($boundaryNegativeRejected -eq 3) `
+  -Message 'one or more current email-link combined-gate boundary negatives passed.'
+$scopeCandidateId = if ($selectionMode -ceq 'C33M_active') {
+  $ticketId
+} else {
+  [string]$mvpState.ticket.id
+}
 
 $resolvedStatePath = Resolve-C33MFile -Path $StatePath -Label 'C33M state'
 $stateRaw = Get-Content -Raw -LiteralPath $resolvedStatePath
@@ -418,19 +571,25 @@ Assert-C33M -Condition (
 
 $scopeGate = Resolve-C33MFile -Path 'scripts/check-mvp-scope-gate-state.ps1' -Label 'MVP scope gate'
 if ($Phase -ceq 'source') {
-  & $scopeGate `
-    -StatePath $ScopePath `
-    -CandidateId $ticketId `
-    -RepositoryRoot $root | Out-Null
+  if ($selectionMode -ceq 'qualified_generic_successor_replay') {
+    & $scopeGate `
+      -StatePath $ScopePath `
+      -CandidateId $scopeCandidateId `
+      -RequireExecutionAuthorized `
+      -RepositoryRoot $root | Out-Null
+  } else {
+    & $scopeGate `
+      -StatePath $ScopePath `
+      -CandidateId $scopeCandidateId `
+      -RepositoryRoot $root | Out-Null
+  }
 } else {
   & $scopeGate `
     -StatePath $ScopePath `
-    -CandidateId $ticketId `
+    -CandidateId $scopeCandidateId `
     -RequireExecutionAuthorized `
     -RepositoryRoot $root | Out-Null
 }
-$mvpStatePath = Resolve-C33MFile -Path $ScopePath -Label 'MVP state'
-$mvpState = Get-Content -Raw -LiteralPath $mvpStatePath | ConvertFrom-Json
 $checkpoint = $mvpState.preTicketSelectionCheckpoint
 $qualifiedPreventions = @(
   [pscustomobject]@{
@@ -438,21 +597,21 @@ $qualifiedPreventions = @(
     ticketId = 'UAW-C33L-FIX4-GENERIC-AAB-POSTBUILD-AGGREGATE-MIRROR-ATOMICITY'
     ticketSha = '2EE039F85DE0E313593D7875BF1A1B7694F7359CBC403B301DA22C4D65FF7BA1'
     state = 'source_test_gate_repair_qualified_dual_host_parent_successor_required_build_Play_OPPO_and_external_actions_held'
-    evidenceSha = '1ABA97C1E97A227007F6D248DAB88C3F4DBDE87C7CB38894E678C2E305E1A257'
+    evidenceSha = '3A0622414428BDA88B5C831C4A62F0C07DEC52CDE0C1D36D58A31C50BFF896E2'
   },
   [pscustomobject]@{
     assessment = $checkpoint.priorC33LFix5SelectedTicketAssessment
     ticketId = 'UAW-C33L-FIX5-FOUNDER-AAB-LAUNCHER-POSTCLEANUP-RESULT-RETENTION'
     ticketSha = '2F558255A40D63AA940D9FD14DFD1D3D1AB67B87A095F45AF342046FD8FA957D'
     state = 'source_test_gate_repair_qualified_dual_host_future_launcher_binding_required_build_Play_OPPO_and_external_actions_held'
-    evidenceSha = 'C600BD1F9D148154AB7032A1413C0893F4B8B52D78FC5AF7C5F837ED94FC40E5'
+    evidenceSha = '8AA9C447C9AD7317DF717A30CDA3FF0F4EC8127E965ADBD61D483F3D3435376F'
   },
   [pscustomobject]@{
     assessment = $checkpoint.priorC33LFix6SelectedTicketAssessment
     ticketId = 'UAW-C33L-FIX6-FIX4-GATE-SUCCESSOR-REPLAY-COMPATIBILITY'
     ticketSha = '67F9F63ED3F44DC94A0E6DC5480704183AC52F18CEFE16225DDDCFDA86D98BB1'
     state = 'source_test_gate_repair_qualified_dual_host_parent_successor_replay_ready_build_Play_OPPO_and_external_actions_held'
-    evidenceSha = 'F1BDEE542DF89349C791A27E38E4B8FD7CFA882AA05F6712171234CA20AE90EC'
+    evidenceSha = 'AC341794F06DC5AE6C5C0C48C4BB1320E06EB1D2CF1D179DFA0A6B5B375E4716'
   },
   [pscustomobject]@{
     assessment = $checkpoint.priorC33MFix1SelectedTicketAssessment
@@ -487,10 +646,10 @@ foreach ($prevention in $qualifiedPreventions) {
   Assert-C33M -Condition (
     [string]$assessment.ticketId -ceq [string]$prevention.ticketId -and
     [string]$assessment.manifestSha256 -ceq [string]$prevention.ticketSha -and
-    (Get-FileHash -Algorithm SHA256 -LiteralPath $preventionTicketPath).Hash -ceq
+    (Get-C33MCanonicalTextSha256 -Path $preventionTicketPath) -ceq
       [string]$prevention.ticketSha -and
     [string]$assessment.implementationState -ceq [string]$prevention.state -and
-    (Get-FileHash -Algorithm SHA256 -LiteralPath $preventionEvidencePath).Hash -ceq
+    (Get-C33MCanonicalTextSha256 -Path $preventionEvidencePath) -ceq
       [string]$prevention.evidenceSha
   ) -Message "qualified prevention binding changed: $($prevention.ticketId)"
 }
@@ -506,10 +665,12 @@ $safeBootGate = Resolve-C33MFile `
 $flutterClassificationGate = Resolve-C33MFile `
   -Path 'scripts/check-uaw-c33l-fix3-authoritative-flutter-null-event-classification.ps1' `
   -Label 'authoritative Flutter classification successor replay gate'
-& $fix4Gate -RepositoryRoot $root | Out-Null
-& $fix5Gate -RepositoryRoot $root | Out-Null
-& $safeBootGate -RepositoryRoot $root | Out-Null
-& $flutterClassificationGate -RepositoryRoot $root | Out-Null
+if ($selectionMode -ceq 'C33M_active') {
+  & $fix4Gate -RepositoryRoot $root | Out-Null
+  & $fix5Gate -RepositoryRoot $root | Out-Null
+  & $safeBootGate -RepositoryRoot $root | Out-Null
+  & $flutterClassificationGate -RepositoryRoot $root | Out-Null
+}
 $memoryGate = Resolve-C33MFile `
   -Path 'scripts/check-codex-development-regression-memory.ps1' `
   -Label 'regression-memory gate'
@@ -526,25 +687,27 @@ $memoryBuildMode = if ($memoryPhase -ceq 'build') { 'release' } else { 'none' }
   -BuildMode $memoryBuildMode `
   -RepositoryRoot $root | Out-Null
 
-$phoneGate = Resolve-C33MFile `
-  -Path ([string]$state.sourcePrerequisites.phoneGatePath) `
-  -Label 'Phone source gate'
-& $phoneGate -Phase source -RepositoryRoot $root | Out-Null
-$blockerGate = Resolve-C33MFile `
-  -Path ([string]$state.sourcePrerequisites.blockerGatePath) `
-  -Label 'C33G blocker gate'
-if ($Phase -in @('postinstall', 'journey')) {
-  & $blockerGate `
-    -CandidateId $ticketId `
-    -CandidateVersionCode '2026081351' `
-    -Phase postinstall `
-    -RepositoryRoot $root | Out-Null
-} else {
-  & $blockerGate `
-    -CandidateId $ticketId `
-    -CandidateVersionCode '2026081351' `
-    -Phase prebuild `
-    -RepositoryRoot $root | Out-Null
+if ($selectionMode -ceq 'C33M_active') {
+  $phoneGate = Resolve-C33MFile `
+    -Path ([string]$state.sourcePrerequisites.phoneGatePath) `
+    -Label 'Phone source gate'
+  & $phoneGate -Phase source -RepositoryRoot $root | Out-Null
+  $blockerGate = Resolve-C33MFile `
+    -Path ([string]$state.sourcePrerequisites.blockerGatePath) `
+    -Label 'C33G blocker gate'
+  if ($Phase -in @('postinstall', 'journey')) {
+    & $blockerGate `
+      -CandidateId $ticketId `
+      -CandidateVersionCode '2026081351' `
+      -Phase postinstall `
+      -RepositoryRoot $root | Out-Null
+  } else {
+    & $blockerGate `
+      -CandidateId $ticketId `
+      -CandidateVersionCode '2026081351' `
+      -Phase prebuild `
+      -RepositoryRoot $root | Out-Null
+  }
 }
 $googleStatePath = Resolve-C33MFile `
   -Path ([string]$state.sourcePrerequisites.googleLiveReadinessPath) `
@@ -595,7 +758,7 @@ foreach ($googleFact in $googleFacts) {
 $runtimeGate = Resolve-C33MFile `
   -Path ([string]$state.sourcePrerequisites.releaseRuntimeGatePath) `
   -Label 'C30W release-runtime gate'
-if ($Phase -ceq 'source') {
+if ($Phase -ceq 'source' -and $selectionMode -ceq 'C33M_active') {
   & $runtimeGate -Phase source -StatePath $resolvedStatePath -RepositoryRoot $root | Out-Null
 }
 
@@ -626,7 +789,16 @@ $sourceQualified = (
   @($state.sourceQualification.cycleEvidence).Count -eq 2 -and
   @($aggregate.sourceQualification.cycleEvidence).Count -eq 2
 )
-if ($cycles -eq 0) {
+$historicalSealReused = $selectionMode -ceq 'qualified_generic_successor_replay'
+if ($historicalSealReused) {
+  Assert-C33M -Condition (
+    $Phase -ceq 'source' -and
+    -not [bool]$mvpState.execution.buildAuthorized -and
+    -not [bool]$mvpState.execution.deviceInstallAuthorized -and
+    -not [bool]$mvpState.execution.playUploadAuthorized -and
+    -not [bool]$mvpState.execution.externalServiceWriteAuthorized
+  ) -Message 'generic source closure attempted to claim release authority.'
+} elseif ($cycles -eq 0) {
   Assert-C33M -Condition (
     [string]$state.machineState -ceq
       'prebuild_composition_registered_two_fresh_cycles_required' -and
@@ -764,7 +936,9 @@ if ($Phase -ceq 'journey') {
 
 Write-Output (
   'C33M r60.51 no-regression release gate passed: ' +
-  "phase=$Phase; registryEntries=$registryCount; sourceCycles=$cycles/2; " +
+  "phase=$Phase; selectionMode=$selectionMode; boundaryNegative=3/3; " +
+  "registryEntries=$registryCount; sourceCycles=$cycles/2; " +
+  "historicalSealReused=$($historicalSealReused.ToString().ToLowerInvariant()); " +
   "buildCount=$($state.actionCounts.build); uploadCount=$($state.actionCounts.upload); " +
   "installCount=$($state.actionCounts.install); deviceAcceptanceCount=$($state.actionCounts.deviceAcceptance); " +
   'historicalRepeatAllowed=false; newDefectAllowed=false; waivers=false; secretValuesObserved=false.'

@@ -1301,57 +1301,48 @@ class FirebaseEmailLinkGateway implements EmailLinkGateway {
 }
 
 JourneyServiceException sanitizedEmailLinkFailure(String code) {
-  return switch (code.trim().toLowerCase()) {
-    'expired-action-code' => const JourneyServiceException(
+  final normalizedCode = code.trim().toLowerCase();
+  final safeCode =
+      normalizedCode.length <= 64 &&
+          RegExp(r'^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$').hasMatch(normalizedCode)
+      ? normalizedCode
+      : null;
+  if (safeCode == null) {
+    return const JourneyServiceException(
+      'Email sign-in could not be classified safely. Please try again.',
+      code: 'email-link-firebase-unclassified',
+    );
+  }
+
+  final message = switch (safeCode) {
+    'expired-action-code' =>
       'This sign-in link has expired. Request a new link.',
-      code: 'expired-action-code',
-    ),
-    'invalid-action-code' => const JourneyServiceException(
+    'invalid-action-code' =>
       'This sign-in link is invalid or has already been used. Request a new link.',
-      code: 'invalid-action-code',
-    ),
     'invalid-email' ||
     'invalid-recipient-email' ||
-    'missing-email' => const JourneyServiceException(
-      'Enter the email address that received this link.',
-      code: 'invalid-email',
-    ),
-    'user-disabled' => const JourneyServiceException(
+    'missing-email' => 'Enter the email address that received this link.',
+    'user-disabled' =>
       'This account cannot sign in right now. Choose another method.',
-      code: 'user-disabled',
-    ),
-    'operation-not-allowed' => const JourneyServiceException(
+    'operation-not-allowed' =>
       'Email link sign-in is not available right now. Choose another method.',
-      code: 'operation-not-allowed',
-    ),
-    'too-many-requests' => const JourneyServiceException(
+    'too-many-requests' =>
       'Too many attempts. Wait a moment before trying again.',
-      code: 'too-many-requests',
-    ),
-    'network-request-failed' ||
-    'web-network-request-failed' => const JourneyServiceException(
+    'network-request-failed' || 'web-network-request-failed' =>
       'Email sign-in could not connect. Check your connection and retry.',
-      code: 'email-link-network-failure',
-    ),
     'invalid-continue-uri' ||
     'missing-continue-uri' ||
     'unauthorized-continue-uri' ||
     'unauthorized-domain' ||
     'missing-android-pkg-name' ||
     'dynamic-link-not-activated' ||
-    'invalid-dynamic-link-domain' => const JourneyServiceException(
+    'invalid-dynamic-link-domain' =>
       'Email link sign-in is not available right now. Choose another method.',
-      code: 'email-link-configuration',
-    ),
-    'internal-error' || 'web-internal-error' => const JourneyServiceException(
+    'internal-error' || 'web-internal-error' =>
       'Email sign-in is temporarily unavailable. Please try again.',
-      code: 'email-link-provider-internal',
-    ),
-    _ => const JourneyServiceException(
-      'Email sign-in could not be classified safely. Please try again.',
-      code: 'email-link-firebase-unclassified',
-    ),
+    _ => 'Email sign-in could not be completed. Please try again.',
   };
+  return JourneyServiceException(message, code: safeCode);
 }
 
 class SharedPreferencesReviewEmailOtpGateway implements EmailOtpGateway {

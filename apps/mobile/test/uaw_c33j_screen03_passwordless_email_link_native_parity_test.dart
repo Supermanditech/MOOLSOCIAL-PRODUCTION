@@ -211,6 +211,30 @@ void main() {
     expect(session.errorMessage, isNot(contains('person@example.com')));
   });
 
+  test(
+    'exact safe Firebase email code drives matching-address recovery',
+    () async {
+      final gateway = ReviewEmailLinkGateway(
+        completionFailure: const JourneyServiceException(
+          'Enter the email address that received this link.',
+          code: 'invalid-recipient-email',
+        ),
+      );
+      final session = await sessionFor(emailLinkGateway: gateway);
+      addTearDown(session.dispose);
+
+      expect(await session.requestEmailLink('person@example.com'), isTrue);
+      expect(
+        await session.prepareEmailLinkReturn(gateway.acceptedLink),
+        isTrue,
+      );
+      expect(session.emailLinkState, EmailLinkState.awaitingEmail);
+      expect(session.emailLinkReceiptCode, 'invalid-recipient-email');
+      expect(session.isAuthenticated, isFalse);
+      expect(session.errorMessage, isNot(contains('person@example.com')));
+    },
+  );
+
   test('process return asks for matching email before completion', () async {
     final store = _completedStore(
       pendingRoute: '/app/chat/inbox?return=/app/social',

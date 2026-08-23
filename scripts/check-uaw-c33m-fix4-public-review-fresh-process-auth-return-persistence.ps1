@@ -34,6 +34,21 @@ function Resolve-C33MFix4File {
   return $resolved
 }
 
+function Get-C33MFix4CanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 function Get-C33MFix4GenericSuccessorMode {
   param(
     [Parameter(Mandatory)][object]$Scope,
@@ -75,12 +90,43 @@ function Get-C33MFix4GenericSuccessorMode {
   return 'qualified_generic_successor_replay'
 }
 
+function Test-C33MFix4ExecutionBoundary {
+  param(
+    [Parameter(Mandatory)][object]$Scope,
+    [Parameter(Mandatory)][string]$SelectionMode
+  )
+  $selected = $Scope.preTicketSelectionCheckpoint.selectedTicketAssessment
+  $historical = (
+    $SelectionMode -ceq 'FIX4_active' -and
+    -not [bool]$Scope.execution.backendWriteAuthorized
+  )
+  $emailLink = (
+    $SelectionMode -ceq 'qualified_generic_successor_replay' -and
+    [string]$Scope.ticket.id -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.ticketId -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.manifestPath -ceq
+      'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md' -and
+    [string]$selected.manifestSha256 -ceq
+      '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A' -and
+    [bool]$Scope.execution.runtimeWriteAuthorized -and
+    -not [bool]$Scope.execution.backendWriteAuthorized
+  )
+  return (
+    [bool]$Scope.execution.testOrGateWriteAuthorized -and
+    ($historical -or $emailLink) -and
+    -not [bool]$Scope.execution.externalServiceWriteAuthorized -and
+    -not [bool]$Scope.execution.liveEmailSendAuthorized -and
+    -not [bool]$Scope.execution.buildAuthorized -and
+    -not [bool]$Scope.execution.deviceInstallAuthorized
+  )
+}
+
 $ticketId = 'UAW-C33M-FIX4-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-PERSISTENCE'
 $ticketPath = Resolve-C33MFix4File `
   -Path 'config/uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence-ticket.json' `
   -Label 'FIX4 ticket'
 Assert-C33MFix4 -Condition (
-  (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash -ceq
+  (Get-C33MFix4CanonicalTextSha256 -Path $ticketPath) -ceq
     'FB56B77AEE47D211D5924C568D72668B6BF150FE28AE5C0BEEFF10656F47025C'
 ) -Message 'FIX4 ticket bytes changed.'
 $ticket = Get-Content -Raw -LiteralPath $ticketPath | ConvertFrom-Json
@@ -115,12 +161,14 @@ $fix4EvidencePath = Join-Path $root `
   'docs/quality/UAW-C33M-FIX4-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-PERSISTENCE-QUALIFICATION-20260816.md'
 $selectionMode = Get-C33MFix4GenericSuccessorMode `
   -Scope $scope `
-  -SelectedTicketSha256 (
-    Get-FileHash -Algorithm SHA256 -LiteralPath $selectedManifestPath
-  ).Hash `
+  -SelectedTicketSha256 (Get-C33MFix4CanonicalTextSha256 `
+    -Path $selectedManifestPath) `
   -Fix4EvidenceExists (
     Test-Path -LiteralPath $fix4EvidencePath -PathType Leaf
   )
+Assert-C33MFix4 -Condition (
+  Test-C33MFix4ExecutionBoundary -Scope $scope -SelectionMode $selectionMode
+) -Message 'current email-link successor or historical execution boundary changed.'
 & $scopeGate `
   -CandidateId ([string]$scope.ticket.id) `
   -RequireExecutionAuthorized `

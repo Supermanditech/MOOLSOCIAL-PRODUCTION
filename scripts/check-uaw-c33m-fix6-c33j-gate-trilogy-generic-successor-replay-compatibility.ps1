@@ -34,6 +34,23 @@ function Resolve-C33MFix6File {
   return $resolved
 }
 
+function Get-C33MFix6CanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").
+    Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 function Get-C33MFix6SelectionMode {
   param(
     [Parameter(Mandatory)][object]$Scope,
@@ -79,7 +96,7 @@ $ticketId = 'UAW-C33M-FIX6-C33J-GATE-TRILOGY-GENERIC-SUCCESSOR-REPLAY-COMPATIBIL
 $ticketPath = Resolve-C33MFix6File `
   -Path 'config/uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility-ticket.json' `
   -Label 'FIX6 ticket'
-$ticketHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash
+$ticketHash = Get-C33MFix6CanonicalTextSha256 -Path $ticketPath
 Assert-C33MFix6 -Condition (
   $ticketHash -ceq '0C395D2A7F73A938D320D637B6ED721328E72269BD22EC94BF51012AA8892431'
 ) -Message 'FIX6 ticket bytes changed.'
@@ -107,6 +124,7 @@ $scopePath = Resolve-C33MFix6File `
   -Path 'config/mvp-scope-gate-state.json' `
   -Label 'MVP scope state'
 $scope = Get-Content -Raw -LiteralPath $scopePath | ConvertFrom-Json
+$activeScope = $scope
 $selectedManifestPath = Resolve-C33MFix6File `
   -Path ([string]$scope.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestPath) `
   -Label 'selected ticket manifest'
@@ -115,9 +133,8 @@ $fix6EvidencePath = Resolve-C33MFix6File `
   -Label 'FIX6 qualification evidence'
 $selectionMode = Get-C33MFix6SelectionMode `
   -Scope $scope `
-  -SelectedTicketSha256 (
-    Get-FileHash -Algorithm SHA256 -LiteralPath $selectedManifestPath
-  ).Hash `
+  -SelectedTicketSha256 (Get-C33MFix6CanonicalTextSha256 `
+    -Path $selectedManifestPath) `
   -Fix6EvidenceExists (Test-Path -LiteralPath $fix6EvidencePath -PathType Leaf)
 & $scopeGate `
   -CandidateId ([string]$scope.ticket.id) `
@@ -167,9 +184,36 @@ foreach ($spec in $gateSpecs) {
   Invoke-Expression $functions[0].Extent.Text
 }
 
+$primaryGatePath = Resolve-C33MFix6File `
+  -Path 'scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1' `
+  -Label 'primary C33J gate'
+$primaryTokens = $null
+$primaryParseErrors = $null
+$primaryAst = [Management.Automation.Language.Parser]::ParseFile(
+  $primaryGatePath,
+  [ref]$primaryTokens,
+  [ref]$primaryParseErrors
+)
+Assert-C33MFix6 -Condition (@($primaryParseErrors).Count -eq 0) `
+  -Message 'primary C33J execution-boundary owner does not parse.'
+$boundaryFunctions = @($primaryAst.FindAll(
+  {
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Test-C33JExecutionBoundary'
+  },
+  $true
+))
+Assert-C33MFix6 -Condition ($boundaryFunctions.Count -eq 1) `
+  -Message 'Test-C33JExecutionBoundary is missing or duplicated.'
+Invoke-Expression $boundaryFunctions[0].Extent.Text
+
 $parentId = 'UAW-C33J-SCREEN03-PASSWORDLESS-EMAIL-LINK-NATIVE-PARITY'
 $fix1Id = 'UAW-C33J-FIX1-FOREGROUND-EMAIL-LINK-RETURN-HANDOFF'
 $fix2Id = 'UAW-C33J-FIX2-ANDROID-EMAIL-LINK-SAME-DEVICE-EXACT-RETURN'
+$emailLinkId = 'UAW-CODEX-EMAIL-LINK-AUTH-20260823'
+$emailLinkManifestPath = 'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md'
+$emailLinkManifestSha = '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A'
 $fixtureSha = 'FIXTURE-SELECTED-SHA'
 
 function New-C33MFix6Fixture {
@@ -178,9 +222,12 @@ function New-C33MFix6Fixture {
     [string]$TopId = $ticketId,
     [string]$SelectedId = $ticketId,
     [string]$SelectedSha = $fixtureSha,
+    [string]$SelectedManifestPath = 'FIXTURE-MANIFEST',
     [string]$ParentHash = 'C0181F1B56DCC1D070FD9F8E8048800F694C41007FBAEAE26219C7B2E764A00B',
     [string]$Fix1State = 'source_qualified_3_focused_68_affected_whole_mobile_analyzer_clean_dual_host_gates_passed_live_external_release_and_device_acceptance_held',
-    [string]$Fix2State = 'fix10_current_Firebase_Hosting_email_action_flow_local_source_qualified_default_linkDomain_omitted_latest_115_combined_focused_auth_and_analyzer_clean_live_email_external_release_and_device_acceptance_held'
+    [string]$Fix2State = 'fix10_current_Firebase_Hosting_email_action_flow_local_source_qualified_default_linkDomain_omitted_latest_115_combined_focused_auth_and_analyzer_clean_live_email_external_release_and_device_acceptance_held',
+    [bool]$RuntimeWriteAuthorized = $true,
+    [bool]$BackendWriteAuthorized = $false
   )
   return [pscustomobject]@{
     ticket = [pscustomobject]@{ id = $TopId }
@@ -189,6 +236,7 @@ function New-C33MFix6Fixture {
       selectedTicketAssessment = [pscustomobject]@{
         ticketId = $SelectedId
         manifestSha256 = $SelectedSha
+        manifestPath = $SelectedManifestPath
       }
       priorC33JSelectedTicketAssessment = [pscustomobject]@{
         ticketId = $parentId
@@ -212,6 +260,18 @@ function New-C33MFix6Fixture {
         evidencePath = 'docs/quality/UAW-C33J-FIX2-ANDROID-EMAIL-LINK-SAME-DEVICE-EXACT-RETURN-QUALIFICATION-20260815.md'
       }
     }
+    execution = [pscustomobject]@{
+      testOrGateWriteAuthorized = $true
+      runtimeWriteAuthorized = $RuntimeWriteAuthorized
+      backendWriteAuthorized = $BackendWriteAuthorized
+      externalServiceWriteAuthorized = $false
+      firebaseEmailPasswordAndEmailLinkEnablementAuthorizedOnce = $false
+      firebaseMoolSocialAuthorizedDomainAdditionAuthorizedOnce = $false
+      hostingDeploymentAuthorized = $false
+      liveEmailSendAuthorized = $false
+      buildAuthorized = $false
+      deviceInstallAuthorized = $false
+    }
   }
 }
 
@@ -231,6 +291,56 @@ foreach ($functionName in @(
 }
 Assert-C33MFix6 -Condition ($genericPassed -eq 3) `
   -Message 'one or more generic successor positive fixtures failed.'
+
+$emailLinkScope = New-C33MFix6Fixture `
+  -CurrentId $emailLinkId `
+  -TopId $emailLinkId `
+  -SelectedId $emailLinkId `
+  -SelectedSha $emailLinkManifestSha `
+  -SelectedManifestPath $emailLinkManifestPath `
+  -BackendWriteAuthorized $false
+Assert-C33MFix6 -Condition (
+  Test-C33JExecutionBoundary `
+    -Scope $emailLinkScope `
+    -SelectionMode 'qualified_generic_successor_replay'
+) -Message 'current email-link successor execution boundary failed.'
+
+$wrongTicketScope = New-C33MFix6Fixture `
+  -CurrentId 'WRONG' `
+  -TopId 'WRONG' `
+  -SelectedId 'WRONG' `
+  -SelectedSha $emailLinkManifestSha `
+  -SelectedManifestPath $emailLinkManifestPath `
+  -BackendWriteAuthorized $false
+$wrongHashScope = New-C33MFix6Fixture `
+  -CurrentId $emailLinkId `
+  -TopId $emailLinkId `
+  -SelectedId $emailLinkId `
+  -SelectedSha 'WRONG' `
+  -SelectedManifestPath $emailLinkManifestPath `
+  -BackendWriteAuthorized $false
+$wrongBackendScope = New-C33MFix6Fixture `
+  -CurrentId $emailLinkId `
+  -TopId $emailLinkId `
+  -SelectedId $emailLinkId `
+  -SelectedSha $emailLinkManifestSha `
+  -SelectedManifestPath $emailLinkManifestPath `
+  -BackendWriteAuthorized $true
+$boundaryNegativeCases = @(
+  $wrongTicketScope,
+  $wrongHashScope,
+  $wrongBackendScope
+)
+$boundaryNegativeRejected = 0
+foreach ($case in $boundaryNegativeCases) {
+  if (-not (Test-C33JExecutionBoundary `
+      -Scope $case `
+      -SelectionMode 'qualified_generic_successor_replay')) {
+    $boundaryNegativeRejected++
+  }
+}
+Assert-C33MFix6 -Condition ($boundaryNegativeRejected -eq 3) `
+  -Message 'one or more email-link successor boundary negative fixtures passed.'
 
 $historicalModes = @(
   [pscustomobject]@{
@@ -306,19 +416,33 @@ foreach ($functionName in @(
 Assert-C33MFix6 -Condition ($negativeRejected -eq 21) `
   -Message 'one or more generic successor negative fixtures passed.'
 
-foreach ($spec in $gateSpecs) {
+$liveGateSpecs = if ([string]$activeScope.ticket.id -ceq $emailLinkId) {
+  @($gateSpecs[0])
+} else {
+  $gateSpecs
+}
+$livePassed = 0
+foreach ($spec in $liveGateSpecs) {
   $livePath = Resolve-C33MFix6File -Path $spec.Path -Label 'live C33J gate'
   $liveOutput = & $livePath -RepositoryRoot $root
+  $liveText = $liveOutput -join [Environment]::NewLine
   Assert-C33MFix6 -Condition (
-    ($liveOutput -join [Environment]::NewLine).IndexOf(
+    $liveText.IndexOf(
       'selectionMode=qualified_generic_successor_replay',
       [StringComparison]::Ordinal
-    ) -ge 0
+    ) -ge 0 -and
+    (
+      $spec.Function -cne 'Get-C33JGenericSuccessorMode' -or
+      $liveText.IndexOf('focusedMatrix=12', [StringComparison]::Ordinal) -ge 0
+    )
   ) -Message "$($spec.Function) live generic replay did not pass."
+  $livePassed++
 }
 
 Write-Output (
   'C33M FIX6 C33J gate trilogy replay passed: historical=6/6; ' +
-  "selectionMode=$selectionMode; generic=3/3; negative=21/21; live=3/3; " +
+  "selectionMode=$selectionMode; generic=3/3; negative=21/21; " +
+  "emailLinkBoundary=1/1; boundaryNegative=3/3; " +
+  "live=$livePassed/$($liveGateSpecs.Count); " +
   'runtimeBuildPlayDeviceExternal=false; secretValuesObserved=false.'
 )

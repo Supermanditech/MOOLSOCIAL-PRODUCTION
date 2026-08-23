@@ -32,6 +32,23 @@ function Read-C33JFile {
   return Get-Content -Raw -LiteralPath $resolved
 }
 
+function Get-C33JCanonicalTextSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").
+    Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 function Get-C33JGenericSuccessorMode {
   param(
     [Parameter(Mandatory)][object]$Scope,
@@ -112,6 +129,48 @@ function Get-C33JGenericSuccessorMode {
   return 'qualified_generic_successor_replay'
 }
 
+function Test-C33JExecutionBoundary {
+  param(
+    [Parameter(Mandatory)][object]$Scope,
+    [Parameter(Mandatory)][string]$SelectionMode
+  )
+
+  $selected = $Scope.preTicketSelectionCheckpoint.selectedTicketAssessment
+  $historicalSelection = (
+    $SelectionMode -cin @('parent_active', 'FIX1_active', 'FIX2_active') -and
+    -not [bool]$Scope.execution.backendWriteAuthorized
+  )
+  $fix8Successor = (
+    $SelectionMode -ceq 'qualified_generic_successor_replay' -and
+    [string]$Scope.ticket.id -ceq
+      'UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR' -and
+    [bool]$Scope.execution.runtimeWriteAuthorized -and
+    [bool]$Scope.execution.backendWriteAuthorized
+  )
+  $emailLinkSuccessor = (
+    $SelectionMode -ceq 'qualified_generic_successor_replay' -and
+    [string]$Scope.ticket.id -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.ticketId -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+    [string]$selected.manifestPath -ceq
+      'docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md' -and
+    [string]$selected.manifestSha256 -ceq
+      '9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A' -and
+    [bool]$Scope.execution.runtimeWriteAuthorized -and
+    -not [bool]$Scope.execution.backendWriteAuthorized
+  )
+  return (
+    [bool]$Scope.execution.testOrGateWriteAuthorized -and
+    ($historicalSelection -or $fix8Successor -or $emailLinkSuccessor) -and
+    -not [bool]$Scope.execution.externalServiceWriteAuthorized -and
+    -not [bool]$Scope.execution.firebaseEmailPasswordAndEmailLinkEnablementAuthorizedOnce -and
+    -not [bool]$Scope.execution.firebaseMoolSocialAuthorizedDomainAdditionAuthorizedOnce -and
+    -not [bool]$Scope.execution.hostingDeploymentAuthorized -and
+    -not [bool]$Scope.execution.liveEmailSendAuthorized -and
+    -not [bool]$Scope.execution.buildAuthorized -and
+    -not [bool]$Scope.execution.deviceInstallAuthorized
+  )
+}
+
 $ticket = (Read-C33JFile `
   -Path 'config/uaw-c33j-screen03-passwordless-email-link-native-parity-ticket.json' `
   -Label 'ticket') | ConvertFrom-Json
@@ -168,30 +227,13 @@ foreach ($assessment in @(
 }
 $selectionMode = Get-C33JGenericSuccessorMode `
   -Scope $scope `
-  -SelectedTicketSha256 (
-    Get-FileHash -Algorithm SHA256 -LiteralPath $selectedManifestFullPath
-  ).Hash `
+  -SelectedTicketSha256 (Get-C33JCanonicalTextSha256 `
+    -Path $selectedManifestFullPath) `
   -ParentEvidenceExists $true `
   -Fix1EvidenceExists $true `
   -Fix2EvidenceExists $true
 Assert-C33J -Condition (
-  [bool]$scope.execution.testOrGateWriteAuthorized -and
-  (
-    ($selectionMode -cin @('parent_active', 'FIX1_active', 'FIX2_active') -and
-      -not [bool]$scope.execution.backendWriteAuthorized) -or
-    ($selectionMode -ceq 'qualified_generic_successor_replay' -and
-      [string]$scope.ticket.id -ceq
-        'UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR' -and
-      [bool]$scope.execution.runtimeWriteAuthorized -and
-      [bool]$scope.execution.backendWriteAuthorized)
-  ) -and
-  -not [bool]$scope.execution.externalServiceWriteAuthorized -and
-  -not [bool]$scope.execution.firebaseEmailPasswordAndEmailLinkEnablementAuthorizedOnce -and
-  -not [bool]$scope.execution.firebaseMoolSocialAuthorizedDomainAdditionAuthorizedOnce -and
-  -not [bool]$scope.execution.hostingDeploymentAuthorized -and
-  -not [bool]$scope.execution.liveEmailSendAuthorized -and
-  -not [bool]$scope.execution.buildAuthorized -and
-  -not [bool]$scope.execution.deviceInstallAuthorized
+  Test-C33JExecutionBoundary -Scope $scope -SelectionMode $selectionMode
 ) -Message 'active MVP selection, qualified FIX1/FIX2 succession or execution boundary changed.'
 Assert-C33J -Condition (
   [string]$acceptance.status -ceq 'Accepted' -and
@@ -320,12 +362,12 @@ foreach ($required in @(
   ) -Message "focused C33J matrix is missing: $required"
 }
 Assert-C33J -Condition (
-  ([regex]::Matches($test, '\btest(?:Widgets)?\(')).Count -eq 11
-) -Message 'focused C33J matrix count changed from eleven.'
+  ([regex]::Matches($test, '\btest(?:Widgets)?\(')).Count -eq 12
+) -Message 'focused C33J matrix count changed from twelve.'
 
 Write-Output (
   'C33J Screen03 email-link native parity gate passed: reference=FINAL-v5; ' +
   "selectionMode=$selectionMode; " +
-  'focusedMatrix=11; providerGrid=6; MobileOTP=preserved; opaqueLinkPersisted=false; ' +
+  'focusedMatrix=12; providerGrid=6; MobileOTP=preserved; opaqueLinkPersisted=false; ' +
   'externalWrites=false; liveEmail=false; buildPlayDevice=false.'
 )
