@@ -40312,6 +40312,29 @@
         "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
         "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3643-REG3638-CHECKER-LIVE-SCOPE-OVERWRITTEN-BY-HISTORICAL-FIXTURE",
+      "status": "registered_root_cause_proven_and_active_scope_snapshot_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "The REG3642 checker replay passed its current-successor and negative fixtures but entered live replay with the last historical fixture scope, invoking the unrelated FIX1 gate, which rejected before any later action.",
+      "rootCause": "The checker reused the variable name scope inside the historical-mode loop and later selected live gates from that overwritten variable instead of the original repository MVP scope.",
+      "prevention": "Bind this registry generation, snapshot the original active scope before fixture loops, use that immutable snapshot for current selection and live-gate choice, retain historical fixtures in separate variables, and replay the checker once with only the current primary C33J live gate.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
