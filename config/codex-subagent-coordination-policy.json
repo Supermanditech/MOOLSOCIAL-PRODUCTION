@@ -172,7 +172,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v34",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v35",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },
