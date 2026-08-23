@@ -50,6 +50,26 @@ function Assert-DeliveryLock {
   }
 }
 
+function Get-CanonicalTextSha256 {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
+
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  $text = [IO.File]::ReadAllText($Path, $utf8).
+    Replace("`r`n", "`n").
+    Replace("`r", "`n")
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString(
+      $sha256.ComputeHash($utf8.GetBytes($text))
+    ).Replace('-', '')
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 function Resolve-RepositoryFile {
   param(
     [Parameter(Mandatory)]
@@ -178,9 +198,7 @@ Assert-DeliveryLock -Condition (
 $nativeDirectivePath = Resolve-RepositoryFile `
   -Path ([string]$lock.nativeFlutterNavigationAuthority.path) `
   -Label 'native Flutter navigation directive'
-$nativeDirectiveHash = (
-  Get-FileHash -Algorithm SHA256 -LiteralPath $nativeDirectivePath
-).Hash
+$nativeDirectiveHash = Get-CanonicalTextSha256 -Path $nativeDirectivePath
 Assert-DeliveryLock -Condition (
   $nativeDirectiveHash -ceq
     ([string]$lock.nativeFlutterNavigationAuthority.sha256).ToUpperInvariant()
@@ -214,7 +232,7 @@ foreach ($manifest in $protectedManifests) {
   $manifestPath = Resolve-RepositoryFile `
     -Path ([string]$manifest.path) `
     -Label "protected manifest '$($manifest.id)'"
-  $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $manifestPath).Hash
+  $actualHash = Get-CanonicalTextSha256 -Path $manifestPath
   Assert-DeliveryLock -Condition (
     $actualHash -ceq ([string]$manifest.sha256).ToUpperInvariant()
   ) -Message "protected manifest '$($manifest.id)' hash changed."
@@ -248,10 +266,8 @@ Assert-TrueRules `
   -Label 'selection-checkpoint human authority')
 
 $state = Get-Content -Raw -LiteralPath $resolvedStatePath | ConvertFrom-Json
-$lockHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedLockPath).Hash
-$checkpointHash = (
-  Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedCheckpointPath
-).Hash
+$lockHash = Get-CanonicalTextSha256 -Path $resolvedLockPath
+$checkpointHash = Get-CanonicalTextSha256 -Path $resolvedCheckpointPath
 Assert-DeliveryLock -Condition (
   [string]$state.deliveryDisciplineLock.lockId -ceq [string]$lock.lockId -and
   [string]$state.deliveryDisciplineLock.path -ceq
@@ -328,9 +344,7 @@ if ($RequireTicketSelectionAssessment) {
     $manifestPath = Resolve-RepositoryFile `
       -Path ([string]$assessment.manifestPath) `
       -Label 'selected-ticket manifest'
-    $manifestHash = (
-      Get-FileHash -Algorithm SHA256 -LiteralPath $manifestPath
-    ).Hash
+    $manifestHash = Get-CanonicalTextSha256 -Path $manifestPath
     Assert-DeliveryLock -Condition (
       $manifestHash -ceq
         ([string]$assessment.manifestSha256).ToUpperInvariant()

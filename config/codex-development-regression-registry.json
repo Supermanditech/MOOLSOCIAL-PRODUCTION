@@ -39994,6 +39994,56 @@
         "config/mvp-scope-gate-state.json",
         "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
       ]
+    },
+    {
+      "id": "REG-20260823-3629-EMAIL-LINK-CLEAN-WORKTREE-MVP-NATIVE-FLUTTER-DIRECTIVE-HASH-MATERIALIZATION",
+      "status": "registered_root_cause_proven_and_canonical_text_hashing_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "worktree"
+      ],
+      "mistake": "After v10 passed the canonical production MVP gate, the same candidate gate in the clean Codex worktree rejected because the native Flutter navigation directive hash changed.",
+      "rootCause": "The protected config/mvp-native-flutter-whirlpool-navigation-motion-directive.json is pinned to the production LF SHA-256 but materializes as CRLF in the clean Codex worktree; the selected email-link Markdown manifest has the same byte-only difference.",
+      "prevention": "Bind this registry generation, make the delivery discipline gate hash its referenced JSON/Markdown text as canonical UTF-8 with LF line endings, keep pinned production hashes and content unchanged, then seal immutable v11 and replay both production and clean-worktree MVP gates.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-mvp-scope-gate-state.ps1"
+      ],
+      "evidence": [
+        ".gitattributes",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "scripts/check-mvp-delivery-discipline-lock.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3630-MVP-NATIVE-DIRECTIVE-STATE-PATH-GUESSED-NULL-HASH-PROBE",
+      "status": "registered_read_only_probe_invalid_and_exact_lock_schema_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first scalar native-directive probe guessed nativeFlutterNavigationAuthority directly under deliveryDisciplineLock, returned null path/hash values and then produced two missing-root hash errors.",
+      "rootCause": "The probe did not first resolve the exact delivery-discipline lock schema and therefore dereferenced a nonexistent property.",
+      "prevention": "Treat the probe as no evidence, bind this registry generation, read only the exact deliveryDisciplineLock property names and configured lock owner, then resolve the native directive from the authoritative lock file without another guessed state path.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-mvp-scope-gate-state.ps1"
+      ],
+      "evidence": [
+        ".gitattributes",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "scripts/check-mvp-delivery-discipline-lock.ps1"
+      ]
     }
   ]
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3599,
-    "sha256": "68F7DBFF1908CBDE828C2CE50D82100EF020490AB78A99993C0EFA7DAEC5CBD1"
+    "entryCount": 3601,
+    "sha256": "93CA5897646E70E7C9C33059C52A6CD5BD08201908FEEBD325A09D79EC658F88"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -43,6 +43,7 @@
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-mvp-delivery-discipline-lock.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     },
@@ -162,7 +163,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260823-v10",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260823-v11",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },
