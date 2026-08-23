@@ -40648,6 +40648,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3658-C33M-GENERIC-EMAIL-SOURCE-REEXECUTED-HISTORICAL-C33L-FIX4-GATE",
+      "status": "registered_no_later_action_and_generic_successor_must_reuse_pinned_preventions_without_reexecution",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "After all six prevention bindings passed, the combined generic email source replay invoked the historical C33L FIX4 gate, which rejected the current selected-manifest hash before later actions.",
+      "rootCause": "The combined gate unconditionally executes historical C33L/C33M prevention gates even for a generic successor whose exact prior assessments, ticket hashes, states and evidence hashes were already verified in the same run.",
+      "prevention": "Bind this registry generation, preserve unconditional exact prevention-binding validation, execute historical prevention gates only for direct C33M lifecycle phases, and for the current generic email-link source phase reuse those pinned qualifications without re-execution; then replay source once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
