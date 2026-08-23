@@ -42,3 +42,25 @@ Founder enters an address on OPPO, receives and opens the real link privately,
 Firebase accepts the credential, a Firebase user/session exists, MoolSocial
 enters and persists authenticated state, sanitized telemetry reports no error,
 and the accepted remote evidence-closure commit leaves the worktree clean.
+
+## Prebuild qualification — runtime acceptance deferred
+
+- Implementation commit: `883f1d06c315438823c801b184b990b672c77f85`
+- Disposition: locally qualified; real email, private login, APK and OPPO
+  acceptance are deferred to the single combined authentication candidate.
+- Focused analyzer: exit `0`; no issues.
+- Focused suites: `5`; authored tests `37`; failed `0`; skipped `0`;
+  terminal success; exit `0`.
+- Safe Firebase codes are retained exactly; unsafe values normalize to
+  `email-link-firebase-unclassified`; matching-address recovery and sanitized
+  stage telemetry are covered.
+- C33J, FIX4, FIX5, C33K, combined source and approved UI-lock gates passed.
+- Approved UI-lock result retains the current splash for later founder/OPPO
+  visual acceptance and reuses the accepted Google r60.87 baseline.
+- Changed-owner secret scan: owners `14`; secret-value pattern classes `0`;
+  secret-path risks `0`.
+- Precommit dirty digest: bytes `1105`; records `14`; SHA-256
+  `FA2B3BBFC11D557A30A71D043491D0303140367C62D528E9B6960681FC25EC80`;
+  stderr bytes `0`; exit `0`.
+- No build, device, provider, private, live-email or external action occurred.
+- This record is not founder/OPPO acceptance and is not final ticket closure.
