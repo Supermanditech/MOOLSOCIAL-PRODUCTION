@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3609,
-    "sha256": "785ECAC0594EBBDCB4939C4F214790A4BBCE68215616A7D99B8A1B2910EE9229"
+    "entryCount": 3610,
+    "sha256": "F186F601DA01499FA72750258044387B26CD401CCEE38819AD1A04F491E6CD0C"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -135,7 +135,7 @@
         "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
         "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
         "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
-        "scripts/check-uaw-codex-email-link-c33j-generic-successor-binding.ps1"
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
       ]
     }
   ],
@@ -165,7 +165,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v14",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v15",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

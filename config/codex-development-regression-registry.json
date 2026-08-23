@@ -40219,6 +40219,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3639-REG3638-GATE-ONLY-CLAIM-NEW-CHECKER-MISSING-AT-WORK-START",
+      "status": "registered_no_feature_mutation_and_existing_checker_owner_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "git_discipline"
+      ],
+      "mistake": "The first REG3638 governance refresh claimed a new focused checker path that did not yet exist, so governance_preflight rejected the recorded owner before any feature mutation or push.",
+      "rootCause": "The coordination contract requires every recorded exact owner to exist at the immutable work-start boundary; a future new-file claim cannot satisfy that rule.",
+      "prevention": "Preserve unpushed v14 as immutable failure evidence, bind this registry generation, replace the missing future path with the existing C33M FIX6 C33J gate compatibility checker, advance to immutable v15, and make only the authorized gate plus existing-checker changes in the feature lane.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
