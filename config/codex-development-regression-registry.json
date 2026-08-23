@@ -40288,6 +40288,30 @@
         "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
         "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3642-REG3638-C33J-FOCUSED-MATRIX-HARDCODED-ELEVEN-REJECTION",
+      "status": "registered_no_later_action_and_exact_authored_matrix_count_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After REG3640 portability was corrected, the one compatibility-checker replay reached the live primary C33J gate and stopped because its focused matrix count was hardcoded to eleven.",
+      "rootCause": "The current exact authored test count and assertion form must be read after registration; no later checker, gate, analyzer, test, build, device, provider, private, email or external action followed.",
+      "prevention": "Bind this registry generation, do not retry before refresh, inspect only the exact count assertion and current claimed C33J matrix, then update the gate and focused checker to the truthful exact authored count without changing feature logic or weakening any behavioral assertion.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
+        "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart"
+      ]
     }
   ]
 }
