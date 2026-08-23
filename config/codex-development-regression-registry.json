@@ -41294,6 +41294,28 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md"
       ]
+    },
+    {
+      "id": "REG-20260824-3688-FACEBOOK-GOVERNANCE-PREFLIGHT-SESSION-HANDLE-NOT-RETAINED",
+      "status": "registered_completed_result_unusable_one_retained_session_replay_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first clean v49 governance_preflight exceeded the initial yield window, but the wrapper emitted only output and omitted the returned session identifier; the process later completed without recoverable gate output or exit code.",
+      "rootCause": "The execution envelope projected selected fields instead of retaining and serializing the full long-running command result.",
+      "prevention": "Bind this registry generation, advance the work-start tag once, commit cleanly, invoke the gate with the full result envelope, retain any session identifier, and poll that exact session to terminal exit before tagging or pushing.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
     }
   ]
 }

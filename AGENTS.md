@@ -38,7 +38,7 @@ The accepted Google-auth runtime baseline remains commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. Parallel work begins only
 from the annotated governance tag
-`moolsocial-parallel-production-discipline-20260824-v49` after the founder
+`moolsocial-parallel-production-discipline-20260824-v50` after the founder
 explicitly authorizes its commit/tag/push.
 
 Before that work-start tag is created, the primary must pass
