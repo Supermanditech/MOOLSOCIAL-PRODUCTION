@@ -39880,6 +39880,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3624-PARALLEL-LANE-V8-COORDINATION-GATE-WORK-START-CONTRACT-REJECTION",
+      "status": "registered_root_cause_proven_and_consistent_immutable_v9_contract_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The clean v8 governance_preflight rejected immediately with production work-start contract changed after the policy workStart tag was advanced to v8.",
+      "rootCause": "The checker and mandatory governance owners hardcode immutable v4 while the JSON workStart contract named v8, so the policy self-check correctly rejected the inconsistent contract; no feature or remote mutation followed the rejection.",
+      "prevention": "Bind this registry generation, update only the claimed checker and mandatory governance owners to the same new immutable v9 work-start tag, seal and push it without moving older tags, fast-forward both clean feature branches, then replay each task_start once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
     }
   ]
 }
