@@ -40044,6 +40044,26 @@
         "config/mvp-scope-gate-state.json",
         "scripts/check-mvp-delivery-discipline-lock.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3634-PRIMARY-REGISTRY-IMPORT-FILTER-MISSING-CURRENT-ITEM",
+      "status": "registered_no_mutation_and_one_corrected_bounded_read_authorized",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first read-only delegated-registry import probe used Where-Object with a bare id expression, emitted repeated safe command-not-found errors and produced no valid entry projection.",
+      "rootCause": "The PowerShell filter omitted the current-item $_ qualifier while a combined result projection allowed the error stream to dominate the bounded output.",
+      "prevention": "Bind this registry generation, keep the delegated worktree untouched, and perform one corrected scalar read using the last three registry entries plus exact ID validation without another broad filter or combined AGENTS output.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
