@@ -40798,6 +40798,29 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3665-C33M-GOOGLE-READINESS-MULTIPLE-PRESERVED-EVIDENCE-GAPS",
+      "status": "registered_second_missing_fact_and_complete_readiness_evidence_reconciliation_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate",
+        "worktree"
+      ],
+      "mistake": "After the first preserved Google provider evidence was restored, the combined source gate stopped on the next Android OAuth/package/Play-signer readiness evidence path.",
+      "rootCause": "Multiple readinessFacts evidence owners were originally production-untracked and are absent from both active worktrees, so single-file restoration would repeat the same class.",
+      "prevention": "Bind this registry generation, inventory the complete readinessFacts evidencePath set once, restore every exact missing preserved artifact to its canonical production path with hash verification and exact local excludes, keep all files untracked, then replay source once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
