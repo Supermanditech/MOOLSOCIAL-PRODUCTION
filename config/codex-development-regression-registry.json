@@ -40692,6 +40692,26 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3660-COMBINED-GATE-BLOCK-LOCATOR-SELECT-STRING-POSITIONAL-INVERSION",
+      "status": "registered_no_file_change_and_direct_rg_context_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "A read-only helper passed the combined gate path and phoneGate pattern positionally to Select-String in the wrong order, producing a missing-path error and unusable line range.",
+      "rootCause": "The command omitted explicit LiteralPath and Pattern parameter names in a compressed locator.",
+      "prevention": "Bind this registry generation, do not retry Select-String, use direct rg context for the exact phoneGate/runtime block, and apply one bounded lifecycle wrapper patch.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
