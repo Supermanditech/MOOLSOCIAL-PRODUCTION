@@ -14,8 +14,20 @@ if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
 $root = [IO.Path]::GetFullPath($RepositoryRoot)
 $registryPath = Join-Path $root 'config\codex-development-regression-registry.json'
 $memoryPath = Join-Path $root 'docs\quality\CODEX-DEVELOPMENT-REGRESSION-MEMORY.md'
+$coordinationPath = Join-Path $root 'config\codex-subagent-coordination-policy.json'
 if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) { throw 'Regression registry is missing.' }
 if (-not (Test-Path -LiteralPath $memoryPath -PathType Leaf)) { throw 'Regression memory is missing.' }
+$dependencyFallbackRoot = $root
+if (Test-Path -LiteralPath $coordinationPath -PathType Leaf) {
+  $coordination = Get-Content -Raw -LiteralPath $coordinationPath | ConvertFrom-Json
+  $configuredProductionRoot = [string]$coordination.productionGitDiscipline.productionCheckout
+  if (-not [string]::IsNullOrWhiteSpace($configuredProductionRoot)) {
+    $candidateFallbackRoot = [IO.Path]::GetFullPath($configuredProductionRoot)
+    if (Test-Path -LiteralPath $candidateFallbackRoot -PathType Container) {
+      $dependencyFallbackRoot = $candidateFallbackRoot
+    }
+  }
+}
 $registry = Get-Content -Raw -LiteralPath $registryPath | ConvertFrom-Json
 if ([int]$registry.schemaVersion -ne 1 -or [string]$registry.registryId -cne 'CODEX-DEVELOPMENT-REGRESSION-MEMORY-001') {
   throw 'Regression registry identity is invalid.'
@@ -37,8 +49,19 @@ foreach ($entry in $entries) {
   }
   foreach ($relative in @($entry.gates) + @($entry.evidence)) {
     $resolved = [IO.Path]::GetFullPath((Join-Path $root ([string]$relative)))
-    if (-not $resolved.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $resolved)) {
+    if (-not $resolved.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
       throw "Regression entry $($entry.id) references missing repository evidence: $relative"
+    }
+    if (-not (Test-Path -LiteralPath $resolved)) {
+      $fallback = [IO.Path]::GetFullPath(
+        (Join-Path $dependencyFallbackRoot ([string]$relative))
+      )
+      if (-not $fallback.StartsWith(
+          $dependencyFallbackRoot,
+          [StringComparison]::OrdinalIgnoreCase
+        ) -or -not (Test-Path -LiteralPath $fallback)) {
+        throw "Regression entry $($entry.id) references missing repository evidence: $relative"
+      }
     }
   }
 }
