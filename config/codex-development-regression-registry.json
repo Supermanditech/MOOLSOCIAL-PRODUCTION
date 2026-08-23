@@ -40582,6 +40582,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3655-C33M-COMBINED-GATE-QUALIFIED-PREVENTION-RAW-TEXT-HASH-REJECTION",
+      "status": "registered_no_later_action_and_existing_canonical_text_hash_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "The corrected combined source gate progressed past selection and historical launcher resolution, then stopped on the first qualified-prevention ticket/evidence raw hash at C33L FIX4.",
+      "rootCause": "The combined gate's qualified-prevention loop still hashes JSON/Markdown text as materialized bytes, so clean Windows worktree CRLF content differs from the production LF pins.",
+      "prevention": "Bind this registry generation, do not rerun provider gates, preserve current changes, and use the combined gate's existing canonical text-hash helper for qualified-prevention ticket and evidence owners only; keep all exact IDs, pins and implementation states unchanged, then replay source phase once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
