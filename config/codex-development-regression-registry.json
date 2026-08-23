@@ -40777,6 +40777,27 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3664-RESTORED-GOOGLE-EVIDENCE-NOT-LOCALLY-EXCLUDED",
+      "status": "registered_exact_local_evidence_exclude_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "worktree"
+      ],
+      "mistake": "The exact hash-matched Google provider evidence restored from preservation appeared as one untracked production file because its local exclude metadata was absent.",
+      "rootCause": "The production-untracked preservation retained the evidence bytes but not the original .git/info/exclude entry.",
+      "prevention": "Bind this registry generation, add only /artifacts/quality/uaw-c33e-firebase-google-provider-enabled-evidence-20260815.json to local production exclude, verify production clean, and never track or copy it into feature source.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
