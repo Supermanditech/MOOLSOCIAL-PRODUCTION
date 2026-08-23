@@ -40607,7 +40607,7 @@
     },
     {
       "id": "REG-20260824-3656-C33M-COMBINED-GATE-C33L-FIX4-PREVENTION-BINDING-STILL-REJECTED",
-      "status": "registered_no_later_action_and_exact_five_field_projection_required",
+      "status": "registered_root_cause_proven_and_exact_current_evidence_sha_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40615,8 +40615,8 @@
         "release_gate"
       ],
       "mistake": "After qualified-prevention ticket/evidence hashing was canonicalized, the combined source gate still rejected the first C33L FIX4 prevention binding before any later action.",
-      "rootCause": "One of the exact ticket ID, assessment hash, canonical ticket hash, implementation state or canonical evidence hash comparisons differs and must be projected after registration.",
-      "prevention": "Bind this registry generation, project only the five exact C33L FIX4 comparison pairs, correct only the proven stale gate-side expectation without weakening the prevention, and replay source phase once.",
+      "rootCause": "The C33L FIX4 ticket ID, assessment hash, canonical ticket hash and implementation state all match. Only the gate's hardcoded evidence SHA is stale at 1ABA97C1E97A227007F6D248DAB88C3F4DBDE87C7CB38894E678C2E305E1A257; the current canonical production evidence SHA is 3A0622414428BDA88B5C831C4A62F0C07DEC52CDE0C1D36D58A31C50BFF896E2.",
+      "prevention": "Bind this registry generation, leave evidence content unchanged, update only the combined gate's C33L FIX4 evidence SHA to the exact current canonical production value, retain every other prevention field, and replay source phase once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
