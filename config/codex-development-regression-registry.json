@@ -41077,6 +41077,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3678-EMAIL-LINK-PRECOMMIT-ADHOC-EMAIL-REGEX-FALSE-POSITIVE",
+      "status": "registered_staged_owners_preserved_and_approved_secret_classes_only_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The 14 exact qualified owners staged cleanly, but an extra ad-hoc precommit scan rejected an email-shaped test fixture even though the approved scan proved secretValuePatternClasses=0 and secretPathRisks=0.",
+      "rootCause": "The ad-hoc regex treated every syntactically valid email address as a secret instead of using credential/token/key classes and the repository's approved secret-risk semantics.",
+      "prevention": "Bind this registry generation, preserve the exact staged patch, use only credential/token/private-key patterns plus the approved secret scanner, never emit fixture values, and rerun precommit once after the mandatory work-start refresh.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
