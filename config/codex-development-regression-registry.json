@@ -40495,6 +40495,29 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33k-firebase-passwordless-email-link-live-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3651-EMAIL-LINK-C33M-R60-51-COMBINED-GATE-TICKET-BYTES-REJECTION",
+      "status": "registered_no_later_action_and_exact_combined_gate_portability_successor_correction_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate",
+        "failure_handling"
+      ],
+      "mistake": "After v25, the combined C33M r60.51 no-regression release-readiness gate was invoked once in source phase and exited one at line 25 because its historical ticket bytes changed.",
+      "rootCause": "The combined gate ticket, selected manifest and source-phase current-successor authority boundary must be classified after registration; the script contains no direct check-uaw invocation and no later action followed.",
+      "prevention": "Bind this registry generation, do not rerun qualified provider gates, claim only the combined r60.51 gate and one existing focused successor checker, canonicalize text-manifest hashes, preserve historical release-state bindings and all build/AAB/Play/install/device/provider/external/secret authorities false, add exact current email-link positive and wrong-ticket/hash/authority negatives, then run source phase once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
