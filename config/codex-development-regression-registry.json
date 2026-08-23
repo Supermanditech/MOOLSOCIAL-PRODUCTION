@@ -39839,6 +39839,26 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3622-PARALLEL-LANE-V6-PUSH-POWERSHELL-VARIABLE-ADJACENT-REFSPEC",
+      "status": "registered_remote_unchanged_and_literal_refspec_retry_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first v5/v6 exact push composed a colon-adjacent branch variable inside a double-quoted refspec, and Git rejected the malformed refspec before contacting the remote.",
+      "rootCause": "PowerShell variable parsing consumed the refspec boundary around the branch name, producing an invalid destination; no remote reference changed.",
+      "prevention": "Bind this registry generation, seal one immutable correction tag, and use only literal full source:destination refspec strings for the remediation branch and each immutable tag before scalar remote readback.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
