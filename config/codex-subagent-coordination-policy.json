@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 3616,
-    "sha256": "5A8B4A691BA8B14DC516066214E29CB300A669A3B9AFCBCD7B9F57CC5F7ECEA9"
+    "sha256": "F80A4D9DBBA80F8DF6510E2D3CF270E4378F9F4F8BEBD46AF1A03744BFE33429"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -135,7 +135,9 @@
         "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
         "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
         "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
-        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1",
+        "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1",
+        "scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1"
       ]
     }
   ],
@@ -165,7 +167,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v19",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v20",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

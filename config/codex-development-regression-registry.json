@@ -40338,7 +40338,7 @@
     },
     {
       "id": "REG-20260824-3644-EMAIL-LINK-C33M-FIX4-TICKET-RAW-BYTE-HASH-REJECTION",
-      "status": "registered_no_later_action_and_exact_FIX4_portability_successor_classification_required",
+      "status": "registered_root_cause_proven_and_FIX4_gate_checker_canonical_hash_successor_boundary_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40347,8 +40347,8 @@
         "failure_handling"
       ],
       "mistake": "After v19, the next distinct no-build FIX4 fresh-process auth-return persistence gate exited one at line 16 because its historical FIX4 ticket bytes changed.",
-      "rootCause": "The exact FIX4 ticket hash materialization and generic-successor execution boundary must be classified after registration; no later gate, analyzer, test, source edit, build, device, private, live-email, provider or external action followed.",
-      "prevention": "Bind this registry generation, do not retry FIX4 or rerun C33J, inspect only the FIX4 ticket hash and successor boundary, then authorize the exact FIX4 gate plus one existing focused compatibility checker for canonical text hashing and evidence-bound current email-link successor fixtures.",
+      "rootCause": "The FIX4 gate, its existing FIX8 compatibility checker and the current selected email-link manifest all use raw byte hashes. Their feature-worktree CRLF hashes differ from the pinned production hashes, while canonical UTF-8/LF hashing matches every pin exactly. The FIX4 generic mode preserves historical evidence but lacks an explicit current email-link execution boundary and authority negatives.",
+      "prevention": "Bind this registry generation, do not rerun C33J, claim only the FIX4 gate and existing FIX8 compatibility checker, canonicalize their ticket and selected-manifest text hashes, add the exact evidence-bound email-link successor with backend/build/device/external/live-email authority false plus wrong-ticket/hash/authority negatives, preserve historical FIX4 bindings, and replay FIX4 once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
