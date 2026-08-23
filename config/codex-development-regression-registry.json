@@ -41035,6 +41035,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3676-APPROVED-UI-CJS-TEXT-OWNER-OMITTED-FROM-ALLOWLIST",
+      "status": "registered_prior_deferred_locks_passed_and_complete_extension_inventory_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "ui_lock",
+        "testing"
+      ],
+      "mistake": "The corrected UI-lock gate passed current splash and accepted Google baseline reuse, then treated screen04-social-final-mission-audit.cjs as binary because .cjs was absent from the text allowlist and rejected its CRLF materialization.",
+      "rootCause": "The initial text-extension allowlist was hand-authored and omitted CommonJS evidence files.",
+      "prevention": "Bind this registry generation, inventory all manifest/checksum/locked-owner extensions once, add every proven UTF-8 text extension including .cjs while keeping image/font/binary extensions raw-only, retain the existing parity/semantic/binary fixtures, then replay the UI lock once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }
