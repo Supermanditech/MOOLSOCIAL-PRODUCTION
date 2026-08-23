@@ -38,7 +38,7 @@ The accepted Google-auth runtime baseline remains commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. Parallel work begins only
 from the annotated governance tag
-`moolsocial-parallel-production-discipline-20260823` after the founder
+`moolsocial-parallel-production-discipline-20260823-v2` after the founder
 explicitly authorizes its commit/tag/push.
 
 Before that work-start tag is created, the primary must pass
@@ -53,11 +53,12 @@ is classified and preserved; it is never deleted to force this gate green.
   coordination-only while feature work is active. Cursor, Codex and later
   integration each use a different Git worktree created directly under
   `C:\GUARANTEED OUTCOME`; a replacement clone or repository is forbidden.
-- The legacy registered worktree
+- The retired legacy worktree path
   `C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREES\codex-cursor-baseline-reconciliation`
-  is preserved evidence and is forbidden as a Cursor, Codex or integration
-  starting point. The primary creates a new authorized worktree from the clean
-  governance tag only after the founder assigns the exact ticket.
+  is preserved outside the active worktree estate and is forbidden as a
+  Cursor, Codex or integration starting point. The primary creates a new
+  authorized worktree from the clean governance tag only after the founder
+  assigns the exact ticket.
 - Every worktree has one founder-authorized ticket, short work ID, exact lane,
   exact branch, exact active owner claim and current regression generation.
   Run `scripts/check-codex-subagent-coordination-policy.ps1` with the matching

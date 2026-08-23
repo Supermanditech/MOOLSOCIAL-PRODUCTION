@@ -1,5 +1,28 @@
 # Active Codex handoff
 
+## 2026-08-23 — parallel Cursor Buy UI and Codex Email Link lanes activated
+
+The founder activated two disjoint production tickets from annotated work-start
+tag `moolsocial-parallel-production-discipline-20260823-v2`:
+
+- Cursor UI: `UAW-CURSOR-BUY-SCREEN-SUBACTIONS-UI-20260823`, work ID
+  `buy-screen-subactions-ui-20260823`, branch
+  `work/cursor-ui/buy-screen-subactions-ui-20260823`.
+- Codex authentication: `UAW-CODEX-EMAIL-LINK-AUTH-20260823`, work ID
+  `email-link-auth-20260823`, branch
+  `work/codex-auth/email-link-auth-20260823`.
+
+Each lane has its own primary-created worktree directly under
+`C:\GUARANTEED OUTCOME`, an exact non-overlapping machine owner claim and one
+open ticket. Cursor is confined to Buy UI/test owners and must wait for the
+founder's exact visual/interaction requirement before changing behavior. Codex
+is confined to the email-link runtime/deep-link/session owners and focused
+tests. Google r60.87 and every unrelated provider remain protected.
+
+No integration or promotion is authorized. Each ticket must independently
+reach focused tests, founder/OPPO acceptance where applicable, evidence-only
+closure, exact remote readback and a clean worktree before integration.
+
 ## 2026-08-23 16:15 IST — r60.87 Google Sign-In accepted; immutable Git baseline authorized
 
 Founder accepted Google Sign-In on the OPPO with release APK `1.0.0-r60.87`

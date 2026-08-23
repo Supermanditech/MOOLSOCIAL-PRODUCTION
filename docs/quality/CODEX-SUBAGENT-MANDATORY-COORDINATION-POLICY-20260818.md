@@ -78,7 +78,7 @@ The immutable runtime starting point is accepted r60.87 commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. The reusable work starting
 point is the later annotated governance tag
-`moolsocial-parallel-production-discipline-20260823`. No feature lane may start
+`moolsocial-parallel-production-discipline-20260823-v2`. No feature lane may start
 until that governance tag exists and descends from the accepted runtime commit.
 Immediately before creating the tag, the primary runs `governance_preflight`.
 That gate requires the production checkout to descend from accepted r60.87,
@@ -91,11 +91,12 @@ classified and preserved; it is not deleted to manufacture a clean baseline.
    `remediation/prototype-conformance-2026-07-20` and is coordination-only while
    feature work is active. It is never switched, cleaned, reset, rebased or used
    as either agent's feature workspace.
-   The legacy registered worktree
+   The retired legacy worktree path
    `C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREES\codex-cursor-baseline-reconciliation`
-   is preserved and cannot be used as an agent or integration starting point.
-   A new authorized worktree is created only from the clean governance tag and
-   only after the exact founder ticket and owner claim exist.
+   is preserved outside the active worktree estate and cannot be used as an
+   agent or integration starting point. A new authorized worktree is created
+   only from the clean governance tag and only after the exact founder ticket
+   and owner claim exist.
 2. True parallel work uses separate primary-created Git worktrees directly
    under `C:\GUARANTEED OUTCOME`. Cursor uses `cursor_ui`; Codex uses
    `codex_auth`. Their exact file claims must be disjoint, and both branches

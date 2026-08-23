@@ -39583,6 +39583,92 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
       ]
+    },
+    {
+      "id": "REG-20260823-3610-PARALLEL-LANE-WORK-START-TAG-LACKS-FEATURE-CLAIMS",
+      "status": "registered_feature_task_start_blocked_and_immutable_v2_activation_tag_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "worktree"
+      ],
+      "mistake": "The first immutable governance tag contains only the coordinator claim, while the feature task_start gate requires each Cursor and Codex task claim to exist at the exact tagged base commit.",
+      "rootCause": "The governance baseline was tagged before the founder activated the first two exact tickets, but the machine contract does not support allocating a new claim after a feature branch leaves that immutable tag.",
+      "prevention": "Never bypass or move a pushed tag. Add the two exact disjoint task claims through one governance activation commit, bind an immutable v2 annotated work-start tag, verify it remotely, and create both feature worktrees only from that v2 tag.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3611-PARALLEL-LANE-V2-TAG-MULTI-OWNER-PATCH-CONTEXT-MISMATCH",
+      "status": "registered_patch_rejected_without_changes_and_owner_local_context_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first combined v2 tag-reference patch was rejected because the external Cursor handoff wraps the expected sentence differently.",
+      "rootCause": "One shared patch assumed identical surrounding prose across repository instructions, policy documentation, checker tokens, machine policy, governance handoff and the external Cursor handoff.",
+      "prevention": "Bind this registry generation, verify each exact owner context, and patch each heterogeneous owner independently with immediate readback instead of retrying a broad multi-owner patch.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3612-PARALLEL-LANE-ACTIVE-CLAIM-GENERATED-PATCH-MISSING-LINE-MARKERS",
+      "status": "registered_claim_patch_rejected_without_changes_and_correct_patch_line_prefixing_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The generated active-claim patch was rejected because only the first line of its multi-line insertion carried an apply_patch addition marker.",
+      "rootCause": "The generator interpolated formatted JSON directly after one plus marker instead of prefixing every inserted line required by unified-diff syntax.",
+      "prevention": "Bind this registry generation, preserve the validated owner inventories, prefix every generated insertion line explicitly, and perform one corrected exact active-claim patch with JSON/gate readback.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3613-PARALLEL-LANE-V2-ACTIVATION-STAGED-WHITESPACE-REJECTION",
+      "status": "registered_precommit_whitespace_gate_blocked_and_exact_reported_lines_require_mechanical_correction",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The exact nine-owner v2 activation stage failed git diff --cached --check before commit.",
+      "rootCause": "One or more new or edited governance/ticket text owners contain a whitespace-check defect that must be classified from Git's safe error headers.",
+      "prevention": "Bind this registry generation, classify only the reported owner/line/error headers, mechanically correct those exact text owners, restage them literally, and require a zero whitespace-check exit before commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
