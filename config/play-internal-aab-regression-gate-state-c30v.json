@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "contractId": "PLAY-INTERNAL-AAB-REGRESSION-GATES-C30V-001",
+  "machineState": "acceptance_failed_r60_47_cold_start_release_config_successor_required",
+  "buildAuthorization": "consumed",
+  "candidate": {
+    "id": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+    "versionName": "1.0.0-r60.47",
+    "versionCode": "2026081347",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "packageName": "com.moolsocial.app"
+  },
+  "aggregateStatePath": "config/play-internal-seal-recovery-acceptance-gate-state-c30v.json",
+  "ticketPath": "config/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-ticket.json",
+  "ticketSha256": "ED997A93C1C62D494704CC3E4A32387118A09D2914C48636A2D6D7ED9D9B4DD5",
+  "toolingQualification": {
+    "requiredPowerShellMajorMinimum": 7,
+    "launcherRejectsWindowsPowerShellBeforePrompt": true,
+    "wrapperRejectsWindowsPowerShellBeforeAuthorityMutation": true,
+    "nativeExitCodeAuthoritative": true,
+    "releaseConfigOnlyCommandQualified": true,
+    "releaseConfigOnlyProducesNoApkOrAab": true,
+    "releaseRegistrantExactPluginSetQualified": true,
+    "googleServicesTaskRegistered": true,
+    "crashlyticsBuildIdTaskRegistered": true,
+    "appBundleInvocationCountRequired": 1,
+    "standaloneBundletoolPath": "tmp/bundletool-all-1.18.3.jar",
+    "standaloneBundletoolSha256": "A099CFA1543F55593BC2ED16A70A7C67FE54B1747BB7301F37FDFD6D91028E29",
+    "standaloneBundletoolVersion": "1.18.3"
+  },
+  "signingQualification": {
+    "releaseUsesDebugSigning": false,
+    "uploadKeyEnvironmentNames": [
+      "MOOLSOCIAL_UPLOAD_STORE_FILE",
+      "MOOLSOCIAL_UPLOAD_STORE_PASSWORD",
+      "MOOLSOCIAL_UPLOAD_KEY_ALIAS",
+      "MOOLSOCIAL_UPLOAD_KEY_PASSWORD"
+    ],
+    "founderControlledUploadKeyPresent": true,
+    "uploadKeyStorePath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRIVATE-SIGNING\\moolsocial-upload-2026.p12",
+    "uploadKeyAlias": "moolsocial-upload-2026",
+    "uploadCertificateSha256": "63:49:1B:E7:8A:01:F4:51:43:19:AE:5D:2A:39:57:61:18:33:F3:2C:A1:CB:FD:57:AB:29:82:B0:1D:39:C0:D6",
+    "playAppSigningCertificateSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "secretValuesRecorded": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "runtimeConfiguration": {
+    "secretDefineFileEnvironmentName": "MOOLSOCIAL_FIREBASE_DART_DEFINE_FILE",
+    "googleServicesFileEnvironmentName": "MOOLSOCIAL_GOOGLE_SERVICES_JSON",
+    "transientGoogleServicesPath": "apps/mobile/android/app/src/release/google-services.json",
+    "googleServicesFileQualifiedByFounder": true,
+    "googleServicesFileReadByAgent": false,
+    "secretDefineFileQualifiedByFounder": true,
+    "secretDefineFileReadByAgent": false,
+    "requiredNonSecretDefines": {
+      "MOOLSOCIAL_DEVICE_REVIEW": "true",
+      "MOOLSOCIAL_USE_EMULATORS": "false",
+      "MOOLSOCIAL_CANDIDATE_ID": "UAW-C30U-POST-R60-45-SOCIAL-REPAIRS-PLAY-INTERNAL-ACCEPTANCE",
+      "MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "true",
+      "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "true",
+      "MOOLSOCIAL_YOUTUBE_PROVIDER_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider",
+      "MOOLSOCIAL_SOCIAL_CONTENT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent",
+      "MOOLSOCIAL_CHAT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat",
+      "MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED": "true",
+      "MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED": "false",
+      "MOOLSOCIAL_FIREBASE_APP_ID": "1:760290687711:android:4202409fd3ab38f6ce076a",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID": "760290687711",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID": "moolsocial-dev-503018"
+    },
+    "requiredSecretDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY"
+    ]
+  },
+  "providerRevisions": {
+    "moolsocialcontent": "moolsocialcontent-00005-lep",
+    "moolsocialchat": "moolsocialchat-00001-yaf",
+    "youtubeprovider": "youtubeprovider-00038-cic",
+    "youtubeoauthcallback": "youtubeoauthcallback-00035-cir",
+    "runtimeServiceAccount": "social-content-runtime@moolsocial-dev-503018.iam.gserviceaccount.com",
+    "backendDeploymentCompleted": false,
+    "additionalBackendDeploymentAuthorized": false
+  },
+  "firebaseAppCheck": {
+    "projectId": "moolsocial-dev-503018",
+    "androidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "packageName": "com.moolsocial.app",
+    "provider": "Play_Integrity",
+    "playProjectLinked": true,
+    "playIntegrityApiEnabled": true,
+    "playIntegrityCloudProjectNumber": "760290687711",
+    "playIntegrityProviderConfigured": true,
+    "playAppSigningCertificateRegistered": true,
+    "playRecognizedRequired": true,
+    "privateVerdictReadAuthorized": false
+  },
+  "sourceQualification": {
+    "state": "passed_two_identical_cycles_with_preserved_Dev_services",
+    "manifestPath": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/07-source-aggregate-manifest-accepted-v7.txt",
+    "manifestSha256": "F63557ADDAFEB5BB17CF1F5E0BF49E8C10B2395A7D36AB6B49DDF97AD5626415",
+    "fileCount": 1088,
+    "identicalQualifyingCycles": 2,
+    "completeRegressionGatePassed": true,
+    "backendVerifyPassed": true,
+    "hostingVerifyPassed": true,
+    "focusedSocialSuitePassed": true,
+    "analyzerPassed": true,
+    "deploymentPassed": true,
+    "releasePreflightPassed": true,
+    "cycleEvidence": [
+      "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/08-qualifying-cycle-1-v6.json",
+      "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/09-qualifying-cycle-2-v6.json"
+    ],
+    "supersededCycleEvidence": [],
+    "authoritativeFlutterExpectedPassed": 405,
+    "authoritativeFlutterExpectedSkipped": 3,
+    "failedAttemptEvidence": [],
+    "protectedSocialSuccessor": {
+      "state": "C30U_RUNTIME_SEAL_PRESERVED_R60_46_UNUPLOADED",
+      "path": "artifacts/quality/social-protected-candidate-c30u-post-r60-45-social-repairs-20260814-01/BASELINE.json",
+      "sha256": "8E6BC23C1FAE8D59DF25E9C37AF0ACD1F74B0CEED5949AEBB8B2846DD2FC73C8",
+      "fileCount": 206,
+      "portableTreeSha256": "f0fa9d67b7fde975d544792d3194dbe457b2028750ee444b02a3c9cd98ef75db",
+      "gate": "scripts/check-c30v-social-protected-successor.ps1",
+      "gatePassed": true,
+      "oppoAcceptance": "pending"
+    }
+  },
+  "buildResult": {
+    "state": "single_release_AAB_succeeded_authority_consumed",
+    "buildCount": 1,
+    "wrapperInvocationCount": 1,
+    "configOnlyCount": 1,
+    "artifactPath": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/MoolSocial-1.0.0-r60.47-2026081347-release.aab",
+    "artifactSha256": "6D231C1DAA923AD44AB67F2A7B1E015899D49CD1E196C8786EA2A29647E61FDE",
+    "artifactBytes": 94451859,
+    "uploadSignerSha256": "63491BE78A01F4514319AE5D2A3957611833F32CA1CBFD57AB2982B01D39C0D6",
+    "crashlyticsBuildIdResourceProved": true,
+    "googleAppIdResourceProved": true,
+    "packageVersionManifestProved": true,
+    "splitAndArm64PayloadProved": true,
+    "mergedReleaseManifestProved": true,
+    "provenance": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/06-release-aab-provenance.json",
+    "secondBuildPerformed": false
+  },
+  "playReleaseResult": {
+    "state": "internal_release_active_upload_consumed",
+    "uploadCount": 1,
+    "track": "internal",
+    "versionCode": "2026081347",
+    "versionName": "1.0.0-r60.47",
+    "releaseId": "4",
+    "availableToInternalTesters": true,
+    "releasedAtPlayDisplay": "14 Aug 04:07",
+    "trackUrl": "https://play.google.com/console/u/0/developers/6388013189654770187/app/4974778280277295872/tracks/4700716609720808604?tab=releases",
+    "productionRolloutPerformed": false,
+    "openTestingRolloutPerformed": false,
+    "closedTestingRolloutPerformed": false,
+    "publicListingMutationPerformed": false
+  },
+  "installResult": {
+    "state": "Play_installed_identity_sealed_journeys_pending",
+    "candidateInstallCount": 1,
+    "deviceSerial": "2b3e0f71",
+    "installerPackageName": "com.android.vending",
+    "installedVersionCode": "2026081347",
+    "installedVersionName": "1.0.0-r60.47",
+    "installedSignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "installedBaseApkSha256": "41007694170BBF8BFE48FC51B3D5236EBC49E9B92BC0FB842EBBD57707F66267",
+    "sealedAabSha256": "6D231C1DAA923AD44AB67F2A7B1E015899D49CD1E196C8786EA2A29647E61FDE",
+    "evidencePath": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/11-oppo-play-in-place-update-identity.json",
+    "inPlacePlayUpdateProved": true,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "downgradePerformed": false,
+    "adbInstallPerformed": false,
+    "secondInstallPerformed": false
+  },
+  "journeyResult": {
+    "state": "failed_cold_start_missing_google_server_client_id",
+    "allMandatoryJourneysPassed": false,
+    "defectsRegistered": [
+      "UAW-C30W-R60-47-PLAY-COLD-START-MISSING-SERVER-CLIENT-ID"
+    ],
+    "reviewerPackageFinalized": false,
+    "emailSent": false,
+    "quotaSubmitted": false
+  }
+}

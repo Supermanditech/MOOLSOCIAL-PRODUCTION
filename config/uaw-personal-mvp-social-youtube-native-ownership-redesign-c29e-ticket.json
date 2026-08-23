@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-GCLOUD-CONTEXT-HOST-REMEDIATION-C29C",
+  "rejectedPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-SUCCESSOR-C29D",
+  "state": "source_qualified_two_fresh_cycles_complete_device_candidate_registration_pending",
+  "classification": "mvp_supporting",
+  "actor": "founder-authorized Personal MoolSocial implementation",
+  "customerOutcome": "Users receive a professional YouTube-attributed Home and edge-to-edge Shorts journey inside MoolSocial while Feed and creation remain truthfully MoolSocial-owned and global Chat and Mool access remain one tap away.",
+  "founderDirection": "remove_the_old_Social_presentation_and_rebuild_directly_in_Flutter_from_the_recent_OPPO_YouTube_journey_references_2026_08_11",
+  "founderFindings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E-FOUNDER-FINDINGS-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_design.dart",
+      "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_controller.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The founder rejected the existing visual shell. The smallest complete successor reuses every runtime, route, provider, player and creation owner, retains the internal videos compatibility route, and changes only the Social-owned presentation, bounded public pagination and focused contracts."
+  },
+  "orderedMicroTickets": [
+    {
+      "id": "C29E-01-YOUTUBE-HOME-AND-DOCK",
+      "state": "complete",
+      "outcome": "Replace the old Social chrome with a dark YouTube-attributed Home and the Home, Shorts, plus, Feed, Chat, Mool dock without adding a route or tap."
+    },
+    {
+      "id": "C29E-02-FULL-BLEED-SHORTS",
+      "state": "complete",
+      "outcome": "Render one policy-compliant official vertical player edge to edge outside all MoolSocial overlays, with swipe continuity and truthful failure recovery."
+    },
+    {
+      "id": "C29E-03-MOOLSOCIAL-CREATION-OWNERSHIP",
+      "state": "complete",
+      "outcome": "Make the center plus open the real MoolSocial creation owner and keep YouTube distribution visibly gated until owner OAuth/upload capabilities are real."
+    },
+    {
+      "id": "C29E-04-REAL-CATALOGUE-20-PLUS-20",
+      "state": "complete",
+      "outcome": "Use bounded page-token pagination to target 20 eligible India videos and 20 eligible creator-declared Shorts with no fabricated fallback."
+    },
+    {
+      "id": "C29E-05-SOURCE-ACCEPTANCE",
+      "state": "complete",
+      "outcome": "Pass focused Flutter and backend-independent public client contracts, navigation/ownership/copy/fitment gates and two fresh host cycles before any device successor is registered."
+    }
+  ],
+  "minimumCompleteScope": [
+    "replace_old_Social_visual_shell_inside_existing_Flutter_owner",
+    "YouTube_Home_and_full_bleed_Shorts_with_official_attribution_and_player",
+    "Home_Shorts_plus_Feed_Chat_Mool_one_tap_dock",
+    "real_MoolSocial_create_and_feed_ownership",
+    "bounded_truthful_20_video_and_20_short_catalogue_target",
+    "focused_tests_complete_gates_and_fresh_host_qualification"
+  ],
+  "explicitExclusions": [
+    "no_HTML_screenbook_write_or_browser_prototype",
+    "no_duplicate_route_screen_player_provider_auth_upload_or_post_backend",
+    "no_player_overlay_obscuring_controls_or_modified_YouTube_branding",
+    "no_fake_upload_success_owner_OAuth_scope_or backend_state",
+    "no_cloud_deploy_secret_value_access_Production_Staging_commit_push_message_call_or_funds",
+    "no_APK_build_install_uninstall_data_clear_downgrade_or_C29D_retry"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_C29D_UI_UX_rejection_and_direct_Flutter_redesign_authority_2026_08_11",
+    "seven_recent_OPPO_YouTube_journey_references_preserved",
+    "C29D_real_App_Check_public_catalogue_and_player_runtime_evidence",
+    "official_YouTube_branding_player_minimum_functionality_and_quota_boundaries",
+    "existing_MoolSocial_feed_create_media_and_Mool_switcher_owners",
+    "founder_confirmed_global_Chat_and_Mool_remain_common_on_Social_2026_08_11",
+    "permanent_regression_memory_and_MVP_delivery_lock"
+  ],
+  "testAndEvidencePlan": [
+    "focused_Home_Shorts_dock_and_ownership_widget_tests",
+    "full_bleed_player_geometry_no_overlay_and_swipe_lifecycle_tests",
+    "plus_to_real_MoolSocial_create_and_truthful_YouTube_upload_gate_tests",
+    "bounded_pagination_deduplication_eligibility_and_shortfall_tests",
+    "navigation_copy_fitment_brand_player_MVP_and_regression_gates",
+    "two_fresh_source_manifest_identical_host_cycles_before_any_device_candidate"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "hostQualification": {
+    "state": "passed_two_fresh_identical_source_cycles",
+    "evidenceRoot": "artifacts/quality/uaw-personal-mvp-social-youtube-native-ownership-redesign-c29e-host-qualification-20260811-01",
+    "sourceManifest": "artifacts/quality/uaw-personal-mvp-social-youtube-native-ownership-redesign-c29e-host-qualification-20260811-01/source-aggregate-manifest.txt",
+    "sourceManifestSha256": "A5F4E76BC0F51614D5BF6F049E50ED91EE0E67F6CBE81DE4FEC555D88B355BB2",
+    "sourceManifestFileCount": 42,
+    "requiredFreshCycles": 2,
+    "completedFreshCycles": 2,
+    "qualifyingCycles": [
+      "artifacts/quality/uaw-personal-mvp-social-youtube-native-ownership-redesign-c29e-host-qualification-20260811-01/qualifying-cycle-1.json",
+      "artifacts/quality/uaw-personal-mvp-social-youtube-native-ownership-redesign-c29e-host-qualification-20260811-01/qualifying-cycle-2.json"
+    ],
+    "cycleAReceiptSha256": "05C0028826865F1E7D009F5A7975A15DC87651EDDE8B0A30CE186AEA9785BB44",
+    "cycleBReceiptSha256": "F5ED3B19FC5C0A2E67C7886FC90E3A608E3E588F2F3FBF880107F51FA0A61757",
+    "completion": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E-COMPLETION-20260811.md",
+    "buildOrDeviceAuthorityTransferred": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.30",
+    "installedVersionCode": "2026081130",
+    "installedApkSha256": "8C4C0BA08B18605C9C5E6AF036B5BB86B93778ED602AA9C4638A384DB7E95BCF",
+    "installedSerial": "2b3e0f71",
+    "c29dBuildAndInstallAuthorityConsumed": true,
+    "c29dEvidenceImmutable": true,
+    "c28dEvidenceImmutable": true,
+    "installedIdentityMustRemainPreserved": true
+  }
+}

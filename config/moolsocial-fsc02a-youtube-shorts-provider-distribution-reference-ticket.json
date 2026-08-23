@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02A-YOUTUBE-SHORTS-PROVIDER-DISTRIBUTION-REFERENCE",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "html_path_stopped_by_founder_native_successor_registered",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user swipes through real, positively admitted YouTube Shorts inside MoolSocial with clear YouTube attribution, one official active player and truthful loading, empty, unavailable and retry behavior.",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-SOCIAL-OWNERSHIP-REDESIGN-MICRO-TICKET-PRESELECTION-20260810.md",
+  "founderReferenceEvidence": "artifacts/quality/founder-oppo-youtube-screenshots-20260810-01/manifest.json",
+  "successorTicketId": "MOOLSOCIAL-FSC02A-NATIVE-YOUTUBE-SHORTS-PROVIDER-DISTRIBUTION",
+  "abandonedCandidateEvidence": "artifacts/quality/moolsocial-fsc02a-youtube-shorts-reference-20260810-01/abandoned-html-candidate/04-universal-focus-shell-abandoned-fsc02a.html",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "C:/GUARANTEED OUTCOME/supermandi-uiux-screenbook/screens/04-universal-focus-shell.html",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The real public-data runtime, typed provider client and official player already exist and have historical private-Dev OPPO proof. The required work is a new versioned Screen 04 reference and later removal of fabricated fallbacks, not another screen, route, player, API client or backend."
+  },
+  "minimumCompleteScope": [
+    "replace_the_editable_current_Shorts_reference_without_overwriting_any_accepted_reference",
+    "make_Shorts_YouTube_owned_and_exclude_MoolSocial_Reels_from_this_destination",
+    "use_one_real_official_provider_player_reference_and_never_screenshot_media_or_fabricated_provider_content",
+    "provide_vertical_next_item_navigation_provider_attribution_and_separate_MoolSocial_Save_Discuss_Share_actions",
+    "provide_available_loading_empty_unavailable_and_retry_reference_states",
+    "keep_the_official_player_unobscured_and_at_least_200_by_200",
+    "preserve_Mool_switcher_accepted_global_navigation_one_tap_reach_and_44_by_44_targets",
+    "stop_for_explicit_founder_FINAL_before_Flutter"
+  ],
+  "explicitExclusions": [
+    "no_pixel_clone_of_YouTube_Home_or_Shorts",
+    "no_personalized_YouTube_recommendation_claim",
+    "no_screenshot_or_founder_photo_asset_reuse",
+    "no_fabricated_video_creator_thumbnail_metrics_or_engagement",
+    "no_upload_plus_like_comment_subscribe_remix_or_fake_provider_action",
+    "no_new_screen_route_backend_service_API_client_or_player_owner",
+    "no_Flutter_build_install_OPPO_mutation_cloud_Firebase_credentials_external_message_commit_push_deploy_promotion_or_Production_write"
+  ],
+  "dependenciesAndApprovals": [
+    "explicit_founder_FINAL_for_exact_HTML_candidate",
+    "authorized_real_public_runtime_and_provider_endpoint_before_customer_data_availability",
+    "positive_Short_admission_public_processed_embeddable_and_India_availability",
+    "fresh_native_ticket_scope_gate_after_reference_freeze",
+    "fresh_APK_host_qualification_before_any_successor_build",
+    "checksum_matched_OPPO_replay_and_founder_acceptance"
+  ],
+  "testAndEvidencePlan": [
+    "HTML_JavaScript_and_customer_copy_checks",
+    "available_loading_empty_unavailable_and_retry_state_checks",
+    "single_active_official_player_and_no_overlay_checks",
+    "vertical_navigation_and_MoolSocial_action_checks",
+    "seven_phone_viewports_at_100_and_140_percent_text",
+    "minimum_44_by_44_taps_and_200_by_200_player",
+    "accepted_navigation_and_Screens_01_03_lock_regressions",
+    "exact_URL_SHA256_and_browser_screenshot_evidence"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

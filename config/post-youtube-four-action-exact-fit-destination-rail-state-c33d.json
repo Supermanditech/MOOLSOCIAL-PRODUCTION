@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33D-PERSONAL-MVP-FOUR-ACTION-EXACT-FIT-DESTINATION-RAIL-RECOVERY",
+  "state": "source_repair_qualified_device_and_release_acceptance_held",
+  "ticketSha256": "651EC79E221CB12025A988F61AB927AAAF85B240F95CEEA05BDFE6FDDD3148B7",
+  "preservedFindings": {
+    "C16FPostC33C": {"passed": 1, "failed": 1},
+    "C16EFirstC33D": {"passed": 2, "failed": 1},
+    "renderedWidthDiagnostic": {"layout": 152, "cluster": 182, "fixedControl": 54}
+  },
+  "changedOwners": {
+    "runtime": {"path": "apps/mobile/lib/core/design/mool_design_system.dart", "sha256": "9E0CEE1AB94C162AC76B35F130D6788EA10C599572AED737825DF4BB995B0758"},
+    "C16E": {"path": "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart", "sha256": "714EA27B2E19D623B8D7EB4A955B893547F9C2109684A457BED9488DCAF9D695"},
+    "C16F": {"path": "apps/mobile/test/uaw_personal_mvp_book_subaction_professional_conformance_c16f_test.dart", "sha256": "72667A6F70006D690458AC8A83C792DF1512B2B52A4B7D899F3301480AC38B0D"}
+  },
+  "validation": {
+    "C16E": {"passed": 3, "failed": 0},
+    "C16F": {"passed": 2, "failed": 0},
+    "C24E": {"passed": 9, "failed": 0, "declaredSkips": 2},
+    "C24F": {"passed": 6, "failed": 0, "declaredSkips": 2},
+    "R08": {"passed": 8, "failed": 0},
+    "bookVerticalSlice": {"passed": 11, "failed": 0},
+    "C20E": {"passed": 6, "failed": 0},
+    "C17D": {"passed": 10, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "combined": {"files": 10, "passed": 61, "failed": 0, "declaredSkips": 4},
+    "wholeMobileAnalyzer": "clean",
+    "dualHostGate": "passed"
+  },
+  "authority": {
+    "runtimeChanged": true,
+    "testChanged": true,
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "backendChanged": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "liveAcceptance": {
+    "PlayInstalledR60_48FailedStatePreserved": true,
+    "successorBuildOrInstallPerformed": false,
+    "deviceAcceptanceRequiredLater": true
+  }
+}

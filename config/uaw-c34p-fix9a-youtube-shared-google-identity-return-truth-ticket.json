@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX9A-YOUTUBE-SHARED-GOOGLE-IDENTITY-RETURN-TRUTH",
+  "parentTicketId": "UAW-C34P-FIX9-CROSS-PROVIDER-RETURN-TRUTH-HARD-GATE",
+  "status": "fix10_youtube_shared_google_identity_return_truth_locally_qualified_device_provider_reproof_pending_no_build",
+  "classification": "mvp_required",
+  "selectedForImplementation": true,
+  "provider": "youtube",
+  "directlySharesGoogleIdentityBoundary": true,
+  "providerSpecificBoundary": "Google identity proof followed by Firebase session verification; YouTube API authorization remains a separate consent and credential lifecycle.",
+  "minimumCompleteScope": [
+    "reuse_the_qualified_android_google_native_identity_bridge",
+    "prove_youtube_login_does_not_start_duplicate_google_identity_or_sql_connect",
+    "distinguish_identity_cancel_from_configuration_network_token_exchange_and_session_bootstrap_failure",
+    "prove_success_cancel_offline_timeout_retry_rollback_relaunch_and_signout",
+    "run_separately_authorized_founder_private_oppo_acceptance_before_api_team_submission"
+  ],
+  "mandatoryEvidence": [
+    "native_identity_return_stage",
+    "firebase_credential_exchange_stage",
+    "verified_session_bootstrap_stage",
+    "youtube_consent_or_connection_stage_if_requested",
+    "sanitized_customer_failure_origin"
+  ],
+  "r60_83DeviceFailure": {
+    "safeCode": "auth-unknown",
+    "provenBoundary": "shared_google_identity_before_distinct_youtube_continuation",
+    "realDeviceCompletionQualified": false,
+    "incidentId": "REG-20260822-3360-R60-83-OPPO-YOUTUBE-SIGN-IN-STILL-NOT-COMPLETED",
+    "privateIdentityTokenEmailOrAccountRecorded": false,
+    "providerRetryRebuildOrReinstallAuthorized": false
+  },
+  "localForensicRepair": {
+    "state": "qualified_locally_not_device_success",
+    "nativeBridgeMissingAndUnexpectedFailuresStageSpecific": true,
+    "unknownFirebaseFailureStageSpecific": true,
+    "googleCredentialCompletionRecordedBeforeBootstrap": true,
+    "youtubeSharedGoogleCompletionRecordedBeforeContinuation": true,
+    "sessionMissingVerificationAndTimeoutCodesDistinct": true,
+    "sharedFocusedSuitePassed": 72,
+    "latestCrossProviderFocusedTerminalSuitePassed": 115,
+    "fullSocialRuntimeCohortQualified": true,
+    "youtubePrivateDevReviewTrueAndPublicReviewFalseQualified": true,
+    "functionalDeviceSuccessClaimed": false,
+    "buildDeployOrDeviceMutationAuthorized": false
+  },
+  "providerReadinessCheckpoint": {
+    "readbackDate": "2026-08-22",
+    "sharedGoogleNativeIdentityBridgeQualified": true,
+    "acceptedMainActivityProjectionQualified": true,
+    "androidReleaseKotlinCompileQualified": true,
+    "sharedIdentityReturnTruthSourceQualified": true,
+    "priorSourceQualificationSupersededByDeviceAuthUnknown": true,
+    "googleAndroidOAuthSignerAndServerClientQualified": true,
+    "duplicateGoogleIdentityFlowAbsentQualified": true,
+    "sqlConnectRequiredForLogin": false,
+    "devPublicAuthFunctionActiveQualified": true,
+    "devAuthBindingSubsetQualified": true,
+    "fix7AccountErasureAdditionalBindingsQualified": false,
+    "firebaseCredentialExchangeDeviceQualified": false,
+    "verifiedSessionBootstrapDeviceQualified": false,
+    "youtubeApiTeamSubmissionQualified": false,
+    "providerIdentifierSecretTokenOrAccountRecorded": false,
+    "agentPrivateLoginCount": 0,
+    "oppoAcceptanceQualified": false,
+    "evidence": "local Google native identity bridge qualification plus bounded Dev function state runtime identity parameter and hashed binding readbacks; values excluded"
+  },
+  "authority": {
+    "ticketRegistrationAuthorized": true,
+    "implementationAuthorized": true,
+    "localReadOnlyForensicsAndTestsAuthorized": true,
+    "buildOrInstallAuthorized": false,
+    "privateProviderLoginAuthorized": false,
+    "youtubeApiSubmissionAuthorized": false,
+    "providerConsoleWriteOrDeploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

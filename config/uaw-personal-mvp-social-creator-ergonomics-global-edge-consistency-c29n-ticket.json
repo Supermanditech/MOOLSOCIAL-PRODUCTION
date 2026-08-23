@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-CREATOR-ERGONOMICS-AND-GLOBAL-EDGE-CONSISTENCY-C29N",
+  "parentTicket": "MOOLSOCIAL-FSC05-YOUTUBE-SHORTS-UPLOAD-AFFORDANCE",
+  "state": "source_qualified_provider_gate_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "A Personal user always finds white-backed Mool at the left edge and Chat at the right edge, chooses YouTube Short or any MoolSocial format directly from Social plus, and writes in a full-height keyboard-safe composer.",
+  "founderDirection": "implement_global_white_mool_left_chat_right_and_one_tap_keyboard_safe_social_creation_atomically_before_deployment",
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-CREATOR-ERGONOMICS-AND-GLOBAL-EDGE-CONSISTENCY-C29N-FINDINGS-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_creator_upload.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/features/shared/social_media_picker.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The existing Social dock duplicates edge controls in reverse order, the creator gateway adds a MoolSocial host intermediary before format choice, and the embedded workbench retains the universal utility header/content library/dock while the keyboard is open. All corrections fit existing shared owners without another route, screen or state service."
+  },
+  "minimumCompleteScope": [
+    "render_one_shared_white_Mool_edge_control_on_the_left_and_one_shared_white_Chat_edge_control_on_the_right_globally",
+    "keep_Social_Home_Shorts_Create_and_Feed_in_the_middle_without_extra_taps",
+    "remove_location_scanner_and_voice_utility_header_from_Social_and_keep_only_provider_useful_YouTube_discovery_controls",
+    "replace_the_two_step_MoolSocial_host_choice_with_direct_Text_Image_Carousel_Image_Poll_Quick_Poll_and_Quiz_actions",
+    "keep_YouTube_Short_as_a_separate_direct_action_that_uses_real_channel_connection_and_never_MoolSocial_hosting",
+    "open_Feed_Write_a_post_directly_in_Text",
+    "make_the_composer_full_height_keyboard_aware_scrollable_and_keep_format_publish_recovery_actions_reachable",
+    "preserve_drafts_and_real_existing_session_media_picker_and_publish_state",
+    "run_connected_navigation_copy_fitment_keyboard_full_analysis_and_two_fresh_source_cycles"
+  ],
+  "explicitExclusions": [
+    "no_new_route_screen_backend_owner_or_fake_publish_state",
+    "no_change_to_Mool_or_Chat_destination_meaning",
+    "no_YouTube_video_or_Short_hosting_by_MoolSocial",
+    "no_public_or_unlisted_YouTube_upload",
+    "no_Screens_01_03_HTML_reference_commit_push_deploy_Production_provider_message_or_secret_value_access",
+    "no_APK_build_install_uninstall_data_clear_downgrade_or_C29K_evidence_mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_atomic_UI_UX_acceptance",
+    "C29L_source_qualified_YouTube_creator_contract",
+    "shared_navigation_semantics_and_44_logical_pixel_minimum",
+    "permanent_regression_memory_and_MVP_delivery_lock",
+    "separate_C29M_Dev_deploy_and_founder_consent_after_C29N_host_qualification"
+  ],
+  "testAndEvidencePlan": [
+    "global_Mool_left_Chat_right_order_contrast_semantics_and_tap_tests",
+    "Social_plus_direct_format_and_YouTube_host_separation_tests",
+    "keyboard_viewInsets_small_viewport_and_140_percent_text_tests",
+    "MoolSocial_publish_media_poll_quiz_carousel_and_recovery_tests",
+    "protected_Social_navigation_customer_copy_and_C29L_creator_tests",
+    "full_Flutter_analysis",
+    "two_fresh_identical_source_host_qualification_cycles"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "externalDevQualificationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "qualificationResult": {
+    "state": "passed_source_host_provider_and_device_gates_pending",
+    "stableSourceManifest": "artifacts/quality/uaw-personal-mvp-social-creator-ergonomics-global-edge-consistency-c29n-host-qualification-20260811-01/source-aggregate-manifest.txt",
+    "stableSourceManifestSha256": "640F8FB0AEA2DB78DD4AD01E9C63142E39BAFF2D729E3917B814C587D222E934",
+    "sourceFiles": 29,
+    "qualifyingCycles": [
+      "artifacts/quality/uaw-personal-mvp-social-creator-ergonomics-global-edge-consistency-c29n-host-qualification-20260811-01/qualifying-cycle-1.json",
+      "artifacts/quality/uaw-personal-mvp-social-creator-ergonomics-global-edge-consistency-c29n-host-qualification-20260811-01/qualifying-cycle-2.json"
+    ],
+    "flutterAnalysis": "clean_twice",
+    "requiredFlutterTestFiles": 17,
+    "flutterTestsPerCycle": 118,
+    "sourceFingerprintBeforeAndAfterIdentical": true,
+    "nextProviderTicket": "config/uaw-personal-mvp-social-youtube-private-upload-dev-provider-qualification-c29m-ticket.json",
+    "providerGate": "explicit_Dev_deploy_authority_and_founder_supervision_required",
+    "apkBuildPerformed": false,
+    "deviceMutationPerformed": false,
+    "backendMutationPerformed": false,
+    "providerMutationPerformed": false,
+    "secretValueAccessPerformed": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true,
+    "protectedBaselineUpdated": false
+  }
+}

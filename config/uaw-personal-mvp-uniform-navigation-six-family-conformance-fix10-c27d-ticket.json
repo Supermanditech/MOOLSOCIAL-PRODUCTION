@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SIX-FAMILY-CONFORMANCE-FIX10-C27D",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Real Social, Shop, Food, Travel, Care and Work routes and their relevant subaction states all project the completed C27 dock and Mool switcher consistently without route, content, state or one-tap regression.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SIX-FAMILY-CONFORMANCE-FIX10-C27D-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "completed C27B shared destination dock",
+      "completed C27C embedded Mool switcher",
+      "existing MoolSocialApp route and memory-session fixtures"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/ui_v2/universal/mool_uniform_navigation_six_family_conformance_c27d_test.dart",
+      "scripts/check-personal-uniform-navigation-six-family-conformance-c27d.ps1"
+    ],
+    "necessityProof": "Component tests do not prove every real family route and cross-owner Bus or Medicine state projects the same shared C27 shell with truthful order and selection."
+  },
+  "acceptance": [
+    "Social Shorts Videos Feed Create projection",
+    "Shop Products Wholesale Orders projection",
+    "Food Order Food Book Table projection",
+    "Travel Bike Auto Cab Bus including Book-owned Bus",
+    "Care Doctor Medicine Salon including Buy-owned Medicine",
+    "Work Earn Today Workspace projection",
+    "one neutral canvas and fixed Mool family local geometry on every route",
+    "one selected local indicator and no horizontal scroll or FittedBox",
+    "Mool switcher opens in place with six families",
+    "no runtime source route content state build or install change"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SIX-FAMILY-CONFORMANCE-FIX10-C27D-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-PROJECTION-FIX8-C25",
+  "state": "c25a_contract_frozen_runtime_pending",
+  "sourceOwnerInventory": "config/mvp-personal-action-projection-v1.json",
+  "presentation": {
+    "brandLabel": "MoolSocial",
+    "mainMenuMainActionsOnly": true,
+    "mainMenuSubactionsAllowed": false,
+    "defaultDestinationTapCount": 1,
+    "destinationLocalSubactionsRequired": true,
+    "destinationSubactionTapCount": 1,
+    "backAndForwardRequired": true,
+    "maximumTapTargetOcclusion": 0,
+    "horizontalActionScrollAllowed": false,
+    "fullWidthOpaqueBottomStripeAllowed": false,
+    "minimumTapTarget": 44,
+    "finiteMotionMillisecondsMinimum": 180,
+    "finiteMotionMillisecondsMaximum": 320,
+    "reducedMotionImmediate": true
+  },
+  "globalUtilities": [
+    {"id":"moolsocial","label":"MoolSocial","tapCount":1,"opens":"main_domain_menu"},
+    {"id":"chat","label":"Chat","tapCount":1,"route":"/app/chat/inbox"}
+  ],
+  "domains": [
+    {
+      "id":"social","label":"Social","defaultRoute":"/app/social","routeOwner":"social_v2",
+      "actions":[
+        {"id":"shorts","label":"Shorts","route":"/app/social?sub=shorts","routeOwner":"social_v2_shorts"},
+        {"id":"videos","label":"Videos","route":"/app/social?sub=videos","routeOwner":"social_v2_videos"},
+        {"id":"feed","label":"Feed","route":"/app/social?sub=feed","routeOwner":"social_v2_feed"},
+        {"id":"create","label":"Create","route":"/app/social?sub=create","routeOwner":"social_v2_create"}
+      ]
+    },
+    {
+      "id":"buy","label":"Shop","defaultRoute":"/app/buy?sub=shop","routeOwner":"buy_v2",
+      "actions":[
+        {"id":"shop","label":"Products","route":"/app/buy?sub=shop","routeOwner":"buy_v2_shop"},
+        {"id":"wholesale","label":"Wholesale","route":"/app/buy?sub=wholesale","routeOwner":"buy_v2_wholesale"},
+        {"id":"orders","label":"Orders","route":"/app/buy?sub=orders","routeOwner":"buy_v2_orders"}
+      ]
+    },
+    {
+      "id":"eat","label":"Food","defaultRoute":"/app/eat/home","routeOwner":"eat_journey_owner",
+      "actions":[
+        {"id":"order","label":"Order Food","route":"/app/eat/home","routeOwner":"eat_order_food"},
+        {"id":"table","label":"Book Table","route":"/app/eat/table","routeOwner":"eat_book_table"}
+      ]
+    },
+    {
+      "id":"ride","label":"Travel","defaultRoute":"/app/ride/book?type=bike","routeOwner":"ride_journey_owner",
+      "actions":[
+        {"id":"bike","label":"Bike","route":"/app/ride/book?type=bike","routeOwner":"ride_bike"},
+        {"id":"auto","label":"Auto","route":"/app/ride/book?type=auto","routeOwner":"ride_auto"},
+        {"id":"cab","label":"Cab","route":"/app/ride/book?type=cab","routeOwner":"ride_cab"},
+        {"id":"bus","label":"Bus","route":"/app/book/bus","routeOwner":"book_bus_existing_owner"}
+      ]
+    },
+    {
+      "id":"book","label":"Care","defaultRoute":"/app/book/doctor","routeOwner":"book_journey_owner",
+      "actions":[
+        {"id":"doctor","label":"Doctor","route":"/app/book/doctor","routeOwner":"book_doctor"},
+        {"id":"medicine","label":"Medicine","route":"/app/buy?sub=medicine","routeOwner":"buy_v2_medicine"},
+        {"id":"salon","label":"Salon","route":"/app/book/salon","routeOwner":"book_salon"}
+      ]
+    },
+    {
+      "id":"work","label":"Work","defaultRoute":"/app/work/earn","routeOwner":"work_journey_owner",
+      "actions":[
+        {"id":"earn","label":"Earn Today","route":"/app/work/earn","routeOwner":"work_earn_today"},
+        {"id":"workspace","label":"Workspace","route":"/app/work/my-work","routeOwner":"workspace_routing_owner"}
+      ]
+    }
+  ],
+  "reuse": {
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "newStateOwners": 0,
+    "medicineBusinessOwnerRemains":"BuyV2Session_and_existing_Buy_pharmacy_commerce",
+    "busBusinessOwnerRemains":"BookSession_BookGateway_and_BusBookingScreen",
+    "sharedNavigationOwner":"apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  },
+  "protectedBusinessContent": ["social","buy"],
+  "execution": {"runtimeWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

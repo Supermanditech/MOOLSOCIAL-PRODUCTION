@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 1,
+    "id": "app-splash-first-open",
+    "referenceVersion": "v4",
+    "route": "/boot"
+  },
+  "status": "Accepted",
+  "approval": {
+    "founderVisualAcceptedAt": "2026-08-01",
+    "productionLockReconciledAt": "2026-08-08",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "candidateId": "BUY-R50-139-PROGRESSIVE-BRAND-LOCKUP-FIX1",
+    "reconciliationTicket": "UAW-PERSONAL-MVP-SCREEN01-ADDITIVE-V4-PRODUCTION-ACCEPTANCE-FIX1-C18B",
+    "scope": "native Flutter Screen01 progressive full-wordmark production presentation",
+    "decision": "One visibly branded Flutter Screen01 with ordered complete wordmark, category, business promise and unified settle; minimum 3000 ms; immediate complete reduced-motion result; plain navy Android system launch window."
+  },
+  "lineage": {
+    "supersedes": "approved-references/screens/01-app-splash-first-open/v3",
+    "v3FilesPreserved": true,
+    "r50SourceManifestSha256": "7E9E76F2753D72E9034D68DD4825405D826D67065F77DFDACB808099689103D5",
+    "r50DirectSourceSha256": "D08DBA928B884554984D28891F5E465B1F7FA910D3884EBE49B6466D199147BE",
+    "r50DirectTestSha256": "39DDD73796415048784471D34612DB8C575C85F48AC8C243B3F35F22FB78D3B8",
+    "r50FounderAcceptance": "artifacts/quality/buy-fv2-139-progressive-lockup-r50-20260801-61/84-founder-acceptance.md",
+    "c18bFounderAuthority": "docs/quality/UAW-C18B-FOUNDER-AUTHORIZATION-20260808.md"
+  },
+  "deviceReplay": {
+    "result": "passed_unlocked_existing_installed_candidate",
+    "device": "OPPO CPH2375",
+    "serial": "2b3e0f71",
+    "installedVersionName": "1.0.0-r60.16",
+    "installedVersionCode": "2026080816",
+    "installedApkSha256": "1CC2A0186CA5DC8C9A09D0B4CC949B94CEE91DE6C70246A4B0168ADE6255150D",
+    "evidence": "artifacts/quality/uaw-personal-mvp-screen01-r50-provenance-and-equivalence-fix1-c18a-20260808-01"
+  },
+  "verification": {
+    "focusedAnalyze": "passed for seven Screen01 and brand owners",
+    "brandMotionTests": "8/8 passed",
+    "screen01BehaviorTests": "3/3 passed",
+    "firstOpenInterruptionTests": "4/4 passed",
+    "screen01To03FitmentMatrix": "3/3 passed",
+    "screen01GoldenUpdateAndReplay": "3/3 passed",
+    "r50AcceptedApkSha256": "F8C21E4B9C32356A451909C2FD9FB7B845E8ED393199A8356EA5EA4ED4BA74F3"
+  },
+  "semanticDependency": {
+    "owner": "apps/mobile/lib/core/design/moolsocial_brand_motion.dart",
+    "policy": "semantic contract rather than false byte-exact R50 claim",
+    "enforcedBy": "scripts/check-brand-integrity.ps1"
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": [
+      "scripts/check-approved-ui-locks.ps1",
+      "scripts/check-screen01-v4-production-acceptance-c18c.ps1"
+    ],
+    "changeRule": "Do not modify an accepted file or hash. A founder-directed replacement requires a new approved-reference version and acceptance record."
+  },
+  "lockedFiles": [
+    {
+      "path": "apps/mobile/lib/ui_v2/launch/launch_presentation_gate.dart",
+      "sha256": "24d41d7d62ae73d1df875f4b4f740bb79433badefc3b7b598f8f1f8925fe0ef0"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/launch/launch_interruption_guard.dart",
+      "sha256": "3e6f58220a6a3b646998562690574b6b91dba4e042ef22248bccb5aceb586824"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart",
+      "sha256": "d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/drawable/launch_transparent.xml",
+      "sha256": "517b2bc2d4d8c0ba64b4c1031c5f9b473b3855c965d03d0be8d7e6d2b4a977f0"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-v31/styles.xml",
+      "sha256": "84c8a1013f5c8e650090ae80294f7b6663afdb0c8fbbd1cfea77661b3842bd71"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-night-v31/styles.xml",
+      "sha256": "143cf58652d25013672c611fa1c47f54fc75048ca594435b1b82cd481dfa5222"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_app_splash_test.dart",
+      "sha256": "39ddd73796415048784471d34612db8c575c85f48ac8c243b3f35f22fb78d3b8"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_golden_test.dart",
+      "sha256": "a9fc88904c3e32464a361ae51f02da184a5488bf08859bf968193ef0f34e08ec"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_first_open_interruption_test.dart",
+      "sha256": "38036791d1ae9a82384171b0dd34ecdc9f0b58924b92615d38db495fea63d096"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_normal-motion-midpoint-360x720.png",
+      "sha256": "c5337f97e8f2c29bf9bbbe8e5c9eaf23ed4c40795621149336d15e035249312e"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_handoff-360x720.png",
+      "sha256": "6d03bb0b1b617d8b03c7480b34acda59a230b76dbb2905a092bd6a1c3eed9eab"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen01_recovery-360x720.png",
+      "sha256": "34edd779b58bb946d4b4a90d2dcef75e0160c5e8b95432b450c3232953a33959"
+    }
+  ]
+}

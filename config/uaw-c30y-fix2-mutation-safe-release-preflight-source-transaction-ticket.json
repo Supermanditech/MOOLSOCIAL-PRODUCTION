@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-FIX2-MUTATION-SAFE-RELEASE-PREFLIGHT-SOURCE-TRANSACTION",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "founder_authorized_aab_audit_finding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The exact r60.48 release preflight and one AAB build preserve every qualified source owner, including generated Android owners, and consume authority only after a mutation-safe preflight succeeds.",
+  "classificationReason": "The first founder-input attempt failed closed because preflight changed two sealed source owners. The founder required every AAB audit finding to be ticketed, repaired and requalified before retry.",
+  "minimumCompleteScope": [
+    "preserve_the_first_attempt_logs_manifests_state_counts_and_failed_closed_disposition",
+    "reconstruct_and_hash_prove_the_exact_pre_attempt_registrant_and_local_properties_bytes",
+    "snapshot_the_exact_two_qualified_generated_owner_bytes_before_preflight",
+    "permit_only_those_two_generated_owner_transitions_during_config_manifest_and_AAB_tasks",
+    "restore_both_exact_qualified_byte_arrays_before_full_manifest_rebind_and_on_every_exit",
+    "add_cross_owner_positive_negative_and_interrupted_cleanup_contracts_on_both_PowerShell_hosts",
+    "seal_a_fresh_manifest_and_pass_two_identical_cycles_before_restoring_one_build_authority"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_chat_social_backend_Hosting_provider_or_service_change",
+    "no_AAB_APK_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX2",
+    "no_deletion_overwrite_or_reuse_of_first_attempt_evidence",
+    "no_other_track_candidate_version_or_failed_r60_47_mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2176_registered_before_repair",
+    "first_attempt_counts_zero_and_available_once_authority_preserved",
+    "prior_1125_file_manifest_and_two_cycles_preserved_as_superseded"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/restore-release-generated-plugin-registrant-c30t.ps1",
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/restore-qualified-generated-owner-c30y-fix2.ps1",
+      "scripts/check-c30y-fix2-mutation-safe-preflight-source-transaction.ps1"
+    ],
+    "necessityProof": "The generic single-AAB wrapper already owns preflight, authority consumption and postbuild rebind. Extending it with one exact two-owner transaction and one static/behavioral checker is the smallest complete repair and creates no alternate build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "prove_reconstructed_owner_hashes_equal_the_pre_attempt_manifest_rows",
+    "prove_only_the_two_allowlisted_owners_can_change_during_synthetic_transaction",
+    "prove_success_failure_and_interruption_paths_restore_exact_bytes",
+    "PowerShell_7_and_Windows_PowerShell_static_contract_replay",
+    "two_fresh_identical_source_cycles_with_417_Flutter_3_skips_528_backend_8_Hosting_and_clean_analyzer",
+    "next_founder_launcher_uses_attempt_2_evidence_slots_and_rebinds_the_full_manifest_before_authority_consumption"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FIX2-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-fix2-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30Y-PREFLIGHT-SEALED-SOURCE-OWNER-MUTATION-20260814.md"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-ANDROID-APP-LINKS-PLAY-SIGNER-MISMATCH",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_source_implementation_and_static_tests_complete_live_deployment_held",
+  "classification": "mvp_required",
+  "severity": "distribution_identity_and_share_link_blocker",
+  "actualResult": {
+    "liveAssetLinksStatus": 200,
+    "liveAssetLinksCertificateSha256": "CB:DF:C5:96:9A:D5:1E:D5:70:AF:B1:CF:2F:E6:03:77:E5:59:D4:3F:59:D5:9E:2A:B6:6C:CA:F7:8E:A9:AC:25",
+    "requiredPlayCertificateSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "socialFallbackStatus": 404
+  },
+  "minimumCorrection": [
+    "add_the_exact_versioned_assetlinks_source_for_com_moolsocial_app_and_the_Play_app_signing_certificate",
+    "allow_the_dot_well_known_directory_in_the_Firebase_Hosting_source_inventory",
+    "add_a_noindex_Social_post_link_browser_fallback_under_app_social",
+    "add_static_tests_for_package_certificate_relation_Hosting_inventory_and_fallback",
+    "hold_live_Hosting_deployment_until_separate_founder_authority",
+    "after_authorized_deployment_prove_live_HTTP_content_and_OPPO_verified_link_resolution"
+  ],
+  "authority": {
+    "localSourceImplementationAuthorized": true,
+    "hostingDeploymentAuthorized": false,
+    "productionBackendWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "staticTests": "7 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/app-links-hosting-static-tests.log",
+    "evidenceSha256": "6BA68E511AEE329ED3162DD50A276A25AAF8431E8751E80B32EC6DF7FA835C04",
+    "liveDeploymentPerformed": false,
+    "liveHttpProofPassed": false,
+    "oppoVerifiedLinkProofPassed": false
+  }
+}

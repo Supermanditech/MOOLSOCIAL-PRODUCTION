@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ADJACENT-PROMOTION-POLICY-C29Q",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "source_qualified_no_visible_ad_oppo_pending",
+  "classification": "mvp_supporting",
+  "customerOutcome": "A user never sees a MoolSocial promotion interfere with YouTube content, and any future adjacent promotion is clearly disclosed, independently valuable and policy-gated.",
+  "minimumCompleteScope": [
+    "deny_every_player_overlay_frame_control_replacement_or_Shorts_overlay",
+    "deny_sold_ads_on_YouTube_only_Home_watch_or_Shorts_surfaces",
+    "require_real_campaign_creator_video_product_relationship",
+    "require_Promoted_on_MoolSocial_disclosure_and_non_YouTube_independent_value",
+    "require_legal_API_review_remote_kill_switch_and_no_engagement_incentive",
+    "ship_policy_tests_with_no_visible_ad_enabled"
+  ],
+  "activationDependencies": ["real_campaign_owner", "independent_MoolSocial_customer_outcome", "legal_and_YouTube_API_compliance_review", "founder_placement_acceptance"],
+  "explicitExclusions": ["no_player_or_thumbnail_overlay", "no_fake_campaign", "no_paid_YouTube_engagement", "no_visible_ad_before_all_dependencies"],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_controller.dart",
+      "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_native_home_dock_c29e_test.dart"
+    ],
+    "separateNonYouTubeOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_creator.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_plans_promotion.dart"
+    ],
+    "necessityProof": "No visible YouTube-adjacent MoolSocial promotion exists. A small fail-closed policy owner and no-visible-ad regression proof are necessary to preserve that state without duplicating the separate creator and retailer campaign workflows."
+  },
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "externalDevQualificationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true
+  },
+  "qualification": {
+    "state": "source_qualified_no_visible_ad_oppo_pending",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ADJACENT-PROMOTION-POLICY-C29Q-HOST-QUALIFICATION-20260811.md",
+    "sourceAggregateSha256": "C1743D6906026CEE3BE418B0B76F8B4A66DAD9D2B3C9D30D73D47F208DA2548A",
+    "sourceAggregateFiles": 7,
+    "focusedAssertions": 5,
+    "freshIdenticalCycles": 2,
+    "formattedFilesPerCycle": 2,
+    "formatChangesPerCycle": 0,
+    "fullFlutterAnalysisPerCycle": "no_issues",
+    "protectedFlutterTestFilesPerCycle": 21,
+    "protectedFlutterAssertionsPerCycle": 128,
+    "protectedFlutterSkippedPerCycle": 1,
+    "visiblePromotionEnabled": false,
+    "buildInstallDeployPerformed": false,
+    "oppoCrossComparisonState": "pending_device_reconnection"
+  }
+}

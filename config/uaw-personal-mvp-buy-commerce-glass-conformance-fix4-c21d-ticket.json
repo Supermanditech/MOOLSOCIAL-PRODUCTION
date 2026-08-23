@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-BUY-COMMERCE-GLASS-CONFORMANCE-FIX4-C21D",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_host_qualified_build_install_closed", "classification": "mvp_required",
+  "actor": "customer switching among Shop, Wholesale, Medicine and Orders",
+  "capability": "use four neutral glass controls without destination colour flooding or product-grid obstruction",
+  "customerOutcome": "Buy sub-actions remain consistently legible and subordinate while product imagery and catalogue content stay dominant.",
+  "classificationReason": "Buy produced the clearest founder-visible compositing failure and requires dedicated four-destination proof.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-BUY-COMMERCE-GLASS-CONFORMANCE-FIX4-C21D-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["configuration", "test_only_acceptance"], "sharedImplementationOwners": ["MoolLocalNavigationRail", "BuyV2Session", "BuyV2Screen"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["actual_Shop_Wholesale_Medicine_Orders_outcomes_only", "no_peach_green_or_teal_control_flood", "stable_neutral_lens_across_four_destinations", "product_grid_dominance", "four_action_compact_fit", "stable_navy_text_and_icon_contrast"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": true, "testOrGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-BUY-COMMERCE-GLASS-CONFORMANCE-FIX4-C21D-COMPLETION-20260808.md",
+  "explicitExclusions": ["no_catalogue_route_copy_provider_or_business_change", "no_build_or_install"]
+}

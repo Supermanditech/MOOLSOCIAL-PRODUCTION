@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-LOAD-MORE-RETRY-MODE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "feed_pagination_recovery_blocker",
+  "actor": "public_MoolSocial_Feed_reader_retrying_a_failed_later_page",
+  "customerOutcome": "Retry Feed repeats the exact failed operation: a failed later page resumes from its cursor, while a failed refresh remains a refresh.",
+  "minimumCorrection": [
+    "retain_whether_the_last_failed_Feed_request_was_refresh_or_load_more",
+    "expose_one_retry_method_that_repeats_that_request_mode",
+    "wire_the_cached_Feed_retry_control_to_the_exact_retry_owner",
+    "disable_the_retry_control_while_a_Feed_request_is_pending",
+    "prove_a_failed_load_more_retries_the_same_cursor"
+  ],
+  "explicitExclusions": [
+    "no_backend_provider_or_cursor_contract_change",
+    "no_automatic_infinite_scroll_or_Feed_redesign",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "6 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-load-more-retry-mode-focused-tests.log",
+    "evidenceSha256": "B3A095747C782E28A2437D60F7B657BC0D747A4DDEF7C11E1E56C646090E862F",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

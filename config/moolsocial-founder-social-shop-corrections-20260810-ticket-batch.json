@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "batchId": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "founderAuthority": {
+    "sourceThreadId": "019fe026-c985-76b3-a181-339b29150ce6",
+    "receivedAt": "2026-08-10",
+    "findings": "docs/quality/MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-FINDINGS-20260810.md"
+  },
+  "workspace": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "preserveDirtyTree": true,
+    "newWorktreeAuthorized": false,
+    "replacementRepositoryAuthorized": false
+  },
+  "protectedDeviceBoundary": {
+    "c28dState": "device_gate_rejected_successor_required",
+    "c28fState": "founder_approved_protected",
+    "installedPackage": "com.moolsocial.app",
+    "installedVersionName": "1.0.0-r60.28",
+    "installedVersionCode": 2026081028,
+    "installedApkSha256": "FD0C1BDE24A1892C7A4E8B82504B19A88057CB63FACAE22E3BE014573843AEE6",
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "freshHostQualificationRequiredBeforeAnySuccessorBuild": true
+  },
+  "tickets": [
+    {
+      "order": 1,
+      "ticketId": "MOOLSOCIAL-FSC01-SOCIAL-REDUNDANT-FAMILY-ROOT-REMOVAL",
+      "state": "completed_nonbuild_gates_passed",
+      "classification": "mvp_required",
+      "customerOutcome": "A Personal user sees Shorts, Videos, Feed and Create directly under Social without a redundant Social cell, while the Mool switcher and one-handed one-tap navigation remain intact.",
+      "reuseOwners": [
+        "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+        "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "implementationDisposition": ["reuse", "configuration"],
+      "runtimeWriteRequiresScopeGate": true
+    },
+    {
+      "order": 2,
+      "ticketId": "MOOLSOCIAL-FSC02-YOUTUBE-SHORTS-VIDEOS-TRUTHFUL-PROVIDER-SURFACES",
+      "state": "fsc02d_fsc02e_fsc02f_fsc02g_and_c29c_qualified_c29b_rejected_preserved_new_device_successor_registration_pending",
+      "classification": "mvp_required",
+      "customerOutcome": "A Personal user browses real eligible YouTube Shorts and Videos with clear provider attribution, official playback and truthful loading, empty, unavailable and retry states.",
+      "reuseOwners": [
+        "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+        "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+        "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart",
+        "backend/functions/src/youtube/provider_service.ts"
+      ],
+      "blockingRequirements": [
+        "current_accepted_Dev_PublicDataReview_runtime_verified_or_exact_reviewed_redeploy_if_required",
+        "Firebase_Auth_Play_Integrity_App_Check_and_provider_endpoint_qualification_without_secret_value_access_or_copy",
+        "official_player_and_brand_attribution_conformance",
+        "removal_of_all_fabricated_youtube_fallback_records",
+        "focused_provider_api_and_flutter_state_tests"
+      ],
+      "externalServiceWriteAuthorized": "conditional_exact_Dev_PublicDataReview_only_if_read_only_qualification_proves_redeploy_required"
+    },
+    {
+      "order": 3,
+      "ticketId": "MOOLSOCIAL-FSC03-MOOLSOCIAL-FEED-OWNERSHIP-AND-TRUTH",
+      "state": "reference_candidate_rejected_fsc03a_native_source_started_then_paused_unverified_by_founder_sequence_correction",
+      "classification": "mvp_required",
+      "customerOutcome": "A Personal user sees a professional, distinctly MoolSocial-owned Feed containing only authoritative MoolSocial items or a truthful empty, loading or recovery state, with a clear Create-a-post handoff and no fabricated publication result.",
+      "reuseOwners": [
+        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+        "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+        "apps/mobile/lib/features/shared/shared_session.dart"
+      ],
+      "blockingRequirements": [
+        "truthful_feed_read_owner_or_explicit_empty_state_scope",
+        "removal_of_representative_feed_records",
+        "focused_empty_loading_error_and_item_rendering_tests"
+      ],
+      "referenceCandidate": "config/moolsocial-fsc03-moolsocial-feed-ownership-and-truth-ticket.json",
+      "nativeSuccessor": "config/moolsocial-fsc03a-native-moolsocial-feed-ownership-ticket.json",
+      "founderFinalRequiredBeforeRuntime": false,
+      "newBackendOwnersAuthorized": false
+    },
+    {
+      "order": 4,
+      "ticketId": "MOOLSOCIAL-FSC04-MOOLSOCIAL-TEXT-IMAGE-CAROUSEL-CREATE",
+      "state": "dependency_held_production_posting_gateway_absent",
+      "classification": "mvp_required",
+      "customerOutcome": "An authenticated Personal user creates a MoolSocial text post, one-image post or 2–10 image carousel and sees durable readback with truthful failure and retry behavior.",
+      "reuseOwners": [
+        "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+        "apps/mobile/lib/features/shared/shared_models.dart",
+        "apps/mobile/lib/features/shared/social_media_picker.dart"
+      ],
+      "blockingRequirements": [
+        "authorized_persistent_posting_gateway",
+        "authentication_authorization_and_media_lifecycle_contract",
+        "idempotent_publish_error_retry_and_readback_states",
+        "focused_gateway_and_flutter_tests"
+      ],
+      "fakeBackendStateAuthorized": false
+    },
+    {
+      "order": 5,
+      "ticketId": "MOOLSOCIAL-FSC05-YOUTUBE-SHORTS-UPLOAD-AFFORDANCE",
+      "state": "successor_c29l_source_qualified_provider_gate_pending_private_only",
+      "classification": "mvp_required",
+      "customerOutcome": "An authorized creator deliberately uploads a Short to the selected YouTube channel from MoolSocial with metadata/privacy choice, progress, cancel, retry, error and processing reconciliation.",
+      "reuseOwners": [
+        "apps/mobile/lib/core/youtube/youtube_private_dev_workflow.dart",
+        "apps/mobile/lib/core/youtube/youtube_private_dev_uploader.dart",
+        "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+        "backend/functions/src/youtube/provider_service.ts"
+      ],
+      "blockingRequirements": [
+        "approved_youtube_oauth_consent_and_youtube_upload_scope",
+        "verified_api_project_upload_audit_disposition",
+        "production_safe_revocable_upload_session_ownership",
+        "metadata_and_public_private_unlisted_choice_compliance",
+        "progress_cancel_retry_error_and_processing_state",
+        "focused_api_transport_and_ui_tests"
+      ],
+      "successorTicket": "config/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-ticket.json",
+      "plusAffordanceAuthorizedBeforeGate": true,
+      "credentialAccessAuthorized": false,
+      "externalServiceWriteAuthorized": "supervised_Dev_qualification_only_after_source_host_gate_no_deploy_or_secret_value_access"
+    },
+    {
+      "order": 6,
+      "ticketId": "MOOLSOCIAL-FSC06-SHOP-PRODUCTS-CELL-DISPOSITION",
+      "state": "completed_nonbuild_gates_passed",
+      "classification": "mvp_required",
+      "customerOutcome": "A Shop customer uses Shop, Wholesale and Orders without a duplicate Products cell or an invented Offers destination.",
+      "reuseOwners": [
+        "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart"
+      ],
+      "offersDisposition": "do_not_create_destination_existing_offers_are_transaction_contextual_only",
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "implementationDisposition": ["reuse", "configuration"],
+      "runtimeWriteRequiresScopeGate": true,
+      "completionEvidence": "docs/quality/MOOLSOCIAL-FSC06-SHOP-PRODUCTS-CELL-DISPOSITION-COMPLETION-20260810.md",
+      "deviceAcceptance": "pending_no_build_or_install_authorized"
+    }
+  ],
+  "successorMicroTickets": [
+    "config/moolsocial-fsc02a-youtube-shorts-provider-distribution-reference-ticket.json",
+    "config/moolsocial-fsc02a1-native-youtube-shorts-screenshot-informed-composition-ticket.json",
+    "config/moolsocial-fsc02c-android-profile-youtube-player-packaging-ticket.json",
+    "config/moolsocial-fsc02d-dev-youtube-public-data-runtime-qualification-ticket.json",
+    "config/uaw-personal-mvp-social-youtube-public-data-host-qualification-c29a-ticket.json",
+    "config/moolsocial-fsc02e-dev-firebase-android-client-key-restriction-ticket.json",
+    "config/uaw-personal-mvp-social-youtube-public-data-gcloud-context-host-remediation-c29c-ticket.json",
+    "config/moolsocial-fsc02f-youtube-official-discovery-revision-reconciliation-ticket.json",
+    "config/moolsocial-fsc02g-youtube-official-discovery-equivalent-revision-gate-ticket.json",
+    "config/moolsocial-fsc02b-youtube-videos-discovery-watch-reference-ticket.json",
+    "config/moolsocial-fsc03a-feed-x-informed-ownership-reference-ticket.json",
+    "config/moolsocial-fsc04a-create-moolsocial-publishing-reference-ticket.json"
+    ,"config/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-ticket.json"
+  ],
+  "globalExclusions": [
+    "no_commit_push_deploy_promote_or_Production_write",
+    "no_credentials_auth_material_or_external_provider_customer_messages",
+    "no_build_install_uninstall_data_clear_downgrade_or_protected_runtime_mutation",
+    "no_fake_youtube_content_fake_backend_success_or_filler_offers_route",
+    "no_parallel_ticket_implementation"
+  ]
+}

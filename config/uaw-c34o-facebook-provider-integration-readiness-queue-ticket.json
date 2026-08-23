@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34O-FACEBOOK-PROVIDER-INTEGRATION-READINESS-QUEUE",
+  "state": "queued_inactive_selection_only_beyond_mvp_provider_expansion_unapproved",
+  "classification": "beyond_mvp",
+  "severity": "deferred_provider_scope",
+  "exactUserType": {
+    "id": "personal_user",
+    "label": "Personal user",
+    "actingRole": "signed_out_customer_choosing_Facebook_identity_on_MoolSocial",
+    "workspaceBoundary": "personal_MoolSocial_authentication_and_exact_protected_destination"
+  },
+  "provider": {
+    "name": "Facebook",
+    "supportedToday": false,
+    "productionDispatchAllowedToday": false,
+    "currentTruthOwner": "UAW-C33G-FIX2-SOCIAL-IDENTITY-PROVIDER-TRUTH",
+    "currentBehavior": "visible_locked_reference_control_fails_locally_with_truthful_unavailable_recovery_and_zero_external_dispatch"
+  },
+  "capability": "integrate_and_qualify_one_real_Facebook_identity_provider_flow_with_exact_cancel_failure_recovery_and_protected_destination return",
+  "customerOutcome": "Only after a separate founder-approved provider expansion, a Personal user can choose Facebook sign-in, grant the exact required identity consent, return to one MoolSocial account, and recover from denial or provider failure without a false authenticated state or lost destination.",
+  "classificationReason": "The production authentication allow-list is currently Google plus the YouTube identity control through the same Google-backed relationship. Facebook is explicitly unsupported by C33G FIX2; adding it is a new external-provider capability and therefore remains beyond MVP until separately and exactly authorized.",
+  "queueBoundary": {
+    "planningOnly": true,
+    "selectedTicket": false,
+    "registeredForExecution": false,
+    "mvpScopeGateMutationAuthorized": false,
+    "candidateIdentityReserved": false,
+    "versionNameReserved": false,
+    "versionCodeReserved": false,
+    "mayActivateWhileC34LIsActive": false,
+    "separateBeyondMvpFounderExpansionRequired": true,
+    "providerConsoleAuthorityInherited": false,
+    "credentialAuthorityInherited": false,
+    "fundsAuthorityInherited": false
+  },
+  "minimumCompleteScope": [
+    "retain_Facebook_as_unsupported_and_zero dispatch_until_exact founder expansion_selection_and readiness evidence",
+    "define_the_minimum_identity_profile_and_consent scopes_before_any provider registration",
+    "prove_current_Meta_developer_terms_app review_business verification_data deletion_callback_domain_and platform requirements_from_current primary provider documentation_after selection",
+    "reuse_the_existing_Screen03_frame_authentication session_account bootstrap_pending destination_and actor policy owners",
+    "add_only_the_smallest_provider adapter_and sanitized readiness gate_if_no existing owner_can safely express_the provider boundary",
+    "qualify_cancel_denial_invalid state_callback mismatch_duplicate return_offline_revocation_data deletion_process death_and exact protected return",
+    "test_one_future_exact_Play installed_OPPO_candidate_only_after_separate build_Play_device_and founder private surface authorities"
+  ],
+  "explicitExclusions": [
+    "no_claim_that_Facebook_is_supported_available_configured_or reviewer ready_today",
+    "no_Meta_console_app_registration_callback_data deletion_or provider configuration write",
+    "no_app_identifier_secret_token_private key_credential_private account_or profile identifier access",
+    "no_business verification_payment_funds_or billing action",
+    "no_runtime_backend_screen_reference_or customer copy_mutation_under_this queue owner",
+    "no_AAB_Play_OPPO_device_browser_private_or external action",
+    "no_C34L_MVP scope_registry_or existing C33G provider truth mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "C34L_and_the_supported_authentication_OPPO_acceptance lane_reach_terminal truth_first",
+    "separate_exact_founder_beyond_mvp_expansion_and_ticket selection",
+    "fresh_primary_Meta_provider_documentation_terms_review_business verification_data use_and deletion assessment",
+    "versioned_Screen03_founder amendment_if_supported availability_or customer copy_changes",
+    "privacy_security_account linking_deletion_revocation_and support contract approval",
+    "founder_only_provider console_credentials_account chooser_and private identifier handling",
+    "separate_provider configuration_runtime_build_Play_OPPO_and funds authorities"
+  ],
+  "testAndEvidencePlan": [
+    "before_selection_replay_C33G_FIX2_and_prove_Facebook_zero gateway dispatch",
+    "after_future_selection_record_sanitized_non_secret_provider readiness_facts_only",
+    "prove_state_nonce_redirect_package_callback_data deletion_and account bootstrap binding_without retaining private payloads",
+    "cover_consent_cancel_denial_provider outage_invalid callback_duplicate return_revocation_data deletion_offline_process death_and exact destination",
+    "run_future_checksum matched_Play installed_OPPO_acceptance_with_founder only private surfaces",
+    "preserve_truthful local unavailable behavior_until_every source_provider_release_and device gate passes"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryCompleteForQueuePlanning": true,
+    "duplicateSearchCompleteForQueuePlanning": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_policy_adapter",
+      "test_only_acceptance",
+      "new_necessary_work"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v5.dart",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/screen03_frame_v2.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "config/release-device-acceptance-actor-policy-c34i.json",
+      "config/uaw-c33g-fix2-social-identity-provider-truth-ticket.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "future_Facebook_provider_adapter_and_sanitized_readiness_gate_only_if_selected_and_duplicate_search_still_proves necessity"
+    ],
+    "necessityProof": "No Facebook provider adapter or readiness owner exists today, which is correct because Facebook is unsupported. A future thin adapter and sanitized gate may become necessary only after an exact beyond-MVP expansion, current provider-contract review and fresh duplicate search; this queue file creates no implementation authority.",
+    "timelineImpactDays": null,
+    "within60To75DayLock": false,
+    "activationAssessmentRequired": true
+  },
+  "actionCounts": {
+    "providerConsoleWrite": 0,
+    "credentialCreationOrAccess": 0,
+    "runtimeOrBackendWrite": 0,
+    "buildPlayOrDeviceAction": 0,
+    "fundsAction": 0
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": false,
+    "selectionAuthorized": false,
+    "beyondMvpExpansionAuthorized": false,
+    "referenceOrRuntimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "providerConsoleOrExternalServiceAuthorized": false,
+    "credentialOrPrivateIdentifierAccessAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "fundsAuthorized": false
+  }
+}

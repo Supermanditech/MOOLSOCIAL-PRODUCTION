@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SOCIAL-ASYNC-CONTEXT-LIFECYCLE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_expanded_regression_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "social_route_and_recovery_lifecycle_blocker",
+  "actor": "signed_in_chat_or_create_user_returning_after_asynchronous_route_or_media_work",
+  "customerOutcome": "Chat navigation and Create picker recovery act only while their owning screen is still mounted, so leaving a screen during an asynchronous operation cannot navigate or message through a disposed context.",
+  "minimumCorrection": [
+    "guard_the_Chat_thread_open_with_an_explicit_mounted_check_after_thread_creation",
+    "guard_each_Create_picker_failure_message_with_an_explicit_mounted_check",
+    "retain_existing_request_format_tool_and_session_ownership_checks",
+    "prove_the_affected_routes_and_draft_recovery_still_pass",
+    "restore_release_configuration_after_Flutter_tests"
+  ],
+  "explicitExclusions": [
+    "no_UI_redesign_backend_provider_or_permission_change",
+    "no_AAB_APK_upload_install_Hosting_deployment_or_external_communication"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "analyzer": "No issues found",
+    "analyzerEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/02-flutter-analyze-corrected.log",
+    "analyzerEvidenceSha256": "E839C1E02196D296B9E8A41778259EE9C587F3B4BBBB5C5F1DB7D126E627CC31",
+    "focusedTests": "38 passed, 0 failed",
+    "focusedEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/03-async-context-focused-tests.log",
+    "focusedEvidenceSha256": "1357B25D15CB3C8E814BA8DC38DC2C9D84C28346550CDD3359AC59CAA1032CBD",
+    "expandedTests": "349 passed, 3 skipped, 0 failed across 57 files",
+    "expandedEvidenceSha256": "71115A25D3786DEA9A9C3AF0FE5FC53CC89D42CB4FCBA55ABB537CA8C404AA68"
+  }
+}

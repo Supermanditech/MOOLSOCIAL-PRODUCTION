@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "checkpointId": "MOOLSOCIAL-OVERNIGHT-RESTART-CHECKPOINT-20260805-2339",
+  "createdAt": "2026-08-05T23:39:44+05:30",
+  "stopAt": "2026-08-06T09:00:00+05:30",
+  "workspace": "C:\\GUARANTEED OUTCOME",
+  "repository": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "humanCheckpoint": "docs/quality/MOOLSOCIAL-OVERNIGHT-RESTART-CHECKPOINT-20260805-2339.md",
+  "executionMode": "founder_preauthorized_sequential_one_child_at_a_time_until_stop",
+  "activeTicket": {
+    "id": "UAW-R07-PERSONAL-RIDE-EXPOSURE",
+    "state": "runtime_patch_written_unformatted_untested",
+    "scopeGatePassedBeforePatch": true,
+    "nextAction": "reconcile_then_format_add_focused_tests_analyze_and_regress"
+  },
+  "completedChildren": ["UAW-R01", "UAW-R02", "UAW-R03", "UAW-R05", "UAW-R06"],
+  "heldChildren": ["UAW-R04"],
+  "oppoBeforeRestart": {
+    "serial": "2b3e0f71",
+    "state": "device",
+    "model": "CPH2375",
+    "mutationByUawBatch": false
+  },
+  "protectedRuntime": {
+    "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "profile": "1.0.0-r58.23 (2026080419)",
+    "sourceSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "apkInstallSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+    "machineStateDiff": "none"
+  },
+  "prohibitedActions": [
+    "branch_switch_reset_clean_delete_merge_main",
+    "commit_push_deploy_promote",
+    "credentials_live_payment_funds_production_data",
+    "live_provider_message_or_call",
+    "silent_baseline_replacement"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-PUBLIC-READ-REJECTED",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocker",
+  "surface": ["YouTube Home", "Search", "Videos", "Shorts"],
+  "actualResult": "The Play-installed r60.44 app reaches Flutter but YouTube Home and Shorts remain in retry error states and no request reaches the current youtubeProvider revision during the bounded retries.",
+  "expectedResult": "Eligible public YouTube videos and Shorts load through the current Dev provider with source attribution and official embedded playback under the declared read-only use case.",
+  "rootCauseState": "evidence_backed_client_App_Check_exchange_blocker",
+  "rootCauseEvidence": [
+    "installed_Play_signer_SHA1_078145A1EB2FFEC009192FF1E82DAED12FB1E8AC",
+    "existing_Firebase_Android_API_key_restriction_allows_only_SHA1_1E4345AA0707C8A4C74F5485B47B14E911923B46",
+    "zero_status_only_Cloud_Run_entries_for_current_youtubeProvider_revision_during_retries",
+    "no_private_verdict_token_nonce_request_payload_or_API_key_value_accessed"
+  ],
+  "correction": "Add the Play app-signing SHA1 as an additional allowed com.moolsocial.app Android application identity on the existing Firebase-created Android API key while preserving every existing restriction and key value.",
+  "acceptance": [
+    "cold_launch_real_catalogue_loads",
+    "bounded_search_list_results_load",
+    "video_detail_attribution_standard_controls_branding_ads_links_and_official_embedded_player_remain_intact",
+    "Shorts_real_catalogue_loads_without_forced_autoplay",
+    "offline_provider_error_and_retry_return_to_real_data",
+    "unconnected_connected_consent_disconnect_and_retry_are_truthful",
+    "no_declared_YouTube_use_case_expansion"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "devConfigurationWriteAuthorized": true,
+    "buildUploadAndInstallInheritedFromParent": true,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretOrPrivateVerdictAccessAuthorized": false
+  }
+}

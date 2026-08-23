@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-CAPSULE-SUBACTION-RECOVERY-FIX5-C22",
+  "state": "founder_rejected_installed_checksum_preserved_successor_c23_ticketed",
+  "classification": "mvp_required",
+  "actor": "release operator producing the one C22 successor for founder review on connected OPPO CPH2375",
+  "capability": "build one unique host-qualified profile APK, install it once in place, prove checksum identity and capture the cumulative device matrix",
+  "customerOutcome": "The founder reviews one checksum-proven C22 successor on OPPO with a cumulative six-family matrix and acceptance left pending.",
+  "classificationReason": "Founder acceptance requires real-device capsule transparency, composite legibility, interaction and continuity evidence after host qualification.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H-PRESELECTION-ASSESSMENT-20260809.md",
+  "founderRejectionEvidence": "docs/quality/UAW-PERSONAL-MVP-R60-21-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C23-TICKETS-20260809.md",
+  "successorTicket": "UAW-PERSONAL-MVP-MOOL-HOME-ACTION-HUB-RECOVERY-FIX6-C23",
+  "candidate": {"id":"UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H","versionName":"1.0.0-r60.21","versionCode":"2026080921","buildMode":"profile","qualifiedSourceFingerprint":"2368E36B47A631096FE0B24CDD87A67EC2F7C2390773B95F463FED0C4828D77D","installedSha256":"17AF5DC2353E7195A597555C88AA42B345AFFDA0EC160900B55B0D3E822691BE"},
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["existing_single_build_wrapper","existing_APK_machine_gate","existing_in_place_install_workflow","existing_OPPO_evidence_workflow"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["one_unique_successor_build_only_after_c22g","one_in_place_install_only_after_postbuild_validation","installed_checksum_identity","first_install_time_preserved","founder_visual_acceptance_rejected_successor_ticketed"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false},
+  "explicitExclusions": ["no_second_build_or_install","no_uninstall_data_clear_or_downgrade","no_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"]
+}

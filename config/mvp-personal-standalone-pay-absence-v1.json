@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R09-PERSONAL-STANDALONE-PAY-ABSENCE-V1",
+  "ticketId": "UAW-R09-PERSONAL-STANDALONE-PAY-ABSENCE",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "visibleMainActions": ["social", "buy", "eat", "ride", "book", "work"],
+  "globalActions": ["chat"],
+  "absentStandaloneActions": ["pay", "recharge", "bills", "scan-pay", "receipts"],
+  "paymentOwnership": "exact_transaction_order_booking_trip_or_work_record",
+  "implementationDisposition": "test_only_acceptance",
+  "newRuntimeOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "legacyRouteContainmentOwner": "UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT",
+  "explicitExclusions": [
+    "no_money_price_payment_receipt_refund_recharge_bill_scan_or_payout_change",
+    "no_route_deletion_or_deep_link_containment_in_R09",
+    "no_build_install_device_provider_backend_commit_push_deploy_or_promotion"
+  ]
+}

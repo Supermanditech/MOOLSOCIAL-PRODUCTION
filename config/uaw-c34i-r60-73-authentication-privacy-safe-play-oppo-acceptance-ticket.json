@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
+  "parentTickets": [
+    "UAW-C34H-R60-72-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "UAW-C33G-FIX1-GOOGLE-ACCOUNT-SELECTION-RETURN-CONFIGURATION-PARITY",
+    "UAW-C33G-FIX2-SOCIAL-IDENTITY-PROVIDER-TRUTH",
+    "UAW-C33G-FIX3-FEED-CREATE-ORIGIN-STATE-PROCESS-CONTAINMENT",
+    "UAW-C33H-FIX1-FIREBASE-PHONE-AUTH-INDEPENDENT-JOURNEY",
+    "UAW-C33M-FIX5-PUBLIC-REVIEW-FIREBASE-PASSWORDLESS-EMAIL-GATEWAY"
+  ],
+  "state": "registered_founder_authorized_preparation_and_selection_source_qualification_pending",
+  "classification": "mvp_required",
+  "severity": "privacy_and_release_acceptance_blocking",
+  "actor": "MoolSocial_Internal_Testing_personal_user_on_existing_OPPO_with_founder_only_authentication_dialog_control",
+  "capability": "receive_one_privacy_safe_successor_and_complete_supported_authentication_Social_and_whole_app_acceptance_without_Codex_opening_or_inspecting_private_account_surfaces",
+  "customerOutcome": "A personal user updates MoolSocial once from Google Play Internal Testing and can complete the supported authentication, Social and whole-app OPPO journeys while every account chooser, private identifier and credential step remains founder-only and no historical or new regression is accepted.",
+  "classificationReason": "C34H r60.72 is permanently rejected at 1/1/1/0 after a YouTube provider tap opened an Android account chooser containing private identifiers. This is a confirmed privacy and release-acceptance regression. C34I is the smallest complete successor: it changes no product behavior and adds only a shared fail-closed device-actor policy plus exact release state and qualification evidence.",
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.73",
+    "versionCode": "2026081373",
+    "candidateId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "minimumCompleteScope": [
+    "preserve_C34H_identity_AAB_Internal_Testing_release_OPPO_install_rejection_evidence_and_authoritative_1_1_1_0_counts_without_reuse_or repair",
+    "reuse_all_existing_product_authentication_Firebase_Social_browser_generic_build_Play_and_OPPO_owners_without_product_source_change",
+    "add_one_shared_fail_closed_device_acceptance_actor_policy_for_Codex_founder_and_system_owned_actions",
+    "classify_every_account_capable_provider_tile_system_account chooser_private_link_email_phone_OTP_and_credential action_as_founder_only_before_device acceptance",
+    "allow_Codex_only_sanitized_package_version_installer_activity_fatal_log_and_non_auth_public_or_gateway journey checks",
+    "require_fresh_exact_CPH2375_mirror_reselection_after_every_founder_device takeover_and_prohibit_reuse_of_stale screenshots_coordinates_or element indices",
+    "reject_the_candidate_immediately_if_a_private_identifier_chooser_secret_private_link_or_unplanned provider surface becomes visible_to_Codex",
+    "bind_fresh_C34I_ticket_state_aggregate_gate_recovery_cycle runner_launcher_and_Internal_Testing runbook_before_source seal",
+    "seal_the_complete_current_regression registry_and_source_then_run_two_fresh independent_zero_failure_cycles while real state remains_0_of_2",
+    "atomically_persist_2_of_2_after_both_summaries_and_pass_dual_host source replay_before founder_hidden_input authority",
+    "permit_exactly_one_founder_input_AAB_one_Internal_Testing_upload_activation_and_one_Play_in_place_OPPO update_only_after_their exact gates",
+    "complete_only_predeclared actor-owned postinstall journeys_and_keep_device_acceptance_at_zero_until_every_required blocker_has truthful retained evidence"
+  ],
+  "explicitExclusions": [
+    "no_product_runtime_UI_route_service_backend provider_or_Firebase configuration change",
+    "no_account_capable_provider_tap_system chooser account selection_private identifier screen_private link_email phone OTP_or credential handling_by_Codex",
+    "no_AAB_or_APK_during_initial preparation_and_selection",
+    "no_reuse_rebuild_reupload_reinstall_repair_or_promotion_of_C34H_r60_72",
+    "no_Play action_outside_Internal Testing",
+    "no_ADB install_sideload_uninstall_clear_data_downgrade_or_other device mutation_outside exact Play in_place_update gate",
+    "no_backend_Hosting_provider_rules_IAM_environment_or_Production deployment",
+    "no_email_SMS_YouTube quota_submission_API enablement_credential creation_funds_waiver_or production readiness claim"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_continuous_end_to_end_Internal_Testing_OPPO_testing_and_high impact_MVP successor authority_2026_08_17",
+    "founder_only_hidden input_account chooser_private identifier_email_phone OTP_and_private link handling",
+    "C34H_permanent_postinstall rejection_at_1_1_1_0_with_nonreusable_artifact",
+    "REG_2709_private_identifier chooser recurrence_and_REG_2710_successor planning wrapper recurrence preserved",
+    "fresh_registry_source seal_after_all_C34I owners_exist",
+    "two_fresh_independent complete_source_cycles_before_one founder input_AAB",
+    "separate_postbuild_preupload_postupload_preinstall_postinstall_and_journey gates"
+  ],
+  "testAndEvidencePlan": [
+    "dual_PowerShell shared_device_actor policy_and_C34I candidate gate_replay",
+    "negative fixtures_rejecting_Codex owned_account provider_taps_system chooser_private identifier_or_private link inspection",
+    "two_fresh complete_Flutter_backend_web_analyzer source_cycles_and exact_manifest evidence_while_real_state_stays_0_of_2",
+    "single_AAB_postbuild artifact_hash_bytes_package_version_signer_payload_source_and_state binding",
+    "Internal_Testing only_upload_activation_and_one_Play in_place_OPPO update",
+    "sanitized_OPPO package_version_installer_activity_cold_start_retained data_and fatal_ANR evidence",
+    "public_Guest Feed_and_protected Create gateway_without_auth provider action",
+    "founder performed_account authentication steps_with_Codex resuming_only_after_every_private system surface_is_closed",
+    "all_six_C33G acceptance blockers_resolved_with_exact_non_private journey evidence_before_device acceptance_count_can_become_one"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance",
+      "new_necessary_work"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/check-play-internal-aab-build-wrapper-c30t.ps1",
+      "scripts/check-release-runtime-configuration-c30w.ps1",
+      "scripts/check-uaw-c33g-fix4-unresolved-acceptance-blocker-pre-aab-ledger.ps1",
+      "scripts/check-codex-development-regression-memory.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "config/release-device-acceptance-actor-policy-c34i.json",
+      "scripts/check-release-device-acceptance-actor-policy-c34i.ps1",
+      "config/successor-aab-regression-hard-gate-state-c34i.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c34i.json",
+      "scripts/check-uaw-c34i-r60-73-authentication-privacy-safe-release-readiness.ps1",
+      "scripts/recover-uaw-c34i-r60-73-postbuild-lifecycle.ps1",
+      "scripts/run-uaw-c34i-r60-73-source-cycle.ps1",
+      "tmp/run-c34i-r60-73-single-aab-founder.ps1",
+      "docs/quality/UAW-C34I-PRESEALED-INTERNAL-TESTING-UPLOAD-RUNBOOK-20260817.md"
+    ],
+    "necessityProof": "Every product, authentication, Firebase, Social, browser, build, Play and OPPO implementation owner is reused. The sole new cross-candidate behavior is a test-only actor policy required because existing journey gates did not prevent Codex from opening a private system account surface. Candidate-specific state and gate files are necessary because C34H authorities are consumed and its artifact is permanently rejected. No screen, route, service, backend, provider or alternate build owner is created.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "candidatePreparationAndSelectionAuthorized": true,
+    "candidateIdentityApproved": true,
+    "sourceQualificationAuthorized": true,
+    "oneAabBuildAuthorizedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild": true,
+    "oneInPlaceOppoPlayUpdateAuthorizedAfterActivation": true,
+    "founderHiddenInputEntryAuthorized": true,
+    "founderOnlyAuthenticationDialogHandlingRequired": true,
+    "agentSecretPrivateIdentifierOrPrivateLinkAccessAuthorized": false,
+    "otherTrackAuthorized": false,
+    "adbInstallUninstallDataClearDowngradeOrSideloadAuthorized": false,
+    "backendHostingProviderOrProductionDeploymentAuthorized": false,
+    "realSmsSendAuthorized": false,
+    "youtubeQuotaOrEmailSubmissionAuthorized": false,
+    "fundsAuthorized": false
+  }
+}

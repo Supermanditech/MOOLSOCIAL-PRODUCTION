@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "stateId": "MOOLSOCIAL-CHAT-FULL-MODULE-C31C-GATE-STATE-20260814",
+  "ticketId": "UAW-C31C-PERSONAL-MVP-CHAT-FORWARD-RECIPIENT-CONTINUITY",
+  "state": "source_qualified_scoped_global_UI_lock_blocked_live_and_release_acceptance_held",
+  "predecessor": {
+    "ticketId": "UAW-C31B-PERSONAL-MVP-CHAT-UNREAD-READ-RECEIPT-CONTINUITY",
+    "historicalManifestSha256": "7EA3C39F7A4A5D372DE675DA7E63472A5299AFB05025A416F805EBC932556015",
+    "C31AAndC31BRegressionsPreserved": true
+  },
+  "repository": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "sourceManifest": {
+    "path": "artifacts/quality/uaw-c31c-personal-mvp-chat-forward-recipient-continuity-20260814-01/source-manifest-c31c.txt",
+    "files": 34,
+    "sha256": "0A8A2142DB52D737185A0D384CA65E1EDF8D2862CDE40DF69458299D10CEE43F"
+  },
+  "qualification": {
+    "identicalCycles": 2,
+    "cycleSourceFingerprintFiles": 36,
+    "cycleSourceFingerprintSha256": "B9CE98B3EE27BDA612C8C00A83D4A33322E5965DAFE39937AE0B34E6C5884576",
+    "backendTypecheck": "passed_each_cycle",
+    "backendTests": {
+      "tests": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    "flutterChatTests": {
+      "files": 5,
+      "tests": 39,
+      "passed": 39,
+      "skipped": 0,
+      "failed": 0
+    },
+    "wholeMobileAnalyzer": "no_issues_each_cycle",
+    "C31AStaticGateBothPowerShellHosts": "passed_each_cycle",
+    "C31BStaticGateBothPowerShellHosts": "passed_each_cycle",
+    "C31CStaticGateBothPowerShellHosts": "passed_each_cycle",
+    "mvpScopeGate": "passed_each_cycle",
+    "regressionMemoryGate": {
+      "entries": 2114,
+      "implementationApplicable": 1210,
+      "passedEachCycle": true
+    }
+  },
+  "implementedOutcome": [
+    "authenticated_idempotent_forward_message_operation",
+    "source_and_target_thread_membership_before_write",
+    "exact_server_owned_text_copy_with_forwarded_boolean",
+    "no_source_conversation_metadata_in_target_response_or_payload",
+    "existing_conversation_picker_excluding_current_thread",
+    "explicit_recipient_confirmation_before_mutation",
+    "failed_forward_retry_reuses_exact_idempotency_key",
+    "target_unread_read_reply_reaction_and_delivery_continuity",
+    "new_C31C_goldens_preserve_all_predecessor_PNG_bytes"
+  ],
+  "referenceBoundary": {
+    "approvedChatScreenshotInManifest": false,
+    "suppliedMessagingScreenshotsBehavioralOnly": true,
+    "nativeFlutterDirectiveControls": true,
+    "thirdPartyTradeDressCopied": false
+  },
+  "globalApprovedUiLock": {
+    "state": "failed_preexisting_unrelated_protected_owner",
+    "owner": "apps/mobile/test/platform_configuration_test.dart",
+    "expectedSha256": "deffe5cfd7cd7c1432d6057e5c045a1569dc3f71fbd5f9d8ef26251e984a68ca",
+    "currentSha256": "725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1",
+    "C31CModifiedOwner": false,
+    "releaseClaimBlocked": true,
+    "evidence": "docs/quality/UAW-C31C-UNRELATED-PLATFORM-CONFIGURATION-UI-LOCK-DRIFT-20260814.md"
+  },
+  "authority": {
+    "scopedSourceImplementationComplete": true,
+    "liveDevDataWriteAuthorized": false,
+    "backendDeploymentAuthorized": false,
+    "hostingOrProviderMutationAuthorized": false,
+    "buildAuthorized": false,
+    "PlayUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "protectedReleaseState": {
+    "r60_46BuildUploadInstallCounts": "1/0/0",
+    "r60_47BuildUploadInstallCounts": "1/1/1",
+    "r60_47RuntimeState": "failed_cold_start_missing_server_client_ID",
+    "successorAabAuthorized": false
+  }
+}

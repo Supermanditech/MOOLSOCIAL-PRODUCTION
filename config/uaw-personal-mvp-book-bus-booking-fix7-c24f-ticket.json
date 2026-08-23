@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-BOOK-BUS-BOOKING-FIX7-C24F",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Bus appears once under Book and opens a direct From, To and Date search with truthful operator, time, seat and fare review before booking.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-BOOK-BUS-BOOKING-FIX7-C24F-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","new_necessary_work"],"sharedImplementationOwners":["BookSession","BookGateway","BookPageScaffold","Mool_Home_Book_family","journey_router","shared_service_home_primitives"],"newScreens":["BusBookingScreen"],"newRoutes":["/app/book/bus"],"newBackendOwners":[],"newSubactions":["Book/Bus"],"necessityProof":"Founder explicitly added Bus; exact duplicate search found zero production, policy or test owners outside regression-memory prose. One existing-domain screen and route are the minimum non-duplicate implementation."},
+  "acceptance": ["Book_family_has_Doctor_Salon_Bus_once","From_To_Date_and_swap","Today_and_Tomorrow_shortcuts","search_results_show_operator_departure_arrival_duration_seats_rating_and_fare","one_select_or_book_action_minimum_44px","existing_BookGateway_extended_not_duplicated","no_fabricated_live_operator_payment_or_ticket_claim","adaptive_and_accessible"],
+  "execution": {"referenceWriteAuthorized":true,"runtimeSourceWriteAuthorized":true,"testOrGateWriteAuthorized":true,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

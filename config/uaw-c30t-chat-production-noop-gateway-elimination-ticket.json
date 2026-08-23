@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-PRODUCTION-NOOP-GATEWAY-ELIMINATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_production_boundary_ambiguity",
+  "actor": "signed_in_Chat_user_sending_through_the_Dev_production_gateway",
+  "customerOutcome": "The production Chat session owns only the authenticated Dev gateway and cannot retain or silently fall back to a review no-op sender.",
+  "finding": "ChatSession.production correctly uses ChatGateway for sends, but it also instantiated a dormant ReviewChatSendGateway. The branch was unreachable while the production gateway remained non-null, yet its presence weakened the permanent no-fake/no-op release proof.",
+  "minimumCorrection": [
+    "make_the_review_sender_nullable_and_present_only_in_the_explicit_review_constructor",
+    "make_the_production_constructor_store_no_review_sender",
+    "fail_closed_if_a_nonproduction_session_has_neither_gateway",
+    "prove_main_injects_ChatSession_production_and_the_production_initializer_contains_no_ReviewChatSendGateway"
+  ],
+  "explicitExclusions": [
+    "no_new_Chat_feature_or_runtime_message_write",
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "14 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/60-chat-production-noop-elimination-tests.log",
+    "evidenceSha256": "1664B99A4B8248945764AC04C696FC888422A5852E4786227B1DBC16761B480D",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/61-flutter-analyze-chat-production-noop-elimination.log",
+    "analyzeEvidenceSha256": "27EE9FDA50E2DD810F23A1B1339680E67E951FBECAE7761F40C32804C9E411BB",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkExists": false
+  }
+}

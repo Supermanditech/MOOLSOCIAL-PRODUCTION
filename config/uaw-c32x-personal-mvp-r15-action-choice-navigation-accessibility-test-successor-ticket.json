@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32X-PERSONAL-MVP-R15-ACTION-CHOICE-NAVIGATION-ACCESSIBILITY-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32W-PERSONAL-MVP-R15-CURRENT-MOOL-HOME-ACCESSIBILITY-TEST-SUCCESSOR",
+  "finding": "REG-20260815-2285-C32W-R15-HIDDEN-ACTION-CHOICE-NAVIGATION-OWNER",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "R15 compact operability verifies the current standalone action-choice launcher, explicit outside dismissal and root Back callback without requiring removed root-rail or Chat controls.",
+  "minimumCompleteScope": [
+    "migrate_only_the_hidden_MvpActionChoiceRoot_navigation_assertions_inside_R15",
+    "assert_mool_home_launcher_minimum_target_and_connected_menu",
+    "assert_explicit_outside_dismiss_closes_menu_then_Back_invokes_root_callback",
+    "assert_removed_mool_action_root_selected_and_root_chat_controls_remain_absent",
+    "preserve_all_action_operability_projection_and_legacy_recovery_coverage",
+    "run_full_R15_exact_current_action_choice_authority_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_MvpActionChoiceRoot_or_navigation_change",
+    "no_restoration_of_removed_selected_main_or_Chat_compatibility_controls",
+    "no_backend_build_Play_OPPO_provider_secret_email_quota_or_external_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33E-R60-48-PLAY-INSTALLED-AUTH-LOGIN-DEVICE-REPRODUCTION",
+  "parentTicket": "UAW-C30Z-R60-48-AUTHENTICATION-METHOD-TRUTH-AND-GUEST-FEED-RECOVERY",
+  "state": "founder_authorized_existing_play_client_reproduction_selected_no_build_install_provider_or_secret_authority",
+  "classification": "mvp_required",
+  "severity": "release_blocking_authentication_device_evidence",
+  "actor": "signed_out_personal_user_entering_public_Feed_or_authenticating_from_a_protected_Social_action_on_the_existing_Play_installed_OPPO_client",
+  "customerOutcome": "The founder receives truthful sanitized OPPO evidence for r60.48 guest Feed and authentication/login behavior, with the failed historical binary kept distinct from the later C30Z source repair and no private account or credential exposure.",
+  "classificationReason": "Authentication is a core launch journey and the founder confirmed a release-blocking r60.48 failure. Bounded reproduction is required to attribute the installed behavior and define successor acceptance without treating the old binary as proof of repaired source.",
+  "minimumCompleteScope": [
+    "verify_exact_OPPO_serial_model_package_version_version_code_and_Play_installer",
+    "launch_and_tap_only_the_existing_Play_installed_r60_48_client",
+    "distinguish_public_guest_Feed_entry_from_protected_create_like_comment_repost_share_save_and_message_authentication_gates",
+    "observe_auth_surface_Back_cancel_retry_and_generic_failure_recovery_without_reading_account_chooser_content",
+    "bind_confirmed_device_findings_to_C30Z_source_qualification_and_exact_successor_acceptance_needs",
+    "capture_only_sanitized_non_secret_package_route_result_and_failure_class_evidence"
+  ],
+  "explicitExclusions": [
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_uninstall_clear_data_downgrade_sideload_or_ADB_install",
+    "no_agent_account_selection_email_address_account_list_password_API_key_OAuth_client_ID_token_nonce_App_Check_verdict_private_key_or_attestation_access",
+    "no_Firebase_Google_YouTube_X_Facebook_Instagram_Apple_email_SMS_provider_console_or_account_mutation",
+    "no_backend_Hosting_rules_IAM_deployment_email_SMS_quota_submission_funds_or_external_communication",
+    "no_claim_that_r60_48_validates_the_post_r60_48_C30Z_source_repair"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_15_direction_to_switch_to_auth_login_OPPO_testing",
+    "C30Z_two_identical_source_cycles_qualified_and_r60_48_failure_counts_1_1_1_preserved",
+    "founder_must_perform_any_private_account_choice_if_a_live_provider_attempt_is_required",
+    "one_separately_authorized_successor_AAB_Internal_Testing_activation_and_in_place_Play_update_is_required_to_validate_C30Z_on_device",
+    "provider_readiness_and_any_external_change_remain_separately_gated"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "apps/mobile/test/c30t_social_auth_and_feed_gateway_test.dart",
+      "apps/mobile/test/screen03_session_test.dart",
+      "config/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-ticket.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The installed Play client, C30Z source owners and existing device evidence contracts already cover the journey. Only a bounded acceptance record is necessary; no duplicate presentation, route, session, gateway, backend or release owner is needed.",
+    "robustnessCoverage": [
+      "exact_Play_installed_identity",
+      "guest_read_versus_protected_write_auth_boundary",
+      "Back_cancel_retry_and_failure_recovery",
+      "private_account_and_secret_non_observation",
+      "historical_binary_versus_repaired_source_separation"
+    ],
+    "adjustments": [
+      "stop_the_interrupted_read_only_Buy_audit_without_Buy_mutation",
+      "reuse_existing_r60_48_and_C30Z_evidence",
+      "hold_private_provider_interaction_for_founder_manual_action"
+    ],
+    "explicitExclusions": [
+      "no_new_UI_route_service_backend_owner_or_release_candidate",
+      "no_build_install_provider_deployment_secret_or_external_write"
+    ],
+    "dependenciesAndApprovals": [
+      "founder_current_OPPO_testing_direction",
+      "C30Z_source_qualification",
+      "future_successor_release_and_live_provider_authority"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33e-r60-48-play-installed-auth-login-device-reproduction-ticket.json"
+  },
+  "testAndEvidencePlan": [
+    "read_only_ADB_package_identity_and_Play_installer_check",
+    "bounded_existing_client_guest_Feed_and_protected_action_route observations",
+    "Back_cancel_retry_without_private_account_inspection",
+    "founder_manual_provider_choice_only_if_needed",
+    "C30Z_gate_focused_auth_tests_and_whole_mobile_analyzer_replay_before_any_successor_request"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "existingPlayClientLaunchAndTapAuthorized": true,
+    "founderManualPrivateAccountSelectionOnly": true,
+    "deviceInstallOrUpdateAuthorized": false,
+    "successorBuildOrPlayAuthorized": false,
+    "backendOrProviderWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  }
+}

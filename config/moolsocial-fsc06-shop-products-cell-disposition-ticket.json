@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC06-SHOP-PRODUCTS-CELL-DISPOSITION",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "completed_nonbuild_gates_passed",
+  "classification": "mvp_required",
+  "customerOutcome": "A Shop customer uses Shop, Wholesale and Orders without a duplicate Products cell or an invented Offers destination.",
+  "founderAuthority": "docs/quality/MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-FINDINGS-20260810.md",
+  "predecessorCompletion": "docs/quality/MOOLSOCIAL-FSC01-SOCIAL-REDUNDANT-FAMILY-ROOT-REMOVAL-COMPLETION-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The Shop family-root and Products local cell resolve to the same /app/buy?sub=shop customer owner. Existing offers are contextual cart and checkout benefits, not a separate destination outcome."
+  },
+  "offersDisposition": "do_not_create_destination_existing_offers_are_transaction_contextual_only",
+  "minimumCompleteScope": [
+    "remove_the_duplicate_Products_local_action_and_shared_catalogue_entry",
+    "preserve_Shop_as_the_one_tap_family_root_and_default_route",
+    "preserve_Wholesale_and_Orders_direct_local_actions",
+    "preserve_contextual_cart_checkout_coupon_and_payment_offer_owners",
+    "focused_Shop_route_navigation_and_unaffected_family_tests"
+  ],
+  "explicitExclusions": [
+    "no_Offers_screen_route_backend_or_filler_content",
+    "no_catalogue_cart_checkout_coupon_or_payment_offer_behavior_change",
+    "no_Social_YouTube_Feed_or_Create_change",
+    "no_C28D_successor_or_build_install_device_external_service_action",
+    "no_credentials_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "FSC01_complete_with_nonbuild_gates",
+    "founder_authority_received_2026_08_10",
+    "mvp_delivery_discipline_preselection_gate",
+    "permanent_regression_memory_gate",
+    "accepted_Buy_owner_and_installed_OPPO_r60_27_identity_preserved"
+  ],
+  "testAndEvidencePlan": [
+    "focused_widget_test_Shop_root_plus_Wholesale_and_Orders_without_Products_or_Offers",
+    "Shop_Wholesale_Orders_one_tap_route_and_Back_continuity",
+    "other_family_catalogue_regression_coverage",
+    "format_analyze_approved_UI_Buy_protection_and_nonbuild_navigation_gates"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "completionEvidence": "docs/quality/MOOLSOCIAL-FSC06-SHOP-PRODUCTS-CELL-DISPOSITION-COMPLETION-20260810.md",
+  "protectedBuySuccessorSeal": "artifacts/quality/moolsocial-fsc06-shop-products-cell-disposition-20260810-01/BASELINE.json",
+  "deviceAcceptance": "pending_no_build_or_install_authorized"
+}

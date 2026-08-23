@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "checkpointId": "MOOLSOCIAL-POST-UAW-CUMULATIVE-OPPO-QUALIFICATION-CHECKPOINT-20260806",
+  "recordedAt": "2026-08-06T15:48:17+05:30",
+  "workspace": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "candidate": {
+    "id": "UAW-PERSONAL-R01-R15-CUMULATIVE-OPPO-QUALIFICATION-FIX1",
+    "state": "technically_device_qualified_founder_review_pending",
+    "versionName": "1.0.0-r60.1",
+    "versionCode": "2026080601",
+    "buildMode": "profile",
+    "apkBytes": 134410961,
+    "apkSha256": "47CE31B544DBD52EB799869F406BC093DAEC44016DE8280D59651A7BCC50E64A",
+    "sourceManifestSha256": "893A7623F441A9129CF48CFB956612D7FB5FD2B14A194E2C254103A8CBC1C296",
+    "sourceFileCount": 2572,
+    "technicalEvidence": "artifacts/quality/uaw-personal-r01-r15-cumulative-oppo-qualification-fix1-20260806-01/70-technical-qualification.md"
+  },
+  "device": {
+    "model": "OPPO CPH2375",
+    "serial": "2b3e0f71",
+    "connectedAtCheckpoint": true,
+    "installedVersionName": "1.0.0-r60.1",
+    "installedVersionCode": "2026080601",
+    "installedApkSha256": "47CE31B544DBD52EB799869F406BC093DAEC44016DE8280D59651A7BCC50E64A",
+    "inPlaceUpgrade": true,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "parkedAt": "Work > Onboard > Continue Setup",
+    "founderReview": "pending",
+    "observationPoints": "artifacts/quality/uaw-personal-r01-r15-cumulative-oppo-qualification-fix1-20260806-01/69-founder-review-observation-points.md"
+  },
+  "protectedPredecessor": {
+    "id": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "preserved": true,
+    "rollbackApkBytes": 134214109,
+    "rollbackApkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+    "rollbackArtifact": "artifacts/quality/uaw-personal-r01-r15-cumulative-oppo-qualification-fix1-20260806-01/04-predecessor-installed-fix7-base.apk"
+  },
+  "manifestContinuation": {
+    "manifestChildCount": 45,
+    "completedChildren": [
+      "UAW-R01",
+      "UAW-R02",
+      "UAW-R03",
+      "UAW-R05",
+      "UAW-R06",
+      "UAW-R07",
+      "UAW-R08",
+      "UAW-R09",
+      "UAW-R10",
+      "UAW-R11",
+      "UAW-R12",
+      "UAW-R13",
+      "UAW-R14",
+      "UAW-R15"
+    ],
+    "heldChildren": [
+      "UAW-R04",
+      "UAW-R16-UAW-R45"
+    ],
+    "activeChild": null,
+    "state": "terminal_until_dependency_or_founder_input_changes",
+    "reason": "No independently executable child remains without an authoritative dependency or founder-final gate change.",
+    "dependencyCheckpoint": "docs/quality/MOOLSOCIAL-POST-UAW-CUMULATIVE-OPPO-QUALIFICATION-CHECKPOINT-20260806.md"
+  },
+  "prohibitionsPreserved": {
+    "commit": false,
+    "push": false,
+    "deploy": false,
+    "promote": false,
+    "productionWrite": false,
+    "credentialAccess": false,
+    "liveProviderAction": false,
+    "externalMessageOrCall": false,
+    "fundsMovement": false,
+    "screenbookMutation": false
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SOCIAL-ACCOUNT-CREATOR-WORKSPACE-COMPLIANCE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_review_scope_misrepresentation_blocker",
+  "actor": "YouTube_reviewer_or_founder_opening_the_Social_account_sheet",
+  "customerOutcome": "Social Account exposes the real minimum-read-only YouTube connection, disconnect and revocation journey and does not route reviewers into an in-memory creator distribution or upload simulation.",
+  "minimumCorrection": [
+    "remove_the_Social_account_entry_point_to_the_in_memory_Creator_workspace",
+    "replace_it_with_the_real_readonly_YouTube_connection_route",
+    "state_minimum_readonly_disconnect_and_Google_permission_control_truth",
+    "leave_broader_Creator_files_and_routes_unchanged",
+    "prove_the_Social_account_sheet_contains_no_Creator_workspace_claim"
+  ],
+  "explicitExclusions": [
+    "no_broad_Creator_workspace_redesign_or_deletion",
+    "no_YouTube_upload_capability_or_scope",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "12 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/social-account-youtube-compliance-focused-tests.log",
+    "evidenceSha256": "2BF1EA7CF24BB61F51586C29DE9B15A438D3176E81B7B0B3E8B33D5617586C7D",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

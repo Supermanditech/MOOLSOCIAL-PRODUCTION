@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-SEARCH-FOOTER-COPY-OPPO-REVIEW-C30F",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-FULL-PAGE-SEARCH-IME-COPY-C30C",
+    "UAW-PERSONAL-MVP-SOCIAL-FOOTER-VISUAL-COMPACTION-C30D",
+    "UAW-PERSONAL-MVP-SOCIAL-CONTENT-SERVICE-CUSTOMER-COPY-C30E"
+  ],
+  "state": "device_gate_rejected_r60_37_preserved_successor_not_selected",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user",
+  "customerOutcome": "One fresh checksum-matched OPPO profile candidate exposes full-page YouTube Search, the policy-safe header without a top YouTube logo, the flat divider-free Social footer and customer-safe Social recovery copy for founder review while deployment remains held.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "config/apk-regression-gate-state-c30f.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C30C through C30E are source-qualified but not present in protected r60.36. A unique profile APK and one in-place OPPO install are the minimum evidence required for founder review; the existing single-build wrapper and APK machine gate are reused."
+  },
+  "minimumCompleteScope": [
+    "seal_one_52_file_source_manifest_and_two_identical_164_test_final_cycles",
+    "qualify_one_unique_r60_37_profile_APK_with_exact_source_checksum_signature_package_and_version",
+    "install_once_in_place_on_OPPO_2b3e0f71_without_uninstall_data_clear_or_downgrade",
+    "run_the_first_native_exported_semantics_bounds_gate_before_any_interaction",
+    "replay_Home_full_page_Search_Watch_return_footer_Mool_Chat_Feed_Create_and_keyboard_paths",
+    "request_founder_review_without_deploying_backend_provider_rules_Firebase_or_the_app"
+  ],
+  "explicitExclusions": [
+    "no_backend_function_rule_provider_profile_Firebase_hosting_or_app_store_deployment",
+    "no_fake_demo_seed_or_MoolSocial_hosted_YouTube_content",
+    "no_credential_value_logging_copy_or_persistence",
+    "no_uninstall_data_clear downgrade second_build or second_install",
+    "no_promotion commit push reference_write message call or fund"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_and_2026_08_12_ticket_fix_OPPO_testing_founder_review_deployment_on_hold",
+    "sourceAuditAndFocusedTestFixAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "candidate": {
+    "versionName": "1.0.0-r60.37",
+    "versionCode": "2026081237",
+    "buildMode": "profile",
+    "deviceSerial": "2b3e0f71",
+    "packageName": "com.moolsocial.app",
+    "sourceManifestPath": "artifacts/quality/uaw-personal-mvp-social-search-footer-copy-oppo-review-c30f-r60-37-20260812-01/source-aggregate-manifest.txt",
+    "sourceManifestSha256": "4D53F61B5159FFB8F9AC90066D4F95070BC53726C7EF715C09606C0D5A216701",
+    "sourceFileCount": 52,
+    "oneBuildOnly": true,
+    "oneInPlaceInstallOnly": true
+  },
+  "dependencies": [
+    "C30E_final_full_analysis_clean",
+    "C30E_two_identical_164_test_final_cycles_passed",
+    "full_user_facing_copy_gate_passed",
+    "OPPO_2b3e0f71_online_with_r60_36_preserved_until_fresh_artifact_qualification",
+    "fresh_APK_machine_permanent_regression_and_native_bounds_gates"
+  ],
+  "testPlan": [
+    "fresh_prebuild_branch_HEAD_dirty_inventory_source_manifest_and_runtime_context_seal",
+    "single_profile_build_and_APK_checksum_signature_package_version_qualification",
+    "single_in_place_install_and_installed_identity_checksum_proof",
+    "first_native_44_logical_pixel_exported_semantics_gate_before_interaction",
+    "OPPO_semantic_replay_with_fresh_hierarchy_before_each_tap",
+    "founder_review_handoff_with_deployment_hold"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "backendAndProviderDeploymentHeld": true,
+    "founderReviewRequiredBeforeAnyDeployment": true
+  }
+}

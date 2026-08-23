@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "BUY-MVP-NO-RESERVATION-OFFER-READINESS",
+  "state": "dependency_held_before_execution",
+  "classification": "mvp_required",
+  "qualifiedDependency": {
+    "id": "SUP-003",
+    "contractPath": "backend/functions/src/commerce/catalogue_contract.ts",
+    "contractSha256": "471E0D05EEFF969E4EE62D1D2A6C94259145BCA7D3E133B7800739963FF5DCCE"
+  },
+  "missingDependencies": [
+    "named_inventory_owner",
+    "named_fulfilment_owner",
+    "qualified_fresh_inventory_and_serviceability_truth_contract"
+  ],
+  "blockingAuthority": "docs/delivery/PRODUCTION-FOUNDATION-TICKETS-20260803.md",
+  "blockingState": "SUP-004_BLOCKED",
+  "sourceWrites": 0,
+  "testWrites": 0,
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "liveCommands": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "holdEvidence": "docs/quality/BUY-MVP-NO-RESERVATION-OFFER-READINESS-DEPENDENCY-HOLD-20260807.md"
+}

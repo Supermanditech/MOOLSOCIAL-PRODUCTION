@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-PROFESSIONAL-DESIGN-SYSTEM-FIX1-C16",
+  "parentTicket": "UAW-PERSONAL-MVP-TRANSPARENT-GRADIENT-WAVE-FAMILY-CONNECTION-FIX1-C15",
+  "state": "r60_16_installed_checksum_matched_founder_device_rejected_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Every main action exposes a polished, globally consistent, thumb-reachable subaction family that preserves destination content, communicates hierarchy clearly and moves with finite production-grade motion.",
+  "founderRejectedCandidate": {
+    "id": "UAW-PERSONAL-MVP-TRANSPARENT-GRADIENT-WAVE-FAMILY-CONNECTION-FIX1-C15",
+    "versionName": "1.0.0-r60.15",
+    "versionCode": "2026080815",
+    "apkSha256": "94443C63382205E5E47DC7BBA2D23D98C579B5AADB5C34ADBC443448E1EB0968",
+    "device": "OPPO_CPH2375_2b3e0f71",
+    "result": "checksum_matched_functional_connection_present_visual_system_founder_rejected"
+  },
+  "founderConfirmedDefects": [
+    "Social_Buy_Eat_Ride_Book_and_Work_subaction_toggle_design_is_not_professional",
+    "subaction_layer_hinders_or_visually_displaces_background_product_and_content_grids",
+    "typography_icon_spacing_selected_state_and_motion_are_not_globally_uniform",
+    "Buy_Shop_Wholesale_Medicine_Orders_still_read_as_an_edge_to_edge_strip_lane",
+    "Eat_Order_Food_and_Book_Table_are_overstretched_and_use_unstandardized_text_scale",
+    "Ride_Book_and_Work_repeat_the_same_variable_count_spacing_and_family_cohesion_failure",
+    "main_action_and_subaction_switches_still_feel_like_unrelated_new_pages_instead_of_one_native_app_shell",
+    "the_full_bottom_rail_does_not_always_feel_visually_native_to_the_destination_surface_and_navigation_transition",
+    "C15_met_static_geometry_but_did_not_deliver_founder_acceptable_visual_quality"
+  ],
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-SUBACTION-DESIGN-TOKEN-AND-ADAPTIVE-LAYOUT-FIX1-C16A",
+    "UAW-PERSONAL-MVP-SOCIAL-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16B",
+    "UAW-PERSONAL-MVP-BUY-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16C",
+    "UAW-PERSONAL-MVP-EAT-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16D",
+    "UAW-PERSONAL-MVP-RIDE-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16E",
+    "UAW-PERSONAL-MVP-BOOK-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16F",
+    "UAW-PERSONAL-MVP-WORK-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16G",
+    "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX1-C16H"
+  ],
+  "children": [
+    {
+      "ticketId": "UAW-PERSONAL-MVP-SUBACTION-DESIGN-TOKEN-AND-ADAPTIVE-LAYOUT-FIX1-C16A",
+      "scope": "one shared native Flutter design owner for typography icons spacing selection variable-count layout content safety finite motion semantics and reduced motion"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-SOCIAL-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16B",
+      "scope": "Shorts Videos Feed and Create using the shared C16A system without Social provider or content changes"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-BUY-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16C",
+      "scope": "Shop Wholesale Medicine and Orders without an edge-to-edge strip lane or obscured product interactions"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-EAT-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16D",
+      "scope": "Order Food and Book Table using a compact adaptive two-action composition rather than full-width overstretch"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-RIDE-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16E",
+      "scope": "Bike Auto and Cab using the shared system while preserving the single in-place booking owner"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-BOOK-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16F",
+      "scope": "Doctor and Salon using the same compact adaptive two-action composition"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-WORK-SUBACTION-PROFESSIONAL-CONFORMANCE-FIX1-C16G",
+      "scope": "Earn Today and Workspace using the same compact adaptive two-action composition"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX1-C16H",
+      "scope": "two host cycles one unique machine-gated successor APK checksum-matched in-place OPPO install and real-user screenshot plus motion replay across all six families"
+    }
+  ],
+  "mandatoryOppoAudit": {
+    "captureBeforeDesign": ["social", "buy", "eat", "ride", "book", "work"],
+    "captureSelectedStates": "every current subaction at least once",
+    "captureMotion": "left right and cross-route finite selection movement",
+    "inspect": ["content_occlusion", "tap_reach", "typography", "icon_scale", "spacing", "family_connection", "selected_state", "global_uniformity", "compact_text", "large_text", "reduced_motion"]
+  },
+  "globalDesignContract": {
+    "singleSharedOwner": true,
+    "edgeToEdgeStripOrPanelAllowed": false,
+    "backgroundContentMayBeObscuredOrOwnHiddenHitTargets": false,
+    "typographyIconSpacingAndSelectedStateGloballyTokenized": true,
+    "variableActionCountsUseAdaptiveLayout": true,
+    "singleNativeShellContinuityRequired": true,
+    "globalRailRemainsVisuallyAnchoredAcrossMainActionSwitches": true,
+    "destinationAndSubactionContentTransitionsBehindStableNavigation": true,
+    "mainOrSubactionSwitchMayFeelLikeUnrelatedPageNavigation": false,
+    "minimumTapTarget": 44,
+    "routineTapBudget": 1,
+    "motion": "finite_directional_event_driven_with_immediate_reduced_motion",
+    "globalRailGeometryOrderAndMeaning": "unchanged"
+  },
+  "featureExpansionRule": {
+    "fillerActionsForVisualSymmetryAllowed": false,
+    "newSubactionAllowedOnlyWhen": [
+      "relevant_customer_outcome_is_documented",
+      "existing_owner_reuse_and_duplicate_search_are_complete",
+      "truthful_route_state_copy_and_acceptance_coverage_exist",
+      "MVP_scope_and_founder_authority_are_recorded_before_implementation"
+    ]
+  },
+  "explicitExclusions": [
+    "no_top_promotion_zone_subactions_modal_palette_more_menu_or_extra_tap",
+    "no_change_to_founder_approved_global_rail_geometry_order_or_meaning",
+    "no_fabricated_feature_route_state_inventory_or_backend_to_balance_visual_counts",
+    "no_Screens_01_03_Social_provider_Buy_commercial_logic_credentials_messages_calls_payments_funds_or_Production",
+    "no_commit_push_deploy_promotion_uninstall_data_clear_downgrade_or_evidence_deletion",
+    "no_second_C15_build_or_install"
+  ],
+  "buildAndInstall": {
+    "authorizedSuccessorAfterHostQualification": true,
+    "authorizedNow": false,
+    "oneUniqueBuildAndOneInPlaceInstallOnly": true
+  },
+  "acceptance": [
+    "founder_predecessor_screenshot_audit_for_all_six_destinations",
+    "one_shared_adaptive_design_owner_and_six_destination_conformance_tests",
+    "no_edge_to_edge_strip_panel_or_product_hit_target_occlusion",
+    "uniform_type_icon_spacing_selection_semantics_motion_and_reduced_motion",
+    "main_and_subaction_switches_retain_one_native_shell_with_the_global_rail_visually_anchored",
+    "destination_identity_changes_without_an_unrelated_new_page_or_navigation_reset_feel",
+    "compact_large_text_and_variable_count_fitment",
+    "C10A_through_C15_navigation_route_Back_Mool_Chat_and_state_contracts_remain_green",
+    "two_complete_affected_host_regression_cycles",
+    "one_separately_machine_gated_successor_APK_and_checksum_matched_OPPO_replay",
+    "founder_OPPO_acceptance_required_before_completion"
+  ],
+  "auditEvidence": "docs/quality/UAW-C16-R60-15-GLOBAL-SUBACTION-DESIGN-SYSTEM-FOUNDER-REJECTION-20260808.md"
+}

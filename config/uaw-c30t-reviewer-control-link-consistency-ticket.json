@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-REVIEWER-CONTROL-LINK-CONSISTENCY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_hosting_and_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_reviewer_revocation_and_user_control_consistency",
+  "actor": "YouTube_compliance_reviewer_or_connected_MoolSocial_user",
+  "customerOutcome": "The Android reviewer controls and every public policy, support, disconnect and deletion page open one clear Google Account destination for reviewing or revoking access.",
+  "minimumCorrection": [
+    "retain_the_three_MoolSocial_owned_privacy_disconnect_and_deletion_routes",
+    "align_all_public_Google_revocation_links_with_the_Android_permissions_destination",
+    "protect_the_exact_four_Android_control_destinations_and_four_public_page_destinations"
+  ],
+  "explicitExclusions": [
+    "no_hosting_deploy",
+    "no_oauth_scope_or_provider_change",
+    "no_AAB_APK_upload_install_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "hostingDeployAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "webTests": "7 passed, 0 failed",
+    "webEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/24-reviewer-control-web-tests.log",
+    "webEvidenceSha256": "994074921649F49BCCCC611D395605886ECEB148368E1F66C988CD3DE791B5AE",
+    "flutterTests": "14 passed, 0 failed",
+    "flutterEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/25-reviewer-control-flutter-tests.log",
+    "flutterEvidenceSha256": "39AA2786A0102EA0998A7313A63E197B3C6E11978159E8035CC69B19ED6706B4",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/26-flutter-analyze-reviewer-controls.log",
+    "analyzeEvidenceSha256": "63B1EE8541E42767019413F8BA94FB8DA85A9D6148F90E3B3C0943F37F355B81"
+  }
+}

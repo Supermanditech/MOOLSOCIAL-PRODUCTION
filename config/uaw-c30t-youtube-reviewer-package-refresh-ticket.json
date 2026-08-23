@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-REVIEWER-PACKAGE-REFRESH",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_draft_complete_final_evidence_and_founder_approval_pending",
+  "classification": "mvp_required",
+  "severity": "youtube_deadline_reviewer_package_identity",
+  "actor": "founder_reviewing_the_unsent_same_thread_response",
+  "customerOutcome": "The next founder review uses a C30T-specific draft with the valid private tester link and no stale C30O/C30Q artifact claim, while every unqualified evidence field remains visibly held.",
+  "minimumCorrection": [
+    "preserve_historical_C30O_and_C30Q_packages",
+    "create_a_C30T_specific_machine_package_and_human_draft",
+    "include_the_valid_private_Internal_Testing_link_and_exact_target_identity",
+    "leave_artifact_Play_OPPO_and_screencast_evidence_null_until_qualified",
+    "retain_the_exact_declared_read_only_use_case_and_no_upload_boundary"
+  ],
+  "explicitExclusions": [
+    "no_Gmail_draft_reply_or_send",
+    "no_quota_submission",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localDraftPreparationAuthorized": true,
+    "gmailOrQuotaActionAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "machinePackage": "config/youtube-api-compliance-reviewer-package-c30t.json",
+    "humanDraft": "docs/quality/YOUTUBE-API-COMPLIANCE-C30T-SAME-THREAD-DRAFT-AND-REVIEWER-PACKAGE-20260813.md",
+    "holdGateEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/30-youtube-reviewer-package-hold-gate.log",
+    "holdGateEvidenceSha256": "E4C87D23E1BE6BD5B6AD2F34599EB8BB5C3512F24EA310CBFB50CB4ECD04C8A8"
+  }
+}

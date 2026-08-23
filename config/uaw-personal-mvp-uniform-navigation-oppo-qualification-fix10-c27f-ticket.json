@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-OPPO-QUALIFICATION-FIX10-C27F",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27",
+  "state": "device_gate_rejected_exported_semantic_height_successor_required_founder_review_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "One unique host-qualified uniform-navigation successor is installed in place on OPPO, checksum-proven and exercised across all six families, every relevant subaction and navigation continuity path for founder review.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-OPPO-QUALIFICATION-FIX10-C27F-PRESELECTION-ASSESSMENT-20260810.md",
+  "qualifiedSourceFingerprint": "3096AC375EC1D4E55C5EB4D39602B0902EE509C8A3AD45E815D3AB0D1CA462C5",
+  "hostQualificationEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-HOST-QUALIFICATION-FIX10-C27E-COMPLETION-20260810.md",
+  "deviceGateRejectionEvidence": "docs/quality/UAW-C27F-OPPO-EXPORTED-NAVIGATION-SEMANTIC-HEIGHT-DEVICE-GATE-REJECTION-20260810.md",
+  "installedIdentityEvidence": "artifacts/quality/uaw-personal-mvp-uniform-navigation-oppo-qualification-fix10-c27f-r60-26-20260810-01/16-installed-runtime.md",
+  "deviceHandoffEvidence": "artifacts/quality/uaw-personal-mvp-uniform-navigation-oppo-qualification-fix10-c27f-r60-26-20260810-01/19-device-gate-rejection-handoff.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration"],
+    "sharedImplementationOwners": [
+      "existing single-build wrapper and APK regression machine gate",
+      "existing in-place ADB upgrade and checksum identity workflow",
+      "existing stable OPPO screenshot and UI-hierarchy capture owners",
+      "completed C27E host qualification evidence"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one versioned C27F device-matrix contract and gate",
+      "one cumulative C27F OPPO evidence package"
+    ],
+    "necessityProof": "Host qualification cannot prove exported OPPO hit bounds, initial Mool paint, real glass presentation, in-place install identity or founder-visible six-family journeys."
+  },
+  "acceptance": [
+    "exactly one r60.26 profile build authorization and build",
+    "exactly one in-place adb install -r",
+    "no uninstall data clear downgrade second build or second install",
+    "local live and pulled APK checksum identity",
+    "preserved signer and first-install time",
+    "six family roots and all 18 relevant local actions",
+    "exported Mool family and local targets at least 44 logical pixels",
+    "Mool initially painted on every family root before switcher interaction",
+    "switcher tap swipe outside Back reduced-motion and Chat continuity",
+    "founder acceptance pending on installed OPPO"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

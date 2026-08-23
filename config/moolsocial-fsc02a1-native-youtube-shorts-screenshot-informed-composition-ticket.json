@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02A1-NATIVE-YOUTUBE-SHORTS-SCREENSHOT-INFORMED-COMPOSITION",
+  "parentTicket": "MOOLSOCIAL-FSC02A-NATIVE-YOUTUBE-SHORTS-PROVIDER-DISTRIBUTION",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "native_implementation_and_focused_gates_passed_provider_runtime_player_packaging_and_fresh_apk_qualification_required",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user watches real eligible YouTube Shorts inside MoolSocial through an immersive, familiar and clearly YouTube-owned native composition while MoolSocial navigation and local Save, Discuss and Share actions remain distinct and reachable.",
+  "founderDirection": "approved_direct_Flutter_correction_after_OPPO_YouTube_journey_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC02A1-NATIVE-YOUTUBE-SHORTS-SCREENSHOT-INFORMED-PRESELECTION-20260811.md",
+  "referenceEvidence": {
+    "use": "read_only_journey_and_spatial_assessment_not_application_assets_or_API_evidence",
+    "directory": "tmp/oppo-youtube-social-reference-20260810",
+    "screenshots": [
+      "Screenshot_2026-08-10-22-10-11-91_f9ee0578fe1cc94de7482bd41accb329.jpg",
+      "Screenshot_2026-08-10-22-10-33-36_ab1359306de43320f9557c797b1c4be5.jpg",
+      "Screenshot_2026-08-10-22-10-46-73_f9ee0578fe1cc94de7482bd41accb329.jpg",
+      "Screenshot_2026-08-10-22-11-36-14_f9ee0578fe1cc94de7482bd41accb329.jpg",
+      "Screenshot_2026-08-10-22-11-57-38_f9ee0578fe1cc94de7482bd41accb329.jpg",
+      "Screenshot_2026-08-10-22-12-09-29_f9ee0578fe1cc94de7482bd41accb329.jpg",
+      "Screenshot_2026-08-10-22-17-47-81_f9ee0578fe1cc94de7482bd41accb329.jpg"
+    ]
+  },
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "FSC02A already owns the real provider catalogue, admission, state machine, vertical pager and official player. This successor changes only the existing Shorts composition and adds focused acceptance; no duplicate presentation or service owner is necessary."
+  },
+  "compositionDecision": {
+    "keep": [
+      "accepted_Mool_switcher_and_outer_global_navigation",
+      "one_tap_Shorts_Videos_Feed_Create_destinations",
+      "vertical_one_Short_per_page_gesture",
+      "one_active_official_embedded_player_at_or_above_200_by_200",
+      "real_provider_title_channel_thumbnail_count_and_date",
+      "YouTube_attribution_and_open_on_YouTube_escape",
+      "distinct_MoolSocial_Save_Discuss_Share_actions",
+      "truthful_provider_access_loading_empty_unavailable_error_and_retry_states",
+      "minimum_44_by_44_reach_and_compact_fitment"
+    ],
+    "adoptAsNativeSpatialInputs": [
+      "continuous_black_YouTube_owned_stage",
+      "larger_near_edge_portrait_player_area",
+      "compact_YouTube_Shorts_identity_sequence_and_open_controls",
+      "lightweight_lower_right_vertical_MoolSocial_action_rail",
+      "channel_title_and_metadata_anchored_near_the_lower_stage_outside_player_bounds",
+      "subtle_vertical_sequence_affordance_without_extra_navigation"
+    ],
+    "doNotAdopt": [
+      "YouTube_global_bottom_navigation_search_notifications_or_menu",
+      "YouTube_like_comment_subscribe_dislike_remix_add_sound_or_capture_tools",
+      "YouTube_central_plus_or_any_upload_flow",
+      "camera_permission_upload_or_posting_UI",
+      "personalized_Home_chips_ads_sponsored_or_recommendation_content",
+      "copied_screenshot_pixels_assets_or_trade_dress",
+      "any_MoolSocial_overlay_on_the_embedded_player"
+    ]
+  },
+  "minimumCompleteScope": [
+    "replace_the_inset_card_composition_with_a_continuous_black_Shorts_stage",
+    "increase_the_portrait_player_presence_without_covering_or_modifying_the_official_player",
+    "add_compact_YouTube_Shorts_identity_sequence_and_external_open_controls",
+    "place_real_provider_channel_title_and_metadata_next_to_but_outside_the_player_rectangle",
+    "restyle_the_distinct_MoolSocial_Save_Discuss_Share_rail_as_a_lightweight_lower_right_control_group",
+    "preserve_all_FSC02A_provider_state_navigation_reach_and_truth_contracts",
+    "add_focused_non_overlap_fitment_copy_navigation_and_regression_tests"
+  ],
+  "explicitExclusions": [
+    "no_HTML_screenbook_or_browser_reference_write",
+    "no_Videos_Feed_Create_or_Shop_implementation",
+    "no_upload_plus_camera_capture_OAuth_scope_or_external_service_write",
+    "no_YouTube_Like_Comment_Subscribe_Dislike_Remix_or_Add_sound_impersonation",
+    "no_copied_YouTube_navigation_screenshot_pixel_or_provider_content",
+    "no_overlay_frame_or_MoolSocial_element_over_any_part_of_the_embedded_player",
+    "no_new_screen_route_backend_API_client_OAuth_owner_or_player",
+    "no_build_install_OPPO_mutation_credentials_Firebase_submission_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_direct_native_Flutter_approval_received_2026_08_11",
+    "YouTube_embedded_player_minimum_size_and_no_overlay_requirements",
+    "focused_Flutter_tests_and_static_gates",
+    "existing_FSC02A_provider_runtime_authority_gate",
+    "separate_official_player_packaging_qualification_for_selected_build_mode",
+    "fresh_APK_host_qualification_before_any_build",
+    "checksum_unique_successor_before_any_OPPO_install",
+    "checksum_matched_OPPO_replay_and_founder_acceptance"
+  ],
+  "testAndEvidencePlan": [
+    "source_boundary_and_no_provider_action_impersonation_tests",
+    "provider_available_loading_empty_unavailable_error_and_retry_widget_tests",
+    "player_minimum_geometry_and_no_Stack_or_overlay_in_the_player_slot_tests",
+    "continuous_stage_compact_header_metadata_and_action_rail_tests",
+    "minimum_44_by_44_actions_and_320_by_568_at_140_percent_fitment",
+    "accepted_global_navigation_and_one_tap_Social_destination_regressions",
+    "MVP_delivery_scope_and_permanent_regression_memory_gates"
+  ],
+  "implementationEvidence": {
+    "state": "native_source_and_focused_tests_passed",
+    "runtimeOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart"
+    ],
+    "testOwners": [
+      "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
+      "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+      "apps/mobile/test/ui_v2_social_continuous_batch_test.dart",
+      "apps/mobile/test/ui_v2_social_named_state_parity_test.dart",
+      "apps/mobile/test/ui_v2_social_fitment_matrix_test.dart",
+      "apps/mobile/test/ui_v2_social_customer_copy_gate_test.dart"
+    ],
+    "verifiedContracts": [
+      "continuous_black_YouTube_owned_stage_without_navy_or_rounded_player_card",
+      "larger_explicit_player_slot_at_or_above_200_by_200",
+      "compact_YouTube_Shorts_identity_sequence_swipe_cue_and_external_open_control",
+      "provider_title_channel_optional_metrics_and_date_rendered_without_fabricated_fallback",
+      "MoolSocial_Save_Discuss_Share_rail_is_geometrically_adjacent_to_not_over_the_player",
+      "no_YouTube_like_comment_subscribe_dislike_remix_upload_capture_or_plus_action",
+      "provider_access_loading_empty_unavailable_error_and_retry_states_preserved",
+      "minimum_44_by_44_actions_and_compact_320_by_568_at_140_percent_fitment",
+      "accepted_Mool_switcher_global_navigation_and_one_tap_Social_destinations_preserved"
+    ],
+    "finalHostGateResults": {
+      "flutterAnalyze": "no_issues_changed_runtime_and_focused_test_owners",
+      "flutterTestsPassed": 76,
+      "flutterTestFiles": 6,
+      "minimumAvailableStateViewport": "320x568_text_140_percent",
+      "approvedUiLocks": "passed",
+      "mvpDeliveryDiscipline": "passed",
+      "mvpScope": "passed_authorized",
+      "permanentRegressionMemory": "passed_phase_implementation_build_mode_none",
+      "allDeclaredScreenshotEvidencePaths": "present"
+    },
+    "remainingProviderRuntimeGate": "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF_true_non_emulator_moolsocial_dev_503018_authorized_provider_URL_Firebase_Auth_Play_Integrity_App_Check_and_capabilities_publicData_true",
+    "remainingPlayerPackagingGate": "official_player_is_currently_debug_only_while_the_selected_Android_review_build_mode_is_profile_and_requires_separate_shared_system_qualification_or_an_authorized_debug_only_proof_path",
+    "oppoBoundary": {
+      "installedVersionName": "1.0.0-r60.28",
+      "installedVersionCode": 2026081028,
+      "protectedUnchanged": true,
+      "newCandidateRegistered": false,
+      "buildPerformed": false,
+      "installPerformed": false,
+      "dataClearPerformed": false,
+      "uninstallPerformed": false
+    },
+    "pausedWork": "FSC03A_Feed_source_and_tests_preserved_paused_and_not_claimed_complete",
+    "buildState": "not_started_provider_runtime_player_packaging_and_fresh_APK_host_qualification_required",
+    "deviceState": "not_started_installed_r60_28_preserved"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

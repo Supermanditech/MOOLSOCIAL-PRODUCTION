@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33G-FIX1-GOOGLE-ACCOUNT-SELECTION-RETURN-CONFIGURATION-PARITY",
+  "parentTicket": "UAW-C33G-R60-49-FAILED-ACCEPTANCE-REPAIR",
+  "findings": [
+    "REG-20260815-2428-C33F-R60-49-GOOGLE-SIGN-IN-INCOMPLETE-ESCAPED-RELEASE",
+    "REG-20260815-2432-C33F-UNRESOLVED-FOUNDER-JOURNEY-BLOCKERS-NOT-CARRIED-INTO-PRE-AAB-GATE"
+  ],
+  "state": "selected_source_test_and_gate_implementation_authorized_release_actions_held",
+  "classification": "mvp_required",
+  "severity": "release_blocking",
+  "actor": "MoolSocial_Internal_Testing_signed_out_real_user_selecting_a_Google_account",
+  "capability": "complete_Google_identity_and_Firebase_authentication_then_return_to_the_pending_protected_Social_action",
+  "customerOutcome": "A Play-installed MoolSocial user who selects a Google account completes a Firebase-authenticated session and returns to the exact pending protected Social action; a true cancellation or configuration failure remains recoverable and is never falsely reported as success.",
+  "classificationReason": "Google authentication is the only currently operational production identity provider family and blocks Create plus all protected Social mutations and YouTube reviewer access.",
+  "minimumCompleteScope": [
+    "make_the_transient_release_google_services_registration_include_the_same_hidden_Web_server_client_relationship_used_by_Dart_without_reading_or_persisting_its_value",
+    "fail_closed_when_the_release_registration_lacks_an_exact_client_type_3_Web_OAuth_entry_or_the_hidden_Dart_and_Gradle_relationships_can_diverge",
+    "treat_post_account_selection_cancellation_as_an_ambiguous_incomplete_result_consistent_with_the_official_Android_plugin_contract",
+    "preserve_true_cancel_retry_and_exact_pending_action_return_state",
+    "add_focused_gateway_session_release_launcher_and_negative_drift_tests"
+  ],
+  "explicitExclusions": [
+    "no_Screen_01_02_or_03_visual_layout_asset_copy_or_reference_change",
+    "no_new_identity_provider_or_provider_console_mutation",
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_verdict_private_key_or_attestation_access",
+    "no_AAB_APK_Play_OPPO_backend_Hosting_email_quota_funds_commit_push_or_deployment"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_direct_2026_08_15_failed_r60_49_ticket_and_source_repair_direction",
+    "r60_49_failure_state_and_1_1_1_0_counts_preserved",
+    "official_google_sign_in_android_7_2_troubleshooting_contract_applied",
+    "current_sanitized_OAuth_display_name_counts_preserved_without_identifier_access",
+    "all_applicable_regression_memory_entries_pass_before_each_retry"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["configuration", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "tmp/run-c30x-successor-single-aab-founder.ps1",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/test/firebase_social_auth_gateway_test.dart",
+      "apps/mobile/test/uaw_c33e_fix4_protected_social_action_intent_return_continuity_test.dart",
+      "scripts/check-release-runtime-configuration-c30w.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33g-fix1-google-account-selection-return-configuration-parity.ps1",
+      "apps/mobile/test/uaw_c33g_fix1_google_account_selection_return_configuration_parity_test.dart"
+    ],
+    "necessityProof": "The existing Google gateway, JourneySession and founder-only transient launcher remain the sole owners. One thin parity gate and focused test file are necessary to bind the hidden Dart and Gradle registration paths without introducing a second authentication flow or reading a credential value.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_static_and_negative_registration_parity_gate",
+    "Google_gateway_authenticated_cancelled_configuration_error_and_retry_unit_tests",
+    "pending_Create_and_Feed_action_return_continuity_widget_tests",
+    "whole_mobile_analyzer_and_affected_Flutter_regressions",
+    "two_fresh_identical_complete_source_qualification_cycles_before_any_future_candidate_proposal",
+    "future_release_equivalent_OPPO_Google_account_selection_session_and_return_evidence_under_separate_exact_release_authority"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "providerOrExternalServiceWriteAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

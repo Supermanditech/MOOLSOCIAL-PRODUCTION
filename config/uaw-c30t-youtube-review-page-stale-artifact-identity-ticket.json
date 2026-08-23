@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-REVIEW-PAGE-STALE-ARTIFACT-IDENTITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_static_tests_passed_hosting_and_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_reviewer_evidence_truthfulness",
+  "actor": "YouTube_API_Services_compliance_reviewer",
+  "customerOutcome": "The public review page states the current private distribution method and declared scope without presenting an obsolete APK, date or checksum as the active reviewer candidate.",
+  "minimumCorrection": [
+    "remove_the_obsolete_July_29_candidate_APK_and_checksum_claims",
+    "state_Google_Play_Internal_Testing_as_the_only_private_distribution_channel",
+    "defer_exact_tester_link_and_release_identity_until_final_Play_installed_device_qualification",
+    "describe_the_use_case_as_declared_until_live_candidate_journeys_pass"
+  ],
+  "explicitExclusions": [
+    "no_tester_link_publication_before_final_qualification",
+    "no_hosting_deploy",
+    "no_AAB_APK_upload_install_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "hostingDeployAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "webTests": "7 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/27-youtube-review-page-truthfulness-tests.log",
+    "evidenceSha256": "97697AB64DF6A29EB889D90D8EB11632CD2A461F72B14AF8970F94D4C9E47136"
+  }
+}

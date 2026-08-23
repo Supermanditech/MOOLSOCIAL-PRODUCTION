@@ -1,0 +1,7 @@
+# C21C preselection robustness and reuse assessment — 2026-08-08
+
+C21C is MVP-required runtime/configuration and focused-test work for Social only. It uses the completed C21B shared control and the existing Social destination/action/provider-asset owners. It will prove the four-action media-tone lens over real Social backgrounds and normalize Material/provider icons within the same optical box. No duplicate widget, screen, route, backend owner, persistent state or sub-action is necessary.
+
+Minimum scope is the actual Shorts/Videos/Feed/Create compact fit, controlled deep-neutral media glass rather than four opaque grey blocks, stable white icon/label contrast, visible background gaps, YouTube-attributed asset versus Material-icon optical normalization, selected/inert and available/one-tap semantics, finite/reduced motion, and focused host tests. The global rail, routes, copy, provider meanings and Social content remain unchanged. Instagram and Facebook are not invented as filler sub-actions.
+
+Implementation disposition is configuration plus test-only acceptance with a one-day-or-less delivery impact and no topology growth. C21A–B, the C21 placement contract, protected UI/brand/copy/interaction gates, permanent memory and preserved r60.19 installed identity are dependencies. Build/install, screenbook, provider/business/backend, credentials, messages/calls, funds, Production, commit/push/deploy/promotion remain excluded.

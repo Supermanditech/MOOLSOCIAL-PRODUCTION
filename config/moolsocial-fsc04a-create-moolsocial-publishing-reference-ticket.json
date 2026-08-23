@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC04A-CREATE-MOOLSOCIAL-PUBLISHING-REFERENCE",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "registered_queued_execution_closed_until_fsc03a_founder_final",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user composes MoolSocial text, image, carousel, image poll, quick poll or quiz content in one professional workbench with truthful draft, validation and failure recovery.",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-SOCIAL-OWNERSHIP-REDESIGN-MICRO-TICKET-PRESELECTION-20260810.md",
+  "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+  "newScreens": [],
+  "newRoutes": [],
+  "newBackendOwners": [],
+  "minimumCompleteScope": ["single_keyboard_ready_composer", "text_image_carousel_image_poll_quick_poll_quiz", "draft_validation_cancel_retry", "truthful_publish_dependency_hold"],
+  "explicitExclusions": ["no_owned_long_form_video", "no_YouTube_upload_or_plus", "no_fake_backend_or_durable_readback", "no_campaign_analytics_earnings_or_external_distribution", "no_runtime_build_device_or_external_write_before_selection"],
+  "execution": {"referenceWriteAuthorized": false, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "backendWriteAuthorized": false, "externalServiceWriteAuthorized": false}
+}

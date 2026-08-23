@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-INDEX-RETIRED-BRAND-REFRESH-FIX1",
+  "state": "production_submission_complete_google_refresh_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "Google receives truthful freshness signals and an explicit reindex request so the indexed MoolSocial Privacy result can replace the retired company identity with current moolsocial.com copy.",
+  "founderAuthority": "docs/quality/WEB-MVP-PUBLIC-DISCOVERY-AND-YOUTUBE-REVIEW-ACCESS-AUTHORIZATION-20260805.md",
+  "founderDefectEvidence": "artifacts/quality/web-mvp-google-index-retired-brand-refresh-20260807-01/founder-google-search-stale-snippet.png",
+  "existingImplementationOwners": [
+    "apps/web/public/sitemap.xml",
+    "apps/web/tests/firebase-public-site.test.mjs",
+    "apps/web/public/robots.txt",
+    "apps/web/public/privacy/index.html",
+    "moolsocial-dev-503018 Firebase Hosting live channel",
+    "moolsocial.com Google Search Console domain property"
+  ],
+  "minimumCompleteScope": [
+    "update the five significantly changed canonical sitemap lastmod values to 2026-08-07",
+    "strengthen the existing sitemap test so stale pre-release dates cannot pass",
+    "run the existing web build tests lint regression and MVP scope gates",
+    "deploy only verified Firebase Hosting content and verify live sitemap source identity",
+    "inspect the live Privacy URL and request indexing plus resubmit the sitemap when the authorized Search Console property is accessible",
+    "record the Search Console receipt or exact access blocker without claiming an immediate Google snippet refresh"
+  ],
+  "explicitExclusions": [
+    "no page removal noindex robots blocking or Refresh Outdated Content submission",
+    "no DNS change unless separately reclassified after a verified ownership blocker",
+    "no Flutter Android iOS backend Firestore Functions provider API or APK change",
+    "no Gmail or YouTube reply send",
+    "no promise of immediate crawl indexing ranking or snippet replacement",
+    "no commit push merge branch switch cleanup or deletion"
+  ],
+  "dependenciesAndApprovals": [
+    "existing 2026-08-05 founder public-discovery and Search Console authorization",
+    "verified Search Console owner or full-user access for moolsocial.com",
+    "authenticated Firebase CLI resolution of moolsocial-dev-503018",
+    "Google-controlled crawl and index processing after submission"
+  ],
+  "testAndEvidencePlan": [
+    "exact sitemap URL and 2026-08-07 lastmod assertions",
+    "npm web production build and seven public-site tests",
+    "web lint with zero errors",
+    "Googlebot-style live Privacy robots canonical copy and header audit",
+    "live sitemap HTTP 200 and local-to-live SHA-256 identity",
+    "Search Console URL Inspection request and sitemap submission receipt or exact blocker"
+  ],
+  "completionEvidence": "docs/quality/WEB-MVP-GOOGLE-INDEX-RETIRED-BRAND-REFRESH-FIX1-COMPLETION-20260807.md",
+  "machineEvidence": "config/web-mvp-google-index-retired-brand-refresh-fix1-state.json"
+}

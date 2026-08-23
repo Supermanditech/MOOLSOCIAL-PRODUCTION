@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-FIX6-RECONCILE-SOURCE-QUALIFIED-STATE-TRANSITION",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_gate_state_transition_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "C30X can truthfully reconcile both its initial blocked audit state and its fully source-qualified, no-candidate state without granting release authority.",
+  "classificationReason": "The two source cycles pass, but the reconcile gate cannot represent their valid outcome. An exact second state context is required before candidate selection can proceed.",
+  "minimumCompleteScope": [
+    "retain_the_exact_initial_unqualified_reconcile_context",
+    "add_the_exact_source_qualified_candidate_selection_pending_context",
+    "bind_the_qualified_context_to_current_manifest_two_cycles_all_regressions_and_source_controls",
+    "require_empty_candidate_zero_counts_and_no_release_authority_in_both_contexts"
+  ],
+  "explicitExclusions": [
+    "no_candidate_selection_version_authority_or_hidden_input_under_FIX6",
+    "no_runtime_UI_backend_Hosting_provider_or_service_change",
+    "no_AAB_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX6"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2171_registered_before_repair",
+    "superseded_1121_file_manifest_and_two_cycles_preserved"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": ["scripts/check-successor-aab-regression-hard-gate-c30x.ps1"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The existing reconcile phase owns all no-authority assertions. Adding one exact qualified-state predicate and manifest-current check is the smallest complete repair and creates no alternate state owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "reconcile_the_current_source_qualified_state_on_both_PowerShell_hosts",
+    "negative_test_a_tampered_qualified_fact_and_preserve_zero_counts",
+    "run_the_C30X_build_phase_without_candidate_and_require_fail_closed",
+    "seal_a_new_manifest_and_run_two_fresh_identical_cycles"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30X-FIX6-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30x-fix6-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30X-RECONCILE-SOURCE-QUALIFIED-STATE-DEAD-END-20260814.md"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "batchId": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "c29o_c29t_c29p_c29q_c29r_source_qualified_external_dev_measurement_and_oppo_pending",
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-AUDIT-20260811.md",
+  "executionOrder": ["C29O", "C29T", "C29P", "C29Q", "C29R", "C29S"],
+  "selectedTicket": "C29R",
+  "installedApkCrossComparison": {
+    "state": "pending_device_not_connected",
+    "expectedSerial": "2b3e0f71",
+    "expectedVersionName": "1.0.0-r60.34",
+    "expectedVersionCode": "2026081134",
+    "mutationAuthorized": false,
+    "mayAddTicketsAfterQualifiedReadOnlyAudit": true
+  },
+  "tickets": [
+    {
+      "shortId": "C29O",
+      "manifest": "config/uaw-personal-mvp-social-action-truth-accessibility-c29o-ticket.json",
+      "classification": "mvp_required",
+      "state": "source_qualified_apk_cross_comparison_pending"
+    },
+    {
+      "shortId": "C29T",
+      "manifest": "config/uaw-personal-mvp-social-youtube-catalogue-continuity-c29t-ticket.json",
+      "classification": "mvp_required",
+      "state": "source_qualified_apk_cross_comparison_pending"
+    },
+    {
+      "shortId": "C29P",
+      "manifest": "config/uaw-personal-mvp-social-feed-create-persistence-c29p-ticket.json",
+      "classification": "mvp_required",
+      "state": "source_qualified_external_dev_deploy_and_oppo_pending"
+    },
+    {
+      "shortId": "C29Q",
+      "manifest": "config/uaw-personal-mvp-social-youtube-adjacent-promotion-policy-c29q-ticket.json",
+      "classification": "mvp_supporting",
+      "state": "source_qualified_no_visible_ad_oppo_pending"
+    },
+    {
+      "shortId": "C29R",
+      "manifest": "config/uaw-personal-mvp-social-youtube-quota-purpose-catalogue-refresh-c29r-ticket.json",
+      "classification": "mvp_required",
+      "state": "source_qualified_external_dev_measurement_and_oppo_pending"
+    },
+    {
+      "shortId": "C29S",
+      "manifest": "config/uaw-personal-post-mvp-social-youtube-recommender-c29s-ticket.json",
+      "classification": "beyond_mvp",
+      "state": "dependency_held_quota_and_compliance_approval_required"
+    }
+  ]
+}

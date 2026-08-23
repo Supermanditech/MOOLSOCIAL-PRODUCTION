@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-COLD-LAUNCH-SOCIAL-DEFAULT-FIX1-C10A",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "r60_10_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "scope": [
+    "fresh_authenticated_launch_without_a_pending_deep_link_opens_social",
+    "explicit_local_pending_deep_links_survive_boot_auth_and_setup_handoffs",
+    "in_process_system_back_history_is_not_rewritten_by_the_cold_launch_rule",
+    "persisted_last_ready_workspace_or_other_destination_is_not_the_default_launch_owner"
+  ],
+  "founderAcceptance": "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md",
+  "acceptance": [
+    "session_unit_tests_for_social_default_and_pending_deep_link_precedence",
+    "production_router_test_from_boot_to_social",
+    "no_change_to_sign_in_setup_or_youtube_return_contracts"
+  ]
+}

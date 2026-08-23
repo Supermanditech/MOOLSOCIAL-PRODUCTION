@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-SELECTION-MOTION-REFINEMENT-FIX4-C21F",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_host_qualified_build_install_closed", "classification": "mvp_required",
+  "actor": "customer discovering, selecting, hiding and restoring a main-action family",
+  "capability": "understand family ownership and selection through one restrained connector, one selected grammar and discoverable disclosure",
+  "customerOutcome": "Sub-actions feel anchored to the selected main action without competing layers, disappearing mysteriously or navigating like unrelated pages.",
+  "classificationReason": "The existing disclosure behavior is preserved but its hierarchy and finite state transitions require integration with the new optical control.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-SELECTION-MOTION-REFINEMENT-FIX4-C21F-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["reuse", "configuration"], "sharedImplementationOwners": ["MoolDestinationNavigationV2", "MoolDestinationFamilyWavePainter", "MoolGlobalNavigationV2"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["default_expanded", "selected_main_retap_hides_and_restores_only_own_family", "obvious_48px_up_down_disclosure", "one_selected_visual_grammar", "finite_160_to_200ms_motion", "immediate_reduced_motion", "Back_Mool_Chat_continuity"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": true, "testOrGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "explicitExclusions": ["no_hidden_gesture", "no_main_rail_geometry_order_position_or_meaning_change", "no_build_or_install"]
+  ,"completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-SELECTION-MOTION-REFINEMENT-FIX4-C21F-COMPLETION-20260808.md"
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C31C-PERSONAL-MVP-CHAT-FORWARD-RECIPIENT-CONTINUITY",
+  "parentOutcome": "FOUNDER-AUTHORIZED-FULL-CHAT-MODULE-IMPLEMENTATION-20260814",
+  "predecessorTicket": "UAW-C31B-PERSONAL-MVP-CHAT-UNREAD-READ-RECEIPT-CONTINUITY",
+  "state": "founder_authorized_implementation_active",
+  "classification": "mvp_required",
+  "actor": "signed_in_MoolSocial_member_forwarding_a_visible_text_message",
+  "customerOutcome": "A signed-in member can choose one existing conversation, confirm its recipient, and forward the exact server-owned text message idempotently with a truthful Forwarded marker and no source-conversation disclosure.",
+  "minimumCompleteScope": [
+    "add_an_authenticated_idempotent_forwardMessage_operation_to_the_existing_moolSocialChat_owner",
+    "validate_actor_membership_in_both_source_and_target_threads_before_copying_text",
+    "persist_only_the_forwarded_text_and_boolean_marker_in_the_target_message_without_source_thread_ID_sender_identity_or_private_timestamp_response",
+    "apply_the_existing_target_unread_read_reply_reaction_and_delivery_contracts_to_the_forwarded_message",
+    "render_an_accessible_Forward_action_on_settled_messages_and_an_existing_conversation_picker_with_explicit_confirmation",
+    "keep_forward_feedback_and_late_completion_bound_to_the_exact_source_and_target_threads",
+    "preserve_all_C30T_C31A_and_C31B_contracts"
+  ],
+  "explicitExclusions": [
+    "no_external_share_SDK_contact_picker_account_enumeration_new_conversation_creation_or_auto_send",
+    "no_forward_of_local_failed_sending_attachment_reference_media_voice_poll_or_call_content_in_C31C",
+    "no_source_thread_ID_source_message_ID_original_sender_identity_or_private_timestamp_in_the_target_client_response",
+    "no_new_screen_route_backend_service_or_top_level_Firestore_collection",
+    "no_live_Dev_message_forward_backend_deployment_Hosting_provider_rules_or_IAM_mutation",
+    "no_AAB_build_Play_upload_activation_OPPO_install_update_launch_or_device_mutation",
+    "no_secret_value_private_verdict_private_key_or_attestation_payload_access",
+    "no_commit_push_merge_rebase_branch_switch_reset_clean_or_main_mutation"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-14 user: next action is to start implementations non stop; work on full chat module",
+    "runtimeSourceWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingRoutes": [
+      "/app/chat/inbox",
+      "/app/chat/thread/:threadId"
+    ],
+    "existingFlutterOwners": [
+      "apps/mobile/lib/features/chat/chat_models.dart",
+      "apps/mobile/lib/features/chat/chat_services.dart",
+      "apps/mobile/lib/features/chat/chat_session.dart",
+      "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart"
+    ],
+    "existingBackendOwners": [
+      "backend/functions/src/chat/contracts.ts",
+      "backend/functions/src/chat/service.ts",
+      "backend/functions/src/chat/firestore_store.ts",
+      "backend/functions/src/index.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "acceptance": [
+    "source_and_target_thread_membership_are_required_before_any_write",
+    "same_retry_key_and_same_request_returns_one_target_message_and_increments_unread_once",
+    "same_retry_key_with_different_source_or_target_is_rejected_as_conflict",
+    "target_response_exposes_forwarded_true_but_no_source_thread_message_sender_or_timestamp_metadata",
+    "picker_lists_only_already_loaded_existing_conversations_excludes_the_current_thread_and_requires_confirmation",
+    "cancel_Back_offline_rejected_retry_and_late_completion_do_not_forward_to_the_wrong_recipient",
+    "forwarded_message_supports_target_reply_reaction_read_and_refresh_contracts",
+    "two_identical_focused_source_cycles_pass_with_zero_failures"
+  ],
+  "referenceBoundary": {
+    "approvedChatScreenshotInManifest": false,
+    "behavioralReferenceOnly": true,
+    "nativeFlutterDirectiveControls": true
+  }
+}

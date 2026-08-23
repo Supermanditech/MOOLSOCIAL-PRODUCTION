@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-EXPLICIT-STATE-CONTENT-OWNERSHIP",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_expanded_regression_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "public_feed_recovery_control_visibility_blocker",
+  "actor": "public_Feed_reader_during_loading_error_or_unavailable_recovery",
+  "customerOutcome": "Every explicit Feed loading, error and unavailable state keeps its truthful indicator or retry action visible even if an asynchronous feed owner also holds cached content.",
+  "minimumCorrection": [
+    "reproduce_both_expanded_regression_failures_in_isolation",
+    "separate_explicit_fail_closed_state_ownership_from_cached_runtime_refresh_ownership",
+    "retain_cached_posts_and_cached_retry_for_normal_refresh_failures",
+    "make_the_two_state_regressions_deterministic",
+    "rerun_the_full_expanded_Social_and_global_navigation_set"
+  ],
+  "explicitExclusions": [
+    "no_new_Feed_capability_visual_redesign_backend_provider_or_data_write",
+    "no_AAB_APK_upload_install_Hosting_deployment_or_external_communication"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "initialExpandedRun": "346 passed, 3 skipped, 2 failed",
+    "initialEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/05-expanded-flutter-regression-57-files.log",
+    "isolatedReproduction": "both failures reproduced",
+    "isolatedReproductionEvidenceSha256": "42EEFDBB643F5D699F40E94E0EB6D2E5CBCAE647D8910D1A07AC4AF5C90783AA",
+    "analyzer": "No issues found",
+    "analyzerEvidenceSha256": "20F2FBA66FD55504112881BE7C1001B8A021B9C6633A1B60B5AE952B4B3B3553",
+    "focusedTests": "19 passed, 0 failed",
+    "focusedEvidenceSha256": "F29B727F98BF2E1DDB68A5F5CDF25586033C436B51477695081F22791D03D8E1",
+    "expandedTests": "349 passed, 3 skipped, 0 failed across 57 files",
+    "expandedEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/12-expanded-flutter-regression-57-files-corrected.log",
+    "expandedEvidenceSha256": "71115A25D3786DEA9A9C3AF0FE5FC53CC89D42CB4FCBA55ABB537CA8C404AA68"
+  }
+}

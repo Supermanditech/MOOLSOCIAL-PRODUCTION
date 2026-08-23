@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-AUTH-SYSTEM-BACK-EXITS-MOOLSOCIAL",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_and_non_build_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "protected_route_authentication_cancellation_continuity_blocker",
+  "actor": "signed_out_user_cancelling_authentication_opened_from_Feed_interaction_Create_Chat_or_YouTube_channel",
+  "customerOutcome": "Cancelling authentication with Android Back returns inside MoolSocial to the exact originating Social surface without exiting the app or losing the requested route.",
+  "observedFailure": {"controlledGuestEntry": "one exact Feed Like opened the MoolSocial sign-in grid", "beforeBack": "MoolSocial social-provider grid", "action": "one Android Back", "afterBackForeground": "com.android.vending/com.google.android.finsky.activities.MainActivityPrivate", "MoolSocialNodesAfterBack": 0},
+  "minimumSuccessorCorrection": ["retain_auth_origin_and_requested_post_auth_route", "intercept_auth_screen_system_Back_as_in_app_cancellation", "return_to_the_originating_Social_surface", "prove_Feed_Like_Reply_Repost_Share_Save_Message_poll_quiz_Create_Chat_and_YouTube_channel_cancel_and_success_continuity"],
+  "explicitExclusions": ["no_activity_or_task_hack_that_mutates_external_apps", "no_secret_or_account_data_access", "no_second_C30T_AAB_upload_or_install"],
+  "authority": {"ticketAndEvidenceWriteAuthorized": true, "sourceImplementationAuthorizedByFounder": true, "executionSelectionPendingFullAcceptance": false, "successorBuildUploadInstallAuthorized": false},
+  "evidence": {"beforeBackHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/35-current-auth-after-founder-report.xml", "afterBackHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/36-auth-system-back.xml", "controlledFeedLikePreHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/51-feed-like-controlled-pre.xml", "controlledFeedLikeAuthScreenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/52-feed-like-controlled-result.png", "controlledFeedLikeAuthScreenshotSha256": "62BBD3A8C969A2019EB7186C2C3841C7336309DAF5DD6BD5528CC05EFC82B51E", "founderObservation": "Feed Like ultimately exposed the underlying Play Store during failed-auth recovery.", "finding": "docs/quality/UAW-C30T-R60-45-AUTH-SYSTEM-BACK-EXITS-MOOLSOCIAL-20260813.md"}
+}

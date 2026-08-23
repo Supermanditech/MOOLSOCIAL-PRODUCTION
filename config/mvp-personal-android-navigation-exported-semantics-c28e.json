@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PERSONAL-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-C28E-001",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E",
+  "predecessorRejection": {
+    "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-OPPO-QUALIFICATION-FIX11-C28D",
+    "installedVersionName": "1.0.0-r60.27",
+    "installedVersionCode": "2026081027",
+    "installedApkSha256": "E4651AEADFD2A98A7617021B8DEF645BC5D428DD1593D882D278F3706FF6BD0C",
+    "exportedLogicalSize": {"width": 54, "height": 19},
+    "evidence": "docs/quality/UAW-C28D-OPPO-EXPORTED-NAVIGATION-SEMANTIC-HEIGHT-DEVICE-GATE-REJECTION-20260810.md"
+  },
+  "runtimeOwners": [
+    "apps/mobile/lib/core/platform/mool_system_ui_viewport.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "systemUi": {
+    "mode": "SystemUiMode.edgeToEdge",
+    "targetSdk": 36,
+    "manualModeAllowed": false
+  },
+  "geometry": {
+    "destinationRailHeight": 58,
+    "minimumExportedLogicalWidth": 44,
+    "minimumExportedLogicalHeight": 44,
+    "clearanceFormula": "max(0, rawViewPaddingTop - (destinationRailHeight - minimumExportedLogicalHeight))",
+    "cellGeometryChanges": false,
+    "routeOrStateChanges": false
+  },
+  "oppoHostSimulation": {
+    "logicalScreen": {"width": 360, "height": 806},
+    "viewPadding": {"top": 41, "bottom": 44},
+    "expectedClearance": 27,
+    "expectedRailTop": 677,
+    "expectedRailBottom": 735,
+    "exportedRootBottom": 721,
+    "expectedMinimumExportedHeight": 44
+  },
+  "currentNavigationProjection": [
+    {
+      "familyId": "social",
+      "familyRootSemantic": null,
+      "familyRootExpected": false,
+      "localLabels": ["Shorts", "Videos", "Feed", "Create"]
+    },
+    {
+      "familyId": "buy",
+      "familyRootSemantic": "Open Shop home",
+      "familyRootExpected": true,
+      "localLabels": ["Wholesale", "Orders"]
+    },
+    {
+      "familyId": "eat",
+      "familyRootSemantic": "Open Food home",
+      "familyRootExpected": true,
+      "localLabels": ["Order Food", "Book Table"]
+    },
+    {
+      "familyId": "ride",
+      "familyRootSemantic": "Open Travel home",
+      "familyRootExpected": true,
+      "localLabels": ["Bike", "Auto", "Cab", "Bus"]
+    },
+    {
+      "familyId": "book",
+      "familyRootSemantic": "Open Care home",
+      "familyRootExpected": true,
+      "localLabels": ["Doctor", "Medicine", "Salon"]
+    },
+    {
+      "familyId": "work",
+      "familyRootSemantic": "Open Work home",
+      "familyRootExpected": true,
+      "localLabels": ["Earn Today", "Workspace"]
+    }
+  ],
+  "acceptance": {
+    "moolSemantics": ["Open MoolSocial main menu", "Close MoolSocial main menu"],
+    "everyVisibleNavigationNodeAtLeast44By44": true,
+    "FSC01SocialRootAbsencePreserved": true,
+    "FSC06ProductsAbsencePreserved": true,
+    "acceptedScreen01To03OwnersChanged": false,
+    "buildOrInstallAuthorizedByThisContract": false
+  }
+}

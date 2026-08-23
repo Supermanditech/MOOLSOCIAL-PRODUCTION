@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-ANDROID-ROOT-FOCUS-EDGE-SUPPRESSION-C30I",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-WATCH-RETURN-OPPO-REVIEW-C30H",
+  "state": "source_qualified_successor_APK_ticket_required",
+  "classification": "mvp_required",
+  "actor": "MoolSocial_user_using_touch_or_hardware_keyboard_navigation",
+  "customerOutcome": "No customer-visible green edge frame is drawn around the complete Flutter surface after a hardware-key event, while Flutter control focus, exported semantics and 44 logical pixel targets remain available.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/android/app/src/main/res/values/styles.xml",
+      "apps/mobile/android/app/src/main/res/values-night/styles.xml",
+      "Android View defaultFocusHighlightEnabled API 26 contract"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/android/app/src/main/res/values-v26/styles.xml",
+      "apps/mobile/android/app/src/main/res/values-night-v26/styles.xml"
+    ],
+    "necessityProof": "C30H device evidence reproduces green vertical edge paint only after a raw hardware-key event, Android debug/accessibility overlays are disabled, and a process restart clears the paint. Android documents the API 26 NormalTheme attribute as the fallback highlight for a focused View without its own focused background. The Flutter root must suppress only that native fallback."
+  },
+  "minimumCompleteScope": [
+    "add_API_26_day_and_night_NormalTheme_overrides_with_android_defaultFocusHighlightEnabled_false",
+    "preserve_launch_themes_window_background_system_bars_and_all_Flutter_focus_semantics",
+    "add_a_focused_resource_contract_test_and_run_full_analysis_and_two_complete_Social_cycles",
+    "leave_installed_rejected_r60_38_and_all_device_evidence_untouched_until_a_separate_successor_ticket"
+  ],
+  "explicitExclusions": [
+    "no_Social_layout_route_state_provider_backend_database_or_credential_change",
+    "no_removal_of_Flutter_control_focus_or_exported_semantics",
+    "no_backend provider Firebase hosting app_store or Production deployment",
+    "no_build install uninstall data_clear downgrade commit push or promotion_under_C30I"
+  ],
+  "authority": {
+    "founderAuthorization": "founder_direct_green_edge_removal_and_global_footer_design_correction_authority_with_deployment_hold",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "REG_1387_C30H_green_edge_device_rejection_and_r60_38_identity_preserved",
+    "Android_API_26_defaultFocusHighlightEnabled_contract",
+    "permanent_regression_memory_and_MVP_delivery_lock"
+  ],
+  "testPlan": [
+    "focused_day_and_night_v26_NormalTheme_resource_contract",
+    "prove_LaunchTheme_and_base_pre26_NormalTheme_are_not_weakened",
+    "full_Flutter_analysis_and_user_facing_copy_gate",
+    "two_identical_complete_Social_cycles_before_any_separate_APK_successor_ticket"
+  ]
+}

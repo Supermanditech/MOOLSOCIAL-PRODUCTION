@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION",
+  "parentTicket": "MOOLSOCIAL-FSC02D-DEV-YOUTUBE-PUBLIC-DATA-RUNTIME-QUALIFICATION",
+  "blockedSuccessor": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B",
+  "state": "completed_exact_Dev_restriction_qualified_C29B_resume_selected",
+  "classification": "mvp_supporting",
+  "actor": "authenticated founder-authorized Dev project administrator hello@moolsocial.com",
+  "customerOutcome": "The r60.29 review client can use its Firebase Android SDK configuration only from the exact MoolSocial Android package signed by the already-qualified review certificate, while the existing Firebase API targets remain unchanged.",
+  "founderDirection": "complete_all_required_Dev_Firebase_runtime_hardening_before_OPPO_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/test-youtube-public-dev-review-build-controls.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The Firebase-managed Android client key already has Firebase-only API targets but its Android allowed-applications list is absent. The smallest production-grade correction is one metadata-only restriction patch on the existing Dev key; no new key, service, route, backend or client owner is required."
+  },
+  "target": {
+    "projectId": "moolsocial-dev-503018",
+    "projectNumber": "760290687711",
+    "firebaseAndroidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "apiKeyUid": "14fee65f-18c4-48b7-a7dd-aa5ce35d4353",
+    "packageName": "com.moolsocial.app",
+    "sha1Fingerprint": "1E4345AA0707C8A4C74F5485B47B14E911923B46"
+  },
+  "minimumCompleteScope": [
+    "confirm_exact_isolated_gcloud_configuration_account_project_and_key_resource_metadata",
+    "preserve_the_complete_existing_Firebase_only_apiTargets_array",
+    "patch_only_restrictions_with_one_exact_Android_package_and_SHA1_allowed_application",
+    "poll_the_long_running_operation_to_completion",
+    "verify_the_exact_application_restriction_and_unchanged_apiTargets_without_accessing_or_outputting_the_key_string",
+    "close_this_ticket_and_restore_C29B_without_transferring_cloud_authority"
+  ],
+  "explicitExclusions": [
+    "no_getKeyString_key_value_secret_token_OAuth_secret_or_debug_token_access_copy_hash_or_output",
+    "no_new_key_key_rotation_key_deletion_API_target_change_or_non_Dev_project_write",
+    "no_Function_redeploy_Auth_App_Check_IAM_billing_Production_Staging_or_Hosting_write",
+    "no_build_install_uninstall_data_clear_downgrade_or_protected_OPPO_mutation",
+    "no_commit_push_message_call_fund_movement_or_provider_submission"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authority_to_complete_all_required_Dev_Firebase_runtime_work_before_OPPO_review_received_2026_08_11",
+    "authenticated_gcloud_account_must_remain_hello_at_moolsocial_dot_com",
+    "isolated_configuration_moolsocial_dev_fsc02d_and_exact_project_moolsocial_dev_503018",
+    "C29B_build_and_install_authority_remain_closed_during_this_ticket",
+    "official_API_Keys_v2_restrictions_patch_contract_and_permanent_regression_memory"
+  ],
+  "testAndEvidencePlan": [
+    "prewrite_no_value_key_metadata_and_etag_read",
+    "exact_request_body_and_apiTargets_digest_seal",
+    "restrictions_only_patch_and_operation_poll",
+    "postwrite_no_value_application_API_target_and_etag_verification",
+    "MVP_delivery_scope_approved_UI_lock_and_permanent_regression_gates"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorizedOnlyForExactDevApiKeyRestriction": true,
+    "secretValueAccessAuthorized": false
+  },
+  "prewriteEvidence": {
+    "path": "artifacts/quality/moolsocial-fsc02e-dev-firebase-android-client-key-restriction-20260811-01/prewrite-metadata.json",
+    "gcloudConfiguration": "moolsocial-dev-fsc02d",
+    "account": "hello@moolsocial.com",
+    "project": "moolsocial-dev-503018",
+    "metadataContainsKeyString": false,
+    "etagPresent": true,
+    "apiTargetCount": 27,
+    "apiTargetSemanticSha256": "B5DD4EAA37BB473AA4A56B1A01E06569AC350ECFAECB05BC481DC3DE67F8772D",
+    "allowedApplicationCount": 0,
+    "qualifiedForExactPatch": true
+  },
+  "implementationEvidence": {
+    "state": "complete",
+    "completion": "docs/quality/MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION-COMPLETION-20260811.md",
+    "postwriteMetadata": "artifacts/quality/moolsocial-fsc02e-dev-firebase-android-client-key-restriction-20260811-01/postwrite-metadata.json",
+    "cloudMutationPerformed": true,
+    "cloudMutationCount": 1,
+    "restrictionsOnlyPatch": true,
+    "operationCompleted": true,
+    "apiTargetsPreserved": true,
+    "exactAndroidApplicationRestrictionQualified": true,
+    "keyStringOrSecretValueAccessed": false,
+    "buildOrDeviceMutationPerformed": false,
+    "successorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B"
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.28",
+    "installedVersionCode": 2026081028,
+    "installedSerial": "2b3e0f71",
+    "installedIdentityMustRemainPreserved": true,
+    "c28dRejectionEvidenceMustRemainPreserved": true,
+    "c29bBuildAuthorizationMustRemainClosed": false
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PRIVATE-UPLOAD-DEV-PROVIDER-QUALIFICATION-C29M",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CREATOR-CONNECTION-PRIVATE-SHORT-UPLOAD-C29L",
+  "state": "founder_authorized_dependency_reordered_waiting_fresh_client_gateway",
+  "classification": "mvp_supporting",
+  "customerOutcome": "A founder-supervised authenticated creator connects the exact YouTube channel and proves one private Short upload through the real Dev provider without exposing credentials or enabling public upload.",
+  "sourceDependency": {
+    "manifest": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-host-qualification-20260811-03/source-aggregate-manifest.txt",
+    "sha256": "0096B43790D3E0466D8225F1407FF29104E7A3E2F0A7D0B7E8456E166FD7F393"
+  },
+  "currentProviderState": {
+    "audit": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-provider-read-audit-20260811-01/deployment-metadata.json",
+    "publicDataReview": true,
+    "privateUpload": false,
+    "deployedRevisionPredatesSource": false,
+    "youtubeProviderRevision": "youtubeprovider-00035-jis",
+    "youtubeOAuthCallbackRevision": "youtubeoauthcallback-00035-cir"
+  },
+  "minimumCompleteScope": [
+    "explicitly_authorize_deployment_of_the_two_Dev_functions_from_the_sealed_source",
+    "verify_Firebase_Auth_Play_Integrity_App_Check_IAM_secret_bindings_and_API_enablement_without_reading_values",
+    "activate_only_the_bounded_PrivateUpload_proof_profile_for_at_most_30_minutes",
+    "founder_completes_Google_password_and_consent_in_the_system_browser",
+    "verify_exact_channel_identity_upload_scope_private_visibility_progress_cancel_retry_and_processing",
+    "end_the_proof_and_restore_the_accepted_public_data_review_profile",
+    "retain_before_during_after_non_secret_metadata_and_function_revision_evidence"
+  ],
+  "explicitExclusions": [
+    "no_Production_staging_public_or_unlisted_upload",
+    "no_credential_token_secret_value_access_or_copy",
+    "no_provider_message_call_commit_push_or_fund_movement",
+    "no_APK_build_install_uninstall_data_clear_or_downgrade_under_this_ticket",
+    "no_persistent_privateUpload_flag_after_the_supervised_window"
+  ],
+  "authority": {
+    "externalReadAuthorized": true,
+    "devDeployAuthorized": true,
+    "temporaryPrivateUploadProfileAuthorized": true,
+    "founderBrowserConsentPresent": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false
+  },
+  "dependencyResolution": {
+    "c29uState": "qualified_dev_deployment_complete",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-DEV-BACKEND-DEPLOYMENT-C29U-COMPLETION-20260811.md",
+    "protectedInstalledCandidate": "1.0.0-r60.34",
+    "deviceFinding": "r60.34_predates_sealed_C29L_creator_gateway",
+    "reorderedDependency": "C29W_fresh_client_gateway_qualification_before_new_C29M_proof_window"
+  },
+  "nextFounderDecision": "Enter Google credentials and approve upload-purpose consent only when the bounded PrivateUpload proof opens; do not provide any credential or token to Codex."
+}

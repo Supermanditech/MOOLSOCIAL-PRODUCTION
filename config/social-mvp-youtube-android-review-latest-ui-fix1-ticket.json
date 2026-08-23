@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "SOCIAL-MVP-YOUTUBE-ANDROID-REVIEW-LATEST-UI-FIX1",
+  "state": "registered_scheduled_not_active",
+  "classification": "mvp_required",
+  "customerOutcome": "A YouTube reviewer can install the latest qualified MoolSocial MVP Android UI and verify the truthful, policy-bounded YouTube journeys through a production-grade native experience.",
+  "schedule": {
+    "timezone": "Asia/Kolkata",
+    "implementationDate": "2026-08-08",
+    "implementationMayStartBeforeDate": false,
+    "registrationOnlyOn": "2026-08-07"
+  },
+  "reuseOwners": [
+    "latest_native_flutter_v2_social_shorts_videos_feed_and_create_surfaces",
+    "existing_youtube_public_discovery_metadata_adapter",
+    "existing_official_embedded_youtube_player_host",
+    "existing_read_only_youtube_channel_connection_boundary",
+    "moolsocial_dev_503018_trial_environment",
+    "firebase_app_distribution_preview_inside_dev"
+  ],
+  "minimumCompleteScope": [
+    "merge_the_latest_qualified_MVP_navigation_and_social_UI_with_the_real_Dev_YouTube_read_boundary",
+    "qualify_public_Shorts_Videos_channel_metadata_and_official_embedded_playback",
+    "retain_truthful_loading_empty_offline_removed_private_non_embeddable_quota_and_OAuth_return_states",
+    "run_host_regressions_and_checksum_matched_OPPO_real_user_journeys",
+    "create_and_externally_verify_one_Dev_Firebase_App_Distribution_review_link_only_after_the_candidate_passes",
+    "prepare_but_do_not_send_the_provider_reply_without_separate_send_authority"
+  ],
+  "explicitExclusions": [
+    "no_implementation_build_install_distribution_or_provider_write_on_2026_08_07",
+    "no_legacy_r20_submission_and_no_r60_8_profile_emulator_submission",
+    "no_YouTube_upload_like_comment_subscription_analytics_reporting_or_live_scope",
+    "no_new_screen_route_backend_owner_or_provider_project_without_separate_necessity_evidence",
+    "no_credentials_Production_staging_promotion_commit_push_deploy_or_live_email_send"
+  ],
+  "activationGate": {
+    "requiresFreshScopeStateOnOrAfter": "2026-08-08",
+    "requiresFounderAuthority": true,
+    "requiresProviderPolicyRecheck": true,
+    "requiresBuildMachineGate": true,
+    "requiresOppoQualification": true,
+    "requiresExternalInstallLinkVerification": true
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-DISCONNECT-LIFECYCLE-AND-STATE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_user_control_lifecycle_and_revocation_truth",
+  "actor": "connected_MoolSocial_user",
+  "customerOutcome": "Cancelling disconnect preserves the channel; confirming disconnect calls the real gateway once and refreshes to a truthful disconnected state without updating an unmounted screen.",
+  "minimumCorrection": [
+    "recheck_widget_ownership_after_the_disconnect_confirmation_async_gap",
+    "prove_cancel_does_not_call_the_gateway",
+    "prove_confirm_calls_disconnect_once_and_refreshes_to_disconnected"
+  ],
+  "explicitExclusions": [
+    "no_provider_or_OAuth_scope_change",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "providerWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "focusedTests": "16 passed, 0 failed",
+    "testEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/28-youtube-disconnect-lifecycle-tests.log",
+    "testEvidenceSha256": "D2D2DC10B1ACE14AE5EAE93D683593AAED25C1611FDBCF9F17D9B258A17F720D",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/29-flutter-analyze-youtube-disconnect.log",
+    "analyzeEvidenceSha256": "8E5FECC237C5B85F0D44AE5CA7BCA4B71D1774969F2072C3732023E3296D38C8"
+  }
+}

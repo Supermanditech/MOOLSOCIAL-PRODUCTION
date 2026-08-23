@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-BOOK-DOCTOR-SALON-HOME-FIX7-C24E",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Doctor and Salon open professional service discovery homes with search, category, provider trust, availability, price and direct booking choices.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-BOOK-DOCTOR-SALON-HOME-FIX7-C24E-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["DoctorBookingScreen","SalonBookingScreen","BookSession","BookGateway","existing_doctor_and_salon_routes","shared_service_home_primitives"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["Doctor_search_specialties_upcoming_and_top_provider_hierarchy","Doctor_clinic_OPD_video_followup_preserved","Salon_service_mode_price_slot_and_cancel_rule_hierarchy","direct_book_actions","Medicine_remains_only_in_Buy","Get_It_Done_remains_postponed","adaptive_and_accessible"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-BOOK-DOCTOR-SALON-HOME-FIX7-C24E-COMPLETION-20260809.md"
+}

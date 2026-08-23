@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "parentTicketId": "WORK-MVP-FUNDED-OPPORTUNITY-TO-AUDITABLE-PAYOUT-END-TO-END-JOURNEY",
+  "classification": "mvp_required",
+  "state": "planning_complete_preauthorized_not_executing",
+  "humanAuthority": "docs/delivery/WORK-MVP-FUNDED-OPPORTUNITY-TO-AUDITABLE-PAYOUT-END-TO-END-JOURNEY-TICKET-20260805.md",
+  "humanAuthoritySha256": "25D779BD8AEB7FC3B58EE6933CB74E0F02B1456247C6E2AFB02DC286C8255678",
+  "childPortfolioId": "WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-20260805",
+  "childManifest": "config/work-mvp-funded-opportunity-payout-portfolio.json",
+  "childManifestSha256": "66A0842D571D90F0CF093817D8E013FEFEA6FDA0E7D03B25099823B079B54D13",
+  "portfolioAuthorization": "config/work-mvp-funded-opportunity-payout-portfolio-authorization.json",
+  "executionModel": "parent_acceptance_ticket_with_45_bounded_child_execution_tickets",
+  "executionActive": false,
+  "launchVerticalSlice": "one_verified_retailer_onboarding_output_to_auditable_payout",
+  "visibilityContract": {
+    "normalUser": "admin_approved_truthful_teaser_may_be_platform_wide_or_public_geography_scoped_until_required_work_workspace_is_created_or_reused",
+    "targetUser": "governed_work_type_and_geography_matched_teaser",
+    "postWorkspace": "complete_terms_visible_before_apply_even_when_verification_still_blocks_apply",
+    "adminGeographyLevels": ["locality_or_zone", "district", "state", "national", "remote"],
+    "materialPublishedEdit": "new_version_with_reconsent_before_acceptance_and_no_rewrite_of_active_assignment"
+  },
+  "workTypeRegistryContract": {
+    "hardCodedTypeChoice": false,
+    "adminCreatesNewTypeBeforeSelection": true,
+    "activeApprovedTypeAutomaticallyAddedToPostingSelection": true,
+    "compatibleDataDefinedTypeRequiresAppRelease": false,
+    "newPermissionIntegrationOrRegulatedCapabilityRequiresIndependentApproval": true
+  },
+  "journeys": [
+    {
+      "number": 1,
+      "id": "common_worker",
+      "title": "Common worker tap-to-tap journey",
+      "childTicketOrders": [5, 6, 7, 8, 9, 10, 11, 14, 15, 17, 19, 20, 21, 23, 24, 25, 27, 28, 29, 30, 32, 36, 37, 38, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 2,
+      "id": "work_profile_and_eligibility",
+      "title": "Work profile and eligibility routing",
+      "childTicketOrders": [2, 4, 8, 9, 10, 11, 18, 36, 37, 38, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 3,
+      "id": "application_assignment_and_reassignment",
+      "title": "Application, assignment and next-worker recovery",
+      "childTicketOrders": [3, 4, 6, 9, 10, 11, 12, 13, 14, 15, 16, 31, 38, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 4,
+      "id": "active_work_consent_and_safety",
+      "title": "Active work, consent and field safety",
+      "childTicketOrders": [13, 17, 18, 19, 20, 31, 32, 36, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 5,
+      "id": "proof_and_submission",
+      "title": "Proof capture and outcome submission",
+      "childTicketOrders": [18, 20, 21, 22, 23, 24, 25, 36, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 6,
+      "id": "review_rework_rejection_and_appeal",
+      "title": "Review, rework, rejection and independent appeal",
+      "childTicketOrders": [22, 23, 24, 25, 26, 32, 34, 36, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 7,
+      "id": "earnings_and_payout",
+      "title": "Earnings and payout",
+      "childTicketOrders": [3, 6, 13, 23, 27, 28, 29, 30, 31, 32, 34, 36, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 8,
+      "id": "funder_and_reviewer",
+      "title": "Funder and reviewer tap-to-tap journey",
+      "childTicketOrders": [1, 2, 3, 6, 12, 22, 23, 27, 29, 31, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 9,
+      "id": "failure_cancellation_and_support",
+      "title": "Failure, cancellation and support recovery",
+      "childTicketOrders": [11, 16, 19, 21, 24, 25, 29, 31, 32, 36, 38, 40, 41, 42, 43, 44, 45]
+    },
+    {
+      "number": 10,
+      "id": "admin_governance",
+      "title": "Admin tap-to-tap governance journey",
+      "childTicketOrders": [1, 2, 3, 4, 12, 13, 22, 23, 25, 26, 27, 29, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+    }
+  ],
+  "referenceAuthority": {
+    "approvedScreens": [67, 68, 70, 71, 72, 73, 133, 134, 135, 136, 137, 138, 152],
+    "supersededDoNotImplementScreens": [69],
+    "newReferenceStatesRequired": ["admin_work_type_registry", "admin_create_work_type", "admin_work_type_selection", "normal_user_teaser", "target_user_teaser", "workspace_full_terms_gate", "admin_audience_geography_editor", "admin_multi_role_preview", "published_version_reconsent"],
+    "postMvpExcludedFamilies": ["generic_get_it_done", "ride", "health", "salon"]
+  },
+  "retainedRule": "The parent ticket does not bypass child classification, dependency, reference, finance, live-service, build, device or release gates."
+}

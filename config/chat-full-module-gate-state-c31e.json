@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "stateId": "MOOLSOCIAL-CHAT-FULL-MODULE-C31E-GATE-STATE-20260815",
+  "ticketId": "UAW-C31E-PERSONAL-MVP-CHAT-PHOTO-ATTACHMENT-CONTINUITY",
+  "state": "source_repair_two_identical_cycles_qualified_live_deployment_and_release_actions_held",
+  "predecessor": {
+    "ticketId": "UAW-C31C-PERSONAL-MVP-CHAT-FORWARD-RECIPIENT-CONTINUITY",
+    "historicalManifestSha256": "0A8A2142DB52D737185A0D384CA65E1EDF8D2862CDE40DF69458299D10CEE43F",
+    "C30TThroughC31CRegressionsMustRemainPreserved": true
+  },
+  "repository": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "scope": {
+    "newRoutes": 0,
+    "newScreens": 0,
+    "newFunctionServices": 0,
+    "newTopLevelFirestoreCollections": 0,
+    "maximumPhotoBytes": 4194304,
+    "allowedContentTypes": ["image/jpeg", "image/png", "image/webp"],
+    "signedUrlMaximumSeconds": 300
+  },
+  "qualification": {
+    "identicalCyclesRequired": 2,
+    "state": "passed",
+    "sourceManifest": {
+      "path": "artifacts/quality/uaw-c31e-personal-mvp-chat-photo-attachment-continuity-20260815-01/source-manifest-c31e.txt",
+      "files": 49,
+      "fingerprintSha256": "401C5C59F9522C173379AD5D17C140E1CFB76C362910674E683C5B57E57C4DF5"
+    },
+    "cycles": 2,
+    "backendTypecheck": "passed_each_cycle",
+    "backendTests": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0
+    },
+    "flutterChatTests": {
+      "files": 6,
+      "tests": 47,
+      "passed": 47,
+      "skipped": 0,
+      "failed": 0
+    },
+    "wholeMobileAnalyzer": "no_issues_each_cycle",
+    "C31EStaticGatePowerShell7": "passed_each_cycle",
+    "C31EStaticGateWindowsPowerShell": "passed_each_cycle",
+    "mvpScopeAndDeliveryGates": "passed_each_cycle",
+    "approvedUiLocks": "passed_each_cycle",
+    "regressionMemory": {
+      "entries": 2213,
+      "implementationApplicable": 1297,
+      "passedEachCycle": true
+    }
+  },
+  "authority": {
+    "scopedSourceImplementationComplete": true,
+    "runtimeSourceWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendDeploymentAuthorized": false,
+    "storageRulesCorsLifecycleOrIamMutationAuthorized": false,
+    "buildAuthorized": false,
+    "PlayUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "protectedReleaseState": {
+    "r60_48BuildUploadInstallCounts": "1/1/1",
+    "r60_48RuntimeState": "failed_social_auth_and_action_journey_acceptance",
+    "successorAabAuthorized": false
+  }
+}

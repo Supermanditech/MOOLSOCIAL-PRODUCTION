@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATOR-STUDIO-ALTERNATE-ENTRY-COMPLIANCE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_review_scope_misrepresentation_alternate_entry",
+  "actor": "reviewer_or_founder_opening_shared_media_or_workspace_cards",
+  "customerOutcome": "All discoverable shared-account and media entry cards return to real MoolSocial Feed/Create instead of exposing prototype Creator Studio YouTube-publishing claims; the optional read-only YouTube connection remains separately reachable.",
+  "finding": "The Social account entry was already contained, but shared media and workspace data still exposed /app/creator/performance and /app/creator. Those screens contain in-memory YouTube publishing destination claims outside the declared reviewer use case.",
+  "minimumCorrection": [
+    "route_the_shared_MoolSocial_media_card_to_the_real_public_Feed",
+    "route_the_shared_creator_workspace_card_to_the_real_Social_Create_workbench",
+    "remove_creator_studio_performance_and_root_routes_from_noncreator_shared_owners",
+    "retain_the_real_readonly_youtube_connect_route_and_freeze_broader_Creator_files",
+    "lock_the_containment_in_the_current_qualifier_owned_Screen_04_test"
+  ],
+  "explicitExclusions": [
+    "no_broad_Creator_workspace_redesign_or_deletion",
+    "no_YouTube_upload_or_mutation_capability",
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "exactContainmentAndSharedJourney": "2 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/65-shared-global-chat-and-creator-entry-tests.log",
+    "evidenceSha256": "0467EAB4BDE85EBE28807570BD2FF9EAEEFB0E8415E79DD5FCD71E7FAA165BDB",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidenceSha256": "DB82A50BDB1316A81BFCE2DCFB14C83DC43D21A82CC65FA5ED26D58BEF10A9C1",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkExists": false
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "stateId": "MOOLSOCIAL-CHAT-FULL-MODULE-C31A-GATE-STATE-20260814",
+  "ticketId": "UAW-C31A-PERSONAL-MVP-CHAT-REPLY-REACTION-CONTINUITY",
+  "state": "source_qualified_historical_baseline_successor_C31B_active_live_and_release_acceptance_held",
+  "repository": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "referenceBoundary": {
+    "approvedChatScreenshotInManifest": false,
+    "suppliedMessagingScreenshotsBehavioralOnly": true,
+    "storedMoolSocialCompositeIsTestEvidenceOnly": true,
+    "directNativeFlutterDirectiveControls": true
+  },
+  "sourceManifest": {
+    "path": "artifacts/quality/uaw-c31a-personal-mvp-chat-reply-reaction-continuity-20260814-01/source-manifest-c31a.txt",
+    "files": 22,
+    "sha256": "270DE5F6D9A5FE0ED8D1A05185C440DBD0D065C3593913C154571FB0EC8AED51"
+  },
+  "qualification": {
+    "identicalCycles": 2,
+    "cycleSourceFingerprintFiles": 24,
+    "cycleSourceFingerprintSha256": "D4EBEFC02A70745A7B4A8D01E07DCF0184100A277FFBDF499DE548ECBC4694BA",
+    "backendTypecheck": "passed_each_cycle",
+    "backendTests": {
+      "tests": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    "flutterChatTests": {
+      "tests": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    "wholeMobileAnalyzer": "no_issues_each_cycle",
+    "PowerShell7StaticGate": "passed_each_cycle",
+    "WindowsPowerShellStaticGate": "passed_each_cycle",
+    "mvpScopeGate": "passed_each_cycle",
+    "regressionMemoryGate": {
+      "entries": 2098,
+      "implementationApplicable": 1194,
+      "passedEachCycle": true
+    }
+  },
+  "implementedOutcome": [
+    "immutable_same_thread_reply_context",
+    "persistent_authenticated_member_reaction_set_and_clear",
+    "aggregate_reaction_privacy_without_other_reactor_identifiers",
+    "failed_send_retry_reply_continuity",
+    "thread_isolated_reply_and_feedback_state",
+    "path_safe_Firestore_identifiers",
+    "accessible_native_reply_reaction_and_cancel_controls"
+  ],
+  "authority": {
+    "sourceImplementationComplete": true,
+    "liveDevDataWriteAuthorized": false,
+    "backendDeploymentAuthorized": false,
+    "hostingOrProviderMutationAuthorized": false,
+    "buildAuthorized": false,
+    "PlayUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "protectedReleaseState": {
+    "r60_46BuildUploadInstallCounts": "1/0/0",
+    "r60_47BuildUploadInstallCounts": "1/1/1",
+    "r60_47RuntimeState": "failed_cold_start_missing_server_client_ID",
+    "successorAabAuthorized": false
+  },
+  "sourceSuccessor": {
+    "ticketId": "UAW-C31B-PERSONAL-MVP-CHAT-UNREAD-READ-RECEIPT-CONTINUITY",
+    "transitionEvidence": "docs/quality/UAW-C31A-TO-C31B-SHARED-CHAT-OWNER-TRANSITION-20260814.md",
+    "manifestRole": "historical_exact_pre_C31B_baseline",
+    "sharedOwnerMutationMustPreserveC31ARegressions": true
+  }
+}

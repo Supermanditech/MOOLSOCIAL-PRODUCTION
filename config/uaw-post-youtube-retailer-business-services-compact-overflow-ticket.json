@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-POST-YOUTUBE-RETAILER-BUSINESS-SERVICES-COMPACT-OVERFLOW",
+  "status": "deferred_founder_directed_domain_review",
+  "classification": "post_youtube_domain_quality",
+  "discoveredBy": "C30T full and compatibility Flutter inventory",
+  "scope": {
+    "domain": "Retailer Business Services",
+    "finding": "A compact accessible screen overflows horizontally by 16 logical pixels in retailer_business_services_vertical_slice_test.dart.",
+    "currentTicketMayImplement": false,
+    "reason": "Founder directed Work, Care, Travel, Shop and Food deep design/UI/UX/backend/database journeys to follow the YouTube reviewer-ready Social release."
+  },
+  "acceptance": [
+    "Reproduce at the exact compact viewport and text scale used by the existing test.",
+    "Correct the overflow without weakening minimum tap targets, copy, or semantics.",
+    "Run the domain vertical-slice and relevant visual regression gates."
+  ]
+}

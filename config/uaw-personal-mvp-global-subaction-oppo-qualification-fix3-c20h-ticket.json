@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX3-C20H",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-GALLERY-PROFESSIONAL-RECOVERY-FIX3-C20",
+  "state": "r60_19_installed_checksum_matched_device_matrix_and_founder_acceptance_pending",
+  "classification": "mvp_required",
+  "actor": "release operator producing the one C20 successor for founder review on the connected OPPO",
+  "capability": "build one uniquely identified host-qualified profile APK, install it once in place, prove installed checksum identity and capture the six-family device matrix",
+  "customerOutcome": "The founder can review the exact host-qualified transparent neutral-glass subaction system across Social, Buy, Eat, Ride, Book and Work on the preserved OPPO installation.",
+  "classificationReason": "Founder device acceptance is mandatory for the rejected r60.18 visual recovery and cannot be established by host evidence alone.",
+  "founderAuthority": "docs/quality/UAW-C20H-FOUNDER-BUILD-INSTALL-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX3-C20H-PRESELECTION-ASSESSMENT-20260808.md",
+  "hostQualification": {
+    "ticket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-HOST-QUALIFICATION-FIX3-C20G",
+    "completedConsecutiveCycles": 2,
+    "sourceFingerprint": "D1788BFF131954E9DB0F5B5E33A693060E6B1F4A79EC111406F20C8491CB6202",
+    "sourceMutationAfterQualificationAllowed": false,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-HOST-QUALIFICATION-FIX3-C20G-COMPLETION-20260808.md"
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX3-C20H",
+    "versionName": "1.0.0-r60.19",
+    "versionCode": "2026080819",
+    "buildMode": "profile",
+    "gateProfile": "uaw_personal_r01_r15_cumulative",
+    "artifactDirectory": "artifacts/quality/uaw-personal-mvp-global-subaction-oppo-qualification-fix3-c20h-r60-19-20260808-01",
+    "collisionSearchComplete": true,
+    "versionCollisionFound": false,
+    "artifactCollisionFound": false,
+    "maximumBuilds": 1,
+    "maximumInstalls": 1
+  },
+  "installedPredecessor": {
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375",
+    "versionName": "1.0.0-r60.18",
+    "versionCode": "2026080818",
+    "installedBaseSha256": "88F82D203E1C8C565BE5DEBB61E6C1EF1F9E588017EADB9120D97B4B3081ED2C",
+    "mustRemainInstalledUntilFinalPreinstallGate": true,
+    "firstInstallTimeMustRemainPreserved": true
+  },
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "sharedRuntimeOwnersReused": true,
+    "existingBuildWrapper": "scripts/build-buy-device-review.ps1",
+    "existingApkMachineGate": "scripts/check-apk-regression-gate-state.ps1",
+    "existingPackage": "com.moolsocial.app",
+    "implementationDisposition": ["reuse", "configuration"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newRuntimeOwners": [],
+    "newBackendOwners": [],
+    "newPersistentStateOwners": [],
+    "newSubactions": []
+  },
+  "prebuildRequirements": [
+    "exact_C20G_source_fingerprint_unchanged",
+    "path_safe_dirty_inventory_reconciled_without_staged_changes",
+    "one_unlocked_connected_CPH2375_with_live_r60_18_identity",
+    "live_installed_r60_18_base_checksum_matches_preserved_identity",
+    "battery_capacity_free_space_and_no_active_build_process",
+    "branch_HEAD_scope_memory_approved_UI_brand_copy_interaction_and_APK_gates",
+    "authorization_negative_self_test_before_opening_one_build",
+    "single_build_authorization_opened_only_after_prebuild_seal"
+  ],
+  "deviceEvidenceRequirements": [
+    "one_adb_install_r_in_place_only",
+    "candidate_and_installed_base_checksum_identity",
+    "first_install_time_preserved",
+    "six_main_action_and_seventeen_selected_state_screenshot_matrix",
+    "disclosure_hide_restore_discoverability",
+    "motion_reduced_motion_Back_Mool_Chat_and_content_reachability",
+    "founder_device_acceptance_pending_review"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "buildPerformed": true,
+    "installPerformed": true
+  },
+  "authorizationState": {
+    "buildAuthorizationOpened": true,
+    "maximumBuilds": 1,
+    "buildsPerformed": 1,
+    "installAuthorizationOpened": true,
+    "installsPerformed": 1,
+    "prebuildEvidence": "artifacts/quality/uaw-personal-mvp-global-subaction-oppo-qualification-fix3-c20h-r60-19-20260808-01/09-prebuild-validation-seal.md"
+  },
+  "explicitExclusions": [
+    "no_source_test_script_or_protected_reference_mutation_after_C20G_fingerprint",
+    "no_second_build_or_second_install_attempt",
+    "no_uninstall_data_clear_downgrade_or_predecessor_evidence_mutation",
+    "no_backend_provider_commercial_or_business_state_change",
+    "no_credentials_messages_calls_funds_commit_push_deploy_or_promotion"
+  ],
+  "stopBoundary": "Any source drift, machine-gate failure, ambiguous build output, package/version/signer/checksum mismatch, OPPO disconnect/lock, install failure or need for a second build/install stops mutation and records truthful evidence."
+}

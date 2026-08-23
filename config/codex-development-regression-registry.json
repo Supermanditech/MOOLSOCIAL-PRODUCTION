@@ -38964,6 +38964,625 @@
         "config/codex-subagent-coordination-policy.json",
         "config/google-authentication-production-baseline-r60-87.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3581-PARALLEL-WORK-DISCIPLINE-DIRTY-DIGEST-TEMP-HELPER-POLICY-BLOCK",
+      "status": "registered_preflight_helper_blocked_no_git_execution_and_in_memory_path_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "powershell"
+      ],
+      "mistake": "The first dirty-state digest helper for the Codex/Cursor production-discipline task was rejected by the local execution policy before PowerShell or Git started.",
+      "rootCause": "The helper combined Start-Process redirection to temporary files with cleanup instead of using the established in-memory bounded Git-status capture required by the regression memory.",
+      "prevention": "Use one in-memory System.Diagnostics.Process capture with untracked enumeration disabled, separate stdout and stderr reads, immediate exit capture and only the allowlisted bytes, records, SHA-256, stderr-bytes and exit-code output. Create no temporary files.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3582-PARALLEL-WORK-DISCIPLINE-METRIC-FOREACH-PIPE-PARSER",
+      "status": "registered_parser_failure_zero_inventory_and_materialized_array_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "powershell"
+      ],
+      "mistake": "A read-only mandatory-owner metrics command was rejected by PowerShell with an empty-pipe parser error before it returned any inventory.",
+      "rootCause": "The command piped directly from a statement-form foreach block instead of materializing its results before ConvertTo-Json.",
+      "prevention": "Assign statement-form loop output to a task-specific array before any pipeline, or issue independent scalar owner metrics. Parser-rejected output counts as zero evidence.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3583-PARALLEL-WORK-DISCIPLINE-PRECOMMIT-PATCH-RESULT-TRUNCATION",
+      "status": "registered_mutation_result_unknown_exact_readback_completed_before_reliance",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "powershell",
+        "tooling"
+      ],
+      "mistake": "The mutation result for the production pre-commit and secret-safety gates was truncated, so the exact applied state was initially unknown.",
+      "rootCause": "Several distant checker insertions were submitted in one patch, causing the mutation result to exceed the available response context even though the edit completed.",
+      "prevention": "After any truncated mutation result, perform an exact parser and token readback before reliance, register the incident, and limit any later patch to one confirmed missing region at a time.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3584-PARALLEL-WORK-DISCIPLINE-GET-COMMAND-PARAMETER-SET-DISCOVERY",
+      "status": "registered_read_only_discovery_failed_no_gate_execution_and_ast_discovery_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "powershell"
+      ],
+      "mistake": "A read-only attempt to discover checker parameters with Get-Command failed before either mandatory gate executed.",
+      "rootCause": "Get-Command was invoked with a path-oriented argument combination that selected an incompatible parameter set in the current PowerShell runtime.",
+      "prevention": "Discover script parameters from the PowerShell parser AST or read the bounded param block directly; do not use this Get-Command path form for repository scripts.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3585-PARALLEL-WORK-DISCIPLINE-STATIC-ASSERTION-GUESSED-INTEGRATION-PROPERTIES",
+      "status": "registered_false_oracle_zero_policy_evidence_and_exact_schema_projection_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "powershell"
+      ],
+      "mistake": "A read-only static policy assertion referenced guessed integration property names and failed without producing valid contract evidence.",
+      "rootCause": "The test was authored from semantic intent instead of projecting the exact machine-policy schema before referencing its fields.",
+      "prevention": "Project the exact property names for each selected machine-policy object first, then assert only those confirmed properties and exact values.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3586-TICKET-CLOSURE-MACHINE-POLICY-STALE-PATCH-CONTEXT",
+      "status": "registered_patch_rejected_no_machine_policy_mutation_and_exact_nested_readback_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "policy"
+      ],
+      "mistake": "The first ticket-closure machine-policy patch was rejected because its context did not match the exact nested JSON indentation and surrounding lines.",
+      "rootCause": "The patch was composed from a projected object rather than a literal bounded readback of the serialized JSON owner.",
+      "prevention": "Read the exact serialized windows around workspaceIsolation, integration and promotion, then apply one smallest confirmed insertion or property extension at a time.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3587-GOVERNANCE-BASELINE-UNAUTHORIZED-DIRTY-REGISTERED-WORKTREE",
+      "status": "registered_preserved_external_worktree_blocks_clean_governance_baseline_pending_founder_treatment",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "worktree",
+        "integration"
+      ],
+      "mistake": "The repository has a previously registered worktree outside the new authorized production/Cursor/Codex/integration naming contract, and its bounded status count is materially dirty.",
+      "rootCause": "Earlier Codex/Cursor baseline-reconciliation work used a separate registered worktree under a legacy parent and left it attached with unresolved tracked or untracked state.",
+      "prevention": "Preserve the legacy worktree without mutation, block the clean governance baseline, and require an explicit founder-approved evidence-preserving disposition before any removal, migration, pruning or reuse. All future worktrees use only the authorized parent and prefixes and must close cleanly.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3588-CLEAN-BASELINE-INVENTORY-STDERR-TRUNCATION",
+      "status": "registered_read_only_inventory_output_truncated_zero_classification_evidence_and_scalar_retry_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "powershell"
+      ],
+      "mistake": "The first read-only clean-baseline inventory allowed Git warning stderr to enter the tool result, causing excessive path output and truncation even though the final scalar summary was present.",
+      "rootCause": "The inventory invoked Git diff and untracked enumeration without independently redirecting and suppressing stderr for each child command in the large dirty production and legacy worktrees.",
+      "prevention": "Treat the truncated result as zero classification evidence. Retry once using independently stderr-suppressed Git commands, retain all path inventories only in memory, and emit only scalar counts, branch, HEAD, exit codes and sealed inventory hashes.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3589-CLEAN-BASELINE-CLASSIFICATION-ORCHESTRATOR-SOURCE-SYNTAX",
+      "status": "registered_orchestrator_parser_rejected_before_nested_tools_and_corrected_scalar_attempt_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "tooling"
+      ],
+      "mistake": "The first path-classification orchestration source was rejected by the JavaScript parser before either nested read-only command ran.",
+      "rootCause": "A PowerShell backtick newline sequence appeared inside a JavaScript template literal and terminated the orchestration source unexpectedly.",
+      "prevention": "Use parser-safe orchestration strings with no embedded backtick characters, run only stderr-suppressed read-only Git commands, and emit aggregate classifications plus sealed manifest hashes without filenames or contents.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3590-CLEAN-BASELINE-CONTENT-COMPARISON-ORCHESTRATOR-BACKTICK-SYNTAX",
+      "status": "registered_orchestrator_parser_rejected_before_nested_tools_and_parser_safe_retry_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "tooling"
+      ],
+      "mistake": "The first read-only production-versus-legacy content-comparison orchestration source was rejected by the JavaScript parser before its nested PowerShell command ran.",
+      "rootCause": "A PowerShell backtick newline expression remained inside the JavaScript template literal and terminated the orchestration source unexpectedly.",
+      "prevention": "Use an encoded parser-safe PowerShell source containing no backtick characters, retain all filenames and content digests in memory, and emit only aggregate relationship counts plus one sealed comparison hash.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3591-CLEAN-BASELINE-MANDATORY-POLICY-READ-OUTPUT-TRUNCATION",
+      "status": "registered_combined_read_truncated_and_independent_bounded_reads_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "policy",
+        "tooling"
+      ],
+      "mistake": "A combined mandatory-read orchestration exceeded the direct tool output budget and truncated the coordination-policy JSON result.",
+      "rootCause": "The complete Markdown policy, large JSON machine policy and bounded handoff were requested in one aggregate tool result instead of independent bounded command results.",
+      "prevention": "Treat the truncated output as incomplete evidence. Read each mandatory owner independently, page the machine policy in non-overlapping bounded windows through verified EOF, and never combine large mandatory-owner outputs.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3592-CLEAN-BASELINE-CONTENT-COMPARISON-BTOA-RUNTIME-ASSUMPTION",
+      "status": "registered_orchestrator_failed_before_nested_tool_and_self_contained_encoder_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "tooling"
+      ],
+      "mistake": "The parser-safe content-comparison retry failed in the JavaScript orchestrator before invoking the nested PowerShell command because btoa was unavailable.",
+      "rootCause": "The orchestration source assumed a browser-compatible Base64 global exists in the fresh V8 tool isolate.",
+      "prevention": "Use a self-contained Base64 encoder with no environment globals, verify the encoded command is non-empty, and continue to emit only aggregate scalar comparison evidence.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3593-CLEAN-BASELINE-COMPARISON-HASHSET-CONSTRUCTOR-PIPELINE-UNROLLING",
+      "status": "registered_read_only_comparison_stopped_before_hashing_and_explicit_union_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "powershell"
+      ],
+      "mistake": "The read-only production-versus-legacy comparison stopped before content hashing because the HashSet copy constructor could not bind its two arguments.",
+      "rootCause": "PowerShell enumerated the HashSet returned from the inventory function, so the caller received an unrolled collection instead of the expected generic set instance.",
+      "prevention": "Create the union as an empty ordinal HashSet and add the independently returned string inventories with explicit UnionWith calls; do not rely on PowerShell preserving a returned collection object's concrete type.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3594-CLEAN-BASELINE-CONTENT-COMPARISON-SUBTREE-OUTPUT-TRUNCATION",
+      "status": "registered_completed_read_only_comparison_output_truncated_and_compact_relation_retry_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "tooling"
+      ],
+      "mistake": "The successful read-only content comparison emitted an optional per-subtree grouping large enough to truncate the direct tool result.",
+      "rootCause": "The output contract included hundreds of safe subtree rows even though only aggregate origin, class and content-relationship totals were required for the reconciliation decision.",
+      "prevention": "Treat the truncated result as incomplete evidence and rerun from the unchanged inventories with only scalar totals, compact relation rows, read-error count and the sealed manifest hash; omit all subtree rows.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3595-CLEAN-BASELINE-TARGETED-HASH-HELPER-ALIAS-COLLISION",
+      "status": "registered_read_only_target_probe_stopped_before_output_and_descriptive_function_name_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "dirty_digest",
+        "powershell"
+      ],
+      "mistake": "The targeted read-only legacy-difference probe stopped before emitting its bounded path list because its single-character hash helper resolved to Get-History.",
+      "rootCause": "The helper name H collided case-insensitively with PowerShell's built-in h alias, whose Id parameter then rejected the supplied file path.",
+      "prevention": "Use the unambiguous function name Get-SafeFileSha256 and avoid single-character PowerShell helper names that may collide with aliases or cmdlets.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3596-CLEAN-BASELINE-PRESERVATION-UNTRACKED-MOVE-VERIFICATION-ERRORS",
+      "status": "registered_partial_manifest_count_and_55_destination_outcomes_require_reconciliation_before_git_progress",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "worktree",
+        "filesystem"
+      ],
+      "mistake": "The evidence-preservation transaction moved 76625 of 76680 untracked records into the vault but recorded 55 per-path errors, while the production checkout retained only the one deliberately kept governance document.",
+      "rootCause": "The exact cause is not yet classified; the source paths are no longer Git-visible, so the 55 outcomes may be successful moves followed by long-path verification failures or incomplete destination records and must be reconciled from the local error manifest.",
+      "prevention": "Do not advance Git cleanup, legacy relocation or governance commit. Reconcile the 55 error-manifest paths against exact source and destination presence using long-path-safe filesystem APIs, restore or complete any missing preservation, and require zero unresolved records plus sealed manifest readback before proceeding.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3597-CLEAN-BASELINE-PRESERVATION-MOVED-UNTRACKED-REGRESSION-MEMORY",
+      "status": "registered_mandatory_gate_blocked_and_all_registry_referenced_vault_owners_must_be_restored",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "regression_memory",
+        "filesystem"
+      ],
+      "mistake": "The first mandatory gate after the preservation move failed because the untracked regression-memory document had been moved into the local vault.",
+      "rootCause": "The initial curation keep-list retained only the new coordination-governance owners and did not first derive every mandatory untracked gate and evidence owner referenced by the regression registry.",
+      "prevention": "Before replaying gates, derive the exact union of mandatory reads plus every registry gate/evidence path, restore each missing owner from the verified vault, require zero unresolved mandatory owners, then run the general regression-memory gate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3598-CLEAN-BASELINE-PRESERVATION-MOVED-ACTIVE-CLAIM-OWNER",
+      "status": "registered_coordination_gate_blocked_and_complete_active_claim_union_must_be_restored",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "filesystem"
+      ],
+      "mistake": "The coordination gate failed after mandatory registry evidence restoration because an active-claim web owner remained in the preservation vault.",
+      "rootCause": "The first recovery union covered mandatory reads and registry gate/evidence paths but omitted the distinct complete activeClaims owner set enforced by the coordination checker.",
+      "prevention": "Derive every exact owner in every recorded active claim from the machine policy, restore each missing claimed owner from the vault, require zero unresolved claims, then replay the coordination gate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3599-CLEAN-BASELINE-BROAD-GIT-ADD-LONG-PATH-AND-LINE-ENDING-OUTPUT-TRUNCATION",
+      "status": "registered_staging_exit_zero_but_output_incomplete_and_no_broad_add_retry_allowed",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "worktree",
+        "tooling"
+      ],
+      "mistake": "The broad governance-baseline git add completed with exit zero but emitted long-path traversal and line-ending warnings large enough to truncate both yielded output segments.",
+      "rootCause": "Exact file exclusions left preserved ignored evidence directory structures visible to Git traversal, while thousands of first-add text files also triggered advisory line-ending warnings on stderr.",
+      "prevention": "Do not repeat broad staging. Preserve residual ignored historical files outside the checkout, remove only verified empty directory shells, retain exact required local evidence, and stage any subsequent changed governance owner by literal path with stderr suppressed and scalar index readback.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3600-CLEAN-BASELINE-NONEXISTENT-IMPLEMENTATION-GATE-FILENAME",
+      "status": "registered_gate_invocation_failed_and_authoritative_repository_gate_must_be_discovered_before_retry",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The clean-baseline gate replay attempted to invoke scripts/check-implementation-regression-gate.ps1, which does not exist in this checkout.",
+      "rootCause": "A summarized gate description was treated as an exact repository filename instead of resolving the authoritative implementation regression-memory checker from the scripts inventory.",
+      "prevention": "Resolve mandatory gate filenames from the repository before invocation, bind the new registry generation, then run the authoritative regression-memory and coordination gates exactly once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3601-CLEAN-BASELINE-PER-FILE-STAGED-SECRET-AUDIT-NO-SCALAR-OUTPUT",
+      "status": "registered_bounded_audit_returned_no_result_and_same_per_file_scan_must_not_be_retried",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "A custom staged-index audit invoked git show separately for each eligible text owner and returned no scalar result within the bounded execution window.",
+      "rootCause": "The audit design multiplied process startup across thousands of staged owners instead of using the repository's authoritative secret-safety gate and Git batch primitives.",
+      "prevention": "Do not retry the per-file scanner. Bind this registry generation, use bounded scalar Git audits for structure, and use the mandatory governance preflight for authoritative staged secret safety.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3602-CLEAN-BASELINE-STAGED-DIFF-WHITESPACE-CHECK-EXIT-TWO",
+      "status": "registered_precommit_whitespace_gate_blocked_and_exact_offenders_must_be_classified_before_correction",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The scalar staged-index audit found git diff --cached --check exiting with code 2 before the governance baseline commit.",
+      "rootCause": "The broad staged snapshot contains one or more whitespace-check offenders whose exact owners and safe classifications have not yet been resolved.",
+      "prevention": "Bind this registry generation, obtain an aggregate and exact safe offender inventory without printing file contents, correct only proven formatting defects, restage exact owners, and require a zero exit before commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3603-CLEAN-BASELINE-APPROVED-SPLASH-UI-LOCK-HASH-MISMATCH",
+      "status": "registered_ui_lock_gate_blocked_and_accepted_runtime_source_seal_must_resolve_owner_authority",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "implementation",
+        "ui"
+      ],
+      "mistake": "The approved-UI lock gate rejected the staged baseline because the app-splash production source hash differs from its recorded UI-lock hash.",
+      "rootCause": "The staged splash owner and the existing approved-UI lock disagree; whether the lock is stale or the source is unauthorized must be proven from the accepted r60.87 source seal before either owner changes.",
+      "prevention": "Compare HEAD, staged blob, accepted r60.87 source seal and UI-lock evidence; preserve the accepted runtime owner, update only a proven stale lock, or restore only a proven unauthorized source delta, then replay the gate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-google-authentication-production-baseline-r60-87.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-google-authentication-production-baseline-r60-87.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3604-CLEAN-BASELINE-PRESERVATION-SUMMARY-OMITTED-RESTORED-FILE-DISPOSITIONS",
+      "status": "registered_preservation_audit_failed_and_exact_restore_groups_must_be_bound_into_summary",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "filesystem",
+        "evidence"
+      ],
+      "mistake": "The supervised preservation audit found 5044 untracked-manifest files absent from the vault even though the summary still implied every moved record remained physically preserved there.",
+      "rootCause": "After the initial move, 3580 mandatory registry/policy owners, 85 active-claim owners and 1379 additional secret-safe candidates were intentionally restored to production, but their exact disposition was not added to the preservation summary.",
+      "prevention": "Bind all 5044 restored records to exact restore manifests, verify their current production hashes against the original untracked manifest without emitting sensitive paths, update the vault summary arithmetic, and rerun the independent read-only preservation audit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3605-CLEAN-BASELINE-RESTORED-FILE-RECONCILIATION-PROBE-PARENTHESIS-SYNTAX",
+      "status": "registered_read_only_probe_did_not_run_and_corrected_scalar_probe_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "filesystem",
+        "tooling"
+      ],
+      "mistake": "The first restored-file reconciliation probe failed to parse because a Test-Path expression omitted a closing parenthesis.",
+      "rootCause": "Nested Join-Path and Test-Path calls were composed inline without first assigning the resolved candidate path.",
+      "prevention": "Bind this registry generation, resolve each candidate into a named scalar path, then execute one corrected read-only aggregate probe before copying any restoration snapshot.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3606-CLEAN-BASELINE-RESTORED-FILE-PROBE-QUADRATIC-ARRAY-GROWTH",
+      "status": "registered_bounded_probe_returned_no_result_and_streaming_collections_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "filesystem",
+        "tooling"
+      ],
+      "mistake": "The corrected restored-file probe again returned no scalar output within its bound because it appended tens of thousands of records with PowerShell array plus-equals operations.",
+      "rootCause": "Repeated immutable-array expansion made the 76625-record manifest scan quadratic even though only 5044 missing records were needed.",
+      "prevention": "Do not retry array growth. Bind this registry generation and use generic streaming lists and hash sets with direct aggregate counters for the one corrected probe.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3607-CLEAN-BASELINE-RESTORED-FILE-PROBE-BACKSLASH-NORMALIZATION",
+      "status": "registered_streaming_probe_completed_with_false_missing_inventory_and_one_corrected_normalization_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "filesystem",
+        "tooling"
+      ],
+      "mistake": "The streaming restoration probe searched for a doubled backslash sequence when converting physical Windows relative paths to manifest forward-slash paths, so every primary-vault file was falsely reported missing.",
+      "rootCause": "JavaScript-to-PowerShell escaping produced a two-character replacement token instead of the single Windows directory separator required by the manifest comparison.",
+      "prevention": "Bind this registry generation and normalize with DirectorySeparatorChar rather than an escaped string before performing the one corrected set comparison.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3608-CLEAN-BASELINE-RESTORED-SNAPSHOT-ROOT-TRIM-CHAR-TOKEN",
+      "status": "registered_snapshot_command_failed_before_write_and_directory_separator_char_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "filesystem",
+        "tooling"
+      ],
+      "mistake": "The first restored-production snapshot command failed before creating its destination because TrimEnd received a doubled-backslash string that could not convert to one Char.",
+      "rootCause": "The root validation repeated an escaped string token instead of using the platform DirectorySeparatorChar value already available from System.IO.Path.",
+      "prevention": "Bind this registry generation, verify the snapshot and manifest remain absent, and use explicit DirectorySeparatorChar and AltDirectorySeparatorChar values for the one corrected snapshot operation.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3609-CLEAN-BASELINE-FINAL-UNTRACKED-ENUMERATION-OUTPUT-CUTOFF",
+      "status": "registered_substantive_gates_passed_but_trailing_scalar_readback_incomplete_and_slow_probe_forbidden",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The final precommit command completed all substantive gates but its output ended during a trailing git ls-files untracked enumeration before printing the final cleanliness scalars.",
+      "rootCause": "Exact ignored historical directory traversal made the redundant end-of-command untracked inventory exceed the bounded output window even though zero untracked paths had already been proven after staging.",
+      "prevention": "Do not repeat the slow enumeration. Bind this registry generation, replay mandatory gates, and use bounded porcelain/index scalars without another broad untracked walk before the atomic commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-google-authentication-production-baseline-r60-87.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
     }
   ]
 }

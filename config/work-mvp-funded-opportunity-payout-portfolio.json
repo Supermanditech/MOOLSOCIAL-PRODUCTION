@@ -1,0 +1,512 @@
+{
+  "schemaVersion": 1,
+  "portfolioId": "WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-20260805",
+  "state": "proposed_for_founder_review_not_preauthorized",
+  "humanAuthority": "docs/delivery/WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-20260805.md",
+  "parentTicketId": "WORK-MVP-FUNDED-OPPORTUNITY-TO-AUDITABLE-PAYOUT-END-TO-END-JOURNEY",
+  "ticketCount": 45,
+  "mvpClassificationCounts": {
+    "mvp_required": 41,
+    "mvp_supporting": 4,
+    "beyond_mvp": 0
+  },
+  "launchVerticalSlice": {
+    "workType": "verified_retailer_onboarding",
+    "unit": "one_bounded_approved_activation",
+    "workerFeeAllowed": false,
+    "inventoryReservation": false,
+    "capacityRule": "campaign_funding_and_one_worker_attempt_capacity_may_be_bounded_only_after_authoritative_assignment_acceptance"
+  },
+  "visibilityModel": {
+    "publicPreview": "truthful_teaser_visible_to_all_normal_users_or_an_admin_selected_public_geography_without_requiring_a_work_workspace",
+    "targetedPreview": "teaser_visible_only_to_governed_user_type_and_geography_segments_selected_by_admin",
+    "fullTerms": "available_after_the_user_creates_or_reuses_the_required_work_workspace_and_always_before_apply",
+    "applicationEligibility": "discovery_visibility_is_separate_from_execution_eligibility_full_terms_visibility_does_not_create_eligibility_and_apply_may_remain_disabled_until_required_verification_passes",
+    "geographyLevels": [
+      "locality_or_zone",
+      "district",
+      "state",
+      "national",
+      "remote"
+    ],
+    "audienceBasis": [
+      "normal_user_public_discovery",
+      "verified_work_profile_type",
+      "skill_or_training",
+      "declared_or_consented_work_area",
+      "proof_capability",
+      "trust_and_conflict_policy"
+    ],
+    "prohibitedTargeting": [
+      "sensitive_trait_targeting",
+      "contacts_or_other_apps",
+      "personal_messages",
+      "unrelated_phone_activity",
+      "unconsented_background_location"
+    ]
+  },
+  "workTypeRegistry": {
+    "fixedWorkTypeEnum": false,
+    "adminCanCreateNewType": true,
+    "creationFlow": "admin_creates_and_versions_a_work_type_then_an_approved_active_type_is_added_to_the_reusable_work_type_selection",
+    "initialExamplesAreNotClosedChoices": [
+      "general_freelancer",
+      "onboarding_or_verifier",
+      "creator",
+      "delivery_partner",
+      "business_participant"
+    ],
+    "requiredTypeDefinition": [
+      "name_and_user_facing_purpose",
+      "compatible_work_workspace_capabilities",
+      "remote_or_field_operating_mode",
+      "allowed_geography_levels",
+      "eligibility_and_conflict_inputs",
+      "step_and_custom_field_schema",
+      "allowed_proof_primitives",
+      "payout_units_and_term_fields",
+      "consent_safety_rights_and_compliance_requirements",
+      "support_and_recovery_rules"
+    ],
+    "lifecycle": ["draft", "review", "active_in_selection", "paused", "retired", "superseded"],
+    "compatibleSchemaChangeRequiresAppRelease": false,
+    "newPermissionIntegrationOrRegulatedCapabilityRequiresIndependentApproval": true
+  },
+  "protectedCheckpoint": {
+    "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "profile": "1.0.0-r58.23 (2026080419)",
+    "sourceSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "apkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9"
+  },
+  "authorizationModel": {
+    "executionActive": false,
+    "oneActiveTicketAtATime": true,
+    "portfolioApprovalDoesNotActivateHeldDependencies": true,
+    "htmlFounderFinalBeforeNewFlutterStates": true,
+    "consolidatedFounderReviewAfterOppoQualification": true,
+    "notAuthorizedWithoutLaterExactFounderActivation": [
+      "runtime_write",
+      "backend_write",
+      "build",
+      "oppo_testing"
+    ],
+    "neverImpliedByPortfolioApproval": [
+      "commit",
+      "push",
+      "deploy",
+      "promote",
+      "production_write",
+      "credential_access",
+      "live_funding_or_payout",
+      "live_external_message_or_call",
+      "live_worker_or_funder_action"
+    ]
+  },
+  "policyOwnership": {
+    "serverOwnedVersionedFutureOnlyAdminChange": [
+      "application_close",
+      "approved_assignment_start_window",
+      "work_deadline",
+      "proof_review_sla",
+      "rework_window_and_attempts",
+      "appeal_sla",
+      "payout_release_target",
+      "visibility_mode",
+      "audience_types",
+      "geography_scope"
+    ],
+    "activeAssignmentPolicyImmutable": true,
+    "automaticProductionLearningEnabled": false,
+    "learningInputsLimitedToConsentedWorkspaceOperationalEvents": true
+  },
+  "sharedDisclosure": {
+    "classificationPolicy": "config/mvp-scope-policy.json",
+    "minimumCompleteScope": "Only the responsibility named by each child ticket and its row in the human authority.",
+    "explicitExclusions": [
+      "generic_get_it_done_service_booking",
+      "jobs_directory_or_recruitment_marketplace",
+      "salary_or_income_guarantee",
+      "worker_application_training_or_access_fee",
+      "ride_or_captain_expansion",
+      "health_or_salon_booking",
+      "unrelated_phone_activity",
+      "contact_import_or_background_surveillance",
+      "autonomous_production_policy_change",
+      "deceptive_or_materially_incomplete_public_teaser",
+      "sensitive_or_unconsented_audience_targeting",
+      "client_declared_eligibility_proof_approval_or_payout_truth"
+    ],
+    "testAndEvidencePlan": [
+      "unique_evidence_identity",
+      "predecessor_branch_head_and_complete_dirty_inventory",
+      "exact_source_manifest",
+      "authorization_tenant_idempotency_and_data_egress_checks",
+      "focused_state_machine_and_failure_tests",
+      "two_affected_regressions",
+      "final_source_drift_check",
+      "applicable_reference_build_device_and_release_gates"
+    ]
+  },
+  "tickets": [
+    {
+      "order": 1,
+      "id": "WORK-MVP-GOVERNED-FUNDED-OPPORTUNITY-CONTRACT",
+      "classification": "mvp_required",
+      "customerOutcome": "Every opportunity has one exact funded output, issuer, capacity, place, audience, geography, deadline, proof, review and payout contract before publication.",
+      "dependenciesAndApprovals": ["work_product_owner", "campaign_governance_owner"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 2,
+      "id": "WORK-MVP-VERIFIED-FUNDER-WORKSPACE-AUTHORITY",
+      "classification": "mvp_required",
+      "customerOutcome": "Only an authorized verified workspace can create or operate a funded opportunity.",
+      "dependenciesAndApprovals": ["workspace_identity_owner", "tenant_authorization_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 3,
+      "id": "WORK-MVP-FUNDING-AND-OUTPUT-CAPACITY-TRUTH",
+      "classification": "mvp_required",
+      "customerOutcome": "No work becomes public or assignable without authoritative funding and remaining output capacity.",
+      "dependenciesAndApprovals": ["finance_owner", "ledger_owner", "ticket_2"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 4,
+      "id": "WORK-MVP-ELIGIBILITY-CONFLICT-AND-SAFETY-POLICY",
+      "classification": "mvp_required",
+      "customerOutcome": "Eligibility is server-evaluated from the exact profile, skill, geography, training, proof capability, trust and conflict rules.",
+      "dependenciesAndApprovals": ["identity_owner", "safety_owner", "policy_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 5,
+      "id": "WORK-MVP-MATCHED-OPPORTUNITY-DISCOVERY",
+      "classification": "mvp_required",
+      "customerOutcome": "A normal user can discover truthful public previews and a matching user can compare targeted funded tasks by output, place, payout, proof, deadline and open capacity.",
+      "dependenciesAndApprovals": ["tickets_1_4"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 6,
+      "id": "WORK-MVP-EXACT-TERMS-VERSION-SNAPSHOT",
+      "classification": "mvp_required",
+      "customerOutcome": "The worker reviews one immutable terms version before applying and again before accepting assignment.",
+      "dependenciesAndApprovals": ["tickets_1_5"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 7,
+      "id": "WORK-MVP-REALISTIC-EARNING-POTENTIAL-DISCLOSURE",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Potential is calculated from eligible funded capacity and clearly separated from salary or guaranteed income.",
+      "dependenciesAndApprovals": ["tickets_3_5", "consumer_copy_owner"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 8,
+      "id": "WORK-MVP-EXISTING-WORK-PROFILE-RESOLUTION",
+      "classification": "mvp_required",
+      "customerOutcome": "An existing eligible Work profile is reused and a missing capability opens only the exact setup path without duplicate workspaces.",
+      "dependenciesAndApprovals": ["workspace_registry_owner", "ticket_4"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 9,
+      "id": "WORK-MVP-IDEMPOTENT-OPPORTUNITY-APPLICATION",
+      "classification": "mvp_required",
+      "customerOutcome": "One Apply decision creates at most one application despite retry, Back, refresh or process death.",
+      "dependenciesAndApprovals": ["tickets_4_8"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 10,
+      "id": "WORK-MVP-AUTHORITATIVE-APPLICATION-ELIGIBILITY-DECISION",
+      "classification": "mvp_required",
+      "customerOutcome": "Applied, waitlisted, approved, rejected and expired states come from authoritative funding, capacity, eligibility and conflict checks.",
+      "dependenciesAndApprovals": ["tickets_3_4_9"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 11,
+      "id": "WORK-MVP-APPLICATION-STATUS-AND-REASON-HISTORY",
+      "classification": "mvp_required",
+      "customerOutcome": "The worker can reopen every application and understand its current state, reason and next allowed action.",
+      "dependenciesAndApprovals": ["tickets_9_10"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 12,
+      "id": "WORK-MVP-ADMIN-ASSIGNMENT-AND-REVIEW-SLA-POLICY",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin controls future assignment-start, work, proof-review, rework, appeal and payout timing through versioned policy instead of hard-coded deadlines.",
+      "dependenciesAndApprovals": ["admin_authorization_owner", "work_operations_owner", "finance_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 13,
+      "id": "WORK-MVP-ASSIGNMENT-POLICY-SNAPSHOT",
+      "classification": "mvp_required",
+      "customerOutcome": "An approved assignment retains the exact timing, proof, review, rework and payout policy the worker accepted.",
+      "dependenciesAndApprovals": ["tickets_6_12"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 14,
+      "id": "WORK-MVP-IDEMPOTENT-WORKER-ASSIGNMENT-ACCEPTANCE",
+      "classification": "mvp_required",
+      "customerOutcome": "Start Work authoritatively accepts one assignment once and cannot create duplicate active work.",
+      "dependenciesAndApprovals": ["tickets_10_13"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 15,
+      "id": "WORK-MVP-FUNDED-SEAT-ALLOCATION",
+      "classification": "mvp_required",
+      "customerOutcome": "After valid acceptance, one bounded funding/capacity seat is allocated to one worker attempt without creating a consumer inventory reservation.",
+      "dependenciesAndApprovals": ["tickets_3_14", "ledger_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 16,
+      "id": "WORK-MVP-DECLINE-EXPIRY-AND-ELIGIBLE-REASSIGNMENT",
+      "classification": "mvp_required",
+      "customerOutcome": "A declined or expired offer releases capacity and may move to the next eligible worker without duplicate assignment or reduced terms.",
+      "dependenciesAndApprovals": ["tickets_10_15", "work_operations_owner"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 17,
+      "id": "WORK-MVP-BOUNDED-ACTIVE-WORK-STEP-CONTRACT",
+      "classification": "mvp_required",
+      "customerOutcome": "Active Work shows one exact output, ordered steps, deadline, proof, payout and support responsibilities.",
+      "dependenciesAndApprovals": ["tickets_6_14_15"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 18,
+      "id": "WORK-MVP-CONSENT-SAFETY-AND-DATA-MINIMIZATION",
+      "classification": "mvp_required",
+      "customerOutcome": "The worker collects only task-required consented evidence and never money, passwords or unrelated documents.",
+      "dependenciesAndApprovals": ["privacy_owner", "safety_owner", "ticket_17"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 19,
+      "id": "WORK-MVP-OFFLINE-PROGRESS-AND-INTERRUPTION-RECOVERY",
+      "classification": "mvp_required",
+      "customerOutcome": "Back, app death, phone restart and intermittent network restore the same authoritative active-work state.",
+      "dependenciesAndApprovals": ["ticket_17"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 20,
+      "id": "WORK-MVP-PERMISSION-BOUND-EVIDENCE-CAPTURE",
+      "classification": "mvp_required",
+      "customerOutcome": "GPS, time, media, OTP, QR and system events are requested only when the exact task needs them and permission is understood.",
+      "dependenciesAndApprovals": ["tickets_17_18", "device_permission_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 21,
+      "id": "WORK-MVP-PROOF-INTEGRITY-AND-IDEMPOTENT-SUBMISSION",
+      "classification": "mvp_required",
+      "customerOutcome": "Original evidence and integrity metadata bind to one work item, and repeated Submit creates one outcome case.",
+      "dependenciesAndApprovals": ["tickets_19_20", "evidence_security_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 22,
+      "id": "WORK-MVP-AUTOMATED-INTEGRITY-CHECKS-AND-EXCEPTION-ROUTING",
+      "classification": "mvp_required",
+      "customerOutcome": "Deterministic checks flag explainable evidence conflicts while exceptions route to accountable human review.",
+      "dependenciesAndApprovals": ["ticket_21", "review_policy_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 23,
+      "id": "WORK-MVP-REVIEWER-APPROVAL-REWORK-OR-REJECTION-DECISION",
+      "classification": "mvp_required",
+      "customerOutcome": "An authorized reviewer records approval, bounded rework or rejection with evidence, reason and policy version.",
+      "dependenciesAndApprovals": ["tickets_21_22", "reviewer_role_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 24,
+      "id": "WORK-MVP-BOUNDED-REWORK-AND-RESUBMISSION",
+      "classification": "mvp_required",
+      "customerOutcome": "When terms permit, the worker sees the exact correction, remaining attempt and deadline and can resubmit without losing valid proof.",
+      "dependenciesAndApprovals": ["tickets_13_23"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 25,
+      "id": "WORK-MVP-REJECTION-REASON-INDEPENDENT-APPEAL",
+      "classification": "mvp_required",
+      "customerOutcome": "A rejected worker can inspect the original evidence, reason and rule and request an independent appeal where allowed.",
+      "dependenciesAndApprovals": ["ticket_23", "independent_appeal_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 26,
+      "id": "WORK-MVP-FAIR-REPUTATION-AND-ELIGIBILITY-EFFECT",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Ratings and future eligibility change only through visible governed outcomes, never silent punishment from one disputed task.",
+      "dependenciesAndApprovals": ["tickets_23_25", "fairness_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 27,
+      "id": "WORK-MVP-IMMUTABLE-TASK-LINKED-PAYABLE-LEDGER",
+      "classification": "mvp_required",
+      "customerOutcome": "Only an approved funded output creates a task-linked payable ledger entry; applications and time spent do not.",
+      "dependenciesAndApprovals": ["tickets_3_23", "finance_ledger_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 28,
+      "id": "WORK-MVP-VERIFIED-PAYOUT-IDENTITY-AND-DESTINATION",
+      "classification": "mvp_required",
+      "customerOutcome": "Payout can release only to the worker's authorized verified destination with privacy-safe display.",
+      "dependenciesAndApprovals": ["identity_owner", "finance_owner", "ticket_27"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 29,
+      "id": "WORK-MVP-PAYOUT-RELEASE-RECONCILIATION-AND-RECEIPT",
+      "classification": "mvp_required",
+      "customerOutcome": "Payable, processing, paid, failed and reversed states reconcile without duplicate payout and expose a receipt reference.",
+      "dependenciesAndApprovals": ["tickets_27_28", "payout_provider_owner", "finance_legal_approval"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 30,
+      "id": "WORK-MVP-EARNINGS-STATEMENT-AND-WORK-HISTORY",
+      "classification": "mvp_supporting",
+      "customerOutcome": "The worker can trace each held, payable and paid amount to its work, proof and decision and prepare a statement.",
+      "dependenciesAndApprovals": ["tickets_23_29"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 31,
+      "id": "WORK-MVP-CANCEL-EXPIRY-AND-FUNDING-RELEASE",
+      "classification": "mvp_required",
+      "customerOutcome": "Cancellation or expiry closes the work once, explains responsibility and releases unused capacity/funding safely.",
+      "dependenciesAndApprovals": ["tickets_13_16_27", "finance_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 32,
+      "id": "WORK-MVP-WORKER-ISSUE-SAFETY-AND-SUPPORT-TIMELINE",
+      "classification": "mvp_required",
+      "customerOutcome": "The worker can report unavailability, wrong location, safety, terms, proof or payout issues from the affected work record.",
+      "dependenciesAndApprovals": ["support_owner", "safety_owner", "tickets_17_31"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 33,
+      "id": "WORK-MVP-FUNDER-REVIEWER-OPERATIONS-WORKSPACE",
+      "classification": "mvp_required",
+      "customerOutcome": "Authorized funder and reviewer roles can monitor capacity, assignments, proof queues and decisions without seeing unrelated worker data.",
+      "dependenciesAndApprovals": ["tickets_2_3_23", "role_separation_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 34,
+      "id": "WORK-MVP-ADMIN-CAMPAIGN-AND-PAYOUT-GOVERNANCE",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can approve governed opportunities, audience/geography, timing policy, proof decisions, appeals and payout controls with audit and rollback.",
+      "dependenciesAndApprovals": ["tickets_1_3_12_23_25_29", "admin_authorization_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 35,
+      "id": "WORK-MVP-OPERATIONAL-POLICY-EVIDENCE-AND-ADMIN-RECOMMENDATIONS",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Admin receives explainable timing recommendations from consented workspace events while retaining the only Production change authority.",
+      "dependenciesAndApprovals": ["ticket_34", "privacy_owner", "observability_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 36,
+      "id": "WORK-MVP-PRIVACY-RETENTION-AND-DATA-EGRESS-BOUNDARY",
+      "classification": "mvp_required",
+      "customerOutcome": "Worker, business and proof data remain purpose-bound, minimized, retained by policy and absent from unauthorized egress.",
+      "dependenciesAndApprovals": ["privacy_owner", "security_owner", "tickets_18_20_33"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 37,
+      "id": "WORK-MVP-TRUTHFUL-PUBLIC-TEASER-AND-WORKSPACE-FULL-TERMS-GATE",
+      "classification": "mvp_required",
+      "customerOutcome": "A normal user sees a compelling but truthful preview, while creating or reusing the required Work workspace unlocks complete terms before Apply.",
+      "dependenciesAndApprovals": ["tickets_1_5_6_8", "consumer_copy_owner", "founder_reference_approval"],
+      "lane": "reference"
+    },
+    {
+      "order": 38,
+      "id": "WORK-MVP-AUDIENCE-TYPE-AND-GEOGRAPHY-PUBLISHING-POLICY",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can select public or targeted visibility by governed user type and locality/district/state/national/remote scope without sensitive targeting.",
+      "dependenciesAndApprovals": ["tickets_2_4_34_36", "audience_policy_owner", "geography_policy_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 39,
+      "id": "WORK-MVP-ADMIN-DRAFT-EDIT-PREVIEW-PUBLISH-LIFECYCLE",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can draft and edit work nature, terms and scope, preview the normal and targeted views, then publish, pause, close or schedule the governed version.",
+      "dependenciesAndApprovals": ["tickets_1_3_12_34_38", "admin_authorization_owner", "campaign_governance_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 40,
+      "id": "WORK-MVP-PUBLISHED-TERMS-VERSION-AND-ACTIVE-ASSIGNMENT-IMMUTABILITY",
+      "classification": "mvp_required",
+      "customerOutcome": "A material published edit creates a new version and re-consent where needed, while accepted assignments retain their exact terms.",
+      "dependenciesAndApprovals": ["tickets_6_13_39", "legal_policy_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 41,
+      "id": "WORK-MVP-ADMIN-CREATED-WORK-TYPE-REGISTRY-AND-SELECTION",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can define and version a new lawful Work Type from governed capabilities, approve it, and add it to the reusable posting selection without a hard-coded type list.",
+      "dependenciesAndApprovals": ["tickets_1_4_18_34_36_39", "admin_authorization_owner", "schema_registry_owner", "applicable_compliance_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 42,
+      "id": "WORK-MVP-END-TO-END-HTML-REFERENCE-BATCH",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder can review every missing opportunity, assignment, proof, review, payout, recovery and Admin state as one connected reference batch.",
+      "dependenciesAndApprovals": ["tickets_1_41", "founder_final_reference_approval"],
+      "lane": "reference"
+    },
+    {
+      "order": 43,
+      "id": "WORK-MVP-NATIVE-EARN-MY-WORK-EARNINGS-STATES",
+      "classification": "mvp_required",
+      "customerOutcome": "Native Flutter implements the frozen Work journey with authoritative loading, empty, offline, denied, error and retry states.",
+      "dependenciesAndApprovals": ["ticket_42_founder_final", "protected_runtime_gates", "backend_contracts"],
+      "lane": "portfolio_after_reference_final"
+    },
+    {
+      "order": 44,
+      "id": "WORK-MVP-AFFECTED-JOURNEY-REGRESSION-AND-OPPO-QUALIFICATION",
+      "classification": "mvp_required",
+      "customerOutcome": "The exact candidate passes success, expiry, reassign, proof, rework, appeal and payout recovery twice and on checksum-matched OPPO hardware.",
+      "dependenciesAndApprovals": ["ticket_43", "apk_machine_gate", "device_authorization"],
+      "lane": "device"
+    },
+    {
+      "order": 45,
+      "id": "WORK-MVP-BATCH-FOUNDER-ACCEPTANCE-PACK",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder receives one exact terminal evidence pack for the cumulative Work candidate and every held or excluded dependency.",
+      "dependenciesAndApprovals": ["tickets_1_44_terminal"],
+      "lane": "founder_final"
+    }
+  ]
+}

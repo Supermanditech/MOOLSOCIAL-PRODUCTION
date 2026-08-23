@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R10-PERSONAL-WORK-EXPOSURE-INTERACTION-NAVIGATION-V1",
+  "ticketId": "UAW-R10-PERSONAL-WORK-EXPOSURE",
+  "actor": "Personal user",
+  "entryRoute": "/app/work",
+  "classification": "mvp_required",
+  "actions": [
+    {"id":"earn-today","label":"Earn Today","route":"/app/work/earn"},
+    {"id":"workspace","label":"Workspace","route":"/app/work/my-work"}
+  ],
+  "navigation": {
+    "back": "pop_prior_surface_else_/app/mool?from=work",
+    "mool": "/app/mool?from=work",
+    "chat": "/app/chat/inbox?return=/app/work",
+    "choiceTransition": "push"
+  },
+  "presentationOwner": "MvpActionChoiceRootV2",
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "excludedActions": ["delivery_work", "onboard", "verify"],
+  "explicitExclusions": [
+    "no_opportunity_eligibility_application_proof_review_workspace_settlement_payout_or_backend_change",
+    "no_jobs_directory_salary_or_fee_to_work_promise",
+    "no_new_screen_route_session_controller_model_or_per_intent_owner",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

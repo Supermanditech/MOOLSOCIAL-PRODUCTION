@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "parentTicket": "UAW-C30W-R60-47-PLAY-COLD-START-MISSING-SERVER-CLIENT-ID",
+  "state": "source_gate_implementation_active_candidate_version_and_all_release_actions_held",
+  "classification": "mvp_supporting",
+  "severity": "blocking_release_control",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "A successor Android candidate cannot be built until every current source regression gate passes, and it cannot advance after build unless the exact AAB and Play-installed app prove zero new issues or defects across cold start, retained-data update and mandatory journeys.",
+  "classificationReason": "This is bounded release reliability and evidence enforcement for the existing MVP, adds no customer feature, and prevents another cold-start escape like failed r60.47.",
+  "minimumCompleteScope": [
+    "create_one_successor_owned_fail_closed_release_state_and_phase_gate_without_selecting_a_version_or_authorizing_a_build",
+    "require_current_regression_memory_MVP_scope_delivery_UI_lock_backend_Hosting_Flutter_analyzer_runtime_configuration_and_source_manifest_evidence_before_build",
+    "bind_postbuild_and_immediate_preupload_checks_to_the_exact_AAB_bytes_package_version_signer_and_nonsecret_provenance",
+    "require_Play_installed_in_place_update_cold_start_retained_data_fatal_ANR_installer_version_and_mandatory_journey_evidence_after_separate_approval",
+    "make_any_new_postbuild_or_postinstall_issue_or_defect_a_failed_candidate_state_that_blocks_promotion"
+  ],
+  "explicitExclusions": [
+    "no_candidate_version_selection_AAB_build_upload_activation_Play_track_change_or_OPPO_mutation",
+    "no_backend_Hosting_provider_Firebase_rules_IAM_or_external_service_deployment",
+    "no_secret_password_API_key_OAuth_client_ID_token_nonce_private_verdict_private_key_or_attestation_payload_access",
+    "no_uninstall_data_clear_downgrade_sideload_ADB_install_email_quota_submission_commit_push_or_main"
+  ],
+  "dependenciesAndApprovals": [
+    "failed_r60_47_identity_counts_and_cold_start_failure_remain_immutable",
+    "C30W_safe_first_frame_and_five_define_name_contract_remain_mandatory",
+    "a_future_candidate_version_and_exact_one_build_authority_require_founder_approval",
+    "upload_activation_and_one_in_place_OPPO_Play_update_each_require_separate_founder_approval",
+    "three_founder_only_hidden_inputs_are_required_for_a_future_authorized_build"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/check-play-internal-aab-build-wrapper-c30v.ps1",
+      "scripts/check-release-runtime-configuration-c30w.ps1",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-approved-ui-locks.ps1",
+      "tmp/run-c30t-authoritative-flutter-manifest-audit.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c30x.json",
+      "tmp/run-c30x-successor-single-aab-founder.ps1"
+    ],
+    "necessityProof": "Historical r60.47 gates are version-locked, the generic wrapper records a contradictory plugin count, and the old preupload phase does not independently rebind the selected AAB bytes. One successor-owned state/gate plus bounded repairs to existing wrapper checks is the smallest non-duplicate correction.",
+    "timelineImpactDays": 1,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_static_gate_replay",
+    "negative_phase_tests_for_missing_regression_artifact_version_signer_installer_cold_start_and_new_defect_evidence",
+    "current_authoritative_Flutter_manifest_backend_Hosting_whole_mobile_analyzer_and_global_UI_lock_audits",
+    "two_identical_source_only_qualification_cycles_after_every_blocker_is_closed",
+    "future_separately_authorized_postbuild_preupload_Play_install_and_mandatory_journey_evidence"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendDeploymentAuthorized": false,
+    "HostingDeploymentAuthorized": false,
+    "providerDeploymentAuthorized": false,
+    "productionOpenClosedOrPublicAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/00-pre-ticket-selection-assessment.json",
+    "auditDirectory": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01",
+    "failedPredecessorState": "config/release-runtime-configuration-gate-state-c30w.json"
+  }
+}

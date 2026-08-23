@@ -1,0 +1,771 @@
+[CmdletBinding()]
+param(
+  [ValidateSet('source', 'build', 'postbuild', 'preupload', 'postupload', 'preinstall', 'postinstall', 'journey')]
+  [string]$Phase = 'source',
+
+  [string]$StatePath = 'config/successor-aab-regression-hard-gate-state-c33m.json',
+
+  [string]$ScopePath = 'config/mvp-scope-gate-state.json',
+
+  [string]$RepositoryRoot
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
+$root = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([char[]]@('\', '/'))
+$prefix = $root + [IO.Path]::DirectorySeparatorChar
+
+function Assert-C33M {
+  param(
+    [Parameter(Mandatory)][bool]$Condition,
+    [Parameter(Mandatory)][string]$Message
+  )
+  if (-not $Condition) {
+    throw "C33M r60.51 no-regression release gate rejected: $Message"
+  }
+}
+
+function Resolve-C33MFile {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Label
+  )
+  Assert-C33M -Condition (-not [string]::IsNullOrWhiteSpace($Path)) `
+    -Message "$Label path is empty."
+  $resolved = if ([IO.Path]::IsPathRooted($Path)) {
+    [IO.Path]::GetFullPath($Path)
+  } else {
+    [IO.Path]::GetFullPath((Join-Path $root $Path))
+  }
+  Assert-C33M -Condition (
+    $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -and
+    (Test-Path -LiteralPath $resolved -PathType Leaf)
+  ) -Message "$Label is missing or escaped the repository: $Path"
+  return $resolved
+}
+
+function Assert-C33MSanitizedText {
+  param(
+    [Parameter(Mandatory)][string]$Text,
+    [Parameter(Mandatory)][string]$Label
+  )
+  foreach ($pattern in @(
+    'AIza[0-9A-Za-z_-]{35}',
+    '[0-9]{6,}-[0-9A-Za-z_-]+[.]apps[.]googleusercontent[.]com',
+    'Bearer\s+[A-Za-z0-9._~+/-]+=*',
+    '-----BEGIN [^-]*PRIVATE KEY-----',
+    'eyJ[A-Za-z0-9_-]+[.]eyJ[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+'
+  )) {
+    Assert-C33M -Condition (-not [regex]::IsMatch($Text, $pattern)) `
+      -Message "$Label contains a credential-, token- or private-key-shaped value."
+  }
+}
+
+function Assert-C33MPowerShellOwner {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Label
+  )
+  $tokens = $null
+  $errors = $null
+  [void][Management.Automation.Language.Parser]::ParseFile(
+    $Path,
+    [ref]$tokens,
+    [ref]$errors
+  )
+  Assert-C33M -Condition (@($errors).Count -eq 0) `
+    -Message "$Label PowerShell parser rejected the current owner."
+}
+
+function Assert-C33MManifestCurrent {
+  param([Parameter(Mandatory)][string]$ManifestPath)
+  foreach ($line in Get-Content -LiteralPath $ManifestPath) {
+    $match = [regex]::Match($line, '^([0-9A-F]{64})  (.+)$')
+    Assert-C33M -Condition $match.Success -Message 'source-manifest row is malformed.'
+    $owner = Resolve-C33MFile -Path $match.Groups[2].Value -Label 'sealed source owner'
+    Assert-C33M -Condition (
+      (Get-FileHash -Algorithm SHA256 -LiteralPath $owner).Hash -ceq
+        $match.Groups[1].Value
+    ) -Message "source changed after qualification: $($match.Groups[2].Value)"
+  }
+}
+
+$ticketId = 'UAW-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE'
+$ticketPath = Resolve-C33MFile `
+  -Path 'config/uaw-c33m-r60-51-authentication-no-regression-play-oppo-acceptance-ticket.json' `
+  -Label 'C33M ticket'
+$ticketRaw = Get-Content -Raw -LiteralPath $ticketPath
+Assert-C33MSanitizedText -Text $ticketRaw -Label 'C33M ticket'
+Assert-C33M -Condition (
+  (Get-FileHash -Algorithm SHA256 -LiteralPath $ticketPath).Hash -ceq
+    'B24E40B0E8A23EC08584AFF82A5E2DDCD37E6E26D4BFF80053DA0C9015FD53DB'
+) -Message 'ticket bytes changed.'
+$ticket = $ticketRaw | ConvertFrom-Json
+Assert-C33M -Condition (
+  [string]$ticket.ticketId -ceq $ticketId -and
+  [string]$ticket.state -ceq
+    'registered_founder_authorized_source_qualification_pending' -and
+  [string]$ticket.classification -ceq 'mvp_required' -and
+  [string]$ticket.candidate.versionName -ceq '1.0.0-r60.51' -and
+  [string]$ticket.candidate.versionCode -ceq '2026081351' -and
+  [string]$ticket.candidate.playTrack -ceq 'internal' -and
+  [bool]$ticket.robustnessAndReuseAssessment.reuseInventoryComplete -and
+  [bool]$ticket.robustnessAndReuseAssessment.duplicateSearchComplete -and
+  [bool]$ticket.robustnessAndReuseAssessment.within60To75DayLock -and
+  @($ticket.robustnessAndReuseAssessment.newScreens).Count -eq 0 -and
+  @($ticket.robustnessAndReuseAssessment.newRoutes).Count -eq 0 -and
+  @($ticket.robustnessAndReuseAssessment.newBackendOwners).Count -eq 0 -and
+  @($ticket.minimumCompleteScope) -contains
+    'reject_the_candidate_and_register_an_exact_repair_ticket_before_retry_if_any_historical_or_new_regression_occurs' -and
+  [bool]$ticket.authority.oneAabBuildAuthorizedAfterAllGates -and
+  [bool]$ticket.authority.oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild -and
+  [bool]$ticket.authority.oneInPlaceOppoPlayUpdateAuthorizedAfterActivation -and
+  [bool]$ticket.authority.oneFounderReviewedPasswordlessEmailSendAuthorizedAfterInstall -and
+  -not [bool]$ticket.authority.agentSecretOrPrivateLinkAccessAuthorized -and
+  -not [bool]$ticket.authority.otherTrackAuthorized -and
+  -not [bool]$ticket.authority.adbInstallUninstallDataClearDowngradeOrSideloadAuthorized -and
+  -not [bool]$ticket.authority.backendHostingProviderOrProductionDeploymentAuthorized -and
+  -not [bool]$ticket.authority.realSmsSendAuthorized -and
+  -not [bool]$ticket.authority.youtubeQuotaOrEmailSubmissionAuthorized -and
+  -not [bool]$ticket.authority.fundsAuthorized
+) -Message 'ticket identity, no-regression rule or authority changed.'
+
+$resolvedStatePath = Resolve-C33MFile -Path $StatePath -Label 'C33M state'
+$stateRaw = Get-Content -Raw -LiteralPath $resolvedStatePath
+Assert-C33MSanitizedText -Text $stateRaw -Label 'C33M state'
+$state = $stateRaw | ConvertFrom-Json
+$aggregatePath = Resolve-C33MFile `
+  -Path ([string]$state.aggregateStatePath) `
+  -Label 'C33M aggregate'
+$aggregateRaw = Get-Content -Raw -LiteralPath $aggregatePath
+Assert-C33MSanitizedText -Text $aggregateRaw -Label 'C33M aggregate'
+$aggregate = $aggregateRaw | ConvertFrom-Json
+
+Assert-C33M -Condition (
+  [int]$state.schemaVersion -eq 1 -and
+  [string]$state.contractId -ceq
+    'MOOLSOCIAL-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-RELEASE-STATE-001' -and
+  [string]$state.ticketId -ceq $ticketId -and
+  [string]$state.repositoryIdentity.branch -ceq
+    'remediation/prototype-conformance-2026-07-20' -and
+  [string]$state.repositoryIdentity.head -ceq
+    'f6dfe7587aa02d782e94282d14af8bafff48ded0' -and
+  [string]$state.candidate.id -ceq $ticketId -and
+  [string]$state.candidate.packageName -ceq 'com.moolsocial.app' -and
+  [string]$state.candidate.versionName -ceq '1.0.0-r60.51' -and
+  [string]$state.candidate.versionCode -ceq '2026081351' -and
+  [string]$state.candidate.authorizedTrack -ceq 'internal' -and
+  [string]$state.candidate.playTrack -ceq 'internal' -and
+  [string]$state.candidate.deviceSerial -ceq '2b3e0f71' -and
+  [string]$state.candidate.deviceModel -ceq 'CPH2375'
+) -Message 'state repository, candidate, package, track or OPPO identity changed.'
+Assert-C33M -Condition (
+  [string]$aggregate.contractId -ceq
+    'MOOLSOCIAL-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-RELEASE-AGGREGATE-001' -and
+  [string]$aggregate.ticketId -ceq $ticketId -and
+  [string]$aggregate.candidate.id -ceq $ticketId -and
+  [string]$aggregate.candidate.versionName -ceq '1.0.0-r60.51' -and
+  [string]$aggregate.candidate.versionCode -ceq '2026081351'
+) -Message 'aggregate identity or candidate changed.'
+
+$historicalPath = Resolve-C33MFile `
+  -Path ([string]$state.historicalFailedCandidate.statePath) `
+  -Label 'failed r60.49 state'
+$historical = Get-Content -Raw -LiteralPath $historicalPath | ConvertFrom-Json
+Assert-C33M -Condition (
+  [string]$historical.machineState -ceq
+    'acceptance_failed_r60_49_google_auth_guest_feed_social_identity_and_create_crash_successor_required' -and
+  [string]$historical.candidate.versionName -ceq '1.0.0-r60.49' -and
+  [string]$historical.candidate.versionCode -ceq '2026081349' -and
+  [int]$historical.buildResult.buildCount -eq 1 -and
+  [int]$historical.playResult.uploadCount -eq 1 -and
+  [int]$historical.installResult.installCount -eq 1 -and
+  [int]$historical.actionCounts.deviceAcceptance -eq 0 -and
+  [string]$historical.buildAuthorization -ceq 'consumed' -and
+  [string]$historical.uploadAuthorization -ceq 'consumed' -and
+  [string]$historical.installAuthorization -ceq 'consumed' -and
+  [string]$historical.deviceAuthorization -ceq 'consumed' -and
+  -not [bool]$historical.installResult.acceptanceSucceeded -and
+  [int]$state.historicalFailedCandidate.buildCount -eq 1 -and
+  [int]$state.historicalFailedCandidate.uploadCount -eq 1 -and
+  [int]$state.historicalFailedCandidate.installCount -eq 1 -and
+  [int]$state.historicalFailedCandidate.deviceAcceptanceCount -eq 0 -and
+  -not [bool]$state.historicalFailedCandidate.runtimeSuccessClaimed -and
+  -not [bool]$state.historicalFailedCandidate.artifactReusable
+) -Message 'failed r60.49 identity, 1/1/1/0 counts, consumed authorities or failure truth changed.'
+
+$rejectedPath = Resolve-C33MFile `
+  -Path ([string]$state.historicalRejectedCandidate.statePath) `
+  -Label 'rejected r60.50 state'
+$rejected = Get-Content -Raw -LiteralPath $rejectedPath | ConvertFrom-Json
+$rejectedAggregatePath = Resolve-C33MFile `
+  -Path ([string]$rejected.aggregateStatePath) `
+  -Label 'rejected r60.50 aggregate'
+$rejectedAggregate = Get-Content -Raw -LiteralPath $rejectedAggregatePath |
+  ConvertFrom-Json
+Assert-C33M -Condition (
+  [string]$rejected.candidate.versionName -ceq '1.0.0-r60.50' -and
+  [string]$rejected.candidate.versionCode -ceq '2026081350' -and
+  [string]$rejected.machineState -ceq
+    'single_release_AAB_succeeded_authority_consumed' -and
+  [string]$rejected.buildAuthorization -ceq 'consumed' -and
+  [int]$rejected.buildResult.buildCount -eq 1 -and
+  [int]$rejected.actionCounts.build -eq 1 -and
+  [int]$rejected.actionCounts.upload -eq 0 -and
+  [int]$rejected.actionCounts.install -eq 0 -and
+  [int]$rejected.actionCounts.deviceAcceptance -eq 0 -and
+  [string]$rejected.buildResult.artifactSha256 -ceq
+    '541F02EA0F7C1C8B9067B31D50AE3CE0BB495E16746A3E4E2FF4AEAA28354F99' -and
+  [int]$rejectedAggregate.candidate.buildCount -eq 1 -and
+  [int]$rejectedAggregate.actionCounts.build -eq 0 -and
+  [string]$rejectedAggregate.releaseAuthorities.build -ceq 'available_once' -and
+  [int]$state.historicalRejectedCandidate.buildCount -eq 1 -and
+  [int]$state.historicalRejectedCandidate.uploadCount -eq 0 -and
+  [int]$state.historicalRejectedCandidate.installCount -eq 0 -and
+  [int]$state.historicalRejectedCandidate.deviceAcceptanceCount -eq 0 -and
+  -not [bool]$state.historicalRejectedCandidate.runtimeSuccessClaimed -and
+  -not [bool]$state.historicalRejectedCandidate.artifactReusable -and
+  -not [bool]$state.historicalRejectedCandidate.stateRepairOrPromotionAllowed
+) -Message 'rejected r60.50 artifact, 1/0/0/0 truth or preserved aggregate-mirror mismatch changed.'
+
+$phoneState = Get-Content -Raw -LiteralPath (
+  Resolve-C33MFile -Path ([string]$state.sourcePrerequisites.phoneReadinessPath) `
+    -Label 'Phone readiness state'
+) | ConvertFrom-Json
+$emailSourceState = Get-Content -Raw -LiteralPath (
+  Resolve-C33MFile -Path ([string]$state.sourcePrerequisites.emailSourceStatePath) `
+    -Label 'email source state'
+) | ConvertFrom-Json
+$emailLiveState = Get-Content -Raw -LiteralPath (
+  Resolve-C33MFile -Path ([string]$state.sourcePrerequisites.emailLiveReadinessPath) `
+    -Label 'email live-readiness state'
+) | ConvertFrom-Json
+Assert-C33M -Condition (
+  [string]$phoneState.state -ceq
+    'source_qualified_prebuild_provider_prerequisites_qualified_candidate_device_pending' -and
+  [bool]$phoneState.liveReadiness.phoneProviderEnabled -and
+  [bool]$phoneState.liveReadiness.smsRegionPolicyQualified -and
+  @($phoneState.liveReadiness.smsRegionPolicyRegions).Count -eq 1 -and
+  [string]$phoneState.liveReadiness.smsRegionPolicyRegions[0] -ceq 'IN' -and
+  -not [bool]$phoneState.liveReadiness.smsRegionPolicyRealSmsSent -and
+  [bool]$emailSourceState.runtimeContract.coldStartEmailLinkOwner -and
+  [bool]$emailSourceState.runtimeContract.foregroundEmailLinkOwner -and
+  [bool]$emailSourceState.runtimeContract.exactPendingDestinationProviderAndDelegate -and
+  [string]$emailLiveState.state -ceq
+    'live_readiness_qualified_two_exact_configuration_writes_consumed' -and
+  [bool]$emailLiveState.sanitizedAfterFacts.phoneProviderEnabled -and
+  [bool]$emailLiveState.sanitizedAfterFacts.googleProviderEnabled -and
+  [bool]$emailLiveState.sanitizedAfterFacts.emailPasswordProviderEnabled -and
+  [bool]$emailLiveState.sanitizedAfterFacts.passwordlessEmailLinkEnabled -and
+  [bool]$emailLiveState.sanitizedAfterFacts.moolSocialDomainAuthorized -and
+  [int]$emailLiveState.actionCounts.emailProviderEnablement -eq 1 -and
+  [int]$emailLiveState.actionCounts.authorizedDomainAddition -eq 1 -and
+  [int]$emailLiveState.actionCounts.liveEmailSend -eq 0 -and
+  [int]$emailLiveState.actionCounts.aabBuild -eq 0 -and
+  [int]$emailLiveState.actionCounts.playUploadOrActivation -eq 0 -and
+  [int]$emailLiveState.actionCounts.oppoMutation -eq 0 -and
+  -not [bool]$emailLiveState.privacy.secretValuesObserved -and
+  -not [bool]$emailLiveState.privacy.emailAddressObservedOrEntered
+) -Message 'Phone or passwordless-email sanitized readiness changed.'
+
+Assert-C33M -Condition (
+  [bool]$state.promotionRule.allApplicableHistoricalRegressionGatesMustPassBeforeBuild -and
+  [bool]$state.promotionRule.registrySealMustRemainExactThroughPromotion -and
+  [bool]$state.promotionRule.zeroNewIssuesAfterBuildRequired -and
+  [bool]$state.promotionRule.zeroNewDefectsAfterBuildRequired -and
+  [bool]$state.promotionRule.zeroHistoricalRegressionRepeatsAcrossAabDeploymentOppoOrProduction -and
+  [bool]$state.regressionMemory.postSealRegistryChangeRejectsBuildOrPromotion -and
+  [bool]$state.regressionMemory.anyHistoricalOrNewRegressionRejectsCandidate -and
+  [bool]$state.regressionMemory.exactRepairTicketBeforeRetryRequired -and
+  -not [bool]$state.regressionMemory.waiversAllowed -and
+  -not [bool]$state.promotionRule.waiversAllowed -and
+  -not [bool]$state.promotionRule.productionReadinessClaimBeforeAllAcceptanceAllowed
+) -Message 'no-regression fail-closed promotion rule changed.'
+Assert-C33M -Condition (
+  [bool]$state.authority.candidateIdentityApproved -and
+  [bool]$state.authority.oneAabBuildAuthorizedAfterAllGates -and
+  [bool]$state.authority.oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild -and
+  [bool]$state.authority.oneInPlaceOppoPlayUpdateAuthorizedAfterActivation -and
+  [bool]$state.authority.oneFounderReviewedPasswordlessEmailAuthorizedAfterInstall -and
+  -not [bool]$state.authority.agentSecretValueAccessAuthorized -and
+  -not [bool]$state.authority.otherTrackAuthorized -and
+  -not [bool]$state.authority.adbOrSideloadAuthorized -and
+  -not [bool]$state.authority.backendOrHostingDeploymentAuthorized -and
+  -not [bool]$state.authority.providerDeploymentAuthorized -and
+  -not [bool]$state.authority.youtubeQuotaOrEmailSubmissionAuthorized -and
+  -not [bool]$state.authority.realSmsSendAuthorized -and
+  -not [bool]$state.authority.fundsAuthorized -and
+  -not [bool]$state.privacyBoundary.secretValuesObserved -and
+  -not [bool]$state.privacyBoundary.oauthClientIdentifierValuesObserved -and
+  -not [bool]$state.privacyBoundary.tokenOrAttestationPayloadObserved -and
+  -not [bool]$state.privacyBoundary.privateEmailLinkObserved -and
+  -not [bool]$state.privacyBoundary.firebaseDebugLogRead
+) -Message 'authority or privacy boundary changed.'
+Assert-C33M -Condition (
+  [int]$state.actionCounts.realSmsSend -eq 0 -and
+  [int]$state.actionCounts.otherTrack -eq 0 -and
+  [int]$state.actionCounts.backendHostingProviderOrProductionDeployment -eq 0 -and
+  [int]$aggregate.actionCounts.realSmsSend -eq 0 -and
+  [int]$aggregate.actionCounts.otherTrack -eq 0 -and
+  [int]$aggregate.actionCounts.backendHostingProviderOrProductionDeployment -eq 0
+) -Message 'forbidden action count advanced.'
+
+$launcherPath = Resolve-C33MFile `
+  -Path ([string]$state.releaseBinding.founderLauncher) `
+  -Label 'C33M founder launcher'
+$wrapperPath = Resolve-C33MFile `
+  -Path ([string]$state.releaseBinding.authoritativeAabWrapper) `
+  -Label 'generic single-AAB wrapper'
+$recoveryPath = Resolve-C33MFile `
+  -Path ([string]$state.releaseBinding.postbuildRecoveryOwner) `
+  -Label 'C33M interrupted-postbuild recovery owner'
+$resultRetentionPath = Resolve-C33MFile `
+  -Path ([string]$state.releaseBinding.launcherResultRetentionOwner) `
+  -Label 'founder launcher result-retention owner'
+Assert-C33MPowerShellOwner -Path $launcherPath -Label 'C33M founder launcher'
+Assert-C33MPowerShellOwner -Path $wrapperPath -Label 'generic single-AAB wrapper'
+Assert-C33MPowerShellOwner `
+  -Path $recoveryPath `
+  -Label 'C33M interrupted-postbuild recovery owner'
+Assert-C33MPowerShellOwner `
+  -Path $resultRetentionPath `
+  -Label 'founder launcher result-retention owner'
+$launcher = Get-Content -Raw -LiteralPath $launcherPath
+$wrapper = Get-Content -Raw -LiteralPath $wrapperPath
+$recovery = Get-Content -Raw -LiteralPath $recoveryPath
+$gateNeedle = 'scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1'
+$gateIndex = $launcher.IndexOf($gateNeedle, [StringComparison]::Ordinal)
+$promptIndex = $launcher.IndexOf('$uploadSecure = Read-Host', [StringComparison]::Ordinal)
+$wrapperIndex = $launcher.IndexOf('& $wrapperPath -StatePath $statePath -RepositoryRoot $root', [StringComparison]::Ordinal)
+$environmentCleanupIndex = $launcher.IndexOf(
+  "SetEnvironmentVariable(`$name, `$null, 'Process')",
+  [StringComparison]::Ordinal
+)
+$fileCleanupIndex = $launcher.IndexOf(
+  'Remove-Item -LiteralPath $path -Force',
+  [StringComparison]::Ordinal
+)
+$retainedResultIndex = $launcher.IndexOf(
+  'Complete-C30TFounderLauncherResult -Result $launcherResult',
+  [StringComparison]::Ordinal
+)
+Assert-C33M -Condition (
+  $gateIndex -ge 0 -and
+  $promptIndex -gt $gateIndex -and
+  $wrapperIndex -gt $promptIndex -and
+  [regex]::Matches($launcher, 'Read-Host[^\r\n]*-AsSecureString').Count -eq 3 -and
+  $launcher.IndexOf('ZeroFreeBSTR', [StringComparison]::Ordinal) -ge 0 -and
+  $environmentCleanupIndex -gt $wrapperIndex -and
+  $fileCleanupIndex -gt $environmentCleanupIndex -and
+  $retainedResultIndex -gt $fileCleanupIndex -and
+  $launcher.IndexOf("`$launcherResult = 'build_qualified'", [StringComparison]::Ordinal) -gt
+    $wrapperIndex -and
+  $launcher.IndexOf("`$launcherResult = 'stopped_after_cleanup'", [StringComparison]::Ordinal) -ge 0 -and
+  $launcher.IndexOf(
+    "throw 'C33M founder launcher stopped after cleanup; reconcile repository state before any retry.'",
+    [StringComparison]::Ordinal
+  ) -gt $retainedResultIndex
+) -Message 'founder launcher ordering, three hidden prompts, cleanup or retained result changed.'
+foreach ($forbidden in @(
+  'Write-Host $uploadPassword',
+  'Write-Output $uploadPassword',
+  'Write-Host $firebaseKey',
+  'Write-Output $firebaseKey',
+  'Write-Host $googleServerClientId',
+  'Write-Output $googleServerClientId',
+  'Set-Clipboard',
+  'Get-Clipboard'
+)) {
+  Assert-C33M -Condition (
+    $launcher.IndexOf($forbidden, [StringComparison]::OrdinalIgnoreCase) -lt 0
+  ) -Message "founder launcher contains forbidden output or clipboard owner: $forbidden"
+}
+Assert-C33M -Condition (
+  $wrapper.IndexOf(
+    "'MOOLSOCIAL-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-RELEASE-STATE-001' { 'check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1' }",
+    [StringComparison]::Ordinal
+  ) -ge 0 -and
+  $wrapper.IndexOf('& $gate -Phase build', [StringComparison]::Ordinal) -lt
+    $wrapper.IndexOf("`$state.buildAuthorization = 'consumed'", [StringComparison]::Ordinal) -and
+  [regex]::Matches($wrapper, "'appbundle'").Count -eq 1
+) -Message 'generic wrapper C33M binding, gate order or single appbundle owner changed.'
+Assert-C33M -Condition (
+  $recovery.IndexOf(
+    "[ValidateSet('audit', 'apply')]",
+    [StringComparison]::Ordinal
+  ) -ge 0 -and
+  $recovery.IndexOf(
+    "[string]`$state.buildAuthorization -ceq 'consumed'",
+    [StringComparison]::Ordinal
+  ) -ge 0 -and
+  $recovery.IndexOf(
+    '[int]$aggregate.actionCounts.build -eq 1',
+    [StringComparison]::Ordinal
+  ) -ge 0 -and
+  $recovery.IndexOf(
+    "[string]`$aggregate.releaseAuthorities.build -ceq 'consumed'",
+    [StringComparison]::Ordinal
+  ) -ge 0 -and
+  $recovery.IndexOf('exactly one completed provenance owner is required.', [StringComparison]::Ordinal) -ge 0 -and
+  $recovery.IndexOf("if (`$Mode -ceq 'apply')", [StringComparison]::Ordinal) -ge 0 -and
+  $recovery.IndexOf('secondBuild=false', [StringComparison]::Ordinal) -ge 0 -and
+  $recovery.IndexOf('flutter build', [StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+  $recovery.IndexOf("'appbundle'", [StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+  $recovery.IndexOf('adb install', [StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+  $recovery.IndexOf('play upload', [StringComparison]::OrdinalIgnoreCase) -lt 0
+) -Message 'presealed recovery owner can rebuild, mutate device/Play or bypass exact provenance and consumed mirrors.'
+
+$scopeGate = Resolve-C33MFile -Path 'scripts/check-mvp-scope-gate-state.ps1' -Label 'MVP scope gate'
+if ($Phase -ceq 'source') {
+  & $scopeGate `
+    -StatePath $ScopePath `
+    -CandidateId $ticketId `
+    -RepositoryRoot $root | Out-Null
+} else {
+  & $scopeGate `
+    -StatePath $ScopePath `
+    -CandidateId $ticketId `
+    -RequireExecutionAuthorized `
+    -RepositoryRoot $root | Out-Null
+}
+$mvpStatePath = Resolve-C33MFile -Path $ScopePath -Label 'MVP state'
+$mvpState = Get-Content -Raw -LiteralPath $mvpStatePath | ConvertFrom-Json
+$checkpoint = $mvpState.preTicketSelectionCheckpoint
+$qualifiedPreventions = @(
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33LFix4SelectedTicketAssessment
+    ticketId = 'UAW-C33L-FIX4-GENERIC-AAB-POSTBUILD-AGGREGATE-MIRROR-ATOMICITY'
+    ticketSha = '2EE039F85DE0E313593D7875BF1A1B7694F7359CBC403B301DA22C4D65FF7BA1'
+    state = 'source_test_gate_repair_qualified_dual_host_parent_successor_required_build_Play_OPPO_and_external_actions_held'
+    evidenceSha = '1ABA97C1E97A227007F6D248DAB88C3F4DBDE87C7CB38894E678C2E305E1A257'
+  },
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33LFix5SelectedTicketAssessment
+    ticketId = 'UAW-C33L-FIX5-FOUNDER-AAB-LAUNCHER-POSTCLEANUP-RESULT-RETENTION'
+    ticketSha = '2F558255A40D63AA940D9FD14DFD1D3D1AB67B87A095F45AF342046FD8FA957D'
+    state = 'source_test_gate_repair_qualified_dual_host_future_launcher_binding_required_build_Play_OPPO_and_external_actions_held'
+    evidenceSha = 'C600BD1F9D148154AB7032A1413C0893F4B8B52D78FC5AF7C5F837ED94FC40E5'
+  },
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33LFix6SelectedTicketAssessment
+    ticketId = 'UAW-C33L-FIX6-FIX4-GATE-SUCCESSOR-REPLAY-COMPATIBILITY'
+    ticketSha = '67F9F63ED3F44DC94A0E6DC5480704183AC52F18CEFE16225DDDCFDA86D98BB1'
+    state = 'source_test_gate_repair_qualified_dual_host_parent_successor_replay_ready_build_Play_OPPO_and_external_actions_held'
+    evidenceSha = 'F1BDEE542DF89349C791A27E38E4B8FD7CFA882AA05F6712171234CA20AE90EC'
+  },
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33MFix1SelectedTicketAssessment
+    ticketId = 'UAW-C33M-FIX1-C33L-FIX5-GATE-SUCCESSOR-REPLAY-COMPATIBILITY'
+    ticketSha = '5BA0420B29288C3BAB861E2C6A9D0B4A81389341F091883C76F3F9B5F144BD89'
+    state = 'source_test_gate_repair_qualified_dual_host_parent_successor_replay_ready_build_Play_OPPO_email_and_external_actions_held'
+    evidenceSha = '8271D2BE07CDBA4564EFB5A7F370B8D24EB388F27A31A1615EF85D35C4FE056F'
+  },
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33MFix2SelectedTicketAssessment
+    ticketId = 'UAW-C33M-FIX2-C33L-FIX1-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY'
+    ticketSha = 'AFF8F6A5741ECEBEF68B47F46CF47B77FBB961D4A3327F89F2C5C81EB35E7EED'
+    state = 'source_test_gate_repair_qualified_dual_host_generic_successor_replay_ready_build_Play_OPPO_email_and_external_actions_held'
+    evidenceSha = 'F6BFAE580AF5746D63BE58455A8130E0E3A08B0BA9458D1BA8CB9FD65486F6D6'
+  },
+  [pscustomobject]@{
+    assessment = $checkpoint.priorC33MFix3SelectedTicketAssessment
+    ticketId = 'UAW-C33M-FIX3-C33L-FIX3-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY'
+    ticketSha = '2722BB4C6F167D4481A98BE638140564135B210F82CD56E2515C77B5BA5E6A53'
+    state = 'source_test_gate_repair_qualified_dual_host_historical_generic_successor_and_negative_replay_ready_build_Play_OPPO_email_and_external_actions_held'
+    evidenceSha = 'A4260CCC605CB98A3506E72E7D4B8D90E7EF23826FA185CA59898EE251FAEC16'
+  }
+)
+foreach ($prevention in $qualifiedPreventions) {
+  $assessment = $prevention.assessment
+  $preventionTicketPath = Resolve-C33MFile `
+    -Path ([string]$assessment.manifestPath) `
+    -Label "qualified prevention ticket $($prevention.ticketId)"
+  $preventionEvidencePath = Resolve-C33MFile `
+    -Path ([string]$assessment.evidencePath) `
+    -Label "qualified prevention evidence $($prevention.ticketId)"
+  Assert-C33M -Condition (
+    [string]$assessment.ticketId -ceq [string]$prevention.ticketId -and
+    [string]$assessment.manifestSha256 -ceq [string]$prevention.ticketSha -and
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $preventionTicketPath).Hash -ceq
+      [string]$prevention.ticketSha -and
+    [string]$assessment.implementationState -ceq [string]$prevention.state -and
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $preventionEvidencePath).Hash -ceq
+      [string]$prevention.evidenceSha
+  ) -Message "qualified prevention binding changed: $($prevention.ticketId)"
+}
+$fix4Gate = Resolve-C33MFile `
+  -Path 'scripts/check-uaw-c33l-fix4-generic-aab-postbuild-aggregate-mirror-atomicity.ps1' `
+  -Label 'FIX4 successor replay gate'
+$fix5Gate = Resolve-C33MFile `
+  -Path 'scripts/check-uaw-c33l-fix5-founder-aab-launcher-postcleanup-result-retention.ps1' `
+  -Label 'FIX5 successor replay gate'
+$safeBootGate = Resolve-C33MFile `
+  -Path 'scripts/check-uaw-c33l-fix1-private-dev-public-review-screen04-safe-boot-regression.ps1' `
+  -Label 'Screen 04 safe-boot successor replay gate'
+$flutterClassificationGate = Resolve-C33MFile `
+  -Path 'scripts/check-uaw-c33l-fix3-authoritative-flutter-null-event-classification.ps1' `
+  -Label 'authoritative Flutter classification successor replay gate'
+& $fix4Gate -RepositoryRoot $root | Out-Null
+& $fix5Gate -RepositoryRoot $root | Out-Null
+& $safeBootGate -RepositoryRoot $root | Out-Null
+& $flutterClassificationGate -RepositoryRoot $root | Out-Null
+$memoryGate = Resolve-C33MFile `
+  -Path 'scripts/check-codex-development-regression-memory.ps1' `
+  -Label 'regression-memory gate'
+$memoryPhase = if ($Phase -in @('postinstall', 'journey')) {
+  'device'
+} elseif ($Phase -eq 'source') {
+  'implementation'
+} else {
+  'build'
+}
+$memoryBuildMode = if ($memoryPhase -ceq 'build') { 'release' } else { 'none' }
+& $memoryGate `
+  -Phase $memoryPhase `
+  -BuildMode $memoryBuildMode `
+  -RepositoryRoot $root | Out-Null
+
+$phoneGate = Resolve-C33MFile `
+  -Path ([string]$state.sourcePrerequisites.phoneGatePath) `
+  -Label 'Phone source gate'
+& $phoneGate -Phase source -RepositoryRoot $root | Out-Null
+$blockerGate = Resolve-C33MFile `
+  -Path ([string]$state.sourcePrerequisites.blockerGatePath) `
+  -Label 'C33G blocker gate'
+if ($Phase -in @('postinstall', 'journey')) {
+  & $blockerGate `
+    -CandidateId $ticketId `
+    -CandidateVersionCode '2026081351' `
+    -Phase postinstall `
+    -RepositoryRoot $root | Out-Null
+} else {
+  & $blockerGate `
+    -CandidateId $ticketId `
+    -CandidateVersionCode '2026081351' `
+    -Phase prebuild `
+    -RepositoryRoot $root | Out-Null
+}
+$googleStatePath = Resolve-C33MFile `
+  -Path ([string]$state.sourcePrerequisites.googleLiveReadinessPath) `
+  -Label 'Google live-readiness state'
+$googleStateRaw = Get-Content -Raw -LiteralPath $googleStatePath
+Assert-C33MSanitizedText -Text $googleStateRaw -Label 'Google live-readiness state'
+$googleState = $googleStateRaw | ConvertFrom-Json
+$googleFacts = @($googleState.readinessFacts)
+$requiredGoogleFacts = @(
+  'firebase_android_app_play_signer',
+  'firebase_google_provider_enabled',
+  'android_oauth_package_play_signer_relationship',
+  'web_server_client_mobile_relationship'
+)
+Assert-C33M -Condition (
+  [string]$googleState.contractId -ceq
+    'GOOGLE-AUTH-LIVE-PROVIDER-READINESS-C33E-FIX2-001' -and
+  [string]$googleState.machineState -ceq
+    'qualified_sanitized_non_secret_evidence_release_gate_open_for_separately_authorized_candidate' -and
+  [string]$googleState.applicationIdentity.project -ceq 'moolsocial-dev-503018' -and
+  [string]$googleState.applicationIdentity.package -ceq 'com.moolsocial.app' -and
+  [string]$googleState.applicationIdentity.authorizedTrack -ceq 'Internal Testing' -and
+  $googleFacts.Count -eq 4 -and
+  -not [bool]$googleState.privacyBoundary.secretValuesObserved -and
+  -not [bool]$googleState.privacyBoundary.privateAccountIdentifiersObserved -and
+  -not [bool]$googleState.privacyBoundary.oauthClientIdentifierValuesObserved -and
+  -not [bool]$googleState.privacyBoundary.tokenOrAttestationPayloadObserved -and
+  -not [bool]$googleState.privacyBoundary.firebaseDebugLogRead
+) -Message 'sanitized Google readiness identity, fact count or privacy boundary changed.'
+$googleFactIds = @($googleFacts | ForEach-Object { [string]$_.id })
+Assert-C33M -Condition (
+  @($googleFactIds | Select-Object -Unique).Count -eq 4 -and
+  @($requiredGoogleFacts | Where-Object { $_ -cnotin $googleFactIds }).Count -eq 0
+) -Message 'sanitized Google readiness fact identifiers changed.'
+foreach ($googleFact in $googleFacts) {
+  Assert-C33M -Condition (
+    [string]$googleFact.status -ceq 'qualified_sanitized_non_secret_evidence' -and
+    [string]$googleFact.evidenceSha256 -match '^[0-9A-F]{64}$'
+  ) -Message "Google readiness fact is not qualified: $($googleFact.id)"
+  $googleEvidencePath = Resolve-C33MFile `
+    -Path ([string]$googleFact.evidencePath) `
+    -Label "Google readiness evidence $($googleFact.id)"
+  Assert-C33M -Condition (
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $googleEvidencePath).Hash -ceq
+      [string]$googleFact.evidenceSha256
+  ) -Message "Google readiness evidence changed: $($googleFact.id)"
+}
+$runtimeGate = Resolve-C33MFile `
+  -Path ([string]$state.sourcePrerequisites.releaseRuntimeGatePath) `
+  -Label 'C30W release-runtime gate'
+if ($Phase -ceq 'source') {
+  & $runtimeGate -Phase source -StatePath $resolvedStatePath -RepositoryRoot $root | Out-Null
+}
+
+$registryPath = Resolve-C33MFile `
+  -Path ([string]$state.regressionMemory.registryPath) `
+  -Label 'regression registry'
+$registryRaw = Get-Content -Raw -LiteralPath $registryPath
+Assert-C33MSanitizedText -Text $registryRaw -Label 'regression registry'
+$registry = $registryRaw | ConvertFrom-Json
+$registryCount = @($registry.entries).Count
+$registrySha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $registryPath).Hash
+$cycles = [int]$state.sourceQualification.completedIdenticalCycles
+$sourceQualified = (
+  $cycles -eq 2 -and
+  [int]$state.sourceQualification.requiredIdenticalCycles -eq 2 -and
+  [bool]$state.regressionMemory.allEntriesAppliedBeforeSeal -and
+  [int]$state.regressionMemory.sealedRegistryEntryCount -eq $registryCount -and
+  [string]$state.regressionMemory.sealedRegistrySha256 -ceq $registrySha256 -and
+  [int]$aggregate.regressionMemory.sealedRegistryEntryCount -eq $registryCount -and
+  [string]$aggregate.regressionMemory.sealedRegistrySha256 -ceq $registrySha256 -and
+  [bool]$state.sourceQualification.wholeMobileAnalyzerPassed -and
+  [bool]$state.sourceQualification.flutterTestsPassed -and
+  [bool]$state.sourceQualification.backendTestsPassed -and
+  [bool]$state.sourceQualification.hostingTestsPassed -and
+  [bool]$state.sourceQualification.dualPowerShellHostsPassed -and
+  [bool]$state.sourceQualification.zeroFailures -and
+  [bool]$aggregate.sourceQualification.zeroFailures -and
+  @($state.sourceQualification.cycleEvidence).Count -eq 2 -and
+  @($aggregate.sourceQualification.cycleEvidence).Count -eq 2
+)
+if ($cycles -eq 0) {
+  Assert-C33M -Condition (
+    [string]$state.machineState -ceq
+      'prebuild_composition_registered_two_fresh_cycles_required' -and
+    [string]$state.buildAuthorization -ceq 'held_source_qualification' -and
+    [string]$aggregate.releaseAuthorities.build -ceq 'held_source_qualification' -and
+    [int]$aggregate.sourceQualification.completedIdenticalCycles -eq 0
+  ) -Message 'unqualified source state or held build authority changed.'
+} else {
+  Assert-C33M -Condition $sourceQualified `
+    -Message 'two identical zero-failure cycles or exact regression-registry seal is incomplete.'
+  Assert-C33M -Condition (
+    [int]$aggregate.sourceQualification.completedIdenticalCycles -eq 2 -and
+    [string]$aggregate.sourceQualification.manifestPath -ceq
+      [string]$state.sourceQualification.manifestPath -and
+    [string]$aggregate.sourceQualification.manifestSha256 -ceq
+      [string]$state.sourceQualification.manifestSha256 -and
+    [string]$aggregate.sourceQualification.focusedManifestSha256 -ceq
+      [string]$state.sourceQualification.focusedManifestSha256
+  ) -Message 'source qualification aggregate mirror changed.'
+  $manifestPath = Resolve-C33MFile `
+    -Path ([string]$state.sourceQualification.manifestPath) `
+    -Label 'sealed source manifest'
+  Assert-C33M -Condition (
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $manifestPath).Hash -ceq
+      [string]$state.sourceQualification.manifestSha256
+  ) -Message 'sealed source-manifest file changed.'
+  Assert-C33MManifestCurrent -ManifestPath $manifestPath
+  $focusedManifestPath = Resolve-C33MFile `
+    -Path ([string]$state.sourceQualification.focusedManifestPath) `
+    -Label 'focused test manifest'
+  Assert-C33M -Condition (
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $focusedManifestPath).Hash -ceq
+      [string]$state.sourceQualification.focusedManifestSha256
+  ) -Message 'focused test manifest changed.'
+}
+
+Assert-C33M -Condition (
+  [int]$state.actionCounts.build -eq [int]$aggregate.actionCounts.build -and
+  [int]$state.actionCounts.upload -eq [int]$aggregate.actionCounts.upload -and
+  [int]$state.actionCounts.install -eq [int]$aggregate.actionCounts.install -and
+  [int]$state.actionCounts.deviceAcceptance -eq [int]$aggregate.actionCounts.deviceAcceptance -and
+  [int]$state.actionCounts.passwordlessEmailSend -eq [int]$aggregate.actionCounts.passwordlessEmailSend
+) -Message 'state/aggregate action-count mirror changed.'
+
+if ($Phase -ceq 'build') {
+  Assert-C33M -Condition $sourceQualified `
+    -Message 'build requires two identical zero-failure cycles and the exact registry seal.'
+  Assert-C33M -Condition (
+    [string]$state.machineState -ceq
+      'source_regression_memory_two_identical_cycles_qualified_founder_prompt_required' -and
+    [string]$state.buildAuthorization -ceq 'available_once' -and
+    [string]$aggregate.releaseAuthorities.build -ceq 'available_once' -and
+    [string]$state.buildResult.state -ceq 'not_started' -and
+    [int]$state.buildResult.buildCount -eq 0 -and
+    [int]$state.actionCounts.build -eq 0 -and
+    -not [bool]$state.founderAuthorization.hiddenFounderInputsEntered
+  ) -Message 'single AAB authority is unavailable, consumed, already prompted or not fully qualified.'
+}
+
+if ($Phase -ceq 'postbuild') {
+  Assert-C33M -Condition (
+    [string]$state.buildAuthorization -ceq 'consumed' -and
+    [int]$state.buildResult.buildCount -eq 1 -and
+    [int]$state.buildResult.wrapperInvocationCount -eq 1 -and
+    [int]$state.buildResult.configOnlyCount -eq 1 -and
+    [int]$state.actionCounts.build -eq 1 -and
+    [int]$state.actionCounts.upload -eq 0 -and
+    [int]$state.actionCounts.install -eq 0 -and
+    [regex]::IsMatch([string]$state.buildResult.artifactSha256, '^[0-9A-F]{64}$') -and
+    [int64]$state.buildResult.artifactBytes -gt 0 -and
+    [bool]$state.buildResult.packageVersionManifestProved -and
+    [bool]$state.buildResult.googleAppIdResourceProved -and
+    [bool]$state.buildResult.crashlyticsBuildIdResourceProved -and
+    [bool]$state.buildResult.splitAndArm64PayloadProved -and
+    [bool]$state.buildResult.mergedReleaseManifestProved
+  ) -Message 'postbuild artifact, count or payload qualification is incomplete.'
+}
+
+if ($Phase -ceq 'preupload') {
+  Assert-C33M -Condition (
+    [string]$state.uploadAuthorization -ceq 'available_once' -and
+    [string]$state.releaseAuthorities.uploadAndInternalActivation -ceq 'available_once' -and
+    [int]$state.actionCounts.build -eq 1 -and
+    [int]$state.actionCounts.upload -eq 0 -and
+    [int]$state.actionCounts.install -eq 0
+  ) -Message 'Internal Testing upload authority or action counts are not ready.'
+}
+
+if ($Phase -ceq 'postupload') {
+  Assert-C33M -Condition (
+    [string]$state.uploadAuthorization -ceq 'consumed' -and
+    [string]$state.releaseAuthorities.uploadAndInternalActivation -ceq 'consumed' -and
+    [int]$state.playResult.uploadCount -eq 1 -and
+    [int]$state.playResult.internalActivationCount -eq 1 -and
+    [int]$state.actionCounts.upload -eq 1 -and
+    [int]$state.actionCounts.install -eq 0 -and
+    -not [string]::IsNullOrWhiteSpace([string]$state.playResult.evidencePath)
+  ) -Message 'Internal Testing upload/activation evidence or one-action count is incomplete.'
+}
+
+if ($Phase -ceq 'preinstall') {
+  Assert-C33M -Condition (
+    [string]$state.installAuthorization -ceq 'available_once' -and
+    [string]$state.releaseAuthorities.inPlaceOppoPlayUpdate -ceq 'available_once' -and
+    [int]$state.actionCounts.upload -eq 1 -and
+    [int]$state.actionCounts.install -eq 0
+  ) -Message 'one in-place OPPO Play-update authority or action counts are not ready.'
+}
+
+if ($Phase -in @('postinstall', 'journey')) {
+  Assert-C33M -Condition (
+    [string]$state.installAuthorization -ceq 'consumed' -and
+    [int]$state.installResult.installCount -eq 1 -and
+    [int]$state.actionCounts.install -eq 1 -and
+    -not [string]::IsNullOrWhiteSpace([string]$state.installResult.coldStartEvidencePath) -and
+    -not [string]::IsNullOrWhiteSpace([string]$state.installResult.retainedDataEvidencePath)
+  ) -Message 'one in-place OPPO Play update or cold-start/retained-data evidence is incomplete.'
+  & $runtimeGate `
+    -Phase postinstall `
+    -StatePath $resolvedStatePath `
+    -AcceptanceEvidencePath ([string]$state.installResult.coldStartEvidencePath) `
+    -RepositoryRoot $root | Out-Null
+}
+
+if ($Phase -ceq 'journey') {
+  Assert-C33M -Condition (
+    [int]$state.actionCounts.deviceAcceptance -eq 1 -and
+    [int]$aggregate.actionCounts.deviceAcceptance -eq 1 -and
+    [bool]$state.installResult.acceptanceSucceeded -and
+    -not [string]::IsNullOrWhiteSpace([string]$state.installResult.journeyEvidencePath) -and
+    [int]$state.actionCounts.passwordlessEmailSend -eq 1 -and
+    [int]$state.actionCounts.realSmsSend -eq 0
+  ) -Message 'complete Google, Phone, email, Social and whole-app device acceptance is incomplete.'
+}
+
+Write-Output (
+  'C33M r60.51 no-regression release gate passed: ' +
+  "phase=$Phase; registryEntries=$registryCount; sourceCycles=$cycles/2; " +
+  "buildCount=$($state.actionCounts.build); uploadCount=$($state.actionCounts.upload); " +
+  "installCount=$($state.actionCounts.install); deviceAcceptanceCount=$($state.actionCounts.deviceAcceptance); " +
+  'historicalRepeatAllowed=false; newDefectAllowed=false; waivers=false; secretValuesObserved=false.'
+)

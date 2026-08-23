@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PERSONAL-ANDROID-NAVIGATION-DEVICE-MATRIX-C28F-001",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F",
+  "state": "captured_founder_review_pending",
+  "candidate": {
+    "versionName": "1.0.0-r60.28",
+    "versionCode": "2026081028",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375",
+    "densityDpi": 320,
+    "minimumLogicalTarget": 44
+  },
+  "evidenceRoot": "artifacts/quality/uaw-personal-mvp-android-navigation-exported-semantics-oppo-qualification-fix12-c28f-r60-28-20260810-01",
+  "reusedOwners": {
+    "stableCapture": "scripts/capture-personal-c26h-stable-device-evidence.ps1",
+    "semanticTap": "scripts/invoke-personal-c26h-semantic-tap.ps1",
+    "boundsContract": "config/mvp-personal-android-navigation-device-bounds-c28f.json",
+    "boundsGate": "scripts/check-personal-android-navigation-device-bounds-c28f.ps1"
+  },
+  "families": [
+    {
+      "id": "social",
+      "label": "Social",
+      "familyRootExpected": false,
+      "familyRootSemantic": "Open Social home",
+      "actions": [
+        {"id":"shorts","label":"YouTube Shorts","selectedSemantic":"YouTube Shorts, current","contentAnyOf":["Shop this basket"]},
+        {"id":"videos","label":"YouTube Videos","selectedSemantic":"YouTube Videos, current","contentAnyOf":["Search videos"]},
+        {"id":"feed","label":"Feed","selectedSemantic":"Feed, current","contentAnyOf":["Search videos, reels, people or posts"]},
+        {"id":"create","label":"Create","selectedSemantic":"Create, current","contentAnyOf":["Drafts","Image"]}
+      ]
+    },
+    {
+      "id": "buy",
+      "label": "Shop",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Shop home",
+      "forbiddenLocalLabels": ["Products", "Shop"],
+      "actions": [
+        {"id":"wholesale","label":"Wholesale","selectedSemantic":"Wholesale, current","contentAnyOf":["Add Fresh tomatoes to cart"]},
+        {"id":"orders","label":"Orders","selectedSemantic":"Orders, current","contentAnyOf":["Track order"]}
+      ]
+    },
+    {
+      "id": "eat",
+      "label": "Food",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Food home",
+      "actions": [
+        {"id":"order-food","label":"Order Food","selectedSemantic":"Order Food, current","contentAnyOf":["Open Spice Darbar menu"]},
+        {"id":"book-table","label":"Book Table","selectedSemantic":"Book Table, current","contentAnyOf":["Book table"]}
+      ]
+    },
+    {
+      "id": "ride",
+      "label": "Travel",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Travel home",
+      "actions": [
+        {"id":"bike","label":"Bike","selectedSemantic":"Bike, current","contentAnyOf":["Book Bike Saver · ₹59"]},
+        {"id":"auto","label":"Auto","selectedSemantic":"Auto, current","contentAnyOf":["Book Auto · ₹112"]},
+        {"id":"cab","label":"Cab","selectedSemantic":"Cab, current","contentAnyOf":["Book Mini · ₹186"]},
+        {"id":"bus","label":"Bus","selectedSemantic":"Bus, current","contentAnyOf":["Search buses"]}
+      ]
+    },
+    {
+      "id": "book",
+      "label": "Care",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Care home",
+      "actions": [
+        {"id":"doctor","label":"Doctor","selectedSemantic":"Doctor, current","contentAnyOf":["Continue with Clinic"]},
+        {"id":"medicine","label":"Medicine","selectedSemantic":"Medicine, current","contentAnyOf":["Add Paracetamol 500 mg tablets to cart"]},
+        {"id":"salon","label":"Salon","selectedSemantic":"Salon, current","contentAnyOf":["Review ₹199 slot"]}
+      ]
+    },
+    {
+      "id": "work",
+      "label": "Work",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Work home",
+      "actions": [
+        {"id":"earn-today","label":"Earn Today","selectedSemantic":"Earn Today, current","contentAnyOf":["Review opportunity"]},
+        {"id":"workspace","label":"Workspace","selectedSemantic":"Workspace, current","contentAnyOf":["Start Workspace setup"]}
+      ]
+    }
+  ],
+  "switcher": {
+    "containerSemantic": "MoolSocial main actions",
+    "closeSemantic": "Close MoolSocial main menu",
+    "rowHeightLogical": 56,
+    "rows": ["Social", "Shop", "Food", "Travel", "Care", "Work"]
+  },
+  "plannedStateIds": [
+    "social-shorts","social-videos","social-feed","social-create-ime-visible","social-create-ime-back","switcher-social-create",
+    "shop-wholesale","shop-orders","food-order-food","food-book-table",
+    "travel-bike","travel-auto","travel-cab","travel-bus",
+    "care-doctor","care-medicine","switcher-care-medicine","care-medicine-after-switcher-back","care-salon",
+    "work-earn-today","work-workspace","chat-from-work-workspace","work-workspace-after-chat-back",
+    "switcher-open-by-swipe-up","workspace-after-swipe-down","switcher-before-outside-tap","workspace-after-outside-tap",
+    "social-after-six-family-cycle"
+  ],
+  "continuityRequirements": [
+    "Create IME Back dismisses only IME and retains Create",
+    "switcher system Back retains Care Medicine",
+    "Chat system Back retains Work Workspace",
+    "Mool swipe up opens and swipe down closes the embedded switcher",
+    "outside tap closes the switcher without changing destination",
+    "six-family cycle returns to Social Shorts",
+    "reduced-motion behavior remains covered by C28E host qualification without mutating protected device settings"
+  ],
+  "capturedStates": [
+    {"id":"social-shorts","png":"18-first-installed-root.png","xml":"18-first-installed-root.xml","readyOneXml":"18-first-installed-root-ready-1.xml","readyTwoXml":"18-first-installed-root-ready-2.xml","pngSha256":"645C11A79B0FF4228001B7E59D7DE3D17EC59C1A7B7AB494B46BF8B69BC3C86E","requiredSemantics":["YouTube Shorts, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"shorts","switcherOpen":false},
+    {"id":"social-videos","png":"20-social-videos.png","xml":"20-social-videos.xml","readyOneXml":"20-social-videos-ready-1.xml","readyTwoXml":"20-social-videos-ready-2.xml","pngSha256":"2A8D54DB2EF0F6D8CC219F6F1E1D33F60B7585F80E25834E11A57FFC95C55DB7","requiredSemantics":["YouTube Videos, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"videos","switcherOpen":false},
+    {"id":"social-feed","png":"21-social-feed.png","xml":"21-social-feed.xml","readyOneXml":"21-social-feed-ready-1.xml","readyTwoXml":"21-social-feed-ready-2.xml","pngSha256":"D6098F38A67F8B3EFF91C4C6B97101AC461168A6A7A52C0C05CF74AFEE0577F7","requiredSemantics":["Feed, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"feed","switcherOpen":false},
+    {"id":"social-create-ime-visible","png":"22-social-create-ime-visible.png","xml":"22-social-create-ime-visible.xml","readyOneXml":"22-social-create-ime-visible-ready-1.xml","readyTwoXml":"22-social-create-ime-visible-ready-2.xml","pngSha256":"A3F8344540A7DB3CD0DBC532696B72FD4B8BD4A39168813707F6C032FC277861","requiredSemantics":["Create, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"create","switcherOpen":false},
+    {"id":"social-create-ime-back","png":"23-social-create-ime-back.png","xml":"23-social-create-ime-back.xml","readyOneXml":"23-social-create-ime-back-ready-1.xml","readyTwoXml":"23-social-create-ime-back-ready-2.xml","pngSha256":"6FD6BA48244DCF040F7A64546E393793EF00EC42AA45E2ECF9E9180A949C8074","requiredSemantics":["Create, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"create","switcherOpen":false},
+    {"id":"switcher-social-create","png":"24-switcher-social-create.png","xml":"24-switcher-social-create.xml","readyOneXml":"24-switcher-social-create-ready-1.xml","readyTwoXml":"24-switcher-social-create-ready-2.xml","pngSha256":"0D68B3B065572545BB7C58C85A673C27F68C2B6D594C08AAB30633AB9C2CB9FA","requiredSemantics":["Create, current","MoolSocial main actions","Close MoolSocial main menu"],"forbiddenSemantics":["Open MoolSocial main menu"],"railFamilyId":"social","actionId":"create","switcherOpen":true},
+    {"id":"shop-wholesale","png":"25b-shop-wholesale.png","xml":"25b-shop-wholesale.xml","readyOneXml":"25b-shop-wholesale-ready-1.xml","readyTwoXml":"25b-shop-wholesale-ready-2.xml","pngSha256":"6FE18DECA06C4C99C20FC7D5092F4981059EBFA9847B2A2D2046E311C66085B1","requiredSemantics":["Wholesale, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu","Products, current"],"railFamilyId":"buy","actionId":"wholesale","switcherOpen":false},
+    {"id":"shop-orders","png":"26-shop-orders.png","xml":"26-shop-orders.xml","readyOneXml":"26-shop-orders-ready-1.xml","readyTwoXml":"26-shop-orders-ready-2.xml","pngSha256":"0FEAA5DCD466B6CB21130C9929031E6654FF40647270781F2955EB62E5A1D02F","requiredSemantics":["Orders, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu","Products, current"],"railFamilyId":"buy","actionId":"orders","switcherOpen":false},
+    {"id":"food-order-food","png":"29b-food-order-food.png","xml":"29b-food-order-food.xml","readyOneXml":"29b-food-order-food-ready-1.xml","readyTwoXml":"29b-food-order-food-ready-2.xml","pngSha256":"F30B55EB0D809CD51AA43757B13D00137944C831224BECF21F46C4BC04D10964","requiredSemantics":["Order Food, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"eat","actionId":"order-food","switcherOpen":false},
+    {"id":"food-book-table","png":"30-food-book-table.png","xml":"30-food-book-table.xml","readyOneXml":"30-food-book-table-ready-1.xml","readyTwoXml":"30-food-book-table-ready-2.xml","pngSha256":"3FC2CC0FD9694CE4BC1650970A4986D924A56ED1DB11D6168B7A9A4711FE4165","requiredSemantics":["Book Table, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"eat","actionId":"book-table","switcherOpen":false},
+    {"id":"travel-bike","png":"33-travel-bike.png","xml":"33-travel-bike.xml","readyOneXml":"33-travel-bike-ready-1.xml","readyTwoXml":"33-travel-bike-ready-2.xml","pngSha256":"20CF94876F36A4C99A3129A7C340788A472ECB17E5A9034F2FD6E8F77DA62060","requiredSemantics":["Bike, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"ride","actionId":"bike","switcherOpen":false},
+    {"id":"travel-auto","png":"34-travel-auto.png","xml":"34-travel-auto.xml","readyOneXml":"34-travel-auto-ready-1.xml","readyTwoXml":"34-travel-auto-ready-2.xml","pngSha256":"0BBA9088674902FA5879AB75061834FFEB8637598600999D3A7140A6F899C3FC","requiredSemantics":["Auto, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"ride","actionId":"auto","switcherOpen":false},
+    {"id":"travel-cab","png":"35-travel-cab.png","xml":"35-travel-cab.xml","readyOneXml":"35-travel-cab-ready-1.xml","readyTwoXml":"35-travel-cab-ready-2.xml","pngSha256":"B5CF410544EAC892CE093BD73A12B70CE8B6BA0B4E4FBF9A8EC0EB3C7C1F8CC9","requiredSemantics":["Cab, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"ride","actionId":"cab","switcherOpen":false},
+    {"id":"travel-bus","png":"36-travel-bus.png","xml":"36-travel-bus.xml","readyOneXml":"36-travel-bus-ready-1.xml","readyTwoXml":"36-travel-bus-ready-2.xml","pngSha256":"3E9EF7D9BD6B499023257D899DCE3C7F9B621978C8B1BA24A3D49D6B64A14CF7","requiredSemantics":["Bus, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"ride","actionId":"bus","switcherOpen":false},
+    {"id":"care-doctor","png":"39-care-doctor.png","xml":"39-care-doctor.xml","readyOneXml":"39-care-doctor-ready-1.xml","readyTwoXml":"39-care-doctor-ready-2.xml","pngSha256":"965DB2E3045C85DC5F8C70035F0C047DDE5881F7ECA9CD63FD3B60E77B83FA8C","requiredSemantics":["Doctor, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"book","actionId":"doctor","switcherOpen":false},
+    {"id":"care-medicine","png":"40-care-medicine.png","xml":"40-care-medicine.xml","readyOneXml":"40-care-medicine-ready-1.xml","readyTwoXml":"40-care-medicine-ready-2.xml","pngSha256":"F6375D16779E1723808C15F669D894FFA7BBAA596C09C73AAF011F5330A63DE2","requiredSemantics":["Medicine, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"book","actionId":"medicine","switcherOpen":false},
+    {"id":"switcher-care-medicine","png":"41-switcher-care-medicine.png","xml":"41-switcher-care-medicine.xml","readyOneXml":"41-switcher-care-medicine-ready-1.xml","readyTwoXml":"41-switcher-care-medicine-ready-2.xml","pngSha256":"58A9E3E830DEF9641AFB5F737954AC18C78C81BCAFE779EE7DD4B2FC87ECB123","requiredSemantics":["Medicine, current","MoolSocial main actions","Close MoolSocial main menu"],"forbiddenSemantics":["Open MoolSocial main menu"],"railFamilyId":"book","actionId":"medicine","switcherOpen":true},
+    {"id":"care-medicine-after-switcher-back","png":"42-care-medicine-after-switcher-back.png","xml":"42-care-medicine-after-switcher-back.xml","readyOneXml":"42-care-medicine-after-switcher-back-ready-1.xml","readyTwoXml":"42-care-medicine-after-switcher-back-ready-2.xml","pngSha256":"D2598C131BAD7B92175454136F62F078DD47BE7E2D299459FF5DD93A0B3C93C0","requiredSemantics":["Medicine, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"book","actionId":"medicine","switcherOpen":false},
+    {"id":"care-salon","png":"43-care-salon.png","xml":"43-care-salon.xml","readyOneXml":"43-care-salon-ready-1.xml","readyTwoXml":"43-care-salon-ready-2.xml","pngSha256":"7AB087CB5E86A6C67E8719AB4994E5EFF81CB56F821A310653F634368D42D15A","requiredSemantics":["Salon, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"book","actionId":"salon","switcherOpen":false},
+    {"id":"work-earn-today","png":"46-work-earn-today.png","xml":"46-work-earn-today.xml","readyOneXml":"46-work-earn-today-ready-1.xml","readyTwoXml":"46-work-earn-today-ready-2.xml","pngSha256":"5DD82FDDDB9B4EC39022F75CCEEEA7B92C714EAD5E73197E5707A9EB335893EC","requiredSemantics":["Earn Today, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"work","actionId":"earn-today","switcherOpen":false},
+    {"id":"work-workspace","png":"47-work-workspace.png","xml":"47-work-workspace.xml","readyOneXml":"47-work-workspace-ready-1.xml","readyTwoXml":"47-work-workspace-ready-2.xml","pngSha256":"BD51D7410C1CF244A91075D5DFE62BD53665DFA022CB91914DD429688552BD2A","requiredSemantics":["Workspace, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":false},
+    {"id":"chat-from-work-workspace","png":"48-chat-from-work-workspace.png","xml":"48-chat-from-work-workspace.xml","readyOneXml":"48-chat-from-work-workspace-ready-1.xml","readyTwoXml":"48-chat-from-work-workspace-ready-2.xml","pngSha256":"E6A6429405AC33B979E651B4E7EF96656DA180A87D868264ADE7B77B5FACCA8E","requiredSemantics":["Chat","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"","actionId":"","switcherOpen":false},
+    {"id":"work-workspace-after-chat-back","png":"49-work-workspace-after-chat-back.png","xml":"49-work-workspace-after-chat-back.xml","readyOneXml":"49-work-workspace-after-chat-back-ready-1.xml","readyTwoXml":"49-work-workspace-after-chat-back-ready-2.xml","pngSha256":"FD5BEF7B0ED4821DC149853869508033E67BBEF1FB3F60D153022C4589072561","requiredSemantics":["Workspace, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":false},
+    {"id":"switcher-open-by-swipe-up","png":"50-switcher-open-by-swipe-up.png","xml":"50-switcher-open-by-swipe-up.xml","readyOneXml":"50-switcher-open-by-swipe-up-ready-1.xml","readyTwoXml":"50-switcher-open-by-swipe-up-ready-2.xml","pngSha256":"98C398415F19C44DF8B76086866AF67A18A2132DCB29069B7D100B467F6F5CF6","requiredSemantics":["Workspace, current","MoolSocial main actions","Close MoolSocial main menu"],"forbiddenSemantics":["Open MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":true},
+    {"id":"workspace-after-swipe-down","png":"51b-workspace-after-swipe-down.png","xml":"51b-workspace-after-swipe-down.xml","readyOneXml":"51b-workspace-after-swipe-down-ready-1.xml","readyTwoXml":"51b-workspace-after-swipe-down-ready-2.xml","pngSha256":"1BD12E9E02C3EFBF3CED9F66DDA9EE420E672D8E18E91C302EC918857ED23E20","requiredSemantics":["Workspace, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":false},
+    {"id":"switcher-before-outside-tap","png":"52b-switcher-before-outside-tap.png","xml":"52b-switcher-before-outside-tap.xml","readyOneXml":"52b-switcher-before-outside-tap-ready-1.xml","readyTwoXml":"52b-switcher-before-outside-tap-ready-2.xml","pngSha256":"DD3382D7F65B1FAE1ABFC66502F87E023257A368F530AC877ED296064071D425","requiredSemantics":["Workspace, current","MoolSocial main actions","Close MoolSocial main menu"],"forbiddenSemantics":["Open MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":true},
+    {"id":"workspace-after-outside-tap","png":"53-workspace-after-outside-tap.png","xml":"53-workspace-after-outside-tap.xml","readyOneXml":"53-workspace-after-outside-tap-ready-1.xml","readyTwoXml":"53-workspace-after-outside-tap-ready-2.xml","pngSha256":"38375DB545F2657D3908A06D97EE69ADE273D25E525ED4AB3C88EDFCF60D3622","requiredSemantics":["Workspace, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"work","actionId":"workspace","switcherOpen":false},
+    {"id":"social-after-six-family-cycle","png":"55-social-after-six-family-cycle.png","xml":"55-social-after-six-family-cycle.xml","readyOneXml":"55-social-after-six-family-cycle-ready-1.xml","readyTwoXml":"55-social-after-six-family-cycle-ready-2.xml","pngSha256":"AEE51505BC377934D5F5E3CA9634E250B1E257EDA290E0C9F4C5A1070A8C3F65","requiredSemantics":["YouTube Shorts, current","Open MoolSocial main menu"],"forbiddenSemantics":["MoolSocial main actions","Close MoolSocial main menu"],"railFamilyId":"social","actionId":"shorts","switcherOpen":false}
+  ]
+}

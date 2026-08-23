@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PROTECTED-CUSTOMER-COPY-TEST-ISOLATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_authoritative_manifest_passed_aab_held",
+  "classification": "mvp_supporting",
+  "actor": "release_qualifier",
+  "customerOutcome": "Social customer-copy regressions remain covered without changing or weakening the immutable Screens 01–03 checkpoint.",
+  "smallestCompleteScope": [
+    "move_only_the_Screen_04_customer_copy_cases_into_the_existing_Social_copy_gate",
+    "restore_the_protected_Screens_01_03_test_to_its_exact_accepted_checksum",
+    "run_the_Social_copy_test_and_approved_UI_lock"
+  ],
+  "explicitExclusions": [
+    "no_Screens_01_03_presentation_change",
+    "no_approved_manifest_change",
+    "no_broad_test_redesign",
+    "no_AAB"
+  ],
+  "testPlan": [
+    "flutter_test_ui_v2_social_customer_copy_gate_test",
+    "check_approved_ui_locks",
+    "C30T_static_release_readiness"
+  ],
+  "verification": {
+    "isolatedOwner": "apps/mobile/test/ui_v2_social_customer_copy_gate_test.dart",
+    "authoritativeFocusedManifest": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-04/focused-test-manifest-accepted.txt",
+    "presentExactlyOnceInManifest": true,
+    "focusedPairResult": "6_passed_0_failed",
+    "authoritativeManifestResult": "401_passed_3_declared_skips_0_failed",
+    "AabAuthorizedOrBuilt": false
+  }
+}

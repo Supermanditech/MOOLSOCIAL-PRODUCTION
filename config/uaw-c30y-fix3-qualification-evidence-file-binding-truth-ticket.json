@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-FIX3-QUALIFICATION-EVIDENCE-FILE-BINDING-TRUTH",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "founder_authorized_aab_audit_finding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_evidence_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "Every successor source-qualification pass is backed by a unique retained file for static gates, Flutter, analyzer, backend typecheck/tests and the current eight-test Hosting suite before one AAB can be authorized.",
+  "classificationReason": "The superseded post-FIX1 summaries name backend compile logs that do not exist and claim eight Hosting passes without a retained eight-test log. The founder requires every AAB audit finding to be ticketed, repaired and requalified before build.",
+  "minimumCompleteScope": [
+    "preserve_all_post_FIX1_summaries_and_the_post_FIX2_1128_file_provisional_manifest_as_superseded_evidence",
+    "add_one_cross_evidence_checker_for_repository_containment_unique_cycle_ownership_file_existence_and_native_exit_binding",
+    "require_exact_log_to_summary_parsing_for_417_Flutter_3_skips_clean_analyzer_528_backend_and_8_Hosting",
+    "seal_a_fresh_post_FIX3_manifest_including_the_ticket_and_checker",
+    "pass_two_fresh_identical_cycles_with_unique_complete_evidence_before_restoring_build_authority"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_chat_social_backend_Hosting_provider_or_service_source_change",
+    "no_AAB_APK_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX3",
+    "no_deletion_overwrite_reuse_or_relabeling_of_prior_missing_or_obsolete_evidence",
+    "no_other_track_candidate_version_or_failed_r60_47_mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_implemented_and_requalified_before_build",
+    "REG_20260814_2181_and_REG_20260814_2182_registered_before_repair",
+    "C30Y_FIX2_implemented_and_build_upload_install_counts_remain_zero",
+    "current_apps_web_suite_contains_the_exact_Hosting_contract"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "tmp/run-c30t-authoritative-flutter-manifest-audit.ps1",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "apps/web/package.json",
+      "backend/functions/package.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-c30y-fix3-qualification-evidence-file-binding-truth.ps1"
+    ],
+    "necessityProof": "Existing test runners remain authoritative. One evidence-binding checker is the smallest complete repair because it validates the retained outputs and summary scalars without adding a second product, backend, Hosting or build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "checker_positive_synthetic_cycle_and_negative_missing_compile_log_probe_on_PowerShell_7_and_Windows_PowerShell",
+    "fresh_manifest_current_assertion_before_and_after_each_cycle",
+    "unique_static_Flutter_analyzer_backend_compile_backend_test_and_Hosting_logs_plus_native_exit_files_per_cycle",
+    "checker_parses_exact_required_counts_and_rejects_the_superseded_post_FIX1_summaries",
+    "two_fresh_identical_cycle_summaries_pass_before_C30X_build_authority"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FIX3-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-fix3-pre-ticket-selection-assessment.json",
+    "backendIncident": "docs/quality/UAW-AAB-C30Y-POST-FIX1-MISSING-BACKEND-COMPILE-EVIDENCE-20260814.md",
+    "hostingIncident": "docs/quality/UAW-AAB-C30Y-POST-FIX1-HOSTING-EIGHT-PASS-EVIDENCE-NOT-RETAINED-20260814.md"
+  }
+}

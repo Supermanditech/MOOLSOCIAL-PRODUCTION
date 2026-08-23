@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-RETIRED-PROTOTYPE-STATE-CONTRACT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_permanent_test_contract_blocker",
+  "actor": "signed_in_Chat_user_returning_from_Mool_or_viewing_a_legacy_attachment_label",
+  "customerOutcome": "Chat retains the real unsent text draft across navigation without resurrecting retired reply or attachment controls, and a label without provider content is presented only as a non-interactive reference.",
+  "minimumCorrection": [
+    "replace_the_stale_permanent_test_contract_with_exact_text_draft_continuity",
+    "prove_retired_reply_and_attachment_previews_remain_absent_before_and_after_navigation",
+    "remove_dormant_reply_and_attachment_composer_state_from_ChatSession",
+    "present_legacy_attachment_labels_as_noninteractive_references_without_an_opened_claim",
+    "run_the_permanent_navigation_and_production_Chat_suites"
+  ],
+  "explicitExclusions": [
+    "no_attachment_upload_download_reply_reaction_or_media_feature_expansion",
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action",
+    "no_change_to_live_Dev_Chat_contract"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "preFixPermanentTest": "failed_as_expected_missing_retired_chat_reply_preview",
+    "preFixEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-retired-prototype-contract-prefx-test.log",
+    "preFixEvidenceSha256": "A9FC8026E575556ACC6B696B7FD5B40AFBDCCE7C16D740E494BF83ADF03E9FF1",
+    "focusedTests": "23 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-retired-prototype-state-contract-focused-tests.log",
+    "evidenceSha256": "FF5CA4D08E09F6DCB43BA7F3C834E8393F115063F1214B0A08770BDAA999D432",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

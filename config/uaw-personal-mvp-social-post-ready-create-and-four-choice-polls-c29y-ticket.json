@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-FRESH-CLIENT-PREPROOF-OPPO-QUALIFICATION-C29W",
+  "state": "source_complete_combined_device_replay_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_post_creator",
+  "customerOutcome": "Create opens posting-ready with professional one-tap MoolSocial formats, four-choice polls and a clearly separate YouTube Short action.",
+  "classificationReason": "Create is a supported MVP journey and the installed intermediate gateway, two-choice polls and cramped composer were founder-rejected.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "open_Create_directly_into_a_keyboard_safe_post_ready_composer",
+    "keep_Text_Image_Carousel_Image_Poll_Quick_Poll_and_Quiz_one_tap_away",
+    "require_and_render_four_choices_for_Image_Poll_Quick_Poll_and_Quiz",
+    "expose_YouTube_Short_as_a_distinct_immediate_creator_action_without_claiming_upload_availability",
+    "retain_real_existing_posting_media_session_and_failure_recovery_owners"
+  ],
+  "explicitExclusions": [
+    "no_fake_post_or_media_state",
+    "no_YouTube_upload_OAuth_provider_profile_or_backend_change",
+    "no_build_install_deploy_or_promotion_under_C29Y"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_design_freeze_request",
+    "sourceImplementationAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "testPlan": [
+    "focused_Create_format_publish_validation_and_navigation_tests",
+    "keyboard_chooser_140_percent_text_scale_and_narrow_viewport_fitment",
+    "four_choice_contract_and_real_session_failure_tests",
+    "later_combined_OPPO_replay_under_a_separate_candidate_ticket"
+  ],
+  "preselectionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y-PRESELECTION-20260811.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y-COMPLETION-20260811.md"
+}

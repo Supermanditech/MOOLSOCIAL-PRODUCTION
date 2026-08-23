@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "stateId": "POST-YOUTUBE-BUY-PROTECTED-SHARED-ROUTER-ATTRIBUTION-C32N-C32P",
+  "state": "focused_two_final_cycles_passed_single_shared_router_delta_attributed_founder_successor_baseline_and_full_preflight_approval_required",
+  "tickets": [
+    "UAW-C32N-PERSONAL-MVP-BUY-PROTECTED-SHARED-ROUTER-DELTA-ATTRIBUTION-HOLD",
+    "UAW-C32O-PERSONAL-MVP-BUY-ROUTER-COMPACT-MOOL-LAUNCHER-TEST-SUCCESSOR",
+    "UAW-C32P-PERSONAL-MVP-BUY-ROUTER-C26D-LOCAL-RAIL-TEST-TOPOLOGY-SUCCESSOR"
+  ],
+  "protectedTree": {
+    "fileCount": 43,
+    "approvedFsc06Sha256": "6e2c18af399d8c2e0a3ab8cb63d76d5e32228f2ea69d26f0d1df662c3f3bbd8e",
+    "currentSha256": "12a9880a51c172f060133a90bcffc38d84f68959ff1caf88e13be43e86631bc5",
+    "singleChangedOwner": "apps/mobile/lib/features/journey01/journey_router.dart",
+    "historicalOwnerSha256": "a98bc91ffaff2d5205e14d258097650d2de7e2a67c214c51ca00ebb312a71429",
+    "currentOwnerSha256": "758eb64038abc04e6e85a4bf053c2148f180d93964c998165d4cbf6744f2319f",
+    "singleOwnerSubstitutionReconstructsFsc06": true,
+    "buyBusinessOwnerDriftDetected": false,
+    "successorBaselineApproved": false
+  },
+  "focusedQualification": {
+    "sourceManifestPath": "artifacts/quality/uaw-c32n-c32p-buy-shared-router-attribution-20260815-01/source-manifest-c32n-c32p.txt",
+    "sourceFileCount": 61,
+    "sourceFingerprintSha256": "A9B630FE467488B72F3E8EECAF60FC3ED8FF2B180939CD96F7570ED44B73AD05",
+    "cycles": 2,
+    "flutterTestsPassedPerCycle": 49,
+    "powerShellHostScriptRunsPerCycle": 6,
+    "analyzerFilesPerCycle": 7,
+    "analyzerResult": "clean",
+    "aggregateC28EQualified": false,
+    "fullPreflightRetried": false
+  },
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "playAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  }
+}

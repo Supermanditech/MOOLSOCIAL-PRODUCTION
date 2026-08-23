@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "directiveId": "MVP-UNIFIED-BUY-SURFACE-AND-VALUE-CHAIN-CATEGORY-20260805",
+  "state": "founder_directed_planning_boundary_not_executing",
+  "humanAuthority": "docs/delivery/MVP-UNIFIED-BUY-SURFACE-AND-VALUE-CHAIN-CATEGORY-DIRECTIVE-20260805.md",
+  "assessment": "docs/quality/MVP-60-DAY-UNIFIED-BUY-SURFACE-COMPRESSION-ASSESSMENT-20260805.md",
+  "singleBuyerSurface": {
+    "owner": "native_Buy_main_action",
+    "destinations": ["Shop", "Wholesale", "Medicine", "Orders"],
+    "workspaceSpecificBuyerScreensAllowed": false,
+    "workspaceEffect": [
+      "eligible_value_chain_categories",
+      "packs_and_quantity_terms",
+      "tax_freight_payment_and_delivery_terms",
+      "buyer_address_and_approval_authority"
+    ],
+    "workspaceEffectMustBeServerAuthoritative": true
+  },
+  "confirmedDirectDuplicateLegacyRoutes": [
+    "/app/manufacturer/purchases",
+    "/app/retailer/wholesale",
+    "/app/retailer/wholesale/cart",
+    "/app/retailer/wholesale/orders/confirmed",
+    "/app/retailer/wholesale/orders/tracking",
+    "/app/retailer/wholesale/goods-receipt",
+    "/app/retailer/wholesale/goods-receipt/result",
+    "/app/retailer/books/purchases",
+    "/app/retailer/supplier-bills/:billId",
+    "/app/retailer/supplier-payments/:paymentId/status"
+  ],
+  "broadLegacyWorkspaceRouteImplementationsExcludedFromCurrentMvp": {
+    "manufacturer": ["books", "growth", "broad_control", "services"],
+    "retailer": [
+      "pos",
+      "broad_books",
+      "services",
+      "customers",
+      "campaigns",
+      "separate_team_administration"
+    ]
+  },
+  "valueChainCategoryProjection": {
+    "isNewScreen": false,
+    "authoritativeOwner": "versioned_catalogue_capability_and_geography_policy",
+    "beyondMvpSupplierProfilesRemainRegisteredDisabled": true,
+    "localSelectionGrantsCapability": false
+  },
+  "retainedWorkspaceMvpCapabilities": {
+    "shop": ["offer_stock", "readiness", "incoming_order_decision", "packing", "handover"],
+    "wholesale_supplier_distributor": ["offer_pack_terms", "incoming_po_decision", "dispatch", "handover"],
+    "bounded_manufacturer": ["product_master_pack", "wholesale_offer", "incoming_order_decision", "dispatch"],
+    "pharmacy": ["medicine_offer_licence", "pharmacist_decision", "incoming_order", "packing", "regulated_handover"]
+  },
+  "planningCompression": {
+    "directDuplicateRoutesNotRebuilt": 10,
+    "broadTypeSpecificRoutesAvoidedAtLeast": 17,
+    "canonicalRouteTarget": "35-48",
+    "routeLevelScreenTarget": "32-40",
+    "activeCodexHourTarget": "730-1000",
+    "elapsedEngineeringDayTarget": "42-52"
+  },
+  "protectedManifestIdentitiesChanged": false,
+  "execution": {
+    "ticketRegistered": false,
+    "runtimeWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "commitPushDeployPromoteAuthorized": false
+  }
+}

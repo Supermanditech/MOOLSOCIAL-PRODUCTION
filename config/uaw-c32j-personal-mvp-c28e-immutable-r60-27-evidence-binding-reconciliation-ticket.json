@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32J-PERSONAL-MVP-C28E-IMMUTABLE-R60-27-EVIDENCE-BINDING-RECONCILIATION",
+  "parentOutcome": "MOOLSOCIAL-POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815",
+  "predecessorTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E",
+  "finding": "REG-20260815-2248-POST-YOUTUBE-AUDIT-C28E-R60-27-MACHINE-STATE-HASH-REJECTION",
+  "state": "founder_authorized_source_gate_repair_selected_live_and_release_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal user relying on the qualified Android shared-navigation host across later release candidates",
+  "customerOutcome": "Personal navigation host qualification remains auditable after later candidates advance, while the original r60.27 version, checksum, two-cycle source fingerprint and closed build/install evidence stay immutable and exact.",
+  "classificationReason": "Historical qualification must remain truthful and reusable without requiring the mutable current APK state to stay frozen forever; this repairs evidence binding and adds no customer feature.",
+  "minimumCompleteScope": [
+    "preserve_both_existing_C28E_cycle_evidence_files_and_contract_hashes_byte_for_byte",
+    "replace_only_the_C28E_host_gate_dependency_on_mutable_apk_regression_gate_state_with_contract_hashed_cycle_evidence",
+    "validate_both_cycle_numbers_ticket_source_fingerprint_test_gate_analysis_suite_version_code_version_name_APK_hash_and_closed_runtime_state",
+    "retain_current_scope_build_device_backend_and_external_authority_closed_assertions",
+    "add_one_C32J_successor_checker_and_run_two_identical_source_gate_cycles"
+  ],
+  "explicitExclusions": [
+    "no_edit_to_r60_27_cycle_evidence_C28E_contract_or_historical_APK_identity",
+    "no_runtime_Flutter_UI_route_screen_copy_reference_or_navigation_behavior_change",
+    "no_backend_provider_cloud_Hosting_rules_IAM_CORS_lifecycle_or_live_data_write",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_or_device_mutation",
+    "no_funds_credential_secret_token_nonce_private_verdict_key_attestation_or_external_communication_action",
+    "no_commit_push_merge_rebase_branch_switch_reset_clean_or_main_mutation"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user: autonomously audit, convert findings into tickets and implement for founder review; exact external and release actions remain gated",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingHostGate": "scripts/check-personal-android-navigation-host-qualification-c28e.ps1",
+    "existingContract": "config/mvp-personal-android-navigation-host-qualification-c28e.json",
+    "immutableCycleEvidence": [
+      "artifacts/quality/uaw-c28e-host-qualification-20260810-04/qualifying-cycle-1.json",
+      "artifacts/quality/uaw-c28e-host-qualification-20260810-04/qualifying-cycle-2.json"
+    ],
+    "mutablePointerRemovedFromHistoricalAssertion": "config/apk-regression-gate-state.json",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c32j-c28e-immutable-r60-27-evidence-binding.ps1"
+    ],
+    "necessityProof": "C28E already pins the two immutable evidence-file hashes and historical expected r60.27 identity, but its host gate ignores those files and compares the same historical fields to the mutable current APK gate. Later authorized candidates necessarily advance that pointer. Binding the host gate to the already-sealed cycle files is the smallest truthful repair."
+  },
+  "acceptance": [
+    "both_existing_C28E_cycle_files_match_their_contract_SHA256_values",
+    "both_cycles_match_ticket_source_fingerprint_test_gate_analysis_suite_and_closed_runtime_contract",
+    "both_cycles_match_exact_r60_27_version_code_version_name_and_APK_SHA256",
+    "C28E_host_gate_no_longer_reads_config_apk_regression_gate_state_json",
+    "current_scope_build_device_backend_and_external_authorities_remain_closed",
+    "C32J_and_C28E_gates_pass_on_both_PowerShell_hosts_in_two_identical_cycles",
+    "C28E_gate_only_preflight_reaches_all_22_gates_without_writing_cycle_evidence"
+  ]
+}

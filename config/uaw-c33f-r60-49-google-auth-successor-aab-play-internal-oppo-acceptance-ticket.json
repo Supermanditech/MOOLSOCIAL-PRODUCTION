@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "parentTicket": "UAW-C33E-FIX4-PROTECTED-SOCIAL-ACTION-INTENT-RETURN-CONTINUITY",
+  "releaseGateParent": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "acceptance_failed_r60_49_successor_source_repair_required_no_artifact_reuse",
+  "classification": "mvp_required",
+  "severity": "release_blocking",
+  "actor": "MoolSocial_Internal_Testing_real_user",
+  "customerOutcome": "The customer receives the source-qualified authentication and protected Social action repairs in exactly one new Google Play Internal Testing candidate, updates the existing OPPO app in place, and completes cold-start, sign-in and action-journey acceptance without treating failed r60.48 as repaired.",
+  "classificationReason": "Google sign-in and the protected Social action return journey are confirmed blockers in a supported core-launch surface. Failed r60.48 cannot contain the later FIX3/FIX4 source repairs, so one distinct Play successor and real-device acceptance are required for truthful release qualification.",
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.49",
+    "versionCode": "2026081349",
+    "candidateId": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "minimumCompleteScope": [
+    "preserve_failed_r60_48_identity_artifact_and_1_1_1_counts_without_reuse",
+    "qualify_all_four_sanitized_Google_Firebase_live_readiness_facts_before_founder_prompt_or_authority_consumption",
+    "bind_the_exact_r60_49_candidate_to_current_FIX3_FIX4_source_and_two_fresh_complete_release_cycles",
+    "build_exactly_one_AAB_through_the_visible_three_hidden_input_founder_launcher",
+    "rebind_and_qualify_the_exact_AAB_before_one_Internal_Testing_upload_activation",
+    "perform_exactly_one_in_place_OPPO_Play_update_and_complete_postinstall_authentication_action_and_whole_app_acceptance"
+  ],
+  "explicitExclusions": [
+    "no_Production_open_closed_public_alpha_beta_or_non_Internal_Testing_track",
+    "no_ADB_install_sideload_uninstall_clear_data_downgrade_or_second_device_mutation",
+    "no_backend_Hosting_provider_rules_IAM_email_quota_funds_or_unrelated_external_write",
+    "no_agent_access_to_password_API_key_OAuth_client_ID_token_nonce_App_Check_verdict_private_key_or_attestation_payload",
+    "no_second_AAB_no_r60_48_artifact_reuse_and_no_runtime_success_claim_before_OPPO_acceptance"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_15_exact_r60_49_one_AAB_Internal_Testing_activation_and_one_in_place_OPPO_Play_update_authority",
+    "C33E_FIX3_and_FIX4_source_qualification_preserved",
+    "C33E_FIX2_four_sanitized_live_readiness_facts_required_before_build",
+    "founder_only_hidden_upload_password_Firebase_Android_API_key_and_Google_OAuth_server_client_ID_entry",
+    "all_candidate_specific_prebuild_postbuild_preupload_postupload_preinstall_postinstall_and_journey_gates_must_pass"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1",
+      "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1",
+      "scripts/check-uaw-c33e-fix3-social-auth-rollback-independent-cleanup.ps1",
+      "scripts/check-uaw-c33e-fix4-protected-social-action-intent-return-continuity.ps1",
+      "apps/mobile/lib/core/config/release_runtime_configuration.dart",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "config/successor-aab-regression-hard-gate-state-c33f.json",
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1"
+    ],
+    "necessityProof": "The existing product and release owners already cover the complete journey. One exact unconsumed candidate state and one thin fail-closed composition gate are necessary because r60.48 authorities are consumed and its artifact predates FIX3/FIX4. No duplicate UI, route, state, backend, provider or build path is created.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "dual_host_static_and_behavioral_candidate_gate_replay_with_every_live_fact_negative_case",
+    "two_identical_fresh_source_cycles_with_whole_mobile_analyzer_Flutter_backend_Hosting_and_regression_memory",
+    "wrapper_generated_configuration_and_fresh_manifest_preflight_before_single_authority_consumption",
+    "postbuild_and_preupload_AAB_hash_bytes_package_version_signer_provenance_plugin_and_payload_binding",
+    "Internal_Testing_only_activation_and_one_Play_in_place_OPPO_update",
+    "cold_start_blank_fatal_ANR_installer_version_retained_data_Google_sign_in_and_exact_Social_action_return",
+    "complete_supported_whole_app_journey_acceptance_before_any_reviewer_readiness_claim"
+  ],
+  "authority": {
+    "candidateIdentityApproved": true,
+    "oneAabBuildAuthorizedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild": true,
+    "oneInPlaceOppoPlayUpdateAuthorizedAfterActivation": true,
+    "founderHiddenInputEntryRequired": true,
+    "agentSecretValueAccessAuthorized": false,
+    "otherTrackAuthorized": false,
+    "adbOrSideloadAuthorized": false,
+    "backendOrHostingDeploymentAuthorized": false,
+    "providerDeploymentAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C33F-R60-49-FOUNDER-END-TO-END-AUTHORIZATION-20260815.md",
+    "preselectionAssessment": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/pre-ticket-selection-assessment.json",
+    "sourceQualification": "docs/quality/UAW-C33E-FIX4-PROTECTED-SOCIAL-ACTION-INTENT-RETURN-CONTINUITY-QUALIFICATION-20260815.md",
+    "liveReadinessState": "config/google-auth-live-provider-readiness-state-c33e-fix2.json",
+    "founderRealUserAcceptanceFailure": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/12-founder-real-user-acceptance-failure-evidence.json"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-CONTRACT-FIX11-C28A",
+  "parentTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-OWNERSHIP-FIX11-C28",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "One evidence-backed contract identifies and bounds the shared Android window and rail ownership correction required before another OPPO review.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-CONTRACT-FIX11-C28A-PRESELECTION-ASSESSMENT-20260810.md",
+  "auditEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-CONTRACT-FIX11-C28A-AUDIT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one Android window viewport compatibility contract",
+      "one density-normalized exported-bounds gate"
+    ],
+    "necessityProof": "C27 host tests prove Flutter geometry but cannot configure or prove the OPPO Android window and exported accessibility viewport boundary."
+  },
+  "acceptance": [
+    "C27F Social and Ride predecessor rejection reproduced without replacing r60.26",
+    "all six families map to the same shared rail owners",
+    "no duplicate feature-local rail screen route or state owner",
+    "approved 58px visual design and all existing navigation meanings frozen",
+    "successor exported-bound gate contract recorded"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-CONTRACT-FIX11-C28A-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

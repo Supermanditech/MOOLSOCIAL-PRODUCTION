@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-FIX3-FIREBASE-ANDROID-PLAY-APP-SIGNING-SHA1-REGISTRATION",
+  "parentTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "finding": "REG-20260815-2386-C33F-FIREBASE-ANDROID-PLAY-APP-SIGNING-SHA1-MISMATCH",
+  "state": "provider_repair_completed_all_four_sanitized_live_facts_qualified",
+  "classification": "mvp_required",
+  "severity": "release_blocking_Play_installed_Google_auth_certificate_mismatch",
+  "customerOutcome": "The existing Firebase Android app recognizes the Google Play app-signing certificate used on customer devices, enabling the correct Android OAuth relationship to be qualified before another AAB is built.",
+  "minimumCompleteScope": [
+    "add_the_Google_Play_App_signing_key_SHA1_to_the_existing_Firebase_Android_app_com_moolsocial_app",
+    "preserve_every_existing_Firebase_certificate_fingerprint",
+    "do_not_use_or_replace_with_the_upload_key_certificate",
+    "reverify_Firebase_and_Play_app_signing_SHA1_match_with_boolean_only_evidence",
+    "reverify_the_Android_OAuth_package_and_Play_signer_relationship",
+    "keep_AAB_Play_and_OPPO_actions_held_until_all_four_live_readiness_facts_qualify"
+  ],
+  "explicitExclusions": [
+    "no_fingerprint_value_in_repository_evidence_or_user_messages",
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_private_key_attestation_or_private_verdict_access",
+    "no_deletion_or_replacement_of_existing_Firebase_fingerprints",
+    "no_backend_Hosting_other_provider_track_email_quota_funds_AAB_Play_upload_or_OPPO_action"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "existingOwners": [
+      "config/google-auth-live-provider-readiness-state-c33e-fix2.json",
+      "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1",
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "Play-installed Google authentication depends on the Play app-signing certificate relationship. Adding the missing public SHA-1 to the existing Firebase Android app is the smallest exact provider repair and requires no runtime or backend source change.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "founder_performs_or_explicitly_approves_the_exact_Add_fingerprint_provider_mutation",
+    "preserve_existing_fingerprints",
+    "boolean_only_Firebase_Play_app_signing_SHA1_recomparison",
+    "sanitized_Android_OAuth_package_Play_signer_relationship_verification",
+    "C33E_FIX2_and_C33F_dual_host_gate_replay",
+    "C33F_build_phase_remains_rejected_until_4_of_4_facts_qualify"
+  ],
+  "founderAuthorization": {
+    "received": true,
+    "recordedAtUtc": "2026-08-15T10:22:05Z",
+    "exactAction": "add_Play_App_signing_SHA1_to_existing_Firebase_Android_app_preserving_all_existing_fingerprints",
+    "otherProviderMutationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceOrTestWriteAuthorized": false,
+    "providerMutationAuthorized": false,
+    "providerMutationAuthorityConsumed": true,
+    "secretValueAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorizedAtThisGate": false
+  },
+  "liveExecution": {
+    "existingFingerprintsPreserved": true,
+    "uiSaveAttempts": 2,
+    "uiResult": "generic_provider_processing_error_with_authoritative_backend_commit_later_proven",
+    "providerMutationCount": 1,
+    "cliMutationAttempts": 0,
+    "readOnlyCliStateQuery": "qualified_exit_zero_authoritative_match",
+    "credentialValuesObserved": false,
+    "fingerprintValuesEmittedOrPersisted": false,
+    "matchReverified": true,
+    "qualifiedEvidencePath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/firebase-play-app-signing-sha1-qualified.json",
+    "qualifiedEvidenceSha256": "942B7F0FCC551D36D617F3A0468FF9106C79F7B8597880F842D6D16677020423",
+    "nextAction": "launch_exact_founder_three_hidden_input_AAB_wrapper_after_all_current_gates_pass",
+    "androidOauthQualificationPath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/android-oauth-package-play-signer-qualified.json",
+    "androidOauthQualificationSha256": "8C26E94FF359EDD5C8D63F6EEB018FB7216D2AD53C1CC413D62B6ED2FD326A91",
+    "webServerClientQualificationPath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/web-server-client-mobile-relationship-qualified.json",
+    "webServerClientQualificationSha256": "D018CDBD8BED7F5362B63974A03FA9379495C495207D8A7A794377A17B127423",
+    "buildPlayAndDeviceActionsRemainHeld": true
+  }
+}

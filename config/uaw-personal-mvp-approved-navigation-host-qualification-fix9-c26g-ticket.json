@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G",
+  "parentTicket": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Two unchanged-source host cycles prove the approved navigation across all six families and the complete protected MVP suite before build authority opens.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","test_only_acceptance"],"sharedImplementationOwners":["C25G qualification algorithm and suite","existing analyzer and regression gates"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":["C26G versioned qualification manifest and aggregate gate"],"necessityProof":"Historical C25G evidence cannot qualify changed C26 runtime; one versioned manifest/gate is required without a new runtime owner."},
+  "acceptance": ["two_consecutive_cycles","same_source_fingerprint","complete_analysis","complete_required_suite","all_machine_gates","build_authority_closed_until_pass"],
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G-PRESELECTION-ASSESSMENT-20260810.md",
+  "qualifiedSourceFingerprint": "FFDA4369201743BAE65EC7D743F5A6615AA24C92B8DD36678B20F02AC30C64E9",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G-COMPLETION-20260810.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

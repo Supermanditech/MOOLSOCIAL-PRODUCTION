@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "routeOwner": "journey01",
+    "productionRoutes": [
+      "/sign-in",
+      "/verify"
+    ],
+    "approvalVersion": "visual-v5",
+    "founderApprovedAt": "2026-08-15",
+    "status": "Accepted",
+    "productionPredecessor": "v4",
+    "connectedAcceptanceCheckpoint": [
+      "Screen 01",
+      "Screen 02",
+      "Screen 03"
+    ]
+  },
+  "referenceCapture": {
+    "sourceHtmlSha256": "1E4DB8FA47E42FD065E8A404D78C17DA2A0023D39F724C6A55A1562467F1A6AB",
+    "capturesAreFounderSuppliedOriginalBytes": true,
+    "referenceImages": [
+      {
+        "path": "reference-images/founder-final-choose-434x833.png",
+        "width": 434,
+        "height": 833,
+        "state": "choose-method"
+      },
+      {
+        "path": "reference-images/founder-final-email-427x827.png",
+        "width": 427,
+        "height": 827,
+        "state": "email-entry"
+      },
+      {
+        "path": "reference-images/founder-final-mobile-otp-481x883.png",
+        "width": 481,
+        "height": 883,
+        "state": "mobile-otp"
+      },
+      {
+        "path": "reference-images/founder-final-review-context-1326x904.png",
+        "width": 1326,
+        "height": 904,
+        "state": "founder-review-context"
+      }
+    ]
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "methodTitle": "Sign in",
+    "methodBody": "Choose one method to continue.",
+    "providers": [
+      "Google",
+      "YouTube",
+      "Apple",
+      "X",
+      "Instagram",
+      "Facebook"
+    ],
+    "emailLink": "Email link",
+    "emailLinkHint": "Use any email address",
+    "mobileOtp": "Mobile OTP",
+    "mobileOtpHint": "Use mobile number",
+    "emailEntryTitle": "Enter your email",
+    "emailSendAction": "Send sign-in link",
+    "mobileOtpTitle": "Enter OTP",
+    "verify": "Verify",
+    "chooseAnotherMethod": "Choose another method"
+  },
+  "entry": {
+    "requiredPreviousScreen": "explicitly completed Screen 02",
+    "routeCondition": "JourneyStage.signIn",
+    "requiredState": [
+      "current setup completion version is durably persisted",
+      "language and current area are preserved",
+      "the user is not already authoritatively authenticated",
+      "a protected destination intent is retained when sign-in was action-triggered"
+    ]
+  },
+  "states": [
+    {
+      "id": "choose-method",
+      "actions": [
+        "Continue with Google",
+        "Continue with YouTube",
+        "Continue with Apple",
+        "Continue with X",
+        "Continue with Instagram",
+        "Continue with Facebook",
+        "Email link",
+        "Mobile OTP"
+      ]
+    },
+    {
+      "id": "provider-handoff",
+      "rule": "Only a qualified provider may open its provider-owned surface. An unavailable provider remains truthful and cannot dispatch a gateway call. MoolSocial never reproduces provider credentials or consent."
+    },
+    {
+      "id": "email-entry",
+      "validation": "Normalize and validate the email locally before requesting a link; never place the raw email address in a review URL."
+    },
+    {
+      "id": "email-link-sent",
+      "rules": [
+        "mask the destination email in visible confirmation",
+        "do not claim authentication until Firebase completes the link",
+        "support resend only after cooldown",
+        "allow a different email or another method"
+      ]
+    },
+    {
+      "id": "email-link-return",
+      "outcomes": [
+        "same-device completion",
+        "different-device confirmation using the same email",
+        "invalid link",
+        "expired link",
+        "already-used link",
+        "cancelled return",
+        "process-death recovery"
+      ]
+    },
+    {
+      "id": "mobile-otp",
+      "rule": "Preserve the independently qualified Firebase Phone Authentication journey and operating-system one-time-code autofill behavior; never read the SMS inbox silently."
+    },
+    {
+      "id": "session-ready",
+      "result": "merge setup into the authenticated account and open the exact pending protected destination, or Universal when no valid pending destination exists"
+    }
+  ],
+  "providerRules": {
+    "youtube": "Use Google basic identity only. Request YouTube channel scopes later and only from creator tools with feature-specific consent.",
+    "availability": "Visible provider presentation does not prove live readiness. Dispatch is enabled only when the exact provider is qualified for the current platform and environment.",
+    "security": [
+      "PKCE where applicable",
+      "state and nonce validation",
+      "redirect allowlist",
+      "provider token validation",
+      "idempotent account and session merge",
+      "no raw provider credentials collected by MoolSocial UI"
+    ]
+  },
+  "routing": {
+    "screen02Exit": "/sign-in",
+    "emailLinkReturn": "/sign-in with a validated Firebase email-link return",
+    "mobileOtpVerification": "/verify",
+    "authenticatedExit": "exact captured /app/ protected destination when valid; otherwise /app/social",
+    "interruptionRule": "Process death or relaunch during incomplete authentication returns to a truthful recoverable sign-in state without claiming authentication."
+  },
+  "implementationBoundary": {
+    "nativeFlutterOnly": true,
+    "newProductRoutes": [],
+    "newBackendOwners": [],
+    "firebaseConfigurationDeploymentAuthorized": false,
+    "emailSendAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false
+  },
+  "prohibited": [
+    "HTML or WebView in Flutter",
+    "mixing legacy SignInScreen or VerifyOtpScreen into UI V2",
+    "provider credentials inside MoolSocial",
+    "YouTube channel-management scopes at login",
+    "fake provider or email-link success",
+    "dispatching an unavailable provider",
+    "numeric Email OTP presentation or backend fallback",
+    "internal implementation, example, review or test language in customer copy",
+    "dropping Screen 02 area or pending-destination state during authentication"
+  ]
+}

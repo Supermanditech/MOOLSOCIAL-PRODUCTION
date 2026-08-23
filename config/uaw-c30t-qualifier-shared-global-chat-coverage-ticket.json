@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-QUALIFIER-SHARED-GLOBAL-CHAT-COVERAGE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_static_gate_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_qualifier_runtime_coverage_gap",
+  "actor": "release_engineer_running_two_identical_C30T_source_cycles",
+  "customerOutcome": "Every qualifying cycle verifies all shared account hubs, their exact actions, global Chat reachability and return-route continuity.",
+  "finding": "All changed shared source and tests were fingerprinted, but test/shared_vertical_slice_test.dart was absent from the focused runtime array even after the global Chat correction.",
+  "minimumCorrection": [
+    "add_the_full_shared_vertical_suite_to_the_focusedTests_array",
+    "lock_its_exact_single_membership_in_static_release_readiness",
+    "retain_source_fingerprinting_for_all_shared_owners"
+  ],
+  "explicitExclusions": [
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "focusedTestManifestCount": 57,
+    "sharedVerticalMembership": "exactly_once",
+    "scriptSyntax": "passed",
+    "staticReleaseReadiness": "passed_plugins_15_permissions_5_providers_4_AAB_count_0",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/69-qualifier-shared-global-chat-coverage-static-gate.log",
+    "evidenceSha256": "1A870236F9C6EA1A07BB7D1DB38992852234A251115387C85F5E034ADF7D8D55"
+  }
+}

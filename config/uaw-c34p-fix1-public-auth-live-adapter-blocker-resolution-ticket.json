@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_founder_authorized_runtime_backend_and_local_test_source_pending_scope_selection",
+  "classification": "beyond_mvp",
+  "founderExplicitAuthorizationDate": "2026-08-18",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can choose X or Facebook on the existing MoolSocial login gateway, privately complete the selected provider handoff, establish one Firebase-backed MoolSocial session and reach the exact protected destination, or receive one sanitized recoverable failure while unconfigured methods remain disabled.",
+  "acceptanceChildren": [
+    "UAW-C34P-FIX1-X-NATIVE-PKCE-FIREBASE-CUSTOM-TOKEN-BROKER",
+    "UAW-C34P-FIX2-FACEBOOK-NATIVE-SDK-PUBLIC-LOGIN-ADAPTER"
+  ],
+  "oneLogicalImplementationWave": true,
+  "minimumCompleteScope": [
+    "reuse_locked_Screen03_JourneySession_FirebaseAuth_bootstrap_rollback_and_protected_return",
+    "reuse_the_existing_backend_functions_package_and_existing_AUTH_API_base_configuration",
+    "implement_X_begin_and_complete_operations_with_App_Check_one_time_PKCE_attempt_exact_redirect_minimum_scopes_provider_subject_verification_Firebase_custom_token_and_immediate_X_token_revocation",
+    "implement_X_foreground_and_cold_callback_delivery_without_persisting_state_verifier_code_access token_or provider subject_in_the_client",
+    "implement_Facebook_native_SDK_adapter_with_public_profile_only_no_email_default_Firebase credential sign in_cancel_denial_collision_logout_and revocation",
+    "keep_X_and_Facebook_controls_disabled_until_every_exact_runtime_platform_provider_privacy_and_deletion_fact_is qualified",
+    "preserve_one_session_exact_return_authenticated relaunch_sign out_and account bootstrap rollback",
+    "run_backend_mobile_platform_configuration_privacy_unit_widget_integration_static_and_two affected regression cycles"
+  ],
+  "explicitExclusions": [
+    "no_new_login_screen_route_JourneySession_or_parallel_authentication_backend_package",
+    "no_X_OAuth1_Firebase_TwitterAuthProvider_or_client secret",
+    "no_X_tweet write_follow_DM_email_or_offline access_scope",
+    "no_Facebook_email_friends_pages_groups_ads_posts_messaging_or_analytics_permissions",
+    "no_provider_app_credential_secret_client token_key hash_value_private identifier_or OAuth token_in_source_logs_tests_or evidence",
+    "no_provider_console_external_service_real email_SMS_funds_build_Play_OPPO_commit_push_merge_or_r60_72_reuse"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_blocker_resolution_authorization_2026_08_18",
+    "existing_C34P_protocol_configuration_failure_privacy_and_regression qualification",
+    "App_Check_protected_public_auth_broker_and_keyless_Firebase_Admin_runtime",
+    "founder_owned_X_native_public_client_exact_callback_and_any_required credits",
+    "founder_owned_Meta_app_native_Facebook_Login_package_activity_key hashes_redirect_privacy_and_data deletion configuration",
+    "later_separately_authorized_external_configuration_build_Internal Testing_and_OPPO acceptance"
+  ],
+  "testAndEvidencePlan": [
+    "X_broker_runtime_schema_App_Check_attempt_expiry_state_redirect_PKCE_exchange_provider subject_custom token_revocation_and redaction tests",
+    "X_mobile_begin_callback_cold_foreground_duplicate_wrong state_wrong redirect_expired_cancel_offline_bootstrap rollback_and exact return tests",
+    "Facebook_native_adapter_public profile_only_token_to_Firebase_cancel_denial_collision_logout_revocation_and no email tests",
+    "platform_configuration_missing_mismatched_or_placeholder_fact_fail closed tests",
+    "unknown_provider_response_token_private identifier_and provider_message_redaction tests",
+    "whole_mobile_and_backend_analysis_two_identical_affected_manifest cycles_and_approved UI containment"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorizedAfterMvpGate": true,
+    "platformConfigurationSourceWriteAuthorizedAfterMvpGate": true,
+    "backendSourceWriteAuthorizedAfterMvpGate": true,
+    "testAndGateWriteAuthorizedAfterMvpGate": true,
+    "providerConsoleOrExternalServiceWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "realEmailSmsOrPrivateLoginAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false,
+    "commitPushMergeAuthorized": false
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-ACTION-AUTHENTICATION-TRUTH-MATRIX",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "test_only_audit_and_all_verified_successors_source_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "authentication_and_public_read_truth_gate",
+  "actor": "guest_MoolSocial_public_Feed_reader",
+  "customerOutcome": "A guest can read public Feed posts, view plain media and copy a public post link without sign-in, while every account-bound Feed write enters MoolSocial sign-in, preserves the exact post return and records no false interaction.",
+  "classificationReason": "The founder observed multiple Feed taps entering sign-in and requested a truthful production-grade distinction between public reads and account-bound writes before authorizing another AAB.",
+  "minimumCompleteScope": [
+    "prove_public_Feed_text_plain_image_carousel_and_share_copy_remain_available_to_a_guest",
+    "prove_like_save_poll_or_quiz_vote_message_and_Create_require_MoolSocial_identity",
+    "prove_every_auth_gate_preserves_the_exact_requested_route_and_makes_zero_false_write",
+    "prove_plain_media_taps_cannot_overlap_or_invoke_an_adjacent_authentication_target",
+    "register_each_unavailable_or_incorrect_action_as_a_separate_successor_ticket"
+  ],
+  "explicitExclusions": [
+    "no_reply_comment_repost_or_quoted_share_implementation_under_this_test_only_ticket",
+    "no_new_screen_route_backend_provider_or_external_service_owner",
+    "no_cloud_Hosting_Play_AAB_upload_install_OPPO_mutation_email_or_quota_submission"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/test/c30t_social_auth_and_feed_gateway_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "Existing owners already implement public reads, authenticated interactions and exact route return. A bounded matrix in the current C30T test owner is sufficient to classify truth without duplicating production code.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "founder_explicit_comprehensive_pre_AAB_audit_and_source_implementation_authority",
+    "UAW_C30T_GUEST_FEED_INTERACTION_SIGNIN_and_Feed_share_source_qualified_predecessors_preserved",
+    "reply_repost_and_any_other_verified_gap_requires_its_own_selected_successor",
+    "another_AAB_remains_explicitly_withheld"
+  ],
+  "testAndEvidencePlan": [
+    "one_guest_action_matrix_with_exact_widget_keys_routes_and_zero_gateway_interactions",
+    "one_signed_in_control_proving_account_bound_actions_keep_the_existing_server_acknowledged_path",
+    "plain_media_hit_test_and_share_clipboard_truth",
+    "focused_Flutter_test_then_authoritative_Social_manifest_regression"
+  ],
+  "authority": {
+    "testOrGateWriteAuthorized": true,
+    "productionSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "verification": {
+    "focusedFlutterTests": "29_passed_0_failed",
+    "publicGuestActions": ["Feed_read", "plain_media_hit_area", "carousel", "Share", "Copy_link"],
+    "accountBoundActions": [
+      "Like",
+      "Save",
+      "Vote",
+      "Reply_submission",
+      "Repost_or_Undo",
+      "Follow",
+      "Message",
+      "Add_thoughts",
+      "Send_in_Chat",
+      "Create"
+    ],
+    "falseInteractionWritesBeforeAuthentication": 0,
+    "verifiedSuccessorDefects": [
+      "Reply_or_Comment_visible_unavailable_dead_end",
+      "Repost_visible_unavailable_dead_end",
+      "Share_choices_missing_Repost_Undo_Add_thoughts_and_Send_in_Chat",
+      "plain_media_has_no_post_or_media_open_completion",
+      "author_profile_and_Follow_completion_absent"
+    ],
+    "successorDisposition": {
+      "Reply_or_Comment_visible_unavailable_dead_end": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+      "Repost_visible_unavailable_dead_end": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+      "Share_choices_missing_Repost_Undo_Add_thoughts_and_Send_in_Chat": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+      "plain_media_has_no_post_or_media_open_completion": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+      "author_profile_and_Follow_completion_absent": "source_implemented_focused_tests_passed_live_Play_acceptance_pending"
+    },
+    "livePlayAcceptance": "pending_future_separately_authorized_candidate"
+  },
+  "evidence": {
+    "finding": "docs/quality/UAW-C30T-PRE-AAB-FEED-ACTION-AUTHENTICATION-TRUTH-MATRIX-20260813.md"
+  }
+}

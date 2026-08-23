@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32X-PERSONAL-MVP-R15-ACTION-CHOICE-NAVIGATION-ACCESSIBILITY-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_zero_warning_runtime_unchanged",
+  "ticketSha256": "C921671592E354C9634B454F8C066AB306C58101B1A617A5027D2E774FAE0AE0",
+  "predecessorEvidence": {
+    "ticketId": "UAW-C32W-PERSONAL-MVP-R15-CURRENT-MOOL-HOME-ACCESSIBILITY-TEST-SUCCESSOR",
+    "machineStateSha256": "FEF97A2FCD06165482E9CB9A930B0F8F19DCBC56546FF460928511898F4233B3",
+    "testSha256": "0331232117ACAC11D3D0B431CD828D927A0EC8A6066A87830A179B484E5B7262",
+    "result": "15_passed_1_hidden_failure"
+  },
+  "testOwner": "apps/mobile/test/ui_v2/universal/uaw_r15_personal_copy_fitment_accessibility_test.dart",
+  "testSha256": "F0AD3D0E6DCBE68C8C6BFEBD0AE19CF184A59DADA5118C3A165E0DA716A3DC88",
+  "runtimeOwner": "apps/mobile/lib/ui_v2/universal/mvp_action_choice_root_v2.dart",
+  "runtimeSha256": "1D6D9664E832D3C149101E2F205376A52A48EC6C2888EE9BAFEC20D22F496C2C",
+  "currentActionChoiceAuthority": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix2_test.dart",
+  "currentActionChoiceAuthoritySha256": "B73E73EDE9DF343B9DF37596472354683CD327FE89869CB759723156C2D6324B",
+  "currentMoolHomeAuthorities": {
+    "R03Sha256": "847DF00238AABC64A16A3B0AD737E25AA7FE9DFBE9334C2257D3EDF59558E730",
+    "C24B2Sha256": "96664DB525432CD123FA8D55294AD9B5E2F5BD966B77D9FB95200E5ACBB82DE8"
+  },
+  "validation": {
+    "R15": {"passed": 16, "failed": 0, "warnings": 0},
+    "FIX2": {"passed": 25, "failed": 0},
+    "R03": {"passed": 11, "failed": 0},
+    "C24B2": {"passed": 4, "declaredSkips": 1, "failed": 0},
+    "combinedC32STUVXR15SuccessorBatch": {"files": 5, "passed": 36, "failed": 0, "warnings": 0},
+    "analyzer": "clean",
+    "C32WGateDualHost": "passed",
+    "C32XGateDualHost": "passed"
+  },
+  "authority": {
+    "runtimeChanged": false,
+    "backendChanged": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

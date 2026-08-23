@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-REVIEWER-POLICY-SITEMAP-FRESHNESS",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_static_tests_passed_hosting_held",
+  "classification": "mvp_supporting",
+  "severity": "reviewer_discovery_metadata_truth",
+  "actor": "YouTube_compliance_reviewer_or_search_crawler",
+  "customerOutcome": "Indexed policy and YouTube review pages expose truthful last-modified dates after their C30T corrections, while unchanged pages retain their earlier dates.",
+  "minimumCorrection": [
+    "update_only_privacy_support_and_youtube_api_lastmod_to_2026_08_13",
+    "retain_company_and_terms_lastmod_at_2026_08_07",
+    "lock_the_exact_URL_to_lastmod_mapping"
+  ],
+  "explicitExclusions": [
+    "no_disconnect_or_deletion_sitemap_indexing",
+    "no_hosting_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "hostingDeployAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "webTests": "7 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/31-reviewer-policy-sitemap-tests.log",
+    "evidenceSha256": "314A954645FC0376C627F8530BFB8F65406BD401CA2BD4D9C3770A3484060827"
+  }
+}

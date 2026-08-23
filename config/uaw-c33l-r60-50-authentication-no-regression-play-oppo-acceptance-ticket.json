@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33L-R60-50-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "parentTickets": [
+    "UAW-C33K-FIREBASE-PASSWORDLESS-EMAIL-LINK-LIVE-READINESS",
+    "UAW-C33G-FIX4-UNRESOLVED-ACCEPTANCE-BLOCKER-PRE-AAB-LEDGER"
+  ],
+  "state": "founder_disclosed_and_end_to_end_authorized_prebuild_qualification_pending",
+  "classification": "mvp_required",
+  "severity": "release_and_authentication_acceptance_blocking",
+  "actor": "MoolSocial_Internal_Testing_real_user_on_the_existing_OPPO_Play_install",
+  "capability": "complete_supported_authentication_and_Social_journeys_without_repeating_any_applicable_historical_regression",
+  "customerOutcome": "A real user updates MoolSocial once from Google Play Internal Testing, completes Google, Mobile OTP and passwordless email-link authentication, reaches the exact protected destination, reads guest Feed, opens Create without a crash and completes the supported whole-app journeys without any applicable historical regression recurring.",
+  "classificationReason": "Authentication completion, guest Feed, Create stability, provider truth, protected return and regression-free release qualification are confirmed blockers in the founder-approved MVP launch slice. Failed r60.49 cannot be reused or promoted.",
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.50",
+    "versionCode": "2026081350",
+    "candidateId": "UAW-C33L-R60-50-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "minimumCompleteScope": [
+    "preserve_failed_r60_49_identity_artifact_and_1_1_1_0_counts_without_reuse",
+    "bind_C33G_blocker_repairs_C33H_Phone_C33J_email_link_and_C33K_live_readiness_to_one_new_candidate",
+    "freeze_the_complete_current_regression_registry_and_reject_any_post_seal_new_or_repeated_regression",
+    "pass_two_fresh_identical_full_source_cycles_and_all_applicable_release_gates_before_hidden_inputs_or_AAB_authority",
+    "build_exactly_one_AAB_through_the_founder_hidden_input_launcher",
+    "upload_and_activate_exactly_once_on_Google_Play_Internal_Testing_only",
+    "perform_exactly_one_in_place_OPPO_Play_update_without_ADB_install_uninstall_data_clear_or_downgrade",
+    "complete_Google_Mobile_OTP_passwordless_email_guest_Feed_Create_provider_truth_protected_return_and_whole_app_acceptance",
+    "reject_the_candidate_and_register_an_exact_repair_ticket_before_any_retry_if_any_historical_or_new_regression_occurs"
+  ],
+  "explicitExclusions": [
+    "no_Production_open_closed_public_alpha_beta_or_non_Internal_Testing_track",
+    "no_backend_Hosting_provider_rules_IAM_or_environment_deployment",
+    "no_ADB_install_sideload_uninstall_data_clear_downgrade_or_second_OPPO_update",
+    "no_second_AAB_and_no_r60_49_artifact_reuse",
+    "no_agent_access_to_password_API_key_OAuth_client_ID_token_nonce_email_action_code_App_Check_verdict_private_key_or_attestation_payload",
+    "no_real_SMS_send_and_no_email_or_quota_submission_other_than_one_founder_reviewed_passwordless_sign_in_email",
+    "no_funds_API_enablement_credential_creation_or_Production_readiness_claim"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_go_ahead_with_next_actions_authorization_2026_08_15",
+    "founder_no_past_regression_repeats_in_AAB_deployment_or_production_direction_2026_08_15",
+    "C33G_FIX1_through_FIX4_source_qualification_and_candidate_independent_blocker_ledger",
+    "C33H_Phone_source_and_India_only_policy_qualification",
+    "C33J_parent_FIX1_FIX2_source_qualification",
+    "C33K_live_Email_Link_provider_domain_and_dual_origin_App_Links_qualification",
+    "founder_only_hidden_upload_password_Firebase_Android_API_key_and_Google_OAuth_server_client_ID_entry",
+    "founder_enters_the_review_email_on_OPPO_and_taps_the_received_link_without_Codex_reading_or_recording_it",
+    "every_candidate_specific_prebuild_postbuild_preupload_postupload_preinstall_postinstall_and_journey_gate"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance",
+      "new_necessary_work"
+    ],
+    "sharedImplementationOwners": [
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/check-release-runtime-configuration-c30w.ps1",
+      "scripts/check-uaw-c33g-fix4-unresolved-acceptance-blocker-pre-aab-ledger.ps1",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "apps/mobile/lib/core/auth/firebase_email_link_gateway.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "config/successor-aab-regression-hard-gate-state-c33l.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c33l.json",
+      "scripts/check-uaw-c33l-r60-50-authentication-no-regression-release-readiness.ps1",
+      "tmp/run-c33l-r60-50-single-aab-founder.ps1"
+    ],
+    "necessityProof": "All product journeys reuse the existing repaired native and Firebase owners. One new candidate state, aggregate, composition gate and founder launcher are necessary because r60.49 authorities are permanently consumed and failed, while the generic single-AAB wrapper requires an exact supported successor contract. No duplicate UI, route, session, service, backend, provider or build implementation is created.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "historicalRegressionHardGate": {
+    "allCurrentRegistryEntriesAppliedBeforeSourceSeal": true,
+    "registryFileSha256AndEntryCountBoundToCandidate": true,
+    "twoFreshIdenticalCompleteCyclesRequired": true,
+    "zeroTestAnalyzerGateBackendOrHostingFailuresRequired": true,
+    "postSealRegistryChangeRejectsBuildOrPromotion": true,
+    "anyRepeatedOrNewDefectRejectsCandidate": true,
+    "exactRepairTicketBeforeRetryRequired": true,
+    "waiversAllowed": false,
+    "productionReadinessClaimBeforeCompletePostinstallAcceptanceAllowed": false
+  },
+  "testAndEvidencePlan": [
+    "dual_PowerShell_candidate_regression_MVP_UI_runtime_provider_and_blocker_gate_replay",
+    "two_identical_fresh_source_cycles_with_full_Flutter_backend_Hosting_analyzer_and_manifest_evidence",
+    "postbuild_AAB_hash_bytes_package_version_upload_signer_manifest_resources_plugins_payload_and_source_binding",
+    "Internal_Testing_only_upload_activation_and_exact_artifact_rebind",
+    "one_in_place_OPPO_Play_update_with_installer_version_signer_retained_data_and_first_frame_proof",
+    "Google_sign_in_Mobile_OTP_passwordless_email_same_device_exact_return_and_cancel_retry_interruption_paths",
+    "guest_Feed_Create_no_crash_provider_truth_protected_Social_Chat_return_and_complete_supported_whole_app_matrix",
+    "zero_blank_fatal_ANR_new_issue_historical_regression_repeat_or_unresolved_core_journey_before_any_readiness_claim"
+  ],
+  "authority": {
+    "candidateIdentityApproved": true,
+    "oneAabBuildAuthorizedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild": true,
+    "oneInPlaceOppoPlayUpdateAuthorizedAfterActivation": true,
+    "oneFounderReviewedPasswordlessEmailSendAuthorizedAfterInstall": true,
+    "founderHiddenInputEntryRequired": true,
+    "agentSecretOrPrivateLinkAccessAuthorized": false,
+    "otherTrackAuthorized": false,
+    "adbInstallUninstallDataClearDowngradeOrSideloadAuthorized": false,
+    "backendHostingProviderOrProductionDeploymentAuthorized": false,
+    "realSmsSendAuthorized": false,
+    "youtubeQuotaOrEmailSubmissionAuthorized": false,
+    "fundsAuthorized": false
+  }
+}

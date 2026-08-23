@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX3-CONTRACT-V1",
+  "ticketId": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX3",
+  "classification": "mvp_required",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX3-FOUNDER-AUTHORIZATION-20260806.md",
+  "rejectedPredecessor": {
+    "candidate": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX2",
+    "versionName": "1.0.0-r60.5",
+    "versionCode": "2026080605",
+    "apkSha256": "2AEEA5E7A3CA417FDADF6E14398FE3EADA7CF499FC8C6F67CDC1AE1E89690CA8",
+    "evidence": "artifacts/quality/uaw-personal-mvp-action-wording-wiring-navigation-fix2-20260806-01/131-final-machine-state.json"
+  },
+  "implementationOwners": {
+    "rideDock": "RideBottomDock",
+    "rideState": "RideSession",
+    "router": "createJourneyRouter",
+    "chatReturn": "ChatInboxScreen/chatGoBack",
+    "newScreenOwners": 0,
+    "newRouteOwners": 0,
+    "newStateOwners": 0,
+    "newBackendOwners": 0
+  },
+  "navigation": {
+    "route": "/app/ride/book?type={bike|auto|cab}",
+    "chatBackRestoresExactRideType": true,
+    "selectedDockSemanticRequiredAfterChatBack": true,
+    "tripAndSupportReturnRoutesRemainUnchanged": true,
+    "activeLifecycleMayBeSilentlyReset": false
+  },
+  "protectedAuditOnly": ["social", "buy"],
+  "deviceGate": {
+    "oppoRequired": true,
+    "inPlaceUpgradeOnly": true,
+    "founderAcceptanceSubjectToCodexSatisfaction": true
+  }
+}

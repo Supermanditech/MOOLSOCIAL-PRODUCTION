@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C33N-R60-52-AUTHENTICATION-NO-REGRESSION-RELEASE-AGGREGATE-001",
+  "ticketId": "UAW-C33N-R60-52-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "machineState": "postbuild_rejected_postseal_registry_change_successor_required",
+  "evidenceRoot": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01",
+  "candidate": {
+    "id": "UAW-C33N-R60-52-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.52",
+    "versionCode": "2026081352",
+    "buildCount": 1,
+    "uploadCount": 0,
+    "installCount": 0,
+    "deviceAcceptanceCount": 0,
+    "aabSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3",
+    "disposition": "rejected",
+    "artifactReusable": false
+  },
+  "historicalCandidates": [
+    {
+      "versionName": "1.0.0-r60.49",
+      "versionCode": "2026081349",
+      "disposition": "failed",
+      "buildCount": 1,
+      "uploadCount": 1,
+      "installCount": 1,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.50",
+      "versionCode": "2026081350",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "541F02EA0F7C1C8B9067B31D50AE3CE0BB495E16746A3E4E2FF4AEAA28354F99"
+    },
+    {
+      "versionName": "1.0.0-r60.51",
+      "versionCode": "2026081351",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "6C4C402DAA5CD813F66DF1ECE895A7FE39936F6D6413FC2D771667E274A7CA24"
+    }
+  ],
+  "regressionMemory": {
+    "registryPath": "config/codex-development-regression-registry.json",
+    "sealedRegistrySha256": "F3F450AE9D248583BDE26A8C89CF089E731BAF20F1AC954D48A6FDAE1DB58DD9",
+    "sealedRegistryEntryCount": 2581,
+    "postSealChangeRejectsBuildOrPromotion": true,
+    "historicalRepeatOrNewDefectRejectsCandidate": true,
+    "waiversAllowed": false
+  },
+  "sourceQualification": {
+    "requiredIdenticalCycles": 2,
+    "completedIdenticalCycles": 2,
+    "manifestPath": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/source-manifest-c33n-registry-2581.txt",
+    "manifestSha256": "77ACAF7CC79833714B08670000B9D4CB0E7238B3FEC85C0E13897BFB7DDA1260",
+    "focusedManifestPath": "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/focused-test-manifest-c33n.txt",
+    "focusedManifestSha256": "BC2CCD7E69CDC2D5817A9B772BF923E6A641AC8783C3BA657E9F729E836F2620",
+    "releasePreflightPassed": true,
+    "zeroFailures": true,
+    "cycleEvidence": [
+      "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/c33n-cycle-01-summary.json",
+      "artifacts/quality/uaw-c33n-r60-52-authentication-no-regression-preparation-20260816-01/c33n-cycle-02-summary.json"
+    ]
+  },
+  "releaseAuthorities": {
+    "build": "consumed",
+    "uploadAndInternalActivation": "rejected_postseal_registry_change",
+    "inPlaceOppoPlayUpdate": "rejected_candidate",
+    "postinstallAcceptance": "rejected_candidate"
+  },
+  "actionCounts": {
+    "build": 1,
+    "upload": 0,
+    "install": 0,
+    "deviceAcceptance": 0,
+    "passwordlessEmailSend": 0,
+    "realSmsSend": 0,
+    "otherTrack": 0,
+    "backendHostingProviderOrProductionDeployment": 0
+  },
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false,
+    "privateEmailLinkObserved": false
+  },
+  "rejection": {
+    "disposition": "rejected",
+    "phase": "postbuild_before_upload",
+    "reasonRegistryIds": [
+      "REG-20260816-2611-C33N-POSTBUILD-EVIDENCE-LOOKUP-GUESSED-NONEXISTENT-RELEASE-DIRECTORY",
+      "REG-20260816-2612-C33N-REJECTION-COMPOUND-PATCH-HANDOFF-CONTEXT-MISMATCH"
+    ],
+    "evidencePath": "docs/quality/UAW-C33N-R60-52-POSTBUILD-REGISTRY-CHANGE-REJECTION-20260816.md",
+    "sealedRegistryEntryCount": 2581,
+    "rejectionRegistryEntryCount": 2583,
+    "artifactReusable": false,
+    "artifactUploadAuthorized": false,
+    "artifactInstallAuthorized": false,
+    "successorRequired": true
+  }
+}

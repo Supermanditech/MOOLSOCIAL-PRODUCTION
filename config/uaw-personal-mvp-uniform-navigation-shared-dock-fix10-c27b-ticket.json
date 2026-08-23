@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SHARED-DOCK-FIX10-C27B",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Every Social, Shop, Food, Travel, Care and Work destination uses one legible, compact and reachable bottom dock without family theme inheritance, text shrinkage, sparse-action drift or competing selection states.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SHARED-DOCK-FIX10-C27B-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart",
+      "scripts/check-personal-uniform-navigation-design-system-c27b.ps1"
+    ],
+    "necessityProof": "Existing tests do not enforce a fixed cross-control token set, neutral shared shell, leading sparse layout, nonshrinking labels or removal of the obsolete disclosure lifecycle."
+  },
+  "acceptance": [
+    "one 58px neutral clear unboxed dock shell",
+    "legacy railHeight aliases the same 58px destination height",
+    "one shared 22px icon and 10.5px Inter label standard",
+    "fixed 54px Mool and family context cells",
+    "two and three action clusters compact and leading aligned",
+    "four action families fit at 320 without scroll",
+    "only current local action owns selected indicator",
+    "Mool icon and label render on every root before switcher interaction",
+    "all host semantic targets at least 44px",
+    "unused predecessor disclosure and anchor lifecycle removed",
+    "no family action route feature content or state change"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-SHARED-DOCK-FIX10-C27B-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-MOBILE-OTP-PUBLIC-LOGIN",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_acceptance_child_source_and_configuration_fix_pending_parent_scope_activation",
+  "classification": "mvp_required",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A Personal user can enter a phone number privately, receive and verify one Firebase SMS OTP on the existing OPPO, survive Play Integrity or reCAPTCHA return, and reach the exact protected destination or recover truthfully.",
+  "minimumCompleteScope": [
+    "reuse_existing_Firebase_mobile_OTP_gateway_and_runtime feature flag",
+    "validate_Firebase_phone provider_region_package_exact_Play signing_SHA_and_Play Integrity_or_reCAPTCHA prerequisites",
+    "cover_send_auto verification_manual code_timeout_invalid_expired_resend_cancel_offline_throttle_process death_and duplicate completion",
+    "never_persist_phone_or_OTP_in logs exceptions tests_or evidence",
+    "preserve_exact_protected_return_bootstrap_rollback_authenticated relaunch_and sign out"
+  ],
+  "explicitExclusions": [
+    "no_email_OTP_claim",
+    "no_real_SMS_send_billing_or_quota_action_by_Codex",
+    "no_phone_or_OTP_visibility_to_Codex",
+    "no_runtime_enablement_in_a_release_candidate_before_provider_and_build gates"
+  ],
+  "testAndEvidencePlan": [
+    "unit_test_phone_gateway_state_machine_and_sanitized errors",
+    "fixture_test_Play_Integrity_reCAPTCHA_return_timeout_resend_and process death",
+    "widget_test_public_entry_progress_cancel_retry_and exact destination return",
+    "Firebase_test_number_or_emulator integration_without_real SMS",
+    "one_new_Play_installed_OPPO_live_SMS attempt_with_founder_only_phone_and_OTP handling"
+  ],
+  "authority": {
+    "runtimeAndTestSourceAuthorizedUnderParent": true,
+    "realSmsSendOrBillingAuthorized": false,
+    "privatePhoneOrOtpAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

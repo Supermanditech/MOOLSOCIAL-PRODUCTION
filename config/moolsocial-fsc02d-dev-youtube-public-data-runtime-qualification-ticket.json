@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02D-DEV-YOUTUBE-PUBLIC-DATA-RUNTIME-QUALIFICATION",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "runtime_qualified_source_and_build_controls_passed_successor_host_qualification_selected",
+  "classification": "mvp_supporting",
+  "actor": "authenticated Personal user on founder-authorized OPPO serial 2b3e0f71",
+  "customerOutcome": "A Personal user receives real eligible YouTube public Shorts and Videos from the accepted MoolSocial Dev provider through Firebase Auth and genuine Play Integrity App Check, with truthful unavailable and retry behavior and no owner or upload capability enabled.",
+  "founderDirection": "complete_full_Dev_runtime_and_OPPO_test_before_founder_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC02D-DEV-YOUTUBE-PUBLIC-DATA-RUNTIME-QUALIFICATION-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "backend/functions/src/youtube/provider_service.ts",
+      "backend/functions/src/youtube/config.ts",
+      "scripts/check-youtube-private-dev-preflight.ps1",
+      "scripts/verify-youtube-private-dev-deployment.ps1",
+      "scripts/check-youtube-private-dev-security-prerequisites.ps1",
+      "scripts/deploy-youtube-private-dev.ps1",
+      "deployment/youtube-private-dev/deployment-manifest.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/test-youtube-public-dev-review-build-controls.ps1"
+    ],
+    "necessityProof": "The durable handoff records a founder-accepted persistent PublicDataReview deployment in moolsocial-dev-503018, real OPPO public catalogue/playback proof and a current client/provider contract. The existing runtime and build owners were reused. One static control-test owner was necessary to prevent Firebase client configuration disclosure and any YouTube server secret from entering the APK."
+  },
+  "minimumCompleteScope": [
+    "reconcile_the_durable_founder_accepted_PublicDataReview_authority_and_current_live_Dev_state",
+    "verify_only_PublicData_is_enabled_and_all_owner_upload_live_and_analytics_capabilities_are_false",
+    "derive_and_validate_the_existing_HTTPS_provider_URI_as_non_secret_runtime_configuration",
+    "verify_Firebase_Auth_and_genuine_Play_Integrity_App_Check_on_the_exact_Android_identity",
+    "verify_real_capabilities_publicData_and_public_catalogue_requests_without_fixture_or_hard_coded_video_substitution",
+    "replace_any_verifier_dependency_that_reads_secret_values_with_metadata_identity_restriction_version_binding_and_end_to_end_runtime_evidence",
+    "run_backend_client_and_Flutter_provider_state_tests_before_APK_qualification",
+    "redeploy_only_the_exact_reviewed_Dev_PublicDataReview_provider_if_read_only_qualification_proves_the_existing_revision_unusable_or_stale"
+  ],
+  "explicitExclusions": [
+    "no_secret_value_API_key_string_OAuth_secret_token_encryption_key_or_debug_token_access_copy_or_output",
+    "no_owner_connect_owner_actions_creator_assets_live_private_upload_owner_analytics_or_new_OAuth_scope",
+    "no_fake_provider_content_fixture_catalogue_hard_coded_video_ID_or_simulated_success",
+    "no_Staging_Production_release_public_or_unlisted_upload_YouTube_submission_or_promotion",
+    "no_provider_or_customer_message_call_fund_movement_commit_push_or_protected_runtime_mutation",
+    "no_OPPO_uninstall_data_clear_downgrade_or_install_before_a_fresh_checksum_unique_candidate_passes_host_qualification"
+  ],
+  "dependenciesAndApprovals": [
+    "durable_founder_acceptance_of_persistent_Dev_PublicDataReview_recorded_2026_07_25",
+    "founder_authority_to_complete_Dev_runtime_and_OPPO_testing_before_review_received_2026_08_11",
+    "authorized_Cloud_and_Firebase_identity_must_be_confirmed_before_any_cloud_command",
+    "exact_KEEP_YOUTUBE_PUBLIC_DATA_REVIEW_LIVE_IN_DEV_confirmation_required_if_and_only_if_redeployment_is_necessary",
+    "no_secret_value_access_or_copy_during_security_qualification",
+    "fresh_APK_machine_and_host_qualification_before_any_build",
+    "checksum_unique_successor_before_any_OPPO_install"
+  ],
+  "testAndEvidencePlan": [
+    "local_package_preflight_and_static_deployment_control_tests",
+    "read_only_Dev_project_function_revision_capability_IAM_App_Check_Auth_and_endpoint_inventory",
+    "backend_provider_and_configuration_tests",
+    "Flutter_client_public_runtime_loading_available_empty_unavailable_error_and_retry_tests",
+    "authenticated_App_Check_guarded_capabilities_and_real_public_catalogue_API_probes_on_OPPO",
+    "fresh_profile_APK_checksum_install_identity_and_full_Shorts_device_journey",
+    "MVP_delivery_scope_approved_UI_lock_and_permanent_regression_gates"
+  ],
+  "implementationEvidence": {
+    "state": "complete_no_cloud_mutation_successor_host_qualification_required",
+    "completion": "docs/quality/MOOLSOCIAL-FSC02D-DEV-YOUTUBE-PUBLIC-DATA-RUNTIME-QUALIFICATION-COMPLETION-20260811.md",
+    "cloudCapabilityProfile": "PublicDataReview",
+    "cloudMutationPerformed": false,
+    "backendNodeVersion": "22.23.2",
+    "backendTestsPassed": 471,
+    "flutterTestsPassed": 82,
+    "flutterAnalysis": "no_issues",
+    "buildControlTests": "passed",
+    "firebaseClientValuesLoggedOrPersisted": false,
+    "youtubeServerSecretsInApk": false,
+    "successorHostTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-HOST-QUALIFICATION-C29A",
+    "oppoMutationPerformed": false
+  },
+  "protectedState": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "installedVersionName": "1.0.0-r60.28",
+    "installedVersionCode": 2026081028,
+    "installedSerial": "2b3e0f71",
+    "installedIdentityMustRemainPreservedUntilQualifiedSuccessor": true,
+    "c28dRejectionEvidenceMustRemainPreserved": true
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorizedAfterRuntimeAndHostQualification": true,
+    "installAuthorizedAfterChecksumQualification": true,
+    "backendWriteAuthorizedOnlyForExactDevPublicDataReviewIfRequired": true,
+    "externalServiceWriteAuthorizedOnlyForExactDevPublicDataReviewIfRequired": true,
+    "secretValueAccessAuthorized": false
+  }
+}

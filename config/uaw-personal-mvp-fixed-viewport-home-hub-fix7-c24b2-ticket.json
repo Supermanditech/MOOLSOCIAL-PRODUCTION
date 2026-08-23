@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-FIXED-VIEWPORT-HOME-HUB-FIX7-C24B2",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-FIXED-VIEWPORT-HOME-HUB-FIX7-C24B2-PRESELECTION-ASSESSMENT-20260809.md",
+  "classification": "mvp_required",
+  "customerOutcome": "Home fits six professional main families and the selected family's direct actions in one fixed adaptive viewport with no scroll or redundant welcome chrome.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["PersonalMoolRootV2","existing_six_family_action_catalogue","MoolHomeHubTokens","C24B_shared_accessibility_tokens","existing_direct_route_callbacks"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["no_ListView_SingleChildScrollView_CustomScrollView_or_GridView","six_main_families_in_adaptive_three_by_two_or_six_column_layout","one_selected_family_action_panel_two_to_four_actions","one_tap_family_then_one_tap_direct_action","no_top_brand_Home_pill_Your_Mool_welcome_area_or_decorative_icons","professional_neutral_platform_inspired_not_trade_dress_copy","320_390_430_and_text_scale_1_4_no_overflow","Back_Chat_reduced_motion_and_semantics"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-FIXED-VIEWPORT-HOME-HUB-FIX7-C24B2-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":true,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

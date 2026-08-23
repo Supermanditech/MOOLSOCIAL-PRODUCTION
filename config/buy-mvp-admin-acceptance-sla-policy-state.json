@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY",
+  "state": "local_domain_slice_complete_live_adapter_and_admin_presentation_held",
+  "classification": "mvp_required",
+  "contractPath": "backend/functions/src/commerce/acceptance_sla_policy_contract.ts",
+  "contractSha256": "969CDA34D065127FDEB0D3BFF1E1D1E92CCF37F1C2640C087B7D6400369B7C4B",
+  "testPath": "backend/functions/src/commerce/acceptance_sla_policy_contract.test.ts",
+  "testSha256": "2451F0B479A7128056FB5BB3B3AA8D66C85E9D46C9445ECFC74B4C0B955DECA2",
+  "focusedCycles": ["18_pass_0_fail", "18_pass_0_fail"],
+  "fullBackendCycles": ["420_pass_0_fail", "420_pass_0_fail"],
+  "cycle1Evidence": "artifacts/quality/buy-mvp-market-schedule-timer-overrides-20260807-01/05-full-backend-cycle-1.tap",
+  "cycle1Sha256": "BD03CB948105C05181770745A606D8D3AA9BA4D9C73EAA8737B163D885378998",
+  "cycle2Evidence": "artifacts/quality/buy-mvp-market-schedule-timer-overrides-20260807-01/06-full-backend-cycle-2.tap",
+  "cycle2Sha256": "A491D53DC91E1883F206C2D3244A19AC3AE90BF561225925F44C556C01B1BF2A",
+  "regressionRegistryEntries": 95,
+  "sharedReuseRequalifiedByTicket": "BUY-MVP-MARKET-SCHEDULE-TIMER-OVERRIDES",
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "liveCommands": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "heldSlices": [
+    "persistence_and_command_adapter",
+    "verified_Admin_session_and_role_claims",
+    "accepted_Admin_presentation",
+    "active_order_snapshotting_and_assignment"
+  ],
+  "completionEvidence": "docs/quality/BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY-COMPLETION-20260807.md"
+}

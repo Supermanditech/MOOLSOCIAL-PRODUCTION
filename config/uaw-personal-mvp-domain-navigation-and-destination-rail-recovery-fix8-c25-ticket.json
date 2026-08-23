@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "c25a_through_c25g_complete_c25h_device_gate_rejected_care_medicine_rail_contrast_successor_required",
+  "classification": "mvp_required",
+  "customerOutcome": "One main-only MoolSocial menu opens Social, Shop, Food, Travel, Care or Work in one tap; each destination keeps its own compact direct subaction rail with Back and Forward without obscuring product or service content.",
+  "founderDirection": "docs/quality/UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25-FOUNDER-DIRECTION-AND-TICKET-DISCLOSURE-20260809.md",
+  "rejectedPredecessor": {
+    "versionName": "1.0.0-r60.23",
+    "versionCode": "2026080923",
+    "apkSha256": "178584AB6993D576EAEBCB9BE0494A5CAD83119FE9888C37D969BBD9162BBA8D",
+    "installedAndPreserved": true,
+    "deviceGateState": "eat_selected_chat_unreachable_and_founder_navigation_visual_rejected"
+  },
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-FOUNDER-DOMAIN-NAMING-AND-PLACEMENT-CONTRACT-FIX8-C25A",
+    "UAW-PERSONAL-MVP-SHARED-DOMAIN-ACTION-CATALOGUE-FIX8-C25B",
+    "UAW-PERSONAL-MVP-PROFESSIONAL-MAIN-ONLY-MOOLSOCIAL-MENU-FIX8-C25C",
+    "UAW-PERSONAL-MVP-COMPACT-DESTINATION-LOCAL-SUBACTION-RAIL-FIX8-C25D",
+    "UAW-PERSONAL-MVP-SIX-DOMAIN-ROUTE-PROJECTION-CONTINUITY-FIX8-C25E",
+    "UAW-PERSONAL-MVP-ADAPTIVE-ACCESSIBILITY-REACHABILITY-GATES-FIX8-C25F",
+    "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G",
+    "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H"
+  ],
+  "children": [
+    {"ticketId":"UAW-PERSONAL-MVP-FOUNDER-DOMAIN-NAMING-AND-PLACEMENT-CONTRACT-FIX8-C25A","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-SHARED-DOMAIN-ACTION-CATALOGUE-FIX8-C25B","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-PROFESSIONAL-MAIN-ONLY-MOOLSOCIAL-MENU-FIX8-C25C","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-COMPACT-DESTINATION-LOCAL-SUBACTION-RAIL-FIX8-C25D","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-SIX-DOMAIN-ROUTE-PROJECTION-CONTINUITY-FIX8-C25E","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-ADAPTIVE-ACCESSIBILITY-REACHABILITY-GATES-FIX8-C25F","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H","state":"device_gate_rejected_successor_required"}
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "sharedImplementationOwners": ["apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart", "apps/mobile/lib/core/design/mool_design_system.dart", "existing Social Buy Eat Ride Book Work scaffolds", "existing route sessions gateways and Back behavior"],
+    "newNecessarySharedOwners": [],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newSubactions": [],
+    "necessityProof": "The existing shared catalogue, menu, rail primitives and six destination call sites are sufficient. Medicine and Bus retain their current route and business owners and change only customer-facing family projection."
+  },
+  "execution": {"currentChild":"UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H","lastCompletedChild":"UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G","referenceWriteAuthorized":true,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

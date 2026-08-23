@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-MOBILE-OTP-GATE-NONFUNCTIONAL",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "founder_selected_Firebase_Phone_Auth_pre_launch_implementation_pending",
+  "classification": "mvp_required",
+  "severity": "authentication_release_blocker",
+  "actor": "personal_MoolSocial_user_selecting_Mobile_OTP",
+  "customerOutcome": "Mobile OTP independently completes secure MoolSocial authentication and returns to the exact requested Social route with truthful invalid, expired, resend and retry states.",
+  "observedFailure": "Founder reports Mobile OTP does not work on Play-installed r60.45.",
+  "minimumSuccessorCorrection": ["diagnose_Mobile_OTP_route_and_gateway", "prove_country_mobile_request_invalid_expired_resend_success_cancel_and_route_return", "add_independent_current_owner_Mobile_OTP_device_and_host_regressions"],
+  "explicitExclusions": ["no_founder_mobile_number_or_OTP_value_capture", "no_inference_from_Email_OTP_or_social_provider_paths", "no_second_C30T_AAB_upload_or_install"],
+  "founderDecision": {
+    "recordedOn": "2026-08-13",
+    "launchRequirement": "complete_before_full_public_launch",
+    "selectedOwner": "Firebase_Phone_Authentication",
+    "requiredIndependentJourney": [
+      "country_and_mobile_entry",
+      "Firebase_verification_request",
+      "invalid_expired_resend_retry_and_cancel",
+      "exact_requested_route_return"
+    ],
+    "currentRound": "pending_not_selected_for_source_implementation_and_no_AAB_authority"
+  },
+  "authority": {"ticketAndEvidenceWriteAuthorized": true, "sourceImplementationAuthorizedByFounder": true, "executionSelectionPendingFullAcceptance": true, "successorBuildUploadInstallAuthorized": false},
+  "evidence": {"authScreen": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/31-create-auth-entry.png", "founderDeviceObservation": "Mobile OTP does not work.", "finding": "docs/quality/UAW-C30T-R60-45-MOBILE-OTP-GATE-NONFUNCTIONAL-20260813.md"}
+}

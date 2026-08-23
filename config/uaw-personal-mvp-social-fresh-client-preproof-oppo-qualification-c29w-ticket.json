@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-FRESH-CLIENT-PREPROOF-OPPO-QUALIFICATION-C29W",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-CREATOR-ERGONOMICS-AND-GLOBAL-EDGE-CONSISTENCY-C29N",
+    "UAW-PERSONAL-MVP-SOCIAL-ACTION-TRUTH-AND-ACCESSIBILITY-C29O",
+    "UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ADJACENT-PROMOTION-POLICY-C29Q",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-QUOTA-PURPOSE-AND-CATALOGUE-REFRESH-C29R",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CATALOGUE-CONTINUITY-C29T",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-BACKEND-DEPLOYMENT-C29U"
+  ],
+  "state": "device_gate_rejected_successor_design_freeze_tickets_required",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user_preproof_creator",
+  "customerOutcome": "One fresh checksum-matched OPPO candidate exposes the accepted new Social UI, global dock, keyboard-safe one-tap MoolSocial formats and truthful YouTube creator gateway before any upload capability is reopened.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "configuration"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+      "apps/mobile/lib/features/journey01/screens/universal_shell.dart",
+      "apps/mobile/lib/core/design/mool_design_system.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "audit_full_Social_tap_design_navigation_API_and_state_matrix_against_C29N_through_C29T",
+    "prove_white_backed_Mool_left_edge_and_Chat_right_edge_globally_on_dark_media_surfaces",
+    "prove_Create_gateway_separates_YouTube_hosted_Short_from_MoolSocial_text_image_carousel_image_poll_quick_poll_quiz",
+    "prove_MoolSocial_formats_are_one_tap_and_composer_is_keyboard_safe_without_legacy_location_search_scanner_mic_chrome",
+    "prove_YouTube_catalogue_refresh_has_no_repeated_blocking_loading_popup_and_no_visible_adjacent_ad",
+    "qualify_build_and_in_place_install_one_unique_profile_APK_with_privateUpload_disabled",
+    "prove_fresh_installed_creator_gateway_route_before_reopening_C29M"
+  ],
+  "explicitExclusions": [
+    "no_Production_staging_provider_submission_public_unlisted_or_private_upload_under_C29W",
+    "no_Google_OAuth_consent_or_channel_connection_under_C29W",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install_without_new_machine_authority",
+    "no_secret_value_access_commit_push_message_call_fund_or_reference_write"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_current_request",
+    "sourceAuditAndFocusedFixAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C29U_Dev_backend_qualified_and_PublicData_review_restored",
+    "C29N_C29O_C29P_C29Q_C29R_C29T_source_qualified",
+    "OPPO_2b3e0f71_online_with_r60_34_protected_until_install_gate",
+    "fresh_host_APK_machine_and_permanent_regression_gates"
+  ],
+  "testPlan": [
+    "focused_Flutter_widget_navigation_accessibility_and_golden_tests",
+    "full_Social_source_gates_and_current_source_vs_r60_34_cross_comparison",
+    "unique_APK_identity_checksum_signature_certificate_and_build_context",
+    "in_place_install_without_uninstall_or_data_clear",
+    "OPPO_tap_replay_for_Home_Shorts_Feed_Create_global_dock_keyboard_and_creator_gateway"
+  ],
+  "deviceReviewRejection": {
+    "state": "founder_rejected_r60_35_design_freeze_not_reached",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-FRESH-CLIENT-PREPROOF-OPPO-QUALIFICATION-C29W-DEVICE-REJECTION-20260811.md",
+    "installedIdentityMustRemainPreserved": true,
+    "successorSourceTickets": [
+      "UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X",
+      "UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y",
+      "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z"
+    ],
+    "deploymentHeldByFounder": true
+  }
+}

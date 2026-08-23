@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-WATCH-RETURN-OPPO-REVIEW-C30H",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-WATCH-RETURN-SEMANTIC-TRUTH-C30G",
+    "UAW-PERSONAL-MVP-SOCIAL-SEARCH-FOOTER-COPY-OPPO-REVIEW-C30F"
+  ],
+  "state": "host_qualified_one_build_authorization_pending",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user",
+  "customerOutcome": "One fresh checksum-unique OPPO successor proves truthful Search-origin and Home-origin Watch Back semantics together with the approved full-page Search and flat Social footer, then waits for founder review with deployment held.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "config/apk-regression-gate-state-c30h.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C30G corrects the r60.37 native semantic mismatch and is source-qualified, but the fix is not installed. A separately registered checksum-unique r60.38 profile APK and one in-place OPPO install are the minimum founder-review evidence."
+  },
+  "minimumCompleteScope": [
+    "seal_the_corrected_52_file_manifest_and_two_identical_164_test_cycles",
+    "build_and_qualify_exactly_one_unique_r60_38_profile_APK",
+    "install_once_in_place_over_rejected_r60_37_without_uninstall_data_clear_or_downgrade",
+    "pass_first_native_exported_semantics_before_interaction",
+    "prove_Search_origin_Back_label_and_return_then_Home_origin_Back_label_and_return",
+    "replay_full_page_Search_footer_Mool_Chat_Feed_Create_and_keyboard_paths_for_founder_review"
+  ],
+  "explicitExclusions": [
+    "no_backend function rule provider profile Firebase hosting app_store or Production deployment",
+    "no_credential value logging copy or persistence",
+    "no_uninstall data_clear downgrade second_build or second_install",
+    "no_promotion commit push reference_write message call or fund"
+  ],
+  "authority": {
+    "founderAuthorization": "standing_production_grade_ticket_fix_OPPO_testing_founder_review_deployment_hold_after_C30F_rejection",
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "candidate": {
+    "versionName": "1.0.0-r60.38",
+    "versionCode": "2026081238",
+    "buildMode": "profile",
+    "deviceSerial": "2b3e0f71",
+    "packageName": "com.moolsocial.app",
+    "sourceManifestPath": "artifacts/quality/uaw-personal-mvp-social-watch-return-oppo-review-c30h-r60-38-20260812-01/source-aggregate-manifest.txt",
+    "sourceManifestSha256": "E4FB23D388ECC63B4A4C3587BA5EF849805FF58927127E60DB1A4BE21E45C057",
+    "sourceFileCount": 52,
+    "oneBuildOnly": true,
+    "oneInPlaceInstallOnly": true
+  },
+  "dependencies": [
+    "C30G_full_analysis_copy_gate_and_two_164_test_cycles_passed",
+    "C30F_r60_37_device_rejection_and_installed_identity_preserved",
+    "fresh_APK_machine_permanent_regression_and_native_bounds_gates"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "backendAndProviderDeploymentHeld": true,
+    "founderReviewRequiredBeforeAnyDeployment": true
+  }
+}

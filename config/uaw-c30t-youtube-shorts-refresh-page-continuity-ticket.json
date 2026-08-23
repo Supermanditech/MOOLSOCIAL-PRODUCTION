@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-SHORTS-REFRESH-PAGE-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_shorts_playback_continuity_blocker",
+  "actor": "viewer_on_a_later_YouTube_Short_when_the_public_catalogue_shrinks",
+  "customerOutcome": "A successful Shorts refresh always leaves one valid active page and official player, even when the previously viewed page was removed.",
+  "minimumCorrection": [
+    "clamp_the_active_Short_page_to_the_new_catalogue_bounds",
+    "restore_the_PageController_to_the_clamped_page_after_render",
+    "prove_a_three_to_one_catalogue_refresh_keeps_the_remaining_Short_active"
+  ],
+  "explicitExclusions": [
+    "no_custom_player_controls_or_YouTube_metadata_change",
+    "no_backend_provider_build_Play_OPPO_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "5 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/youtube-shorts-refresh-page-continuity-focused-tests.log",
+    "evidenceSha256": "871B05EB087FB6DFDBBC7E3FE94F95A5E6701823823F427196A8E122E31A2FE3",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

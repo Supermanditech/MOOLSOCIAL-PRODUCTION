@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "device_gate_rejected_care_medicine_rail_contrast_successor_required_founder_review_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "One unique qualified successor is installed in place on OPPO, checksum-proven and exercised across every main domain and relevant local action for founder acceptance.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H-PRESELECTION-ASSESSMENT-20260809.md",
+  "qualifiedSourceFingerprint": "EFEFC511D1F2C4B5F40AC00F299E03A17346DBBEAF4972A09DD3C69C37CCB548",
+  "hostQualificationEvidence": "docs/quality/UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["existing single-build wrapper","existing APK machine gate","existing in-place ADB upgrade workflow","existing OPPO screenshot and UI hierarchy evidence workflow"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["exactly_one_build_authorization","exactly_one_in_place_install","no_uninstall_clear_or_downgrade","local_live_pulled_checksum_identity","version_signer_first_install_preserved","main_and_subaction_screenshot_matrix","Back_Forward_MoolSocial_Chat_continuity","founder_acceptance_pending"],
+  "execution": {"referenceWriteAuthorized":true,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

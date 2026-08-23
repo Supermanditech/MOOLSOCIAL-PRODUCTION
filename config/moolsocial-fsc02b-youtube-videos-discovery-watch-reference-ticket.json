@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02B-YOUTUBE-VIDEOS-DISCOVERY-WATCH-REFERENCE",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "html_path_stopped_by_founder_native_successor_registered",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user discovers real eligible YouTube long-form videos and opens one focused official watch surface with supported provider metadata and truthful recovery.",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-SOCIAL-OWNERSHIP-REDESIGN-MICRO-TICKET-PRESELECTION-20260810.md",
+  "successorTicketId": "MOOLSOCIAL-FSC02B-NATIVE-YOUTUBE-VIDEOS-DISCOVERY-WATCH",
+  "successorTicketPath": "config/moolsocial-fsc02b-native-youtube-videos-discovery-watch-ticket.json",
+  "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+  "newScreens": [],
+  "newRoutes": [],
+  "newBackendOwners": [],
+  "minimumCompleteScope": ["YouTube_owned_discovery", "one_active_official_watch_player", "supported_metadata", "loading_empty_error_retry", "native_Back_restoration"],
+  "explicitExclusions": ["no_YouTube_Home_clone", "no_personalized_recommendations", "no_fake_catalogue", "no_provider_write_actions", "no_runtime_build_device_or_external_write_before_selection"],
+  "execution": {"referenceWriteAuthorized": false, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "backendWriteAuthorized": false, "externalServiceWriteAuthorized": false}
+}

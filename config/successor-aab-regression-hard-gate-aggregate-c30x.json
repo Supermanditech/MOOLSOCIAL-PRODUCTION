@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "contractId": "SUCCESSOR-AAB-REGRESSION-HARD-GATE-AGGREGATE-C30X-001",
+  "ticketId": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "machineState": "acceptance_failed_r60_48_social_auth_and_action_journey_defects_successor_required",
+  "evidenceRoot": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01",
+  "candidate": {
+    "id": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.48",
+    "versionCode": "2026081348",
+    "packageName": "com.moolsocial.app",
+    "track": "internal",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "aabSha256": "342A8AF46FD8C01E7C156A62A2C01F1B74FB798F07F08E108B39B3928BCDAA9F"
+  },
+  "historicalFailedCandidate": {
+    "id": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+    "versionName": "1.0.0-r60.47",
+    "versionCode": "2026081347",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "acceptanceSucceeded": false,
+    "failure": "cold_start_release_configuration_abort_before_runApp_missing_google_server_client_id"
+  },
+  "authority": {
+    "buildAuthorized": true,
+    "uploadAuthorized": true,
+    "installAuthorized": true,
+    "deviceMutationAuthorized": true,
+    "deploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "acceptance": {
+    "succeeded": false,
+    "newIssueCount": 2,
+    "newDefectCount": 3,
+    "failureEvidencePath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-founder-device-defect-evidence.json"
+  },
+  "sourceQualification": {
+    "state": "two_identical_current_source_cycles_qualified",
+    "manifestPath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix5.txt",
+    "manifestSha256": "54645062FBAA0233759B0F3C6F5C1C4C539D1A322DE7E7FA14629ECF3EDCDED4",
+    "fileCount": 1135,
+    "identicalQualifyingCycles": 2,
+    "authoritativeFocusedManifestSha256": "6F6C9C7AE281510F156CA4869854A37D0424338F88839D23F64C8A1114F47147",
+    "authoritativeFocusedManifestFiles": 59,
+    "authoritativeFlutterPassed": 417,
+    "authoritativeFlutterSkipped": 3,
+    "authoritativeFlutterFailed": 0,
+    "backendPassed": 528,
+    "backendFailed": 0,
+    "hostingPassed": 8,
+    "hostingFailed": 0,
+    "wholeMobileAnalyzerClean": true,
+    "sourceReleaseControlsPassed": true,
+    "releasePreflightPassed": true,
+    "allRegressionGatesPassed": true,
+    "supersededQualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/cycle-01-summary-c30x.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/cycle-02-summary-c30x.json"
+    ],
+    "supersededPostFix6QualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/post-fix6-cycle-01-summary-c30x.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/post-fix6-cycle-02-summary-c30x.json"
+    ],
+    "candidateQualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix5-cycle-01-attempt-07-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix5-cycle-02-attempt-05-summary.json"
+    ],
+    "supersededFailedStaticAttempts": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix3-cycle-01-static.log",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix3-cycle-01-static.exit.txt"
+    ],
+    "supersededPostFix1CandidateEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix1-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix1-cycle-02-summary.json"
+    ],
+    "supersededC30YQualification": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-cycle-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix1.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix2-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix3-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix3-provisional-attempt-02.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix4-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix4-provisional-attempt-02.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-03-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-03-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-04-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-04-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-05-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-05-summary.json"
+    ]
+  }
+}

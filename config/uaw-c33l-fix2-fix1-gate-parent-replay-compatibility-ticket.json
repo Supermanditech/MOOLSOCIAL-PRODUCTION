@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
+  "parentTicketId": "UAW-C33L-R60-50-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "findingId": "REG-20260816-2543-C33L-FIX1-GATE-CANNOT-REPLAY-AFTER-PARENT-RESELECTION",
+  "state": "gate_parent_replay_compatibility_qualified_parent_reselection_and_new_source_seal_required",
+  "classification": "mvp_required",
+  "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
+  "classificationReason": "The parent release cannot complete its mandatory no-regression cycles while the qualified child prevention gate rejects the correct parent-selected lifecycle.",
+  "minimumCompleteScope": [
+    "preserve_the_existing_FIX1_child_active_gate_path",
+    "add_parent_C33L_replay_only_when_the_exact_qualified_FIX1_assessment_is_pinned",
+    "reject_every_other_selected_ticket_or_unqualified_child_assessment",
+    "pass_dual_PowerShell_child_and_parent_behavioral_qualification",
+    "invalidate_the_rejected_seal_and_restart_two_complete_parent_cycles"
+  ],
+  "explicitExclusions": [
+    "no_mobile_runtime_UI_route_session_service_backend_or_provider_change",
+    "no_AAB_Play_OPPO_email_SMS_or_external_service_action",
+    "no_backend_Hosting_provider_Firebase_or_Production_deployment",
+    "no_secret_private_link_token_nonce_verdict_key_or_attestation_access",
+    "no_waiver_or_known_defect_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_no_regression_repeat_and_finding_to_ticket_repair_authority",
+    "qualified_C33L_FIX1_ticket_and_evidence",
+    "REG_2543_preserved_cycle_rejection_evidence",
+    "parent_C33L_release_ticket"
+  ],
+  "testAndEvidencePlan": [
+    "child_active_exact_FIX1_gate_pass",
+    "parent_active_exact_pinned_FIX1_assessment_gate_pass",
+    "wrong_ticket_and_changed_hash_fail_closed_static_contract",
+    "PowerShell_7_and_Windows_PowerShell_replay",
+    "two_new_complete_parent_C33L_cycles_after_new_seal"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/check-mvp-scope-gate-state.ps1",
+      "scripts/check-uaw-c33l-fix1-private-dev-public-review-screen04-safe-boot-regression.ps1",
+      "config/mvp-scope-gate-state.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "config/uaw-c33l-fix2-fix1-gate-parent-replay-compatibility-ticket.json"
+    ],
+    "necessityProof": "The existing FIX1 prevention gate is the sole behavioral owner. One bounded lifecycle branch inside that gate is the smallest complete correction and creates no duplicate product, state, service, backend, provider or build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "sourceAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "powerShell7RepairLifecycleGate": "passed",
+    "windowsPowerShellRepairLifecycleGate": "passed",
+    "existingFix1RuntimeAndTestAssertionsPreserved": true,
+    "exactAllowedActiveTickets": 3,
+    "parentReplayRequiresExactFix1TicketHashAndEvidence": true,
+    "wrongTicketChangedHashOrMissingEvidenceRejected": true,
+    "runtimeSourceChanged": false,
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "secretValuesObserved": false,
+    "evidence": "docs/quality/UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY-QUALIFICATION-20260816.md"
+  }
+}

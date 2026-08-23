@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-PUBLIC-BRAND-IDENTITY-COPY-REMOVAL-20260807",
+  "state": "founder_authorized_pending_machine_gate",
+  "classification": "mvp_required",
+  "customerOutcome": "Every public MoolSocial page identifies the public brand as moolsocial.com and contains no visible or structured-data occurrence of the old company name.",
+  "founderAuthority": "docs/quality/WEB-MVP-PUBLIC-BRAND-IDENTITY-COPY-REMOVAL-PRESELECTION-ASSESSMENT-20260807.md",
+  "existingImplementationOwners": [
+    "apps/web/app/layout.tsx",
+    "apps/web/app/LandingPage.tsx",
+    "apps/web/public/index.html",
+    "apps/web/public/privacy/index.html",
+    "apps/web/public/terms/index.html",
+    "apps/web/public/support/index.html",
+    "apps/web/public/disconnect/index.html",
+    "apps/web/public/delete-account/index.html",
+    "apps/web/public/youtube-api/index.html",
+    "apps/web/tests/firebase-public-site.test.mjs"
+  ],
+  "liveAuthority": {
+    "canonicalOrigin": "https://moolsocial.com/",
+    "firebaseProject": "moolsocial-dev-503018",
+    "hostingSource": "apps/web/public",
+    "deploymentScope": "hosting_only"
+  },
+  "minimumCompleteScope": [
+    "replace every public-web old-company-name occurrence with moolsocial.com",
+    "update matching dynamic metadata and regression expectations",
+    "run the existing web build tests lint and exact zero-occurrence scan",
+    "deploy only verified Firebase Hosting content and verify every live route"
+  ],
+  "explicitExclusions": [
+    "no Flutter Android iOS backend Firestore Functions or provider API change",
+    "no APK upload publication distribution or mobile application link creation",
+    "no YouTube capability scope quota or OAuth change",
+    "no email send",
+    "no DNS or Search Console change",
+    "no unrelated public-copy redesign",
+    "no commit push merge branch switch cleanup or deletion"
+  ],
+  "testAndEvidencePlan": [
+    "zero old-company-name source scan across public and dynamic web owners",
+    "npm web test and build",
+    "web lint",
+    "live HTTP 200 and zero-name verification for every public route",
+    "local-to-live HTML hash equality after hosting-only deployment"
+  ]
+}

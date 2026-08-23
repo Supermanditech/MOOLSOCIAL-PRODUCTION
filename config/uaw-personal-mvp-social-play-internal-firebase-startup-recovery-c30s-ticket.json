@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-FIREBASE-STARTUP-RECOVERY-C30S",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-INSTALL-RECOVERY-C30R",
+  "state": "founder_authorized_exact_release_Firebase_startup_successor",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_creator_and_YouTube_API_reviewer",
+  "customerOutcome": "A single r60.44 Dev release corrects the confirmed Firebase and Crashlytics Android release-packaging defect, is uploaded only to Google Play Internal Testing, updates the Play-signed r60.43 installation in place without uninstall or data clear, and reaches a truthful first Flutter frame before the bounded reviewer journeys run.",
+  "classificationReason": "The current Play-installed r60.43 cannot render its first frame because the release variant lacks the Crashlytics build identifier and Firebase Android app resource identity. Correcting this confirmed release blocker is required for the core Social reviewer journey and the time-bounded YouTube Android-link response.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "apps/mobile/android/settings.gradle.kts",
+      "apps/mobile/android/app/build.gradle.kts",
+      "apps/mobile/lib/main.dart",
+      "config/play-internal-aab-regression-gate-state-c30q.json",
+      "config/play-internal-install-recovery-gate-state-c30r.json",
+      "config/youtube-api-compliance-reviewer-package-c30q.json",
+      "scripts/check-play-internal-aab-build-wrapper-c30q.ps1",
+      "scripts/invoke-play-internal-aab-build-c30q.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newProviderCapabilities": [],
+    "newNecessaryToolingOwners": [
+      "config/play-internal-aab-regression-gate-state-c30s.json",
+      "scripts/check-play-internal-aab-regression-gate-state-c30s.ps1",
+      "scripts/check-play-internal-release-readiness-c30s.ps1",
+      "scripts/check-play-internal-aab-build-wrapper-c30s.ps1",
+      "scripts/invoke-play-internal-aab-build-c30s.ps1",
+      "scripts/qualify-play-internal-firebase-startup-c30s.ps1",
+      "tmp/run-c30s-single-aab-founder.ps1"
+    ],
+    "necessityProof": "The product, routes, providers, Firebase app and Play application already exist. The smallest complete recovery is Android release configuration plus one static/source qualifier and one artifact-resource proof; no application feature or backend owner is necessary. Separate C30S machine owners are required because all C30Q build, upload and install authorities are consumed and immutable."
+  },
+  "minimumCompleteScope": [
+    "preserve_the_Play_installed_r60_43_package_and_current_data_until_one_same_signer_Play_update",
+    "apply_the_official_Crashlytics_Gradle_plugin_and_generate_the_release_build_identifier",
+    "supply_the_exact_nonsecret_Dev_Firebase_google_app_id_resource_without_persisting_or_exposing_the_API_key",
+    "pass_a_comprehensive_release_readiness_audit_covering_startup_lifecycle_all_registered_native_and_Firebase_plugins_resources components permissions R8_splits signing versioning secret_handling providers retained_data update_behavior offline_retry and_full_affected_regressions",
+    "pass_two_identical_release_configuration_source_cycles_and_postbuild_AAB_resource_identity_checks_before_upload",
+    "build_exactly_one_r60_44_release_AAB_and_seal_package_version_upload_signer_checksum_source_fingerprint_and_provenance",
+    "upload_only_to_the_existing_Google_Play_Internal_Testing_track_and_update_OPPO_in_place_without_uninstall_data_clear_downgrade_or_ADB_sideload",
+    "prove_Play_installer_signer_version_first_frame_App_Check_and_the_previously_bounded_reviewer_journeys",
+    "prepare_but_do_not_send_the_same_thread_YouTube_reviewer_package"
+  ],
+  "explicitExclusions": [
+    "no_UI_redesign_new_screen_route_backend provider corpus or_YouTube_declared_use_case_expansion",
+    "no_Play_Production_open_testing public rollout Staging Production_backend Hosting email or_quota_submission",
+    "no_uninstall_data_clear_downgrade_ADB_sideload_second_C30S_build second_upload or_second_install",
+    "no_password_MFA_token_API_key_OAuth_credential_App_Check_token private_verdict nonce private_key or_attestation_payload_access",
+    "no_commit_push_merge_rebase_main provider_message call fund_movement or_broad_dependency_upgrade"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_12_C30S_one_r60_44_AAB_Internal_upload_and_in_place_OPPO_update_authority",
+    "Play_supermanditech_gmail_and_Firebase_hello_moolsocial_account_split_preserved",
+    "founder_only_hidden_upload_key_password_and_Firebase_Android_API_key_entry_if_the_build_launcher_requires_them",
+    "r60_43_Play_installer_and_Play_App_Signing_identity_preserved_for_same_signer_update",
+    "moolsocialcontent_00003_juw_youtubeprovider_00036_qer_youtubeoauthcallback_00035_cir_and_C30K_corpus_preserved",
+    "Firebase_Play_App_Signing_SHA256_registration_and_Play_Integrity_provider_configuration_preserved"
+  ],
+  "testPlan": [
+    "Android_Gradle_plugin_nonsecret_Firebase_resource generated_registrant manifest component permission R8_ABI_and_release_dependency_static_contract_tests",
+    "startup_and_lifecycle_audit_for_every_registered_native_and_Firebase_plugin_including_Analytics App_Check Auth Crashlytics Messaging Performance Remote_Config embedded_player scanner speech and_webview_auth",
+    "secret_and_environment_audit_proving_no_API_key password token nonce private_verdict attestation_payload or_private_key_is_persisted_or_emitted",
+    "provider URL package app identity signing version update retention offline retry process_death and_error_recovery contract audit",
+    "full_affected_Flutter_regressions_and_two_identical_source_qualification_cycles_without_an_APK_AAB_or_device_mutation",
+    "exactly_one_release_AAB_build_then_bundle_resource_Crashlytics_ID_package_version_signer_checksum_and_provenance_proof",
+    "existing_Internal_track_only_upload_and_release_readback",
+    "in_place_Play_update_version_installer_signer_split_relationship_and_retained_data proof",
+    "cold_launch_first_frame_C28D_and_bounded_error_only_logcat_without_nonce token verdict or_credential_lines",
+    "Play_recognized_App_Check_YouTube_matrix_real_Dev_Feed_exactly_six_Create_readbacks resilience and_global_navigation",
+    "unsent_YouTube_reviewer_package_and_founder_final_approval_hold"
+  ],
+  "authority": {
+    "founderExecutionAuthority": "explicit_2026_08_12_Authorize_C30S_implement_release_Firebase_Crashlytics_fix_one_r60_44_AAB_Internal_only_and_in_place_OPPO_update_without_uninstall_or_data_clear",
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "backendWriteAuthorized": false,
+    "runtimeDevCreateWritesAuthorized": true,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": true,
+    "uploadAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "protectedState": {
+    "deviceSerial": "2b3e0f71",
+    "installedVersionName": "1.0.0-r60.43",
+    "installedVersionCode": "2026081243",
+    "installedInstaller": "com.android.vending",
+    "installedPlaySignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "installedPackageMustRemainUntilInPlacePlayUpdate": true,
+    "candidateVersionName": "1.0.0-r60.44",
+    "candidateVersionCode": "2026081244",
+    "candidateBuildCount": 0,
+    "candidateUploadCount": 0,
+    "candidateInstallCount": 0,
+    "createWritesAttempted": 0
+  },
+  "findings": "docs/quality/UAW-C30S-PLAY-INTERNAL-FIREBASE-STARTUP-RECOVERY-FINDINGS-20260812.md"
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32U-PERSONAL-MVP-C07-CURRENT-MOOL-HOME-DASHBOARD-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "finding": "REG-20260815-2279-C32R-C07-SUPERSEDED-GLOBAL-MOOL-HOME-RAIL-CONTRACT",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "Global Mool navigation regression evidence verifies the connected six-family menu, fixed direct-route Home dashboard and exact Back behavior now used by customers.",
+  "minimumCompleteScope": [
+    "migrate_only_apps_mobile_test_ui_v2_universal_uaw_personal_mvp_global_mool_navigation_c07_test_dart",
+    "replace_removed_root_rail_keys_with_mool_home_dashboard_and_mool_home_family_keys",
+    "assert_social_to_connected_menu_direct_route_home_and_compact_six_family_routes",
+    "preserve_no_invented_origin_and_platform_Back_behavior",
+    "run_C07_R03_C24B2_C26D_C27D_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_home_navigation_route_semantics_geometry_or_copy_change",
+    "no_compatibility_keys_for_removed_root_rail",
+    "no_backend_build_device_external_or_secret_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-FIX2-C30X-ORDER-GATE-CURRENT-LAUNCHER-SOURCE-PROOF-COMPATIBILITY",
+  "parentTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "finding": "REG-20260815-2378-C33F-C30X-ORDER-GATE-OBSOLETE-LAUNCHER-SOURCE-LITERAL",
+  "state": "source_qualified_two_identical_cycles_live_readiness_hold_no_authority_consumed",
+  "classification": "mvp_required",
+  "severity": "release_blocking_regression_gate_compatibility_failure",
+  "customerOutcome": "All preserved and current pre-AAB order gates pass without weakening the rule that generated release preflight results are owned by the wrapper and never required before founder prompts.",
+  "minimumCompleteScope": [
+    "preserve_historical_C30X_sourceReleaseControlsPassed_support",
+    "accept_only_the_exact_current_C33F_two_cycle_and_whole_analyzer_source_proof",
+    "continue_rejecting_releasePreflightPassed_as_a_launcher_prerequisite",
+    "pass_C30X_and_C33F_order_gates_on_PowerShell_7_and_Windows_PowerShell_5_1",
+    "reseal_source_and_restart_two_full_identical_cycles"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_route_backend_Hosting_or_provider_change",
+    "no_AAB_Play_upload_activation_OPPO_or_external_action",
+    "no_secret_identifier_token_private_key_attestation_or_private_verdict_access"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "sharedImplementationOwners": [
+      "scripts/check-c30x-fix2-preflight-order-contract.ps1",
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "One bounded compatibility assertion in the existing preserved gate is the smallest complete repair; it keeps the historical proof and adds the exact current proof without creating another build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_parser_validation",
+    "C30X_order_gate_PowerShell_7_and_5_1",
+    "C33F_gate_PowerShell_7_and_5_1",
+    "current_launcher_releasePreflightPassed_absence",
+    "new_source_manifest_and_two_full_identical_cycles"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-FRESH-CLIENT-PREPROOF-OPPO-QUALIFICATION-C29W",
+  "state": "source_complete_combined_device_replay_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_feed_reader_and_post_creator",
+  "customerOutcome": "Feed presents truthful public MoolSocial posts as the primary timeline and places the post action after the timeline, with clear empty, loading, error and retry states.",
+  "classificationReason": "Feed is a core MVP surface and the founder rejected an empty-state-first composition that did not read like the approved public-post timeline journey.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "render_only_real_public_MoolSocial_items_from_the_existing_session_owner",
+    "place_the_post_CTA_after_loaded_timeline_content",
+    "keep_truthful_empty_loading_error_retry_pagination_and_publish_return_states",
+    "visually_preserve_MoolSocial_ownership_distinct_from_YouTube"
+  ],
+  "explicitExclusions": [
+    "no_fabricated_seed_posts_or_local_success_state",
+    "no_new_feed_route_service_backend_owner_or_recommender",
+    "no_build_install_deploy_or_promotion_under_C29Z"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_design_freeze_request",
+    "sourceImplementationAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "testPlan": [
+    "focused_real_feed_empty_loading_error_retry_and_pagination_tests",
+    "loaded_timeline_then_post_CTA_order_assertion",
+    "accessibility_140_percent_text_scale_and_narrow_viewport_fitment",
+    "later_combined_OPPO_replay_under_a_separate_candidate_ticket"
+  ],
+  "preselectionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z-PRESELECTION-20260811.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z-COMPLETION-20260811.md"
+}

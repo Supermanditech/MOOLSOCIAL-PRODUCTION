@@ -1,0 +1,10 @@
+{
+  "caseId": "held-without-dependency",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "clear_dependencies",
+    "mainActionId": "social",
+    "subActionId": "shorts"
+  },
+  "expectedErrorContains": "held action 'shorts' has no dependency"
+}

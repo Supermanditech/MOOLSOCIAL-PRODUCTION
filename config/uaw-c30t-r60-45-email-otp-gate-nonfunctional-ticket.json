@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-EMAIL-OTP-GATE-NONFUNCTIONAL",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "founder_selected_Google_identity_and_Firebase_email_link_pre_launch_implementation_pending",
+  "classification": "mvp_required",
+  "severity": "authentication_release_blocker",
+  "actor": "personal_MoolSocial_user_selecting_Email_OTP",
+  "customerOutcome": "Email OTP independently completes secure MoolSocial authentication and returns to the exact requested Social route with truthful invalid, expired, resend and retry states.",
+  "observedFailure": "Founder reports Email OTP does not work on Play-installed r60.45.",
+  "minimumSuccessorCorrection": ["diagnose_Email_OTP_route_and_gateway", "prove_request_invalid_expired_resend_success_cancel_and_route_return", "add_independent_current_owner_Email_OTP_device_and_host_regressions"],
+  "explicitExclusions": ["no_founder_email_or_OTP_value_capture", "no_inference_from_Mobile_OTP_or_social_provider_paths", "no_second_C30T_AAB_upload_or_install"],
+  "selectionBlocker": {
+    "releaseConfiguration": "MOOLSOCIAL_AUTH_API_BASE_URL_is_not_supplied_by_the_current_release_boundary",
+    "repositoryBackend": "no_v1_auth_otp_request_or_verify_route_exists",
+    "supportedFirebaseAlternative": "passwordless_email_link_requires_a_versioned_presentation_and_return_contract",
+    "requiredDecision": "fulfilled_founder_selected_Google_identity_plus_a_Firebase_email_authentication_path_and_did_not_select_a_custom_numeric_Email_OTP_backend"
+  },
+  "founderDecision": {
+    "recordedOn": "2026-08-13",
+    "launchRequirement": "complete_before_full_public_launch",
+    "selectedOwners": [
+      "existing_Google_identity_sign_in",
+      "Firebase_passwordless_email_link_for_the_independent_email_path"
+    ],
+    "notSelected": [
+      "unowned_custom_six_digit_Email_OTP_backend",
+      "claiming_that_Firebase_natively_delivers_the_current_numeric_Email_OTP_contract"
+    ],
+    "currentRound": "pending_not_selected_for_source_implementation_and_no_AAB_authority"
+  },
+  "authority": {"ticketAndEvidenceWriteAuthorized": true, "sourceImplementationAuthorizedByFounder": true, "executionSelectionPendingFullAcceptance": true, "successorBuildUploadInstallAuthorized": false},
+  "evidence": {"authScreen": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/31-create-auth-entry.png", "founderDeviceObservation": "Email OTP does not work.", "finding": "docs/quality/UAW-C30T-R60-45-EMAIL-OTP-GATE-NONFUNCTIONAL-20260813.md"}
+}

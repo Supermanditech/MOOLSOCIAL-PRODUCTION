@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33M-FIX8-FIX4-GATE-GENERIC-SUCCESSOR-REPLAY-COMPATIBILITY",
+  "parentTicketId": "UAW-C33M-FIX5-PUBLIC-REVIEW-FIREBASE-PASSWORDLESS-EMAIL-GATEWAY",
+  "findingId": "REG-20260816-2602-C33M-FIX4-GATE-BOUNDED-TO-FIX4-ACTIVE-SELECTION",
+  "state": "selected_founder_authorized_gate_only_repair_FIX5_partial_source_preserved",
+  "classification": "mvp_required",
+  "severity": "release_qualification_gate_lifecycle_blocker",
+  "actor": "future_lawfully_selected_successor_replaying_the_qualified_fresh_process_auth_return_prevention",
+  "capability": "replay_FIX4_under_an_exact_qualified_successor_without_weakening_historical_behavior_or_scope_selection",
+  "customerOutcome": "A corrected successor can prove that protected authentication return state still survives fresh application processes while the exact qualified FIX4 evidence and all closed release authorities remain enforced.",
+  "classificationReason": "FIX5 cannot complete its mandatory predecessor replay because the qualified FIX4 gate is bound to active FIX4 selection. A generic evidence-bound gate lifecycle branch is the smallest complete repair and changes no product runtime.",
+  "minimumCompleteScope": [
+    "preserve_the_FIX4_active_selection_branch_ticket_hash_runtime_source_assertions_r60_51_rejection_and_closed_authorities",
+    "preserve_partial_FIX5_runtime_and_focused_test_changes_without_qualification_claim",
+    "add_exact_current_top_level_selected_ticket_and_selected_manifest_hash_binding_for_generic_successors",
+    "require_the_exact_qualified_FIX4_ticket_hash_assessment_state_and_retained_qualification_evidence",
+    "add_positive_historical_generic_and_fail_closed_negative_fixtures",
+    "pass_the_repaired_FIX4_gate_and_FIX8_checker_in_PowerShell_7_and_Windows_PowerShell",
+    "reselect_FIX5_replay_FIX4_and_only_then_resume_affected_tests_analyzer_and_two_complete_cycles"
+  ],
+  "explicitExclusions": [
+    "no_mobile_runtime_UI_route_session_service_persistence_manifest_assetlinks_backend_Hosting_provider_or_Firebase_configuration_change",
+    "no_weakening_of_FIX4_source_behavior_privacy_r60_51_rejection_or_closed_authority_assertions",
+    "no_secret_email_address_action_code_private_link_token_nonce_verdict_key_or_attestation_access",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_device_email_SMS_deployment_quota_funds_or_external_message"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_next_authorization_after_r60_51_postbuild_reconciliation_2026_08_16",
+    "REG_20260816_2602_registered_before_FIX4_gate_mutation",
+    "qualified_FIX4_ticket_state_and_evidence_preserved",
+    "FIX5_partial_source_and_focused_test_pass_preserved_then_reselection_required"
+  ],
+  "testAndEvidencePlan": [
+    "historical_FIX4_active_fixture",
+    "generic_exact_successor_fixture",
+    "wrong_current_top_selected_manifest_hash_FIX4_hash_state_or_missing_evidence_negative_fixtures",
+    "live_FIX4_replay_and_FIX8_checker_in_both_PowerShell_hosts",
+    "FIX5_reselected_live_FIX4_replay_before_affected_suite_or_source_seal"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1",
+      "scripts/check-mvp-scope-gate-state.ps1",
+      "config/mvp-scope-gate-state.json",
+      "config/uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence-ticket.json",
+      "docs/quality/UAW-C33M-FIX4-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-PERSISTENCE-QUALIFICATION-20260816.md"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1"
+    ],
+    "necessityProof": "The existing FIX4 gate remains the sole behavioral prevention owner and the MVP scope gate already validates selected tickets. One pure selection function plus one dual-host fixture checker is sufficient; no duplicate runtime, product, persistence, provider, backend or release owner is added.",
+    "robustnessCoverage": [
+      "historical_FIX4_active_selection_remains_exact",
+      "generic_successor_requires_current_top_selected_identity_and_selected_manifest_hash",
+      "qualified_FIX4_ticket_hash_state_and_evidence_are_exact",
+      "negative_fixtures_fail_closed_for_every_binding",
+      "runtime_build_Play_device_provider_external_and_secret_authorities_remain_closed"
+    ],
+    "adjustments": [
+      "replace_only_the_FIX4_scope_selection_call_with_a_pure_historical_or_qualified_successor_resolver",
+      "retain_every_existing_FIX4_source_behavior_and_candidate_rejection_assertion",
+      "add_one_fixture_checker_and_dual_host_qualification"
+    ],
+    "explicitExclusions": [
+      "no_product_runtime_or_test_behavior_change",
+      "no_provider_build_Play_device_external_or_secret_action"
+    ],
+    "dependenciesAndApprovals": [
+      "C33M_FIX4_source_qualification",
+      "C33M_FIX5_lawful_selection_and_partial_source_preservation",
+      "future_FIX5_reselection_after_FIX8_qualification"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility-ticket.json"
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

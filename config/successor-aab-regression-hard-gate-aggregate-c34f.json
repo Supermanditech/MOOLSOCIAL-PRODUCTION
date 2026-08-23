@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C34F-R60-70-AUTHENTICATION-NO-REGRESSION-RELEASE-AGGREGATE-001",
+  "ticketId": "UAW-C34F-R60-70-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "machineState": "prebuild_rejected_cycle1_authoritative_flutter_audit_unset_event_successor_required",
+  "evidenceRoot": "artifacts/quality/uaw-c34f-r60-70-authentication-no-regression-preparation-20260817-01",
+  "candidate": {
+    "id": "UAW-C34F-R60-70-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.70",
+    "versionCode": "2026081370",
+    "buildCount": 1,
+    "uploadCount": 0,
+    "installCount": 0,
+    "deviceAcceptanceCount": 0,
+    "aabSha256": "8FDB9A5CC6D925A7D5E79FEBA169703A5177D5B4E6B5BFB767E06DC0D7542213",
+    "disposition": "prebuild_composition_registered_two_fresh_cycles_required",
+    "artifactReusable": false
+  },
+  "historicalCandidates": [
+    {
+      "versionName": "1.0.0-r60.49",
+      "versionCode": "2026081349",
+      "disposition": "failed",
+      "buildCount": 1,
+      "uploadCount": 1,
+      "installCount": 1,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.50",
+      "versionCode": "2026081350",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "541F02EA0F7C1C8B9067B31D50AE3CE0BB495E16746A3E4E2FF4AEAA28354F99"
+    },
+    {
+      "versionName": "1.0.0-r60.51",
+      "versionCode": "2026081351",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "6C4C402DAA5CD813F66DF1ECE895A7FE39936F6D6413FC2D771667E274A7CA24"
+    },
+    {
+      "versionName": "1.0.0-r60.52",
+      "versionCode": "2026081352",
+      "disposition": "rejected",
+      "machineState": "postbuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3"
+    },
+    {
+      "versionName": "1.0.0-r60.53",
+      "versionCode": "2026081353",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.54",
+      "versionCode": "2026081354",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.55",
+      "versionCode": "2026081355",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.56",
+      "versionCode": "2026081356",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.57",
+      "versionCode": "2026081357",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.58",
+      "versionCode": "2026081358",
+      "disposition": "rejected",
+      "machineState": "prebuild_founder_launcher_gate_rejected_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.59",
+      "versionCode": "2026081359",
+      "disposition": "rejected",
+      "machineState": "postupload_rejected_privacy_boundary_tooling_incident_successor_required",
+      "buildCount": 1,
+      "uploadCount": 1,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "148D679AA5FACF5AF670FF56DC8B50F9056082D7466C480D3DB4F246F04D6074"
+    },
+    {
+      "versionName": "1.0.0-r60.60",
+      "versionCode": "2026081360",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_cycle_orchestration_inventory_missing_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.61",
+      "versionCode": "2026081361",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_final_source_replay_focused_manifest_hash_mismatch_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.62",
+      "versionCode": "2026081362",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_manifest_binding_patch_context_mismatch_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.63",
+      "versionCode": "2026081363",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_precycle_manifest_binding_state_contradiction_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.64",
+      "versionCode": "2026081364",
+      "disposition": "rejected",
+      "machineState": "prebuild_founder_launcher_preprompt_qualification_flag_rejected_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.65",
+      "versionCode": "2026081365",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_intermediate_state_discovery_after_two_cycles_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.66",
+      "versionCode": "2026081366",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postinput_build_gate_phase_contradiction_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.67",
+      "versionCode": "2026081367",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_postseal_fixture_patch_context_mismatch_after_two_cycles_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.68",
+      "versionCode": "2026081368",
+      "disposition": "rejected",
+      "machineState": "prebuild_rejected_sealed_cycle_runner_manifest_path_mismatch_successor_required",
+      "buildCount": 0,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.69",
+      "versionCode": "2026081369",
+      "disposition": "rejected",
+      "machineState": "preupload_rejected_raw_authenticated_tab_query_recurrence_successor_required",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "8FDB9A5CC6D925A7D5E79FEBA169703A5177D5B4E6B5BFB767E06DC0D7542213"
+    }
+  ],
+  "presealUploadWorkflow": {
+    "evidencePath": "docs/quality/UAW-C34F-PRESEALED-INTERNAL-TESTING-BROWSER-QUALIFICATION-20260817.md",
+    "liveBrowserRouteQualified": true,
+    "signedInMoolSocialAppRouteProved": true,
+    "internalTestingRouteProved": true,
+    "noPlayWritePerformed": true
+  },
+  "regressionMemory": {
+    "registryPath": "config/codex-development-regression-registry.json",
+    "sealedRegistrySha256": "5DB74D0BDBEAAB4B9A57D414CA56C90906E368033AF46E429010ADAE7B743C9B",
+    "sealedRegistryEntryCount": 2646,
+    "postSealChangeRejectsBuildOrPromotion": true,
+    "historicalRepeatOrNewDefectRejectsCandidate": true,
+    "waiversAllowed": false
+  },
+  "sourceQualification": {
+    "requiredIdenticalCycles": 2,
+    "completedIdenticalCycles": 0,
+    "manifestPath": "artifacts/quality/uaw-c34f-r60-70-authentication-no-regression-preparation-20260817-01/source-manifest-c34f-registry-2646.txt",
+    "manifestSha256": "811E2E7CB4A64E0BA403757AB1D3D66FE68F1304402D312043EF27B517960AF5",
+    "fileCount": 1297,
+    "focusedManifestPath": "artifacts/quality/uaw-c34f-r60-70-authentication-no-regression-preparation-20260817-01/focused-test-manifest-c34f.txt",
+    "focusedManifestSha256": "7250DE7887F1517F9F8CDFC4830D50138D2092A02C499CA561EB4CE0DCFCDAF0",
+    "focusedManifestFileCount": 73,
+    "releasePreflightPassed": false,
+    "zeroFailures": false,
+    "cycleEvidence": []
+  },
+  "lifecycleTransitions": {
+    "presealComposition": "prebuild_composition_registered_two_fresh_cycles_required",
+    "postsealManifestBoundPrecycle": "prebuild_manifest_bound_two_fresh_cycles_required",
+    "postcycleBuildAuthorityHeld": "source_regression_memory_two_identical_cycles_qualified_build_authority_held",
+    "founderPromptRequired": "source_regression_memory_two_identical_cycles_qualified_founder_prompt_required",
+    "founderInputsValidatedBuildRequired": "founder_inputs_validated_single_aab_build_required",
+    "postcyclePersistenceOrder": [
+      "persist_state_and_aggregate_cycle_results_with_all_release_authorities_held",
+      "pass_source_gate_in_PowerShell_7",
+      "pass_source_gate_in_Windows_PowerShell",
+      "expose_one_build_and_founder_hidden_input_authority",
+      "pass_preprompt_gate_in_PowerShell_7",
+      "pass_preprompt_gate_in_Windows_PowerShell"
+    ]
+  },
+  "releaseAuthorities": {
+    "build": "rejected_source_cycle_failure",
+    "uploadAndInternalActivation": "rejected_candidate",
+    "inPlaceOppoPlayUpdate": "rejected_candidate",
+    "postinstallAcceptance": "rejected_candidate"
+  },
+  "actionCounts": {
+    "build": 0,
+    "upload": 0,
+    "install": 0,
+    "deviceAcceptance": 0,
+    "passwordlessEmailSend": 0,
+    "realSmsSend": 0,
+    "otherTrack": 0,
+    "backendHostingProviderOrProductionDeployment": 0
+  },
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "privateAccountIdentifiersObserved": false,
+    "privateLinksObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false,
+    "privateEmailLinkObserved": false
+  },
+  "rejection": {
+    "disposition": "rejected",
+    "phase": "source_cycle_01_before_authoritative_flutter_result",
+    "reasonRegistryIds": [
+      "REG-20260817-2676-C34F-CYCLE1-AUTHORITATIVE-FLUTTER-AUDIT-UNSET-EVENT",
+      "REG-20260817-2677-C34F-REJECTION-STATE-COMBINED-PATCH-TERMINAL-CONTEXT-MISMATCH"
+    ],
+    "evidencePath": "docs/quality/UAW-C34F-R60-70-CYCLE-01-FLUTTER-AUDIT-UNSET-EVENT-REJECTION-20260817.md",
+    "sealedRegistryEntryCount": 2646,
+    "sealedRegistrySha256": "5DB74D0BDBEAAB4B9A57D414CA56C90906E368033AF46E429010ADAE7B743C9B",
+    "rejectionRegistryEntryCount": 2648,
+    "rejectionRegistrySha256": "298E00738495A781BF36964EE48975A96C5FAA0F90A7CB33C1A23EB39D82795B",
+    "artifactReusable": false,
+    "artifactUploadCompleted": false,
+    "artifactInstallAuthorized": false,
+    "successorRequired": true
+  }
+}

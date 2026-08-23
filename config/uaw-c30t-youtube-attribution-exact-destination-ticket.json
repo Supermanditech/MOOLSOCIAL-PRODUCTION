@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-ATTRIBUTION-EXACT-DESTINATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_attribution_link_integrity",
+  "actor": "YouTube_compliance_reviewer_or_MoolSocial_user",
+  "customerOutcome": "Every visible YouTube attribution control must be wired to its exact video or channel destination and cannot silently fall back to the generic YouTube home page.",
+  "minimumCorrection": [
+    "make_the_attribution_onTap_handler_required_and_non_nullable",
+    "remove_the_generic_YouTube_home_fallback",
+    "retain_exact_video_Short_and_channel_URL_builders_and_failure_messages"
+  ],
+  "explicitExclusions": [
+    "no_visual_layout_or_provider_change",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "focusedTests": "10 passed, 0 failed",
+    "testEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/50-youtube-attribution-exact-destination-corrected-tests.log",
+    "testEvidenceSha256": "B769D5DF03B65601DDAFEB2C941AA9A43669D0E5C47A5EFAF4FF686AEC2CBC13",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/51-flutter-analyze-attribution-exact-destination.log",
+    "analyzeEvidenceSha256": "178D9182276233AAAE3DC0AD382E7F9F75D42B48617EE4AC3B3891C45F817CF4",
+    "finalRegistrant": "15 plugins; IntegrationTestPlugin absent",
+    "releaseArtifactState": "release APK absent; sealed r60.44 AAB unchanged"
+  }
+}

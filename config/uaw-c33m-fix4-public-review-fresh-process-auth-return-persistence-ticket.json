@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33M-FIX4-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-PERSISTENCE",
+  "parentTicketId": "UAW-C33M-R60-51-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "findingId": "REG-20260816-2583-C33M-PUBLIC-REVIEW-FRESH-PROCESS-AUTH-RETURN-STORE-RESET",
+  "state": "registered_founder_authorized_runtime_test_gate_repair_pending_r60_51_postbuild_rejected",
+  "classification": "mvp_required",
+  "severity": "release_blocking_postbuild_new_defect",
+  "actor": "signed_out_real_user_or_reviewer_returning_from_authentication_after_application_process_recreation",
+  "capability": "resume_the_exact_protected_destination_cancel_origin_and_authentication_purpose_without_losing_public_Screen04_safe_boot",
+  "customerOutcome": "A guest who authenticates from Social Create, a protected shared-post action, Chat or YouTube connection returns to the exact requested destination after a fresh application process, can cancel to the exact prior item or surface, and can still open public Feed and Videos without authentication.",
+  "classificationReason": "The built r60.51 runtime bypasses the qualified persistent JourneyStore in public-review mode, contradicts C33G FIX3 process-containment acceptance and the parent ticket's exact protected-return outcome, and therefore blocks every upload under the no-new-defect rule.",
+  "minimumCompleteScope": [
+    "retain_r60_51_permanently_rejected_at_1_0_0_0_with_its_exact_SHA_and_without_upload_repair_or_promotion",
+    "replace_the_public_review_MemoryJourneyStore_bootstrap_with_the_existing_SharedPreferences_owner_behind_one_seed_if_empty_adapter",
+    "preserve_the_exact_Screen04_Videos_safe_boot_only_when_no_durable_journey_snapshot_exists",
+    "persist_only_existing_bounded_non_secret_JourneySnapshot_route_cancel_purpose_setup_and_ready_state_fields",
+    "prove_protected_Create_shared_post_Chat_and_YouTube_authentication_intent_survival_with_new_store_and_session_objects",
+    "prove_Google_Mobile_OTP_and_passwordless_email_completion_and_cancellation_return_exactly_once",
+    "preserve_public_Feed_Videos_email_link_and_YouTube_return_precedence_setup_failure_and_offline_recovery",
+    "pass_ticket_gate_affected_tests_whole_mobile_analyzer_and_two_identical_complete_source_cycles_before_any_successor_selection"
+  ],
+  "explicitExclusions": [
+    "no_r60_51_upload_activation_install_OPPO_use_rebuild_artifact_repair_state_repair_or_promotion",
+    "no_new_screen_route_session_backend_endpoint_gateway_provider_adapter_or_persistence_schema",
+    "no_email_address_email_action_code_password_API_key_OAuth_identifier_token_nonce_private_link_verdict_key_or_attestation_persistence_or_access",
+    "no_Firebase_Google_Cloud_YouTube_Play_console_provider_backend_Hosting_rules_IAM_environment_or_Production_write",
+    "no_AAB_APK_build_ADB_install_sideload_uninstall_data_clear_downgrade_device_action_email_SMS_quota_submission_funds_or_external_message"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_next_authorization_after_r60_51_postbuild_reconciliation_2026_08_16",
+    "REG_20260816_2583_registered_before_ticket_selection_or_runtime_mutation",
+    "r60_51_postbuild_rejection_evidence_at_exact_1_0_0_0_counts_and_artifact_SHA",
+    "qualified_C33G_FIX3_C33J_FIX1_FIX2_and_C33L_FIX1_safe_boot_behavior_preserved",
+    "existing_MVP_scope_delivery_lock_JourneySession_JourneyStore_and_SharedPreferences_owners_reused"
+  ],
+  "testAndEvidencePlan": [
+    "ticket_specific_seed_if_empty_persistence_and_fresh_store_reconstruction_tests",
+    "exact_Create_shared_post_Chat_YouTube_cancel_Google_Mobile_OTP_and_passwordless_email_return_tests",
+    "existing_C33G_FIX3_C33J_FIX1_FIX2_Screen04_safe_boot_and_public_Feed_tests",
+    "PowerShell_7_and_Windows_PowerShell_ticket_gate",
+    "Dart_format_focused_analyzer_affected_suite_and_whole_mobile_analyzer",
+    "two_identical_complete_Flutter_backend_Hosting_and_static_source_cycles_before_future_successor_selection"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/test/uaw_c33g_fix3_feed_create_origin_state_process_containment_test.dart",
+      "apps/mobile/test/uaw_c33j_fix1_foreground_email_link_return_handoff_test.dart",
+      "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
+      "scripts/check-uaw-c33g-fix3-feed-create-origin-state-process-containment.ps1",
+      "scripts/check-uaw-c33l-fix1-private-dev-public-review-screen04-safe-boot-regression.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart",
+      "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1"
+    ],
+    "necessityProof": "JourneySnapshot, JourneyStore, SharedPreferencesJourneyStore and all protected-return classification and completion logic already exist. One generic seed-if-empty JourneyStore adapter inside the existing owner, one bootstrap substitution, one focused test file and one fail-closed gate are sufficient; no duplicate product, route, session, persistence schema, provider or backend owner is created.",
+    "robustnessCoverage": [
+      "empty_durable_state_seeds_public_Screen04_without_writing_private_or_authentication_values",
+      "existing_durable_state_wins_over_the_seed_after_a_genuine_new_store_and_session_bootstrap",
+      "pending_destination_cancel_origin_and_authentication_purpose_survive_process_recreation",
+      "Google_Mobile_OTP_passwordless_email_cancel_and_success_return_exactly_once",
+      "public_Feed_and_Videos_remain_guest_readable_and_provider_return_precedence_remains_exact",
+      "read_write_failure_setup_version_and_malformed_or_public_route_paths_fail_safely",
+      "r60_51_artifact_counts_identity_and_non_promotion_hold_remain_exact"
+    ],
+    "adjustments": [
+      "wrap_the_existing_SharedPreferencesJourneyStore_instead_of_adding_another_persistence_schema",
+      "keep_the_Screen04_seed_as_the_existing_JourneySnapshot_literal",
+      "construct_new_store_and_session_objects_in_tests_instead_of_reusing_one_MemoryJourneyStore",
+      "add_one_ticket_specific_static_and_behavioral gate_without_changing_locked presentation"
+    ],
+    "explicitExclusions": [
+      "no_presentation_reference_navigation_provider_backend_or_release_architecture_expansion",
+      "no_secret_or_private_return_payload_persistence",
+      "no_build_Play_device_external_or_provider_action"
+    ],
+    "dependenciesAndApprovals": [
+      "C33G_FIX3_persistent_authentication_intent_contract",
+      "C33J_cold_and_foreground_email_link_return_contract",
+      "C33L_FIX1_private_dev_public_review_safe_boot_contract",
+      "future_separately_selected_successor_release_after_FIX4_qualification"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence-ticket.json"
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

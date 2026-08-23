@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FACEBOOK-LOGIN-PUBLIC-LOGIN",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_founder_authorized_beyond_mvp_acceptance_child_pending_parent_scope_activation",
+  "classification": "beyond_mvp",
+  "founderExplicitAuthorizationDate": "2026-08-18",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A Personal user can choose Facebook on the existing public login gateway, authorize privately with minimum permissions, return through the exact configured app callback, establish one MoolSocial session, and recover safely from cancellation, denial, replay or provider failure.",
+  "protocolContract": {
+    "provider": "Meta_Facebook_Login",
+    "minimumPermissions": ["public_profile"],
+    "emailPermissionRequestedByDefault": false,
+    "exactAndroidPackageAndLaunchActivityRequired": true,
+    "releaseAndDebugKeyHashesSeparated": true,
+    "exactRedirectRequired": true,
+    "tokenRevocationAndDataDeletionContractRequired": true,
+    "committedAppSecretAccessTokenOrAccountIdentifierForbidden": true
+  },
+  "minimumCompleteScope": [
+    "reuse_existing_shared_login_screen_provider enum_session_bootstrap_rollback_and protected return",
+    "qualify_the_dormant_FacebookAuthProvider_dispatch_or_replace_it_with_one_explicit_supported_federated adapter",
+    "bind_exact_Meta_app_ID_Android_package_launch activity_release key hash_redirect_and_Firebase provider configuration",
+    "request_only_public_profile_unless_a_separate_customer outcome_justifies_email",
+    "validate_provider_attempt_state_callback_cardinality_and_account collision_before session commit",
+    "cover_cancel_denied_wrong app_or_redirect_duplicate callback_expired attempt_offline_provider error_account collision_revoke_data deletion_and sign out",
+    "fail_closed_when_Meta_app_Facebook_Login_key hash_privacy_or_data deletion readiness_is_missing"
+  ],
+  "explicitExclusions": [
+    "no_friends_pages_groups_ads_posts_messaging_business_or_analytics permissions",
+    "no_email_permission_by_default",
+    "no_committed_app_secret_access token_account name_email_or identifier",
+    "no_Meta_console_app_key hash_or_live mode action_without_action_time founder confirmation",
+    "no_claim_of_live_OPPO_support_before_a_new_Play_candidate_and_founder_private authorization"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_owned_Meta_app_and_Facebook_Login_product",
+    "exact_Android_package_launch activity_and_debug_release key hashes",
+    "exact_valid_OAuth_redirect_and_Firebase_Facebook_provider configuration",
+    "public_privacy_policy_terms_and_data deletion_request_URL",
+    "app_review_or_live mode_only_if_Meta_requires_it_for_non_developer accounts"
+  ],
+  "testAndEvidencePlan": [
+    "permission_allowlist_package_activity_key hash_and_redirect configuration gates",
+    "callback_state_attempt_cardinality_and_replay unit tests",
+    "cancel_denial_network_provider_error_and sanitized response fixtures",
+    "account_collision_bootstrap_rollback_protected return_relaunch_revoke_data deletion_and sign out tests",
+    "one_new_Play_installed_OPPO_Facebook_attempt_with_founder_only provider and account handling"
+  ],
+  "authority": {
+    "runtimeAndTestSourceAuthorizedUnderParent": true,
+    "beyondMvpExplicitlyAuthorized": true,
+    "providerConsoleAppCredentialLiveModeOrReviewAuthorizedWithoutActionTimeConfirmation": false,
+    "secretOrPrivateAccountAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

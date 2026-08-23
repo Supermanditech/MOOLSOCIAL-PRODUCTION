@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32S-PERSONAL-MVP-C22F-CURRENT-NAVIGATION-VISUAL-CONTRACT-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "finding": "REG-20260815-2277-C32R-C22F-SUPERSEDED-INNER-CHROMA-GEOMETRY-CONTRACT",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "The historical visual regression verifies the accepted C27 local-cell and dock owners without requiring removed local inner chroma or false equal geometry.",
+  "minimumCompleteScope": [
+    "migrate_only_apps_mobile_test_core_design_mool_inner_chroma_emission_c22f_test_dart",
+    "assert_58_pixel_local_cells_and_48_pixel_legacy_dock_capsules",
+    "assert_local_selected_indicator_and_press_scale_with_accessible_motion",
+    "retain_dock_only_inner_chroma_family_timing_gradient_and_clipping_coverage",
+    "run_C22F_C27B_C27D_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_design_geometry_navigation_semantics_route_or_copy_change",
+    "no_compatibility_key_or_blanket_expectation_weakening",
+    "no_backend_build_device_external_or_secret_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

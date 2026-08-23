@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-SUCCESSOR-C29D",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-GCLOUD-CONTEXT-HOST-REMEDIATION-C29C",
+  "rejectedPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B",
+  "state": "founder_ui_ux_rejected_runtime_evidence_preserved_no_retry",
+  "classification": "mvp_supporting",
+  "actor": "authenticated Personal review user on founder-authorized OPPO serial 2b3e0f71",
+  "customerOutcome": "The founder reviews real eligible YouTube Shorts and Videos in the production-grade Flutter Social surface on a checksum-qualified r60.30 OPPO build.",
+  "founderDirection": "complete_production_grade_Dev_runtime_and_OPPO_test_before_founder_review_2026_08_11",
+  "founderReview": {
+    "decision": "rejected_current_social_presentation",
+    "observedAt": "2026-08-11",
+    "reason": "The Shorts and Videos presentation reads as embedded content inside the old Social chrome rather than a native-feel full-bleed YouTube-owned journey.",
+    "requiredSuccessor": "A separate Flutter successor must use the recent founder-provided YouTube journey screenshots, remove the old Social presentation, make YouTube Home and Shorts visually coherent and full-bleed, retain truthful YouTube ownership, and keep Feed and Create explicitly MoolSocial-owned.",
+    "runtimeEvidencePreserved": true,
+    "candidateRetryAllowed": false
+  },
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-SUCCESSOR-C29D-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/check-youtube-public-dev-build-context.ps1",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "C29C qualified the corrected shared wrapper context and all runtime owners in two complete cycles. C29D only consumes the existing one-build and in-place device-review path; r60.29 and C29B cannot be reused because their sole wrapper authority was consumed."
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-SUCCESSOR-C29D",
+    "versionName": "1.0.0-r60.30",
+    "versionCode": "2026081130",
+    "buildMode": "profile",
+    "runtimeProfile": "YouTubePublicDevReview",
+    "sourceManifestSha256": "AE9E6C674E2FD392E098093AC3711809F488BC2083DEE5D6228D0A63828ADA9C",
+    "oneBuildOnly": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "minimumCompleteScope": [
+    "fresh_prebuild_machine_gate_for_C29D_only",
+    "one_profile_APK_wrapper_invocation_and_no_second_build",
+    "checksum_signature_version_source_and_serial_qualification",
+    "in_place_OPPO_install_without_data_clear_only_after_artifact_qualification",
+    "real_App_Check_capabilities_catalogue_player_navigation_lifecycle_and_recovery_replay",
+    "founder_review_handoff"
+  ],
+  "explicitExclusions": [
+    "no_C29B_or_r60_29_retry_reuse_or_evidence_mutation",
+    "no_cloud_write_redeploy_or_secret_value_access",
+    "no_owner_OAuth_upload_live_or_analytics_capability",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install",
+    "no_Production_Staging_HTML_commit_push_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29C_two_complete_26_file_host_cycles_passed",
+    "FSC02D_no_secret_PublicDataReview_runtime_qualified",
+    "FSC02E_exact_Dev_Firebase_Android_client_key_restriction_passed",
+    "FSC02G_official_99_method_exact_contract_gate_passed",
+    "founder_OPPO_and_production_grade_Dev_authority_2026_08_11",
+    "exact_OPPO_serial_and_r60_28_predecessor_identity",
+    "checksum_unique_same_certificate_successor_before_install",
+    "permanent_regression_memory"
+  ],
+  "testAndEvidencePlan": [
+    "prebuild_process_context_source_and_device_identity_audit",
+    "one_wrapper_profile_build_with_in_memory_Firebase_configuration",
+    "APK_checksum_v2_signature_badging_version_and_source_audit",
+    "single_in_place_install_and_installed_checksum_match",
+    "real_Shorts_Videos_catalogue_player_navigation_lifecycle_and_recovery_replay"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorizedAfterMachineGate": false,
+    "installAuthorizedAfterChecksumQualification": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "protectedState": {
+    "c29bBuildAuthorizationConsumed": true,
+    "c29bEvidenceImmutable": true,
+    "c28dEvidenceImmutable": true,
+    "installedVersionName": "1.0.0-r60.28",
+    "installedVersionCode": "2026081028",
+    "installedApkSha256": "FD0C1BDE24A1892C7A4E8B82504B19A88057CB63FACAE22E3BE014573843AEE6",
+    "installedSerial": "2b3e0f71",
+    "installedIdentityMustRemainPreservedUntilQualifiedInPlaceInstall": true,
+    "currentInstalledVersionName": "1.0.0-r60.30",
+    "currentInstalledVersionCode": "2026081130",
+    "currentInstalledApkSha256": "8C4C0BA08B18605C9C5E6AF036B5BB86B93778ED602AA9C4638A384DB7E95BCF",
+    "c29dBuildAuthorizationConsumed": true,
+    "c29dInstallAuthorizationConsumed": true,
+    "c29dEvidenceImmutable": true
+  }
+}

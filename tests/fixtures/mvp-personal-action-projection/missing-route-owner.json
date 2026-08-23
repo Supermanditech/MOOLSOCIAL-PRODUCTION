@@ -1,0 +1,10 @@
+{
+  "caseId": "missing-route-owner",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "clear_route_owner",
+    "mainActionId": "buy",
+    "subActionId": "orders"
+  },
+  "expectedErrorContains": "route owner is missing for 'orders'"
+}

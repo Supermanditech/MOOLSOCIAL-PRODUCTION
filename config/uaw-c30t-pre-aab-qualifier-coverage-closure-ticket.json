@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-PRE-AAB-QUALIFIER-COVERAGE-CLOSURE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "release_qualification_coverage_blocker",
+  "actor": "release_reviewer_qualifying_the_complete_C30T_Social_candidate",
+  "customerOutcome": "The pre-AAB qualifier owns every corrected Social, YouTube, Hosting/App Links and C30T defect-ticket surface before it may unlock founder AAB authorization.",
+  "minimumCorrection": [
+    "include_the_readonly_YouTube_connection_state_regression_in_the_focused_Flutter_suite",
+    "run_the_seven_test_Hosting_and_App_Links_static_suite",
+    "fingerprint_all_Hosting_public_source_and_Firebase_hosting_configuration",
+    "fingerprint_every_C30T_defect_ticket_instead_of_a_partial_hardcoded_subset",
+    "retain_exact_success_markers_and_evidence_hashes_for_the_new_suite"
+  ],
+  "explicitExclusions": [
+    "no_live_qualifier_execution_until_live_ownerConnect_and_Hosting_prerequisites_are_authorized_and_ready",
+    "no_backend_provider_Hosting_build_Play_OPPO_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "powerShellParser": "passed",
+    "hostingStaticTests": "7 passed, 0 failed",
+    "hostingPublicFilesInventoried": 27,
+    "c30tDefectTicketsInventoriedBeforeThisTicket": 21,
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/c30t-qualifier-coverage-focused-tests.log",
+    "evidenceSha256": "517C30CCC00C98E603FFDDD557D4399EB9A62B4F16629058D4888FBFA5E1B944",
+    "fullQualifierExecuted": false,
+    "releaseAuthorityChanged": false
+  }
+}

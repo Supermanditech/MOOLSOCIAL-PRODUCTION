@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-CHAT-GLOBAL-DOCK-EXACT-RETURN-FIX1-C10D",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "r60_10_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "scope": [
+    "chat_inbox_uses_shared_global_dock_with_chat_selected",
+    "chat_thread_keeps_content_back_to_exact_inbox_and_origin",
+    "global_destination_switch_from_chat_restores_exact_prior_destination_on_system_back",
+    "draft_keyboard_and_scroll_state_survive_global_round_trip"
+  ],
+  "founderAcceptance": "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md",
+  "acceptance": [
+    "inbox_thread_draft_keyboard_back_and_interruption_router_tests",
+    "real_OPPO_named_control_taps_with_IME_visibility_gate"
+  ],
+  "auditFindings": [
+    "chat_inbox_used_top_chat_back_and_no_shared_global_dock",
+    "chat_header_and_composer_duplicated_mool_global_navigation",
+    "inbox_to_thread_context_go_replaced_live_inbox_state"
+  ],
+  "hostQualification": {
+    "dedicatedC10d": "3_of_3_passed",
+    "chatFlow": "6_of_6_passed",
+    "priorNavigationFamily": "46_of_46_passed",
+    "fullAffectedFamily": "159_of_159_passed",
+    "analysis": "no_issues_found",
+    "staticContracts": "c10b_c10c_c10d_global_copy_and_regression_memory_passed",
+    "retiredSourceKeys": "chat_open_mool_chat_thread_mool_and_positive_buy_back_usage_absent",
+    "deviceStatus": "not_built_or_installed_installed_r60_9_remains_rejected_evidence"
+  }
+}

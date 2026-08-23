@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-CREATE-FORMAT-SELECTOR-TOUCH-TARGET-CLIPPED",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "major_accessibility",
+  "actualResult": "The initial r60.44 Create hierarchy exported Carousel and Text selector bounds only 32 logical pixels high at the lower edge although the source intends 50 pixels.",
+  "expectedResult": "Every visible Create format and tool selector exports at least a 48 by 48 logical interactive target inside the safe viewport.",
+  "acceptance": ["Text_Image_Carousel_Image_Poll_Quick_Poll_and_Quiz_each_export_minimum_48_by_48", "selectors_are_not_clipped_by_safe_area_keyboard_or_system_navigation", "all_empty_validation_and_picker_cancel_paths_remain_truthful"],
+  "authority": {"sourceImplementationAuthorized": true, "buildUploadAndInstallInheritedFromParent": true}
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-SHARE-FALSE-SUCCESS",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_tests_passed_live_app_links_pending",
+  "classification": "mvp_required",
+  "severity": "reviewer_truth_blocker",
+  "actor": "signed_in_or_guest_MoolSocial_Feed_reader",
+  "customerOutcome": "Copying a Feed post link copies the exact stable post URL and that URL opens the selected post in MoolSocial when the app is installed, with a truthful browser fallback otherwise.",
+  "minimumCorrection": [
+    "bind_the_Share_action_to_the_exact_provider_post",
+    "remove_the_unimplemented_Chat_share_option",
+    "write_the_stable_HTTPS_post_URL_to_the_clipboard_before_showing_success",
+    "resolve_the_shared_item_through_bounded_Feed_pagination_and_scroll_it_into_view",
+    "show_a_truthful_unavailable_notice_when_the_post_no_longer_exists",
+    "test_clipboard_payload_item_routing_pagination_and_missing_item_recovery"
+  ],
+  "explicitExclusions": [
+    "no_share_count_mutation",
+    "no_Chat_attachment_or_message_send",
+    "no_new_public_post_detail_backend",
+    "no_Hosting_deployment_AAB_Play_or_OPPO_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "hostingDeploymentAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedFlutterTests": "17 passed, 0 failed",
+    "flutterEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-share-deeplink-focused-tests.log",
+    "flutterEvidenceSha256": "DF1B729E5314FBAE1DA6B6596EE5F2E14D1EAA1A4C05F4D9B5027CFC00B59ADC",
+    "webStaticTests": "7 passed, 0 failed",
+    "webEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/app-links-hosting-static-tests.log",
+    "webEvidenceSha256": "6BA68E511AEE329ED3162DD50A276A25AAF8431E8751E80B32EC6DF7FA835C04",
+    "releaseRegistrantPlugins": 15,
+    "apkChanged": false,
+    "aabChanged": false
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "caseId": "invalid-validity",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "expire_before_effective"
+  },
+  "expectedErrorContains": "expiry must be after effective time"
+}

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX4-INSTAGRAM-PROFESSIONAL-OAUTH-PUBLIC-LOGIN-ADAPTER",
+  "parentTicketId": "UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "state": "registered_founder_authorized_acceptance_child_source_pending_parent_reseal",
+  "classification": "beyond_mvp",
+  "exactUserType": "personal_user",
+  "providerEligibility": "eligible_Instagram_professional_account_only",
+  "customerOutcome": "A signed-out Personal user with an eligible Instagram professional account can choose Instagram on the existing MoolSocial login gateway, authorize privately with minimum identity permission, establish one Firebase-backed MoolSocial session and reach the exact protected destination, while personal or ineligible Instagram accounts receive a truthful recoverable result.",
+  "minimumCompleteScope": [
+    "reuse_shared_Screen03_JourneySession_AUTH_API_base_App Check_Firebase custom token_bootstrap rollback_and protected return",
+    "implement_exact_state_redirect_and_one time_server retained_Instagram authorization attempt",
+    "request_only_instagram_business_basic_for_identity_and_no_content_messaging_comment_or publishing permission",
+    "exchange_code_and_verify_eligible_professional provider subject_on_the_privileged server_without exposing_the_client secret_or token_to_the_app",
+    "derive_a_nonreversible_project scoped_Firebase UID_mint_custom token_and_revoke_transient_provider access",
+    "map_personal account_ineligible_cancel_denied_wrong state_wrong redirect_expired_duplicate_network_collision_and unknown outcomes_truthfully",
+    "complete_cold_foreground_bootstrap rollback_exact return_relaunch_and sign out"
+  ],
+  "explicitExclusions": [
+    "no_claim_that_all_personal_Instagram_accounts_can_authenticate",
+    "no_instagram_business_content publish_manage messages_manage comments_insights_ads_or Facebook Page permissions",
+    "no_client secret_access token_provider subject_account name_email_or identifier_in_mobile_source_logs_tests_or evidence",
+    "no_relabeling_Facebook_Login_as_Instagram_and_no_duplicate_screen_route_session_or backend package",
+    "no_Meta_console_app_review_live mode_external build_Play_OPPO_or private account_action"
+  ],
+  "testAndEvidencePlan": [
+    "Instagram_attempt_state_redirect_cardinality_expiry_replay_and minimum scope tests",
+    "server_code exchange_professional eligibility_subject projection_custom token_revocation_and redaction tests",
+    "personal account_ineligible_cancel_denial_network_provider_and sanitized error fixtures",
+    "mobile_cold_foreground_process death_bootstrap rollback_and exact return tests",
+    "no_private token_subject_client secret_or provider message leakage tests"
+  ],
+  "authority": {
+    "runtimeBackendPlatformTestSourceAuthorizedUnderParent": true,
+    "providerConsoleAppReviewLiveModeOrExternalWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

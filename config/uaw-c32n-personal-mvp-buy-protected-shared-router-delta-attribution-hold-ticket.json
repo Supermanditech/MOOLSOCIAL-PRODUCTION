@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32N-PERSONAL-MVP-BUY-PROTECTED-SHARED-ROUTER-DELTA-ATTRIBUTION-HOLD",
+  "parentOutcome": "UAW-C32M-PERSONAL-MVP-CHAINED-SUCCESSOR-GATE-HISTORICAL-SCOPE-BINDING",
+  "finding": "REG-20260815-2254-POST-YOUTUBE-AUDIT-C28E-BUY-PROTECTED-BASELINE-DRIFT-REJECTION",
+  "state": "founder_authorized_source_gate_attribution_selected_protected_baseline_and_all_live_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal user whose accepted Buy journey must remain protected while shared authentication and route recovery evolve",
+  "customerOutcome": "The founder receives exact machine proof that the current protected Buy-tree mismatch is attributable only to the shared journey router, not to Buy catalogue, cart, checkout, payment, order or session owners, before deciding whether a versioned successor baseline is acceptable.",
+  "classificationReason": "This ticket adds truthful audit attribution and fail-closed evidence only; it changes no customer runtime or protected baseline.",
+  "minimumCompleteScope": [
+    "preserve_the_FSC06_baseline_C25F_predecessor_and_current_43_file_tree_byte_for_byte",
+    "verify_the_current_and_expected_tree_hashes_and_the_exact_historical_and_current_journey_router_hashes",
+    "prove_that_substituting_only_the_historical_journey_router_hash_reconstructs_the_exact_FSC06_tree",
+    "record_the_known_immutable_C24F_saved_store_shortened_digest_without_treating_it_as_source_drift",
+    "preserve_C32M_through_its_exact_prior_ticket_manifest_hash_implementation_state_and_source_manifest",
+    "add_one_C32N_dual_host_attribution_checker_and_run_two_focused_cycles"
+  ],
+  "explicitExclusions": [
+    "no_Buy_shared_router_runtime_UI_route_screen_copy_reference_or_business_owner_change",
+    "no_protected_baseline_replacement_reseal_bypass_or_full_C28E_preflight_retry",
+    "no_backend_provider_cloud_live_data_build_Play_OPPO_funds_secret_or_external_communication_action"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user autonomous audit finding ticket and source implementation direction",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingBaselineGate": "scripts/check-buy-protected-baseline.ps1",
+    "existingBaseline": "artifacts/quality/moolsocial-fsc06-shop-products-cell-disposition-20260810-01/BASELINE.json",
+    "existingPredecessorManifest": "artifacts/quality/buy-protected-candidate-c24f-connected-back-20260809-02/RUNTIME-MANIFEST.txt",
+    "existingC32MChecker": "scripts/check-uaw-c32m-chained-successor-gate-historical-scope-binding.ps1",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": ["scripts/check-uaw-c32n-buy-protected-shared-router-delta-attribution-hold.ps1"]
+  },
+  "acceptance": [
+    "current_43_file_tree_is_12a9880a51c172f060133a90bcffc38d84f68959ff1caf88e13be43e86631bc5",
+    "approved_FSC06_tree_is_6e2c18af399d8c2e0a3ab8cb63d76d5e32228f2ea69d26f0d1df662c3f3bbd8e",
+    "historical_journey_router_hash_is_a98bc91ffaff2d5205e14d258097650d2de7e2a67c214c51ca00ebb312a71429",
+    "current_journey_router_hash_is_758eb64038abc04e6e85a4bf053c2148f180d93964c998165d4cbf6744f2319f",
+    "historical_router_only_substitution_reconstructs_the_exact_FSC06_tree",
+    "C32M_and_C32N_pass_on_both_PowerShell_hosts",
+    "two_fresh_focused_cycles_pass_while_baseline_replacement_and_full_preflight_remain_held"
+  ]
+}

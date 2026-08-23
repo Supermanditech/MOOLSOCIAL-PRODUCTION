@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "authorizationId": "WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-AUTHORIZATION-20260805",
+  "portfolioId": "WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-20260805",
+  "parentTicketId": "WORK-MVP-FUNDED-OPPORTUNITY-TO-AUDITABLE-PAYOUT-END-TO-END-JOURNEY",
+  "portfolioManifest": "config/work-mvp-funded-opportunity-payout-portfolio.json",
+  "portfolioManifestSha256": "66A0842D571D90F0CF093817D8E013FEFEA6FDA0E7D03B25099823B079B54D13",
+  "founderEvidence": "docs/quality/WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-AUTHORIZATION-20260805.md",
+  "state": "preauthorized_not_executing",
+  "authorizedActionsWhenExecutionIsLaterActivated": [
+    "bounded_local_implementation",
+    "bounded_local_execution",
+    "machine_gated_builds",
+    "checksum_matched_oppo_testing"
+  ],
+  "independentGatesRetained": [
+    "one_active_ticket",
+    "mvp_scope_execution_gate",
+    "funding_payout_finance_legal",
+    "privacy_safety_security_and_compliance",
+    "provider_environment_credentials_and_live_actions",
+    "html_founder_final_before_new_flutter_states",
+    "apk_machine_device_and_release_gates"
+  ],
+  "notAuthorized": [
+    "commit",
+    "push",
+    "deploy",
+    "promote",
+    "production_write",
+    "credential_access",
+    "live_funding_or_payout",
+    "live_worker_funder_or_reviewer_action",
+    "live_external_message_or_call"
+  ],
+  "currentExecutionState": "closed_awaiting_explicit_child_activation",
+  "activeChildTicket": null,
+  "nextAuthorizedActivity": "prepare_next_parent_ticket_and_user_journey"
+}

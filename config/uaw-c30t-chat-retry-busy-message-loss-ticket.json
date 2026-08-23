@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-RETRY-BUSY-MESSAGE-LOSS",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "message_recovery_integrity_blocker",
+  "actor": "signed_in_MoolSocial_Chat_user",
+  "customerOutcome": "A failed message remains visible and retryable when another Chat operation is pending; retry never deletes it unless a new authoritative send attempt can start.",
+  "minimumCorrection": [
+    "reject_retry_before_mutating_failed_message_state_when_Chat_is_busy",
+    "disable_the_failed_message_retry_control_while_Chat_is_busy",
+    "preserve_the_original_failed_message_and_retry_identity",
+    "prove_no_additional_transport_call_for_the_rejected_retry"
+  ],
+  "explicitExclusions": [
+    "no_backend_or_provider_change",
+    "no_live_message_send",
+    "no_build_Play_OPPO_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "liveChatWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "10 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-retry-busy-focused-tests.log",
+    "evidenceSha256": "A199804135CF85D357B7EC6BB6CD9EEC0402A186897608C65FB2B8E5970D0132",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

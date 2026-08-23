@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PERSONAL-ANDROID-NAVIGATION-DEVICE-MATRIX-C28D-001",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-OPPO-QUALIFICATION-FIX11-C28D",
+  "state": "planned_prebuild",
+  "candidate": {
+    "versionName": "1.0.0-r60.27",
+    "versionCode": "2026081027",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375",
+    "densityDpi": 320,
+    "minimumLogicalTarget": 44
+  },
+  "evidenceRoot": "artifacts/quality/uaw-personal-mvp-android-navigation-oppo-qualification-fix11-c28d-r60-27-20260810-01",
+  "reusedOwners": {
+    "stableCapture": "scripts/capture-personal-c26h-stable-device-evidence.ps1",
+    "semanticTap": "scripts/invoke-personal-c26h-semantic-tap.ps1",
+    "boundsContract": "config/mvp-personal-android-navigation-device-bounds-c28d.json",
+    "boundsGate": "scripts/check-personal-android-navigation-device-bounds-c28d.ps1"
+  },
+  "families": [
+    {
+      "id": "social",
+      "label": "Social",
+      "familyRootSemantic": "Open Social home",
+      "actions": [
+        {"id":"shorts","label":"YouTube Shorts","selectedSemantic":"YouTube Shorts, current","contentAnyOf":["Shop this basket"]},
+        {"id":"videos","label":"YouTube Videos","selectedSemantic":"YouTube Videos, current","contentAnyOf":["Search videos"]},
+        {"id":"feed","label":"Feed","selectedSemantic":"Feed, current","contentAnyOf":["Search videos, reels, people or posts"]},
+        {"id":"create","label":"Create","selectedSemantic":"Create, current","contentAnyOf":["Drafts","Image"]}
+      ]
+    },
+    {
+      "id": "buy",
+      "label": "Shop",
+      "familyRootSemantic": "Open Shop home",
+      "actions": [
+        {"id":"products","label":"Products","selectedSemantic":"Products, current","contentAnyOf":["Add Fresh tomatoes to cart"]},
+        {"id":"wholesale","label":"Wholesale","selectedSemantic":"Wholesale, current","contentAnyOf":["Add Fresh tomatoes to cart"]},
+        {"id":"orders","label":"Orders","selectedSemantic":"Orders, current","contentAnyOf":["Track order"]}
+      ]
+    },
+    {
+      "id": "eat",
+      "label": "Food",
+      "familyRootSemantic": "Open Food home",
+      "actions": [
+        {"id":"order-food","label":"Order Food","selectedSemantic":"Order Food, current","contentAnyOf":["Open Spice Darbar menu"]},
+        {"id":"book-table","label":"Book Table","selectedSemantic":"Book Table, current","contentAnyOf":["Book table"]}
+      ]
+    },
+    {
+      "id": "ride",
+      "label": "Travel",
+      "familyRootSemantic": "Open Travel home",
+      "actions": [
+        {"id":"bike","label":"Bike","selectedSemantic":"Bike, current","contentAnyOf":["Book Bike Saver · ₹59"]},
+        {"id":"auto","label":"Auto","selectedSemantic":"Auto, current","contentAnyOf":["Book Auto · ₹112"]},
+        {"id":"cab","label":"Cab","selectedSemantic":"Cab, current","contentAnyOf":["Book Mini · ₹186"]},
+        {"id":"bus","label":"Bus","selectedSemantic":"Bus, current","contentAnyOf":["Search buses"]}
+      ]
+    },
+    {
+      "id": "book",
+      "label": "Care",
+      "familyRootSemantic": "Open Care home",
+      "actions": [
+        {"id":"doctor","label":"Doctor","selectedSemantic":"Doctor, current","contentAnyOf":["Continue with Clinic"]},
+        {"id":"medicine","label":"Medicine","selectedSemantic":"Medicine, current","contentAnyOf":["Add Paracetamol 500 mg tablets to cart"]},
+        {"id":"salon","label":"Salon","selectedSemantic":"Salon, current","contentAnyOf":["Review ₹199 slot"]}
+      ]
+    },
+    {
+      "id": "work",
+      "label": "Work",
+      "familyRootSemantic": "Open Work home",
+      "actions": [
+        {"id":"earn-today","label":"Earn Today","selectedSemantic":"Earn Today, current","contentAnyOf":["Review opportunity"]},
+        {"id":"workspace","label":"Workspace","selectedSemantic":"Workspace, current","contentAnyOf":["Start Workspace setup"]}
+      ]
+    }
+  ],
+  "switcher": {
+    "containerSemantic": "MoolSocial main actions",
+    "closeSemantic": "Close MoolSocial main menu",
+    "rowHeightLogical": 56,
+    "rows": ["Social", "Shop", "Food", "Travel", "Care", "Work"]
+  },
+  "plannedStateIds": [
+    "social-shorts","social-videos","social-feed","social-create-ime-visible","social-create-ime-back","switcher-social-create",
+    "shop-products","shop-wholesale","shop-orders","food-order-food","food-book-table",
+    "travel-bike","travel-auto","travel-cab","travel-bus",
+    "care-doctor","care-medicine","switcher-care-medicine","care-medicine-after-switcher-back","care-salon",
+    "work-earn-today","work-workspace","chat-from-work-workspace","work-workspace-after-chat-back",
+    "switcher-open-by-swipe-up","workspace-after-swipe-down","switcher-before-outside-tap","workspace-after-outside-tap",
+    "social-after-six-family-cycle"
+  ],
+  "continuityRequirements": [
+    "Create IME Back dismisses only IME and retains Create",
+    "switcher system Back retains Care Medicine",
+    "Chat system Back retains Work Workspace",
+    "Mool swipe up opens and swipe down closes the embedded switcher",
+    "outside tap closes the switcher without changing destination",
+    "six-family cycle returns to Social Shorts",
+    "reduced-motion behavior remains covered by C28C host qualification without mutating protected device settings"
+  ],
+  "capturedStates": []
+}

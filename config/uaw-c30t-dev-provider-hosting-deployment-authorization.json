@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "authorizationId": "UAW-C30T-DEV-YOUTUBE-PROVIDER-HOSTING-DEPLOYMENT-20260813",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "single_aab_built_internal_release_active_Play_install_sealed_journeys_pending",
+  "founderAuthorization": {
+    "date": "2026-08-13",
+    "exactText": "Authorize C30T bounded Dev YouTube provider and Firebase Hosting deployments only; no AAB.",
+    "project": "moolsocial-dev-503018",
+    "account": "hello@moolsocial.com"
+  },
+  "founderC30TReleaseAuthorization": {
+    "date": "2026-08-13",
+    "exactText": "Authorize C30T exactly one r60.45 AAB build, upload only to Google Play Internal Testing, and one in-place OPPO update through Google Play; no uninstall, data clear, downgrade, email or quota submission.",
+    "historicalTestDeferral": "Historical universal/navigation test migration debt is explicitly accepted as deferred. Do not reintroduce retired UI/navigation contracts. Current authoritative C30T runtime/release tests remain the launch gate.",
+    "buildLimit": 1,
+    "uploadLimit": 1,
+    "installLimit": 1,
+    "authorizedTrack": "internal",
+    "productionOpenClosedOrPublicAuthorized": false,
+    "uninstallDataClearDowngradeSideloadOrAdbInstallAuthorized": false,
+    "gmailEmailOrQuotaSubmissionAuthorized": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "allowedExternalWrites": {
+    "firebaseFunctionTarget": "functions:provider:youtubeProvider",
+    "cloudRunService": "youtubeprovider",
+    "cloudRunRegion": "asia-south1",
+    "firebaseHostingSite": "moolsocial-dev-503018",
+    "restoreProviderNoInvokerIamCheck": true
+  },
+  "forbiddenExternalWrites": {
+    "youtubeOAuthCallbackDeploy": true,
+    "moolSocialContentDeploy": true,
+    "moolSocialChatDeploy": true,
+    "firestoreRulesDeploy": true,
+    "storageRulesDeploy": true,
+    "iamPrincipalChanges": true,
+    "stagingOrProduction": true,
+    "aabBuildUploadOrInstall": true,
+    "gmailOrQuotaSubmission": true
+  },
+  "predecessors": {
+    "youtubeprovider": "youtubeprovider-00036-qer",
+    "youtubeoauthcallback": "youtubeoauthcallback-00035-cir",
+    "moolsocialcontent": "moolsocialcontent-00004-gig",
+    "moolsocialchat": "moolsocialchat-00001-yaf"
+  },
+  "predeploymentEvidence": {
+    "sourceManifest": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/111-predeploy-provider-hosting-source-manifest-postprovider-final.json",
+      "sha256": "7A26D3E6FAEC74F353C530522282D1F23A6BCCA0A89EC1CD25101D8C9846FEF6",
+      "providerFingerprint": "C61E723988A5B52FACC78C9AC1009B0F37AAC0775FC0033C167423656DFBA97A",
+      "hostingFingerprint": "9E5D1C08920B9091AFDB8021ABED17D3618804E94DCA13224266665DD045213B"
+    },
+    "backendTests": {
+      "passed": 505,
+      "failed": 0,
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/97-predeploy-backend-full-tests-final.log",
+      "sha256": "2158F89175DD5F0A408D7381F7DAE1A84FF59BA45FE88E6747E5510661934894"
+    },
+    "hostingTests": {
+      "passed": 7,
+      "failed": 0,
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/98-predeploy-hosting-public-site-tests-final.log",
+      "sha256": "802C94BD91BB958F20865CAD31DB1AFA622BD9F3A8A0D55488E065C40E6F462E"
+    },
+    "regressionMemory": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/96-predeploy-regression-memory-after-auth-recovery.log",
+      "sha256": "0BAAE16C7656FD6E1D3800B586B225823DA97A9CCF9BD6544344938A238897D2"
+    },
+    "deploymentControls": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/110-c30t-controls-after-service-annotation-fix.log",
+      "sha256": "5D745D68A0B607F8A518D93FCE74AB878A8356F2276ADA5D0015772A699B0EFF"
+    },
+    "cloudPreflight": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/100-predeploy-youtube-cloud-preflight-final.log",
+      "sha256": "3AA9CEF204960399E2292CCD4A47A07F99543614E727BC088FF4F4A389B10BD8"
+    },
+    "delegatedProviderValidation": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/107-predeploy-c30t-provider-delegated-validate-final.log",
+      "sha256": "51343EBF415422B079092BBFE277071889D1DDC92F41DFC98AD2F153D8FBE10D",
+      "compiledExportCount": 4,
+      "runtimeRestoredSha256": "5AED3DD3D27EE82EDDC4B76FD2AAD2082EEDB3C7E8DEB3109F1FC798242E4702"
+    },
+    "hostingValidation": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/112-predeploy-c30t-hosting-validate-final.log",
+      "sha256": "370F8BEEB6FEA71EFEB13633935C27E52973602B7F1EF83ED059380421C4C7CD",
+      "passed": 7,
+      "failed": 0
+    }
+  },
+  "runtimePreservation": {
+    "path": "backend/functions/.env.moolsocial-dev-503018",
+    "preexisting": true,
+    "sha256": "5AED3DD3D27EE82EDDC4B76FD2AAD2082EEDB3C7E8DEB3109F1FC798242E4702",
+    "forbiddenSecretNamesPresent": false,
+    "restoreRequired": true
+  },
+  "deploymentResult": {
+    "provider": "deployed_and_qualified_youtubeprovider-00038-cic",
+    "hosting": "deployed_and_qualified_live_release_1786609421461000",
+    "providerRevision": "youtubeprovider-00038-cic",
+    "hostingRelease": "projects/moolsocial-dev-503018/sites/moolsocial-dev-503018/channels/live/releases/1786609421461000",
+    "hostingVersion": "projects/moolsocial-dev-503018/sites/moolsocial-dev-503018/versions/86a17ea7c0f4a41f",
+    "providerAttemptEvidence": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/104-c30t-dev-youtubeprovider-deployment.log",
+      "sha256": "949FD37B8D1D9FAAC6151B5DE517A41AFFF57F44F4CB39628466625A3F040117",
+      "externalWriteStarted": false,
+      "runtimeRestoredSha256": "5AED3DD3D27EE82EDDC4B76FD2AAD2082EEDB3C7E8DEB3109F1FC798242E4702",
+      "allPredecessorRevisionsUnchanged": true
+    },
+    "providerDeploymentEvidence": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/108-c30t-dev-youtubeprovider-deployment-retry.log",
+      "sha256": "2B5BF78E20FE24121969C063E3BBF26C2E0850C6BB757C4925EF2D771059F3B3",
+      "firebaseDeploySucceeded": true,
+      "revision": "youtubeprovider-00038-cic",
+      "trafficPercent": 100,
+      "safeCapabilityReadbackPassed": true,
+      "serviceInvokerIamDisabled": true,
+      "originalRuntimeRestored": true,
+      "callbackSocialAndChatUnchanged": true,
+      "outerVerifierFalseFailure": "service_annotation_path_only"
+    },
+    "providerPostdeployReadback": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/109-c30t-provider-safe-postdeploy-readback.log",
+      "sha256": "3ABF2605C48CEEFCD0387C4C6625ED8CEF4FF2A427BDDDF23E843BC312E3F688",
+      "passed": true
+    },
+    "hostingDeploymentEvidence": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/113-c30t-dev-firebase-hosting-deployment.log",
+      "sha256": "74C967DC13A2EF57E008978E1053173BA88F5A7E22D1095C121D6E2163D861C3",
+      "passed": true,
+      "firebaseAndCustomDomainReadbackPassed": true,
+      "securityHeadersAndAppLinksPassed": true
+    },
+    "finalProviderHostingReadback": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/114-c30t-provider-hosting-final-readback.log",
+      "sha256": "91A3C8A4C71ECEF026CCBCFF691DB09FC9D8DF7CB0C5BF2BD06E09A0A8CC90F2",
+      "passed": true
+    }
+  },
+  "qualificationResult": {
+    "state": "two_identical_cycles_passed_founder_single_aab_internal_authorized",
+    "sourceManifest": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-11/source-aggregate-manifest-accepted.txt",
+      "sha256": "118F1D50EAAF1C550E9F305532DC4F3369223587E46AA881768776DE753791AB",
+      "fileCount": 1121
+    },
+    "focusedTestManifest": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-11/focused-test-manifest-accepted.txt",
+      "sha256": "FFDA2733F96C3ACBC34C68E8542958C201D75A231C0B78BF30FC4AE551D81B0A",
+      "fileCount": 58
+    },
+    "cycle1": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-11/01-source-qualifying-cycle-1.json",
+      "sha256": "11B70D1880F1A54B805568841CDFEF4B75653DAF4BFAB2B25E88DD4A9EA2CA4F",
+      "backendTests": "505_of_505_passed",
+      "hostingTests": "7_of_7_passed",
+      "focusedFlutterTests": "all_passed"
+    },
+    "cycle2": {
+      "path": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-11/02-source-qualifying-cycle-2.json",
+      "sha256": "D02EED1BBBFB68DA2A226EE7CAC8B9D4AEAF87F1271AE77F60B3D13087FF623F",
+      "backendTests": "505_of_505_passed",
+      "hostingTests": "7_of_7_passed",
+      "focusedFlutterTests": "all_passed"
+    },
+    "machineState": "source_qualified_founder_secret_prompt_required",
+    "buildCount": 0,
+    "uploadCount": 0,
+    "installCount": 0,
+    "oppoMutated": false
+  },
+  "playInternalReleaseResult": {
+    "state": "active_available_to_internal_testers_Play_install_sealed",
+    "track": "internal",
+    "trackId": "4700716609720808604",
+    "releaseId": "3",
+    "versionCode": "2026081345",
+    "versionName": "1.0.0-r60.45",
+    "uploadCount": 1,
+    "buildCount": 1,
+    "installCount": 1,
+    "deviceSerial": "2b3e0f71",
+    "installerPackageName": "com.android.vending",
+    "installedVersionCode": "2026081345",
+    "installedVersionName": "1.0.0-r60.45",
+    "installedSignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "installedBaseApkSha256": "3AB2D9F6241FC917DD4E0CDCAEEE087BB331EB18D14E7A96D40A12639EFEFB9C",
+    "installEvidence": "docs/quality/UAW-C30T-OPPO-PLAY-IN-PLACE-UPDATE-IDENTITY-EVIDENCE-20260813.md",
+    "releasedDisplayTime": "13 Aug 2026 16:58",
+    "evidence": "docs/quality/UAW-C30T-PLAY-INTERNAL-RELEASE-ACTIVATION-EVIDENCE-20260813.md",
+    "productionOpenClosedOrPublicMutationPerformed": false
+  }
+}

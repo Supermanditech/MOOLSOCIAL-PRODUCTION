@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-FOOTER-VISUAL-COMPACTION-C30D",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-FULL-PAGE-SEARCH-IME-COPY-C30C",
+    "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F"
+  ],
+  "state": "source_qualified_successor_review_candidate_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_user_navigating_Social_with_one_thumb",
+  "customerOutcome": "Social uses a flat visually compact footer without an app or Android navigation divider line, while every Home, Shorts, Create, Feed, Mool and Chat target remains directly reachable and safely exported on OPPO.",
+  "founderDirection": "remove_the_footer_blue_line_and_reduce_the_large_footer_appearance_before_the_next_OPPO_review",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_policy_adapter",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/core/design/mool_design_system.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The r60.36 OPPO baseline shows the Social footer separated by a visible divider and a heavy elevated treatment. The accepted shared 58 logical-pixel target and Android exported-semantics clearance already solve C28D and must be reused; a Social presentation-only adapter is the smallest safe correction."
+  },
+  "minimumCompleteScope": [
+    "remove_the_Social_footer_top_border_and_elevation",
+    "request_a_transparent_Android_system_navigation_divider_on_Social",
+    "retain_one_flat_neutral_media_footer_surface_without_family_theme_colours",
+    "preserve_Mool_left_Chat_right_and_Home_Shorts_Create_Feed_order",
+    "preserve_direct_taps_one_thumb_reach_58_logical_pixel_rail_and_44_logical_pixel_exported_semantics",
+    "prove_small_viewport_large_text_and_fresh_OPPO_footer_bounds_before_founder_review"
+  ],
+  "explicitExclusions": [
+    "no_reduction_or_removal_of_the_C28F_exported_semantics_clearance",
+    "no_rendering_inside_the_OPPO_system_navigation_button_area",
+    "no_global_colour_theme_or_footer_geometry_change_outside_Social",
+    "no_new_screen_route_backend_database_provider_or_credential_work",
+    "no_deploy_commit_push_promotion_uninstall_data_clear_or_downgrade"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_add_footer_ticket_remove_blue_line_and_reduce_large_footer_appearance",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C30C_two_identical_161_test_cycles_passed",
+    "C28F_founder_approved_exported_semantics_clearance_preserved",
+    "C30B_r60_36_preserved_until_a_fresh_combined_successor_is_qualified"
+  ],
+  "testPlan": [
+    "focused_source_and_widget_assertions_for_no_border_no_elevation_and_transparent_system_divider",
+    "390x844_320x568_and_140_percent_text_footer_fitment",
+    "C28E_exported_semantics_and_global_edge_navigation_regressions",
+    "two_identical_complete_Social_cycles_after_the_final_C30D_source_change",
+    "one_fresh_checksum_matched_in_place_OPPO_candidate_with_native_bounds_and_visual_review_evidence"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "backendAndProviderDeploymentHeld": true,
+    "founderReviewRequiredBeforeAnyDeployment": true
+  }
+}

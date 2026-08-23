@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-WORK-OPPORTUNITY-HOME-FIX7-C24G",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Earn Today and Workspace open calm direct work homes with matching, pay, distance, timing, verification and next-action information.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-WORK-OPPORTUNITY-HOME-FIX7-C24G-PRESELECTION-ASSESSMENT-20260809.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-WORK-OPPORTUNITY-HOME-FIX7-C24G-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["WorkEarnScreen","MyWorkScreen","WorkPageScaffold","WorkSession","ReviewWorkGateway","existing_work_routes","shared_service_home_primitives","connected_MoolSocial_navigator"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[],"necessityProof":"The bounded inventory found all required Work product, route, state and gateway owners. Only presentation reuse/configuration is needed; no duplicate screen, route, backend, persistent state owner or action is authorized."},
+  "acceptance": ["Earn_Today_and_Workspace_only","search_or_match_first","pay_distance_time_and_verification_visible","direct_opportunity_or_workspace_next_action","no_delivery_onboarding_scope_expansion","adaptive_and_accessible"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

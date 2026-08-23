@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-FIX1-PREBUILD-REGRESSION-MEMORY-AND-EVIDENCE-TRUTH",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "founder_authorized_aab_audit_finding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The exact r60.48 successor can enter its fail-closed prebuild gate with the truthful release build mode, and inherited chat-gate evidence reports the build authority it actually validated.",
+  "classificationReason": "The founder required every AAB audit finding to become an implemented ticket before build. The current C30X build path is deadlocked by an invalid regression-memory mode and C31C emits stale authority evidence under the exact successor scope.",
+  "minimumCompleteScope": [
+    "add_exact_release_mode_to_regression_memory_build_contract",
+    "invoke_regression_memory_with_BuildMode_release_from_C30X_build_phase",
+    "render_C31C_validated_build_authority_dynamically",
+    "add_one_cross_owner_static_contract_with_positive_and_negative_evidence",
+    "seal_a_fresh_successor_manifest_and_pass_two_identical_cycles_before_restoring_one_build_authority"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_backend_Hosting_provider_or_service_change",
+    "no_AAB_APK_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX1",
+    "no_other_track_candidate_version_or_failed_r60_47_mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2173_and_REG_20260814_2175_registered_before_source_repair",
+    "C30Y_1123_file_manifest_and_two_prior_cycles_preserved_as_superseded"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "scripts/check-uaw-c31c-chat-forward-recipient-contract.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": ["scripts/check-c30y-fix1-prebuild-memory-and-evidence-contract.ps1"],
+    "necessityProof": "The three existing gate owners already contain the defective contracts. One cross-owner static checker is the smallest durable regression owner and introduces no alternate release or product implementation.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "positive_regression_memory_build_release_and_negative_build_none",
+    "C30X_prebuild_fail_closed_only_on_missing_hidden_founder_inputs_with_zero_counts",
+    "C31C_original_no_build_and_exact_C30Y_build_authority_evidence_truth",
+    "PowerShell_7_and_Windows_PowerShell_static_contract_replay",
+    "two_fresh_identical_source_cycles_with_417_Flutter_3_skips_528_backend_8_Hosting_and_clean_analyzer"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FIX1-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-fix1-pre-ticket-selection-assessment.json",
+    "buildModeIncident": "docs/quality/UAW-AAB-C30Y-PREBUILD-REGRESSION-MEMORY-BUILD-MODE-DEADLOCK-20260814.md",
+    "c31cEvidenceIncident": "docs/quality/UAW-AAB-C30Y-C31C-STALE-BUILD-AUTHORITY-SUCCESS-LABEL-20260814.md"
+  }
+}

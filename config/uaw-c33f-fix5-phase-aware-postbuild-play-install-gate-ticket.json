@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-FIX5-PHASE-AWARE-POSTBUILD-PLAY-INSTALL-GATE",
+  "parentTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "findings": [
+    "REG-20260815-2418-C33F-POSTBUILD-GATE-PRERELEASE-MACHINE-STATE-DEADLOCK",
+    "REG-20260815-2419-C33F-POSTBUILD-GATE-PRERELEASE-COUNT-DEADLOCK",
+    "REG-20260815-2420-C33F-LATER-RELEASE-PHASE-CONTRACTS-MISSING",
+    "REG-20260815-2421-C33F-WRAPPER-BUILD-COUNT-MIRROR-NOT-ADVANCED"
+  ],
+  "relatedPreventionFinding": "REG-20260815-2417-C33F-ACTIVE-BUILD-LIVENESS-FALSE-STALL-NEAR-MISS",
+  "state": "registered_release_gate_repair_required_exact_AAB_preserved_unuploaded",
+  "classification": "mvp_required",
+  "severity": "release_blocking_postbuild_and_external_action_transition_gate_deadlock",
+  "actor": "founder_release_operator_qualifying_the_exact_r60_49_Internal_Testing_candidate",
+  "capability": "qualify_the_sealed_AAB_then_advance_exactly_once_through_Internal_Testing_and_in_place_OPPO_Play_update_without_weakening_any_authority_or_privacy_boundary",
+  "customerOutcome": "The exact r60.49 artifact is independently rebound after build, uploaded and activated only on Internal Testing once, then updated in place from Play on the founder OPPO once before authentication and whole-app acceptance.",
+  "classificationReason": "The current phase-insensitive gate rejects the wrapper's truthful postbuild state and cannot prove the authorized Play and OPPO lifecycle, blocking core MVP Google authentication acceptance.",
+  "minimumCompleteScope": [
+    "preserve_the_exact_sealed_AAB_provenance_and_consumed_single_build_authority_without_rebuild",
+    "make_machine_state_and_candidate_action_counts_phase_aware",
+    "advance_and_require_all_declared_build_count_mirrors_in_the_single_authority_consumption_transaction",
+    "bind_postbuild_and_preupload_to_exactly_one_build_and_the_exact_artifact",
+    "bind_postupload_to_one_Internal_Testing_upload_and_activation_with_no_other_track_change",
+    "bind_preinstall_to_available_once_in_place_Play_update_authority_after_activation",
+    "bind_postinstall_to_one_Play_installed_in_place_update_and_required_cold_start_retained_data_and_acceptance_evidence",
+    "bind_journey_to_complete_zero_new_issue_or_defect_authentication_action_and_whole_app_acceptance_evidence",
+    "add_positive_and_negative_fixture_coverage_for_every_declared_phase",
+    "pass_PowerShell_7_and_Windows_PowerShell_5_1_without_reading_or_storing_hidden_values"
+  ],
+  "explicitExclusions": [
+    "no_AAB_rebuild_or_second_build_authority",
+    "no_Play_upload_activation_or_OPPO_action_during_FIX5_implementation",
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_private_key_attestation_or_private_verdict_access",
+    "no_runtime_UI_route_backend_Hosting_provider_or_customer_copy_change",
+    "no_non_Internal_Testing_track_ADB_sideload_uninstall_data_clear_downgrade_email_quota_funds_commit_push_or_deployment"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "config/successor-aab-regression-hard-gate-state-c33f.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c33f.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33f-fix5-release-phase-transition.ps1",
+      "scripts/test-uaw-c33f-fix5-phase-aware-postbuild-play-install-gate.ps1"
+    ],
+    "necessityProof": "The existing C33F gate remains the single lifecycle owner. A phase-aware switch and one isolated fixture suite are the smallest complete repair; no app source, build wrapper, provider configuration or alternate release path is required.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_parser_validation_for_the_changed_gate_and_new_test",
+    "positive_and_wrong_phase_negative_fixtures_for_implementation_build_postbuild_preupload_postupload_preinstall_postinstall_and_journey",
+    "exact_artifact_hash_bytes_package_version_signer_provenance_plugin_and_payload_rebinding",
+    "regression_memory_and_preserved_authentication_gate_replay",
+    "PowerShell_7_and_Windows_PowerShell_5_1_execution",
+    "no_external_action_until_postbuild_and_preupload_both_pass"
+  ],
+  "founderAuthorization": {
+    "received": true,
+    "evidence": "founder_explicit_2026_08_15_all_release_audit_findings_to_ticket_then_implement_and_exact_r60_49_end_to_end_authority",
+    "existingAabMayBeQualifiedWithoutRebuild": true,
+    "secretValueAccessAuthorized": false
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "aabRebuildAuthorizedDuringFix": false,
+    "playOrDeviceActionAuthorizedDuringFix": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

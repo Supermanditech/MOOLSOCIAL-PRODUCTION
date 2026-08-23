@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-R60-18-OPPO-INSTALL-TRANSPORT-RECOVERY-FIX1-C17H",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-BUILD-RECOVERY-FIX1-C17G",
+  "state": "r60_18_installed_in_place_checksum_matched_founder_gallery_rejected_preserved",
+  "classification": "mvp_required",
+  "customerOutcome": "The already built and validated r60.18 candidate reaches the unlocked OPPO through one path-safe signed in-place upgrade so the founder can review all six subaction families.",
+  "founderAuthority": "docs/quality/UAW-C17H-R60-18-INSTALL-RECOVERY-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-R60-18-OPPO-INSTALL-TRANSPORT-RECOVERY-FIX1-C17H-PRESELECTION-ASSESSMENT-20260808.md",
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-BUILD-RECOVERY-FIX1-C17G",
+    "versionName": "1.0.0-r60.18",
+    "versionCode": "2026080818",
+    "reservedArtifactSha256": "88F82D203E1C8C565BE5DEBB61E6C1EF1F9E588017EADB9120D97B4B3081ED2C",
+    "reservedArtifactBytes": 134427417,
+    "pathSafeInstallInput": "apps/mobile/build/app/outputs/flutter-apk/app-profile.apk",
+    "pathSafeInputMustMatchReservedArtifact": true,
+    "buildReuseOnly": true,
+    "newBuildAuthorized": false
+  },
+  "failedInstallCommand": {
+    "ticket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-BUILD-RECOVERY-FIX1-C17G",
+    "state": "local_long_path_stat_failure_before_device_mutation",
+    "installedPredecessorPreserved": true,
+    "evidence": "artifacts/quality/uaw-personal-mvp-global-subaction-cumulative-oppo-qualification-build-recovery-fix1-c17g-r60-18-20260808-01/13b-install-command-local-stat-rejection.md"
+  },
+  "implementationDisposition": ["reuse", "configuration", "device_evidence_only"],
+  "newScreens": [],
+  "newRoutes": [],
+  "newRuntimeOwners": [],
+  "newBackendOwners": [],
+  "newPersistentStateOwners": [],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "installRecovery": {
+    "authorizedNow": false,
+    "onePathSafeInstallAttemptOnly": true,
+    "installAuthorizationOpened": true,
+    "installPerformed": true,
+    "uninstallAllowed": false,
+    "dataClearAllowed": false,
+    "downgradeAllowed": false,
+    "founderDeviceAcceptance": "rejected_subaction_ui_ux_professional_recovery_c20_required",
+    "founderGalleryAudit": "docs/quality/UAW-PERSONAL-MVP-R60-18-FOUNDER-GALLERY-VISUAL-REJECTION-AND-C20-TICKETS-20260808.md",
+    "successorTicket": "config/uaw-personal-mvp-global-subaction-founder-gallery-professional-recovery-fix3-c20-ticket.json"
+  },
+  "requiredGates": [
+    "exact_reserved_and_path_safe_APK_byte_length_and_SHA256_equality",
+    "unchanged_C18D_source_fingerprint",
+    "one_unlocked_CPH2375_with_checksum_matched_r60_16_predecessor",
+    "candidate_package_version_v2_signature_and_signer_match",
+    "battery_capacity_and_no_active_build_process",
+    "MVP_scope_and_permanent_device_regression_memory"
+  ],
+  "explicitExclusions": [
+    "no_build_rebuild_APK_copy_rename_or_mutation",
+    "no_runtime_reference_test_script_backend_or_business_state_change",
+    "no_second_C17H_install_attempt_uninstall_data_clear_or_downgrade",
+    "no_credentials_external_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ]
+}

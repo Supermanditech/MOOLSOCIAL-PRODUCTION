@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C33F-R60-49-SUCCESSOR-RELEASE-AGGREGATE-001",
+  "ticketId": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "machineState": "acceptance_failed_r60_49_google_auth_guest_feed_social_identity_and_create_crash_successor_required",
+  "evidenceRoot": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01",
+  "candidate": {
+    "id": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.49",
+    "versionCode": "2026081349",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "deviceAcceptanceCount": 0,
+    "aabSha256": "53D44C5DB061C88FC27198E405828B673422D875835456A5C6F56B3BB2AE7BD2"
+  },
+  "historicalFailedCandidate": {
+    "versionName": "1.0.0-r60.48",
+    "versionCode": "2026081348",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "runtimeSuccessClaimed": false,
+    "artifactReusable": false
+  },
+  "liveReadiness": {
+    "qualifiedFacts": 4,
+    "requiredFacts": 4,
+    "secretValuesObserved": false
+  },
+  "priorQualifiedSource": {
+    "supersededByTicket": "UAW-C33F-FIX4-HIDDEN-FOUNDER-INPUT-FLAG-PREBUILD-GATE-ORDER",
+    "manifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/source-manifest-c33f-fix2.txt",
+    "manifestSha256": "55EC0F438F990E9D47A85EBEB68A84DBD1B219B377305CBA228B180EC989F87D",
+    "completedIdenticalCycles": 2,
+    "preserved": true
+  },
+  "sourceQualification": {
+    "requiredIdenticalCycles": 2,
+    "completedIdenticalCycles": 2,
+    "manifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/source-manifest-c33f-fix4.txt",
+    "manifestSha256": "8E448668E56EACE3A92382189439A94C161FD1E7A4FD296DD374DE9DE05C668A",
+    "releasePreflightPassed": true
+  },
+  "releaseAuthorities": {
+    "build": "consumed",
+    "uploadAndInternalActivation": "consumed",
+    "inPlaceOppoPlayUpdate": "consumed",
+    "postinstallAcceptance": "failed_consumed"
+  },
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false
+  }
+}

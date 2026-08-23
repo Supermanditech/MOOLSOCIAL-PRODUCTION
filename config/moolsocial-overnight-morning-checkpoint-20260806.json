@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "checkpointId": "MOOLSOCIAL-OVERNIGHT-MORNING-CHECKPOINT-20260806",
+  "createdAt": "2026-08-06T01:35:02+05:30",
+  "scheduledStopAt": "2026-08-06T09:00:00+05:30",
+  "completionReason": "no_authorized_executable_child_remains_before_scheduled_stop",
+  "workspace": "C:\\GUARANTEED OUTCOME",
+  "repository": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "humanCheckpoint": "docs/quality/MOOLSOCIAL-OVERNIGHT-MORNING-CHECKPOINT-20260806.md",
+  "ticketManifest": {
+    "path": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+    "sha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8",
+    "children": 45,
+    "accountedFor": 45
+  },
+  "execution": {
+    "state": "terminal_until_dependency_or_founder_input_changes",
+    "activeChild": null,
+    "lastExecutedChild": "UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY",
+    "completedChildren": [
+      "UAW-R01",
+      "UAW-R02",
+      "UAW-R03",
+      "UAW-R05",
+      "UAW-R06",
+      "UAW-R07",
+      "UAW-R08",
+      "UAW-R09",
+      "UAW-R10",
+      "UAW-R11",
+      "UAW-R12",
+      "UAW-R13",
+      "UAW-R14",
+      "UAW-R15"
+    ],
+    "heldChildren": [
+      "UAW-R04",
+      "UAW-R16",
+      "UAW-R17",
+      "UAW-R18",
+      "UAW-R19",
+      "UAW-R20",
+      "UAW-R21",
+      "UAW-R22",
+      "UAW-R23",
+      "UAW-R24",
+      "UAW-R25",
+      "UAW-R26",
+      "UAW-R27",
+      "UAW-R28",
+      "UAW-R29",
+      "UAW-R30",
+      "UAW-R31",
+      "UAW-R32",
+      "UAW-R33",
+      "UAW-R34",
+      "UAW-R35",
+      "UAW-R36",
+      "UAW-R37",
+      "UAW-R38",
+      "UAW-R39",
+      "UAW-R40",
+      "UAW-R41",
+      "UAW-R42",
+      "UAW-R43",
+      "UAW-R44",
+      "UAW-R45"
+    ]
+  },
+  "latestValidation": {
+    "flutterAnalyze": "clean",
+    "r15FocusedTests": "16_of_16_passed",
+    "accumulatedPersonalRootRecoveryTests": "89_of_89_passed",
+    "r15ReferenceCombinations": 238,
+    "gitDiffCheck": "passed",
+    "protectedApkMachineStateDiff": "none",
+    "screen01SourceDiff": "none",
+    "approvedUiLockKnownExistingMismatch": {
+      "path": "apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart",
+      "expectedSha256": "B0E7B099B70BE7240A4E7699596AB7F16B77285FBA9C23C4F3708AFDA7AE218D",
+      "currentSha256": "D08DBA928B884554984D28891F5E465B1F7FA910D3884EBE49B6466D199147BE",
+      "introducedByThisRun": false,
+      "baselineChanged": false
+    }
+  },
+  "oppo": {
+    "serial": "2b3e0f71",
+    "state": "device",
+    "model": "CPH2375",
+    "mutationByUawBatch": false
+  },
+  "protectedRuntime": {
+    "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "profile": "1.0.0-r58.23 (2026080419)",
+    "sourceSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "apkInstallSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9",
+    "machineStateSha256": "E38A0465C1A3D791322ABFF885551D5D639AA22BD6CEA814F265BCD12F6535E6",
+    "machineStateDiff": "none"
+  },
+  "workspacePreservation": {
+    "dirtyStatusEntryCountAtSeal": 1020,
+    "dirtyFilesPreserved": true,
+    "screenbookModified": false,
+    "commitPushDeployPromote": false,
+    "buildInstallDeviceMutation": false
+  },
+  "currentMachineHashes": {
+    "authorizationSha256": "6640035C7422DDBAFE38D50EF2D8AEBDFB9A26C02EACB862B2B37748AD921B54",
+    "scopeGateStateSha256": "81C4B72D3C1457D4984CF70197AC33DABF780C159772208A915009132122659F"
+  },
+  "nextRequiredInputs": [
+    "youtube_compliance_and_social_reference_for_UAW_R04_R39_R40",
+    "authoritative_workspace_membership_registry_publication_policy_creation_lifecycle_and_capability_owners_for_UAW_R16_R40",
+    "accepted_connected_reference_candidate_and_founder_final_for_UAW_R41_R43",
+    "scope_gated_unique_apk_candidate_before_UAW_R44_device_work",
+    "founder_accept_or_reject_after_UAW_R01_R44_are_acceptance_ready"
+  ]
+}

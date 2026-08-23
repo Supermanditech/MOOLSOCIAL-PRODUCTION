@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-MOOL-HOME-ACTION-HUB-REGRESSION-C23",
+  "founderRejectedBaseline": {"versionName":"1.0.0-r60.21","versionCode":"2026080921","sha256":"17AF5DC2353E7195A597555C88AA42B345AFFDA0EC160900B55B0D3E822691BE","reason":"dual_persistent_main_and_subaction_layers_clutter_product_content"},
+  "destinationShell": {"persistentGlobalRailAllowed":false,"persistentSubactionRailAllowed":false,"fullWidthBottomSurfaceAllowed":false,"horizontalActionScrollingAllowed":false,"singleMoolHomeLauncherRequired":true,"launcherMinimumTapSize":56,"chatPersistentBottomControlAllowed":false},
+  "homeHub": {"existingRoute":"/app/mool","newScreenAllowed":false,"familyExpansionTapAllowed":false,"mainDefaultTapCountFromHome":1,"subactionTapCountFromHome":1,"maximumTapCountFromDestination":2,"minimumTapSize":44,"professionalNeutralSurfaceRequired":true,"restrainedFamilyAccentRequired":true,"largeBlockFamilyColourAllowed":false,"fillerActionAllowed":false},
+  "families": [
+    {"id":"social","label":"Social","route":"/app/social","accent":"7C5CFF","actions":[{"label":"Shorts","route":"/app/social?sub=shorts"},{"label":"Videos","route":"/app/social?sub=videos"},{"label":"Feed","route":"/app/social?sub=feed"},{"label":"Create","route":"/app/social?sub=create"}]},
+    {"id":"buy","label":"Buy","route":"/app/buy","accent":"FFB347","actions":[{"label":"Shop","route":"/app/buy?sub=shop"},{"label":"Wholesale","route":"/app/buy?sub=wholesale"},{"label":"Medicine","route":"/app/buy?sub=medicine"},{"label":"Orders","route":"/app/buy?sub=orders"}]},
+    {"id":"eat","label":"Eat","route":"/app/eat","accent":"FF6B7A","actions":[{"label":"Order Food","route":"/app/eat/home"},{"label":"Book Table","route":"/app/eat/table"}]},
+    {"id":"ride","label":"Ride","route":"/app/ride","accent":"41C7FF","actions":[{"label":"Bike","route":"/app/ride/book?type=bike"},{"label":"Auto","route":"/app/ride/book?type=auto"},{"label":"Cab","route":"/app/ride/book?type=cab"}]},
+    {"id":"book","label":"Book","route":"/app/book","accent":"3DDC97","actions":[{"label":"Doctor","route":"/app/book/doctor"},{"label":"Salon","route":"/app/book/salon"}]},
+    {"id":"work","label":"Work","route":"/app/work","accent":"6EA8FF","actions":[{"label":"Earn Today","route":"/app/work/earn"},{"label":"Workspace","route":"/app/work/my-work"}]}
+  ],
+  "motion": {"finiteOnly":true,"launcherPressMilliseconds":100,"hubArrivalMaximumMilliseconds":220,"reducedMotionImmediate":true},
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": ["apps/mobile/lib", "apps/mobile/test", "scripts"],
+    "unchangedSourceFingerprintRequired": true,
+    "completeAnalysisRequired": true,
+    "completeRequiredSuiteRequired": true
+  },
+  "requiredTests": [
+    "apps/mobile/test/core/design/mool_home_action_hub_primitives_c23b_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_home_six_family_hub_c23d_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_home_direct_routing_c23e_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_home_motion_accessibility_polish_c23f_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+    "apps/mobile/test/chat_flow_test.dart",
+    "apps/mobile/test/ui_v2_social_continuous_batch_test.dart",
+    "apps/mobile/test/eat_vertical_slice_test.dart",
+    "apps/mobile/test/ride_vertical_slice_test.dart",
+    "apps/mobile/test/book_vertical_slice_test.dart",
+    "apps/mobile/test/work_vertical_slice_test.dart"
+  ],
+  "requiredGateCount": 10,
+  "authority": {"runtimeMutationAuthorized":false,"buildAuthorized":false,"installAuthorized":false}
+}

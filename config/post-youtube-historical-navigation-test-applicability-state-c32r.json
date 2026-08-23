@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "state": "five_historical_files_individually_audited_current_authorities_passed_zero_runtime_defect_five_separate_test_successors_required",
+  "historicalAudit": {
+    "files": 5,
+    "passed": 6,
+    "failed": 30,
+    "batchRetried": false,
+    "runtimeOrTestBytesChangedDuringAudit": false,
+    "preMigrationHashes": {
+      "apps/mobile/test/core/design/mool_inner_chroma_emission_c22f_test.dart": "EB2580A21C3BF3635AAD5D5DDA412E8E6CE250EB94AA4A4C02C2BC59104E08BD",
+      "apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart": "04EBC3886FD94F31C609EFF2C31FCCE2867D5A03F8D6CDBBA176F7EA3851E54A",
+      "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart": "F23EDD9D26BC9AC2C3A86C6241BC956F9D58DC723079621AD05D828C686BDD70",
+      "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_subaction_professional_regression_c20f_test.dart": "B660E128F04D4C2F12A168BE83B36ACB11F7AB5A8EF8271C1D3CBBAFED1FCD47",
+      "apps/mobile/test/ui_v2/universal/uaw_r15_personal_copy_fitment_accessibility_test.dart": "16A180D0ECA5103B40955ED650961A70418ACA7E1A91756913B5D7827E65C73F"
+    },
+    "results": [
+      {
+        "owner": "apps/mobile/test/core/design/mool_inner_chroma_emission_c22f_test.dart",
+        "passed": 1,
+        "failed": 8,
+        "classification": "stale_test_contract",
+        "finding": "REG-20260815-2277-C32R-C22F-SUPERSEDED-INNER-CHROMA-GEOMETRY-CONTRACT",
+        "successor": "UAW-C32S-PERSONAL-MVP-C22F-CURRENT-NAVIGATION-VISUAL-CONTRACT-TEST-SUCCESSOR"
+      },
+      {
+        "owner": "apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart",
+        "passed": 1,
+        "failed": 1,
+        "classification": "stale_test_contract",
+        "finding": "REG-20260815-2278-C32R-C23C-SUPERSEDED-SINGLE-HOME-LAUNCHER-CONTRACT",
+        "successor": "UAW-C32T-PERSONAL-MVP-C23C-COMPACT-DESTINATION-SHELL-TEST-SUCCESSOR"
+      },
+      {
+        "owner": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
+        "passed": 1,
+        "failed": 4,
+        "classification": "stale_test_contract",
+        "finding": "REG-20260815-2279-C32R-C07-SUPERSEDED-GLOBAL-MOOL-HOME-RAIL-CONTRACT",
+        "successor": "UAW-C32U-PERSONAL-MVP-C07-CURRENT-MOOL-HOME-DASHBOARD-TEST-SUCCESSOR"
+      },
+      {
+        "owner": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_subaction_professional_regression_c20f_test.dart",
+        "passed": 2,
+        "failed": 2,
+        "classification": "stale_test_contract",
+        "finding": "REG-20260815-2280-C32R-C20F-PRE-C20H-AGGREGATE-STATE-AND-COPY-CONTRACT",
+        "successor": "UAW-C32V-PERSONAL-MVP-C20F-C20H-AGGREGATE-CONTRACT-TEST-SUCCESSOR"
+      },
+      {
+        "owner": "apps/mobile/test/ui_v2/universal/uaw_r15_personal_copy_fitment_accessibility_test.dart",
+        "passed": 1,
+        "failed": 15,
+        "classification": "stale_test_contract",
+        "finding": "REG-20260815-2281-C32R-R15-SUPERSEDED-ROOT-RAIL-ACCESSIBILITY-OWNER",
+        "successor": "UAW-C32W-PERSONAL-MVP-R15-CURRENT-MOOL-HOME-ACCESSIBILITY-TEST-SUCCESSOR"
+      }
+    ]
+  },
+  "currentAuthority": {
+    "files": 7,
+    "passed": 33,
+    "declaredSkips": 1,
+    "failed": 0,
+    "owners": [
+      "apps/mobile/test/ui_v2/universal/mool_family_pair_navigation_conformance_c26d_test.dart",
+      "apps/mobile/test/ui_v2/universal/mool_uniform_navigation_design_system_c27b_test.dart",
+      "apps/mobile/test/ui_v2/universal/mool_uniform_navigation_six_family_conformance_c27d_test.dart",
+      "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_creator_ergonomics_global_edge_consistency_c29n_test.dart",
+      "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+      "apps/mobile/test/ui_v2/universal/mool_home_fixed_viewport_hub_c24b2_test.dart",
+      "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_navigation_motion_containment_c10e_test.dart"
+    ]
+  },
+  "authorities": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-TRANSLUCENT-SUBACTION-FAMILY-RAIL-FIX1-C12",
+  "parentTicket": "UAW-PERSONAL-MVP-CONTEXTUAL-SUBACTION-THUMB-SHELF-FIX1-C11",
+  "state": "founder_authorized_prewrite",
+  "classification": "mvp_required",
+  "interactionContractVersion": "C12-V1-20260807",
+  "actor": "Personal account customer",
+  "customerOutcome": "A person can reach every primary destination sub-action with one direct tap from a thin translucent family rail without materially crowding the destination content or changing the approved global rail.",
+  "acceptedPlacementPattern": {
+    "name": "translucent_subaction_family_rail",
+    "position": "immediately_above_founder_approved_global_bottom_rail",
+    "ownership": "one_shared_destination_local_owner",
+    "maximumHeight": 48,
+    "minimumTapTarget": 44,
+    "globalRailGeometry": "unchanged",
+    "topPromotionMediaZone": "reserved_and_clear_of_routine_subactions",
+    "tapBudget": 1,
+    "familyRelationship": "persistent_destination_icon_accent_and_semantic_label",
+    "surface": "thin_translucent_low_shadow",
+    "moreMenu": false,
+    "modalOrPalette": false
+  },
+  "subactions": {
+    "social": ["shorts", "videos", "feed", "create"],
+    "buy": ["shop", "wholesale", "medicine", "orders"],
+    "eat": ["order_food", "book_table"],
+    "ride": ["bike", "auto", "cab"],
+    "book": ["doctor", "salon"],
+    "work": ["earn_today", "workspace"]
+  },
+  "contextualExclusion": {
+    "buyHelp": "remains attached to exact order, recovery or Mool Assist context and is not a primary destination sub-action"
+  },
+  "motion": {
+    "selection": "finite_color_border_and_indicator_acknowledgement_160_to_240_ms",
+    "destinationTransition": "reuse_existing_finite_shared_navigation_motion",
+    "reducedMotion": "zero_nonessential_translation_scale_blur_or_spring",
+    "perpetualMotion": false
+  },
+  "implementationBoundary": {
+    "reuseOwners": [
+      "MoolDestinationNavigationV2",
+      "MoolGlobalNavigationV2",
+      "MoolLocalNavigationRail",
+      "Screen04ContextTabs",
+      "BuyV2Session",
+      "JourneySession",
+      "existing_Eat_Ride_Book_Work_route_and_state_owners"
+    ],
+    "newNecessaryOwner": "none_restyle_existing_shared_destination_navigation_owner",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentStateOwners": []
+  },
+  "explicitExclusions": [
+    "no_change_to_founder_approved_global_bottom_rail_geometry_order_or_meaning",
+    "no_top_promotional_media_advertising_or_provider_content_implementation",
+    "no_new_business_flow_screen_route_backend_provider_or_persistent_state",
+    "no_Screens_01_03_change",
+    "no_Social_provider_contract_or_Buy_commercial_logic_change",
+    "no_More_menu_modal_palette_or_multi_tap_primary_subaction_path",
+    "no_target_smaller_than_44_by_44",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "all_six_destinations_use_the_same_shared_48_pixel_translucent_family_rail",
+    "every_primary_subaction_remains_visible_selected_and_one_tap_reachable",
+    "family_marker_tint_and_semantics_identify_the_owning_main_action",
+    "Buy_grid_and_each_destination_primary_content_remain_visually_dominant",
+    "compact_large_text_reduced_motion_route_history_and_state_continuity_pass",
+    "two_complete_affected_host_regression_cycles_pass",
+    "one_new_machine_gated_APK_matches_the_installed_OPPO_checksum",
+    "real_one_handed_OPPO_journeys_and_screenshots_pass_before_founder_visual_acceptance"
+  ]
+}

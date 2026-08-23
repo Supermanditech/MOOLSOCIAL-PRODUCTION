@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D",
+  "parentTicket": "UAW-PERSONAL-MVP-PROTECTED-SCREEN01-R50-APPROVED-UI-LOCK-RECONCILIATION-FIX1-C18",
+  "state": "host_qualified_two_consecutive_unchanged_source_cycles",
+  "classification": "mvp_required",
+  "customerOutcome": "The approved clear-glass subaction system and protected startup/login UI are qualified together under one final source identity before any successor APK exists.",
+  "founderAuthority": "docs/quality/UAW-C18D-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D-PRESELECTION-ASSESSMENT-20260808.md",
+  "implementationDisposition": [
+    "reuse",
+    "configuration",
+    "test_gate_only",
+    "evidence_only"
+  ],
+  "reuseInventory": [
+    "existing_C17E_clear_glass_host_contract_and_source_fingerprint_algorithm",
+    "existing_C17B_C17C_C17D_static_conformance_gates",
+    "existing_implemented_subaction_placement_gate",
+    "existing_permanent_regression_memory_gate",
+    "existing_591_test_three_shard_non_golden_runtime_boundary",
+    "qualified_Screen01_v4_and_Screen03_v3_production_locks",
+    "preserved_r60_16_installed_predecessor_and_C17F_rejection_evidence"
+  ],
+  "qualification": {
+    "requiredConsecutiveCycles": 2,
+    "testsPerCycle": 591,
+    "expectedTotalPasses": 1182,
+    "shards": {
+      "universalSocialScreen04": 252,
+      "sharedRemainingFamilies": 90,
+      "nonGoldenBuy": 249
+    },
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": [
+      "apps/mobile/lib",
+      "apps/mobile/test",
+      "scripts"
+    ],
+    "goldenPolicy": "exclude_every_matchesGoldenFile_owner_from_broad_runtime_shards_and_do_not_update_goldens",
+    "completedConsecutiveCycles": 2,
+    "cycleOnePasses": 591,
+    "cycleTwoPasses": 591,
+    "totalPasses": 1182,
+    "sourceFingerprintBeforeCycleOne": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "sourceFingerprintAfterCycleOne": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "sourceFingerprintAfterCycleTwo": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "status": "passed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-c17-host-qualification-refresh-after-screen01-lock-fix1-c18d-20260808-01/01-host-qualification.md"
+  },
+  "newScreens": [],
+  "newRoutes": [],
+  "newRuntimeOwners": [],
+  "newBackendOwners": [],
+  "newPersistentStateOwners": [],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "requiredGates": [
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-screen01-v4-production-acceptance-c18c.ps1",
+    "scripts/check-screen03-v3-production-acceptance-c19.ps1",
+    "scripts/check-personal-subaction-clear-glass-host-qualification-c17e.ps1"
+  ],
+  "buildAndInstall": {
+    "authorizedNow": false,
+    "c17fMustBeSeparatelySelected": true,
+    "predecessorMustRemainInstalled": true
+  },
+  "explicitExclusions": [
+    "no_runtime_UI_business_copy_backend_provider_or_persistent_state_mutation",
+    "no_new_screen_route_feature_owner_or_subaction",
+    "no_protected_golden_update_removal_or_reacceptance",
+    "no_v1_v2_v3_v4_accepted_reference_overwrite_or_screenbook_copy",
+    "no_build_install_uninstall_data_clear_downgrade_or_protected_runtime_replacement_during_C18D",
+    "no_credentials_external_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ]
+}

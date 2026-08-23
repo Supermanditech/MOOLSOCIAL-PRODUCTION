@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-GALLERY-PROFESSIONAL-RECOVERY-FIX3-C20",
+  "state": "c21_complete_founder_rejected_r60_20_installed_identity_preserved_c22_selected",
+  "classification": "mvp_required",
+  "customerOutcome": "Social, Buy, Eat, Ride, Book and Work use one visibly new, professional, independently floating optical liquid-glass sub-action system that preserves destination content, stable legibility and the founder-approved global rail.",
+  "founderRejectedCandidate": {
+    "id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX3-C20H",
+    "versionName": "1.0.0-r60.19",
+    "versionCode": "2026080819",
+    "apkSha256": "D97E4F8B28EAA7DDBF9C74DF7FE4BBBC1204CD118B2DEC07F85C75559A91F0F0",
+    "installedAndPreserved": true,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md"
+  },
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-FOUNDER-DEVICE-OPTICAL-CONTRACT-FIX4-C21A",
+    "UAW-PERSONAL-MVP-SHARED-OPTICAL-LIQUID-GLASS-CONTROL-FIX4-C21B",
+    "UAW-PERSONAL-MVP-SOCIAL-MEDIA-GLASS-CONFORMANCE-FIX4-C21C",
+    "UAW-PERSONAL-MVP-BUY-COMMERCE-GLASS-CONFORMANCE-FIX4-C21D",
+    "UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-ADAPTIVE-GLASS-CONFORMANCE-FIX4-C21E",
+    "UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-SELECTION-MOTION-REFINEMENT-FIX4-C21F",
+    "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-DELTA-HOST-QUALIFICATION-FIX4-C21G",
+    "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H"
+  ],
+  "children": [
+    {"ticketId": "UAW-PERSONAL-MVP-FOUNDER-DEVICE-OPTICAL-CONTRACT-FIX4-C21A", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-SHARED-OPTICAL-LIQUID-GLASS-CONTROL-FIX4-C21B", "state": "complete", "runtimeWriteAuthorized": true},
+    {"ticketId": "UAW-PERSONAL-MVP-SOCIAL-MEDIA-GLASS-CONFORMANCE-FIX4-C21C", "state": "complete", "runtimeWriteAuthorized": true},
+    {"ticketId": "UAW-PERSONAL-MVP-BUY-COMMERCE-GLASS-CONFORMANCE-FIX4-C21D", "state": "complete", "runtimeWriteAuthorized": true},
+    {"ticketId": "UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-ADAPTIVE-GLASS-CONFORMANCE-FIX4-C21E", "state": "complete", "runtimeWriteAuthorized": true},
+    {"ticketId": "UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-SELECTION-MOTION-REFINEMENT-FIX4-C21F", "state": "complete", "runtimeWriteAuthorized": true},
+    {"ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-DELTA-HOST-QUALIFICATION-FIX4-C21G", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H", "state": "founder_rejected_r60_20_installed_identity_preserved", "runtimeWriteAuthorized": false}
+  ],
+  "sharedRuntimeOwners": [
+    "apps/mobile/lib/core/design/mool_design_system.dart::MoolGlassSurface",
+    "apps/mobile/lib/core/design/mool_design_system.dart::MoolLocalNavigationTokens",
+    "apps/mobile/lib/core/design/mool_design_system.dart::MoolLocalNavigationRail",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolDestinationNavigationV2"
+  ],
+  "professionalContract": {
+    "families": ["social", "buy", "eat", "ride", "book", "work"],
+    "selectedStateCount": 17,
+    "individualFloatingControlsRequired": true,
+    "fullWidthBandPanelTrapezoidOrSegmentedStripAllowed": false,
+    "backgroundVisibleBetweenAndBehindControls": true,
+    "controlledNeutralLensRequired": true,
+    "realBackdropBlurRequired": true,
+    "specularInnerEdgeRequired": true,
+    "pageThemeColorFloodAllowed": false,
+    "controlHeightRange": [44.0, 48.0],
+    "radiusRange": [14.0, 16.0],
+    "labelFontSize": 13.0,
+    "labelFontWeight": 700,
+    "maximumNavigationTextScale": 1.3,
+    "supportedActionCounts": [2, 3, 4],
+    "selectedGrammar": "one_brighter_elevated_lens_plus_one_identity_micro_indicator",
+    "selectedHeavyOutlinePlusUnderlineAllowed": false,
+    "finitePressMotionMillisecondsRange": [80, 120],
+    "finiteSelectionAndDisclosureMillisecondsRange": [160, 200],
+    "reducedMotionImmediate": true,
+    "predecessorSuccessorOpticalDeltaRequired": true
+  },
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentBusinessStateOwners": [],
+    "newSubactions": []
+  },
+  "execution": {
+    "currentChild": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H",
+    "lastCompletedChild": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-DELTA-HOST-QUALIFICATION-FIX4-C21G",
+    "nextEligibleChild": "",
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "explicitExclusions": [
+    "no_screenbook_copy_or_mutation",
+    "no_global_rail_geometry_order_position_or_meaning_change",
+    "no_new_screen_route_backend_owner_business_state_or_subaction",
+    "no_build_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ]
+}

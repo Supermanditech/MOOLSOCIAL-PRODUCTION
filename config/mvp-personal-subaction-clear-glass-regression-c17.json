@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-CLEAR-GLASS-SUBACTION-REGRESSION-C17",
+  "ticketId": "UAW-PERSONAL-MVP-SUBACTION-LEGIBILITY-CONTRAST-OCCLUSION-MOTION-GATES-FIX2-C17E",
+  "state": "c17e_host_qualified_two_consecutive_cycles",
+  "founderDirection": "CLEAR-GLASS-COMPACT-INDIVIDUAL-ACTION-CONTROLS",
+  "founderAuthority": "docs/quality/UAW-C17-CLEAR-GLASS-ACTION-CONTROLS-FOUNDER-AUTHORIZATION-20260808.md",
+  "sharedOwner": "MoolLocalNavigationRail",
+  "familyInventory": {
+    "social": ["shorts", "videos", "feed", "create"],
+    "buy": ["shop", "wholesale", "medicine", "orders"],
+    "eat": ["order", "table"],
+    "ride": ["bike", "auto", "cab"],
+    "book": ["doctor", "salon"],
+    "work": ["earn", "workspace"]
+  },
+  "selectedStateCount": 17,
+  "surfaceToneByFamily": {
+    "social": "media",
+    "buy": "light",
+    "eat": "light",
+    "ride": "light",
+    "book": "light",
+    "work": "light"
+  },
+  "visualRules": {
+    "railSurfaceOpacity": 0.0,
+    "lightGlassAlpha": 0.52,
+    "mediaGlassAlpha": 0.58,
+    "selectedTintMayIncreaseAlpha": false,
+    "backdropBlurSigma": 16.0,
+    "railHeight": 52.0,
+    "controlHeight": 48.0,
+    "minimumTapTarget": 48.0,
+    "cornerRadius": 14.0,
+    "iconSize": 20.0,
+    "labelFontSize": 12.0,
+    "minimumLabelFontWeight": 700,
+    "maximumNavigationTextScale": 1.3,
+    "minimumForegroundContrastRatio": 4.5,
+    "selectedIndicatorWidth": 18.0,
+    "selectedIndicatorHeight": 2.0,
+    "connectionMaximumStrokeWidth": 1.5,
+    "connectionMaximumOpacity": 0.35,
+    "individualControlBorderRequired": true,
+    "filledFamilyBandOrTrapezoidAllowed": false,
+    "horizontalScrollOrPanelAllowed": false,
+    "distributedSparseCellsAllowed": false,
+    "fillerActionsAllowed": false
+  },
+  "adaptiveRules": {
+    "supportedActionCounts": [2, 3, 4],
+    "preferredClusterWidthsAt412": {
+      "twoActions": 212.0,
+      "threeActions": 272.0,
+      "fourActions": 316.0
+    },
+    "compactClusterWidthsAt320": {
+      "twoActions": 212.0,
+      "threeActions": 272.0,
+      "fourActions": 312.0
+    }
+  },
+  "interactionRules": {
+    "routineTapBudget": 1,
+    "selectedActionIsInert": true,
+    "availableActionSemanticTapRequired": true,
+    "pressedScale": 0.985,
+    "controlMotionMilliseconds": 160,
+    "connectionMotionMilliseconds": 200,
+    "perpetualMotionAllowed": false,
+    "reducedMotionImmediate": true,
+    "BackMoolChatContinuityRequired": true,
+    "contentReachabilityRequired": true
+  },
+  "requiredGates": [
+    "scripts/check-personal-shared-clear-glass-action-control-c17b.ps1",
+    "scripts/check-personal-social-buy-clear-glass-conformance-c17c.ps1",
+    "scripts/check-personal-eat-ride-book-work-clear-glass-conformance-c17d.ps1",
+    "scripts/check-personal-subaction-clear-glass-host-qualification-c17e.ps1",
+    "scripts/check-personal-subaction-placement-regression.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "requiredTests": [
+    "apps/mobile/test/core/design/mool_clear_glass_local_navigation_c17b_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_social_buy_clear_glass_conformance_c17c_test.dart",
+    "apps/mobile/test/core/design/mool_remaining_family_clear_glass_conformance_c17d_test.dart",
+    "apps/mobile/test/core/design/mool_clear_glass_selected_state_matrix_c17e_test.dart"
+  ],
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "completedConsecutiveCycles": 2,
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": ["apps/mobile/lib", "apps/mobile/test", "scripts"],
+    "sourceFingerprint": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "status": "passed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-c17-host-qualification-refresh-after-screen01-lock-fix1-c18d-20260808-01/01-host-qualification.md",
+    "refreshedByTicket": "UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D",
+    "refreshedAt": "2026-08-08",
+    "testsPerCycle": 591,
+    "totalPasses": 1182
+  },
+  "deviceBoundary": {
+    "predecessorVersionName": "1.0.0-r60.16",
+    "predecessorVersionCode": "2026080816",
+    "predecessorApkSha256": "1CC2A0186CA5DC8C9A09D0B4CC949B94CEE91DE6C70246A4B0168ADE6255150D",
+    "predecessorMustRemainInstalledUntilC17F": true,
+    "successorBuildAuthorized": false,
+    "successorInstallAuthorized": false,
+    "c17fPreselectionState": "rejected_protected_screen01_approved_ui_lock",
+    "c17fPreselectionEvidence": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F-PRESELECTION-REJECTION-20260808.md",
+    "c18dHostRefreshState": "passed_two_consecutive_unchanged_source_cycles",
+    "c18dHostRefreshEvidence": "artifacts/quality/uaw-personal-mvp-c17-host-qualification-refresh-after-screen01-lock-fix1-c18d-20260808-01/01-host-qualification.md",
+    "c17fR6017AttemptState": "single_build_attempt_consumed_no_candidate_install_closed",
+    "c17fR6017AttemptEvidence": "artifacts/quality/uaw-personal-mvp-global-subaction-cumulative-oppo-qualification-fix2-c17f-r60-17-20260808-01/12-build-validation.md",
+    "founderDeviceAcceptance": "rejected_r60_18_successor_C20_required",
+    "installedReviewedVersionName": "1.0.0-r60.18",
+    "installedReviewedVersionCode": "2026080818",
+    "installedReviewedSha256": "88F82D203E1C8C565BE5DEBB61E6C1EF1F9E588017EADB9120D97B4B3081ED2C",
+    "installedReviewedCandidatePreserved": true,
+    "founderGalleryAudit": "docs/quality/UAW-PERSONAL-MVP-R60-18-FOUNDER-GALLERY-VISUAL-REJECTION-AND-C20-TICKETS-20260808.md",
+    "successorTicket": "config/uaw-personal-mvp-global-subaction-founder-gallery-professional-recovery-fix3-c20-ticket.json"
+  }
+}

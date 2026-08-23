@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-FOUNDER-DEVICE-OPTICAL-CONTRACT-FIX4-C21A",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_reference_audit_no_runtime_build_or_device_mutation",
+  "classification": "mvp_required",
+  "actor": "founder reviewing the six-family sub-action system on OPPO CPH2375",
+  "capability": "reject r60.19 truthfully, compare predecessor and successor crops, inventory shared owners and freeze the C21 optical contract",
+  "customerOutcome": "The next implementation begins from the exact founder-visible defects and a measurable professional optical-glass target rather than another token-only variation.",
+  "classificationReason": "A truthful rejection and exact visual contract are required to stop the already repeated false professional pass.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-FOUNDER-DEVICE-OPTICAL-CONTRACT-FIX4-C21A-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedRuntimeOwnersReused": true,
+    "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []
+  },
+  "acceptance": [
+    "all_six_founder_crops_and_r60_19_matrix_compared",
+    "all_escaped_defects_registered_before_retry",
+    "shared_native_Flutter_owners_and_duplicates_inventoried",
+    "professional_optical_target_and_C21A_through_C21H_sequence_frozen",
+    "r60_19_installed_checksum_identity_preserved"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false,
+    "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false
+  },
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-FOUNDER-DEVICE-OPTICAL-CONTRACT-FIX4-C21A-COMPLETION-20260808.md",
+  "explicitExclusions": ["no_runtime_test_gate_build_install_or_device_mutation", "no_mutation_of_C20H_manifest_or_accepted_evidence"]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-PRECONSENT-USER-CONTROLS",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_informed_consent_and_user_control_visibility",
+  "actor": "unconnected_MoolSocial_user_or_YouTube_compliance_reviewer",
+  "customerOutcome": "Before choosing Google consent, the user can review MoolSocial privacy, deletion, disconnect/revocation help and Google permissions while seeing that connection is optional and read-only.",
+  "minimumCorrection": [
+    "render_the_readonly_control_card_in_the_unconnected_state",
+    "use_truthful_preconnection_copy_distinct_from_connected_copy",
+    "prove_privacy_Google_permissions_and_deletion_links_open_without_starting_connection"
+  ],
+  "explicitExclusions": [
+    "no_OAuth_scope_provider_or_upload_change",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "focusedTests": "17 passed, 0 failed",
+    "testEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/53-youtube-preconsent-controls-tests.log",
+    "testEvidenceSha256": "7CBA4BAF3C1DACBB365F171D6C11911068530C6C1DED8DF79EF6B7C8B3994CE0",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/54-flutter-analyze-youtube-preconsent-controls.log",
+    "analyzeEvidenceSha256": "BAFB4903A7258622D9E93CD6E67BD0F206CBF00F1681FDF02A8734DFB39ABD15",
+    "finalRegistrant": "15 plugins; IntegrationTestPlugin absent"
+  }
+}

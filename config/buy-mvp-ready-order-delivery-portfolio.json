@@ -1,0 +1,505 @@
+{
+  "schemaVersion": 1,
+  "portfolioId": "BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-20260805",
+  "state": "proposed_for_exact_founder_preauthorization",
+  "humanAuthority": "docs/delivery/BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-20260805.md",
+  "ticketCount": 47,
+  "scopeFamilies": [
+    "shop",
+    "wholesale",
+    "medicine"
+  ],
+  "protectedCheckpoint": {
+    "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "sourceSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "apkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9"
+  },
+  "legacyAuthorityLabels": {
+    "SUP-001": "participant/workspace capability contract",
+    "SUP-002": "verified onboarding and eligibility review",
+    "SUP-003": "canonical product, verified pack and participant-offer contract",
+    "SUP-004": "inventory and serviceability truth contract; reservation behavior is excluded from this portfolio",
+    "SUP-005": "seller-specific retail order and wholesale purchase-order commitment",
+    "DISC-005": "regulated-category trust and licence facts",
+    "B2B-001": "wholesale pilot and commercial operating decision",
+    "B2B-002": "verified pack and logistics-unit contract",
+    "B2B-003": "wholesale offer and commercial-term snapshot",
+    "B2B-004": "verified business-buyer workspace and approval authority",
+    "TAX-003": "effective-dated tax determination policy",
+    "PAY-001": "seller, merchant-of-record, collection, settlement, refund and dispute operating decision",
+    "PAY-003": "provider-neutral payment-intent and payment-attempt state contract"
+  },
+  "authorizationModel": {
+    "oneActiveTicketAtATime": true,
+    "portfolioApprovalDoesNotActivateHeldDependencies": true,
+    "htmlFounderFinalBeforeNewFlutterStates": true,
+    "consolidatedFounderReviewAfterOppoQualification": true,
+    "proposedPreauthorizedActions": [
+      "bounded_local_runtime_writes",
+      "bounded_local_backend_writes",
+      "deterministic_tests",
+      "unique_candidate_registration",
+      "machine_gated_builds",
+      "checksum_matched_oppo_install_and_testing"
+    ],
+    "notAuthorizedByPortfolio": [
+      "commit",
+      "push",
+      "deploy",
+      "promote",
+      "production_write",
+      "credential_access",
+      "live_payment_or_funds_movement",
+      "live_whatsapp",
+      "live_telephony",
+      "unlisted_external_service_action"
+    ]
+  },
+  "timerPolicy": {
+    "minimumSeconds": 30,
+    "maximumSeconds": 300,
+    "moolChatFraction": 0,
+    "whatsAppFraction": 0.333333,
+    "agenticCallFraction": 0.666667,
+    "reassignFraction": 1,
+    "initialSeconds": {
+      "shop": 60,
+      "wholesale": 180,
+      "medicineNonPrescription": 90,
+      "medicinePrescriptionAfterPharmacistReady": 300
+    },
+    "minimumSequentialPartnerAttempts": 1,
+    "maximumSequentialPartnerAttempts": 5,
+    "initialMaximumSequentialPartnerAttempts": {
+      "shop": 3,
+      "wholesale": 3,
+      "medicineNonPrescription": 3,
+      "medicinePrescriptionAfterPharmacistReady": 2
+    },
+    "initialMaximumAssignmentSeconds": {
+      "shop": 180,
+      "wholesale": 540,
+      "medicineNonPrescription": 270,
+      "medicinePrescriptionAfterPharmacistReady": 600
+    },
+    "assignmentStopsAtFirst": [
+      "partner_acceptance",
+      "eligible_ladder_exhaustion",
+      "quote_expiry",
+      "maximum_sequential_partner_attempts",
+      "overall_assignment_ceiling"
+    ],
+    "adminDimensions": [
+      "market_type",
+      "provider_type",
+      "category",
+      "locality",
+      "weekday_time_band",
+      "declared_busy_schedule"
+    ],
+    "activeOrderPolicyIsImmutable": true,
+    "automaticProductionLearningEnabled": false
+  },
+  "sharedDisclosure": {
+    "classificationPolicy": "config/mvp-scope-policy.json",
+    "minimumCompleteScope": "Only the exact responsibility named by the ticket and its row in the human authority.",
+    "explicitExclusions": [
+      "broad_personalization",
+      "unrelated_phone_activity",
+      "background_location",
+      "contact_import",
+      "silent_price_or_term_change",
+      "silent_product_or_medicine_substitution",
+      "second_debit_during_reassignment",
+      "unconditional_physical_delivery_guarantee"
+    ],
+    "testAndEvidencePlan": [
+      "unique_evidence_identity",
+      "predecessor_branch_head_and_complete_dirty_inventory",
+      "exact_source_manifest",
+      "authorization_tenant_idempotency_and_data_egress_checks",
+      "focused_tests",
+      "two_affected_regressions",
+      "final_source_drift_check",
+      "applicable_reference_build_device_and_release_gates"
+    ]
+  },
+  "tickets": [
+    {
+      "order": 1,
+      "id": "BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin controls safe acceptance windows, bounded partner attempts and an overall assignment ceiling instead of hard-coded or indefinite deadlines.",
+      "dependenciesAndApprovals": ["admin_authorization_owner"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 2,
+      "id": "BUY-MVP-MARKET-SCHEDULE-TIMER-OVERRIDES",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Acceptance timing reflects market and declared busy schedules.",
+      "dependenciesAndApprovals": ["BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 3,
+      "id": "BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT",
+      "classification": "mvp_required",
+      "customerOutcome": "Each order retains one stable visible acceptance policy, attempt limit and overall assignment ceiling.",
+      "dependenciesAndApprovals": ["tickets_1_2"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 4,
+      "id": "BUY-MVP-PROVIDER-READY-BUSY-PAUSE-STATE",
+      "classification": "mvp_required",
+      "customerOutcome": "Orders reach only providers currently willing to receive demand.",
+      "dependenciesAndApprovals": ["SUP-001"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 5,
+      "id": "BUY-MVP-ACCEPTANCE-POLICY-AUDIT-ROLLBACK",
+      "classification": "mvp_required",
+      "customerOutcome": "Operational timing changes remain accountable and recoverable.",
+      "dependenciesAndApprovals": ["tickets_1_4"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 6,
+      "id": "BUY-MVP-NO-RESERVATION-OFFER-READINESS",
+      "classification": "mvp_required",
+      "customerOutcome": "Customer receives a fresh ready decision without a stock hold.",
+      "dependenciesAndApprovals": ["SUP-003", "inventory_owner", "fulfilment_owner"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 7,
+      "id": "BUY-MVP-FULL-BASKET-FULFILLABILITY",
+      "classification": "mvp_required",
+      "customerOutcome": "Automatic assignment uses only a partner able to fulfil every exact line.",
+      "dependenciesAndApprovals": ["BUY-MVP-NO-RESERVATION-OFFER-READINESS"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 8,
+      "id": "BUY-MVP-ACCEPTANCE-TIME-STOCK-COMMIT",
+      "classification": "mvp_required",
+      "customerOutcome": "Stock commits atomically only when the partner accepts.",
+      "dependenciesAndApprovals": ["tickets_6_7", "inventory_command_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 9,
+      "id": "BUY-MVP-FINAL-PAYABLE-DELIVERY-QUOTE",
+      "classification": "mvp_required",
+      "customerOutcome": "Customer sees an exact payable amount and fulfilment promise.",
+      "dependenciesAndApprovals": ["tickets_6_7", "tax_facts", "logistics_facts"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 10,
+      "id": "BUY-MVP-ELIGIBLE-FALLBACK-PARTNER-LADDER",
+      "classification": "mvp_required",
+      "customerOutcome": "A safe policy-bounded fallback list exists before assignment without holding stock.",
+      "dependenciesAndApprovals": ["tickets_6_9"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 11,
+      "id": "BUY-MVP-QUOTE-FRESHNESS-EXPLICIT-FAILURE",
+      "classification": "mvp_required",
+      "customerOutcome": "Stale or unavailable readiness is shown honestly before money moves.",
+      "dependenciesAndApprovals": ["tickets_6_10"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 12,
+      "id": "BUY-MVP-CART-COMMITMENT-SNAPSHOT",
+      "classification": "mvp_required",
+      "customerOutcome": "Checkout freezes the exact reviewed customer commitment.",
+      "dependenciesAndApprovals": ["tickets_7_11"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 13,
+      "id": "BUY-MVP-IDEMPOTENT-CUSTOMER-ORDER",
+      "classification": "mvp_required",
+      "customerOutcome": "One confirmed Cart creates one customer order despite retry or interruption.",
+      "dependenciesAndApprovals": ["BUY-MVP-CART-COMMITMENT-SNAPSHOT", "production_order_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 14,
+      "id": "BUY-MVP-PROVIDER-NEUTRAL-PAYABLE-INTENT",
+      "classification": "mvp_required",
+      "customerOutcome": "One authoritative payable intent owns the reviewed order amount.",
+      "dependenciesAndApprovals": ["PAY-001", "ticket_13", "finance_legal_backend_authorization"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 15,
+      "id": "BUY-MVP-PAYMENT-PENDING-ASSIGNMENT",
+      "classification": "mvp_required",
+      "customerOutcome": "Customer money remains protected while a partner is being confirmed.",
+      "dependenciesAndApprovals": ["ticket_14", "verified_payment_provider_capability"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 16,
+      "id": "BUY-MVP-REASSIGNMENT-SINGLE-DEBIT",
+      "classification": "mvp_required",
+      "customerOutcome": "Partner reassignment never creates a second debit.",
+      "dependenciesAndApprovals": ["tickets_13_15"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 17,
+      "id": "BUY-MVP-NO-FULFILLER-VOID-REFUND",
+      "classification": "mvp_required",
+      "customerOutcome": "Exhausted assignment ends in an authoritative void, release or refund.",
+      "dependenciesAndApprovals": ["tickets_14_16", "refund_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 18,
+      "id": "BUY-MVP-SELLER-SETTLEMENT-AFTER-ACCEPTANCE",
+      "classification": "mvp_required",
+      "customerOutcome": "Only the accepted seller can become the payable settlement owner.",
+      "dependenciesAndApprovals": ["TAX_PAY_dual_model", "tickets_8_17", "finance_legal"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 19,
+      "id": "BUY-MVP-PARTNER-ACCEPT-DECLINE-COMMAND",
+      "classification": "mvp_required",
+      "customerOutcome": "Provider authoritatively accepts or declines the complete exact order.",
+      "dependenciesAndApprovals": ["tickets_3_4_8_13"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 20,
+      "id": "BUY-MVP-MOOLCHAT-PARTNER-ORDER-ALERT",
+      "classification": "mvp_required",
+      "customerOutcome": "Provider receives an immediate owned-channel actionable order alert.",
+      "dependenciesAndApprovals": ["ticket_19", "moolchat_transactional_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 21,
+      "id": "BUY-MVP-WHATSAPP-PARTNER-ESCALATION",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Consented provider receives one minimal fallback order alert.",
+      "dependenciesAndApprovals": ["ticket_20", "business_sender", "consent", "template_budget_security", "external_service_authorization"],
+      "lane": "dependency_held_external"
+    },
+    {
+      "order": 22,
+      "id": "BUY-MVP-AGENTIC-VOICE-ACCEPTANCE-CALL",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Verified provider receives a bounded Accept-or-Decline escalation call.",
+      "dependenciesAndApprovals": ["ticket_20", "telephony", "privacy_recording", "security_cost", "external_service_authorization"],
+      "lane": "dependency_held_external"
+    },
+    {
+      "order": 23,
+      "id": "BUY-MVP-ACCEPTANCE-TIMEOUT-AUTO-REASSIGN",
+      "classification": "mvp_required",
+      "customerOutcome": "Unanswered or declined order moves to the next eligible full fulfiller until its snapshotted limit or ceiling.",
+      "dependenciesAndApprovals": ["tickets_10_16_19"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 24,
+      "id": "BUY-MVP-PROVIDER-NONRESPONSE-CAPABILITY-PAUSE",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Repeatedly unresponsive providers stop receiving new orders until ready.",
+      "dependenciesAndApprovals": ["tickets_4_23"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 25,
+      "id": "BUY-MVP-CUSTOMER-ASSIGNMENT-COUNTDOWN-STATUS",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Customer understands the countdown, escalation, reassignment and acceptance state.",
+      "dependenciesAndApprovals": ["tickets_3_15_23", "html_founder_final"],
+      "lane": "reference_gate"
+    },
+    {
+      "order": 26,
+      "id": "BUY-MVP-SHOP-FULL-BASKET-ASSIGNMENT",
+      "classification": "mvp_required",
+      "customerOutcome": "One eligible Shop fulfils the complete consumer basket at the approved decision.",
+      "dependenciesAndApprovals": ["tickets_7_23"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 27,
+      "id": "BUY-MVP-SHOP-SUBSTITUTION-CONSENT",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Customer explicitly controls any narrowly permitted Shop replacement.",
+      "dependenciesAndApprovals": ["ticket_26", "reference_approval"],
+      "lane": "reference_gate"
+    },
+    {
+      "order": 28,
+      "id": "BUY-MVP-WHOLESALE-EXACT-COMMERCIAL-TERMS",
+      "classification": "mvp_required",
+      "customerOutcome": "Wholesale reassignment preserves every approved commercial term.",
+      "dependenciesAndApprovals": ["B2B-002", "B2B-003", "TAX-003", "tickets_9_23"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 29,
+      "id": "BUY-MVP-WHOLESALE-BUYER-APPROVAL-CONTROL",
+      "classification": "mvp_required",
+      "customerOutcome": "Only an authorized verified-business approver can commit the Wholesale order.",
+      "dependenciesAndApprovals": ["B2B-001", "B2B-004", "ticket_28"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 30,
+      "id": "BUY-MVP-MEDICINE-OTC-LICENSED-PHARMACY-ASSIGNMENT",
+      "classification": "mvp_required",
+      "customerOutcome": "Non-prescription Medicine reaches only an eligible licensed pharmacy.",
+      "dependenciesAndApprovals": ["SUP-002", "DISC-005", "regulatory_evidence", "tickets_7_23"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 31,
+      "id": "BUY-MVP-MEDICINE-RX-SECURE-PHARMACY-HANDOFF",
+      "classification": "mvp_required",
+      "customerOutcome": "Prescription failure recovery transfers minimum secure context for fresh pharmacy acceptance.",
+      "dependenciesAndApprovals": ["prescription_pharmacist_owner", "consent", "privacy", "regulatory_evidence"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 32,
+      "id": "BUY-MVP-MEDICINE-NO-CLINICAL-SUBSTITUTION",
+      "classification": "mvp_required",
+      "customerOutcome": "Automatic failover cannot change the approved medicine identity or quantity.",
+      "dependenciesAndApprovals": ["tickets_30_31"],
+      "lane": "portfolio_contract_live_held"
+    },
+    {
+      "order": 33,
+      "id": "BUY-MVP-ACCEPTED-ORDER-PACKING-DEADLINE",
+      "classification": "mvp_required",
+      "customerOutcome": "Accepted order advances through complete line-by-line packing by a visible deadline.",
+      "dependenciesAndApprovals": ["tickets_8_19", "family_assignment"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 34,
+      "id": "BUY-MVP-DELIVERY-CAPABILITY-ASSIGNMENT",
+      "classification": "mvp_required",
+      "customerOutcome": "Packed order receives one accountable eligible delivery owner.",
+      "dependenciesAndApprovals": ["SUP-004", "SUP-005", "logistics_owner", "ticket_33"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 35,
+      "id": "BUY-MVP-PARCEL-HANDOVER-OTP-PROOF",
+      "classification": "mvp_required",
+      "customerOutcome": "Parcel custody changes only after verified captain, OTP and physical handover.",
+      "dependenciesAndApprovals": ["ticket_34", "identity_otp_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 36,
+      "id": "BUY-MVP-CUSTOMER-DELIVERY-TRACKING",
+      "classification": "mvp_required",
+      "customerOutcome": "Customer sees authoritative delivery ownership, events and proof.",
+      "dependenciesAndApprovals": ["tickets_33_35", "tracking_owner", "html_founder_final"],
+      "lane": "reference_gate_after_dependencies"
+    },
+    {
+      "order": 37,
+      "id": "BUY-MVP-PREPACK-SELLER-FAILOVER",
+      "classification": "mvp_required",
+      "customerOutcome": "Early accepted-seller failure safely reopens assignment without another debit.",
+      "dependenciesAndApprovals": ["tickets_16_23_33"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 38,
+      "id": "BUY-MVP-POSTPICKUP-DELIVERY-RECOVERY",
+      "classification": "mvp_required",
+      "customerOutcome": "Post-pickup failure enters accountable logistics recovery without duplicating the seller order.",
+      "dependenciesAndApprovals": ["tickets_34_36", "support_logistics_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 39,
+      "id": "BUY-MVP-DELIVERY-FAILURE-REFUND-SUPPORT",
+      "classification": "mvp_required",
+      "customerOutcome": "Unrecoverable fulfilment ends in one support case and authoritative refund or replacement choice.",
+      "dependenciesAndApprovals": ["tickets_17_32_38", "refund_returns_support_owner"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 40,
+      "id": "BUY-MVP-OPERATIONAL-RESPONSE-TELEMETRY",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Admin sees privacy-safe aggregate evidence for acceptance-policy tuning.",
+      "dependenciesAndApprovals": ["tickets_1_5_19_24", "observability_privacy_approval"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 41,
+      "id": "BUY-MVP-ADMIN-TIMER-RECOMMENDATIONS",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Admin receives an explainable bounded timer recommendation without automatic Production change.",
+      "dependenciesAndApprovals": ["ticket_40", "minimum_sample_policy_review"],
+      "lane": "portfolio_after_dependencies"
+    },
+    {
+      "order": 42,
+      "id": "BUY-MVP-PHONE-ACTIVITY-PRIVACY-BOUNDARY",
+      "classification": "mvp_required",
+      "customerOutcome": "Provider and customer are protected from unrelated device surveillance.",
+      "dependenciesAndApprovals": ["privacy_approval"],
+      "lane": "portfolio_contract_collection_held"
+    },
+    {
+      "order": 43,
+      "id": "BUY-MVP-FAILOVER-HTML-REFERENCE-BATCH",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder reviews every new assignment and recovery state as one connected reference batch.",
+      "dependenciesAndApprovals": ["applicable_tickets_1_42", "founder_html_final"],
+      "lane": "reference_gate"
+    },
+    {
+      "order": 44,
+      "id": "BUY-MVP-NATIVE-ASSIGNMENT-RECOVERY-STATES",
+      "classification": "mvp_required",
+      "customerOutcome": "Native Flutter presents the frozen assignment and recovery contract across all three families.",
+      "dependenciesAndApprovals": ["ticket_43_founder_final", "protected_gates", "backend_contracts"],
+      "lane": "portfolio_after_reference_final"
+    },
+    {
+      "order": 45,
+      "id": "BUY-MVP-AFFECTED-JOURNEY-REGRESSION-MATRIX",
+      "classification": "mvp_required",
+      "customerOutcome": "Every assignment, payment-safe failure and recovery path passes twice.",
+      "dependenciesAndApprovals": ["all_applicable_implemented_tickets"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 46,
+      "id": "BUY-MVP-OPPO-CUSTOMER-PROVIDER-QUALIFICATION",
+      "classification": "mvp_required",
+      "customerOutcome": "Exact APK passes customer and provider workflows on the physical OPPO.",
+      "dependenciesAndApprovals": ["tickets_43_45", "apk_machine_gate", "one_use_build_authorization"],
+      "lane": "device_gate"
+    },
+    {
+      "order": 47,
+      "id": "BUY-MVP-BATCH-FOUNDER-ACCEPTANCE-PACK",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder receives one exact cumulative portfolio decision pack.",
+      "dependenciesAndApprovals": ["tickets_1_46_terminal_or_explicitly_held"],
+      "lane": "founder_final"
+    }
+  ]
+}

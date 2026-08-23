@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-FOUNDER-OPPO-HOME-NAVIGATION-CONTRACT-FIX7-C24B1",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_contract_passed_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "The founder's OPPO Home, connected-navigation and single-focal-brand rejection becomes an exact machine-readable contract before another Home runtime change.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-FOUNDER-OPPO-HOME-NAVIGATION-CONTRACT-FIX7-C24B1-PRESELECTION-ASSESSMENT-20260809.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-FOUNDER-OPPO-HOME-NAVIGATION-CONTRACT-FIX7-C24B1-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["configuration","test_only_acceptance"],"sharedImplementationOwners":["PersonalMoolRootV2","MoolDestinationNavigationV2","MoolGlobalNavigationV2","existing_six_family_action_catalogue","existing_route_callbacks","existing_Back_Chat_and_destination_state"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["r60_22_Home_scroll_clutter_navigation_and_branding_rejections_registered","Home_has_zero_vertical_or_horizontal_scroll","six_family_selector_plus_selected_family_actions_one_viewport","single_MoolSocial_launcher_brand_focal_point","destination_connected_navigator_without_Home_route","remove_Home_MoolSocial_Your_Mool_welcome_area_and_decorative_icon_copy","remove_only_redundant_feature_brand_chrome_not_product_copy","runtime_build_install_closed"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

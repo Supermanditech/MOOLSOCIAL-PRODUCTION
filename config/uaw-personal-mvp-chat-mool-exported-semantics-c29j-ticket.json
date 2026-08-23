@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-C29J",
+  "parentRejectedTicket": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+  "state": "complete_host_qualified",
+  "classification": "mvp_supporting",
+  "customerOutcome": "Chat keeps the common Mool switcher with a truthful exported Android target of at least 44 logical pixels on OPPO.",
+  "founderDirection": "chat_and_mool_switcher_are_common_across_main_actions_and_production_grade_OPPO_review_is_required",
+  "findings": "docs/quality/UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-C29J-FINDINGS-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "shared_system_fix", "protected_test"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",
+      "apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart"
+    ],
+    "reusedGeometryOwner": "moolAndroidExportedSemanticsClearance",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The standalone non-compact MoolGlobalNavigationV2 placement misses the existing Android exported-semantics clearance; Chat correctly consumes that shared owner and must not fork it."
+  },
+  "minimumCompleteScope": [
+    "apply_existing_exported_semantics_clearance_to_non_compact_global_launcher",
+    "do_not_double_apply_clearance_to_compact_destination_rails",
+    "protect_OPPO_viewPadding_and_minimum_44_logical_target_in_widget_tests",
+    "run_full_analysis_and_protected_navigation_social_tests",
+    "run_two_fresh_identical_host_qualification_cycles"
+  ],
+  "explicitExclusions": [
+    "no_route_screen_backend_provider_or_credential_change",
+    "no_YouTube_content_player_upload_OAuth_or_API_change",
+    "no_build_install_uninstall_data_clear_downgrade_or_baseline_update",
+    "no_HTML_commit_push_deploy_Production_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29I_device_gate_rejection_and_preserved_r60_33_identity",
+    "C28D_permanent_exported_semantics_rejection",
+    "founder_common_Chat_and_Mool_navigation_direction",
+    "MVP_delivery_lock_and_permanent_regression_memory"
+  ],
+  "testAndEvidencePlan": [
+    "focused_OPPO_padding_widget_test",
+    "existing_C28B_C28E_C28F_navigation_regressions",
+    "full_flutter_analysis",
+    "protected_Social_and_customer_copy_tests",
+    "two_identical_host_cycles"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "qualificationResult": {
+    "state": "passed",
+    "identicalHostCycles": 2,
+    "sourceManifestSha256": "79497D35DDB36DEF52D4FF5636BF6ADA61FA0C858C86E9EEBBA00CE29BF293E0",
+    "sourceFiles": 23,
+    "flutterAnalysis": "clean",
+    "protectedTestsPassedPerCycle": 117,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-C29J-HOST-QUALIFICATION-20260811.md"
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.33",
+    "installedVersionCode": "2026081133",
+    "installedApkSha256": "8DF33A827C6C85C33B90D8BE46F1256ACD37975D387E7E9F402F27C5931953B3",
+    "installedSerial": "2b3e0f71",
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "c29iEvidenceImmutable": true,
+    "protectedBaselineUpdated": false
+  }
+}

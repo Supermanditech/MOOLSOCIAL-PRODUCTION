@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "packageId": "YOUTUBE-API-COMPLIANCE-REVIEWER-PACKAGE-C30Q-20260812",
+  "state": "awaiting_Play_OPPO_acceptance_and_founder_approval",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30Q",
+  "mailbox": "hello@moolsocial.com",
+  "threadSubject": "Re: YouTube API Services: Thank you for your submission",
+  "latestRequestDate": "2026-08-06",
+  "hardInternalDeadline": "2026-08-14",
+  "application": {
+    "product": "MoolSocial",
+    "projectId": "moolsocial-dev-503018",
+    "packageName": "com.moolsocial.app",
+    "distribution": "Google_Play_Internal_Testing_only",
+    "playLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "versionName": "1.0.0-r60.43",
+    "versionCode": "2026081243",
+    "artifactSha256": "E7E7DF249C71195FF9EDF8FD0247AEB64C91FEC3DD541F4A5A8FD11690AD8A69",
+    "playReleaseEvidence": "docs/quality/UAW-C30Q-PLAY-INTERNAL-ACTIVE-RELEASE-EVIDENCE-20260812.md",
+    "playInstalledProvenanceEvidence": null
+  },
+  "declaredUseCaseUnchangedFromC30O": true,
+  "draft": "docs/quality/YOUTUBE-API-COMPLIANCE-C30O-SAME-THREAD-DRAFT-AND-REVIEWER-PACKAGE-20260812.md",
+  "gmailDraftCreated": false,
+  "emailSent": false,
+  "quotaSubmitted": false,
+  "founderApproved": false
+}

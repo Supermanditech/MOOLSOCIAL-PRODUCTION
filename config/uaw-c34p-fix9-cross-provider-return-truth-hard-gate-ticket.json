@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX9-CROSS-PROVIDER-RETURN-TRUTH-HARD-GATE",
+  "parentTicketId": "UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR",
+  "status": "fix10_cross_provider_return_truth_local_implementation_and_pre_apk_contract_qualified_device_provider_reproof_pending_no_build",
+  "classification": "mvp_required",
+  "selectedForImplementation": true,
+  "founderDirectionDate": "2026-08-22",
+  "customerOutcome": "Every social identity method distinguishes genuine user cancellation from provider, configuration, network, callback, token-exchange and Firebase-session failures without exposing private identity data.",
+  "permanentRule": {
+    "genericCanceledIsNotProofOfUserCancellation": true,
+    "exactReturnStageMustBeProven": true,
+    "firebaseExchangeReachabilityMustBeProven": true,
+    "verifiedSessionBootstrapReachabilityMustBeProven": true,
+    "privateProviderDetailMustBeSanitized": true,
+    "partialIdentityMustRollback": true,
+    "retryMustBeBoundedAndOriginSafe": true,
+    "successRequiresProviderSpecificOppoAcceptance": true
+  },
+  "executionOrder": ["google", "youtube", "facebook", "x", "instagram"],
+  "childTickets": [
+    "UAW-C34P-FIX9A-YOUTUBE-SHARED-GOOGLE-IDENTITY-RETURN-TRUTH",
+    "UAW-C34P-FIX9B-FACEBOOK-NATIVE-SDK-RETURN-TRUTH",
+    "UAW-C34P-FIX9C-X-OAUTH2-PKCE-RETURN-TRUTH",
+    "UAW-C34P-FIX9D-INSTAGRAM-OAUTH-BROKER-RETURN-TRUTH"
+  ],
+  "heldBoundaries": ["apple_account_recovery", "email_link", "mobile_otp"],
+  "r60_83DeviceRejection": {
+    "installedVersionName": "1.0.0-r60.83",
+    "installedVersionCode": "2026082183",
+    "artifactSha256": "3B1E5B026FB6BEE7878FF70C9956744FD7A7C0F361087C83BDC334EDEC802232",
+    "buildCount": 1,
+    "installCount": 1,
+    "googleSafeCode": "auth-unknown",
+    "youtubeSafeCode": "auth-unknown",
+    "facebookSafeCode": "auth-facebook-firebase-provider-failure",
+    "xSafeCode": "auth-provider-unavailable",
+    "instagramSafeCode": "auth-provider-unavailable",
+    "buttonWiringReached": true,
+    "privateIdentityTokenEmailOrAccountRecorded": false,
+    "candidateAccepted": false,
+    "providerRetryRebuildOrReinstallAuthorized": false
+  },
+  "localForensicRepairQualification": {
+    "state": "diagnostic_source_and_pre_apk_contract_qualified_not_device_success",
+    "stageSpecificGoogleYoutubeFacebookXInstagramReceiptsRequired": true,
+    "mobileBackendBrokerSchemaAndErrorCodeParityGateRequired": true,
+    "allSocialFocusedTestsPassed": 130,
+    "allSocialFocusedTestsFailed": 0,
+    "allSocialFocusedTestsSkipped": 0,
+    "retainedEvidenceSha256": "BCD25F0AC56D5CADA3F7AB993878D4812C08229DB8BB7AE75E838EDE8C46836D",
+    "flutterAnalyzerQualified": true,
+    "backendStrictTypecheckQualified": true,
+    "androidReleaseKotlinCompileExitZero": true,
+    "preApkFoundationGateQualified": true,
+    "latestFocusedAuthTerminalTestsPassed": 115,
+    "latestFocusedAuthTerminalTestsFailed": 0,
+    "publicHostedReturnBridgeTestsPassed": 10,
+    "xAndInstagramHostedReturnBridgeQualified": true,
+    "youtubeFullSocialRuntimeCohortQualified": true,
+    "officialFlutterFirebaseAuthContractApplied": true,
+    "functionalProviderSuccessClaimed": false,
+    "buildDeployProviderConsoleWriteOrDeviceMutationAuthorized": false
+  },
+  "providerReadinessCheckpoint": {
+    "readbackDate": "2026-08-22",
+    "fullSocialFounderDevReadinessGateQualified": true,
+    "google": {
+      "firebaseProviderQualified": true,
+      "androidNativeIdentityBridgeLocallyQualified": true,
+      "oauthSignerAndServerClientQualified": true,
+      "oppoAcceptanceQualified": false
+    },
+    "youtube": {
+      "sharedGoogleIdentityQualified": true,
+      "fix7AccountErasureBindingsQualified": false,
+      "apiTeamSubmissionQualified": false,
+      "oppoAcceptanceQualified": false
+    },
+    "facebook": {
+      "firebaseAndMetaConfigurationQualified": true,
+      "providerHandshakeQualified": true,
+      "firebaseExchangeAndSessionBootstrapQualified": false,
+      "returnTruthImplementationQualified": true,
+      "oppoAcceptanceQualified": false
+    },
+    "x": {
+      "nativePublicClientReadScopeAndCallbackQualified": true,
+      "brokerAuthConfigurationQualified": true,
+      "returnTruthImplementationQualified": true,
+      "oppoAcceptanceQualified": false
+    },
+    "instagram": {
+      "founderDevBusinessLoginAndCallbackQualified": true,
+      "publicAppReviewOrLiveModeQualified": false,
+      "returnTruthImplementationQualified": true,
+      "oppoAcceptanceQualified": false
+    },
+    "focusedCrossProviderTestQualification": {
+      "qualified": true,
+      "passed": 122,
+      "skipped": 0,
+      "failed": 0,
+      "cycleCount": 2,
+      "latestEvidence": "artifacts/quality/uaw-c34p-fix8-full-social-readiness-20260822-01/focused-cross-provider-tests-cycle-2.jsonl",
+      "latestEvidenceSha256": "D9949866A90C0D472B7F5A0D090BB47E668E53E61B2A83BE43EF73AEEDC9E7DF"
+    },
+    "flutterAnalyzerQualified": true,
+    "androidReleaseKotlinCompileQualified": true,
+    "approvedUiLocksAndProviderSeamProjectionQualified": true,
+    "publicAuthBuildControlsQualified": true,
+    "localTestsProveRealDeviceCompletion": false,
+    "sqlConnectRequiredForSocialLogin": false,
+    "providerConsoleWriteCount": 0,
+    "agentPrivateLoginCount": 0,
+    "secretCredentialIdentifierOrKeyHashRecorded": false,
+    "buildCount": 1,
+    "installCount": 1
+  },
+  "authority": {
+    "ticketRegistrationAuthorized": true,
+    "implementationAuthorized": true,
+    "localReadOnlyForensicsAndTestsAuthorized": true,
+    "buildOrInstallAuthorized": false,
+    "privateProviderLoginAuthorized": false,
+    "providerConsoleWriteAuthorized": false,
+    "deploymentAuthorized": false,
+    "playOrProductionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

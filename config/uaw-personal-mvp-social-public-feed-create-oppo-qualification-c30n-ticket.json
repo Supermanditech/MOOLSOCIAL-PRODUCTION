@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-CREATE-OPPO-QUALIFICATION-C30N",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-REVIEW-PERSONAS-AND-CONTENT-C30K",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-CONTENT-REDEPLOY-C30K-FIX1",
+    "UAW-PERSONAL-MVP-SOCIAL-C30L-RUNTIME-RECOVERY-C30M"
+  ],
+  "state": "device_rejected_Feed_pretransport_App_Check_distribution_gate_successor_authority_required",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_and_creator",
+  "customerOutcome": "A fresh Dev OPPO candidate shows the real three-author public MoolSocial Feed across text, image, carousel, four-choice Image Poll, four-choice Quick Poll and four-choice Quiz, and the signed-in personal user can publish each format through Create and see the accepted result after refresh and relaunch.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "backend/functions/src/social/contracts.ts",
+      "backend/functions/src/social/service.ts",
+      "backend/functions/src/social/firestore_store.ts",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/build-buy-device-review.ps1",
+      "scripts/test-personal-social-content-runtime-build-controls-c30m.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newUsers": [],
+    "newSeedPosts": [],
+    "necessityProof": "C30K already owns three real Dev Firebase Auth personas, 36 public posts and 48 media objects with two posts per persona per requested format. r60.39 is empty only because its immutable build omitted the content endpoint. One endpoint-enabled successor and device acceptance are the minimum complete recovery; duplicating users, posts, screens, routes or backend owners is forbidden."
+  },
+  "minimumCompleteScope": [
+    "reverify_the_sealed_C30K_3_persona_36_post_48_media_readback_without_reapply_or_secret_output",
+    "qualify_the_exact_Dev_social_content_endpoint_in_a_fresh_successor_machine_state",
+    "run_two_identical_complete_Social_source_cycles_before_build",
+    "after_exact_authority_build_once_install_once_and_preserve_r60_39_and_all_C28D_C30L_C30M_evidence",
+    "prove_OPPO_Feed_loads_all_three_authors_and_text_image_carousel_imagePoll_quickPoll_quiz",
+    "prove_four_choices_media_carousel_paging_vote_quiz_answer_refresh_offline_retry_and_retained_relaunch",
+    "publish_one_real_Dev_post_per_supported_Create_format_from_the_currently_signed_in_personal_user_and_read_each_back_through_Feed",
+    "replay_YouTube_Home_Shorts_and_truthful_creator_account_state_before_founder_review"
+  ],
+  "explicitExclusions": [
+    "no_new_review_user_duplicate_corpus_fake_local_post_or_direct_client_Firestore_Storage_write",
+    "no_C30K_corpus_reapply_update_delete_cleanup_or_persona_enablement",
+    "no_content_provider callback rules Hosting Staging or Production deployment",
+    "no_password token API_key OAuth_credential App_Check_token download_token or_secret_value_output",
+    "no_YouTube_quota_submission_commit_push_promotion_message_call_or_fund",
+    "one_build_one_checksum_matched_in_place_install_and_exactly_six_signed_in_Dev_Create_writes_only"
+  ],
+  "authority": {
+    "founderObservationAndTicketRegistration": "explicit_2026_08_12_Feed_real_users_all_formats_end_to_end_required_before_YouTube_quota_submission",
+    "founderExecutionAuthority": "explicit_2026_08_12_C30N_fresh_host_one_APK_build_one_checksum_matched_OPPO_install_device_launch_taps_and_six_signed_in_Dev_Create_writes_no_Production_or_YouTube_quota_submission",
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.40",
+    "installedVersionCode": "2026081240",
+    "installedApkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "installedSerial": "2b3e0f71",
+    "uninstallDataClearDowngradeOrSecondR60_39InstallForbidden": true,
+    "C28DAndC30LC30MEvidenceImmutable": true,
+    "protectedBaselineUpdated": false,
+    "secondBuildPerformed": false,
+    "secondInstallPerformed": false,
+    "createWritesAttempted": 0
+  },
+  "deviceQualificationResult": {
+    "state": "rejected_Feed_pretransport_App_Check_distribution_gate",
+    "c28d": "passed_two_matching_no_tap_frames",
+    "youtubeHome": "passed_real_provider_catalogue",
+    "moolSocialFeed": "rejected_before_server_transport_after_one_bounded_retry",
+    "createWritesAttempted": 0,
+    "inferredCause": "ADB_sideloaded_profile_install_not_prequalified_for_current_Play_Integrity_App_Check_policy",
+    "inferenceNotDecodedVerdict": true,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-CREATE-OPPO-QUALIFICATION-C30N-DEVICE-REJECTION-20260812.md"
+  },
+  "dependencies": [
+    "moolsocialcontent_00003_juw_ACTIVE",
+    "youtubeprovider_00036_qer_ACTIVE",
+    "C30K_three_persona_36_post_48_media_corpus_preserved",
+    "Firebase_Auth_and_Play_Integrity_App_Check_on_the_exact_Dev_Android_identity",
+    "fresh_C30N_host_build_install_and_signed_in_Dev_content_write_authority",
+    "permanent_regression_MVP_delivery_environment_and_C28D_gates"
+  ],
+  "testPlan": [
+    "C30K_seal_and_bounded_readback_counts_without_reapply",
+    "endpoint_positive_missing_empty_wrong_environment_and_runtime_omission_controls",
+    "focused_then_two_identical_complete_Social_source_cycles",
+    "fresh_C30N_host_qualification_one_APK_build_and_one_checksum_verified_install",
+    "OPPO_three_author_all_format_media_carousel_poll_quiz_vote_refresh_offline_retry_and_relaunch_matrix",
+    "OPPO_current_signed_in_user_one_publish_and_Feed_readback_per_six_Create_formats",
+    "YouTube_Home_Shorts_creator_state_and_global_navigation_nonregression",
+    "founder_review_before_any_YouTube_quota_submission"
+  ],
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-CREATE-OPPO-QUALIFICATION-C30N-FINDINGS-20260812.md"
+}

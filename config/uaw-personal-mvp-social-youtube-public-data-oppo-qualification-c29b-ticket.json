@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B",
+  "parentTicket": "MOOLSOCIAL-FSC02D-DEV-YOUTUBE-PUBLIC-DATA-RUNTIME-QUALIFICATION",
+  "hostQualification": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-HOST-QUALIFICATION-C29A",
+  "state": "rejected_pre_flutter_wrapper_gcloud_account_gate_authorization_consumed_successor_required",
+  "classification": "mvp_supporting",
+  "actor": "authenticated Personal review user on founder-authorized OPPO serial 2b3e0f71",
+  "customerOutcome": "The founder reviews real eligible YouTube Shorts and Videos in the production-grade Flutter Social surface on a checksum-qualified r60.29 OPPO build.",
+  "founderDirection": "complete_production_grade_Dev_runtime_and_OPPO_test_before_founder_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "C29A qualified every source owner. C29B only consumes the existing one-build and in-place device-review path."
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-C29B",
+    "versionName": "1.0.0-r60.29",
+    "versionCode": "2026081129",
+    "buildMode": "profile",
+    "sourceManifestSha256": "42D38ECD8B037BDAE10092E4BDEF607A5210CEC42A1DF12747313B1CF2974B64",
+    "oneBuildOnly": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "minimumCompleteScope": [
+    "prebuild_machine_gate",
+    "one_profile_APK_build",
+    "checksum_signature_version_and_serial_qualification",
+    "in_place_OPPO_install_without_data_clear",
+    "real_App_Check_capabilities_catalogue_player_and_recovery_replay",
+    "founder_review_handoff"
+  ],
+  "explicitExclusions": [
+    "no_cloud_write_redeploy_or_secret_value_access",
+    "no_owner_OAuth_upload_live_or_analytics_capability",
+    "no_uninstall_data_clear_downgrade_or_second_build",
+    "no_Production_Staging_HTML_commit_push_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29A_two_cycle_host_qualification_passed",
+    "FSC02D_no_secret_PublicDataReview_qualification_passed",
+    "FSC02E_exact_Dev_Firebase_Android_client_key_restriction_passed",
+    "founder_OPPO_authority_2026_08_11",
+    "exact_OPPO_serial_and_r60_28_predecessor_identity",
+    "checksum_unique_successor_before_install",
+    "permanent_regression_memory"
+  ],
+  "testAndEvidencePlan": [
+    "prebuild_process_and_source_audit",
+    "one_wrapper_profile_build",
+    "APK_identity_and_signing_audit",
+    "in_place_install_and_installed_checksum_match",
+    "real_Shorts_catalogue_player_navigation_lifecycle_and_recovery_replay"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorizedAfterMachineGate": true,
+    "installAuthorizedAfterChecksumQualification": true,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "securityDependency": {
+    "ticket": "MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION",
+    "state": "passed",
+    "completion": "docs/quality/MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION-COMPLETION-20260811.md",
+    "externalServiceWriteAuthorityInherited": false
+  }
+}

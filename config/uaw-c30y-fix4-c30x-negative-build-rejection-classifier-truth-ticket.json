@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-FIX4-C30X-NEGATIVE-BUILD-REJECTION-CLASSIFIER-TRUTH",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "founder_authorized_aab_audit_finding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_evidence_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "A successor qualification cycle distinguishes the exact expected C30X fail-closed prebuild rejection from a real gate failure without weakening the release gate or producing a false pass.",
+  "classificationReason": "The first post-FIX3 static cycle reached the correct C30X hard-gate rejection but a reconstructed label caused a false orchestration failure. The founder requires every AAB audit finding to be ticketed and implemented before build.",
+  "minimumCompleteScope": [
+    "preserve_the_failed_cycle_1_static_log_and_exit_as_non_qualifying_evidence",
+    "add_one_read_only_repository_owned_C30X_negative_build_rejection_classifier",
+    "require_the_exact_hard_gate_prefix_and_incomplete_candidate_authority_qualification_reason",
+    "prove_state_aggregate_counts_authority_and_source_manifest_are_unchanged_by_the_negative_probe",
+    "reseal_source_and_restart_two_fresh_complete_cycles_with_new_evidence_names"
+  ],
+  "explicitExclusions": [
+    "no_change_to_C30X_positive_or_negative_business_rules",
+    "no_runtime_UI_chat_social_backend_Hosting_provider_or_service_source_change",
+    "no_AAB_APK_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX4",
+    "no_overwrite_reuse_or_relabeling_of_the_failed_static_attempt"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_implemented_and_requalified_before_build",
+    "REG_20260814_2183_registered_before_repair",
+    "C30Y_FIX1_through_FIX3_implemented_and_counts_remain_zero"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c30x.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-c30y-fix4-c30x-negative-build-rejection-classifier-truth.ps1"
+    ],
+    "necessityProof": "C30X remains the sole release-state gate. One thin read-only classifier is necessary to own expected negative evidence durably; it creates no alternate release state or build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_positive_expected_rejection_classification",
+    "static_source_assertion_for_exact_C30X_owner_prefix",
+    "before_after_state_aggregate_manifest_hash_and_zero_count_equality",
+    "fresh_1132_file_source_manifest_and_two_complete_FIX4_cycles",
+    "failed_attempt_paths_remain_immutable_and_new_attempt_paths_are_unique"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FIX4-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-fix4-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30Y-C30X-EXPECTED-REJECTION-LABEL-MISMATCH-20260814.md"
+  }
+}

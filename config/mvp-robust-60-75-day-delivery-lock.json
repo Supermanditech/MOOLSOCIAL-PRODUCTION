@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+  "state": "founder_locked_active",
+  "authorityDate": "2026-08-05",
+  "humanAuthority": "docs/delivery/MVP-ROBUST-60-75-DAY-DELIVERY-LOCK-20260805.md",
+  "secondarySelectionCheckpoint": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+  "nativeFlutterNavigationAuthority": {
+    "path": "config/mvp-native-flutter-whirlpool-navigation-motion-directive.json",
+    "sha256": "C0A3C60BAC66B1D6F9090BFEE3F3C673FF186144D1193AB7C85DB76836153EAC"
+  },
+  "targetWindow": {
+    "basisDate": "2026-08-05",
+    "minimumCalendarDays": 60,
+    "maximumCalendarDays": 75,
+    "earliestTargetDate": "2026-10-04",
+    "latestTargetDate": "2026-10-19",
+    "targetOutcome": "controlled_public_production_go_live",
+    "qualityOutcome": "robust_founder_defined_mvp",
+    "nonstopExecutionStartRequiresSeparateFounderActivation": true,
+    "externalProviderAndStoreDatesAreNotEngineeringControlled": true,
+    "externalDelayMustBeReportedAndMustNotBeHiddenByQualityReduction": true
+  },
+  "implementationTopologyTargets": {
+    "canonicalRouteTargetMinimum": 35,
+    "canonicalRouteTargetMaximum": 48,
+    "routeLevelV2ScreenTargetMinimum": 32,
+    "routeLevelV2ScreenTargetMaximum": 40,
+    "targetsArePlanningControlsNotPermissionToOmitRequiredSafetyOrRecovery": true,
+    "deviationRequiresRecordedNecessityAndTimelineImpact": true
+  },
+  "rules": {
+    "robustFounderDefinedMvpRequired": true,
+    "maximizeUsefulFeaturesInsideApprovedMvpThroughReuse": true,
+    "blockUnnecessaryDuplicateCode": true,
+    "blockDuplicateScreensPerUserType": true,
+    "blockDuplicateRoutesPerUserType": true,
+    "blockDuplicateBackendOwners": true,
+    "oneSharedBuySurfaceForAllEligibleBuyers": true,
+    "sharedScreensUseExactDataCapabilityAndPolicyVariants": true,
+    "sharedBackendOwnersUseThinExactPolicyAdapters": true,
+    "acceptanceTicketsRemainExactByActorAndOutcome": true,
+    "ticketCountDoesNotImplyScreenRouteServiceOrBuildCount": true,
+    "newScreenRequiresRecordedNecessityProof": true,
+    "newRouteRequiresRecordedNecessityProof": true,
+    "newBackendOwnerRequiresRecordedNecessityProof": true,
+    "reuseExistingNonUiOwnersBeforeCreatingAnotherOwner": true,
+    "legacyPresentationRemainsReadOnly": true,
+    "beyondMvpRequiresSeparateExactFounderAuthorization": true,
+    "securityPrivacyAccessibilityRecoveryAndReleaseGatesCannotBeWaived": true,
+    "dependencyHeldWorkCannotBeFabricatedAsComplete": true,
+    "criticalTimelineThreatMustBeReportedImmediatelyWithSmallestLawfulMitigation": true
+  },
+  "protectedPreauthorizedManifests": [
+    {
+      "id": "MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH",
+      "path": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+      "sha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8"
+    },
+    {
+      "id": "BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-20260805",
+      "path": "config/buy-mvp-ready-order-delivery-portfolio.json",
+      "sha256": "5CE81AB6332607A71B960C57A1E99466109E13299CD8A5995FFC3163F35893AF"
+    },
+    {
+      "id": "WORK-MVP-FUNDED-OPPORTUNITY-PAYOUT-PORTFOLIO-20260805",
+      "path": "config/work-mvp-funded-opportunity-payout-portfolio.json",
+      "sha256": "66A0842D571D90F0CF093817D8E013FEFEA6FDA0E7D03B25099823B079B54D13"
+    }
+  ],
+  "authorityBoundary": {
+    "executionActivationAtRegistration": false,
+    "changesImplementationTopologyWithoutChangingApprovedCustomerOutcomes": true,
+    "doesNotActivateAnyTicket": true,
+    "doesNotAuthorizeRuntimeBackendBuildDeviceExternalCommitPushDeployOrPromotion": true,
+    "materialManifestOrOutcomeChangeRequiresVersionedFounderAmendment": true
+  }
+}

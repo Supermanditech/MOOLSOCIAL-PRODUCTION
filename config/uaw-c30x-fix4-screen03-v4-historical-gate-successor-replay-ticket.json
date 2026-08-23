@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-FIX4-SCREEN03-V4-HISTORICAL-GATE-SUCCESSOR-REPLAY",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_historical_gate_replay_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The accepted Screen03 v4 release-configuration lock can be replayed read-only during C30X qualification without reopening or mutating the protected reference.",
+  "classificationReason": "The immutable v4 content gate is correct, but its scope assertion accepts only the completed mutation ticket. C30X requires an exact read-only successor context to include this protection in release qualification.",
+  "minimumCompleteScope": [
+    "retain_the_exact_FIX1_creation_scope_with_reference_write_authority",
+    "add_only_the_exact_C30X_read_only_successor_qualification_scope",
+    "keep_all_non_test_runtime_backend_build_device_external_and_secret_authorities_false",
+    "pass_the_v4_gate_and_global_UI_lock_without_changing_any_approved_reference_byte"
+  ],
+  "explicitExclusions": [
+    "no_approved_reference_manifest_v4_UI_test_runtime_asset_or_golden_change",
+    "no_broad_ticket_prefix_wildcard_or_generic_successor_acceptance",
+    "no_AAB_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX4"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2166_registered_before_repair",
+    "C30X_FIX1_v4_acceptance_and_global_UI_lock_are_already_green"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": ["scripts/check-screen03-v4-production-acceptance-c30x-fix1.ps1"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The existing gate already owns all immutable-content assertions. One exact two-context scope predicate is the smallest complete correction and adds no alternate protected-reference owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "prove_every_approved_Screen03_v4_byte_is_unchanged",
+    "run_the_v4_gate_under_exact_FIX4_creation_repair_scope_then_under_C30X_read_only_scope",
+    "run_the_v4_gate_on_PowerShell_7_and_Windows_PowerShell",
+    "replay_the_global_approved_UI_lock"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30X-FIX4-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30x-fix4-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-SCREEN03-V4-HISTORICAL-GATE-SCOPE-DEAD-END-20260814.md"
+  }
+}

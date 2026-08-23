@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 2,
+  "policyId": "MOOLSOCIAL-MVP-SCOPE-POLICY-V2-20260805",
+  "state": "founder_directed_active",
+  "authorityDate": "2026-08-05",
+  "humanAuthority": "docs/delivery/MVP-SCOPE-EXECUTION-POLICY.md",
+  "launchAuthority": "docs/delivery/45-DAY-GO-LIVE-PLAN.md",
+  "latestFounderActionProviderAuthority": "docs/delivery/MVP-FOUNDER-ACTION-PROVIDER-SURFACE-DIRECTIVE-20260805.md",
+  "latestFounderScopeAmendment": "docs/delivery/MVP-BOOK-BUS-REFERENCE-SERVICE-HOME-FOUNDER-AMENDMENT-20260809.md",
+  "deliveryDisciplineAuthority": "docs/delivery/MVP-ROBUST-60-75-DAY-DELIVERY-LOCK-20260805.md",
+  "deliveryDisciplineMachineLock": "config/mvp-robust-60-75-day-delivery-lock.json",
+  "preTicketSelectionCheckpoint": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+  "classifications": [
+    "mvp_required",
+    "mvp_supporting",
+    "beyond_mvp"
+  ],
+  "mvpRequiredCriteria": [
+    "completes_or_unblocks_a_core_launch_journey",
+    "fixes_a_confirmed_regression_in_a_supported_launch_journey",
+    "is_required_for_security_privacy_legal_accessibility_or_truthful_state",
+    "is_required_for_launch_reliability_recovery_or_release_qualification",
+    "implements_a_bounded_provider_or_payment_contract_already_authorized_for_launch"
+  ],
+  "mvpSupportingCriteria": [
+    "bounded_usability_or_navigation_work_needed_to_complete_the_core_journey",
+    "minimal_operational_or_observability_support_needed_to_release_safely",
+    "small_non_speculative_polish_that_removes_a_confirmed_launch_blocker"
+  ],
+  "beyondMvpSignals": [
+    "optional_feature_depth_or_speculative_personalization",
+    "broad_b2b_enterprise_or_multi_market_expansion_beyond_the_launch_pilot",
+    "ride_health_salon_food_or_other_depth_beyond_the_exact_founder_approved_bounded_mvp_journeys",
+    "owned_long_form_video_universal_ai_agents_or_unapproved_provider_scope",
+    "speculative_ten_million_user_scaling_without_a_measured_launch_bottleneck",
+    "opportunistic_redesign_animation_or_platform_work_not_needed_by_the_ticket"
+  ],
+  "founderApprovedBoundedMvpSurfaces": [
+    "social_shorts_videos_feed_create_dependency_held_until_youtube_sequence_finishes",
+    "buy_shop_wholesale_medicine_orders_complete_provider_bound_delivery_journey",
+    "eat_order_food_and_book_table_only",
+    "ride_bike_auto_and_cab_only",
+    "book_individual_doctor_salon_and_founder_added_bus_booking",
+    "work_earn_today_and_workspace_universal_entry_only",
+    "global_individual_shared_and_journey_context_chat"
+  ],
+  "founderPostponedSurfaces": [
+    "eat_tiffin",
+    "book_get_it_done",
+    "standalone_pay_recharge_bills_scan_and_receipts",
+    "universal_work_delivery_onboard_and_verify"
+  ],
+  "preExecutionDisclosureFields": [
+    "ticketId",
+    "customerOutcome",
+    "classification",
+    "classificationReason",
+    "minimumCompleteScope",
+    "explicitExclusions",
+    "dependenciesAndApprovals",
+    "testAndEvidencePlan",
+    "robustnessAndReuseAssessment"
+  ],
+  "sqlConnectCompletionRule": {
+    "state": "founder_locked_active",
+    "authorityDate": "2026-08-22",
+    "singleAuthoritativeDatabaseMapping": true,
+    "mappingEntryCondition": "complete_frontend_ui_ux_api_business_logic_ownership_failure_recovery_privacy_retention_and_authoritative_data_contracts",
+    "multipleProvisioningAttemptsAllowed": false,
+    "duplicateOrRepeatedMigrationsAllowed": false,
+    "partialOrUnderdevelopedBusinessLogicSchemaAllowed": false,
+    "provisionalMainOrSubactionDomainSchemaAllowed": false,
+    "preCompletionBackendScope": [
+      "already_complete_shared_global_capabilities",
+      "shared_authentication_login_and_account_erasure",
+      "explicitly_separate_locally_emulated_or_existing_non_sql_connect_backends"
+    ],
+    "preCompletionExcludedScope": [
+      "unfinished_main_action_business_logic",
+      "unfinished_subaction_business_logic",
+      "unapproved_api_contracts",
+      "speculative_domain_tables_relationships_or_migrations"
+    ],
+    "currentSqlConnectProvisioningAuthorized": false,
+    "currentSqlConnectMigrationAuthorized": false,
+    "founderReactivationRequiresCompleteDatabaseMapAndFreshExactAuthorization": true
+  },
+  "rules": {
+    "discloseBeforeExecution": true,
+    "preferSmallestCompleteJourney": true,
+    "oneLogicalTicketAtATime": true,
+    "noOpportunisticExpansion": true,
+    "mvpClassificationDoesNotCreateAuthority": true,
+    "beyondMvpRequiresSeparateExactFounderAuthorization": true,
+    "existingProtectedAndEnvironmentGatesRemainMandatory": true,
+    "failClosedWhenClassificationOrDisclosureIsMissing": true,
+    "robust60To75DayDeliveryLockRequired": true,
+    "preTicketSelectionReuseAssessmentRequired": true,
+    "noDuplicateScreensRoutesOrBackendOwnersPerUserType": true,
+    "ticketCountDoesNotImplyImplementationOwnerCount": true,
+    "newImplementationOwnerRequiresNecessityProof": true,
+    "robustnessCannotBeReducedForTimeline": true,
+    "sqlConnectSingleAuthoritativeMappingAfterCompleteContracts": true,
+    "sqlConnectMultipleAttemptsAndDuplicateMigrationsForbidden": true,
+    "sqlConnectPartialBusinessLogicSchemaForbidden": true,
+    "sqlConnectPreCompletionScopeLimitedToCompleteSharedGlobalCapabilities": true
+  }
+}

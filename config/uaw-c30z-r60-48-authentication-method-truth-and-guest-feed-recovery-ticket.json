@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30Z-R60-48-AUTHENTICATION-METHOD-TRUTH-AND-GUEST-FEED-RECOVERY",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "unlocked_source_two_identical_cycles_qualified_locked_presentation_live_provider_and_successor_release_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocking_authentication_truth_and_guest_navigation",
+  "actor": "signed_out_personal_user_entering_public_Feed_or_authenticating_from_a_protected_Social_action",
+  "customerOutcome": "A signed-out user can browse public Feed, and a protected Social action opens a truthful sign-in surface where only qualified methods are operable; successful authentication returns to the exact requested action while unavailable or failed methods provide accurate recovery without a false success.",
+  "observedFailure": {
+    "candidate": "1.0.0-r60.48+2026081348_Play_Internal",
+    "confirmed": [
+      "Google_and_YouTube_account_choice_did_not_establish_a_MoolSocial_session",
+      "Email_OTP_was_advertised_without_MOOLSOCIAL_AUTH_API_BASE_URL",
+      "Mobile_OTP_was_advertised_without_qualified_live_provider_readiness",
+      "all_six_social_provider_controls_rendered_enabled_while_runtime_allowed_only_Google_and_YouTube"
+    ],
+    "reproductionRequired": [
+      "guest_Feed_entry_reported_to_redirect_to_sign_in"
+    ]
+  },
+  "minimumSuccessorCorrection": [
+    "bind_social_provider_enabled_state_and_accessibility_semantics_to_JourneySession_availability",
+    "bind_Email_and_Mobile_OTP_enabled_state_to_explicit_runtime_availability",
+    "keep_missing_or_unqualified_methods_visible_only_as_truthfully_unavailable_and_non_dispatching",
+    "preserve_structured_Google_configuration_interruption_cancellation_and_Firebase_failure_recovery",
+    "prevent_a_downstream_account_bootstrap_failure_from_leaving_an_ambiguous_partial_social_auth_session",
+    "prove_public_guest_Feed_entry_separately_from_protected_write_authentication",
+    "prove_exact_origin_success_cancel_failure_retry_and_Back_continuity_for_protected_Social_actions"
+  ],
+  "explicitExclusions": [
+    "no_new_screen_route_backend_owner_or_duplicate_auth_gateway",
+    "no_Firebase_Google_X_Facebook_Apple_Instagram_email_or_SMS_provider_console_mutation",
+    "no_credential_API_key_OAuth_client_ID_token_nonce_private_verdict_or_attestation_access",
+    "no_email_SMS_or_external_message_send",
+    "no_backend_Hosting_provider_rules_IAM_or_external_service_deployment",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_or_other_device_mutation"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorizedByFounder": true,
+    "testAndGateImplementationAuthorizedByFounder": true,
+    "backendSourceImplementationAuthorized": false,
+    "externalProviderOrDeploymentAuthorized": false,
+    "successorBuildUploadInstallAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "sourceQualification": {
+    "state": "two_identical_cycles_passed_partial_ticket_qualification",
+    "manifestPath": "artifacts/quality/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-20260815-01/source-manifest-c30z-attempt-01.txt",
+    "manifestFiles": 1114,
+    "manifestSha256": "16F698E97C865CD8CCC75E9EE8C5E99FCCFC16AB9E912A05A67D1C74A3F62361",
+    "flutterPassedPerCycle": 418,
+    "flutterSkippedPerCycle": 3,
+    "flutterFailedPerCycle": 0,
+    "focusedAuthAndFeedPassedPerCycle": 36,
+    "wholeMobileAnalyzerCleanPerCycle": true,
+    "c30zDualPowerShellHostGatePassedPerCycle": true,
+    "approvedUiLocksPassedPerCycle": true,
+    "historicalR60_48CountsPreserved": "1/1/1",
+    "newReleaseActions": "0/0/0"
+  },
+  "remainingApprovalNeeds": [
+    "founder_authorized_Screen03_v5_visible_unavailable_method_review_workflow",
+    "non_secret_live_Google_and_phone_provider_readiness_evidence_without_client_ID_or_secret_access",
+    "email_OTP_backend_source_ticket_and_later_deployment_provider_authority",
+    "one_exact_successor_AAB_Internal_Testing_upload_activation_and_in_place_OPPO_Play_update"
+  ],
+  "evidence": {
+    "founderDeviceFailure": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-founder-device-defect-evidence.json",
+    "installedIdentity": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-play-installed-retained-data-evidence.json",
+    "assessment": "docs/quality/UAW-C30Z-R60-48-AUTHENTICATION-METHOD-TRUTH-AND-GUEST-FEED-RECOVERY-20260815.md",
+    "cycle01": "artifacts/quality/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-20260815-01/cycle-01-summary.json",
+    "cycle02": "artifacts/quality/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-20260815-01/cycle-02-summary.json",
+    "gate": "scripts/check-c30z-authentication-method-truth-and-guest-feed-recovery.ps1"
+  }
+}

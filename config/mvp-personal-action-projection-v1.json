@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R01-PERSONAL-ACTION-PROJECTION-CONTRACT-V1",
+  "projectionId": "personal_user_mvp_launch",
+  "projectionVersion": "2026-08-05.1",
+  "projectionState": "static_reference_fixture_not_runtime_authority",
+  "authority": {
+    "owner": "launch_policy_owner",
+    "accountBaseline": "personal_user",
+    "capabilityGrantAuthority": "server_only",
+    "localCapabilityGrantAllowed": false
+  },
+  "validity": {
+    "effectiveAt": "2026-08-05T00:00:00+05:30",
+    "expiresAt": "2026-10-20T00:00:00+05:30",
+    "staleRecovery": "retain_last_safe_context_and_request_fresh_projection"
+  },
+  "sourceManifest": {
+    "path": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+    "sha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8"
+  },
+  "mainActions": [
+    {
+      "id": "social",
+      "label": "Social",
+      "disposition": "active",
+      "routeOwner": "social_v2",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "shorts",
+          "label": "Shorts",
+          "disposition": "dependency_held",
+          "routeOwner": "social_v2_shorts",
+          "dependencies": ["youtube_compliance"]
+        },
+        {
+          "id": "videos",
+          "label": "Videos",
+          "disposition": "dependency_held",
+          "routeOwner": "social_v2_videos",
+          "dependencies": ["youtube_compliance"]
+        },
+        {
+          "id": "feed",
+          "label": "Feed",
+          "disposition": "active",
+          "routeOwner": "social_v2_feed",
+          "dependencies": []
+        },
+        {
+          "id": "create",
+          "label": "Create",
+          "disposition": "active",
+          "routeOwner": "social_v2_create",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "buy",
+      "label": "Buy",
+      "disposition": "active",
+      "routeOwner": "buy_v2",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "shop",
+          "label": "Shop",
+          "disposition": "active",
+          "routeOwner": "buy_v2_shop",
+          "dependencies": []
+        },
+        {
+          "id": "wholesale",
+          "label": "Wholesale",
+          "disposition": "active",
+          "routeOwner": "buy_v2_wholesale",
+          "dependencies": []
+        },
+        {
+          "id": "medicine",
+          "label": "Medicine",
+          "disposition": "active",
+          "routeOwner": "buy_v2_medicine",
+          "dependencies": []
+        },
+        {
+          "id": "orders",
+          "label": "Orders",
+          "disposition": "active",
+          "routeOwner": "buy_v2_orders",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "eat",
+      "label": "Eat",
+      "disposition": "active",
+      "routeOwner": "eat_journey_owner",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "order-food",
+          "label": "Order Food",
+          "disposition": "active",
+          "routeOwner": "eat_order_food",
+          "dependencies": []
+        },
+        {
+          "id": "book-table",
+          "label": "Book Table",
+          "disposition": "active",
+          "routeOwner": "eat_book_table",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "ride",
+      "label": "Ride",
+      "disposition": "active",
+      "routeOwner": "ride_journey_owner",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "bike",
+          "label": "Bike",
+          "disposition": "active",
+          "routeOwner": "ride_bike",
+          "dependencies": []
+        },
+        {
+          "id": "auto",
+          "label": "Auto",
+          "disposition": "active",
+          "routeOwner": "ride_auto",
+          "dependencies": []
+        },
+        {
+          "id": "cab",
+          "label": "Cab",
+          "disposition": "active",
+          "routeOwner": "ride_cab",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "book",
+      "label": "Book",
+      "disposition": "active",
+      "routeOwner": "book_journey_owner",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "doctor",
+          "label": "Doctor",
+          "disposition": "active",
+          "routeOwner": "book_doctor",
+          "dependencies": []
+        },
+        {
+          "id": "salon",
+          "label": "Salon",
+          "disposition": "active",
+          "routeOwner": "book_salon",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "label": "Work",
+      "disposition": "active",
+      "routeOwner": "work_journey_owner",
+      "dependencies": [],
+      "subActions": [
+        {
+          "id": "earn-today",
+          "label": "Earn Today",
+          "disposition": "active",
+          "routeOwner": "work_earn_today",
+          "dependencies": []
+        },
+        {
+          "id": "workspace",
+          "label": "Workspace",
+          "disposition": "active",
+          "routeOwner": "workspace_routing_owner",
+          "dependencies": []
+        }
+      ]
+    }
+  ],
+  "globalActions": [
+    {
+      "id": "chat",
+      "label": "Chat",
+      "disposition": "active",
+      "routeOwner": "moolchat_global_entry",
+      "dependencies": [],
+      "subActions": []
+    }
+  ],
+  "removedActions": [
+    {
+      "id": "pay",
+      "disposition": "removed_from_universal",
+      "recovery": "open_transaction_owned_payment_or_truthful_unavailable"
+    },
+    {
+      "id": "recharge",
+      "disposition": "removed_from_universal",
+      "recovery": "show_truthful_unavailable_and_return_to_safe_origin"
+    },
+    {
+      "id": "bills",
+      "disposition": "removed_from_universal",
+      "recovery": "show_truthful_unavailable_and_return_to_safe_origin"
+    },
+    {
+      "id": "scan-pay",
+      "disposition": "removed_from_universal",
+      "recovery": "show_truthful_unavailable_and_return_to_safe_origin"
+    },
+    {
+      "id": "receipts",
+      "disposition": "removed_from_universal",
+      "recovery": "open_exact_transaction_record_or_truthful_unavailable"
+    },
+    {
+      "id": "tiffin",
+      "disposition": "removed_from_universal",
+      "recovery": "show_truthful_unavailable_with_distinct_order_food_option"
+    },
+    {
+      "id": "get-done",
+      "disposition": "removed_from_universal",
+      "recovery": "show_truthful_unavailable_with_distinct_doctor_or_salon_options"
+    },
+    {
+      "id": "delivery",
+      "disposition": "removed_from_universal",
+      "recovery": "open_exact_owning_workspace_or_show_missing_workspace_requirement"
+    },
+    {
+      "id": "onboard",
+      "disposition": "removed_from_universal",
+      "recovery": "open_exact_owning_workspace_or_show_missing_workspace_requirement"
+    },
+    {
+      "id": "verify",
+      "disposition": "removed_from_universal",
+      "recovery": "open_exact_owning_workspace_or_show_missing_workspace_requirement"
+    }
+  ]
+}

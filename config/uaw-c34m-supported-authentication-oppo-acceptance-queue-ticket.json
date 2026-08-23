@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34M-SUPPORTED-AUTHENTICATION-OPPO-ACCEPTANCE-QUEUE",
+  "state": "queued_inactive_selection_only_not_registered_for_execution",
+  "classification": "mvp_required",
+  "severity": "authentication_release_acceptance_blocking",
+  "exactUserType": {
+    "id": "personal_user",
+    "label": "Personal user",
+    "actingRole": "signed_out_MoolSocial_customer_on_the_existing_OPPO",
+    "workspaceBoundary": "personal_MoolSocial_account_and_exact_protected_destination"
+  },
+  "capability": "complete_each_currently_supported_identity_method_on_one_exact_Google_Play_Internal_Testing_successor_and_return_to_the_exact_requested_destination",
+  "customerOutcome": "A Personal user can sign in on the existing OPPO with Google, the YouTube identity control through the same Google-backed identity relationship, Firebase passwordless email link, or Firebase Mobile OTP, and each independent journey completes or recovers truthfully at the exact requested destination.",
+  "classificationReason": "Personal-user authentication and exact protected-action return are core launch journeys. Source and live-readiness owners already exist, but candidate-specific Play-installed OPPO completion remains unproved and all six C33G blockers still require exact future-candidate device evidence.",
+  "queueBoundary": {
+    "planningOnly": true,
+    "selectedTicket": false,
+    "registeredForExecution": false,
+    "mvpScopeGateMutationAuthorized": false,
+    "candidateIdentityReserved": false,
+    "versionNameReserved": false,
+    "versionCodeReserved": false,
+    "mayActivateWhileC34LIsActive": false,
+    "activationRequiresFreshFounderSelection": true,
+    "deduplicateAgainstC34LTerminalEvidence": true,
+    "cancelAsRedundantIfC34LOrAnotherAcceptedCandidateAlreadyProvesAllOutcomes": true
+  },
+  "supportedMethods": [
+    {
+      "method": "Google",
+      "identityRelationship": "qualified_Google_backed_identity_gateway",
+      "currentTruth": "sanitized_provider_readiness_qualified_device_completion_pending",
+      "privateActor": "founder_only_for_provider_tap_account_chooser_and_account_selection"
+    },
+    {
+      "method": "YouTube identity",
+      "identityRelationship": "same_qualified_Google_backed_identity_gateway_as_Google",
+      "currentTruth": "shared_identity_contract_source_qualified_device_completion_pending",
+      "privateActor": "founder_only_for_provider_tap_account_chooser_and_account_selection"
+    },
+    {
+      "method": "Firebase passwordless email link",
+      "identityRelationship": "qualified_C33J_C33K_and_C33M_FIX5_email_link_owners",
+      "currentTruth": "source_and_provider_domain_readiness_qualified_live_email_and_OPPO_completion_pending",
+      "privateActor": "founder_only_for_email_entry_private_action_link_and_private_deep_link"
+    },
+    {
+      "method": "Firebase Mobile OTP",
+      "identityRelationship": "qualified_FirebaseOtpGateway_and_C33H_phone_readiness_owners",
+      "currentTruth": "source_and_prebuild_provider_prerequisites_qualified_Play_Integrity_or_reCAPTCHA_real_SMS_and_OPPO_completion_pending",
+      "privateActor": "founder_only_for_phone_entry_SMS_and_OTP"
+    }
+  ],
+  "minimumCompleteScope": [
+    "wait_for_C34L_terminal_truth_and_leave_the_current_MVP_selection_unchanged",
+    "reuse_C33E_FIX2_C33G_FIX1_through_FIX4_C33H_C33J_FIX1_FIX2_C33K_C33M_FIX4_FIX5_and_C34I_actor_policy_owners",
+    "select_no_candidate_or_version_until_the_exact_successor_and_release_authorities_are_separately_approved",
+    "prove_Google_account_selection_authenticated_session_retained_relaunch_and_exact_protected_return",
+    "prove_the_YouTube_identity_control_dispatches_the_same_supported_Google_identity_relationship_without_claiming_a_separate_YouTube_authentication_provider",
+    "prove_passwordless_email_link_cold_start_foreground_same_device_different_process_invalid_expired_used_cancel_retry_and_exact return",
+    "prove_Mobile_OTP_send_verify_cancel_timeout_invalid_code_retry_Play_Integrity_or_reCAPTCHA_return_and_exact return",
+    "keep_passwordless_email_link_and_Mobile_OTP_as_independent_acceptance_journeys",
+    "resolve_all_six_C33G_candidate_specific_blockers_before_device_acceptance",
+    "apply_the_C34I_founder_only_private_surface_handoffs_and_reject_on_any_private_identifier_exposure_to_Codex",
+    "complete_two_affected_regressions_and_the_supported_whole_app_return journey_without_product_or_provider_scope expansion"
+  ],
+  "explicitExclusions": [
+    "no_numeric_email_OTP_claim_backend_or_acceptance_path",
+    "no_Apple_X_Instagram_or_Facebook_support_or_provider dispatch claim",
+    "no_new_screen_route_session_gateway_backend_or_duplicate_authentication owner_by_default",
+    "no_C34L_state_MVP_scope_registry_source_runtime_provider_device_browser_or private_state mutation_under_this_queue_owner",
+    "no_AAB_APK_Play_OPPO_or_device action_until_a_later_exact_selected_candidate_authorizes_each phase",
+    "no_provider_console_Firebase_Hosting_API_IAM_credential_secret_quota_email_SMS_funds_or external write_without_its_exact separate authority",
+    "no_Codex_provider_tap_account_chooser_email_phone_OTP_private_link_or credential handling"
+  ],
+  "dependenciesAndApprovals": [
+    "C34L_terminal_state_and_retained_evidence_recorded_without_mutating_or preempting_C34L",
+    "fresh_pre_ticket_robustness_reuse_assessment_pinned_only_when_this_ticket_is selected",
+    "fresh_MVP_scope_disclosure_and_founder_selection_after_the_active_slot_is clear",
+    "C33E_FIX2_current_four_of_four_sanitized_Google_readiness_facts_preserved",
+    "C33G_FIX2_Google_and_YouTube_shared_identity_truth_and_all_six_blocker_ledger rows preserved",
+    "C33H_phone_source_provider_SMS_region_and_Play_signing readiness preserved",
+    "C33J_parent_FIX1_FIX2_C33K_and_C33M_FIX4_FIX5_passwordless_email qualifications preserved",
+    "C34I_founder_only_authentication_actor_policy_preserved",
+    "separate_child_authority_for_real_SMS_Play_Integrity_or_reCAPTCHA_and_potential billing",
+    "separate_child_authority_for_live_email_send_and_private_action_link",
+    "separate_future_candidate_build_Internal_Testing_Play_in_place_OPPO_and journey authorities"
+  ],
+  "testAndEvidencePlan": [
+    "parse_and_replay_current_Google_phone_email_provider_truth_and_actor policy gates_before_candidate selection",
+    "bind_exact_branch_HEAD_ticket_candidate_AAB_hash_package_version_signer_Play track_installer_and_OPPO identity_after_later authorization",
+    "run_each_supported_method_from_signed_out_state_and_from_an_exact protected destination independently",
+    "cover_cancel_error_offline_retry_app_switch_call_lock_unlock_process death_provider return_system Back_and_authenticated relaunch",
+    "retain_only_sanitized_completion_failure_and_exact destination evidence_with_no private identifier_phone_email_OTP_or action link",
+    "require_all_six_C33G_rows_candidate specific_passed_before_device acceptance_count_can_become_one",
+    "run_affected_authentication_and_return suites_plus_two_full regressions_before_any acceptance claim"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryCompleteForQueuePlanning": true,
+    "duplicateSearchCompleteForQueuePlanning": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance",
+      "new_necessary_work"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v5.dart",
+      "apps/mobile/lib/ui_v2/screens/screen03_login/screen03_frame_v2.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
+      "config/google-auth-live-provider-readiness-state-c33e-fix2.json",
+      "config/release-acceptance-blocker-ledger-c33g.json",
+      "config/firebase-phone-auth-live-readiness-state-c33h.json",
+      "config/screen03-passwordless-email-link-native-parity-state-c33j.json",
+      "config/firebase-passwordless-email-link-live-readiness-state-c33k.json",
+      "config/release-device-acceptance-actor-policy-c34i.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "future_exact_candidate_state_aggregate_composition_gate_and_sanitized_journey_evidence_only_after_selection"
+    ],
+    "necessityProof": "No new product, provider, screen, route, session, gateway or backend owner is justified. One later candidate-specific acceptance owner may be necessary only because existing source/readiness qualifications and failed historical candidates cannot prove a future Play-installed OPPO outcome; its identity is deliberately not reserved here.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "activationAssessmentRequired": true
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": false,
+    "selectionAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "realSmsSendOrBillingAuthorized": false,
+    "liveEmailSendAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "founderPrivateAuthenticationActionAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "fundsAuthorized": false
+  }
+}

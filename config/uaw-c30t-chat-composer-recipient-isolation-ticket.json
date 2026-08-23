@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-COMPOSER-RECIPIENT-ISOLATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "chat_wrong_recipient_draft_and_feedback_blocker",
+  "actor": "signed_in_member_switching_Chat_threads_while_a_text_send_is_pending",
+  "customerOutcome": "Each Chat thread retains only its own unsent text and send feedback; a completion from an older thread cannot clear or annotate the current recipient's composer.",
+  "minimumCorrection": [
+    "retain_unsent_text_by_thread_when_the_thread_widget_is_reused",
+    "clear_a_sent_draft_only_for_the_thread_and_exact_text_that_was_submitted",
+    "own_send_error_and_success_feedback_by_thread",
+    "render_only_the_current_thread_send_feedback",
+    "prove_an_old_send_completion_does_not_clear_or_annotate_the_new_thread"
+  ],
+  "explicitExclusions": [
+    "no_attachment_reply_reaction_or_backend_contract_expansion",
+    "no_real_message_send",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "13 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-composer-recipient-isolation-focused-tests.log",
+    "evidenceSha256": "87511B10BC187A91009F24B7D4D970E9799C797BAC8E099138A655672877957C",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

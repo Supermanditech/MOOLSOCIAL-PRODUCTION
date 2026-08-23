@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SHARED-SERVICE-HOME-AND-ACCESSIBILITY-PRIMITIVES-FIX7-C24B",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_runtime_and_tests_passed_build_install_closed",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SHARED-SERVICE-HOME-AND-ACCESSIBILITY-PRIMITIVES-FIX7-C24B-PRESELECTION-ASSESSMENT-20260809.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SHARED-SERVICE-HOME-AND-ACCESSIBILITY-PRIMITIVES-FIX7-C24B-COMPLETION-20260809.md",
+  "classification": "mvp_required",
+  "customerOutcome": "Every changed service home uses one adaptive hierarchy and every Mool Home control exposes a real Android tap action.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","new_necessary_work"],"sharedImplementationOwners":["MoolSpacing","MoolRadii","MoolMotion","MoolCardSurface","MoolHomeHubFamilyRow","MoolGlobalNavigation"],"newNecessarySharedOwners":["mool_service_home.dart"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["one_shared_service_home_token_and_component_owner","search_52px_and_controls_minimum_44px","standard_page_section_card_and_type_scale","adaptive_320_to_430_and_text_scale_1_4","outer_SemanticsAction_tap_for_Mool_Chat_six_families_and_all_direct_actions","reduced_motion_immediate","no_social_or_buy_visual_change"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

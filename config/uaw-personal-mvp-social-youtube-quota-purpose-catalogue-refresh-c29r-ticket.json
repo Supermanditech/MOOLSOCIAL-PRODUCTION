@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-QUOTA-PURPOSE-AND-CATALOGUE-REFRESH-C29R",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "source_qualified_external_dev_measurement_and_oppo_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "A user receives a fresh eligible public YouTube catalogue without per-user high-cost polling, while reviewers can verify the exact quota purpose and safeguards.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "sharedImplementationOwners": ["backend/functions/src/youtube/client.ts", "backend/functions/src/youtube/quota.ts", "backend/functions/src/youtube/firestore_store.ts", "backend/functions/src/index.ts", "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart", "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart"],
+    "newNecessaryOwners": ["shared_shorts_catalogue_refresh_store", "quota_measurement_evidence_export"],
+    "necessityProof": "The automatic Shorts loader currently calls uncached explicit search for up to four pages per app load. Existing quota and cache primitives do not provide a durable shared low-frequency catalogue refresh."
+  },
+  "minimumCompleteScope": [
+    "replace_per_app_automatic_search_with_shared_low_frequency_refresh",
+    "retain_explicit_user_search_as_a_separate_metered_action",
+    "measure_search_upload_general_cache_hit_and_error_budgets",
+    "document_public_discovery_official_playback_owner_connect_and_private_upload_purpose",
+    "prove_no_history_Watch_Later_native_recommendation_or_engagement_incentive_claim",
+    "prepare_but_do_not_submit_quota_audit_evidence_without_founder_authority"
+  ],
+  "externalDependencies": ["C29M_provider_qualification", "representative_Dev_measurement_window", "quota_or_compliance_review_if_required"],
+  "explicitExclusions": ["no_form_submission", "no_per_user_polling", "no_secret_access", "no_recommender"],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "externalDevQualificationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true
+  },
+  "qualification": {
+    "state": "source_qualified_external_dev_measurement_and_oppo_pending",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-QUOTA-PURPOSE-CATALOGUE-REFRESH-C29R-HOST-QUALIFICATION-20260811.md",
+    "sourceAggregateSha256": "E42D412EF02B1D26A6D493C0A7CE302D240FBDD30CDA73C0E129D97A80CAE164",
+    "sourceAggregateFiles": 14,
+    "focusedBackendAssertions": 8,
+    "completeBackendAssertionsPerCycle": 495,
+    "freshIdenticalCycles": 2,
+    "formattedFilesPerCycle": 3,
+    "formatChangesPerCycle": 0,
+    "fullFlutterAnalysisPerCycle": "no_issues",
+    "protectedFlutterTestFilesPerCycle": 24,
+    "protectedFlutterAssertionsPerCycle": 155,
+    "protectedFlutterSkippedPerCycle": 5,
+    "externalDevMeasurementState": "pending_separate_authority",
+    "buildInstallDeployPerformed": false,
+    "oppoCrossComparisonState": "protected_r60_34_identity_reconfirmed_successor_pending",
+    "oppoReadAudit": "artifacts/quality/uaw-personal-mvp-social-c29r-protected-oppo-read-audit-20260811-01/identity.json"
+  }
+}

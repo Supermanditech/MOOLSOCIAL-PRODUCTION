@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30W-R60-47-PLAY-COLD-START-MISSING-SERVER-CLIENT-ID",
+  "parentTicket": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+  "state": "source_repair_two_identical_cycles_qualified_successor_build_not_authorized",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_Play_internal_tester",
+  "customerOutcome": "MoolSocial always renders a truthful first screen on release cold start, and no future Android candidate can be built unless its founder-qualified release configuration includes every runtime-required define including the Google server client ID.",
+  "classificationReason": "The Play-installed r60.47 candidate aborts before runApp because its AAB omitted a required release define. Cold start and Google identity are mandatory Social launch capabilities, so recovery is MVP blocking.",
+  "minimumCompleteScope": [
+    "render_a_safe_blocking_recovery_screen_instead_of_a_blank_or_hung_process_when_release_bootstrap_configuration_is_incomplete",
+    "extract_one_testable_release_runtime_configuration_contract_used_by_main_and_release_gates",
+    "require_the_google_server_client_id_key_in_future_founder_only_transient_release_configuration_without_reading_or_printing_its_value",
+    "add_release_runtime_configuration_and_first_frame_regressions_to_the_authoritative_launch_gate",
+    "fail_future_candidate_qualification_without_a_real_release_configured_first_frame_and_zero_app_process_fatal_errors"
+  ],
+  "explicitExclusions": [
+    "no_second_AAB_upload_install_Play_track_or_device_mutation_without_new_explicit_founder_authorization",
+    "no_backend_Hosting_provider_callback_Chat_rules_IAM_or_public_track_mutation",
+    "no_OAuth_client_ID_value_password_API_key_token_nonce_private_verdict_private_key_or_attestation_payload_access_by_the_agent",
+    "no_uninstall_data_clear_downgrade_sideload_or_ADB_install",
+    "no_email_quota_submission_commit_push_merge_rebase_branch_switch_or_main"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_the_cold_start_regression_fix_and_strong_non_recurrence_gates",
+    "r60_47_remains_the_failed_Internal_Testing_candidate_and_no_successor_AAB_is_authorized",
+    "founder_only_secure_input_is_required_for_any_future_OAuth_client_ID_value",
+    "all_C30V_build_upload_install_and_device_evidence_remains_preserved"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "tmp/run-c30v-single-aab-founder.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/check-play-internal-aab-build-wrapper-c30v.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/lib/core/config/release_runtime_configuration.dart",
+      "apps/mobile/test/release_runtime_configuration_test.dart",
+      "scripts/check-release-runtime-configuration-c30w.ps1",
+      "config/release-runtime-configuration-gate-state-c30w.json"
+    ],
+    "necessityProof": "The existing main bootstrap owns release validation and the existing Google identity gateway already fails safely when its client ID is empty. A shared configuration contract, safe bootstrap fallback and build gate are the smallest complete correction; no new route, backend or identity provider is needed.",
+    "timelineImpactDays": 1,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "unit_test_complete_and_missing_release_configuration_contracts",
+    "widget_test_missing_configuration_renders_safe_first_frame_without_secret_values",
+    "static_gate_required_define_names_and_founder_only_hidden_collection_flow",
+    "whole_mobile_analyzer_and_authoritative_focused_manifest",
+    "future_separately_authorized_release_runtime_smoke_and_Play_installed_cold_start_no_fatal_error_gate"
+  ],
+  "authority": {
+    "sourceAndGateWriteAuthorized": true,
+    "testWriteAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendDeploymentAuthorized": false,
+    "HostingDeploymentAuthorized": false,
+    "providerDeploymentAuthorized": false,
+    "productionOpenClosedOrPublicAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "findings": "docs/quality/UAW-C30W-R60-47-PLAY-COLD-START-CONFIG-RECOVERY-FINDINGS-20260814.md",
+    "failure": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/12-oppo-r60-47-cold-start-release-config-failure.json",
+    "qualification": "docs/quality/UAW-C30W-R60-47-COLD-START-SOURCE-REPAIR-QUALIFICATION-20260814.md",
+    "sourceManifest": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/source-manifest-c30w.txt",
+    "focusedManifest": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/focused-test-manifest-c30w.txt",
+    "machineState": "config/release-runtime-configuration-gate-state-c30w.json"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-READONLY-CONNECT-UNAVAILABLE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_implementation_complete_all_tests_passed_deployment_held",
+  "classification": "mvp_required",
+  "severity": "release_blocker",
+  "surface": [
+    "YouTube channel status",
+    "youtube.readonly OAuth consent",
+    "connected channel identity",
+    "disconnect and revocation controls"
+  ],
+  "actualResult": "The accepted Dev public-review capability profile enables public discovery but requires ownerConnect=false. Live revision youtubeprovider-00036-qer therefore cannot serve the release UI's separately user-initiated minimum youtube.readonly connection journey.",
+  "expectedResult": "The exact Dev reviewer profile supports public YouTube discovery and separately user-initiated youtube.readonly channel connection while upload, viewer mutation, playlist/channel/asset mutation, Analytics, Reporting, Live, partner, membership, Super Chat and content-owner capabilities remain disabled.",
+  "evidence": {
+    "providerRevision": "youtubeprovider-00036-qer",
+    "safeRuntimeFlags": {
+      "YOUTUBE_OWNER_CONNECT_ENABLED": "false",
+      "YOUTUBE_PRIVATE_UPLOAD_ENABLED": "false",
+      "YOUTUBE_OWNER_ANALYTICS_ENABLED": "false",
+      "YOUTUBE_LIVE_ENABLED": "false"
+    },
+    "sourceBoundary": "acceptedPublicReviewActive currently accepts exactly publicData and rejects ownerConnect",
+    "releaseUiBoundary": "SocialYouTubeCreatorUploadScreen defaults uploadCapabilityAuthorized=false and requests YouTubeConnectPurpose.readonly"
+  },
+  "minimumCorrection": [
+    "locally_define_one_exact_Dev_only_accepted_review_set_with_publicData_and_ownerConnect_true",
+    "keep_ownerActions_creatorAssets_live_privateUpload_ownerAnalytics_analyticsV2_reportingV1_and_publicOrUnlistedUpload_false",
+    "update_runtime_materialization_preflight_verification_and_control_tests_to_the_same_exact_contract",
+    "prove_release_route_defaults_to_readonly_and_never_renders_upload_controls",
+    "do_not_deploy_or_change_live_environment_until_separately_authorized"
+  ],
+  "acceptance": [
+    "public_catalogue_and_bounded_search_remain_enabled",
+    "unconnected_status_connect_consent_callback_connected_identity_disconnect_and_revocation_help_pass",
+    "OAuth_scope_set_is_exactly_youtube.readonly_for_the_release_journey",
+    "every_mutation_upload_Analytics_Reporting_Live_partner_membership_Super_Chat_and_content_owner_capability_remains_false",
+    "wrong_project_staging_production_ambiguous_or_mixed_proof_configuration_fails_closed"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "DevBackendSourceWriteAuthorized": true,
+    "DevDeploymentAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretOrPrivateVerdictAccessAuthorized": false
+  }
+}

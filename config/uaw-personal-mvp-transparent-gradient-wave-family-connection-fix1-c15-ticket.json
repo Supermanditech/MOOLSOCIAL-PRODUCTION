@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-TRANSPARENT-GRADIENT-WAVE-FAMILY-CONNECTION-FIX1-C15",
+  "parentTicket": "UAW-PERSONAL-MVP-SLIM-UNBOXED-SUBACTION-FAMILY-STRIP-FIX1-C14",
+  "state": "founder_authorized_prewrite",
+  "classification": "mvp_required",
+  "interactionContractVersion": "C15-V1-20260808",
+  "actor": "Personal account customer",
+  "customerOutcome": "A person sees the selected destination sub-action as part of the selected main-action family through a transparent moving gradient connection while the destination content remains fully visible and every sub-action remains one tap away.",
+  "founderDesignEvidence": {
+    "source": "founder_OPPO_review_of_checksum_matched_r60_14",
+    "candidate": "UAW-PERSONAL-MVP-SLIM-UNBOXED-SUBACTION-FAMILY-STRIP-FIX1-C14",
+    "versionName": "1.0.0-r60.14",
+    "apkSha256": "B50A1C073AA5A9D8987643900BF816777C7FC3CBAD9806BD07552EFDEAA77082",
+    "frame": "artifacts/quality/uaw-personal-mvp-slim-unboxed-subaction-family-strip-fix1-c14-r60-14-20260808-01/15-05-buy-shop-settled.png",
+    "feedback": "docs/quality/UAW-C14-R60-14-FAMILY-CONNECTION-OPPO-FEEDBACK-20260808.md"
+  },
+  "visualContract": {
+    "position": "immediately_above_founder_approved_global_bottom_rail",
+    "maximumHeight": 44,
+    "minimumTapTarget": 44,
+    "surface": "fully_transparent_with_no_side_panel_band_fill_card_shadow_or_blur",
+    "unselectedAction": "unboxed_transparent_text_and_compact_icon",
+    "selectedAction": "family_coherent_text_weight_tint_and_two_pixel_identity_line_without_filled_tile",
+    "familyRelationship": "transparent_gradient_wave_visibly_links_the_selected_main_action_anchor_to_the_selected_local_subaction",
+    "waveDirection": "travels_left_or_right_to_the_new_selected_subaction",
+    "backgroundVisibility": "destination_content_remains_visible_behind_and_beside_the_subaction_text",
+    "separateFamilyTile": false,
+    "sidePanelOrBand": false,
+    "perActionBoxBorder": false,
+    "filledSelectedPill": false,
+    "tapBudget": 1,
+    "globalRailGeometryOrderAndMeaning": "unchanged"
+  },
+  "subactions": {
+    "social": ["shorts", "videos", "feed", "create"],
+    "buy": ["shop", "wholesale", "medicine", "orders"],
+    "eat": ["order_food", "book_table"],
+    "ride": ["bike", "auto", "cab"],
+    "book": ["doctor", "salon"],
+    "work": ["earn_today", "workspace"]
+  },
+  "motion": {
+    "selection": "finite_180_to_220_ms_directional_gradient_wave_and_text_identity_acknowledgement",
+    "initialFrame": "settled_connection_without_entrance_loop",
+    "scaleOrSheen": false,
+    "reducedMotion": "immediate_settled_connection_with_zero_nonessential_animation",
+    "perpetualMotion": false
+  },
+  "implementationBoundary": {
+    "reuseOwners": [
+      "MoolDestinationNavigationV2",
+      "MoolLocalNavigationRail",
+      "Screen04ContextTabs",
+      "BuyV2DestinationTabs",
+      "C13_direct_default_route_and_state_owners"
+    ],
+    "newNecessaryOwner": "one_shared_noninteractive_gradient_wave_painter_inside_MoolDestinationNavigationV2",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentStateOwners": []
+  },
+  "explicitExclusions": [
+    "no_opaque_translucent_blurred_or_shadowed_side_to_side_subaction_panel",
+    "no_change_to_founder_approved_global_bottom_rail_geometry_order_or_meaning",
+    "no_new_screen_route_menu_modal_palette_backend_provider_or_persistent_state_owner",
+    "no_target_smaller_than_44_by_44_or_extra_subaction_tap",
+    "no_perpetual_decorative_motion_scale_sheen_or_content_obscuration",
+    "no_Screens_01_03_Social_provider_or_Buy_commercial_logic_change",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "all_six_destinations_use_one_maximum_44px_fully_transparent_subaction_layer",
+    "every_keyed_action_measures_at_least_44_by_44_and_remains_one_tap_reachable",
+    "only_text_compact_icons_selected_identity_and_the_gradient_connection_overlay_the_visible_content",
+    "the_wave_endpoint_matches_the_selected_local_index_and_visibly_joins_the_selected_global_action_anchor",
+    "selection_changes_move_the_wave_left_or_right_in_180_to_220_ms_without_a_loop",
+    "reduced_motion_settles_immediately_without_hiding_the_family_connection",
+    "no_side_panel_family_tile_per_action_border_filled_pill_or_shadow_remains",
+    "C13_direct_default_Back_Mool_Chat_and_global_rail_contracts_remain_green",
+    "two_complete_affected_host_regression_cycles_pass",
+    "one_separately_machine_gated_APK_matches_the_installed_OPPO_checksum",
+    "real_OPPO_first_frame_subaction_switch_and_content_visibility_pass_before_founder_acceptance"
+  ]
+}

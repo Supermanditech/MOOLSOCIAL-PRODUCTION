@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-REFERENCE-SERVICE-HOME-CONTRACT-C24-20260809",
+  "state": "founder_directed_pending_host_and_device_qualification",
+  "referenceBoundary": {
+    "directory": "C:\\GUARANTEED OUTCOME\\reference screens",
+    "readOnly": true,
+    "copiedIntoProduction": false,
+    "brandOrTradeDressAuthority": false,
+    "files": [
+      {"name":"DR APP FLOW.png","bytes":189227,"width":1472,"height":532,"sha256":"467D144E25BAD2FD9465BA6F39DF877B895B16E994AAACAB0A8F2B81BA6284FB"},
+      {"name":"dr app home screen.png","bytes":304384,"width":402,"height":722,"sha256":"382D4793131ED4E98163B85C716F7260C87F2948FA0E0E1ECD036CF465DA50DF"},
+      {"name":"DR app wireframe categoroes.png","bytes":97041,"width":246,"height":507,"sha256":"72A42FF794C88555DFD53360C12F39453A3DB23C150E4937763333B919FB9D21"},
+      {"name":"dr.app top rated dr wireframe.png","bytes":79670,"width":232,"height":467,"sha256":"C211A21685DD2998FC293F64C96EB2DD178387E0D936E7789DE7A0FE2A127FCA"},
+      {"name":"rapido.jpg","bytes":419663,"width":720,"height":1612,"sha256":"0515F4CC59806F2ED847A2472F4861395942C92F29CFF666C92F2F5C2BF8F763"},
+      {"name":"redbus.jpg","bytes":198997,"width":720,"height":1612,"sha256":"619631511D35B986FAC26D27F6A50E049DD278A8AB000B41E0CA4CB0C066335B"},
+      {"name":"zomato home screen 3.jpg","bytes":501495,"width":720,"height":1612,"sha256":"DE49F4E80F042E76875AF885FC514695048D082B12EC35FFDEC985830C7BF29C"},
+      {"name":"zomota home screen 2.jpg","bytes":466535,"width":720,"height":1612,"sha256":"555CFC4AE8011037E5A8E1C811E478AF550E4ED617C978B8369F769DA26468B1"},
+      {"name":"zomoto home screen 1.jpg","bytes":510099,"width":720,"height":1612,"sha256":"1CDC5FEC7F409CEC3F5EFACD63EE96B5A2CE4C1DFDE9B24B0B75EC05FDC1D7B2"}
+    ]
+  },
+  "placement": {
+    "Social": {"protected":true,"actions":["Shorts","Videos","Feed","Create"]},
+    "Buy": {"protected":true,"actions":["Shop","Wholesale","Medicine","Orders"],"medicineDecision":"retain_as_regulated_pharmacy_commerce"},
+    "Eat": {"actions":["Order Food","Book Table"],"postponed":["Tiffin"]},
+    "Ride": {"actions":["Bike","Auto","Cab"]},
+    "Book": {"actions":["Doctor","Salon","Bus"],"doctorDecision":"retain_as_appointment_service","postponed":["Get It Done"]},
+    "Work": {"actions":["Earn Today","Workspace"]}
+  },
+  "routeOwners": {
+    "Eat/Order Food":"/app/eat/home",
+    "Eat/Book Table":"/app/eat/table",
+    "Ride/Bike":"/app/ride/book?type=bike",
+    "Ride/Auto":"/app/ride/book?type=auto",
+    "Ride/Cab":"/app/ride/book?type=cab",
+    "Book/Doctor":"/app/book/doctor",
+    "Book/Salon":"/app/book/salon",
+    "Book/Bus":"/app/book/bus",
+    "Work/Earn Today":"/app/work/earn",
+    "Work/Workspace":"/app/work/my-work"
+  },
+  "duplicateSearch": {
+    "busAllMatchesIncludingRegressionMemory": 2,
+    "busProductionPolicyTestMatchesExcludingRegressionMemory": 0,
+    "medicineOwnerPathCount": 49,
+    "disposition": "one_new_Book_route_and_screen_extend_existing_Book_domain_no_new_backend_owner"
+  },
+  "sharedDesign": {
+    "pagePadding": 16,
+    "sectionGap": 24,
+    "cardGap": 12,
+    "cardRadius": 18,
+    "searchHeight": 52,
+    "minimumTapTarget": 44,
+    "primaryActionHeight": 48,
+    "typeScale": {"display":28,"section":20,"cardTitle":16,"body":14,"metadata":12},
+    "surface": "quiet_light_foundation_with_white_cards_and_one_restrained_family_accent",
+    "interaction": "search_or_primary_decision_first_then_direct_provider_product_or_service_action",
+    "motion": "finite_180_to_260ms_and_immediate_when_reduced_motion",
+    "accessibility": "real_SemanticsAction_tap_clear_labels_text_scale_1_4_and_320px_width",
+    "forbidden": ["full_width_subaction_rail","brand_copy","promo_clutter","obstructive_overlay","gradient_flood","unbounded_glass_blur","fake_loading","extra_family_expansion_tap"]
+  },
+  "founderOppoHomeAmendment": {
+    "evidence": "docs/quality/UAW-C24-FOUNDER-OPPO-HOME-NAVIGATION-BRANDING-REJECTION-20260809.md",
+    "supersedes": ["expanded_six_family_17_action_Home_stack","destination_launcher_navigates_to_intermediate_Home","separate_header_arrival_and_launcher_brand_repetition"],
+    "homeViewport": {
+      "scrollOwnersAllowed": [],
+      "forbiddenWidgetOwners": ["ListView","SingleChildScrollView","CustomScrollView","GridView","PageView"],
+      "mainFamilyLayout": "six_equal_choices_in_fixed_three_by_two_grid",
+      "detailLayout": "only_selected_family_two_to_four_direct_actions_in_fixed_two_column_grid",
+      "initialFamily": "Social",
+      "mainTapOutcome": "select_family_in_place",
+      "subactionTapOutcome": "open_exact_existing_route",
+      "maximumTapCountFromHome": 2,
+      "removedCopyAndChrome": ["MoolSocial_header_wordmark","Home_icon_and_current_pill","Your_Mool","Products_services_and_your_place_ready_when_you_are","Your_area_arrival_card","decorative_launcher_or_mascot_icon"],
+      "retained": ["Chat_one_tap","system_Back","six_family_order_and_meaning","all_truthful_direct_actions","finite_motion","immediate_reduced_motion"]
+    },
+    "destinationNavigator": {
+      "launcherLabel": "MoolSocial",
+      "launcherRole": "sole_persistent_brand_and_connected_navigation_focal_point",
+      "presentation": "modal_connected_chooser_over_current_destination",
+      "preserveDestinationUnderlay": true,
+      "intermediateHomeRouteForbidden": true,
+      "catalogueOwner": "one_shared_family_and_direct_action_catalogue_used_by_Home_and_destinations",
+      "dismissOutcome": "return_to_unchanged_destination",
+      "systemBackOutcome": "dismiss_chooser_before_destination_Back",
+      "removedDestinationChrome": ["redundant_top_MoolSocial_wordmark_or_empty_reserved_brand_tile"],
+      "retainedDestinationContent": ["Social_and_Buy_business_content","product_and_service_truth_copy","account_context_actions","Back_and_Chat_continuity"]
+    },
+    "adaptation": {"widths":[320,390,430],"maximumTextScale":1.4,"minimumTapTarget":44,"overflowAllowed":false},
+    "visualDirection": "platform_level_restraint_alignment_depth_and_spacing_without_Apple_trade_dress_copy"
+  },
+  "referenceTranslation": {
+    "Eat": ["location_and_search_first","food_categories","restrained_filters","restaurant_cards_with_rating_time_distance_price","direct_order_or_table_action"],
+    "Ride": ["current_pickup","where_to_primary","recent_and_saved_places","vehicle_fare_and_arrival_before_confirm"],
+    "Doctor": ["search","upcoming_appointment","specialties","top_provider_trust","direct_book_action"],
+    "Bus": ["from_to_date","swap","today_tomorrow","single_search_action","operator_time_seat_fare_results"],
+    "Work": ["shared_hierarchy_only","existing_truthful_opportunity_and_workspace_content","no_reference_invented_features"]
+  },
+  "qualification": ["focused_widget_and_semantics_tests","affected_vertical_slice_tests","analyze","two_consecutive_unchanged_source_cycles","one_successor_APK","in_place_OPPO_install","checksum_identity","cumulative_screenshot_and_continuity_matrix","founder_acceptance_pending"]
+}

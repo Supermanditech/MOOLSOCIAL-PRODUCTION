@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT",
+  "state": "local_domain_slice_complete_order_store_and_runtime_adapter_held",
+  "classification": "mvp_required",
+  "contractPath": "backend/functions/src/commerce/order_timer_policy_snapshot_contract.ts",
+  "contractSha256": "296D27B67029CA5616952BEA8D9D5F0AC576570494C85BDE7A54595AE6C3424F",
+  "testPath": "backend/functions/src/commerce/order_timer_policy_snapshot_contract.test.ts",
+  "testSha256": "B6C4A21A5A63CDA2C7508F089AEDA7E51410858F46EF68A71F3E85E69238337C",
+  "ticket1ContractSha256": "969CDA34D065127FDEB0D3BFF1E1D1E92CCF37F1C2640C087B7D6400369B7C4B",
+  "ticket2ContractSha256": "0C6129297194FE48AD376BF75F2F84EAF50FFF5A0E677A6760B1390F98F44460",
+  "focusedCycles": ["19_pass_0_fail", "19_pass_0_fail"],
+  "fullBackendCycles": ["439_pass_0_fail", "439_pass_0_fail"],
+  "cycle1Evidence": "artifacts/quality/buy-mvp-order-timer-policy-snapshot-20260807-01/05-full-backend-cycle-1.tap",
+  "cycle1Sha256": "02624CFCC23455BF148B65812B552521A179446AF538B5073B4DE38E0155D9EB",
+  "cycle2Evidence": "artifacts/quality/buy-mvp-order-timer-policy-snapshot-20260807-01/06-full-backend-cycle-2.tap",
+  "cycle2Sha256": "45E121FB2221E9AE3092C7D633497D949AAFDB4F9AE0EB2DDDBB92D86A740F7B",
+  "regressionRegistryEntries": 99,
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "liveCommands": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "heldSlices": [
+    "production_order_creation_and_store",
+    "runtime_command_adapter",
+    "payment_and_provider_assignment",
+    "message_call_and_reassignment_execution",
+    "countdown_presentation"
+  ],
+  "completionEvidence": "docs/quality/BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT-COMPLETION-20260807.md"
+}

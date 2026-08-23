@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34M-MOBILE-OTP-LIVE-SMS-PLAY-INTEGRITY-QUEUE",
+  "parentTicketId": "UAW-C34M-SUPPORTED-AUTHENTICATION-OPPO-ACCEPTANCE-QUEUE",
+  "state": "queued_inactive_selection_only_live_action_authority_absent",
+  "classification": "mvp_required",
+  "severity": "mobile_authentication_live_acceptance_blocking",
+  "exactUserType": {
+    "id": "personal_user",
+    "label": "Personal user",
+    "actingRole": "signed_out_customer_using_Mobile_OTP_on_the_existing_OPPO",
+    "workspaceBoundary": "personal_MoolSocial_authentication_and_exact_protected_destination"
+  },
+  "capability": "complete_one_real_Firebase_Mobile_OTP_send_and_verify_with_the_candidate_specific_Play_Integrity_or_reCAPTCHA_return",
+  "customerOutcome": "A Personal user can request and verify Mobile OTP on the exact future Play-installed OPPO candidate, recover from verification failures without a false authenticated state, and return to the exact requested destination.",
+  "classificationReason": "Mobile OTP is a founder-approved Screen 03 launch method. C33H qualifies source, Phone provider, India-only SMS region policy and Play signing prerequisites, but Play Integrity or reCAPTCHA return, real SMS send/verify, potential billing and OPPO acceptance remain explicitly unproved and unauthorized.",
+  "queueBoundary": {
+    "planningOnly": true,
+    "selectedTicket": false,
+    "registeredForExecution": false,
+    "mvpScopeGateMutationAuthorized": false,
+    "candidateIdentityReserved": false,
+    "mayActivateWhileC34LIsActive": false,
+    "parentSelectionRequired": true,
+    "separateFounderLiveActionAuthorityRequired": true
+  },
+  "minimumCompleteScope": [
+    "preserve_C33H_source_provider_SMS_region_and_Play signing readiness_without_repeat configuration writes",
+    "bind_the_exact_future_Play_installed_candidate_package_version_signer_installer_and_OPPO identity",
+    "have_the_founder_enter_the_private_phone_number_and_OTP_and_control_any_private_system surface",
+    "perform_at_most_the_exact_separately_authorized_real_SMS send_and_verify attempt count",
+    "prove_candidate_specific_Play_Integrity_or_reCAPTCHA return_before authentication success",
+    "prove_valid_invalid_expired_timeout_resend_cancel_offline_app switch_lock_process death_and relaunch behavior",
+    "roll_back_any_partial_Firebase identity_on_bootstrap_or_destination failure",
+    "retain_only_sanitized_boolean_result_attempt count_and_exact destination evidence"
+  ],
+  "explicitExclusions": [
+    "no_Firebase_Phone_provider_or_SMS region policy rewrite_by_default",
+    "no_real_SMS_send_verify_billing_or_funds_without_exact_founder authority",
+    "no_phone_number_OTP_token_nonce_App_Check_verdict_attestation_or private identifier_access_by_Codex",
+    "no_runtime_source_change_unless_a_separately_registered_device finding_proves_one_is necessary",
+    "no_AAB_Play_OPPO_device_or external action_under_this_inactive queue owner",
+    "no_C34L_MVP scope_registry_or current provider state mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "parent_supported_authentication_OPPO_acceptance_ticket_selected_after_C34L terminal",
+    "C33H_state_remains_source_qualified_prebuild_provider_prerequisites_qualified_candidate_device_pending",
+    "exact_future_candidate_build_Internal Testing_and_Play_in place_OPPO authorities",
+    "exact_founder_real_SMS_send_verify_attempt count_and_potential billing authorization",
+    "founder_only_phone_OTP_and_private system surface handling",
+    "sanitized_Play_Integrity_or_reCAPTCHA_result evidence_without payload access"
+  ],
+  "testAndEvidencePlan": [
+    "replay_C33H_independent_phone journey_and_dual_host gate_before candidate selection",
+    "prove_phone_provider_SMS region_Play signing_and_zero_repeat configuration write facts",
+    "capture_sanitized_candidate_specific_Play_Integrity_or_reCAPTCHA return truth",
+    "run_real_send_verify_only_after_exact authority_and_count_each accepted external action",
+    "cover_valid_invalid_expired_timeout_resend_cancel_offline_interruption_process death_and exact return",
+    "prove_zero_phone_number_OTP_or private payload_in logs_screenshots_machine state_and retained evidence"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryCompleteForQueuePlanning": true,
+    "duplicateSearchCompleteForQueuePlanning": true,
+    "implementationDisposition": [
+      "reuse",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v5.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "config/firebase-phone-auth-live-readiness-state-c33h.json",
+      "scripts/check-uaw-c33h-fix1-firebase-phone-auth-independent-journey.ps1",
+      "config/release-device-acceptance-actor-policy-c34i.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The FirebaseOtpGateway, JourneySession, Screen 03, provider readiness and actor policy already exist. This child separates live SMS, candidate-specific integrity return and founder-private evidence authority from the parent; it does not justify another runtime or provider owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "activationAssessmentRequired": true
+  },
+  "actionCounts": {
+    "providerConfigurationWrite": 0,
+    "smsRegionPolicyWrite": 0,
+    "realSmsSend": 0,
+    "realOtpVerify": 0,
+    "billingOrFundsAction": 0,
+    "deviceAction": 0
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": false,
+    "selectionAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "firebaseProviderWriteAuthorized": false,
+    "realSmsSendOrVerifyAuthorized": false,
+    "playIntegrityOrRecaptchaLiveActionAuthorized": false,
+    "billingOrFundsAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "founderPrivateAuthenticationActionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SHARED-DOMAIN-ACTION-CATALOGUE-FIX8-C25B",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Every shared launcher and destination consumes one canonical six-domain catalogue with explicit cross-route ownership for Medicine and Bus.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SHARED-DOMAIN-ACTION-CATALOGUE-FIX8-C25B-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["moolActionFamilies","personalMoolRootActions","openMoolConnectedRoute","existing GoRouter routes and destination sessions"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"The current catalogue already owns all domain/action metadata. Updating labels, membership and explicit route-family resolution is sufficient."},
+  "acceptance": ["stable_internal_family_ids_new_customer_labels","explicit_route_to_domain_resolution","default_domain_routes_are_one_tap","no_uri_prefix_assumption_for_cross_owned_routes","no_duplicate_route_or_action_owner"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SHARED-DOMAIN-ACTION-CATALOGUE-FIX8-C25B-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

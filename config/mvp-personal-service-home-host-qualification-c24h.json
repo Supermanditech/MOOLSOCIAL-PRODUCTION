@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-SERVICE-HOME-HOST-QUALIFICATION-C24H-20260809",
+  "ticketId": "UAW-PERSONAL-MVP-SERVICE-HOME-HOST-QUALIFICATION-FIX7-C24H",
+  "ticketManifestPath": "config/uaw-personal-mvp-service-home-host-qualification-fix7-c24h-ticket.json",
+  "ticketManifestSha256": "00CAEA4D9083AEDB83C225360F1E5C61857B4DB039F1BED4C4B7442135FF9E42",
+  "state": "selected_host_qualification_execution_open",
+  "authority": {
+    "runtimeMutationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalWriteAuthorized": false
+  },
+  "requiredTests": [
+    "apps/mobile/test/book_vertical_slice_test.dart",
+    "apps/mobile/test/core/design/mool_service_home_c24b_test.dart",
+    "apps/mobile/test/eat_vertical_slice_test.dart",
+    "apps/mobile/test/journey01_test.dart",
+    "apps/mobile/test/ride_vertical_slice_test.dart",
+    "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+    "apps/mobile/test/support_shortcuts_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_book_subaction_professional_conformance_c16f_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_eat_subaction_professional_conformance_c16d_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_work_subaction_professional_conformance_c16g_test.dart",
+    "apps/mobile/test/ui_v2/book/book_bus_booking_c24f_test.dart",
+    "apps/mobile/test/ui_v2/book/book_doctor_salon_home_c24e_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+    "apps/mobile/test/ui_v2/eat/eat_discovery_home_c24c_test.dart",
+    "apps/mobile/test/ui_v2/ride/ride_destination_home_c24d_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_connected_action_navigator_c24b3_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_home_fixed_viewport_hub_c24b2_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix2_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_cold_launch_social_default_c10a_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_navigation_motion_containment_c10e_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_shared_global_dock_main_roots_c10b_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r06_personal_eat_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r07_personal_ride_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r14_personal_context_restore_test.dart",
+    "apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart",
+    "apps/mobile/test/universal_intent_completion_test.dart",
+    "apps/mobile/test/work_vertical_slice_test.dart"
+  ],
+  "protectedTestManifests": [
+    {
+      "id": "buy",
+      "path": "artifacts/quality/buy-protected-candidate-c24f-connected-back-20260809-02/TEST-MANIFEST.txt",
+      "expectedFiles": 53
+    },
+    {
+      "id": "social",
+      "path": "artifacts/quality/social-protected-candidate-c24f-connected-back-20260809-02/TEST-MANIFEST.txt",
+      "expectedFiles": 34
+    }
+  ],
+  "formatOwners": [
+    "apps/mobile/lib/core/design/mool_service_home.dart",
+    "apps/mobile/lib/ui_v2/universal/personal_mool_root_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+    "apps/mobile/lib/features/journey01/journey_router.dart",
+    "apps/mobile/lib/features/eat",
+    "apps/mobile/lib/features/ride",
+    "apps/mobile/lib/features/book",
+    "apps/mobile/lib/features/work"
+  ],
+  "requiredGates": [
+    "scripts/check-personal-service-home-host-qualification-c24h.ps1",
+    "scripts/check-personal-subaction-placement-regression.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-brand-integrity.ps1",
+    "scripts/check-user-facing-copy.ps1",
+    "scripts/check-interaction-contracts.ps1",
+    "scripts/check-mvp-personal-action-projection.ps1",
+    "scripts/check-mvp-delivery-discipline-lock.ps1",
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-buy-protected-baseline.ps1",
+    "scripts/check-social-protected-baseline.ps1"
+  ],
+  "expectedInstalledPredecessor": {
+    "machineState": "c23h_r60_22_device_gate_rejected_accessibility_actions_missing_installed_checksum_preserved_authorities_closed",
+    "versionName": "1.0.0-r60.22",
+    "versionCode": "2026080922",
+    "apkSha256": "778C9338DAFDEC3693337D54410946C75F9B6B1BB5977D822DF2CF7E38D9D850",
+    "buildAuthorization": "consumed_no_second_build"
+  },
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "unchangedSourceFingerprintRequired": true,
+    "completeAnalysisRequired": true,
+    "completeRequiredSuiteRequired": true,
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": [
+      "apps/mobile/lib",
+      "apps/mobile/test",
+      "scripts",
+      "config",
+      "docs/quality",
+      "docs/delivery"
+    ]
+  }
+}

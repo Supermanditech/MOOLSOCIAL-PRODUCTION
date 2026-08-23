@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X",
+    "UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y",
+    "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z"
+  ],
+  "state": "source_complete_real_shorts_provider_deployment_held",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_social_viewer_and_creator",
+  "customerOutcome": "Every Social page forms one reviewable design system, and Shorts presents only real eligible YouTube-hosted content or a truthful deployment hold before a review APK is built.",
+  "classificationReason": "The founder requested a complete Social design freeze before deployment, while installed r60.35 loaded real Videos but never invoked the deployed public Shorts catalogue and remained unavailable.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "backend/functions/src/youtube/shared_catalogue.ts",
+      "backend/functions/src/youtube/provider_service.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "audit_Home_Videos_Shorts_Feed_Create_Chat_tap_design_navigation_state_and_accessibility_as_one_freeze_set",
+    "trace_the_exact_real_publicShortsCatalogue_client_request_and_truthful_failure_path",
+    "fix_only_an_evidence_proven_existing_client_or_UI_owner_defect",
+    "prove_no_MoolSocial_hosted_Short_no_fabricated_catalogue_and_no_visible_YouTube_adjacent_ad",
+    "record_an_explicit_hold_if_a_backend_deployment_is_required"
+  ],
+  "explicitExclusions": [
+    "no_backend_function_rule_provider_profile_or_Firebase_deployment",
+    "no_fake_demo_seed_or_locally_fabricated_YouTube_content",
+    "no_recommendation_personalization_polling_OAuth_upload_or_secret_value_access",
+    "no_APK_build_install_promotion_commit_or_push_under_C30A"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_complete_Social_design_freeze_and_OPPO_review_request",
+    "sourceImplementationAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "readOnlyDevRuntimeAuditAuthorized": true,
+    "installedRejectedClientLaunchAndTapAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "testPlan": [
+    "focused_YouTube_public_client_catalogue_and_no_fabrication_tests",
+    "complete_Social_page_navigation_copy_accessibility_and_140_percent_fitment",
+    "read_only_Dev_function_operation_and_OPPO_r60_35_request_trace_if_needed",
+    "later_two_full_source_cycles_and_combined_OPPO_candidate_under_separate_machine_authority"
+  ],
+  "preselectionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A-PRESELECTION-20260811.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A-COMPLETION-20260811.md",
+  "runtimeFinding": {
+    "installedClient": "1.0.0-r60.35+2026081135",
+    "traceStartUtc": "2026-08-11T17:01:21Z",
+    "providerRevision": "youtubeprovider-00035-jis",
+    "failure": "maxResults must be between 1 and 25",
+    "sourceRootCause": "shared Shorts service wiring supplied maxResults 50 to a client contract capped at 25",
+    "sourceFix": "sharedShortsCatalogueContract.pageSize=25 and service wiring consumes that named contract",
+    "deploymentPerformed": false,
+    "liveShortsReviewState": "blocked_until_separately_authorized_Dev_provider_deployment"
+  }
+}

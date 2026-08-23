@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33E-FIX4-PROTECTED-SOCIAL-ACTION-INTENT-RETURN-CONTINUITY",
+  "parentTicket": "UAW-C33E-R60-48-PLAY-INSTALLED-AUTH-LOGIN-DEVICE-REPRODUCTION",
+  "finding": "REG-20260815-2349-C33E-PROTECTED-SOCIAL-ACTION-INTENT-COLLAPSES-AFTER-AUTH",
+  "state": "founder_authorized_runtime_and_test_repair_selected_no_build_provider_device_external_or_secret_authority",
+  "classification": "mvp_required",
+  "severity": "release_blocking_protected_action_authentication_continuity",
+  "actor": "signed_out_personal_user_authenticating_from_an_exact_Feed_Like_Reply_Repost_Save_or_Poll_vote_action",
+  "customerOutcome": "A successful sign-in returns to the exact protected Feed action and item the customer requested, preserves a reply draft or poll choice, never toggles an already-complete desired state off, consumes resumable mutation intent once, and fails safely without a false write when intent is malformed or stale.",
+  "classificationReason": "The confirmed action-intent loss violates the qualified C30Z core authentication outcome and blocks reliable reviewer and customer completion of supported Social MVP actions.",
+  "minimumCompleteScope": [
+    "replace_the_untyped_public_card_authentication_callback_with_one_existing_owner_typed_action_intent",
+    "carry_like_reply_repost_save_and_vote_plus_vote_choice_through_the_existing_Social_route_query",
+    "consume_a_valid_authenticated_return_once_before_mutation_and_remove_resumable_action_parameters_from_the_route",
+    "use_desired_state_checks_for_like_save_and_repost_so_prior_authenticated_state_is_never_toggled_off",
+    "reopen_the_existing_reply_sheet_with_the_existing_SharedSession_reply_draft",
+    "reject_unknown_missing_item_or_invalid_vote_choice_intent_without_gateway_dispatch",
+    "add_ticket_specific_route_cancellation_success_already_complete_vote_reply_and_invalid_intent_tests",
+    "extend_the_existing_C30Z_C33E_lifecycle_and_readiness_gates_without_weakening_live_provider_holds"
+  ],
+  "explicitExclusions": [
+    "no_locked_Screen03_presentation_accepted_test_golden_reference_asset_copy_or_provider_artwork_change",
+    "no_new_screen_route_backend_endpoint_session_gateway_persistence_owner_or_provider_adapter",
+    "no_automatic_reply_submission_and_no_replay_of_an_action_after_its_route_intent_is_consumed",
+    "no_Firebase_Google_Cloud_OAuth_YouTube_Play_console_CLI_project_or_provider_mutation",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_tap_or_other_device_action",
+    "no_password_API_key_OAuth_identifier_token_nonce_private_verdict_private_key_attestation_payload_or_debug_log_access",
+    "no_backend_Hosting_rules_IAM_deployment_email_quota_submission_external_message_or_funds"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_login_first_and_audit_findings_to_ticket_implementation_direction_2026_08_15",
+    "REG_20260815_2349_registered_before_ticket_and_runtime_mutation",
+    "C30Z_exact_requested_action_contract_and_C33E_FIX1_through_FIX3_source_qualification_preserved",
+    "four_sanitized_Google_Firebase_live_provider_readiness_facts_still_required",
+    "future_separately_authorized_successor_release_and_Play_installed_OPPO_acceptance_still_required"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_policy_adapter",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/test/c30t_social_auth_and_feed_gateway_test.dart",
+      "scripts/check-c30z-authentication-method-truth-and-guest-feed-recovery.ps1",
+      "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1",
+      "scripts/check-uaw-c33e-fix3-social-auth-rollback-independent-cleanup.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/uaw_c33e_fix4_protected_social_action_intent_return_continuity_test.dart",
+      "scripts/check-uaw-c33e-fix4-protected-social-action-intent-return-continuity.ps1"
+    ],
+    "necessityProof": "The existing Feed card, Social route, JourneySession return location, SharedSession interaction methods and reply-draft owner already provide the entire journey. One typed intent value, two existing-owner adaptations, one ticket-specific regression file and one fail-closed source gate are sufficient; no duplicate screen, route, session, gateway, persistence or backend owner is needed.",
+    "robustnessCoverage": [
+      "exact_action_and_item_return_for_like_reply_repost_save_and_vote",
+      "vote_choice_and_existing_reply_draft_continuity",
+      "consume_before_mutation_and_no_second_dispatch_after_route_update_or_rebuild",
+      "desired_state_no_op_for_already_liked_saved_or_reposted_items",
+      "malformed_unknown_missing_item_and_out_of_range_vote_choice_no_dispatch",
+      "cancel_Back_failure_and_retry_keep_the_existing_origin_without_false_success",
+      "locked_Screen03_provider_live_release_device_and_secret_containment"
+    ],
+    "adjustments": [
+      "reuse_the_existing_Social_route_with_bounded_query_metadata_not_a_new_route",
+      "reuse_SharedSession_reply_draft_and_interaction_error_owners",
+      "add_one_typed_value_and_one_authenticated_return_consumer_inside_existing_Social_owners",
+      "place_new_behavioral_coverage_in_a_ticket_specific_non_locked_test_owner"
+    ],
+    "explicitExclusions": [
+      "no_presentation_reference_provider_or_backend_architecture_expansion",
+      "no_release_device_external_or_secret_action"
+    ],
+    "dependenciesAndApprovals": [
+      "C30Z_qualified_authentication_source",
+      "C33E_FIX2_live_readiness_gate_and_FIX3_rollback_repair",
+      "future_live_console_evidence_and_Play_successor"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33e-fix4-protected-social-action-intent-return-continuity-ticket.json"
+  },
+  "testAndEvidencePlan": [
+    "approved_UI_lock_before_and_after_runtime_change",
+    "Dart_format_and_no_unintended_format_delta",
+    "focused_analyzer_for_changed_runtime_and_new_test_owner",
+    "ticket_specific_exact_route_cancel_success_consume_once_and_desired_state_tests",
+    "ticket_specific_reply_draft_vote_choice_and_invalid_intent_tests",
+    "existing_C30T_auth_feed_Firebase_gateway_Screen03_session_and_FIX3_suites",
+    "C30Z_C33E_FIX1_FIX2_FIX3_and_new_FIX4_source_gates",
+    "whole_mobile_analyzer_and_two_identical_source_cycles_before_any_future_release"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "existingPlayClientLaunchAndTapAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "caseId": "duplicate-sub-action",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "duplicate_sub_action",
+    "mainActionId": "ride",
+    "sourceIndex": 0,
+    "targetIndex": 1
+  },
+  "expectedErrorContains": "sub-action ids for 'ride' ids differ"
+}

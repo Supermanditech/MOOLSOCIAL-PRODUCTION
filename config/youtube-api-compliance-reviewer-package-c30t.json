@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "packageId": "YOUTUBE-API-COMPLIANCE-REVIEWER-PACKAGE-C30T-20260813",
+  "state": "local_draft_prepared_awaiting_C30T_AAB_Play_OPPO_acceptance_and_founder_approval",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "mailbox": "hello@moolsocial.com",
+  "threadSubject": "Re: YouTube API Services: Thank you for your submission",
+  "latestRequestDate": "2026-08-06",
+  "hardInternalDeadline": "2026-08-14",
+  "application": {
+    "product": "MoolSocial",
+    "projectId": "moolsocial-dev-503018",
+    "packageName": "com.moolsocial.app",
+    "distribution": "Google_Play_Internal_Testing_only",
+    "playLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "playLinkFounderEligibilityPreviouslyObserved": true,
+    "targetVersionName": "1.0.0-r60.45",
+    "targetVersionCode": "2026081345",
+    "artifactSha256": null,
+    "playReleaseEvidence": null,
+    "playInstalledProvenanceEvidence": null,
+    "oppoJourneyEvidence": null
+  },
+  "declaredUseCaseUnchanged": true,
+  "youtubeUploadAuthorized": false,
+  "draft": "docs/quality/YOUTUBE-API-COMPLIANCE-C30T-SAME-THREAD-DRAFT-AND-REVIEWER-PACKAGE-20260813.md",
+  "screencastEvidence": null,
+  "gmailDraftCreated": false,
+  "emailSent": false,
+  "quotaSubmitted": false,
+  "founderApproved": false
+}

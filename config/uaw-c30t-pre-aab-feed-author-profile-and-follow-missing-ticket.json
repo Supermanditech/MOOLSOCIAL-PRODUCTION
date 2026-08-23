@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-AUTHOR-PROFILE-AND-FOLLOW-MISSING",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "Feed_author_relationship_completion_blocker",
+  "actor": "MoolSocial_public_Feed_reader_inspecting_an_author",
+  "customerOutcome": "A reader opens the public author identity without sign-in and a signed-in member can Follow or Unfollow with server-acknowledged state and truthful recovery.",
+  "classificationReason": "The public card renders author identity but it is not actionable and exposes no Follow completion, leaving the supported author/profile action absent.",
+  "minimumCompleteScope": [
+    "make_author_identity_an_accessible_public_tap_target",
+    "show_the_existing_author_name_handle_and_public_posts_in_a_native_sheet",
+    "gate_Follow_or_Unfollow_behind_MoolSocial_identity",
+    "persist_relationship_state_through_an_existing_shared_social_owner",
+    "contain_self_follow_missing_author_offline_rejected_and_retry_states"
+  ],
+  "explicitExclusions": [
+    "no_profile_edit_private_fields_follower_list_block_report_notifications_or_recommendations",
+    "no_new_route_or_route_level_screen",
+    "no_backend_deployment_cloud_Play_AAB_upload_install_or_device_write"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "backend/functions/src/social/contracts.ts",
+      "backend/functions/src/social/service.ts",
+      "backend/functions/src/social/firestore_store.ts"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The public card, Social sheet, content records and current backend owner can express the bounded public identity and relationship state without another profile screen family.",
+    "timelineImpactDays": 1,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "Feed_action_authentication_truth_matrix_source_qualified",
+    "real_authorId_is_already_required_for_Message_and_relationship_binding",
+    "founder_source_implementation_authority_and_no_AAB_authority"
+  ],
+  "testAndEvidencePlan": [
+    "guest_public_author_sheet_and_no_private_field_exposure",
+    "authenticated_Follow_Unfollow_server_acknowledgement_and_single_flight",
+    "self_follow_missing_author_offline_rejected_retry_and_Back",
+    "authoritative_Flutter_backend_analyzer_and_non_build_release_gates"
+  ],
+  "authority": {
+    "sourceImplementationAuthorizedByFounder": true,
+    "selectionPending": false,
+    "backendDeploymentAuthorized": false,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "author_identity_is_an_accessible_guest_readable_exact_author_tap_target",
+      "bounded_public_profile_exposes_only_name_handle_metrics_and_public_posts",
+      "Follow_and_Unfollow_require_MoolSocial_identity_with_exact_author_return",
+      "relationship_and_follower_count_change_only_after_server_acknowledgement",
+      "offline_rejected_and_retry_outcomes_preserve_truth_without_optimistic_state",
+      "backend_rejects_self_follow_cross_author_results_and_duplicate_count_changes",
+      "real_author_cards_and_profile_sheet_fit_320x568_at_140_percent_text"
+    ],
+    "flutterFocused": "59_passed_0_failed",
+    "backendVerify": "516_passed_0_failed",
+    "analyzer": "8_exact_owned_items_clean",
+    "routesAdded": 0,
+    "routeLevelScreensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayAcceptancePending": true
+  },
+  "evidence": "docs/quality/UAW-C30T-PRE-AAB-FEED-AUTHOR-PROFILE-AND-FOLLOW-MISSING-20260813.md"
+}

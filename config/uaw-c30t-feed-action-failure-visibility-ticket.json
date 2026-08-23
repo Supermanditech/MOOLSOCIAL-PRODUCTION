@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-ACTION-FAILURE-VISIBILITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "feed_interaction_truth_blocker",
+  "actor": "signed_in_MoolSocial_Feed_reader",
+  "customerOutcome": "Like, Save and Vote explain a real offline/provider rejection without claiming a change, and the visible unsupported Repost action clearly states that nothing changed.",
+  "minimumCorrection": [
+    "retain_the_exact_interaction_failure_by_post",
+    "show_the_failure_after_Like_Save_or_Vote_returns_false",
+    "keep_authoritative_post_state_unchanged_on_failure",
+    "make_Repost_explain_its_unsupported_state_in_the_visible_Feed_surface",
+    "reprove_guest_auth_single_flight_share_deep_link_and_all_public_formats"
+  ],
+  "explicitExclusions": [
+    "no_Repost_or_Reply_backend_implementation",
+    "no_optimistic_mutation_or_false_success_copy",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "13 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-action-failure-visibility-focused-tests.log",
+    "evidenceSha256": "524BD6583170EED2A594250AFB2080613A0404617CE2EF64F293F91AB6D081E1",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

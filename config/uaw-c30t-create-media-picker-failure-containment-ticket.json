@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATE-MEDIA-PICKER-FAILURE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "create_native_media_recovery_blocker",
+  "actor": "creator_whose_native_photo_video_or_interrupted_selection_boundary_fails",
+  "customerOutcome": "A native media-picker failure never escapes the Create future or clears the unfinished MoolSocial draft; fixed recovery copy remains visible and retryable.",
+  "minimumCorrection": [
+    "contain_interrupted_selection_recovery_failures",
+    "contain_image_carousel_image_poll_and_reel_picker_failures",
+    "always_release_the_media_selection_busy_state",
+    "preserve_caption_choices_existing_media_and_format",
+    "never_expose_private_platform_exception_detail"
+  ],
+  "explicitExclusions": [
+    "no_media_picker_plugin_or_permission_policy_change",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "15 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/create-media-picker-failure-containment-focused-tests.log",
+    "evidenceSha256": "D69533431E78712B69D558D70F1F160C0AF03B8711ABBC61ED3A50143BCA0961",
+    "privateExceptionDetailExposed": false,
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

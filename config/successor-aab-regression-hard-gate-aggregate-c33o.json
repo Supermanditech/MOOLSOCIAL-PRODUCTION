@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C33O-R60-53-AUTHENTICATION-NO-REGRESSION-RELEASE-AGGREGATE-001",
+  "ticketId": "UAW-C33O-R60-53-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "machineState": "prebuild_rejected_postseal_registry_change_successor_required",
+  "evidenceRoot": "artifacts/quality/uaw-c33o-r60-53-authentication-no-regression-preparation-20260816-01",
+  "candidate": {
+    "id": "UAW-C33O-R60-53-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.53",
+    "versionCode": "2026081353",
+    "buildCount": 0,
+    "uploadCount": 0,
+    "installCount": 0,
+    "deviceAcceptanceCount": 0,
+    "aabSha256": null,
+    "disposition": "rejected",
+    "artifactReusable": false
+  },
+  "historicalCandidates": [
+    {
+      "versionName": "1.0.0-r60.49",
+      "versionCode": "2026081349",
+      "disposition": "failed",
+      "buildCount": 1,
+      "uploadCount": 1,
+      "installCount": 1,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false
+    },
+    {
+      "versionName": "1.0.0-r60.50",
+      "versionCode": "2026081350",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "541F02EA0F7C1C8B9067B31D50AE3CE0BB495E16746A3E4E2FF4AEAA28354F99"
+    },
+    {
+      "versionName": "1.0.0-r60.51",
+      "versionCode": "2026081351",
+      "disposition": "rejected",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "6C4C402DAA5CD813F66DF1ECE895A7FE39936F6D6413FC2D771667E274A7CA24"
+    },
+    {
+      "versionName": "1.0.0-r60.52",
+      "versionCode": "2026081352",
+      "disposition": "rejected",
+      "machineState": "postbuild_rejected_postseal_registry_change_successor_required",
+      "buildCount": 1,
+      "uploadCount": 0,
+      "installCount": 0,
+      "deviceAcceptanceCount": 0,
+      "artifactReusable": false,
+      "aabSha256": "E56BF124B3F46D27D34387A5AB6B12012125227095026EAB04CEC56B69A2E8A3"
+    }
+  ],
+  "presealUploadWorkflow": {
+    "evidencePath": "docs/quality/UAW-C33O-PRESEALED-INTERNAL-TESTING-BROWSER-QUALIFICATION-20260816.md",
+    "liveBrowserRouteQualified": true,
+    "signedInMoolSocialAppRouteProved": true,
+    "internalTestingRouteProved": true,
+    "noPlayWritePerformed": true
+  },
+  "regressionMemory": {
+    "registryPath": "config/codex-development-regression-registry.json",
+    "sealedRegistrySha256": "03BC53B47AF2AAE58EF5C79B9215E5860BAE6249739CD714846AE8FC5AE90643",
+    "sealedRegistryEntryCount": 2591,
+    "postSealChangeRejectsBuildOrPromotion": true,
+    "historicalRepeatOrNewDefectRejectsCandidate": true,
+    "waiversAllowed": false
+  },
+  "sourceQualification": {
+    "requiredIdenticalCycles": 2,
+    "completedIdenticalCycles": 1,
+    "manifestPath": "artifacts/quality/uaw-c33o-r60-53-authentication-no-regression-preparation-20260816-01/source-manifest-c33o-registry-2591.txt",
+    "manifestSha256": "FA9BD54970292265E98355B7B0FC23A4C4EEA77AA1BED90CC4755338586F5855",
+    "focusedManifestPath": "artifacts/quality/uaw-c33o-r60-53-authentication-no-regression-preparation-20260816-01/focused-test-manifest-c33o.txt",
+    "focusedManifestSha256": "BC2CCD7E69CDC2D5817A9B772BF923E6A641AC8783C3BA657E9F729E836F2620",
+    "releasePreflightPassed": false,
+    "zeroFailures": false,
+    "cycleEvidence": [
+      "artifacts/quality/uaw-c33o-r60-53-authentication-no-regression-preparation-20260816-01/c33o-cycle-01-summary.json"
+    ]
+  },
+  "releaseAuthorities": {
+    "build": "rejected_postseal_registry_change",
+    "uploadAndInternalActivation": "rejected_candidate",
+    "inPlaceOppoPlayUpdate": "rejected_candidate",
+    "postinstallAcceptance": "rejected_candidate"
+  },
+  "actionCounts": {
+    "build": 0,
+    "upload": 0,
+    "install": 0,
+    "deviceAcceptance": 0,
+    "passwordlessEmailSend": 0,
+    "realSmsSend": 0,
+    "otherTrack": 0,
+    "backendHostingProviderOrProductionDeployment": 0
+  },
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false,
+    "privateEmailLinkObserved": false
+  },
+  "rejection": {
+    "disposition": "rejected",
+    "phase": "source_cycle_2_before_build",
+    "reasonRegistryIds": [
+      "REG-20260816-2621-C33O-CYCLE2-EVIDENCE-LOGGER-UNSUPPORTED-TEE-PARAMETER"
+    ],
+    "evidencePath": "docs/quality/UAW-C33O-R60-53-PREBUILD-REGISTRY-CHANGE-REJECTION-20260816.md",
+    "sealedRegistryEntryCount": 2591,
+    "rejectionRegistryEntryCount": 2592,
+    "artifactReusable": false,
+    "artifactUploadAuthorized": false,
+    "artifactInstallAuthorized": false,
+    "successorRequired": true
+  }
+}

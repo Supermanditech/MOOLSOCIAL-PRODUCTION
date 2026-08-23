@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "auditId": "UAW-C30T-PRE-AAB-PREPARATORY-AUDIT-HANDOFF-20260813",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_source_runtime_static_and_release_workflow_passed_environment_deploy_and_two_cycle_qualification_pending",
+  "candidate": {
+    "versionName": "1.0.0-r60.45",
+    "versionCode": "2026081345",
+    "packageName": "com.moolsocial.app",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "localVerification": {
+    "focusedFlutter": {
+      "files": 57,
+      "passed": 368,
+      "skipped": 3,
+      "failed": 0,
+      "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/75-final-current-57-file-focused-flutter-tests-after-fitment.log",
+      "sha256": "0800E1C74FEA2AF15EAFC15A7FC064DC7FE0F88DF51B9FA639AC5D996893D02C"
+    },
+    "backend": {
+      "passed": 505,
+      "failed": 0,
+      "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/15-backend-isolated-full-tests.log",
+      "sha256": "9D71C8B3D42962637A810B4DD8143277FA82B99797196AC86DE0BEE51BE58460"
+    },
+    "publicSite": {
+      "passed": 7,
+      "failed": 0,
+      "latestEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/56-privacy-youtube-readonly-scope-tests.log",
+      "latestSha256": "B23088029D5156D20789F8B00CFC65274886EB6F10469C537A44E58906ED13B0"
+    },
+    "flutterAnalyze": {
+      "state": "no_issues",
+      "latestEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/76-final-current-full-flutter-analyze-after-fitment.log",
+      "latestSha256": "D02235513ED2AD7FEFD1166EC1B741048FBABEECCC7D589027C952612D5803A6"
+    },
+    "releaseStaticReadiness": {
+      "state": "passed",
+      "plugins": 15,
+      "permissions": 5,
+      "providers": 4,
+      "candidateAabCount": 0,
+      "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/83-final-static-release-readiness-after-reconciliation.log",
+      "sha256": "C47FDCAEA516C09D817C2B2862C6FE58C4FD90CD75658BDD796D99A48ABC9A6B"
+    },
+    "regressionMemory": {
+      "state": "passed",
+      "entries": 1835,
+      "applicable": 1001,
+      "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/82-final-memory-gate-after-browser-audit.log",
+      "sha256": "AE82BD370964B9D15D8FC8610AC57DA69AA164A146619338FCDF24719E343D28"
+    }
+  },
+  "releaseHold": {
+    "machineState": "founder_authorized_continuous_social_audit_in_progress_build_held",
+    "buildAuthorization": "founder_hold_pending_new_aab_authorization",
+    "buildCount": 0,
+    "uploadCount": 0,
+    "installCount": 0,
+    "releaseApkExists": false,
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "transientReleaseSecretFilesPresent": 0,
+    "preservedAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55",
+    "preservedAabBytes": 93201374
+  },
+  "oppoPredecessor": {
+    "serial": "2b3e0f71",
+    "versionName": "1.0.0-r60.44",
+    "versionCode": "2026081244",
+    "installerPackageName": "com.android.vending",
+    "uninstallDataClearDowngradeOrAdbInstallPerformed": false
+  },
+  "liveProviderReadReconciliation": {
+    "state": "pending_founder_visible_gcloud_reauthentication",
+    "projectVisibleInExistingCloudSession": true,
+    "localCliMutationPerformed": false,
+    "browserMutationPerformed": false,
+    "iamRestored": false,
+    "reason": "local_gcloud_session_requires_interactive_reauthentication_and_authenticated_browser_query_output_is_not_eligible_as_revision_evidence"
+  },
+  "pendingBeforeAabAuthorizationRequest": [
+    "founder_authorizes_the_exact_Dev_youtubeprovider_readonly_ownerConnect_deployment_and_machine_revision_seal",
+    "founder_authorizes_Firebase_Hosting_deployment_of_App_Links_and_reviewer_policy_corrections",
+    "run_two_identical_C30T_source_qualification_cycles_against_the_deployed_exact_revisions_and_live_Hosting",
+    "present_the_passed_pre_AAB_source_manifest_and_state_for_separate_founder_AAB_authorization"
+  ],
+  "communicationHold": {
+    "gmailDraftCreated": false,
+    "emailSent": false,
+    "quotaSubmitted": false,
+    "founderFinalApproval": false
+  }
+}

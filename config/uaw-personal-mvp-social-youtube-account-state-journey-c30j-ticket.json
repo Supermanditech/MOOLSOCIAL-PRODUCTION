@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ACCOUNT-STATE-JOURNEY-C30J",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CREATOR-CONNECTION-PRIVATE-SHORT-UPLOAD-C29L",
+    "UAW-PERSONAL-MVP-GLOBAL-ANDROID-ROOT-FOCUS-EDGE-SUPPRESSION-C30I"
+  ],
+  "state": "source_qualified_successor_APK_and_provider_runtime_proof_required",
+  "classification": "mvp_required",
+  "actor": "MoolSocial_public_YouTube_viewer_or_connected_channel_creator",
+  "customerOutcome": "A public viewer can watch YouTube-hosted videos and Shorts without connecting a Google account, while the YouTube Home account action truthfully opens the real channel-status journey and shows disconnected, connected, reconnect, unavailable and authentication-required states without implying authorization from a MoolSocial avatar.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_creator_upload.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_models.dart",
+      "apps/mobile/lib/core/navigation/youtube_connect_return_route.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "backend/functions/src/youtube/oauth.ts",
+      "backend/functions/src/youtube/provider_service.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "YouTube Home currently renders an M avatar labelled MoolSocial account and routes it to the MoolSocial account page, so it visually implies a YouTube sign-in state that it never reads. C29L already owns authoritative server-backed disconnected/connected/reconnect channel states and the exact allowlisted return route; the smallest complete correction is to route a neutral YouTube channel-status action to that existing real owner while leaving public playback OAuth-free."
+  },
+  "minimumCompleteScope": [
+    "replace_the_misleading_MoolSocial_M_avatar_on_YouTube_Home_with_a_neutral_YouTube_channel_status_action",
+    "route_that_action_to_the_existing_real_youtube_connect_return_owner_without_a_new_route_or_local_boolean",
+    "keep_public_Home_Search_Watch_and_Shorts_available_when_no_YouTube_channel_is_connected",
+    "show_exact_backend_connected_channel_identity_only_after_authoritative_connectionStatus",
+    "preserve_disconnected_reconnect_capability_unavailable_auth_required_error_disconnect_and_reauth_states",
+    "cover_public_viewer_connected_creator_and_cold_callback_non_authority_journeys_with_focused_tests",
+    "run_full_analysis_copy_gate_and_two_identical_current_complete_Social_cycles"
+  ],
+  "explicitExclusions": [
+    "no_YouTube_login_or_connected_claim_from_the_header_avatar_callback_flag_or_CreatorSession_boolean",
+    "no_OAuth_requirement_for_public_video_or_Shorts_viewing",
+    "no_new_scope upload_visibility recommender tracking profile backend route screen or credential owner",
+    "no_credential_value_access copy logging service_account_identity_or_fake_channel",
+    "no_backend provider Firebase hosting app_store or Production deployment",
+    "no_build install uninstall data_clear downgrade commit push promotion provider_message_call_or_fund"
+  ],
+  "authority": {
+    "founderAuthorization": "founder_direct_production_grade_connected_and_not_connected_YouTube_user_journey_ticket_authority_with_deployment_hold",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C29L_source_qualified_authoritative_connection_status_and_creator_screen",
+    "public_YouTube_provider_remains_available_without_user_OAuth",
+    "provider_privateUpload_activation_required_later_for_real_connected_runtime_proof",
+    "C30I_source_qualified_and_r60_38_rejected_identity_preserved",
+    "permanent_regression_memory_MVP_delivery_and_YouTube_compliance_locks"
+  ],
+  "testPlan": [
+    "YouTube_Home_neutral_channel_status_semantics_and_exact_route",
+    "public_viewer_without_connection_keeps_Home_Search_Watch_and_Shorts",
+    "existing_disconnected_connected_reconnect_unavailable_auth_error_disconnect_and_cold_callback_tests",
+    "full_Flutter_analysis_and_user_facing_copy_gate",
+    "two_identical_current_complete_Social_cycles_before_any_successor_APK_or_provider_activation_ticket"
+  ]
+}

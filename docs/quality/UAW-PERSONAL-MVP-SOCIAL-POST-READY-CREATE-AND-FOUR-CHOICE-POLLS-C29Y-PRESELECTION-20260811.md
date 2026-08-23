@@ -1,0 +1,3 @@
+# C29Y posting-ready Create and four-choice polls preselection
+
+C29Y is `mvp_required` because the supported Create journey was founder-rejected on r60.35. The smallest complete fix reuses `SocialCreateWorkbenchV2`, the existing Social host and the real shared posting/media session: Create opens post-ready, six MoolSocial formats remain one tap away, Image Poll/Quick Poll/Quiz use four choices, and a distinct immediate YouTube Short action routes to the existing truthful creator gateway. No new screen, route, posting service, media owner, backend owner or fabricated state is necessary. OAuth, upload, provider changes, deployment, build and install are excluded. Timeline impact is bounded to one source/test wave and remains inside the 60–75-day lock.

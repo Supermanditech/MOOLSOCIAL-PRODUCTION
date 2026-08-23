@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34L-PRE-AAB-2-FIX1-EVIDENCE-PROVENANCE-ATOMICITY-PRIVACY",
+  "parentTicketId": "UAW-C34L-PRE-AAB-2-SANITIZED-EVIDENCE-PRODUCER-CONTRACTS",
+  "findingId": "REG-20260817-2786-C34L-EVIDENCE-PRODUCER-PROVENANCE-ATOMICITY-PRIVACY-GAPS",
+  "state": "registered_implementation_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "Play, OPPO and journey success can advance C34L only when exact sanitized records are cryptographically bound to independently retained source attestations, privacy-allowlisted and crash-recoverable.",
+  "classificationReason": "Independent review found that caller switches can fabricate success, the OPPO pair can strand a partial commit, unknown/private fields can pass and read paths permit reparse ancestors.",
+  "minimumCompleteScope": [
+    "create_one_exact_sanitized_source_attestation_contract_for_Play_OPPO_and_journey evidence types",
+    "bind_source_attestation_path_SHA256_bytes_producer_session_nonce_and_evidence_specific_digest_manifest_into_each_success record",
+    "make_OPPO_cold_and_retained_pair_a_journaled_atomic_transaction_with_deterministic_crash reconciliation",
+    "enforce_exact_property_allowlists_and_forbidden_name_value_scanning_in_producers_transition_and retained gates",
+    "reject_leaf_and_ancestor_reparse_points_under_exact_real_and_fixture roots",
+    "pass_dual_host_positive_provenance_partial_commit_tamper_privacy_unknown_field_and confinement fixtures"
+  ],
+  "explicitExclusions": [
+    "no_real_Play_console_upload_activation_or track action",
+    "no_real_OPPO_ADB_install update_or device action",
+    "no_real_authentication private journey browser_or account action",
+    "no_secret private identifier_link_token_exception_payload_or credential inspection",
+    "no_source seal_cycle founder prompt_AAB backend Hosting provider_or external action",
+    "no_product runtime_UI route service_or backend change"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authorized_C34L_parent_and_immediate_pre_AAB_batch_2026_08_17",
+    "REG2786_preserved_before repair",
+    "existing_C34L_transition_retained_recovery_and producer owners",
+    "PRE_AAB_4_held_until_FIX1_dual_host qualification"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_attestation_producer_retained_transition_and recovery fixtures",
+    "wrong_missing_stale_tampered_or_replayed_source_attestation negatives",
+    "OPPO_before_journal_after_journal_after_cold_move_after_retained_move_and_committed_reconciliation boundaries",
+    "unknown_field_email_phone_private_URL_identifier_exception_nonBearer_token_and reparse ancestor negatives",
+    "zero_real_state_Play_OPPO_browser_device_private_secret_or external action"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/write-release-play-evidence-c34l.ps1",
+      "scripts/write-release-oppo-evidence-c34l.ps1",
+      "scripts/write-release-journey-evidence-c34l.ps1",
+      "scripts/check-release-evidence-producers-c34l.ps1",
+      "scripts/check-release-retained-evidence-c34l.ps1",
+      "scripts/check-release-retained-evidence-fixtures-c34l.ps1",
+      "scripts/invoke-release-lifecycle-transition-c34l.ps1",
+      "scripts/check-release-lifecycle-transition-c34l.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/write-release-source-attestation-c34l.ps1",
+      "scripts/check-release-source-attestation-c34l.ps1",
+      "scripts/check-release-oppo-evidence-transaction-c34l.ps1"
+    ],
+    "necessityProof": "Existing sanitized writers and validators remain the release owners, but a separate source-attestation trust boundary and OPPO transaction fixture are necessary to prevent caller fabrication and partial immutable commits. No product, browser, provider, device, backend or build path is added.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "sourceAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "state": "pending",
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "externalActions": 0,
+    "secretOrPrivateValuesObserved": false
+  }
+}

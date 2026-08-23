@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX2-CONTRACT-V1",
+  "ticketId": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX2",
+  "classification": "mvp_required",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX2-FOUNDER-AUTHORIZATION-20260806.md",
+  "sourceProjection": {
+    "path": "config/mvp-personal-action-projection-v1.json",
+    "manifestPath": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+    "manifestSha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8"
+  },
+  "implementationOwners": {
+    "moolHub": "PersonalMoolRootV2",
+    "chooser": "MvpActionChoiceRootV2",
+    "persistentDock": "MoolGlobalNavigationV2",
+    "router": "createJourneyRouter",
+    "newScreenOwners": 0,
+    "newRouteOwners": 0,
+    "newBackendOwners": 0
+  },
+  "surfaces": [
+    {
+      "id": "eat",
+      "entryRoute": "/app/eat",
+      "subActions": ["order-food", "book-table"],
+      "downstreamRoutes": ["/app/eat/home", "/app/eat/table"]
+    },
+    {
+      "id": "ride",
+      "entryRoute": "/app/ride",
+      "subActions": ["bike", "auto", "cab"],
+      "downstreamRoutes": [
+        "/app/ride/book?type=bike",
+        "/app/ride/book?type=auto",
+        "/app/ride/book?type=cab"
+      ]
+    },
+    {
+      "id": "book",
+      "entryRoute": "/app/book",
+      "subActions": ["doctor", "salon"],
+      "downstreamRoutes": ["/app/book/doctor", "/app/book/salon"]
+    },
+    {
+      "id": "work",
+      "entryRoute": "/app/work",
+      "subActions": ["earn-today", "workspace"],
+      "downstreamRoutes": ["/app/work/earn", "/app/work/my-work"]
+    }
+  ],
+  "navigation": {
+    "moolHubMainActionsOneTap": true,
+    "chooserSubActionsRemainInContent": true,
+    "destinationSubActionsNeverReplaceGlobalDock": true,
+    "selectedGlobalDestinationSemanticRequired": true,
+    "topLevelVisibleBackAllowed": false,
+    "systemBackRestoresExactPriorOrSafeChooser": true,
+    "moolOneTapWithOrigin": true,
+    "chatOneTapWithExactReturn": true,
+    "activeLifecycleMayBeSilentlyReset": false
+  },
+  "motion": {
+    "chooserArrivalMilliseconds": 240,
+    "dockSelectionMilliseconds": 160,
+    "routeTransition": "existing_native_platform_directional_transition",
+    "reducedMotionRequired": true,
+    "perpetualDecorativeLoopsAllowed": false,
+    "semanticOwnershipMayMoveForAnimation": false
+  },
+  "protectedAuditOnly": ["social", "buy"],
+  "deviceGate": {
+    "oppoRequired": true,
+    "inPlaceUpgradeOnly": true,
+    "founderAcceptanceSubjectToCodexSatisfaction": true
+  }
+}

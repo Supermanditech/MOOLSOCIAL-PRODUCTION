@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-INDEX-RETIRED-BRAND-REFRESH-FIX1",
+  "recordedAt": "2026-08-07T13:37:23.6889095+05:30",
+  "state": "production_submission_complete_google_refresh_pending",
+  "target": {
+    "origin": "https://moolsocial.com",
+    "firebaseProject": "moolsocial-dev-503018",
+    "deployScope": "hosting_only",
+    "searchConsoleProperty": "sc-domain:moolsocial.com"
+  },
+  "founderEvidence": {
+    "path": "artifacts/quality/web-mvp-google-index-retired-brand-refresh-20260807-01/founder-google-search-stale-snippet.png",
+    "sha256": "DB5A2702465A1443B74C4BA55C2790D42810D1AC799518104B0B3AF59116C383",
+    "finding": "Google displayed a stale 26 July 2026 Privacy snippet containing the retired company identity while the live page already contained moolsocial.com copy."
+  },
+  "implementation": {
+    "sitemapPath": "apps/web/public/sitemap.xml",
+    "testPath": "apps/web/tests/firebase-public-site.test.mjs",
+    "canonicalUrlCount": 5,
+    "truthfulLastmod": "2026-08-07",
+    "staleLastmodRejectionAdded": true,
+    "publicPageCopyChangedByThisTicket": false
+  },
+  "localQualification": {
+    "sitemapXmlValid": true,
+    "sitemapSha256": "9D9D0316529F8E851F51AFEDF1DF3C92456FAC90ACCB669471A550BEF3B7D796",
+    "buildPassed": true,
+    "publicSiteTestsPassed": 7,
+    "publicSiteTestsFailed": 0,
+    "lintErrors": 0,
+    "lintWarnings": 2,
+    "regressionGateEntries": 126,
+    "regressionGateApplicableEntries": 99,
+    "mvpScopeGateAuthorizedBeforeDeployment": true
+  },
+  "deployment": {
+    "attempted": true,
+    "succeeded": true,
+    "firebaseProjectPreflightPassed": true,
+    "hostingSite": "moolsocial-dev-503018",
+    "firebaseDefaultHostingUrl": "https://moolsocial-dev-503018.web.app",
+    "filesFound": 24,
+    "newOrChangedFilesUploaded": 1,
+    "versionFinalized": true,
+    "releaseComplete": true,
+    "credentialsAccessedByCodex": false
+  },
+  "liveVerification": {
+    "sitemapUrl": "https://moolsocial.com/sitemap.xml",
+    "sitemapHttpStatus": 200,
+    "sitemapSha256": "9D9D0316529F8E851F51AFEDF1DF3C92456FAC90ACCB669471A550BEF3B7D796",
+    "localLiveSitemapSha256Identical": true,
+    "canonicalUrlCount": 5,
+    "lastmod20260807Count": 5,
+    "privacyHttpStatus": 200,
+    "privacyNormalizedRetiredBrandMatches": 0,
+    "privacyMoolsocialDotComMatches": 14,
+    "privacyCanonical": "https://moolsocial.com/privacy",
+    "privacyRobots": "index,follow,max-image-preview:large,max-snippet:-1",
+    "privacyLastModifiedUtc": "2026-08-07T08:01:28Z"
+  },
+  "searchConsole": {
+    "sitemap": {
+      "url": "https://moolsocial.com/sitemap.xml",
+      "resubmissionReceipt": "Sitemap submitted successfully",
+      "submittedDate": "2026-08-07",
+      "lastReadDate": "2026-08-06",
+      "status": "Success",
+      "discoveredPages": 5
+    },
+    "privacyUrlInspection": {
+      "url": "https://moolsocial.com/privacy",
+      "indexedStatus": "URL is on Google",
+      "pageIndexingStatus": "Page is indexed",
+      "lastCrawl": "2026-08-06T14:32:48+05:30",
+      "crawledAs": "Googlebot smartphone",
+      "crawlAllowed": true,
+      "pageFetch": "Successful",
+      "indexingAllowed": true,
+      "userCanonical": "https://moolsocial.com/privacy",
+      "googleCanonical": "Inspected URL",
+      "indexingRequestReceipt": "Indexing requested",
+      "indexingRequestDetail": "URL was added to a priority crawl queue. Submitting a page multiple times will not change its queue position or priority.",
+      "receiptEvidence": "artifacts/quality/web-mvp-google-index-retired-brand-refresh-20260807-01/search-console-privacy-indexing-requested.jpg",
+      "receiptEvidenceSha256": "A24DCEA202EA5FD5B57424E039DB0068AE7C91A3E8E1E72B3FC65162752B0B98"
+    }
+  },
+  "externalProviderState": {
+    "owner": "Google Search",
+    "state": "pending_google_recrawl_and_search_result_refresh",
+    "immediateSnippetReplacementClaimed": false,
+    "repeatSubmissionNeeded": false
+  },
+  "regressionsRegistered": [
+    "REG-20260807-125-PUBLIC-COPY-RELEASE-SITEMAP-LASTMOD-STALE",
+    "REG-20260807-126-DELIVERY-DISPOSITION-ENUM-INVENTED"
+  ],
+  "nextSafeAction": "monitor_later_without_repeat_submission;_google_controls_recrawl_and_snippet_refresh",
+  "emailSent": false,
+  "mobileOrBackendChanged": false,
+  "apkOrOppoChanged": false
+}

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "routeOwner": "journey01",
+    "productionRoutes": [
+      "/sign-in",
+      "/verify"
+    ],
+    "approvalVersion": "native-production-v4",
+    "founderVisualAcceptedAt": "2026-07-20",
+    "productionLockReconciledAt": "2026-08-14",
+    "status": "Accepted",
+    "presentationInheritedFrom": "approved-references/screens/03-login-account-handoff/v3"
+  },
+  "presentation": {
+    "changedFromV3": false,
+    "nativeFlutterOwnerCount": 3,
+    "providerAssetChanged": false,
+    "copyChanged": false,
+    "goldenChanged": false,
+    "referenceImagesCopiedIntoV4": false
+  },
+  "customerJourney": {
+    "entry": "explicitly completed Screen02 with setup state preserved",
+    "methodActions": [
+      "Continue with Google",
+      "Continue with YouTube",
+      "Continue with Apple",
+      "Continue with X",
+      "Continue with Instagram",
+      "Continue with Facebook",
+      "Email OTP",
+      "Mobile OTP"
+    ],
+    "providerRule": "provider-owned native or secure browser handoff; MoolSocial never collects provider credentials",
+    "verifiedExit": "open Universal immediately while preserving Screen02 state",
+    "recoveryRule": "a device-review routing failure is never mislabeled as proof that the customer is offline"
+  },
+  "releaseRuntimeConfiguration": {
+    "requiredForRelease": true,
+    "sharedContract": "apps/mobile/lib/core/config/release_runtime_configuration.dart",
+    "safeFirstFrame": "ReleaseConfigurationFailureApp",
+    "bootstrapRule": "validate before Firebase initialization and render a safe update-required first frame instead of aborting before runApp",
+    "requiredDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY",
+      "MOOLSOCIAL_FIREBASE_APP_ID",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID",
+      "MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID"
+    ],
+    "credentialValuesLockedOrRendered": false,
+    "enforcedBy": [
+      "apps/mobile/test/platform_configuration_test.dart",
+      "apps/mobile/test/release_runtime_configuration_test.dart",
+      "scripts/check-release-runtime-configuration-c30w.ps1"
+    ]
+  },
+  "profileProvenance": {
+    "requiredForProfileDeviceReview": true,
+    "candidateEnvironmentKey": "MOOLSOCIAL_CANDIDATE_ID",
+    "deviceReviewEnvironmentKey": "MOOLSOCIAL_DEVICE_REVIEW",
+    "candidateMarker": "MOOLSOCIAL_CANDIDATE",
+    "startupMarker": "MOOLSOCIAL_STARTUP",
+    "startupOutcomes": [
+      "ready-or-preserved-journey-stage",
+      "boot-failure"
+    ],
+    "enforcedBy": [
+      "apps/mobile/test/platform_configuration_test.dart",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-buy-device-review-runtime.ps1"
+    ],
+    "permanentRegression": "REG-20260806-006-PROFILE-RUNTIME-MARKER-SUPPRESSED"
+  },
+  "prohibited": [
+    "HTML or WebView in Flutter",
+    "copying the read-only screenbook into production",
+    "changing the accepted Screen03 presentation or goldens in C30X FIX1",
+    "suppressing safe release first-frame or profile startup provenance coverage",
+    "fake provider success in a production build",
+    "provider credentials inside MoolSocial"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-SHARED-LINK-ROUTE-ORDER-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "feed_deep_link_continuity_blocker",
+  "actor": "reader_opening_a_new_shared_Feed_link_while_an_older_link_is_paginating",
+  "customerOutcome": "The newest shared Feed route always owns pagination and card promotion; an older asynchronous link resolution cannot replace or suppress it.",
+  "minimumCorrection": [
+    "assign_a_generation_to_each_shared_Feed_item_resolution",
+    "reject_stale_completion_before_resolved_or_unavailable_state_changes",
+    "restart_resolution_for_the_newest_route_after_an_older_inflight_owner_finishes",
+    "prove_the_new_route_loads_and_moves_its_card_ahead_of_the_latest_Feed_card"
+  ],
+  "explicitExclusions": [
+    "no_backend_pagination_or_share_URL_contract_change",
+    "no_provider_Hosting_build_Play_OPPO_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "14 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-shared-link-route-order-focused-tests.log",
+    "evidenceSha256": "17C1FD620C6F8DF4610AD869387FBD68EDEED383BD559E138D7208E1BC2E4122",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-PRE-AAB-VERSUS-LIVE-ACCEPTANCE-SEQUENCING-ESCAPE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "permanent_process_correction_registered",
+  "classification": "mvp_supporting",
+  "severity": "release_assurance_and_claim_integrity_blocker",
+  "actor": "founder_or_release_reviewer_deciding_whether_a_MoolSocial_candidate_is_production_grade",
+  "customerOutcome": "Every readiness statement identifies its exact phase, and final production-grade status is withheld until the exact Play-installed candidate passes complete adversarial real-user acceptance with no unresolved blocker.",
+  "minimumCorrection": [
+    "separate_pre_AAB_build_readiness_Internal_candidate_activation_postinstall_acceptance_and_go_live_qualification_vocabulary",
+    "treat_automated_tests_as_necessary_but_not_sufficient",
+    "require_unexpected_issue_hunting_across_auth_provider_system_back_offline_retry_relaunch_accessibility_and_real_content",
+    "register_every_escape_before_continuing_and_implement_exact_authorized_successor_tickets",
+    "forbid_complete_production_grade_reviewer_ready_or_go_live_ready_claims_while_any_required_live_journey_or_blocker_remains"
+  ],
+  "explicitExclusions": ["no_blanket_rejection_of_valid_prebuild_tests", "no_automatic_build_upload_install_or_production_authority", "no_hiding_or_deleting_historical_evidence"],
+  "authority": {"projectMemoryWriteAuthorized": true, "founderDirection": "follow production grade practice until full MoolSocial completes and goes live; proactively find unexpected defects and fix authorized tickets", "buildUploadInstallAuthorized": false},
+  "evidence": "docs/quality/MOOLSOCIAL-PRODUCTION-GRADE-REAL-USER-EXPLORATORY-RELEASE-PRACTICE-20260813.md"
+}

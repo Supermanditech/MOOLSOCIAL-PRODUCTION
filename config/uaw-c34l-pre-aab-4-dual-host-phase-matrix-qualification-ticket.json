@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34L-PRE-AAB-4-DUAL-HOST-PHASE-MATRIX-QUALIFICATION",
+  "parentTicketId": "UAW-C34L-R60-76-CONSOLIDATED-RELEASE-TRANSACTION-EVIDENCE-PLAY-OPPO-ACCEPTANCE",
+  "state": "registered_implementation_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "All eight C34L release phases reject stale, cross-attempt or incomplete proofs identically on PowerShell 7 and Windows PowerShell before any source seal or release action.",
+  "classificationReason": "The parent requires one complete pre-AAB lifecycle audit; isolated interfaces are insufficient until their exact phase composition and negative boundaries pass together on both supported hosts.",
+  "minimumCompleteScope": [
+    "create_the_exact_C34L_candidate_gate_owner_for_preprompt_build_postbuild_preupload_postupload_preinstall_postinstall_and_journey",
+    "mint_and_verify_current_preimage_ticket_attempt_transition_phase_count_authority_hash_and_byte_bound immutable proofs",
+    "compose_state_aggregate_transaction_journal_retained_evidence_blocker_browser_and_wrapper contracts",
+    "pass_one_positive_matrix_and_fail_closed_negative_matrix_on_PowerShell_7_and_Windows_PowerShell",
+    "prove_zero_source_seal_cycle_founder_prompt_build_Play_OPPO_browser_or private action"
+  ],
+  "explicitExclusions": [
+    "no_source_seal_or_source cycle",
+    "no_founder_launcher_hidden input_or AAB",
+    "no_Play upload activation_or other track",
+    "no_OPPO ADB install update_or journey",
+    "no_browser private account provider secret backend Hosting email SMS quota funds_or external action",
+    "no_product runtime_UI route service_or backend change"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authorized_C34L_parent_scope_2026_08_17",
+    "tickets_PRE_AAB_1_through_3_interfaces_qualified",
+    "qualified_C34L_transition_journal_retained_recovery_wrapper_and launcher_static contracts",
+    "exact_branch_HEAD_ticket_registry_and_rejected_predecessor evidence"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_7_complete_eight_phase_positive_and_negative matrix",
+    "Windows_PowerShell_complete_eight_phase_positive_and_negative matrix",
+    "wrong_ticket_attempt_phase_transition_preimage_count_authority_hash_byte_stale_browser_mutable_ledger_and duplicate authority rejections",
+    "static wrapper_launcher_historical_path_and no_private_value replay",
+    "independent_cross_owner audit_and_primary review"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/invoke-release-lifecycle-transition-c34l.ps1",
+      "scripts/check-release-transaction-journal-c34l.ps1",
+      "scripts/check-release-retained-evidence-c34l.ps1",
+      "scripts/recover-uaw-c34l-r60-76-postbuild-lifecycle.ps1",
+      "scripts/check-c34l-build-wrapper-terminal-state.ps1",
+      "scripts/check-uaw-c34l-r60-76-consolidated-release-transaction-evidence-readiness.ps1",
+      "scripts/check-release-blocker-browser-proof-integration-c34l.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-release-lifecycle-candidate-gates-c34l.ps1",
+      "scripts/check-c34l-pre-aab-child-batch-integration.ps1"
+    ],
+    "necessityProof": "The master ticket already requires the candidate gate. One executable phase owner and one integration fixture are the smallest way to qualify all existing contracts together; they perform no product, build, browser, device, provider or backend action.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "sourceAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "state": "pending",
+    "requiredPhases": 8,
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "secretValuesObserved": false
+  }
+}

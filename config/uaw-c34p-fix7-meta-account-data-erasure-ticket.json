@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX7-META-ACCOUNT-DATA-ERASURE",
+  "status": "implementation_qualified_dataconnect_deployment_deferred_by_founder_database_completion_rule",
+  "objective": "Provide truthful, durable Facebook and Instagram account-data deletion across Firebase Auth and all MoolSocial product data without corrupting shared records.",
+  "blocks": {
+    "bootstrapAabForPlaySigningCertificate": false,
+    "developerRoleOppoLoginTesting": false,
+    "publicMetaAppReview": true,
+    "productionRelease": true
+  },
+  "requiredFounderPolicyDecisions": [
+    "delete_or_anonymize_shared_chat_messages",
+    "delete_or_anonymize_social_posts_comments_and_reposts",
+    "retention_period_for_audit_and_transaction_records",
+    "treatment_of_shared_threads_and_replies_after_identity_erasure",
+    "customer_visible_deletion_status_and_completion_sla"
+  ],
+  "approvedPolicy": {
+    "socialAuthoredContent": "delete",
+    "socialInteractionsFollowsAndDerivedMetrics": "delete_and_recalculate",
+    "sharedChatMessages": "retain_text_with_permanent_deleted_account_anonymization",
+    "chatAttachmentsReactionsAndPrivateProfileSnapshots": "delete",
+    "youtubeConnectionsTokensAttemptsAndUserPublications": "revoke_and_delete",
+    "workspaceAccessAndPersonalProfile": "delete",
+    "legallyRequiredTransactionsAndAudit": "retain_minimized_without_provider_identity_outside_normal_product_access",
+    "statusStates": ["pending", "completed", "failed"],
+    "completionTargetDays": 30,
+    "partialFailureMayReportCompleted": false,
+    "retry": "idempotent"
+  },
+  "implementationReadiness": {
+    "durableCoordinator": "implemented_and_unit_qualified",
+    "firestoreStorageAuthWorker": "implemented_and_emulator_qualified",
+    "facebookInstagramCallbacks": "implemented_and_unit_qualified",
+    "publicConfirmationStatus": "implemented_source_qualified_dev_hosting_stale_and_not_redeployed",
+    "dataConnectMutation": "implemented_local_live_validation_deferred_until_complete_application_database_map",
+    "youtubeProviderRevocation": "implemented_runtime_secret_and_iam_readback_blocked_by_gcloud_authentication",
+    "publicMetaAppReview": "blocked",
+    "productionRelease": "blocked"
+  },
+  "devDeploymentCheckpoint": {
+    "authorizationMarker": "AUTHORIZE DEV FIX7 DATACONNECT FUNCTION HOSTING DEPLOY",
+    "state": "dataconnect_create_cancelled_before_submit_founder_sql_connect_rule_active",
+    "evidencePaths": [
+      "docs/quality/REG-20260821-3127-FIX7-DATACONNECT-DEV-READBACK-AUTHENTICATION.md",
+      "docs/quality/REG-20260821-3128-FIX7-DATACONNECT-DEV-READBACK-UNCLASSIFIED.md",
+      "docs/quality/REG-20260821-3129-FIX7-HOSTING-SITE-READBACK-SCHEMA.md",
+      "docs/quality/REG-20260821-3130-FIX7-GCLOUD-DEFAULT-PROJECT-MISMATCH.md",
+      "docs/quality/REG-20260821-3131-FIX7-EXPLICIT-DEV-GCLOUD-AUTHENTICATION.md",
+      "docs/quality/REG-20260822-3132-FIX7-IAM-TROUBLESHOOTER-AUTHENTICATION.md",
+      "docs/quality/REG-20260822-3133-FIX7-UNNECESSARY-DATACONNECT-ROLE-GRANT-GUIDANCE.md",
+      "docs/quality/REG-20260822-3134-REGISTRY-ENTRY-LOCATOR-MULTIMATCH.md",
+      "docs/quality/REG-20260822-3135-DATACONNECT-COMPILE-AUTHENTICATION.md"
+    ],
+    "registryEntryCount": 3106,
+    "registrySha256": "287FE57A46E78F50E0BA78B3AFD6F44FF88A4BF15EB79A87982018252EFF611D",
+    "readbackAttempts": {
+      "dataConnectServiceList": 3,
+      "functionsList": 2,
+      "hostingSiteList": 4,
+      "hostingHttp": 3,
+      "gcloudProject": 3,
+      "projectIamPolicy": 1,
+      "iamPolicyTroubleshooter": 1,
+      "dataConnectConsole": 1,
+      "dataConnectCompile": 1,
+      "cloudSqlInventory": 1
+    },
+    "authoritativeReadback": {
+      "dataConnect": "console_service_absent_creation_cancelled_before_submit",
+      "cloudSql": "instance_count_zero_moolsocial_core_db_absent",
+      "function": "active_old_revision_timeout_30_seconds_four_auth_secret_bindings_current_fix7_requires_45_seconds_and_nine_bindings",
+      "hosting": "default_dev_site_exists_delete_page_stale_status_rewrite_returns_html_404",
+      "security": "meta_invalid_signatures_403_and_missing_app_check_401_on_active_function",
+      "secretIam": "not_read_external_dataconnect_deployer_roles_requested_first"
+    },
+    "externalHelp": {
+      "requestedImmediately": true,
+      "state": "founder_checkpoint_completed",
+      "project": "moolsocial-dev-503018",
+      "action": "close_sql_connect_dialog_without_submit",
+      "url": "https://console.firebase.google.com/project/moolsocial-dev-503018/dataconnect",
+      "iamMutationRequested": false,
+      "result": "founder_confirmed_not_submitted",
+      "safeReplyMarker": "SQL CONNECT DIALOG CLOSED",
+      "screenshotMayBeSharedAfterPrivateIdentityRedaction": true
+    },
+    "pendingExternalAction": {
+      "actionId": "FIX7-DEV-DATACONNECT-CREATE-001",
+      "actionType": "dataconnect_service_and_cloudsql_create",
+      "project": "moolsocial-dev-503018",
+      "location": "asia-south1",
+      "serviceId": "moolsocial-core",
+      "cloudSqlInstanceId": "moolsocial-core-db",
+      "database": "moolsocial",
+      "preActionCount": 0,
+      "expectedPostReadbackCount": 1,
+      "authorizationMarker": "AUTHORIZE DEV FIX7 DATACONNECT FUNCTION HOSTING DEPLOY",
+      "destructiveSchemaMigrationAuthorized": false,
+      "state": "cancelled_before_submit_by_founder_database_completion_rule"
+    },
+    "actionCounts": {
+      "dataConnectDeploy": 0,
+      "iamBinding": 0,
+      "functionDeploy": 0,
+      "hostingDeploy": 0
+    },
+    "secretPayloadRead": false,
+    "alternateCredentialWorkaroundUsed": false
+  },
+  "schemaInventoryRequired": [
+    "firebase_auth_identity_and_provider_links",
+    "social_posts_comments_media_interactions_follows_and_metrics",
+    "chat_threads_messages_reactions_attachments_and_receipts",
+    "youtube_connections_tokens_attempts_publications_and_audit",
+    "workspace_commerce_and_other_user_owned_records",
+    "storage_objects_and_data_connect_rows"
+  ],
+  "acceptance": [
+    "one idempotent erasure coordinator owns Facebook direct-provider and Instagram projected identities",
+    "every product data class has an explicit delete anonymize retain decision",
+    "confirmation codes map to durable pending completed or failed status without exposing identity",
+    "partial failure is retryable and cannot report completed",
+    "provider callbacks remain HMAC verified bounded and sanitized",
+    "emulator integration proves deletion and shared-record integrity",
+    "public status page reports only confirmation-scoped state"
+  ],
+  "prohibitedUntilPolicyAccepted": [
+    "bulk_product_data_delete",
+    "shared_chat_or_social_record_mutation",
+    "claiming_meta_data_deletion_complete",
+    "public_meta_app_review",
+    "production_release"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32I-PERSONAL-MVP-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-RECONCILIATION",
+  "parentOutcome": "MOOLSOCIAL-POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815",
+  "predecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E",
+  "finding": "REG-20260815-2246-POST-YOUTUBE-AUDIT-C27D-CANONICAL-PROJECTION-REJECTION",
+  "state": "founder_authorized_source_gate_repair_selected_live_and_release_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal user navigating the accepted Social Home-first dock inside the shared six-family Mool shell",
+  "customerOutcome": "Personal users retain the accepted Social Home, Shorts, Create and Feed order while navigation and release qualification truthfully validates that current model instead of rejecting it with a superseded Shorts-first assertion.",
+  "classificationReason": "A truthful regression gate is necessary to protect the launch navigation model and prevent false release blocks, but this ticket adds no customer feature or scope.",
+  "minimumCompleteScope": [
+    "preserve_the_C29E_runtime_projection_Home_videos_Shorts_Create_Feed_without_UI_source_change",
+    "replace_only_the_superseded_C27D_Social_sequence_and_label_assertions_with_the_C29E_order",
+    "bind_one_C32I_successor_checker_to_the_current_navigation_owner_C27D_gate_C29E_ticket_and_focused_test",
+    "retain_every_Buy_Eat_Ride_Book_Work_family_member_label_route_and_shared_navigation_assertion",
+    "run_two_identical_source_gate_and_focused_Flutter_cycles_plus_analyzer_memory_MVP_and_UI_locks"
+  ],
+  "explicitExclusions": [
+    "no_runtime_Flutter_UI_route_screen_copy_reference_or_navigation_behavior_change",
+    "no_new_backend_owner_service_collection_provider_scope_or_external_API_behavior",
+    "no_cloud_Firebase_Hosting_provider_rules_IAM_CORS_lifecycle_or_live_data_write",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_or_device_mutation",
+    "no_funds_credential_secret_token_nonce_private_verdict_key_or_attestation_payload_access",
+    "no_email_quota_submission_commit_push_merge_rebase_branch_switch_reset_clean_or_main_mutation"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user: autonomously audit, convert findings into tickets and implement for founder review; exact external and release actions remain gated",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingRuntimeOwner": "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+    "existingHistoricalGate": "scripts/check-personal-uniform-navigation-six-family-conformance-c27d.ps1",
+    "existingSuccessorAuthority": "config/uaw-personal-mvp-social-youtube-native-ownership-redesign-c29e-ticket.json",
+    "existingFocusedTests": [
+      "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_native_home_dock_c29e_test.dart",
+      "apps/mobile/test/ui_v2/universal/mool_uniform_navigation_six_family_conformance_c27d_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c32i-c27d-social-home-first-gate-successor.ps1"
+    ],
+    "necessityProof": "C27D is still invoked by C27E, C28C and C28E qualification scripts but requires the pre-C29E Shorts, Videos, Feed, Create sequence. C29E explicitly accepted Home-first and its focused test requires videos, shorts, create, feed. One thin successor checker and the smallest literal reconciliation keep the existing qualification chain usable without changing runtime source."
+  },
+  "acceptance": [
+    "C27D_requires_social_videos_Home_then_shorts_then_create_then_feed_in_exact_order",
+    "C27D_no_longer_requires_the_superseded_Shorts_Videos_Feed_Create_order_or_Videos_label",
+    "C32I_checker_binds_the_current_runtime_owner_C27D_gate_C29E_ticket_and_focused_test",
+    "current_personal_action_projection_and_all_non_Social_C27D_family_assertions_remain_unchanged",
+    "focused_C29E_and_C27D_Flutter_tests_pass_in_two_identical_cycles",
+    "targeted_analyzer_regression_memory_MVP_delivery_and_approved_UI_locks_pass"
+  ]
+}

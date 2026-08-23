@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX9B-FACEBOOK-NATIVE-SDK-RETURN-TRUTH",
+  "parentTicketId": "UAW-C34P-FIX9-CROSS-PROVIDER-RETURN-TRUTH-HARD-GATE",
+  "status": "fix10_facebook_native_sdk_return_truth_locally_qualified_device_provider_reproof_pending_no_build",
+  "classification": "mvp_required",
+  "selectedForImplementation": true,
+  "provider": "facebook",
+  "directlySharesGoogleIdentityBoundary": false,
+  "providerSpecificBoundary": "Facebook native SDK login result and access token followed by Firebase Facebook credential exchange and verified MoolSocial session bootstrap.",
+  "minimumCompleteScope": [
+    "prove_native_sdk_success_cancel_denial_configuration_network_and_token_result_separately",
+    "never_treat_facebook_sdk_cancel_as_proof_of_founder_cancel_without_return_stage_evidence",
+    "prove_firebase_exchange_collision_rollback_and_verified_session_bootstrap",
+    "preserve_existing_meta_redirect_and_public_profile_scope_without_requesting_extra_permissions",
+    "prove_offline_timeout_retry_process_return_relaunch_and_signout",
+    "run_separately_authorized_founder_private_oppo_acceptance"
+  ],
+  "mandatoryEvidence": [
+    "facebook_native_result_stage",
+    "facebook_token_presence_without_value_emission",
+    "firebase_credential_exchange_stage",
+    "verified_session_bootstrap_stage",
+    "sanitized_customer_failure_origin"
+  ],
+  "r60_83DeviceFailure": {
+    "safeCode": "auth-facebook-firebase-provider-failure",
+    "provenBoundary": "facebook_provider_interaction_then_firebase_credential_exchange",
+    "nativeButtonAndProviderWiringReached": true,
+    "firebaseCredentialExchangeDeviceQualified": false,
+    "incidentId": "REG-20260822-3361-R60-83-OPPO-FACEBOOK-SIGN-IN-STILL-NOT-COMPLETED",
+    "privateIdentityTokenEmailOrAccountRecorded": false,
+    "providerRetryRebuildOrReinstallAuthorized": false
+  },
+  "localForensicRepair": {
+    "state": "qualified_locally_not_device_success",
+    "firebaseAuthExceptionCodesSanitizedAndEnumerated": true,
+    "platformExceptionCodesSanitizedAndEnumerated": true,
+    "unclassifiedFirebaseAndBridgeFailuresDistinct": true,
+    "providerCredentialAndSessionStagesDistinct": true,
+    "facebookFocusedSuitePassed": 38,
+    "latestCrossProviderFocusedTerminalSuitePassed": 115,
+    "centralizedSanitizedAccountCollisionContractQualified": true,
+    "functionalDeviceSuccessClaimed": false,
+    "buildDeployOrDeviceMutationAuthorized": false
+  },
+  "providerReadinessCheckpoint": {
+    "readbackDate": "2026-08-22",
+    "firebaseProviderEnabledQualified": true,
+    "clientOAuthAndHttpsQualified": true,
+    "strictRedirectQualified": true,
+    "exactFirebaseRedirectQualified": true,
+    "webDeviceEmbeddedAndJavascriptLoginDisabledQualified": true,
+    "publicProfileOnlyQualified": true,
+    "deauthorizationCallbackQualified": true,
+    "androidPackageAndActivitySourceQualified": true,
+    "sideloadKeyHashOperationallyQualified": true,
+    "providerHandshakeQualified": true,
+    "firebaseCredentialExchangeQualified": false,
+    "verifiedSessionBootstrapQualified": false,
+    "preflightNativeFirebaseAndCompletedOriginsSeparated": true,
+    "sanitizedTransientReceiptQualified": true,
+    "focusedSourceTestsQualified": true,
+    "providerIdentifierSecretTokenOrKeyHashRecorded": false,
+    "consoleWriteCount": 0,
+    "agentPrivateLoginCount": 0,
+    "returnTruthImplementationQualified": true,
+    "priorSourceQualificationSupersededByDeviceFirebaseProviderFailure": true,
+    "oppoAcceptanceQualified": false,
+    "evidence": "founder Firebase and Meta settings screenshots plus provider success notification and OPPO post-provider return failure; private identifiers excluded"
+  },
+  "authority": {
+    "ticketRegistrationAuthorized": true,
+    "implementationAuthorized": true,
+    "localReadOnlyForensicsAndTestsAuthorized": true,
+    "buildOrInstallAuthorized": false,
+    "privateProviderLoginAuthorized": false,
+    "metaConsoleWriteOrPublishAuthorized": false,
+    "deploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

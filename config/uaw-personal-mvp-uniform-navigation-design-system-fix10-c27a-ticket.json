@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27A",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "One evidence-backed uniform standard governs the accepted embedded Mool switcher and every Social, Shop, Food, Travel, Care and Work bottom action rail before shared Flutter mutation.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27A-PRESELECTION-ASSESSMENT-20260810.md",
+  "auditEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27A-AUDIT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one C27 uniform navigation source contract",
+      "one focused C27 static machine gate"
+    ],
+    "necessityProof": "C26 structurally shares navigation but does not machine-enforce one typography, icon, geometry, background, selected-state and exported Android hit-target standard."
+  },
+  "acceptance": [
+    "all seven C27A findings registered before implementation",
+    "two existing shared Flutter owners selected",
+    "no duplicate feature-local navigation owner",
+    "exact successor visual and accessibility tokens recorded",
+    "C26H installed predecessor remains unchanged"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27A-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

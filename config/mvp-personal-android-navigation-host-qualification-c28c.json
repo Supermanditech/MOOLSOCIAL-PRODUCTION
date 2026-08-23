@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-C28C-20260810",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-FIX11-C28C",
+  "ticketManifestPath": "config/uaw-personal-mvp-android-navigation-host-qualification-fix11-c28c-ticket.json",
+  "ticketManifestSha256": "79427FE72DBB0936E857868D2288F38C2B2EF8A7D657848B782D9143AC7DC56E",
+  "state": "two_cycle_host_qualification_complete",
+  "baseContract": {
+    "path": "config/mvp-personal-uniform-navigation-host-qualification-c27e.json",
+    "sha256": "A6CE9B4C16E5CFC817A7DDFD541FD0A42CF396BFA4BE3BA6431876654F8A75E0",
+    "requiredTestCount": 51,
+    "requiredGateCount": 21,
+    "replacedGate": "scripts/check-personal-uniform-navigation-host-qualification-c27e.ps1"
+  },
+  "addedTests": [
+    "apps/mobile/test/core/platform/mool_system_ui_viewport_c28b_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart"
+  ],
+  "addedFormatOwners": [
+    "apps/mobile/lib/core/platform/mool_system_ui_viewport.dart",
+    "apps/mobile/lib/main.dart"
+  ],
+  "addedGates": [
+    "scripts/check-personal-android-navigation-host-qualification-c28c.ps1",
+    "scripts/check-personal-android-navigation-viewport-c28b.ps1"
+  ],
+  "expectedTotals": {
+    "requiredTests": 53,
+    "requiredGates": 22,
+    "formatOwners": 4
+  },
+  "completedPredecessorTickets": [
+    "config/uaw-personal-mvp-android-navigation-viewport-contract-fix11-c28a-ticket.json",
+    "config/uaw-personal-mvp-android-navigation-viewport-implementation-fix11-c28b-ticket.json"
+  ],
+  "expectedInstalledPredecessor": {
+    "machineState": "c27f_r60_26_device_gate_rejected_exported_semantic_height_successor_required",
+    "versionName": "1.0.0-r60.26",
+    "versionCode": "2026081026",
+    "apkSha256": "A27200CEF659B3C1DC5F2C62ECBF6529B2F01B2036A41A0E1A7A87B186BDB1F4",
+    "buildAuthorization": "consumed_no_second_build"
+  },
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "unchangedSourceFingerprintRequired": true,
+    "completeAnalysisRequired": true,
+    "completeRequiredSuiteRequired": true,
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": [
+      "apps/mobile/lib",
+      "apps/mobile/test",
+      "scripts",
+      "config",
+      "docs/quality",
+      "docs/delivery"
+    ]
+  }
+}

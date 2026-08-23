@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-QUOTA-PURPOSE-AND-CATALOGUE-REFRESH-C29R",
+  "environment": "Dev_source_only",
+  "state": "source_implemented_representative_dev_measurement_pending",
+  "customerOutcome": "Users receive a shared fresh eligible public YouTube Shorts catalogue without an automatic high-cost search on every app open.",
+  "quotaPurposes": [
+    {
+      "journey": "YouTube Home public video catalogue",
+      "operation": "videos.list.chart",
+      "localBudgetBucket": "general",
+      "trigger": "automatic_with_process_cache",
+      "identityScope": "public_not_per_user"
+    },
+    {
+      "journey": "YouTube Shorts shared public catalogue refresh",
+      "operation": "search.list.sharedShortsRefresh",
+      "localBudgetBucket": "search",
+      "trigger": "shared_snapshot_expiry_only",
+      "identityScope": "shared_not_per_user",
+      "refreshTtlMinutes": 30,
+      "refreshLeaseMinutes": 2,
+      "boundedStaleFallbackHours": 6,
+      "maximumProviderPagesPerRefresh": 4,
+      "maximumCatalogueItems": 20
+    },
+    {
+      "journey": "Explicit user YouTube search",
+      "operation": "search.list.explicit",
+      "localBudgetBucket": "search",
+      "trigger": "explicit_user_action_only",
+      "identityScope": "request_scoped"
+    },
+    {
+      "journey": "Provider-owned playback",
+      "operation": "youtube_embedded_player",
+      "localBudgetBucket": "none_for_player_playback",
+      "trigger": "explicit_video_or_short_tap",
+      "identityScope": "provider_owned_player"
+    },
+    {
+      "journey": "Creator YouTube channel connection",
+      "operation": "oauth_incremental_scope",
+      "localBudgetBucket": "owner_action",
+      "trigger": "explicit_creator_connect_action",
+      "identityScope": "authenticated_creator"
+    },
+    {
+      "journey": "Creator private YouTube upload",
+      "operation": "videos.insert.private",
+      "localBudgetBucket": "upload",
+      "trigger": "explicit_authenticated_creator_action",
+      "identityScope": "connected_creator_channel"
+    }
+  ],
+  "durableMeasurement": {
+    "quotaDecisionCollection": "youtubeProviderQuotaMeasurements",
+    "quotaDimensions": [
+      "windowId",
+      "bucket",
+      "operation",
+      "acceptedReservations",
+      "rejectedReservations",
+      "acceptedLocalReservations"
+    ],
+    "catalogueOutcomeCollection": "youtubeSharedCatalogueMeasurements",
+    "catalogueOutcomes": [
+      "cache_hit",
+      "refresh_success",
+      "stale_fallback",
+      "refresh_error",
+      "lease_contended"
+    ],
+    "privacy": "No user identity, watch history, Watch Later state or content preference is stored in either measurement collection.",
+    "providerQuotaUnits": "Provider-reported quota consumption must come from the separately authorized representative Dev measurement window; acceptedLocalReservations is not a claim about YouTube provider quota units."
+  },
+  "eligibility": [
+    "privacy_status_public",
+    "upload_status_processed",
+    "embeddable_true",
+    "provider_availability_available_for_IN",
+    "no_known_IN_region_exclusion",
+    "creator_declared_short",
+    "duration_between_1_and_180_seconds"
+  ],
+  "explicitNonClaims": [
+    "no_MoolSocial_hosted_short_or_reel",
+    "no_YouTube_watch_history_or_Watch_Later_access",
+    "no_native_or_MoolSocial_personalized_recommender",
+    "no_engagement_incentive",
+    "no_provider_quota_approval_claim",
+    "no_upload_capability_claim_without_connected_OAuth_scope_and_private_upload_runtime"
+  ],
+  "externalGate": {
+    "representativeDevMeasurementWindow": "pending_separate_authority",
+    "quotaOrComplianceSubmission": "not_submitted",
+    "providerMessage": "not_sent",
+    "deployment": "not_performed",
+    "credentialAccess": "not_performed"
+  }
+}

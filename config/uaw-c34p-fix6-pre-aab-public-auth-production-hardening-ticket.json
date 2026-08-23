@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX6-PRE-AAB-PUBLIC-AUTH-PRODUCTION-HARDENING",
+  "status": "source_qualified_with_fix7_release_blocker",
+  "objective": "Remove confirmed end-to-end authentication defects before any bootstrap or OPPO AAB is accepted.",
+  "scope": {
+    "methods": [
+      "google_youtube_shared_identity",
+      "apple_firebase",
+      "x_oauth2_pkce_s256",
+      "instagram_professional_oauth",
+      "facebook_native_public_profile",
+      "firebase_passwordless_email_link",
+      "firebase_mobile_otp"
+    ],
+    "owners": [
+      "apps/mobile/lib/core/auth/x_oauth2_pkce_network_adapter.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/main.dart",
+      "backend/functions/src/auth/x_pkce_broker.ts",
+      "backend/functions/src/auth/instagram_oauth_broker.ts",
+      "backend/functions/src/index.ts",
+      "their focused tests"
+    ]
+  },
+  "confirmedDefects": [
+    {
+      "id": "FIX6-01-OAUTH-TIMEOUT-ORDERING",
+      "severity": "P0",
+      "state": "implemented_qualified",
+      "problem": "The mobile HTTP close timeout can end before the backend function/provider chain, after the one-time attempt has already been consumed.",
+      "acceptance": "One bounded end-to-end mobile operation timeout exceeds the backend maximum; response-body reads remain capped; timeout produces a sanitized retryable result."
+    },
+    {
+      "id": "FIX6-02-EXPIRY-BOUNDARY",
+      "severity": "P1",
+      "state": "implemented_qualified",
+      "problem": "X and Instagram attempt stores accept nowMs equal to expiresAtMs.",
+      "acceptance": "Both stores classify nowMs greater than or equal to expiresAtMs as expired with focused boundary tests."
+    },
+    {
+      "id": "FIX6-03-PROVIDER-ERROR-CLASSIFICATION",
+      "severity": "P1",
+      "state": "implemented_qualified",
+      "problem": "Every syntactically valid provider error is classified as user authorization denial.",
+      "acceptance": "Only explicit user-denial codes map to cancellation; server/configuration provider errors map to provider failure and remain sanitized."
+    },
+    {
+      "id": "FIX6-04-PHONE-AUTO-VERIFY-RACE",
+      "severity": "P0",
+      "state": "implemented_qualified",
+      "problem": "A late verificationCompleted callback can sign Firebase in after codeSent or request timeout, without JourneySession authentication completion.",
+      "acceptance": "Each phone request owns a generation; only one terminal callback may mutate/sign in; late callbacks after codeSent, timeout or a newer request are ignored."
+    },
+    {
+      "id": "FIX6-05-META-APP-DATA-ERASURE",
+      "severity": "P0",
+      "state": "release_blocking_followup_required",
+      "problem": "Meta deletion callbacks delete or unlink Firebase Auth identity only; application data erasure and durable deletion-status evidence are absent.",
+      "acceptance": "A separately owned, schema-complete erasure transaction removes or anonymizes all user-owned product data, persists status by confirmation code, and is exercised by Facebook and Instagram callback tests.",
+      "followupTicketId": "UAW-C34P-FIX7-META-ACCOUNT-DATA-ERASURE"
+    }
+  ],
+  "prohibitedActions": [
+    "read_or_emit_credentials",
+    "provider_console_mutation",
+    "real_email_or_sms",
+    "private_login",
+    "build_or_play_upload_before_green_source_qualification",
+    "oppo_action_before_final_candidate"
+  ]
+}

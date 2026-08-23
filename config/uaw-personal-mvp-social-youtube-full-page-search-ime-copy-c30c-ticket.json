@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-FULL-PAGE-SEARCH-IME-COPY-C30C",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-OPPO-REVIEW-C30B"
+  ],
+  "state": "founder_authorized_source_implementation_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_user_viewing_YouTube_owned_content",
+  "customerOutcome": "Search from YouTube Home or Watch opens a full-screen keyboard-safe YouTube search journey backed by the real authorized publicSearch provider operation, with truthful loading, empty, error, retry, result selection and exact return state.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_adapter",
+      "new_necessary_contained_state",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "backend/functions/src/index.ts",
+      "backend/functions/src/youtube/provider_service.ts"
+    ],
+    "newScreens": [
+      "screen04_youtube_full_page_search_contained_state"
+    ],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The founder supplied two OPPO screenshots proving the existing sheet exposes internal loaded-catalogue commentary, remains visible across dismissal attempts and allows the keyboard to obscure the usable search UI. A contained full-page state is the smallest complete replacement and reuses the already implemented publicSearch operation without another route or backend owner."
+  },
+  "minimumCompleteScope": [
+    "replace_the_filter_loaded_videos_bottom_sheet_with_a_full_page_search_state",
+    "open_from_YouTube_Home_and_Watch_and_restore_the_exact_prior_surface_on_Back",
+    "submit_only_nonempty_user_queries_to_the_existing_publicSearch_provider_operation",
+    "show_only_real_provider_returned_YouTube_results_without_intermixing_or_rewriting",
+    "provide_keyboard_safe_loading_empty_error_retry_clear_and_result_selection_states",
+    "remove_internal_loaded_catalogue_filter_copy_from_visible_and_semantic_output",
+    "remove_the_top_header_YouTube_logo_while_retaining_clickable_content_level_YouTube_attribution_required_by_policy",
+    "run_focused_copy_IME_navigation_provider_and_complete_Social_regressions"
+  ],
+  "explicitExclusions": [
+    "no_bottom_sheet_popup_or_loaded_list_filter_presented_as_YouTube_search",
+    "no_fake_cached_seeded_or_MoolSocial_results_in_YouTube_search",
+    "no_voice_scanner_recommendation_history_personalization_or_search_analytics",
+    "no_new_route_backend_owner_database_migration_or_credential_access",
+    "no_provider_function_rule_Firebase_app_store_or_Production_deployment",
+    "no_commit_push_promotion_uninstall_data_clear_or_downgrade"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_replace_search_popup_fix_commentary_copy_and_keyboard_overlap_under_ticket_fix_OPPO_review_deployment_hold",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "providerPolicy": {
+    "officialBrandingGuidelines": "https://developers.google.com/youtube/terms/branding-guidelines",
+    "officialDeveloperPolicies": "https://developers.google.com/youtube/terms/developer-policies",
+    "decision": "Remove the top header logo instead of making it non-interactive. Every remaining YouTube logo stays clickable and links to YouTube content or a YouTube component; search results remain unmodified and YouTube-only."
+  },
+  "dependencies": [
+    "C30B_r60_36_preserved_as_the_current_installed_founder_review_candidate",
+    "existing_youtubeProvider_publicData_capability_and_publicSearch_operation",
+    "fresh_source_APK_and_device_machine_gates_before_any_successor_build_or_install"
+  ],
+  "testPlan": [
+    "focused_public_search_runtime_mapping_and_real_operation_contract_tests",
+    "Home_and_Watch_search_entry_clear_submit_loading_empty_error_retry_and_result_selection_widget_tests",
+    "320x568_at_140_percent_and_OPPO_720x1600_keyboard_visibility_checks",
+    "customer_copy_and_semantic_scan_for_removed_internal_commentary",
+    "two_identical_complete_Social_regression_cycles_before_any_build",
+    "one_fresh_checksum_matched_in_place_OPPO_candidate_only_after_machine_qualification"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "shortsProviderFixStillUndeployed": true,
+    "searchUsesExistingDeployedPublicSearchOperation": true
+  }
+}

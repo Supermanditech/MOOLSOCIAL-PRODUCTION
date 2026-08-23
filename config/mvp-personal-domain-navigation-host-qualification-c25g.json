@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-C25G-20260809",
+  "ticketId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G",
+  "ticketManifestPath": "config/uaw-personal-mvp-domain-navigation-host-qualification-fix8-c25g-ticket.json",
+  "ticketManifestSha256": "916F66654A85719DB6FF95B736BEB9BCDF1FC73BC35DABEB39B8F6999F0D8A0F",
+  "state": "selected_host_qualification_execution_open",
+  "authority": {
+    "runtimeMutationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalWriteAuthorized": false
+  },
+  "requiredTests": [
+    "apps/mobile/test/book_vertical_slice_test.dart",
+    "apps/mobile/test/core/design/mool_service_home_c24b_test.dart",
+    "apps/mobile/test/eat_vertical_slice_test.dart",
+    "apps/mobile/test/journey01_test.dart",
+    "apps/mobile/test/ride_vertical_slice_test.dart",
+    "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+    "apps/mobile/test/support_shortcuts_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_book_subaction_professional_conformance_c16f_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_eat_subaction_professional_conformance_c16d_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart",
+    "apps/mobile/test/uaw_personal_mvp_work_subaction_professional_conformance_c16g_test.dart",
+    "apps/mobile/test/ui_v2/book/book_bus_booking_c24f_test.dart",
+    "apps/mobile/test/ui_v2/book/book_doctor_salon_home_c24e_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+    "apps/mobile/test/ui_v2/eat/eat_discovery_home_c24c_test.dart",
+    "apps/mobile/test/ui_v2/ride/ride_destination_home_c24d_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_connected_action_navigator_c24b3_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_home_fixed_viewport_hub_c24b2_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix2_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_cold_launch_social_default_c10a_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_navigation_motion_containment_c10e_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_shared_global_dock_main_roots_c10b_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r06_personal_eat_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r07_personal_ride_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_r14_personal_context_restore_test.dart",
+    "apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart",
+    "apps/mobile/test/universal_intent_completion_test.dart",
+    "apps/mobile/test/work_vertical_slice_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_main_only_menu_c25c_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_compact_destination_rail_c25d_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_adaptive_accessibility_reachability_c25f_test.dart"
+  ],
+  "formatOwners": [
+    "apps/mobile/lib/core/design/mool_design_system.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+    "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/features/eat/widgets/eat_widgets.dart",
+    "apps/mobile/lib/features/ride/widgets/ride_widgets.dart",
+    "apps/mobile/lib/features/book/widgets/book_widgets.dart",
+    "apps/mobile/lib/features/work/widgets/work_widgets.dart"
+  ],
+  "requiredGates": [
+    "scripts/check-personal-domain-navigation-host-qualification-c25g.ps1",
+    "scripts/check-personal-domain-navigation-contract-c25a.ps1",
+    "scripts/check-personal-domain-navigation-adaptive-reachability-c25f.ps1",
+    "scripts/check-personal-subaction-placement-regression.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-brand-integrity.ps1",
+    "scripts/check-user-facing-copy.ps1",
+    "scripts/check-interaction-contracts.ps1",
+    "scripts/check-mvp-personal-action-projection.ps1",
+    "scripts/check-mvp-delivery-discipline-lock.ps1",
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-buy-protected-baseline.ps1",
+    "scripts/check-social-protected-baseline.ps1"
+  ],
+  "protectedRuntimeSeals": [
+    {
+      "id": "social",
+      "path": "artifacts/quality/social-protected-candidate-c25f-domain-navigation-20260809-01/BASELINE.json",
+      "expectedFiles": 178,
+      "portableTreeSha256": "9d79db1aa83d52d26e5f4a494315a7c213a504da6cba231346772aadac9af4e5"
+    },
+    {
+      "id": "buy",
+      "path": "artifacts/quality/buy-protected-candidate-c25f-domain-navigation-20260809-01/BASELINE.json",
+      "expectedFiles": 43,
+      "portableTreeSha256": "37d946cd050d378a9ee60fd8b19716f59acba25dbc0c0593a9136668fcd120e7"
+    }
+  ],
+  "expectedInstalledPredecessor": {
+    "machineState": "c24i_r60_23_device_gate_rejected_eat_selected_chat_unreachable_installed_checksum_preserved_authorities_closed",
+    "versionName": "1.0.0-r60.23",
+    "versionCode": "2026080923",
+    "apkSha256": "178584AB6993D576EAEBCB9BE0494A5CAD83119FE9888C37D969BBD9162BBA8D",
+    "buildAuthorization": "consumed_no_second_build"
+  },
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "unchangedSourceFingerprintRequired": true,
+    "completeAnalysisRequired": true,
+    "completeRequiredSuiteRequired": true,
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": [
+      "apps/mobile/lib",
+      "apps/mobile/test",
+      "scripts",
+      "config",
+      "docs/quality",
+      "docs/delivery"
+    ]
+  }
+}

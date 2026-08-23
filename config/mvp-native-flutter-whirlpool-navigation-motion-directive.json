@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "directiveId": "MOOLSOCIAL-MVP-NATIVE-FLUTTER-WHIRLPOOL-NAVIGATION-MOTION-20260805",
+  "state": "founder_directed_active",
+  "authorityDate": "2026-08-05",
+  "humanAuthority": "docs/delivery/MVP-NATIVE-FLUTTER-WHIRLPOOL-NAVIGATION-MOTION-DIRECTIVE-20260805.md",
+  "deliveryLock": "config/mvp-robust-60-75-day-delivery-lock.json",
+  "appliesTo": [
+    "universal_mool_shared_navigation",
+    "eat_order_food_and_book_table",
+    "ride_bike_auto_and_cab",
+    "book_individual_doctor_and_salon",
+    "work_earn_today_workspace_and_exact_workspace_owned_actions",
+    "global_direct_shared_and_journey_context_moolchat"
+  ],
+  "oldPrototypeBoundary": {
+    "visualAuthority": false,
+    "motionAuthority": false,
+    "navigationAuthority": false,
+    "readOnlyInventoryUses": [
+      "route_and_tap_inventory",
+      "useful_customer_facts",
+      "failure_and_recovery_cases",
+      "legacy_route_containment"
+    ]
+  },
+  "nativeFlutterBoundary": {
+    "directNativeFlutterV2Authorized": true,
+    "htmlFirstVisualParityRequired": false,
+    "versionedInteractionAndNavigationContractRequired": true,
+    "reuseExistingNonUiOwnersRequired": true,
+    "duplicateScreensRoutesAndStateOwnersBlocked": true,
+    "oneCumulativeFounderReviewPack": true
+  },
+  "navigationModel": {
+    "name": "mool_whirlpool_stable_hub_and_orbit",
+    "moolReachableInOneTapFromEveryPrimarySurface": true,
+    "chatReachableInOneTapFromEveryPrimarySurface": true,
+    "mainActionJumpFromMoolInOneTap": true,
+    "forwardDepthIsVisuallyDirectional": true,
+    "backRestoresExactOriginSelectionAndScroll": true,
+    "chatReturnRestoresExactPermittedOrigin": true,
+    "deepLinksSearchAndNotificationsUseSamePolicyGate": true,
+    "literalSpinningOrDisorientingNavigationAllowed": false
+  },
+  "motionModel": {
+    "appleInspiredNativeMotion": true,
+    "preferredTransitionMillisecondsMinimum": 180,
+    "preferredTransitionMillisecondsMaximum": 320,
+    "sharedAxisContainerAndMatchedElementContinuity": true,
+    "interruptibleAndLifecycleSafe": true,
+    "reducedMotionRequired": true,
+    "perpetualDecorativeLoopsAllowed": false,
+    "fabricatedLoadingOrLivenessAllowed": false,
+    "semanticOwnershipMayMoveForAnimation": false
+  },
+  "qualification": {
+    "widgetStateNavigationAndSemanticsTests": true,
+    "androidAndIosResponsiveCaptures": true,
+    "reducedMotionEvidence": true,
+    "twoAffectedRegressions": true,
+    "checksumMatchedOppoEvidence": true,
+    "frameAndInteractionPerformanceEvidence": true,
+    "cumulativeFounderReview": true
+  },
+  "protectedBoundaries": [
+    "locked_screens_01_03",
+    "accepted_social_baseline_and_youtube_dependency",
+    "accepted_buy_reference_and_protected_fix7_runtime",
+    "provider_payment_backend_environment_and_release_authorities"
+  ],
+  "sourceManifestOverlay": {
+    "path": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+    "sha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8",
+    "manifestFileChanged": false,
+    "sequencingAmendment": "replace_html_first_visual_parity_for_named_surfaces_with_direct_native_flutter_contract_and_evidence"
+  },
+  "authorityBoundary": {
+    "runtimeChildStillRequiresExactSelectionAndMvpGate": true,
+    "doesNotAuthorizeBackendProviderPaymentProductionCommitPushDeployOrPromotion": true,
+    "doesNotReduceSecurityPrivacyAccessibilityRecoveryOrReleaseGates": true
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "parentTicketId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-END-TO-END-JOURNEY",
+  "classification": "mvp_required",
+  "state": "planning_complete_proposed_not_preauthorized_not_executing",
+  "humanAuthority": "docs/delivery/SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-END-TO-END-JOURNEY-TICKET-20260805.md",
+  "humanAuthoritySha256": "1777DC954ED87CECF3A13F583F9E28E3F2D6D407E2D283F5FA3DDF1690D76F2B",
+  "childPortfolioId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-PORTFOLIO-20260805",
+  "childManifest": "config/social-mvp-content-declared-action-portfolio.json",
+  "childManifestSha256": "AB87CC9CF743E4B558A2EA03C15807AD421A2830C85F891180ADA14221CBE6C4",
+  "executionModel": "parent_acceptance_ticket_with_42_bounded_child_execution_tickets",
+  "executionActive": false,
+  "launchExit": "content_opens_and_one_declared_authoritative_buy_or_work_action_completes",
+  "protectedBaseline": {
+    "authority": "artifacts/quality/social-protected-baseline-20260729-02/BASELINE.json",
+    "fileCount": 119,
+    "portableTreeSha256": "54851B4769C6A0087F586CE6C9325BBEE1D7C790E06488ECCAE3A62CA953332E"
+  },
+  "journeys": [
+    {
+      "number": 1,
+      "id": "common_viewer",
+      "title": "Common viewer tap-to-tap journey",
+      "childTicketOrders": [3, 6, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 30, 31, 35, 38, 39, 40, 41, 42]
+    },
+    {
+      "number": 2,
+      "id": "native_creator",
+      "title": "Native text/image creator tap-to-tap journey",
+      "childTicketOrders": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 28, 30, 32, 35, 38, 40, 41, 42]
+    },
+    {
+      "number": 3,
+      "id": "youtube_connected_creator",
+      "title": "YouTube-connected creator tap-to-tap journey",
+      "childTicketOrders": [1, 2, 3, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 25, 26, 27, 28, 29, 30, 32, 35, 38, 39, 40, 41, 42]
+    },
+    {
+      "number": 4,
+      "id": "declared_buy_or_work_action_completion",
+      "title": "Declared Buy or Work action completion",
+      "childTicketOrders": [17, 18, 19, 20, 21, 22, 23, 24, 30, 35, 38, 40, 41, 42]
+    },
+    {
+      "number": 5,
+      "id": "funded_campaign_creator_and_business",
+      "title": "Funded campaign creator and business tap-to-tap journey",
+      "childTicketOrders": [3, 6, 7, 8, 9, 17, 18, 19, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 40, 41, 42]
+    },
+    {
+      "number": 6,
+      "id": "viewer_and_creator_social_controls",
+      "title": "Viewer and creator Social controls",
+      "childTicketOrders": [3, 6, 11, 12, 30, 31, 35, 38, 40, 41, 42]
+    },
+    {
+      "number": 7,
+      "id": "report_correction_enforcement_and_appeal",
+      "title": "Report, correction, enforcement and appeal",
+      "childTicketOrders": [7, 8, 9, 11, 24, 28, 29, 30, 31, 32, 33, 34, 35, 38, 40, 41, 42]
+    },
+    {
+      "number": 8,
+      "id": "admin_trust_and_safety",
+      "title": "Admin Trust and Safety tap-to-tap journey",
+      "childTicketOrders": [3, 7, 8, 9, 24, 30, 31, 32, 33, 34, 35, 36, 38, 40, 41, 42]
+    },
+    {
+      "number": 9,
+      "id": "admin_configuration_and_launch",
+      "title": "Admin configuration and launch tap-to-tap journey",
+      "childTicketOrders": [2, 3, 6, 8, 17, 18, 19, 23, 24, 25, 26, 27, 29, 30, 35, 37, 38, 39, 40, 41, 42]
+    },
+    {
+      "number": 10,
+      "id": "interruption_unavailable_and_support",
+      "title": "Interruption, unavailable state and support recovery",
+      "childTicketOrders": [2, 4, 5, 10, 11, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 41, 42]
+    }
+  ],
+  "referenceAuthority": {
+    "protectedSocialBaseline": "artifacts/quality/social-protected-baseline-20260729-02/BASELINE.json",
+    "approvedOrProtectedInputs": [
+      "screen_05_social_shorts",
+      "screen_06_social_videos",
+      "screen_07_social_feed",
+      "screen_08_social_create",
+      "screens_124_through_131_creator",
+      "screen_153_admin_content_trust_safety",
+      "protected_r20_youtube_compliance"
+    ],
+    "pendingFinalReferenceGates": [
+      "screen_166_youtube_connect_exact_journey",
+      "campaign_placement_and_duration_exact_journey",
+      "screen_156_social_configuration_delta"
+    ],
+    "notAuthority": [
+      "working_screen_170_social_promotion"
+    ],
+    "screenbookMutationAuthorized": false
+  },
+  "declaredActionContract": {
+    "maximumActionsPerPost": 1,
+    "launchDestinationFamilies": ["buy", "work"],
+    "serviceBookingDestination": "blocked_until_accepted_complete_destination_journey",
+    "completionTruth": "destination_server_owned_declared_completion_event",
+    "fulfilledOutcomeSeparateFromClick": true,
+    "serverRecheckAtOpenAndTap": true
+  },
+  "campaignContract": {
+    "launchDurationHours": {
+      "minimum": 24,
+      "maximum": 168
+    },
+    "startsAfterApprovalAndSuccessfulActivation": true,
+    "automaticRenewal": false,
+    "externalEngagementPay": false,
+    "activeVersionMayBeRewrittenByAdmin": false
+  },
+  "authorization": {
+    "preauthorized": false,
+    "activeChildTicket": null,
+    "runtimeOrBackendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "oppoTestingAuthorized": false,
+    "commitPushDeployPromoteOrProductionAuthorized": false,
+    "requiredBeforeFirstRuntimeBackendWriteOrBuild": "scripts/check-mvp-scope-gate-state.ps1 -RequireExecutionAuthorized"
+  }
+}

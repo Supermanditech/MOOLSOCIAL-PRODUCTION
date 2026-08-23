@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32W-PERSONAL-MVP-R15-CURRENT-MOOL-HOME-ACCESSIBILITY-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "finding": "REG-20260815-2281-C32R-R15-SUPERSEDED-ROOT-RAIL-ACCESSIBILITY-OWNER",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "The full Personal copy, fitment and accessibility matrix reaches current fixed Mool Home family controls before exercising every remaining exposure and recovery state.",
+  "minimumCompleteScope": [
+    "migrate_only_root_portions_of_apps_mobile_test_ui_v2_universal_uaw_r15_personal_copy_fitment_accessibility_test_dart",
+    "replace_removed_root_scroll_rail_with_fixed_mool_home_family_targets",
+    "assert_current_family_semantics_minimum_targets_and_operability_at_320x568_text140",
+    "run_the_entire_R15_matrix_to_expose_any_later_hidden_failure",
+    "run_R15_R03_C24B2_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_home_or_other_Personal_screen_change_without_a_new_evidenced_ticket",
+    "no_removal_or_weakening_of_nonroot_R15_fitment_accessibility_coverage",
+    "no_backend_build_device_external_or_secret_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

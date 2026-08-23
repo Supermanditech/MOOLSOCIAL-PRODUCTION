@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-QUALIFIER-BACKEND-TEST-COUNT-DRIFT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_implementation_complete_syntax_and_static_gate_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_backend_verification_false_rejection",
+  "actor": "C30T_source_qualifier",
+  "customerOutcome": "The two-cycle pre-AAB qualifier accepts only the current complete 505-test backend verification with zero failures instead of rejecting it against the obsolete 503-test count.",
+  "minimumCorrection": [
+    "replace_all_qualifier_503_pass_markers_and_summaries_with_505",
+    "retain_zero_failure_requirement",
+    "make_static_readiness_reject_the_stale_503_summary"
+  ],
+  "explicitExclusions": [
+    "no_backend_source_or_Dev_deployment_change",
+    "no_AAB_APK_upload_install_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "DevDeploymentAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "powershellSyntaxEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/43-c30t-qualifier-final-syntax.log",
+    "powershellSyntaxEvidenceSha256": "F8B46D857CB6431A4B33BE84414691E3D2AC1959231F8A663BB27D6C7FA8B0D8",
+    "staticReadinessEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/44-c30t-static-release-readiness-final-count-audit.log",
+    "staticReadinessEvidenceSha256": "B816E991461E9A927EC606CAABF1E2CAC4CBAE27DD3E384CCEB1D43D4EC44083",
+    "backendCorpusEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/15-backend-isolated-full-tests.log",
+    "backendCorpusEvidenceSha256": "9D71C8B3D42962637A810B4DD8143277FA82B99797196AC86DE0BEE51BE58460"
+  }
+}

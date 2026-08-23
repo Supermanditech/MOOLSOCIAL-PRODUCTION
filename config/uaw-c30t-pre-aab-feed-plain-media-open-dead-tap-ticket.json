@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-PLAIN-MEDIA-OPEN-DEAD-TAP",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "public_Feed_intent_completion_blocker",
+  "actor": "guest_MoolSocial_public_Feed_reader",
+  "customerOutcome": "Tapping a public Feed image opens an accessible zoomable media view without sign-in, and Back returns to the exact originating post.",
+  "classificationReason": "The public card renders image content as a visible first content tap but owns no tap handler or completion, violating the supported Feed intent-completion contract.",
+  "minimumCompleteScope": [
+    "make_plain_post_media_an_explicit_44px_or_larger_public_tap_target",
+    "open_the_existing_media_owner_in_a_native_zoomable_sheet_without_authentication",
+    "preserve_exact_Feed_post_context_and_Back_return",
+    "contain_missing_or_failed_media_with_truthful_recovery"
+  ],
+  "explicitExclusions": [
+    "no_image_download_edit_upload_comment_like_save_or_share_side_effect",
+    "no_new_route_screen_backend_or_provider_owner",
+    "no_cloud_Hosting_Play_AAB_upload_install_or_OPPO_mutation"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_design.dart"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The existing Social sheet and SocialMediaPreviewV2 owners can express the entire public viewer without a new route or service.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "Feed_action_authentication_truth_matrix_source_qualified",
+    "founder_authorized_source_repairs_and_withheld_successor_AAB"
+  ],
+  "testAndEvidencePlan": [
+    "guest_media_tap_opens_zoomable_sheet_and_never_changes_auth_state",
+    "Back_returns_to_exact_card_and_action_row_remains_operable",
+    "missing_media_recovery_and_320x568_140_percent_fitment",
+    "focused_then_authoritative_Social_regression"
+  ],
+  "authority": {
+    "sourceImplementationAuthorizedByFounder": true,
+    "selectionPending": true,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "verification": {
+    "focusedFlutterTests": "30_passed_0_failed",
+    "guestAuthenticationStatePreserved": true,
+    "interactionWrites": 0,
+    "compactLargeText": "320x568_140_percent_passed",
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "AabBuiltUploadedOrInstalled": false,
+    "livePlayAcceptance": "pending_future_separately_authorized_candidate"
+  },
+  "evidence": "docs/quality/UAW-C30T-PRE-AAB-FEED-PLAIN-MEDIA-OPEN-DEAD-TAP-20260813.md"
+}

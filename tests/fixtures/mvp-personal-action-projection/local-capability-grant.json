@@ -1,0 +1,8 @@
+{
+  "caseId": "local-capability-grant",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "allow_local_capability_grant"
+  },
+  "expectedErrorContains": "local capability grants are forbidden"
+}

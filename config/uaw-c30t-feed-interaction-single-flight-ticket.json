@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-INTERACTION-SINGLE-FLIGHT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "mutation_integrity_blocker",
+  "actor": "signed_in_MoolSocial_Feed_reader",
+  "customerOutcome": "One deliberate Like, Save or Vote tap produces at most one provider mutation and the control remains unavailable until the authoritative response returns.",
+  "minimumCorrection": [
+    "own_one_in_flight_mutation_per_post",
+    "notify_the_Feed_before_and_after_the_provider_operation",
+    "disable_like_save_and_all_poll_or_quiz_choices_while_pending",
+    "reject_a_second_programmatic_request_without_transport",
+    "retain_the_server_returned_item_as_the_only_success_state"
+  ],
+  "explicitExclusions": [
+    "no_optimistic_like_save_or_vote_state",
+    "no_backend_schema_or_provider_change",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "20 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-interaction-single-flight-focused-tests.log",
+    "evidenceSha256": "F442D2DAC878D4FDE16ED38E8D4A9924C722AC328130C68E9C42A827FEDF1F8C",
+    "providerCallsForTwoConcurrentRequests": 1,
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

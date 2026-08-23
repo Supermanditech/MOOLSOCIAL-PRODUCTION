@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moolsocial.com/contracts/uaw-r01-personal-action-projection-v1.schema.json",
+  "title": "MoolSocial Personal Action Projection V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "projectionId",
+    "projectionVersion",
+    "projectionState",
+    "authority",
+    "validity",
+    "sourceManifest",
+    "mainActions",
+    "globalActions",
+    "removedActions"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": {
+      "const": "UAW-R01-PERSONAL-ACTION-PROJECTION-CONTRACT-V1"
+    },
+    "projectionId": { "const": "personal_user_mvp_launch" },
+    "projectionVersion": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.[0-9]+$"
+    },
+    "projectionState": {
+      "const": "static_reference_fixture_not_runtime_authority"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "accountBaseline",
+        "capabilityGrantAuthority",
+        "localCapabilityGrantAllowed"
+      ],
+      "properties": {
+        "owner": { "const": "launch_policy_owner" },
+        "accountBaseline": { "const": "personal_user" },
+        "capabilityGrantAuthority": { "const": "server_only" },
+        "localCapabilityGrantAllowed": { "const": false }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effectiveAt", "expiresAt", "staleRecovery"],
+      "properties": {
+        "effectiveAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "staleRecovery": {
+          "const": "retain_last_safe_context_and_request_fresh_projection"
+        }
+      }
+    },
+    "sourceManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": "config/mvp-universal-action-workspace-routing-reference-batch.json"
+        },
+        "sha256": {
+          "const": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8"
+        }
+      }
+    },
+    "mainActions": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "globalActions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "removedActions": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/removedAction" }
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "disposition",
+        "routeOwner",
+        "dependencies",
+        "subActions"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "enum": ["active", "dependency_held"]
+        },
+        "routeOwner": { "type": "string", "minLength": 1 },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "subActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subAction" }
+        }
+      }
+    },
+    "subAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "disposition",
+        "routeOwner",
+        "dependencies"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "enum": ["active", "dependency_held"]
+        },
+        "routeOwner": { "type": "string", "minLength": 1 },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "removedAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "disposition", "recovery"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "disposition": { "const": "removed_from_universal" },
+        "recovery": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

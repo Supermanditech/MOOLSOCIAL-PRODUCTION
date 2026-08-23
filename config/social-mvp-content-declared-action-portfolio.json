@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "portfolioId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-PORTFOLIO-20260805",
+  "preparedAt": "2026-08-05",
+  "parentTicketId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-END-TO-END-JOURNEY",
+  "classification": "mvp_required",
+  "state": "proposed_for_founder_review_not_preauthorized",
+  "authorizationRecorded": false,
+  "executionActive": false,
+  "ticketCount": 42,
+  "classificationCounts": {
+    "mvp_required": 39,
+    "mvp_supporting": 3,
+    "beyond_mvp": 0
+  },
+  "launchExit": "content_opens_and_one_declared_authoritative_buy_or_work_action_completes",
+  "executionRule": "one_explicitly_activated_child_at_a_time_after_mvp_scope_gate_and_all_ticket_dependencies_pass",
+  "protectedBaseline": {
+    "authority": "artifacts/quality/social-protected-baseline-20260729-02/BASELINE.json",
+    "fileCount": 119,
+    "portableTreeSha256": "54851B4769C6A0087F586CE6C9325BBEE1D7C790E06488ECCAE3A62CA953332E",
+    "mutationWithoutNewFounderDecision": false
+  },
+  "declaredActionPolicy": {
+    "actionsPerPost": 1,
+    "allowedLaunchDestinationFamilies": [
+      "buy_authoritative_route",
+      "work_authoritative_route"
+    ],
+    "adminMayConfigureRegisteredActions": true,
+    "adminMayInventUnimplementedDestination": false,
+    "destinationMustBeLiveEligibleAndEnabledAtOpen": true,
+    "serviceOrBookingWithoutAcceptedDestination": "blocked"
+  },
+  "campaignPolicy": {
+    "durationHoursMinimum": 24,
+    "durationHoursMaximum": 168,
+    "clockStartsAfterApprovalAndSuccessfulActivation": true,
+    "automaticRenewal": false,
+    "paymentForExternalViewsLikesCommentsSharesOrWatchTime": false,
+    "adminPolicyVersionedEffectiveDatedAndAudited": true
+  },
+  "tickets": [
+    {
+      "order": 1,
+      "id": "SOCIAL-MVP-PROTECTED-BASELINE-ADOPTION-AND-DELTA-BOUNDARY",
+      "classification": "mvp_required",
+      "customerOutcome": "The accepted Social and YouTube behavior is reused without silent regression, redesign or unsupported provider expansion.",
+      "dependenciesAndApprovals": ["social_protected_baseline", "founder_delta_decision"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 2,
+      "id": "SOCIAL-MVP-CONTENT-ACTION-STATE-AND-OWNERSHIP-CONTRACT",
+      "classification": "mvp_required",
+      "customerOutcome": "Every draft, post, connected source, declared action, campaign and moderation state has one authoritative owner and durable identity.",
+      "dependenciesAndApprovals": ["social_product_owner", "backend_architecture_owner", "ticket_1"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 3,
+      "id": "SOCIAL-MVP-PERSONAL-CREATOR-BUSINESS-AND-ADMIN-AUTHORITY",
+      "classification": "mvp_required",
+      "customerOutcome": "A normal user, creator, campaign business and Admin see only the Social actions their verified role can perform.",
+      "dependenciesAndApprovals": ["workspace_identity_owner", "tenant_authorization_owner", "ticket_2"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 4,
+      "id": "SOCIAL-MVP-NATIVE-TEXT-POST-DRAFT",
+      "classification": "mvp_required",
+      "customerOutcome": "A signed-in user can create, save, resume, edit or discard one native text-post draft without duplicate publication.",
+      "dependenciesAndApprovals": ["accepted_create_reference", "ticket_2", "ticket_3"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 5,
+      "id": "SOCIAL-MVP-NATIVE-IMAGE-INGEST-PREVIEW-AND-RECOVERY",
+      "classification": "mvp_required",
+      "customerOutcome": "A user can attach an image with just-in-time permission, preview it, recover a failed upload and remove it before publishing.",
+      "dependenciesAndApprovals": ["media_storage_owner", "privacy_owner", "accepted_create_reference", "ticket_4"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 6,
+      "id": "SOCIAL-MVP-POST-VISIBILITY-AUDIENCE-AND-DISCOVERABILITY",
+      "classification": "mvp_required",
+      "customerOutcome": "The creator chooses an allowed per-post visibility while Admin campaign targeting remains separate, consented and explainable.",
+      "dependenciesAndApprovals": ["privacy_owner", "audience_policy_owner", "personal_social_controls_lock", "ticket_3"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 7,
+      "id": "SOCIAL-MVP-CONTENT-RIGHTS-AND-LICENCE-DECLARATION",
+      "classification": "mvp_required",
+      "customerOutcome": "Before publication, the creator records the rights basis for native media and connected YouTube context.",
+      "dependenciesAndApprovals": ["rights_policy_owner", "accepted_rights_reference", "ticket_2"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 8,
+      "id": "SOCIAL-MVP-PAID-SPONSOR-AFFILIATE-DISCLOSURE",
+      "classification": "mvp_required",
+      "customerOutcome": "Funded, sponsored or outcome-linked content carries a clear disclosure before users act.",
+      "dependenciesAndApprovals": ["campaign_governance_owner", "trust_safety_owner", "ticket_7"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 9,
+      "id": "SOCIAL-MVP-PREPUBLICATION-SAFETY-AND-ACTION-TRUTH-PREFLIGHT",
+      "classification": "mvp_required",
+      "customerOutcome": "Obvious policy, rights, disclosure and broken-action problems are blocked or explained before publication without fabricating a final moderation decision.",
+      "dependenciesAndApprovals": ["trust_safety_owner", "declared_action_owner", "ticket_7", "ticket_8", "ticket_18"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 10,
+      "id": "SOCIAL-MVP-IDEMPOTENT-NATIVE-POST-PUBLISH",
+      "classification": "mvp_required",
+      "customerOutcome": "One publish decision creates one durable native post and returns an accountable result on retry or interruption.",
+      "dependenciesAndApprovals": ["social_backend_owner", "ticket_4", "ticket_5", "ticket_6", "ticket_9"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 11,
+      "id": "SOCIAL-MVP-FEED-PROJECTION-POST-DETAIL-AND-RESTORE",
+      "classification": "mvp_required",
+      "customerOutcome": "An eligible viewer opens the exact post from Social, sees its current state and returns to the same feed position after Back, restart or action completion.",
+      "dependenciesAndApprovals": ["accepted_feed_reference", "ticket_6", "ticket_10", "ticket_30"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 12,
+      "id": "SOCIAL-MVP-REACTION-COMMENT-SHARE-SAVE-AND-CREATOR-CONTROLS",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Allowed engagement controls work predictably and respect creator comment, mention, block, mute and restriction settings.",
+      "dependenciesAndApprovals": ["accepted_feed_reference", "personal_social_controls_lock", "trust_safety_owner", "ticket_11"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 13,
+      "id": "SOCIAL-MVP-YOUTUBE-PUBLIC-LINK-VALIDATION",
+      "classification": "mvp_required",
+      "customerOutcome": "A creator can paste one public YouTube video or Short link and receive an explicit eligible or blocked result before continuing.",
+      "dependenciesAndApprovals": ["youtube_provider_owner", "screen_166_final_reference_gate", "ticket_1"],
+      "lane": "reference_held"
+    },
+    {
+      "order": 14,
+      "id": "SOCIAL-MVP-YOUTUBE-READONLY-CHANNEL-CONNECTION-AND-REVOCATION",
+      "classification": "mvp_required",
+      "customerOutcome": "A creator can connect a channel with least-privilege read-only access, understand the permission and revoke it without losing the personal account.",
+      "dependenciesAndApprovals": ["youtube_oauth_owner", "security_owner", "privacy_owner", "protected_r20_compliance_boundary", "ticket_1"],
+      "lane": "provider_held"
+    },
+    {
+      "order": 15,
+      "id": "SOCIAL-MVP-YOUTUBE-ELIGIBLE-CONTENT-SELECTION-AND-RECHECK",
+      "classification": "mvp_required",
+      "customerOutcome": "Only public, available and embeddable YouTube content can be selected, and eligibility is rechecked when the post opens.",
+      "dependenciesAndApprovals": ["youtube_provider_owner", "ticket_13", "ticket_14"],
+      "lane": "provider_held"
+    },
+    {
+      "order": 16,
+      "id": "SOCIAL-MVP-OFFICIAL-YOUTUBE-PLAYER-AND-PROVIDER-ATTRIBUTION",
+      "classification": "mvp_required",
+      "customerOutcome": "The user starts unobscured official YouTube playback and always understands that video hosting and engagement belong to YouTube.",
+      "dependenciesAndApprovals": ["protected_r20_compliance_boundary", "youtube_provider_owner", "ticket_15"],
+      "lane": "provider_held"
+    },
+    {
+      "order": 17,
+      "id": "SOCIAL-MVP-EXACTLY-ONE-DECLARED-MOOL-ACTION-SCHEMA",
+      "classification": "mvp_required",
+      "customerOutcome": "A post may carry exactly one plainly labelled MoolSocial action with truthful context and a versioned destination reference.",
+      "dependenciesAndApprovals": ["declared_action_owner", "screen_166_final_reference_gate", "ticket_2"],
+      "lane": "reference_held"
+    },
+    {
+      "order": 18,
+      "id": "SOCIAL-MVP-AUTHORITATIVE-BUY-OR-WORK-DESTINATION-RESOLVER",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin and creators can select only a registered, accepted and currently enabled Buy or Work destination; a label can never invent a route.",
+      "dependenciesAndApprovals": ["buy_route_owner", "work_route_owner", "admin_configuration_owner", "ticket_17"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 19,
+      "id": "SOCIAL-MVP-ACTION-AVAILABILITY-TERMS-AND-ELIGIBILITY-PREFLIGHT",
+      "classification": "mvp_required",
+      "customerOutcome": "Before tapping, a viewer sees what the action does; at tap time the server rechecks route, item or opportunity, geography, eligibility and availability.",
+      "dependenciesAndApprovals": ["buy_route_owner", "work_route_owner", "ticket_18"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 20,
+      "id": "SOCIAL-MVP-DECLARED-ACTION-DEEP-LINK-HANDOFF",
+      "classification": "mvp_required",
+      "customerOutcome": "One tap opens the exact accepted Buy product/cart decision or Work opportunity/terms decision with source context preserved.",
+      "dependenciesAndApprovals": ["navigation_owner", "ticket_19"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 21,
+      "id": "SOCIAL-MVP-DOWNSTREAM-COMPLETION-RECEIPT",
+      "classification": "mvp_required",
+      "customerOutcome": "Only an authoritative downstream Buy or Work event marks the declared action completed; navigation, opening or a client timer cannot do so.",
+      "dependenciesAndApprovals": ["buy_backend_owner", "work_backend_owner", "ticket_20"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 22,
+      "id": "SOCIAL-MVP-RETURN-TO-CONTENT-CONTINUITY",
+      "classification": "mvp_required",
+      "customerOutcome": "Back or completion returns the user to the same Social item and shows an accurate completed, pending, failed or still-available action state.",
+      "dependenciesAndApprovals": ["navigation_owner", "ticket_11", "ticket_21"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 23,
+      "id": "SOCIAL-MVP-ACTION-OPEN-ATTRIBUTION-IDENTITY-AND-DEDUPE",
+      "classification": "mvp_required",
+      "customerOutcome": "Eligible action opens are attributed once to the correct post, creator, campaign and destination without cross-user leakage or duplicate credit.",
+      "dependenciesAndApprovals": ["attribution_owner", "privacy_owner", "ticket_20"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 24,
+      "id": "SOCIAL-MVP-FULFILLED-OUTCOME-ATTRIBUTION-AND-REVERSAL",
+      "classification": "mvp_required",
+      "customerOutcome": "Retained Buy fulfillment or accepted Work outcome is attributed separately from a click, and cancellation, return or reversal corrects the record.",
+      "dependenciesAndApprovals": ["attribution_owner", "buy_ledger_owner", "work_ledger_owner", "ticket_21", "ticket_23"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 25,
+      "id": "SOCIAL-MVP-FUNDED-CAMPAIGN-LINKAGE-WITHOUT-ENGAGEMENT-PAY",
+      "classification": "mvp_required",
+      "customerOutcome": "A funded campaign can link approved content and a declared outcome without paying for YouTube or external views, likes, comments, shares or watch time.",
+      "dependenciesAndApprovals": ["campaign_governance_owner", "finance_owner", "ticket_8", "ticket_24"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 26,
+      "id": "SOCIAL-MVP-CAMPAIGN-DURATION-POLICY-24-TO-168-HOURS",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can version the allowed duration policy, while the launch UI permits one to seven whole days and shows the exact purchased duration before activation.",
+      "dependenciesAndApprovals": ["campaign_governance_owner", "admin_configuration_owner", "campaign_reference_gate", "ticket_25"],
+      "lane": "reference_held"
+    },
+    {
+      "order": 27,
+      "id": "SOCIAL-MVP-CAMPAIGN-APPROVAL-ACTIVATION-CLOCK-EXPIRY-AND-NO-RENEWAL",
+      "classification": "mvp_required",
+      "customerOutcome": "Purchased time starts only after approval and successful placement activation, ends exactly once and never auto-renews.",
+      "dependenciesAndApprovals": ["campaign_backend_owner", "finance_owner", "ticket_25", "ticket_26"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 28,
+      "id": "SOCIAL-MVP-CREATOR-CONTENT-LIBRARY-AND-PUBLISH-STATUS",
+      "classification": "mvp_supporting",
+      "customerOutcome": "The creator can find one draft, processing, published, failed, paused or removed item and resume the exact next action.",
+      "dependenciesAndApprovals": ["accepted_creator_library_reference", "ticket_10", "ticket_27"],
+      "lane": "portfolio"
+    },
+    {
+      "order": 29,
+      "id": "SOCIAL-MVP-PROVIDER-METRICS-AND-MOOLSOCIAL-OUTCOME-SEPARATION",
+      "classification": "mvp_supporting",
+      "customerOutcome": "Creators and businesses see YouTube-provided metrics separately from MoolSocial-verified opens and completed outcomes.",
+      "dependenciesAndApprovals": ["analytics_owner", "youtube_provider_owner", "ticket_23", "ticket_24"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 30,
+      "id": "SOCIAL-MVP-CAPABILITY-FLAG-AUDIENCE-CANARY-AND-KILL-SWITCH",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can release, pause or stop each Social capability for an approved audience without corrupting existing posts, obligations or cases.",
+      "dependenciesAndApprovals": ["admin_configuration_owner", "release_owner", "ticket_2", "ticket_3"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 31,
+      "id": "SOCIAL-MVP-CONTENT-REPORT-INTAKE-TRIAGE-AND-REPORTER-PRIVACY",
+      "classification": "mvp_required",
+      "customerOutcome": "A viewer can report content or an action once, choose an accurate reason, receive a case reference and keep reporter identity protected.",
+      "dependenciesAndApprovals": ["trust_safety_owner", "privacy_owner", "ticket_11"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 32,
+      "id": "SOCIAL-MVP-RIGHTS-DISCLOSURE-AND-ACTION-CORRECTION",
+      "classification": "mvp_required",
+      "customerOutcome": "Where safe and lawful, a creator can correct missing disclosure, rights evidence or a broken action without erasing the prior version or report history.",
+      "dependenciesAndApprovals": ["trust_safety_owner", "rights_policy_owner", "ticket_7", "ticket_8", "ticket_31"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 33,
+      "id": "SOCIAL-MVP-PROPORTIONATE-ENFORCEMENT-REASON-EVIDENCE-AND-DURATION",
+      "classification": "mvp_required",
+      "customerOutcome": "A moderation decision records evidence, policy version, scope, duration and reason and uses the least sufficient proportionate action.",
+      "dependenciesAndApprovals": ["trust_safety_owner", "specialist_review_owner", "ticket_31"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 34,
+      "id": "SOCIAL-MVP-CREATOR-NOTICE-APPEAL-AND-INDEPENDENT-REVIEW",
+      "classification": "mvp_required",
+      "customerOutcome": "For an important moderation, rights or campaign decision, the creator sees the reason and evidence basis and can use the permitted appeal route.",
+      "dependenciesAndApprovals": ["appeals_owner", "trust_safety_owner", "ticket_33"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 35,
+      "id": "SOCIAL-MVP-REMOVED-PRIVATE-UNEMBEDDABLE-OR-BROKEN-ACTION-RECOVERY",
+      "classification": "mvp_required",
+      "customerOutcome": "A viewer or creator receives an explicit recovery when content becomes private, unavailable, removed, unembeddable or its destination closes.",
+      "dependenciesAndApprovals": ["youtube_provider_owner", "declared_action_owner", "ticket_15", "ticket_18", "ticket_33"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 36,
+      "id": "SOCIAL-MVP-ADMIN-TRUST-SAFETY-TAP-TO-TAP-GOVERNANCE",
+      "classification": "mvp_required",
+      "customerOutcome": "An authorized reviewer can triage, contain, investigate, decide, notify and close or escalate a Social case with a complete audit trail.",
+      "dependenciesAndApprovals": ["accepted_screen_153", "admin_role_owner", "ticket_31", "ticket_32", "ticket_33", "ticket_34"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 37,
+      "id": "SOCIAL-MVP-ADMIN-AUDIENCE-ACTION-CAMPAIGN-AND-LAUNCH-CONTROL",
+      "classification": "mvp_required",
+      "customerOutcome": "Admin can configure registered actions, campaign timing, audience, approval, canary, health checks, expansion and pause without exporting raw audience lists.",
+      "dependenciesAndApprovals": ["screen_156_provisioning_reference_gate", "admin_configuration_owner", "ticket_18", "ticket_26", "ticket_30"],
+      "lane": "reference_held"
+    },
+    {
+      "order": 38,
+      "id": "SOCIAL-MVP-PRIVACY-PERMISSION-RETENTION-REVOCATION-AND-EGRESS",
+      "classification": "mvp_required",
+      "customerOutcome": "Media, OAuth, audience, attribution and moderation data are purpose-bound, minimally retained, revocable where applicable and protected from unauthorized egress.",
+      "dependenciesAndApprovals": ["privacy_owner", "security_owner", "data_governance_owner", "ticket_5", "ticket_14", "ticket_23", "ticket_31"],
+      "lane": "dependency_held"
+    },
+    {
+      "order": 39,
+      "id": "SOCIAL-MVP-YOUTUBE-QUOTA-COST-RETRY-AND-CIRCUIT-BREAKER",
+      "classification": "mvp_required",
+      "customerOutcome": "Provider failure, quota exhaustion or retry cannot create duplicate posts, surprise cost, hidden fallback playback or an endless loading state.",
+      "dependenciesAndApprovals": ["youtube_provider_owner", "sre_owner", "finance_owner", "ticket_13", "ticket_14", "ticket_15", "ticket_16"],
+      "lane": "provider_held"
+    },
+    {
+      "order": 40,
+      "id": "SOCIAL-MVP-ACCEPTED-HTML-REFERENCE-AND-STATE-MATRIX-BATCH",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder reviews one coherent responsive state matrix for viewer, creator, campaign, recovery and Admin journeys before native delta work.",
+      "dependenciesAndApprovals": ["screenbook_review_workflow", "screen_166_final_reference_gate", "campaign_reference_gate", "screen_156_provisioning_reference_gate", "tickets_1_through_39_contracts"],
+      "lane": "reference_held"
+    },
+    {
+      "order": 41,
+      "id": "SOCIAL-MVP-NATIVE-BACKEND-REGRESSION-BUILD-AND-OPPO-QUALIFICATION",
+      "classification": "mvp_required",
+      "customerOutcome": "The exact native candidate and backend contracts pass focused/full tests, protected-baseline regression, machine-gated build and checksum-matched OPPO tap evidence.",
+      "dependenciesAndApprovals": ["ticket_40_founder_reference_acceptance", "explicit_child_activation", "mvp_scope_gate", "all_runtime_dependencies", "oppo_device_available"],
+      "lane": "execution_held"
+    },
+    {
+      "order": 42,
+      "id": "SOCIAL-MVP-FOUNDER-ACCEPTANCE-EVIDENCE-AND-RELEASE-HANDOFF",
+      "classification": "mvp_required",
+      "customerOutcome": "Founder receives an evidence-indexed candidate with exact source and APK identity, known limits, acceptance decisions and no implied release authority.",
+      "dependenciesAndApprovals": ["ticket_41", "release_gate_owner", "founder_acceptance"],
+      "lane": "acceptance_held"
+    }
+  ]
+}

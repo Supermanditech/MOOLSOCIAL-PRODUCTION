@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC03A-NATIVE-MOOLSOCIAL-FEED-OWNERSHIP",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "selected_native_implementation_authorized_empty_state_scope_build_and_device_held",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user enters a professional, unmistakably MoolSocial-owned Feed that shows only authoritative text, image or carousel items, or a truthful empty, loading, unavailable or recovery state with a direct Create handoff.",
+  "founderDirection": "html_path_stopped_direct_Flutter_microtickets_authorized_2026_08_10",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC03A-NATIVE-MOOLSOCIAL-FEED-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The existing Social Feed destination, Create handoff and future authoritative-item renderer are sufficient. ReviewSharedGateway and socialPublishedItems are in-memory review owners, not durable Feed read authority, so the lawful production default is a professional empty state rather than a new service or fabricated record."
+  },
+  "minimumCompleteScope": [
+    "remove_every_hard_coded_representative_Feed_record_filter_and_commerce_path",
+    "remove_the_Feed_quick_publish_surface_and_in_memory_publication_readback_claim",
+    "render_a_distinct_professional_MoolSocial_owned_empty_first_Feed",
+    "provide_truthful_loading_empty_unavailable_error_and_retry_states",
+    "provide_one_direct_Create_a_post_handoff_to_the_existing_Create_destination",
+    "preserve_future_text_image_carousel_authoritative_item_owner_without_fake_data",
+    "preserve_Mool_switcher_global_navigation_one_tap_reach_and_44_by_44_targets",
+    "add_focused_native_tests_before_any_APK_work"
+  ],
+  "explicitExclusions": [
+    "no_X_trade_dress_copy_YouTube_identity_or_provider_visual_ownership",
+    "no_fabricated_person_post_carousel_thumbnail_engagement_promotion_or_commerce",
+    "no_publish_persist_deliver_rank_social_graph_or_readback_success_claim",
+    "no_new_screen_route_backend_feed_API_repository_or_state_owner",
+    "no_FSC04_Create_redesign_or_posting_gateway_implementation",
+    "no_build_install_OPPO_mutation_credentials_external_service_write_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_direct_Flutter_direction_received_2026_08_10",
+    "explicit_empty_state_scope_selected_because_authoritative_feed_read_owner_is_absent",
+    "focused_Flutter_tests_and_static_gates",
+    "authorized_authenticated_persistent_feed_read_owner_before_any_content_available_state",
+    "FSC04_durable_posting_gateway_before_any_publication_success_or_readback_claim",
+    "fresh_APK_host_qualification_before_any_successor_build",
+    "checksum_matched_OPPO_replay_and_founder_acceptance"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

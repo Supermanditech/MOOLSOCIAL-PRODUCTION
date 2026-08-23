@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_exact_candidate_registered_source_requalification_required",
+  "classification": "mvp_required",
+  "severity": "release_blocking",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "One distinct r60.48 successor is built only after current regression qualification, advances only through Google Play Internal Testing, and updates the existing OPPO app in place before complete acceptance journeys.",
+  "classificationReason": "Failed r60.47 cannot be repaired in place. The founder explicitly authorized one exact successor AAB, one Internal Testing upload/activation and one in-place OPPO Play update, with no other release track or device mutation.",
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.48",
+    "versionCode": "2026081348",
+    "candidateId": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "minimumCompleteScope": [
+    "add_exact_C30Y_read_only_source_qualification_contexts_to_inherited_release_gates",
+    "seal_and_pass_two_fresh_candidate_specific_source_cycles_before_machine_build_authority",
+    "build_exactly_one_AAB_through_the_visible_three_hidden_input_founder_launcher",
+    "rebind_the_exact_AAB_after_build_and_immediately_before_one_Internal_Testing_upload_activation",
+    "perform_exactly_one_in_place_OPPO_update_through_Google_Play_and_complete_postinstall_and_journey_gates"
+  ],
+  "explicitExclusions": [
+    "no_r60_46_or_r60_47_reuse_second_AAB_or_implicit_successor",
+    "no_Production_open_closed_public_alpha_beta_or_non_internal_track",
+    "no_ADB_install_sideload_uninstall_data_clear_downgrade_or_non_Play_device_mutation",
+    "no_backend_Hosting_provider_rules_IAM_email_quota_funds_or_unrelated_external_write",
+    "no_agent_access_to_password_API_key_OAuth_client_ID_token_nonce_App_Check_verdict_private_key_or_attestation_payload"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_14_end_to_end_one_AAB_Internal_Testing_activation_and_one_in_place_OPPO_Play_update_authorization",
+    "founder_only_hidden_upload_password_Firebase_Android_API_key_and_Google_OAuth_server_client_ID_entry",
+    "C30X_FIX1_through_FIX6_and_failed_r60_47_history_preserved",
+    "all_candidate_specific_source_postbuild_preupload_postupload_preinstall_postinstall_and_journey_gates_must_pass"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "scripts/check-uaw-c31c-chat-forward-recipient-contract.ps1",
+      "scripts/check-screen03-v4-production-acceptance-c30x-fix1.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c30x.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "All implementation, wrapper, artifact, runtime and acceptance owners already exist. The exact candidate registration and narrow historical-gate successor contexts are the minimum remaining work; no duplicate release or product owner is needed.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "two_identical_post_registration_source_cycles_with_417_Flutter_3_declared_skips_528_backend_8_Hosting_and_clean_analyzer",
+    "PowerShell_7_and_Windows_PowerShell_release_gate_replay",
+    "wrapper_generated_config_and_manifest_preflight_before_one_authority_consumption",
+    "postbuild_and_preupload_exact_AAB_hash_bytes_package_version_signer_provenance_plugin_and_payload_binding",
+    "Internal_Testing_only_activation_and_one_Play_in_place_OPPO_update",
+    "cold_start_blank_fatal_ANR_installer_version_retained_data_and_complete_journey_acceptance"
+  ],
+  "authority": {
+    "candidateIdentityApproved": true,
+    "oneAabBuildAuthorizedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild": true,
+    "oneInPlaceOppoPlayUpdateAuthorizedAfterActivation": true,
+    "founderHiddenInputEntryRequired": true,
+    "agentSecretValueAccessAuthorized": false,
+    "otherTrackAuthorized": false,
+    "adbOrSideloadAuthorized": false,
+    "backendOrHostingDeploymentAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FOUNDER-END-TO-END-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-pre-ticket-selection-assessment.json",
+    "priorProposal": "docs/quality/MOOLSOCIAL-14-AUGUST-OVERNIGHT-C30W-YOUTUBE-AND-MORNING-APPROVALS-20260814.md"
+  }
+}

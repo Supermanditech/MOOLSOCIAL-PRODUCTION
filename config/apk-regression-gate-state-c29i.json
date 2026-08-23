@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "device_gate_rejected",
+  "buildAuthorization": "consumed",
+  "successorPreselection": {
+    "candidateId": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+    "state": "device_gate_rejected_chat_mool_exported_semantic_height",
+    "ticketSelected": true,
+    "buildAuthorizationOpened": true,
+    "wrapperInvocationPerformed": true,
+    "buildPerformed": true,
+    "installPerformed": true,
+    "predecessorInstalledSha256": "497F00B5E52D17788B25353ADD36A4C91AA5C0A2BDD7967367BC3815F50AAA89",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/03-prebuild-validation-seal.md"
+  },
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/03-prebuild-validation-seal.md",
+    "negativeSelfTest": "scripts/test-youtube-public-dev-review-build-controls.ps1",
+    "positiveSelfTest": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G-HOST-QUALIFICATION-20260811.md"
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+    "versionName": "1.0.0-r60.33",
+    "versionCode": "2026081133",
+    "buildMode": "profile",
+    "gateProfile": "uaw_personal_r01_r15_cumulative",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/source-build-manifest.txt",
+    "manifestSha256": "AA941EDFFA45470BDCC77AC085F8B8236A5F2FC3CA5B45455DF9FC3558379B29",
+    "fileCount": 18,
+    "hostQualification": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29I",
+    "identicalQualifyingCycles": 2
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "false",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+    "MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "true",
+    "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "true",
+    "MOOLSOCIAL_YOUTUBE_PROVIDER_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider",
+    "MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED": "true",
+    "MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED": "true",
+    "MOOLSOCIAL_FIREBASE_APP_ID": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID": "760290687711",
+    "MOOLSOCIAL_FIREBASE_PROJECT_ID": "moolsocial-dev-503018"
+  },
+  "requiredNonEmptyRuntimeDefines": ["MOOLSOCIAL_FIREBASE_API_KEY"],
+  "firebaseClientConfiguration": {
+    "projectId": "moolsocial-dev-503018",
+    "projectNumber": "760290687711",
+    "androidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "packageName": "com.moolsocial.app",
+    "apiKeyUid": "14fee65f-18c4-48b7-a7dd-aa5ce35d4353",
+    "apiKeyRestrictionState": "exact_package_and_signing_SHA1_qualified",
+    "apiTargetCount": 27,
+    "apiTargetSemanticSha256": "B5DD4EAA37BB473AA4A56B1A01E06569AC350ECFAECB05BC481DC3DE67F8772D",
+    "restrictionEvidence": "docs/quality/MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION-COMPLETION-20260811.md",
+    "clientKeyValuePersisted": false,
+    "youtubeServerSecretsPresent": false
+  },
+  "preBuildGates": [
+    {"id":"branch-head","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/02-prebuild-clean-inventory.json"]},
+    {"id":"source-manifest","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/source-build-manifest.txt"]},
+    {"id":"format-analysis","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/00-source-qualifying-cycle-1.json","artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/01-source-qualifying-cycle-2.json"]},
+    {"id":"focused-tests","state":"passed","evidence":["docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G-HOST-QUALIFICATION-20260811.md"]},
+    {"id":"buy-regression-1","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/00-source-qualifying-cycle-1.json"]},
+    {"id":"buy-regression-2","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/01-source-qualifying-cycle-2.json"]},
+    {"id":"positive-release-gates","state":"passed","evidence":["docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G-HOST-QUALIFICATION-20260811.md","docs/quality/MOOLSOCIAL-FSC02E-DEV-FIREBASE-ANDROID-CLIENT-KEY-RESTRICTION-COMPLETION-20260811.md"]},
+    {"id":"protected-boundary-disposition","state":"passed","evidence":["docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I-PRESELECTION-20260811.md"]},
+    {"id":"rejected-candidate-preserved","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29h-r60-32-20260811-01/06-build-wrapper-failure.md","docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F-DEVICE-GATE-REJECTION-20260811.md","docs/quality/UAW-C28D-OPPO-EXPORTED-NAVIGATION-SEMANTIC-HEIGHT-DEVICE-GATE-REJECTION-20260810.md"]},
+    {"id":"startup-config-regression-registered","state":"passed","evidence":["artifacts/quality/buy-route-continuity-r49-1-20260801-60/00-startup-build-provenance-remediation-contract.md"]},
+    {"id":"personal-regression-1","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/00-source-qualifying-cycle-1.json"]},
+    {"id":"personal-regression-2","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/01-source-qualifying-cycle-2.json"]},
+    {"id":"qualified-mobile-regression-1","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/00-source-qualifying-cycle-1.json"]},
+    {"id":"qualified-mobile-regression-2","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/01-source-qualifying-cycle-2.json"]},
+    {"id":"legacy-regression-disposition","state":"passed","evidence":["docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G-HOST-QUALIFICATION-20260811.md"]},
+    {"id":"clean-state-regression","state":"passed","evidence":["artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/02-prebuild-clean-inventory.json","artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/03-prebuild-validation-seal.md"]},
+    {"id":"wrapper-self-test","state":"passed","evidence":["scripts/test-youtube-public-dev-review-build-controls.ps1","artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/00-source-qualifying-cycle-1.json","artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/01-source-qualifying-cycle-2.json"]}
+  ],
+  "premiumMotionPolicy": {
+    "state": "c29g_source_qualified_c29i_device_review_candidate_no_new_motion",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I-PRESELECTION-20260811.md",
+    "disposition": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I-PRESELECTION-20260811.md",
+    "applied": [],
+    "reused": ["finite_180ms_embedded_switcher","immediate_reduced_motion_resolution","FSC02A1_adjacent_noninteractive_Shorts_sequence_cue"],
+    "dependencyHeld": ["backend_provider_upload_payment_and_liveness_motion"],
+    "inapplicable": ["perpetual_decorative_or_fabricated_motion"]
+  },
+  "predecessor": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F",
+    "state": "r60_31_installed_and_preserved_until_c29i_artifact_qualification",
+    "versionName": "1.0.0-r60.31",
+    "versionCode": "2026081131",
+    "apkSha256": "497F00B5E52D17788B25353ADD36A4C91AA5C0A2BDD7967367BC3815F50AAA89",
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "lastUpdateTime": "2026-08-11 06:38:14",
+    "inPlaceUpgradeOnly": true,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false
+  },
+  "founderDirective": {
+    "state": "c29i_one_profile_build_then_checksum_qualification_and_single_in_place_OPPO_test_authorized",
+    "authority": "config/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-ticket.json",
+    "predecessorEvidenceImmutable": true,
+    "inPlaceUpgradeOnly": true,
+    "externalServiceWriteAuthorized": false
+  },
+  "qualificationResult": {"state":"device_gate_rejected","artifactEvidence":"artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/04-artifact-qualification.json","deviceEvidence":"artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/17-device-gate-rejection.json","rejection":"chat_mool_exported_semantic_height_23_logical_below_44","apkSha256":"8DF33A827C6C85C33B90D8BE46F1256ACD37975D387E7E9F402F27C5931953B3","protectedBaselineUpdated":false},
+  "buildResult": {"state":"single_build_succeeded_authority_consumed","buildCount":1,"wrapperInvocationCount":1,"flutterBuildStarted":true,"artifactPath":"artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-device-review-profile.apk","artifactSha256":"8DF33A827C6C85C33B90D8BE46F1256ACD37975D387E7E9F402F27C5931953B3","artifactBytes":134133661,"builtAt":"2026-08-11T08:59:54.6069868+05:30","secondFlutterBuildPerformed":false},
+  "installResult": {"state":"installed_identity_passed_device_gate_rejected_preserve_r60_33","deviceSerial":"2b3e0f71","candidateInstallCount":1,"versionName":"1.0.0-r60.33","versionCode":"2026081133","installedApkSha256":"8DF33A827C6C85C33B90D8BE46F1256ACD37975D387E7E9F402F27C5931953B3","firstInstallTime":"2026-08-04 02:51:59","lastUpdateTime":"2026-08-11 09:08:50","identityEvidence":"artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/05-installed-identity.json","deviceRejectionEvidence":"artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/17-device-gate-rejection.json","uninstallPerformed":false,"dataClearPerformed":false,"downgradePerformed":false,"secondInstallPerformed":false}
+}

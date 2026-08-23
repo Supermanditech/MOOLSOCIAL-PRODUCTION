@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33J-FIX2-ANDROID-EMAIL-LINK-SAME-DEVICE-EXACT-RETURN",
+  "parentTicket": "UAW-C33J-SCREEN03-PASSWORDLESS-EMAIL-LINK-NATIVE-PARITY",
+  "predecessorTicket": "UAW-C33J-FIX1-FOREGROUND-EMAIL-LINK-RETURN-HANDOFF",
+  "state": "fix10_android_email_link_exact_return_and_default_firebase_hosting_flow_locally_qualified_live_email_and_oppo_reproof_pending_no_build",
+  "classification": "mvp_required",
+  "severity": "authentication_completion_and_same_device_return_blocker",
+  "actor": "customer_tapping_a_Firebase_passwordless_email_link_on_the_same_Android_phone",
+  "capability": "verified_Android_App_Link_opens_MoolSocial_then_completes_Screen03_and_returns_to_the_exact_pending_page",
+  "customerOutcome": "After requesting an email sign-in link, tapping that link on the same Android phone opens MoolSocial, completes or confirms Screen 03 authentication, and returns to the exact page or action that requested sign-in.",
+  "classificationReason": "C33J and FIX1 qualify in-app cold and foreground handling, but AndroidManifest currently catches only /app links and does not catch Firebase Hosting email-action links under /__/auth/links. Without the platform association entry point, a real email tap cannot reach the qualified Dart handoff.",
+  "minimumCompleteScope": [
+    "add_auto_verified_HTTPS_email_action_link_filters_for_the_known_default_Firebase_Hosting_domain_and_existing_custom_MoolSocial_domain",
+    "bind_both_filters_to_pathPrefix_/__/auth/links_and_MainActivity_singleTop_without_changing_the_existing_/app_share_link_filter",
+    "fail_closed_when_the_runtime_linkDomain_is_not_blank_and_not_one_of_the_manifest_supported_hosts",
+    "reuse_C33J_cold_start_FIX1_foreground_and_exact_pending_destination_owners",
+    "add_static_and_behavioral_source_gates_for_manifest_domain_path_runtime_domain_parity_and_existing_social_filter_preservation"
+  ],
+  "explicitExclusions": [
+    "no_Firebase_Authentication_authorized_domain_or_provider_write",
+    "no_Hosting_assetlinks_or_public_deployment",
+    "no_live_email_send_or_real_link_open",
+    "no_AAB_Play_OPPO_or_device_mutation",
+    "no_secret_value_access_or_email_link_action_code_logging",
+    "no_change_to_locked_Screen03_reference_or_v4_owner"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_same_device_link_to_app_exact_page_request_2026_08_15",
+    "C33J_parent_and_FIX1_source_qualification",
+    "existing_MainActivity_singleTop_and_verified_/app_link_owner",
+    "existing_versioned_assetlinks_source_for_com_moolsocial_app",
+    "future_separate_Firebase_Hosting_live_email_and_OPPO_acceptance"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/android/app/src/main/AndroidManifest.xml",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/web/public/.well-known/assetlinks.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
+      "apps/mobile/test/uaw_c33j_fix2_android_email_link_same_device_exact_return_test.dart",
+      "scripts/check-uaw-c33j-fix2-android-email-link-same-device-exact-return.ps1"
+    ],
+    "necessityProof": "The existing MainActivity, C33J gateway/session and FIX1 lifecycle callback are the complete runtime owners. One manifest extension, one small non-secret host-parity policy and focused tests are the smallest complete source correction; no alternate auth screen, route, backend or provider is required.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "manifest_has_two_exact_autoVerify_email_action_filters_and_preserves_existing_/app_filter",
+    "runtime_linkDomain_blank_default_and_two_supported_hosts_pass_while_unknown_or_URL_shaped_values_fail_closed",
+    "cold_and_foreground_email_link_returns_continue_to_pass_exact_destination_matrices",
+    "dual_PowerShell_static_gate_affected_regressions_and_whole_mobile_analyzer",
+    "live_Firebase_Hosting_email_and_OPPO_verified_link_acceptance_remain_held"
+  ],
+  "sourceQualification": {
+    "state": "qualified_locally_not_live_email_or_device_success",
+    "officialFlutterFirebaseEmailLinkDocumentationApplied": true,
+    "legacyFirebaseDynamicLinksFlowExcluded": true,
+    "defaultFirebaseHostingLinkDomainOmitted": true,
+    "exactAndroidEmailActionIntentFiltersRetained": true,
+    "latestCombinedFocusedAuthTerminalSuitePassed": 115,
+    "flutterAnalyzerIssues": 0,
+    "functionalDeviceSuccessClaimed": false,
+    "freshSourceSealRequiredBeforeAnyFutureArtifact": true
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "androidManifestAndRuntimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "firebaseHostingOrProviderWriteAuthorized": false,
+    "liveEmailSendAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Two consecutive unchanged-source host cycles prove the complete C25 navigation and protected MVP suite before any build authority opens.",
+  "acceptance": ["two_consecutive_cycles","same_source_fingerprint","complete_analysis","complete_required_suite","all_machine_gates","build_authority_closed_until_pass"],
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G-PRESELECTION-ASSESSMENT-20260809.md",
+  "qualifiedSourceFingerprint": "EFEFC511D1F2C4B5F40AC00F299E03A17346DBBEAF4972A09DD3C69C37CCB548",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-HOST-QUALIFICATION-FIX8-C25G-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","test_only_acceptance"],"sharedImplementationOwners":["C24H two-cycle fingerprint algorithm","C24H 38-file predecessor suite","C25A and C25F machine gates","protected Social and Buy successor seals","existing Flutter analyzer and test runner"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":["C25G qualification manifest","C25G aggregate gate"],"necessityProof":"The C24H gate is immutable historical evidence tied to the rejected C24 placement and r60.22. One versioned C25G manifest/gate is necessary to bind the current C25 contract, 43-file suite, r60.23 identity and two unchanged-source cycles without changing runtime owners."},
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

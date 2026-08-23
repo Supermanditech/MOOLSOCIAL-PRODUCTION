@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32T-PERSONAL-MVP-C23C-COMPACT-DESTINATION-SHELL-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_runtime_unchanged",
+  "testOwner": "apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart",
+  "testSha256": "399B77D0D7DD95A3AAE0D23460817CCE3C850B0626FFE84979C2F5418A1C45F7",
+  "productionNavigationSha256": "591D92DDB791E3EED2D5B3967E7FAA75A63087126A8965C45D070A3357F1DD62",
+  "validation": {
+    "C23C": {"passed": 2, "failed": 0},
+    "C26D": {"passed": 1, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  }
+}

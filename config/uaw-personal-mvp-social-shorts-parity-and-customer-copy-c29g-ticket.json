@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E",
+  "rejectedDevicePredecessor": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F",
+  "state": "source_qualified_two_fresh_cycles_complete_future_device_candidate_registration_pending",
+  "classification": "mvp_required",
+  "actor": "Personal MoolSocial customer watching public YouTube Shorts or creating a MoolSocial post",
+  "customerOutcome": "Customers watch truthful YouTube-hosted Shorts in an edge-to-edge Social surface with accessible common navigation, while the center plus opens only available MoolSocial creation and no internal delivery commentary reaches the UI.",
+  "founderDirection": "forensically_compare_the_two_recent_OPPO_Shorts_captures_register_the_missing_parts_remove_all_customer_facing_commentary_and_implement_the_Flutter_successor_2026_08_11",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_bridge.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_controller.dart",
+      "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+      "apps/mobile/test/ui_v2_customer_copy_machine_gate_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "Every correction belongs to the existing Social Scaffold, official player, accepted exported-semantics clearance, MoolSocial creation workbench and rendered-copy gates. No duplicate UI, route, service, provider or backend owner is necessary."
+  },
+  "minimumCompleteScope": [
+    "C29F_device_rejection_and_two_founder_copy_escapes_permanently_registered",
+    "Shorts_draws_behind_a_transparent_status_region_without_MoolSocial_top_chrome_or_side_gutters",
+    "all_six_Social_dock_controls_export_at_least_44_logical_pixels_on_Android",
+    "official_YouTube_player_branding_and_controls_remain_provider_owned_with_no_MoolSocial_overlay_or_fabricated_engagement_action",
+    "center_plus_opens_the_existing_MoolSocial_text_image_carousel_image_poll_quick_poll_quiz_creator_directly",
+    "unavailable_YouTube_upload_is_hidden_and_remains_an_internal_machine_gate",
+    "every_reachable_Social_loading_empty_error_and_creation_state_uses_finished_customer_copy",
+    "focused_responsive_accessibility_copy_player_and_navigation_tests_plus_two_host_cycles"
+  ],
+  "explicitExclusions": [
+    "no_copied_YouTube_native_engagement_rail_subscribe_comments_like_share_remix_or_account_UI",
+    "no_fake_counts_actions_backend_state_or_upload_success",
+    "no_owner_OAuth_scope_grant_upload_progress_analytics_or_creator_distribution_implementation",
+    "no_HTML_WebView_page_or_MoolSocial_business_UI_inside_the_provider_WebView",
+    "no_cloud_write_deploy_credential_access_build_install_uninstall_data_clear_downgrade_commit_push_message_call_or_fund_movement",
+    "no_Feed_or_Create_product-scope_expansion_beyond_copy_and_direct_entry_regression"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_C29F_comparison_and_customer_copy_corrections_2026_08_11",
+    "official_YouTube_embedded_player_no_overlay_requirement",
+    "accepted_C28F_Android_exported_semantics_clearance_owner",
+    "existing_C29E_public_provider_and_MoolSocial_creator_owners",
+    "permanent_regression_registry_and_customer_copy_machine_gate",
+    "fresh_successor_host_qualification_before_any_future_APK_candidate"
+  ],
+  "microTickets": [
+    {"id":"C29G-01","outcome":"register_C29F_visual_semantic_and_copy_rejection","state":"complete"},
+    {"id":"C29G-02","outcome":"remove_customer_facing_delivery_commentary_and_direct_plus_to_MoolSocial_Create","state":"complete"},
+    {"id":"C29G-03","outcome":"apply_Shorts_edge_to_edge_status_geometry","state":"complete"},
+    {"id":"C29G-04","outcome":"reuse_exported_semantics_clearance_and_prove_all_six_dock_targets","state":"complete"},
+    {"id":"C29G-05","outcome":"preserve_official_player_policy_and_truthful_recovery_states","state":"complete"},
+    {"id":"C29G-06","outcome":"run_focused_tests_protected_gates_and_two_fresh_host_cycles","state":"complete"}
+  ],
+  "testAndEvidencePlan": [
+    "render_and_tap_the_center_plus_then_assert_direct_MoolSocial_workbench_and_zero_delivery_commentary",
+    "mount_every_Social_loading_empty_error_available_Create_Feed_Home_and_Shorts_state_in_customer_copy_gate",
+    "assert_Shorts_body_top_equals_window_top_while_Home_Feed_and_Create_keep_their_owned_insets",
+    "assert_semantic_rect_height_at_least_44_for_Home_Shorts_Create_Feed_Chat_and_Mool",
+    "assert_the_official_player_is_the_only_child_over_the_active_Shorts_media_surface",
+    "run_format_analysis_focused_tests_shared_regressions_protected_UI_and_regression_memory_gates_twice"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "protectedState": {
+    "c29fBuildAndInstallAuthorizationConsumed": true,
+    "c29fInstalledVersionName": "1.0.0-r60.31",
+    "c29fInstalledVersionCode": "2026081131",
+    "c29fInstalledApkSha256": "497F00B5E52D17788B25353ADD36A4C91AA5C0A2BDD7967367BC3815F50AAA89",
+    "c29fInstalledSerial": "2b3e0f71",
+    "c29fInstalledIdentityAndEvidenceMustRemainPreserved": true,
+    "c28dEvidenceImmutable": true
+  }
+}

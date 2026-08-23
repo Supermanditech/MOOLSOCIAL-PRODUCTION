@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-RELEASE-REGISTRANT-CARDINALITY-DRIFT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_recovery_and_static_readiness_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_release_plugin_surface_drift",
+  "actor": "Android_release_startup",
+  "customerOutcome": "The final release includes only the exact production plugin surface and no test, tooling or unintended startup registrant.",
+  "minimumCorrection": [
+    "compare_the_current_16_registrants_with_the_qualified_15_plugin_allow_list",
+    "classify_the_added_owner_before_any_source_or_dependency_change",
+    "restore_or_intentionally_requalify_the_exact_release_registrant_contract",
+    "rerun_config_only_and_static_release_readiness_without_creating_an_APK_or_AAB"
+  ],
+  "explicitExclusions": [
+    "no_dependency_removal_before_owner_classification",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localDiagnosisImplementationAndTestsAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "classification": "IntegrationTestPlugin_dev_dependency_true_test_tooling_contamination",
+    "recoveryTests": "10 passed; post-test 16/integration true; final 15/integration false; APK absent; sealed AAB unchanged",
+    "recoveryEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/37-post-test-release-registrant-recovery.log",
+    "recoveryEvidenceSha256": "E1301729CC0B96A57B0F235C0214AAF8769389AE5D309D2B844E1C61FE5240A7",
+    "wrapperGateEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/38-c30t-wrapper-pre-aab-audit.log",
+    "wrapperGateEvidenceSha256": "DFD77F8F3FA3A670C4C6B3DADC1EC20058845D7C33A89F210DD4FA8729A26F3A",
+    "staticReadinessEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/39-c30t-static-release-readiness-pre-aab-audit.log",
+    "staticReadinessEvidenceSha256": "83F8E20612A7EDF23757873F6EB166549DBE879DDE4180E243645548D6344060"
+  }
+}

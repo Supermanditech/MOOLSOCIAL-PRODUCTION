@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT-V1",
+  "ticketId": "UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "recoveryOwner": {
+    "screen": "LegacyRouteContainmentScreenV2",
+    "route": "/app/action-unavailable",
+    "newScreenOwners": 1,
+    "newRouteOwners": 1,
+    "newBackendOwners": 0
+  },
+  "blockedFamilies": [
+    {"id":"tiffin","exactPaths":["/app/eat/tiffin"],"prefixPaths":["/app/eat/tiffin/"],"queryAliases":["tiffin"],"currentRoot":"/app/eat"},
+    {"id":"get-it-done","exactPaths":["/app/book/home","/app/book/task"],"prefixPaths":["/app/book/task/"],"queryAliases":["get-done","home"],"currentRoot":"/app/book"},
+    {"id":"standalone-pay","exactPaths":["/app/pay","/app/pay/home","/app/pay/recharge","/app/pay/bills","/app/pay/scan","/app/pay/requests","/app/pay/receipts"],"prefixPaths":[],"queryAliases":["pay","recharge","bills","scan-pay","receipts"],"currentRoot":"/app/mool"},
+    {"id":"delivery","exactPaths":["/app/work/opportunity/delivery"],"prefixPaths":[],"queryAliases":["delivery"],"currentRoot":"/app/work"},
+    {"id":"onboard","exactPaths":["/app/work/choose"],"prefixPaths":[],"queryAliases":["onboard"],"currentRoot":"/app/work"},
+    {"id":"verify","exactPaths":["/app/work/proof"],"prefixPaths":[],"queryAliases":["verify"],"currentRoot":"/app/work"}
+  ],
+  "canonicalReplacements": [
+    {"old":"/app/work/choose","current":"/app/work/workspace/choose"},
+    {"old":"/app/work/proof","current":"/app/work/workspace/proof"}
+  ],
+  "preservedRoutePatterns": [
+    "/app/pay/request/:requestId/confirm",
+    "/app/pay/payment/:paymentId/receipt",
+    "/app/pay/payment/:paymentId/status",
+    "/app/pay/payment/:paymentId/outcome",
+    "/app/work/opportunity/:exactFundedOpportunityId"
+  ],
+  "explicitExclusions": [
+    "no_historical_screen_session_model_service_or_test_deletion",
+    "no_transaction_owned_payment_or_exact_funded_Work_route_change",
+    "no_legacy_Universal_or_approved_HTML_edit",
+    "no_vertical_or_backend_fact_change",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

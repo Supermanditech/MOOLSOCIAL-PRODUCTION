@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-HISTORICAL-HTTP-NOINDEX-VALIDATION-FIX1",
+  "parentTicket": "WEB-MVP-GOOGLE-INDEX-RETIRED-BRAND-REFRESH-FIX1",
+  "state": "owner_validation_started_google_processing",
+  "classification": "mvp_required",
+  "customerOutcome": "Google reprocesses the historical HTTP-root noindex exclusion and the current canonical Home and YouTube API pages using the already-correct live indexability signals.",
+  "founderAuthority": "Founder instruction in the active task on 2026-08-08 to resolve the Search Console indexing reasons reported by email.",
+  "searchConsoleEvidence": {
+    "property": "sc-domain:moolsocial.com",
+    "reportLastUpdate": "2026-08-05",
+    "noindexExample": "http://moolsocial.com/",
+    "noindexExampleLastCrawled": "2026-07-18",
+    "crawledNotIndexedExamples": [
+      "https://moolsocial.com/",
+      "https://moolsocial.com/youtube-api"
+    ],
+    "crawledNotIndexedLastCrawled": "2026-08-05"
+  },
+  "minimumCompleteScope": [
+    "prove the HTTP root permanently redirects to the canonical HTTPS root without an X-Robots-Tag noindex response",
+    "prove the live Home and YouTube API pages return HTTP 200 with index follow and self-referencing canonical metadata",
+    "prove robots.txt allows crawling and sitemap.xml contains both canonical URLs",
+    "run the existing public-site SEO regression suite",
+    "submit Search Console validation for the historical noindex reason and the crawled-currently-not-indexed reason",
+    "record receipts and leave Google-controlled crawling and indexing pending without promising ranking or timing"
+  ],
+  "implementationDisposition": "validation_only_live_surface_already_correct",
+  "explicitExclusions": [
+    "no removal of intentional noindex follow from disconnect or delete-account utilities",
+    "no public website source mutation or Firebase Hosting deployment",
+    "no DNS removal temporary URL removal robots blocking 404 410 cloaking or search manipulation",
+    "no mobile backend provider credential email YouTube reply APK or OPPO mutation",
+    "no promise of immediate crawl indexing ranking or result refresh",
+    "no commit push merge branch switch cleanup or deletion"
+  ],
+  "testAndEvidencePlan": [
+    "Googlebot-style HTTP and HTTPS status header robots and canonical audit",
+    "robots.txt and sitemap live audit",
+    "six public-site tests",
+    "permanent regression-memory parse gate",
+    "Search Console validation receipts"
+  ],
+  "auditEvidence": "docs/quality/WEB-MVP-GOOGLE-HISTORICAL-HTTP-NOINDEX-VALIDATION-FIX1-AUDIT-20260808.md",
+  "machineEvidence": "config/web-mvp-google-historical-http-noindex-validation-fix1-state.json"
+}

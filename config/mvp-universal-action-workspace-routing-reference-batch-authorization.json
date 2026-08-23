@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "authorizationId": "MVP-UNIVERSAL-ACTION-WORKSPACE-ROUTING-REFERENCE-BATCH-AUTHORIZATION-20260805",
+  "ticketId": "MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH",
+  "ticketManifest": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+  "ticketManifestSha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8",
+  "founderEvidence": "docs/quality/MVP-UNIVERSAL-ACTION-WORKSPACE-ROUTING-REFERENCE-BATCH-AUTHORIZATION-20260805.md",
+  "state": "founder_nonstop_start_authorized_one_child_at_a_time",
+  "authorizedActionsWhenExecutionIsLaterActivated": [
+    "bounded_screenbook_reference_correction",
+    "bounded_local_implementation",
+    "bounded_local_execution",
+    "deterministic_tests",
+    "native_flutter_parity_after_the_required_reference_gate",
+    "machine_gated_builds",
+    "checksum_matched_oppo_install_and_testing"
+  ],
+  "independentGatesRetained": [
+    "one_active_child_ticket",
+    "current_web_ticket_terminal_or_formally_suspended_before_replacing_the_mvp_machine_state",
+    "mvp_scope_execution_gate",
+    "exact_workspace_registry_admin_publication_and_creation_dependencies",
+    "youtube_social_dependencies",
+    "vertical_payment_regulatory_logistics_chat_and_work_dependencies",
+    "approved_manifest_html_founder_final_before_native_flutter",
+    "apk_machine_device_and_release_gates"
+  ],
+  "notAuthorized": [
+    "credential_access",
+    "live_provider_action",
+    "external_message_or_call",
+    "payment_or_funds_movement",
+    "production_data_write",
+    "deploy",
+    "promote",
+    "commit",
+    "push"
+  ],
+  "founderReviewSequencing": {
+    "founderRequestedFutureSingleCumulativeReview": true,
+    "currentApprovedManifestStillRequiresHtmlFounderFinalBeforeNative": false,
+    "nativeFlutterDirectiveSupersedesHtmlFirstForNamedSurfacesAndSharedNavigation": true,
+    "singleReviewExecutionRequiresExactSequencingAmendmentBeforeNative": false,
+    "sequencingAmendmentRecorded": true,
+    "sequencingAmendment": "docs/delivery/MVP-NATIVE-FLUTTER-WHIRLPOOL-NAVIGATION-MOTION-DIRECTIVE-20260805.md",
+    "cumulativeFounderReviewRetained": true
+  },
+  "startEvidence": "docs/quality/MVP-PREAUTHORIZED-NONSTOP-EXECUTION-START-AUTHORIZATION-20260805.md",
+  "currentExecutionState": "terminal_until_dependency_or_founder_input_changes",
+  "activeChildTicket": null,
+  "lastExecutedChildTicket": "UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY",
+  "latestCumulativeQualification": {
+    "candidate": "UAW-PERSONAL-R01-R15-CUMULATIVE-OPPO-QUALIFICATION-FIX1",
+    "state": "technically_device_qualified_founder_review_pending",
+    "profile": "1.0.0-r60.1 (2026080601)",
+    "apkSha256": "47CE31B544DBD52EB799869F406BC093DAEC44016DE8280D59651A7BCC50E64A",
+    "evidence": "artifacts/quality/uaw-personal-r01-r15-cumulative-oppo-qualification-fix1-20260806-01/70-technical-qualification.md",
+    "oppoParkedAt": "Work > Onboard > Continue Setup",
+    "founderReviewPending": true
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F",
+  "parentTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E",
+  "state": "founder_approved_protected",
+  "classification": "mvp_required",
+  "customerOutcome": "One unique C28E-host-qualified Android-navigation successor is installed in place on OPPO, checksum-proven, rejected or accepted at the first current-catalogue native bounds gate, and only then exercised across all six families for founder review.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F-PRESELECTION-ASSESSMENT-20260810.md",
+  "founderAuthorization": {
+    "receivedAt": "2026-08-10",
+    "scope": "implement_and_after_OPPO_testing_notify_founder_for_review",
+    "finalAcceptanceGranted": true,
+    "acceptedAt": "2026-08-10",
+    "approvalEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F-FOUNDER-APPROVAL-20260810.md"
+  },
+  "qualifiedSourceFingerprint": "52E505B59809E920ED128E16CE8AD0DB0DDD7CB7CEAE0C3C8C5CD89CAA3B3989",
+  "hostQualificationEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E-COMPLETION-20260810.md",
+  "predecessorRejectionEvidence": "docs/quality/UAW-C28D-OPPO-EXPORTED-NAVIGATION-SEMANTIC-HEIGHT-DEVICE-GATE-REJECTION-20260810.md",
+  "deviceBoundsContract": "config/mvp-personal-android-navigation-device-bounds-c28f.json",
+  "deviceBoundsGate": "scripts/check-personal-android-navigation-device-bounds-c28f.ps1",
+  "deviceBoundsSelfTest": "scripts/test-personal-android-navigation-device-bounds-c28f-gate.ps1",
+  "deviceMatrixContract": "config/mvp-personal-android-navigation-device-matrix-c28f.json",
+  "deviceMatrixGate": "scripts/check-personal-android-navigation-device-matrix-c28f.ps1",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/capture-personal-c26h-stable-device-evidence.ps1",
+      "scripts/invoke-personal-c26h-semantic-tap.ps1",
+      "config/mvp-personal-android-navigation-device-bounds-c28d.json",
+      "config/mvp-personal-android-navigation-device-matrix-c28d.json",
+      "completed C28E host qualification evidence"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one current-catalogue density-normalized C28F bounds contract/gate/self-test",
+      "one versioned 17-action C28F device-matrix contract/gate",
+      "one checksum-unique cumulative evidence package"
+    ],
+    "necessityProof": "C28D is permanently rejected and its sealed contracts require the now-removed Social family-root and Buy Products cells; C28F must prove the C28E exported-height correction without weakening or overwriting C28D evidence."
+  },
+  "acceptance": [
+    "fresh C28E-qualified source manifest and complete prebuild gates",
+    "exactly one r60.28 profile build authorization and build",
+    "exactly one in-place adb install -r",
+    "no uninstall data clear downgrade second build or second install",
+    "local live and pulled APK checksum identity with preserved first-install time",
+    "first native XML gate proves all current visible navigation targets at least 44 by 44 logical pixels",
+    "Social family-root and Buy Products/local Shop semantic absence",
+    "six family roots where required and all 17 current local actions",
+    "embedded switcher tap swipe outside Back IME Mool and Chat continuity",
+    "founder acceptance received and exact installed OPPO candidate protected"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

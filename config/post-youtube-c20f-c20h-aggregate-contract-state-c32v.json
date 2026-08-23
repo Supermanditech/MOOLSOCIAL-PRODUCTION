@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32V-PERSONAL-MVP-C20F-C20H-AGGREGATE-CONTRACT-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_machine_state_runtime_unchanged",
+  "testOwner": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_subaction_professional_regression_c20f_test.dart",
+  "testSha256": "7DDEC307CD143DC428F409992526011B9B645E96C912BD5EA879F1D90103D2F9",
+  "machineStateSha256": "AD1A66DA763D988879A066AFA9440E27380ACADCFE0893D1F63045BD61E6F456",
+  "C10EAuthoritySha256": "D581F87BF2335186AFE09B465DEF4C6E37EA25AB18B52A55010F2B9D321A765B",
+  "validation": {
+    "C20F": {"passed": 4, "failed": 0},
+    "C10E": {"passed": 8, "failed": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  }
+}

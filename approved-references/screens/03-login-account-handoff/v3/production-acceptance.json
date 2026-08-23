@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "referenceVersion": "v3",
+    "routes": [
+      "/sign-in",
+      "/verify"
+    ]
+  },
+  "status": "Accepted",
+  "approval": {
+    "founderVisualAcceptedAt": "2026-07-20",
+    "productionLockReconciledAt": "2026-08-08",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "reconciliationTicket": "UAW-PERSONAL-MVP-SCREEN03-PROFILE-PROVENANCE-TEST-LOCK-RECONCILIATION-FIX1-C19",
+    "scope": "unchanged native Flutter Screen03 presentation plus mandatory profile candidate/startup provenance test lock",
+    "decision": "Preserve Screen03 v2 customer-visible UI byte-exact and retain the profile provenance assertion required to identify a production review candidate and its startup outcome."
+  },
+  "lineage": {
+    "supersedes": "approved-references/screens/03-login-account-handoff/v2",
+    "v1AndV2FilesPreserved": true,
+    "v2LockedOwnerCount": 12,
+    "unchangedOwnerCount": 11,
+    "changedOwnerCount": 1,
+    "changedOwner": "apps/mobile/test/platform_configuration_test.dart",
+    "changeType": "mandatory_test_only_profile_provenance_assertion",
+    "founderAuthority": "docs/quality/UAW-C19-FOUNDER-AUTHORIZATION-20260808.md"
+  },
+  "presentationEquivalence": {
+    "runtimeSourceChanged": false,
+    "providerAssetChanged": false,
+    "behaviorOrCopyTestChanged": false,
+    "fitmentTestChanged": false,
+    "goldenTestChanged": false,
+    "goldenImagesChanged": false,
+    "htmlCopied": false
+  },
+  "mandatoryRegression": {
+    "id": "REG-20260806-006-PROFILE-RUNTIME-MARKER-SUPPRESSED",
+    "test": "profile device-review builds retain candidate provenance markers",
+    "expectedCandidateMarker": "MOOLSOCIAL_CANDIDATE",
+    "expectedStartupMarker": "MOOLSOCIAL_STARTUP",
+    "requiredStartupOutcomeCount": 2
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": [
+      "scripts/check-approved-ui-locks.ps1",
+      "scripts/check-screen03-v3-production-acceptance-c19.ps1"
+    ],
+    "changeRule": "Do not modify an accepted file or hash. A founder-directed replacement requires a new approved-reference version and acceptance record."
+  },
+  "lockedFiles": [
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/screen03_frame_v2.dart",
+      "sha256": "352c126b7ce8d65c6f3363c200f36559f61841693adda61e6ed81960adadfe95"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "sha256": "9f8f8a72aced405332920bc8f46b71b9907a14f6b440ad851abfd2a96bfcd28b"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/screens/screen03_login/otp_screen_v2.dart",
+      "sha256": "1913d3c1ee387a509d5035f3f894a850b653adcd979f00a0379b2a6fd96fe8e5"
+    },
+    {
+      "path": "apps/mobile/assets/prototype/provider-youtube.svg",
+      "sha256": "34ded30aeb15e83c96015c925d472eacdbf2478c68cbaefe4b51c5b8a84a925a"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen03_login_test.dart",
+      "sha256": "a36a4fd2b6bdba9f0da4262eb360bb7885fb9e7270bec37cc50d5b75181a6c5a"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen03_golden_test.dart",
+      "sha256": "26e70e444f455fc95def13d8b32eea91cf6d139981407096adea7128e6ec76cb"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_customer_copy_machine_gate_test.dart",
+      "sha256": "b07468f487a5c04286f0d228cdccf7ead373154c756600c58dc216a4edd2bd11"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2_screen01_03_fitment_matrix_test.dart",
+      "sha256": "8cce94ba9e7e508a2b449e8d73ce3eb60558ab3197951f862134ebc0b35e85f2"
+    },
+    {
+      "path": "apps/mobile/test/platform_configuration_test.dart",
+      "sha256": "deffe5cfd7cd7c1432d6057e5c045a1569dc3f71fbd5f9d8ef26251e984a68ca"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_login-360x720.png",
+      "sha256": "4f0361824b6ce41905004e1bc4f13d213ce1eb78abf61dfc9ffcec3afd98e287"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_mobile-otp-360x720.png",
+      "sha256": "714129642847519910a621124c5bcd8ae8c22ba1e894c0bf69517422b097e8d5"
+    },
+    {
+      "path": "apps/mobile/test/goldens/ui_v2_screen03_email-otp-360x720.png",
+      "sha256": "66c34ad4646b24a7e74ff569f387e7c46bf66a053eb49da4775a45562690f43d"
+    }
+  ]
+}

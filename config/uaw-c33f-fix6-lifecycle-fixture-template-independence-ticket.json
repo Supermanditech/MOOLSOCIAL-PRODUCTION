@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-FIX6-LIFECYCLE-FIXTURE-TEMPLATE-INDEPENDENCE",
+  "parentTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "finding": "REG-20260815-2423-C33F-PREUPLOAD-TEST-POSTBUILD-FIXTURE-INHERITED-LIVE-AUTHORITY",
+  "state": "registered_test_fixture_repair_required_upload_authority_available_external_action_held",
+  "classification": "mvp_required",
+  "severity": "release_blocking_preupload_test_fixture_phase_coupling",
+  "actor": "founder_release_operator_rebinding_the_exact_r60_49_AAB_before_Internal_Testing_upload",
+  "capability": "replay_every_release_phase_fixture_from_explicit_phase_owned_values_regardless_of_the_current_live_lifecycle_state",
+  "customerOutcome": "Preupload qualification remains repeatable after the live state advances, without weakening the production contract or consuming another build or upload authority.",
+  "classificationReason": "The coupled fixture blocks the only authorized Internal Testing upload after a successful AAB and can recur at every later state transition unless the test owns its full synthetic phase state.",
+  "minimumCompleteScope": [
+    "preserve_the_exact_AAB_and_available_once_upload_authority_without_external_action",
+    "explicitly_assign_postbuild_machine_state_authorities_results_and_all_count_mirrors_in_the_fixture",
+    "retain_existing_eight_positive_eight_wrong_phase_and_forbidden_action_negative_cases",
+    "bind_the_FIX6_ticket_and_fixture_independence_assertions_in_the_C33F_main_gate",
+    "pass_dedicated_FIX5_fixture_and_complete_preupload_gates_on_PowerShell_7_and_Windows_PowerShell_5_1"
+  ],
+  "explicitExclusions": [
+    "no_AAB_rebuild_or_second_build_authority",
+    "no_Play_upload_activation_or_OPPO_action_during_FIX6",
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_private_key_attestation_or_private_verdict_access",
+    "no_runtime_UI_backend_Hosting_provider_email_quota_funds_commit_push_or_deployment"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/test-uaw-c33f-fix5-phase-aware-postbuild-play-install-gate.ps1",
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The existing fixture suite remains the single test owner. Explicitly normalizing the postbuild fixture and statically binding those assignments is the smallest complete repair.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_parser_validation",
+    "dedicated_eight_phase_fixture_replay_on_both_PowerShell_hosts_from_live_preupload_state",
+    "complete_C33F_preupload_gate_on_both_PowerShell_hosts",
+    "regression_memory_and_exact_artifact_binding",
+    "zero_external_actions_until_every_replay_passes"
+  ],
+  "founderAuthorization": {
+    "received": true,
+    "evidence": "founder_explicit_2026_08_15_register_every_release_regression_and_implement_before_end_to_end_Internal_Testing_OPPO_acceptance",
+    "secretValueAccessAuthorized": false
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "aabRebuildAuthorizedDuringFix": false,
+    "playOrDeviceActionAuthorizedDuringFix": false,
+    "secretValueAccessAuthorized": false
+  }
+}

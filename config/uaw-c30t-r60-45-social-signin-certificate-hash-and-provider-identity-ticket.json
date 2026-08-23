@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-SOCIAL-SIGNIN-CERTIFICATE-HASH-AND-PROVIDER-IDENTITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_and_non_build_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "shared_authentication_release_blocker",
+  "actor": "signed_out_personal_MoolSocial_user_or_content_creator_selecting_a_social_sign_in_provider",
+  "customerOutcome": "Each exposed social sign-in gate starts its own truthful provider flow on the Play-installed app, preserves its provider identity on cancel/error/retry, and returns the authenticated user to the exact requested Social route.",
+  "observedCandidate": {
+    "versionName": "1.0.0-r60.45",
+    "versionCode": "2026081345",
+    "packageName": "com.moolsocial.app",
+    "installerPackageName": "com.android.vending",
+    "playSignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9"
+  },
+  "observedFailure": [
+    "exact_Google_gate_returns_a_YouTube_branded_failure_sheet",
+    "failure_copy_says_the_package_certificate_hash_could_not_be_obtained",
+    "Try_again_returns_to_the_same_failure",
+    "Choose_another_method_returns_to_the_same_provider_grid",
+    "founder_reports_YouTube_X_Instagram_and_Facebook_gates_do_not_proceed"
+  ],
+  "minimumSuccessorCorrection": [
+    "diagnose_the_shared_Android_package_certificate_hash_owner_under_Play_app_signing",
+    "preserve_the_exact_selected_provider_through_loading_cancel_error_and_retry",
+    "return_successful_authentication_to_the_requested_Create_Chat_or_YouTube_channel_route",
+    "prove_Google_YouTube_X_Instagram_and_Facebook_gates_separately_or_truthfully_disable_any_provider_without_a_production_owner",
+    "qualify_Email_OTP_and_Mobile_OTP_as_independent_paths",
+    "add_Play_signer_and_provider_identity_regressions_to_current_authoritative_auth_tests"
+  ],
+  "explicitExclusions": [
+    "no_account_identity_password_MFA_token_OAuth_credential_nonce_private_verdict_attestation_payload_or_private_key_access",
+    "no_fake_success_review_gateway_or_unimplemented_provider_claim",
+    "no_backend_provider_Hosting_Play_or_communication_mutation_without_separate_authority",
+    "no_second_C30T_AAB_upload_or_install"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorizedByFounder": true,
+    "founderAuthorizationText": "you need to be real user and do full detailed in depth real user testing from social screens ,global navigation then make new tickets if any defects/issues then implement those tickets",
+    "executionSelectionPendingFullAcceptance": false,
+    "successorBuildUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "evidence": {
+    "screenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/34-auth-google-retry-loop.png",
+    "screenshotSha256": "E971903AFAD00489C05BE4E41CEDFF82153E5BD1CA1B7B7D9642A6E6A8D2FC22",
+    "uiHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/34-auth-google-retry-loop.xml",
+    "founderDeviceObservation": "Google loops through Try again; Choose another method returns to the provider grid; YouTube, X, Instagram and Facebook gates do not proceed.",
+    "finding": "docs/quality/UAW-C30T-R60-45-SOCIAL-SIGNIN-CERTIFICATE-HASH-AND-PROVIDER-IDENTITY-BLOCKER-20260813.md"
+  }
+}

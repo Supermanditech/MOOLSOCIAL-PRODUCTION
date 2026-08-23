@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32S-PERSONAL-MVP-C22F-CURRENT-NAVIGATION-VISUAL-CONTRACT-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_runtime_unchanged",
+  "testOwner": "apps/mobile/test/core/design/mool_inner_chroma_emission_c22f_test.dart",
+  "testSha256": "F7BA34082DED2366B668E56E9E6F5D1985FDC00C4163A69E9F31CE86A287865D",
+  "productionDesignSha256": "D66C9A8E34E49FF58DF25EF6DC0694B22DB91E5C33B6A04CA5CD7A63C7F76BFE",
+  "validation": {
+    "C22F": {"passed": 9, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  },
+  "authorities": {
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

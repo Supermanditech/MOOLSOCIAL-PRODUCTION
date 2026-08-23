@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ADAPTIVE-ACCESSIBILITY-REACHABILITY-GATES-FIX8-C25F",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "The menu and every destination rail remain readable, tappable and reachable at supported phone widths/text scales, including one-tap Chat.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ADAPTIVE-ACCESSIBILITY-REACHABILITY-GATES-FIX8-C25F-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","test_only_acceptance"],"sharedImplementationOwners":["MoolMainDomainMenu","MoolDestinationNavigationV2","MoolLocalNavigationRail","MoolGlobalChatShortcut","existing Social Buy Eat Ride Book Work scaffolds"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"The C25 shared owners and existing family scaffolds contain every required control and route. C25F needs focused adaptive, semantic, motion, reachability and protection assertions, with runtime correction only if those gates expose a defect."},
+  "acceptance": ["320_390_430_widths","text_scale_1_0_to_1_4","44px_minimum","Android_semantic_taps","all_actions_reachable_without_scroll","Chat_reachable_for_every_family_count","reduced_motion_immediate","protected_Social_Buy_business_seals"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-ADAPTIVE-ACCESSIBILITY-REACHABILITY-GATES-FIX8-C25F-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

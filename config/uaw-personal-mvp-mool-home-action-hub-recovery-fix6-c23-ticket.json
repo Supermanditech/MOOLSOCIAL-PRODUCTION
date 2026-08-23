@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-MOOL-HOME-ACTION-HUB-RECOVERY-FIX6-C23",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-CAPSULE-SUBACTION-RECOVERY-FIX5-C22",
+  "state": "c23h_device_gate_rejected_accessibility_actions_missing_installed_checksum_preserved_successor_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "One compact Mool Home launcher replaces both persistent rails; Mool Home presents six professionally grouped families and all 17 truthful subactions with one-tap targets from Home and at most two taps from a destination.",
+  "founderRejectedCandidate": {"id":"UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H","versionName":"1.0.0-r60.21","versionCode":"2026080921","apkSha256":"17AF5DC2353E7195A597555C88AA42B345AFFDA0EC160900B55B0D3E822691BE","installedAndPreserved":true,"evidence":"docs/quality/UAW-PERSONAL-MVP-R60-21-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C23-TICKETS-20260809.md"},
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-FOUNDER-MOOL-HOME-ACTION-HUB-CONTRACT-FIX6-C23A",
+    "UAW-PERSONAL-MVP-SHARED-HOME-HUB-PRIMITIVES-FIX6-C23B",
+    "UAW-PERSONAL-MVP-SINGLE-MOOL-LAUNCHER-SHELL-FIX6-C23C",
+    "UAW-PERSONAL-MVP-SIX-FAMILY-HOME-HUB-CONFORMANCE-FIX6-C23D",
+    "UAW-PERSONAL-MVP-DIRECT-SUBACTION-ROUTING-FIX6-C23E",
+    "UAW-PERSONAL-MVP-HOME-HUB-MOTION-ACCESSIBILITY-POLISH-FIX6-C23F",
+    "UAW-PERSONAL-MVP-HOME-BUY-QUERY-STATE-CONTINUITY-FIX6-C23E1",
+    "UAW-PERSONAL-MVP-HOME-HUB-HOST-QUALIFICATION-FIX6-C23G",
+    "UAW-PERSONAL-MVP-HOME-HUB-OPPO-QUALIFICATION-FIX6-C23H"
+  ],
+  "children": [
+    {"ticketId":"UAW-PERSONAL-MVP-FOUNDER-MOOL-HOME-ACTION-HUB-CONTRACT-FIX6-C23A","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-SHARED-HOME-HUB-PRIMITIVES-FIX6-C23B","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-SINGLE-MOOL-LAUNCHER-SHELL-FIX6-C23C","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-SIX-FAMILY-HOME-HUB-CONFORMANCE-FIX6-C23D","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-DIRECT-SUBACTION-ROUTING-FIX6-C23E","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-HOME-HUB-MOTION-ACCESSIBILITY-POLISH-FIX6-C23F","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-HOME-BUY-QUERY-STATE-CONTINUITY-FIX6-C23E1","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-HOME-HUB-HOST-QUALIFICATION-FIX6-C23G","state":"complete","runtimeWriteAuthorized":false},
+    {"ticketId":"UAW-PERSONAL-MVP-HOME-HUB-OPPO-QUALIFICATION-FIX6-C23H","state":"device_gate_rejected_accessibility_actions_missing_installed_checksum_preserved","runtimeWriteAuthorized":false}
+  ],
+  "sharedRuntimeOwners": [
+    "apps/mobile/lib/ui_v2/universal/personal_mool_root_v2.dart::PersonalMoolRootV2",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolDestinationNavigationV2",
+    "apps/mobile/lib/core/design/mool_design_system.dart",
+    "apps/mobile/lib/features/journey01/journey_router.dart"
+  ],
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newPersistentBusinessStateOwners":[],"newSubactions":[]},
+  "execution": {"currentChild":"UAW-PERSONAL-MVP-HOME-HUB-OPPO-QUALIFICATION-FIX6-C23H","lastCompletedChild":"UAW-PERSONAL-MVP-HOME-HUB-HOST-QUALIFICATION-FIX6-C23G","nextEligibleChild":null,"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false},
+  "explicitExclusions": ["no_new_screen_route_backend_owner_business_state_or_subaction","no_horizontal_main_or_subaction_rail","no_persistent_dual_navigation_layers","no_screenbook_copy_or_mutation","no_build_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"]
+}

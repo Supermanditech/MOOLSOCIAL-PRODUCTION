@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CLEAR-GLASS-ACTION-CONTROLS-FIX2-C17",
+  "state": "single_build_attempt_consumed_no_candidate_install_closed_second_build_not_authorized",
+  "classification": "mvp_required",
+  "customerOutcome": "The founder receives one checksum-identical OPPO successor that proves the professional clear-glass subaction system across Social, Buy, Eat, Ride, Book and Work without changing the approved global shell or existing customer journeys.",
+  "founderAuthority": "docs/quality/UAW-C17F-R60-17-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F-R60-17-PRESELECTION-ASSESSMENT-20260808.md",
+  "implementationDisposition": [
+    "reuse",
+    "configuration",
+    "test_gate_only",
+    "build_and_device_evidence_only"
+  ],
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+    "versionName": "1.0.0-r60.17",
+    "versionCode": "2026080817",
+    "buildMode": "profile",
+    "gateProfile": "uaw_personal_r01_r15_cumulative",
+    "uniquenessState": "bounded_config_docs_and_artifact_name_inventory_passed"
+  },
+  "hostQualification": {
+    "ticket": "UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D",
+    "requiredConsecutiveCycles": 2,
+    "completedConsecutiveCycles": 2,
+    "testsPerCycle": 591,
+    "totalPasses": 1182,
+    "sourceFingerprint": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "evidence": "artifacts/quality/uaw-personal-mvp-c17-host-qualification-refresh-after-screen01-lock-fix1-c18d-20260808-01/01-host-qualification.md"
+  },
+  "predecessor": {
+    "candidateId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX1-C16H",
+    "versionName": "1.0.0-r60.16",
+    "versionCode": "2026080816",
+    "apkSha256": "1CC2A0186CA5DC8C9A09D0B4CC949B94CEE91DE6C70246A4B0168ADE6255150D",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375",
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "lastUpdateTime": "2026-08-08 14:20:42",
+    "preserveUntilInstallAuthorization": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "reuseInventory": [
+    "host_qualified_MoolLocalNavigationRail_and_MoolLocalNavigationTokens",
+    "six_existing_family_scaffolds_and_17_existing_one_tap_subactions",
+    "existing_routes_state_copy_content_global_shell_motion_and_reduced_motion_owners",
+    "C18D_two_cycle_unchanged_source_host_qualification",
+    "Screen01_v4_Screen03_v3_and_global_approved_UI_locks",
+    "existing_single_build_wrapper_APK_machine_gate_and_OPPO_in_place_install_workflow",
+    "preserved_r60_16_installed_checksum_identity_and_C15_C16_evidence"
+  ],
+  "newScreens": [],
+  "newRoutes": [],
+  "newRuntimeOwners": [],
+  "newBackendOwners": [],
+  "newPersistentStateOwners": [],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "requiredPrebuildGates": [
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-brand-integrity.ps1",
+    "scripts/check-user-facing-copy.ps1",
+    "scripts/check-personal-subaction-clear-glass-host-qualification-c17e.ps1",
+    "scripts/check-personal-subaction-placement-regression.ps1",
+    "scripts/check-apk-regression-gate-state.ps1"
+  ],
+  "buildAndInstall": {
+    "authorizedNow": false,
+    "oneUniqueBuildOnly": true,
+    "oneInPlaceInstallOnly": true,
+    "buildAuthorizationOpened": true,
+    "buildPerformed": true,
+    "installAuthorizationOpened": false,
+    "installPerformed": false,
+    "founderDeviceAcceptance": "pending"
+  },
+  "explicitExclusions": [
+    "no_runtime_UI_business_copy_backend_provider_or_persistent_state_mutation",
+    "no_new_screen_route_feature_owner_subaction_filler_or_extra_tap",
+    "no_global_rail_geometry_order_position_meaning_or_shell_change",
+    "no_protected_golden_reference_or_screenbook_mutation",
+    "no_second_build_second_install_uninstall_data_clear_or_downgrade",
+    "no_credentials_external_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "materialStopConditions": [
+    "source_branch_HEAD_manifest_or_qualified_fingerprint_drift",
+    "approved_UI_brand_copy_scope_regression_or_APK_machine_gate_rejection",
+    "device_lock_disconnect_package_signer_version_checksum_capacity_or_install_identity_failure",
+    "any_need_for_runtime_mutation_after_host_qualification"
+  ]
+}

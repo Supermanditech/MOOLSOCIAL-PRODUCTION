@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-PROFESSIONAL-MAIN-ONLY-MOOLSOCIAL-MENU-FIX8-C25C",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "One MoolSocial tap opens a professional main-only six-domain menu; one domain tap opens its default service without family expansion or subaction clutter.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-PROFESSIONAL-MAIN-ONLY-MOOLSOCIAL-MENU-FIX8-C25C-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["MoolConnectedActionNavigator","MoolGlobalNavigationV2","PersonalMoolRootV2","moolActionFamilies","MoolGlassSurface","MoolHomeHubTokens"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"The existing dialog, Home route and shared catalogue can be recomposed as one main-only menu; no new page, route or state owner is needed."},
+  "acceptance": ["six_main_actions_only","one_tap_default_destination","professional_neutral_glass_surface","restrained_domain_accent","finite_180_to_220ms_motion","reduced_motion_immediate","44px_minimum","Chat_remains_one_tap_global_utility"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-PROFESSIONAL-MAIN-ONLY-MOOLSOCIAL-MENU-FIX8-C25C-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

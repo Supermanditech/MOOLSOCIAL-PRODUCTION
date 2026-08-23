@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATE-DRAFT-TAB-RETENTION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "user_content_data_loss_blocker",
+  "actor": "signed_in_MoolSocial_Create_author",
+  "customerOutcome": "An unfinished Create draft survives a bounded move to Feed, Home or Shorts and is cleared only after authoritative publish success or an explicit future discard action.",
+  "minimumCorrection": [
+    "own_one_Create_draft_above_the_conditionally_mounted_workbench",
+    "preserve_format_caption_selected_media_four_choices_and_quiz_answer",
+    "restore_the_same_draft_when_Create_is_reopened",
+    "clear_the_draft_only_after_authoritative_publish_success",
+    "prove_text_image_carousel_image_poll_quick_poll_and_quiz_state_retention"
+  ],
+  "explicitExclusions": [
+    "no_cloud_draft_persistence_or_cross_device_sync",
+    "no_backend_or_provider_change",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "21 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/create-draft-retention-focused-tests.log",
+    "evidenceSha256": "D5A9A228D9EFAA7096C3957E88735A7241930E1089D045FF611F9FD5045ACD22",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

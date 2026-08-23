@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R07-PERSONAL-RIDE-EXPOSURE-INTERACTION-NAVIGATION-V1",
+  "ticketId": "UAW-R07-PERSONAL-RIDE-EXPOSURE",
+  "actor": "Personal user",
+  "entryRoute": "/app/ride",
+  "classification": "mvp_required",
+  "actions": [
+    {"id":"bike","label":"Bike","route":"/app/ride/book?type=bike","selectedType":"bike"},
+    {"id":"auto","label":"Auto","route":"/app/ride/book?type=auto","selectedType":"auto"},
+    {"id":"cab","label":"Cab","route":"/app/ride/book?type=cab","selectedType":"cab"}
+  ],
+  "navigation": {
+    "back": "pop_prior_surface_else_/app/mool?from=ride",
+    "mool": "/app/mool?from=ride",
+    "chat": "/app/chat/inbox?return=/app/ride",
+    "choiceTransition": "push"
+  },
+  "presentationOwner": "MvpActionChoiceRootV2",
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "explicitExclusions": [
+    "no_fare_payment_dispatch_tracking_support_or_trip_change",
+    "no_provider_call_message_or_external_action",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

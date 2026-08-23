@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "parentOutcome": "UAW-C32Q-PERSONAL-MVP-RETAILER-BUSINESS-SERVICES-COMPACT-ACCESSIBILITY-OVERFLOW",
+  "finding": "REG-20260815-2273-C32Q-OVERBROAD-SHARED-NAVIGATION-PREDECESSOR-TEST-BATCH",
+  "state": "founder_authorized_source_preserving_per_file_applicability_audit_selected_all_runtime_release_device_backend_and_external_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal and professional MoolSocial users relying on the accepted shared navigation contract across compact and accessible layouts",
+  "customerOutcome": "Historical navigation regression evidence is reconciled one owner at a time against later accepted source, so stale assertions cannot block or falsely green-light a successor release.",
+  "classificationReason": "The exploratory batch mixed five historical failure-bearing or unproven owners with later successor contracts. Exact individual results and authority comparison are required before any test or runtime mutation.",
+  "minimumCompleteScope": [
+    "preserve_C32Q_runtime_test_and_manifest_evidence_as_a_source_qualified_predecessor",
+    "run_C22F_C23C_C07_C20F_and_R15_files_individually_without_retrying_the_eight_file_batch",
+    "record_exact_per_file_pass_fail_counts_and_failure_assertions",
+    "compare_each_failure_with_C26D_C27D_C29N_C32P_and_current_production_owners",
+    "classify_each_failure_as_current_defect_stale_test_or_nonapplicable_historical_evidence",
+    "select_separate_exact_successor_tickets_before_any_runtime_or_historical_test_migration"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_navigation_route_copy_semantics_geometry_or_business_behavior_change_under_C32R",
+    "no_test_expectation_deletion_weakening_or_blanket_compatibility_key",
+    "no_protected_Buy_baseline_update_full_C28E_retry_build_AAB_Play_or_OPPO_action",
+    "no_backend_provider_cloud_secret_funds_email_quota_submission_or_external_communication"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user autonomous audit finding ticket and implementation direction across all pages for founder review",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "acceptance": [
+    "five_individual_test_files_have_exact_results_without_batch_retry",
+    "C32Q_is_preserved_as_an_exact_source_qualified_prior_assessment",
+    "C32P_and_C32Q_historical_gates_pass_on_both_PowerShell_hosts",
+    "no_runtime_or_test_expectation_bytes_change_under_C32R",
+    "every_actionable_failure_has_a_separate_successor_ticket_before_mutation",
+    "all_release_backend_device_external_and_secret_authorities_remain_false"
+  ]
+}

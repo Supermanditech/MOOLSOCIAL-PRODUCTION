@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-C29K",
+  "parentSourceTicket": "UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-C29J",
+  "rejectedInstalledPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+  "state": "device_qualified_founder_review_pending",
+  "classification": "mvp_supporting",
+  "customerOutcome": "The founder reviews one checksum-qualified r60.34 OPPO build where Chat's common Mool switcher target exports at least 44 logical pixels and the complete Social journey remains intact.",
+  "founderDirection": "production_grade_end_to_end_OPPO_testing_then_founder_review",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-C29K-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",
+      "apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart",
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/check-youtube-public-dev-build-context.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "C29J is source-qualified; only one separately checksum-qualified physical-device successor can close the C29I OPPO rejection."
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-C29K",
+    "versionName": "1.0.0-r60.34",
+    "versionCode": "2026081134",
+    "buildMode": "profile",
+    "runtimeProfile": "YouTubePublicDevReview",
+    "sourceManifestPath": "artifacts/quality/uaw-personal-mvp-chat-mool-exported-semantics-c29j-host-qualification-20260811-01/source-aggregate-manifest.txt",
+    "sourceManifestSha256": "79497D35DDB36DEF52D4FF5636BF6ADA61FA0C858C86E9EEBBA00CE29BF293E0",
+    "sourceFileCount": 23,
+    "oneBuildOnly": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "minimumCompleteScope": [
+    "two_fresh_selected_candidate_cycles_over_the_23_owner_manifest",
+    "same_shell_no_token_gcloud_process_source_and_exact_r60_33_prebuild_gate",
+    "one_profile_r60_34_wrapper_invocation",
+    "checksum_size_package_version_v2_signature_certificate_and_provenance_qualification",
+    "one_in_place_OPPO_install_without_uninstall_or_data_clear",
+    "real_Chat_Mool_44dp_and_complete_Social_runtime_replay"
+  ],
+  "explicitExclusions": [
+    "no_C29I_rebuild_reinstall_or_evidence_mutation",
+    "no_route_screen_backend_provider_upload_OAuth_or_credential_change",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install",
+    "no_Production_Staging_HTML_commit_push_deploy_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29J_two_identical_host_qualification_cycles",
+    "C29I_device_rejection_and_installed_r60_33_identity",
+    "founder_end_to_end_production_grade_OPPO_authority",
+    "same_shell_gcloud_and_Firebase_Android_client_configuration",
+    "permanent_regression_memory_and_MVP_delivery_lock"
+  ],
+  "testAndEvidencePlan": [
+    "two_expanded_source_cycles",
+    "fresh_prebuild_context_source_process_and_device_identity_audit",
+    "one_wrapper_profile_build",
+    "artifact_and_installed_checksum_identity_match",
+    "real_Home_Shorts_vertical_swipe_video_Create_Feed_Chat_Mool_replay",
+    "Chat_Mool_and_Social_dock_exported_semantic_bounds"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorizedAfterMachineGate": true,
+    "buildAuthorizationConsumed": true,
+    "installAuthorizedAfterChecksumQualification": true,
+    "installAuthorizationConsumed": true,
+    "externalServiceWriteAuthorized": false,
+    "agentSecretValueAccessAuthorized": false,
+    "qualifiedWrapperEphemeralFirebaseClientReadAuthorized": true,
+    "credentialOrConfigurationValuePersistenceAuthorized": false
+  },
+  "artifactCandidate": {
+    "path": "artifacts/quality/uaw-personal-mvp-chat-mool-exported-semantics-oppo-qualification-c29k-r60-34-20260811-01/uaw-personal-mvp-chat-mool-exported-semantics-oppo-qualification-c29k-device-review-profile.apk",
+    "sha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "bytes": 134133661,
+    "builtAt": "2026-08-11T09:47:05.6507108+05:30",
+    "qualificationState": "passed",
+    "qualificationEvidence": "artifacts/quality/uaw-personal-mvp-chat-mool-exported-semantics-oppo-qualification-c29k-r60-34-20260811-01/04-artifact-qualification.json",
+    "installHeld": false
+  },
+  "installAttempt": {
+    "state": "device_qualified_founder_review_pending",
+    "deviceSerial": "2b3e0f71",
+    "installCount": 1,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "downgradePerformed": false,
+    "secondInstallPerformed": false
+  },
+  "prebuildResult": {
+    "state": "passed_one_build_authorized",
+    "selectedCandidateCycles": 2,
+    "sourceManifestSha256": "79497D35DDB36DEF52D4FF5636BF6ADA61FA0C858C86E9EEBBA00CE29BF293E0",
+    "evidence": "artifacts/quality/uaw-personal-mvp-chat-mool-exported-semantics-oppo-qualification-c29k-r60-34-20260811-01/03-prebuild-validation-seal.md"
+  },
+  "deviceQualification": {
+    "state": "passed_founder_review_pending",
+    "evidence": "artifacts/quality/uaw-personal-mvp-chat-mool-exported-semantics-oppo-qualification-c29k-r60-34-20260811-01/17-device-qualification.json",
+    "completion": "docs/quality/UAW-PERSONAL-MVP-CHAT-MOOL-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-C29K-COMPLETION-20260811.md",
+    "chatMoolLogicalHeight": 50,
+    "minimumLogicalTarget": 44,
+    "protectedBaselineUpdated": false,
+    "founderAcceptancePending": true
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "lastUpdateTime": "2026-08-11 09:51:00",
+    "installedIdentityMustRemainPreservedUntilQualifiedInPlaceInstall": false,
+    "qualifiedSuccessorIdentityMustRemainPreservedUntilFounderReview": true,
+    "c29iEvidenceImmutable": true,
+    "c28dEvidenceImmutable": true
+  }
+}

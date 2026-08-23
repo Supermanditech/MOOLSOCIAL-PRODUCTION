@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATE-PUBLISH-COMPLETION-DRAFT-OWNERSHIP",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "create_newer_draft_data_loss_blocker",
+  "actor": "signed_in_creator_editing_or_changing_format_while_an_older_public_post_is_uploading",
+  "customerOutcome": "A successful older upload clears only the exact submitted draft; newer text, choices, media and format state remain intact for the creator.",
+  "minimumCorrection": [
+    "capture_the_exact_visible_Create_draft_fingerprint_before_publish",
+    "clear_the_composer_only_when_the_current_draft_still_matches_the_submitted_fingerprint",
+    "preserve_and_persist_newer_edits_or_format_changes_when_the_old_completion_returns",
+    "reject_completion_UI_ownership_if_the_workbench_session_changed",
+    "prove_a_delayed_old_publish_cannot_clear_new_text"
+  ],
+  "explicitExclusions": [
+    "no_backend_contract_or_write_expansion",
+    "no_real_Create_write_media_picker_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "19 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/create-publish-completion-draft-ownership-focused-tests.log",
+    "evidenceSha256": "77A8E217447332EAFFC97DAF88ED0CC6EEDC7D867F3FF9D5EBF172D59A4462BF",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

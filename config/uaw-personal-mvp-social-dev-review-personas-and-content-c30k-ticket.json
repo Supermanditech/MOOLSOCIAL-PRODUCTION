@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DEV-REVIEW-PERSONAS-AND-CONTENT-C30K",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ACCOUNT-STATE-JOURNEY-C30J"
+  ],
+  "state": "Dev_review_corpus_applied_and_verified_APK_and_deployment_held",
+  "classification": "mvp_required",
+  "actor": "founder_supervised_Dev_Social_review_operator",
+  "customerOutcome": "Three clearly identified MoolSocial Community Preview personas own two real persisted Dev posts for each supported Feed format—text, image, carousel, four-choice Image Poll, four-choice Quick Poll and four-choice Quiz—so Flutter can render and exercise a truthful multi-author Feed without local demo state.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "backend/functions/src/social/contracts.ts",
+      "backend/functions/src/social/service.ts",
+      "backend/functions/src/social/firestore_store.ts",
+      "backend/functions/src/index.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "backend/functions/src/social/dev_review_corpus.ts",
+      "backend/functions/src/social/dev_review_corpus_runner.ts"
+    ],
+    "necessityProof": "The deployed moolSocialContent service and Flutter Feed already own all six requested formats, authoritative Firebase Auth authors, App Check, idempotent Firestore persistence and private server-side Storage writes. No deterministic Dev review-corpus provisioner exists. A guarded server-side runner can reuse those exact owners without adding client bypasses, rules exceptions, passwords, fake local posts or a deployable HTTP surface."
+  },
+  "minimumCompleteScope": [
+    "define_three_deterministic_disabled_passwordless_Dev_Firebase_Auth_review_personas_with_clear_MoolSocial_Community_Preview_identity",
+    "define_exactly_36_idempotent_public_posts_two_per_persona_per_text_image_carousel_imagePoll_quickPoll_and_quiz_format",
+    "require_exactly_four_choices_for_every_Image_Poll_Quick_Poll_and_Quiz_and_a_valid_correct_Quiz_answer",
+    "reuse_SocialContentService_and_FirestoreSocialContentRepository_for_validation_media_persistence_idempotency_and_author_resolution",
+    "generate_small_valid_non_credential_review_images_in_memory_and_persist_only_through_the_existing_server_Storage_owner",
+    "make_dry_run_the_default_and_require_exact_project_apply_confirmation_before_any_Dev_external_write",
+    "create_missing_personas_only_and_reject_any_existing_identity_mismatch_without_overwrite_delete_or_password_mutation",
+    "prove_36_unique_persisted_post_records_and_Flutter_decode_render_coverage_before_OPPO_or_deployment",
+    "record_bounded_non_sensitive_Auth_post_media_and_type_counts_without_user_tokens_passwords_or_download_tokens"
+  ],
+  "explicitExclusions": [
+    "no_local_in_memory_demo_feed_fixture_or_direct_client_Firestore_Storage_write",
+    "no_password_phone_provider_link_custom_token_ID_token_App_Check_token_secret_or_download_token_output",
+    "no_enablement_of_disabled_review_personas_and_no_impersonation_of_real_people",
+    "no_update_delete_cleanup_overwrite_or_duplicate_post_on_rerun",
+    "no_rules_exception migration index new_endpoint backend_deploy Firebase_deploy Hosting Production or_provider_write",
+    "no_APK_build install launch tap uninstall data_clear downgrade commit push promotion message call or_fund"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_real_Dev_users_and_two_posts_per_persona_per_supported_format_with_deployment_hold_2026_08_12",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "devAuthUserAndContentWriteAuthorizedAfterSourceQualificationAndADC": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendDeployAuthorized": false,
+    "externalServiceWriteAuthorizedNow": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "moolSocialContent_revision_moolsocialcontent_00001_fef_ACTIVE_on_moolsocial_dev_503018",
+    "deny_all_direct_client_Firestore_and_Storage_rules_remain_active",
+    "secure_local_Application_Default_Credentials_for_hello_at_moolsocial_dot_com_or_an_exact_least_privilege_operator_without_credential_value_exposure",
+    "C30J_source_qualified_C30I_source_qualified_and_r60_38_rejected_identity_preserved",
+    "permanent_regression_memory_MVP_delivery_and_environment_promotion_locks"
+  ],
+  "testPlan": [
+    "unit_test_deterministic_three_persona_36_post_matrix_and_all_four_choice_contracts",
+    "unit_test_dry_run_apply_project_allowlist_existing_identity_conflict_and_idempotency_keys",
+    "backend_typecheck_complete_backend_suite_and_rules_emulator_denial",
+    "bounded_ADC_authority_probe_without_token_or_credential_output",
+    "founder_supervised_exact_Dev_apply_and_non_sensitive_readback_counts_only_after_source_qualification",
+    "Flutter_authenticated_gateway_decode_and_all_six_public_content_render_types",
+    "no_APK_build_install_or_deployment_until_founder_lifts_the_active_hold"
+  ]
+}

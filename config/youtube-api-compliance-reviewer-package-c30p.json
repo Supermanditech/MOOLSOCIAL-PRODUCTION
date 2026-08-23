@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "packageId": "YOUTUBE-API-COMPLIANCE-REVIEWER-PACKAGE-C30P-20260812",
+  "state": "awaiting_Play_artifact_OPPO_acceptance_and_founder_approval",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30P",
+  "mailbox": "hello@moolsocial.com",
+  "threadSubject": "Re: YouTube API Services: Thank you for your submission",
+  "latestRequestDate": "2026-08-06",
+  "hardInternalDeadline": "2026-08-14",
+  "requestedOutcome": "valid_Android_mobile_application_link_for_the_app_using_YouTube_API_Services",
+  "application": {
+    "product": "MoolSocial",
+    "projectId": "moolsocial-dev-503018",
+    "packageName": "com.moolsocial.app",
+    "firebaseAndroidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "distribution": "Google_Play_Internal_Testing_only",
+    "playLink": null,
+    "versionName": "1.0.0-r60.42",
+    "versionCode": "2026081242",
+    "artifactSha256": null,
+    "playInstalledProvenanceEvidence": null
+  },
+  "declaredUseCase": {
+    "publicDiscovery": ["videos.list", "channels.list", "bounded_search.list"],
+    "metadata": "source_attributed",
+    "playback": "official_embedded_YouTube_player",
+    "accountConnection": "separately_user_initiated_minimum_youtube_readonly",
+    "moolSocialIndependentValue": ["Feed", "Create"],
+    "youtubeUploadEnabled": false,
+    "viewerMutationEnabled": false,
+    "playlistChannelAssetMutationEnabled": false,
+    "analyticsReportingLivePartnerMembershipSuperChatOrContentOwnerEnabled": false
+  },
+  "canonicalLinks": {
+    "youtubeApiUse": "https://moolsocial.com/youtube-api",
+    "privacy": "https://moolsocial.com/privacy",
+    "disconnect": "https://moolsocial.com/disconnect",
+    "deleteAccount": "https://moolsocial.com/delete-account",
+    "googlePermissions": "https://myaccount.google.com/permissions"
+  },
+  "draft": "docs/quality/YOUTUBE-API-COMPLIANCE-C30O-SAME-THREAD-DRAFT-AND-REVIEWER-PACKAGE-20260812.md",
+  "gmailDraftCreated": false,
+  "emailSent": false,
+  "quotaSubmitted": false,
+  "founderApproved": false
+}

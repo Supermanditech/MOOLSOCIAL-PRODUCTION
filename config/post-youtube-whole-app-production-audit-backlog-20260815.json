@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "backlogId": "MOOLSOCIAL-POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815",
+  "state": "staged_non_executable_founder_selection_required",
+  "createdOn": "2026-08-15",
+  "humanAuthority": "docs/quality/POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815.md",
+  "releaseContext": {
+    "playInstalledCandidate": "1.0.0-r60.48+2026081348",
+    "candidateState": "failed_social_authentication_and_protected_action_journeys",
+    "sourceQualifiedRepairs": [
+      "UAW-C30Z-R60-48-AUTHENTICATION-METHOD-TRUTH-AND-GUEST-FEED-RECOVERY",
+      "UAW-C31E-PERSONAL-MVP-CHAT-PHOTO-ATTACHMENT-CONTINUITY"
+    ],
+    "sourceQualificationIsRuntimeAcceptance": false,
+    "successorCandidate": null
+  },
+  "authority": {
+    "planningOnly": true,
+    "ticketSelected": false,
+    "implementationAuthorized": false,
+    "referenceMutationAuthorized": false,
+    "backendOrRuntimeWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "playUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "rules": {
+    "findingMustBecomeExactTicketBeforeRepair": true,
+    "ticketMustNameExactActorCapabilityOutcomeAndRecovery": true,
+    "oneEndToEndVerticalJourneyAtATime": true,
+    "routeOrScreenSourcePresenceCreatesApproval": false,
+    "newRouteScreenServiceOrBackendOwnerDefault": "forbidden_without_written_necessity_duplicate_search_and_founder_selection",
+    "existingMvpScopeGateStateMustNotBeChangedByThisBacklog": true,
+    "beyondMvpRegistrationCreatesImplementationAuthority": false,
+    "noRuntimeSuccessClaimUntilChecksumMatchedPlayInstalledDeviceEvidencePasses": true
+  },
+  "auditDimensions": [
+    "design_ui_ux_and_customer_copy",
+    "authoritative_state_and_backend_wiring",
+    "primary_actions_and_every_visible_subaction",
+    "global_menu_mool_switcher_and_exact_return",
+    "subscreen_to_subscreen_and_end_to_end_navigation",
+    "loading_empty_error_offline_retry_and_interruption_recovery",
+    "accessibility_keyboard_back_process_death_and_relaunch",
+    "privacy_security_provider_policy_and_regulatory_boundaries",
+    "complete_actor_specific_user_journey"
+  ],
+  "sequence": [
+    "youtube_reviewer_prerequisites_and_successor_Play_acceptance",
+    "personal_identity_global_shell_social_and_chat",
+    "personal_buy_eat_ride_book_work_and_pay",
+    "exact_launch_partner_workspace_portfolios",
+    "separately_authorized_cross_journey_release_regression"
+  ],
+  "personalJourneyTickets": [
+    {
+      "id": "UAW-C31F-PERSONAL-FIRST-OPEN-IDENTITY-AND-EXACT-RETURN-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "open MoolSocial, choose only a genuinely available sign-in method, authenticate, cancel or recover, and return to the exact requested destination",
+      "authoritativeOutcome": "first-open, retained-data and protected-action entry never strand the user, falsely advertise an unavailable method, or lose the requested route",
+      "failureRecovery": "invalid input, provider cancellation, offline, app switch, call, lock, process death and relaunch preserve truthful guidance and exact return",
+      "routeFamilies": ["boot", "setup", "sign-in", "verify", "action-unavailable"],
+      "dependencies": ["C30Z source qualification", "live identity-provider readiness", "separately approved Play successor"],
+      "approvalNeeded": "founder selects the exact successor ticket and provider/release actions separately",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31G-PERSONAL-GLOBAL-MENU-MOOL-SWITCHER-EXACT-RETURN-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "move among Home, Social, Buy, Eat, Ride, Book, Work and Chat through the shared shell and Mool switcher",
+      "authoritativeOutcome": "every destination opens once, selected state is truthful, back returns to the exact prior context and no global control is obscured or duplicated",
+      "failureRecovery": "keyboard, compact viewport, text scale, rotation, deep link, app switch, process death and relaunch preserve navigation state",
+      "routeFamilies": ["/app/:section", "shared shell", "global menu", "Mool switcher"],
+      "dependencies": ["founder-specific native Flutter navigation amendment", "existing shared navigation owners"],
+      "approvalNeeded": "founder selects this audit ticket before any implementation or reference change",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31H-PERSONAL-SOCIAL-FEED-CREATE-PROTECTED-ACTIONS-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "read public Feed and complete signed-in create, like, comment, share and save actions plus bounded YouTube connection",
+      "authoritativeOutcome": "guest reading stays available while each protected action authenticates once, resumes the exact intent, commits once and renders authoritative state",
+      "failureRecovery": "cancel, revoke, offline, provider rejection, duplicate tap, stale result and relaunch do not fabricate success or lose the requested action",
+      "routeFamilies": ["Social Feed", "Create", "public content", "YouTube creator connection"],
+      "dependencies": ["C30Z source qualification", "YouTube compliance sequence", "real provider and backend readiness"],
+      "approvalNeeded": "founder selects the exact provider and action ticket; all provider deployment and external writes remain separately gated",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31I-PERSONAL-CHAT-TEXT-PHOTO-CONTINUITY-LIVE-ACCEPTANCE-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "open inbox and thread, send text or one private photo, reply, react, read, retry and use only supported forwarding",
+      "authoritativeOutcome": "participant-gated messages commit once, unread/read state converges and private media remains inaccessible to non-participants",
+      "failureRecovery": "picker cancel, interruption, upload/finalize failure, stale thread, offline, process death and relaunch preserve the draft and avoid duplicate sends",
+      "routeFamilies": ["/app/chat", "inbox", "thread"],
+      "dependencies": ["C31E source qualification", "Dev Chat deployment IAM CORS lifecycle approval", "two real participant accounts"],
+      "approvalNeeded": "founder authorizes the exact Dev deployment/data-write and later Play/device acceptance ticket",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31J-PERSONAL-BUY-BROWSE-BASKET-ORDER-RECOVERY-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "browse grocery, medicine and products, review details, manage basket, submit an eligible order and recover order problems",
+      "authoritativeOutcome": "catalogue, availability, price, basket, review, order state and support outcome remain consistent end to end",
+      "failureRecovery": "out-of-stock, price change, prescription or regulated hold, network failure, duplicate submit and retained order recovery are truthful",
+      "routeFamilies": ["Buy home", "grocery", "medicine", "product", "basket", "review", "order", "order problem"],
+      "dependencies": ["accepted Buy boundaries", "authoritative commerce adapters", "regulated pharmacy gates"],
+      "approvalNeeded": "founder selects one exact Buy finding ticket before repair; no funds or live order mutation is implied",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31K-PERSONAL-EAT-ORDER-TABLE-TIFFIN-CONTINUITY-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "discover food, manage basket, review and track an order, book a table and inspect the currently exposed tiffin path",
+      "authoritativeOutcome": "menu, availability, basket, order, tracking, completion and booking states stay consistent without fabricated provider confirmation",
+      "failureRecovery": "closed venue, changed item, failed submit, retry, duplicate tap, app interruption and support return preserve authoritative state",
+      "routeFamilies": ["Eat home", "order", "basket", "review", "tracking", "completed", "table", "tiffin"],
+      "dependencies": ["native Flutter amendment", "Restaurant / Dhaba / Cafe launch scope", "Tiffin Provider remains beyond-MVP disabled"],
+      "approvalNeeded": "founder selects an exact current-launch actor ticket; the tiffin path is inventory-only until scope changes",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31L-PERSONAL-RIDE-BOOKING-TRIP-SUPPORT-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "request an eligible ride, follow trip state and reach support",
+      "authoritativeOutcome": "pickup, destination, fare representation, captain assignment, trip state and support outcome are truthful",
+      "failureRecovery": "permission denial, unavailable captain, cancellation, network loss, backgrounding and trip-state disagreement recover without duplicate requests",
+      "routeFamilies": ["Ride booking", "trip", "support"],
+      "dependencies": ["native Flutter amendment", "exact Bike, Auto or Cab captain capability ticket", "maps and provider readiness"],
+      "approvalNeeded": "C33C compact navigation is source-qualified; founder still selects the exact ride and captain type before any live trip, provider, device or funds action",
+      "state": "source_audit_partial_C33C_compact_navigation_repair_qualified_live_trip_provider_device_and_funds_held"
+    },
+    {
+      "id": "UAW-C31M-PERSONAL-BOOK-BUS-DETAIL-RESERVATION-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_supporting",
+      "capability": "browse a bus journey, inspect exact details and complete only the approved reservation boundary",
+      "authoritativeOutcome": "route, schedule, seat or availability representation, review and reservation result remain consistent",
+      "failureRecovery": "availability change, invalid passenger input, timeout, duplicate submit and return from external boundaries never fabricate a booking",
+      "routeFamilies": ["Book home", "bus", "details"],
+      "dependencies": ["native Flutter amendment", "provider and payment boundaries"],
+      "approvalNeeded": "founder classifies and selects the exact bus capability before any repair or external test",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31N-PERSONAL-DOCTOR-BOOKING-INVITE-FOLLOWUP-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "review an Individual Doctor, request the bounded appointment, join the approved session boundary and view follow-up",
+      "authoritativeOutcome": "doctor identity, availability, consent, appointment and follow-up are authoritative and do not make unsupported medical claims",
+      "failureRecovery": "availability loss, permission denial, missed join, network failure and support return preserve privacy and accurate status",
+      "routeFamilies": ["doctor", "details", "invite", "join", "followup"],
+      "dependencies": ["Individual Doctor launch scope", "health privacy and regulated gates"],
+      "approvalNeeded": "founder selects an exact health ticket; no medical-service or live appointment mutation is implied",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31O-PERSONAL-SALON-CONFIRM-VISIT-COMPLETE-SUPPORT-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "choose a Salon / Parlour service, confirm the bounded booking, follow visit state, complete and seek support",
+      "authoritativeOutcome": "service, price representation, availability, booking, visit and completion stay consistent",
+      "failureRecovery": "availability change, provider cancellation, duplicate confirm, interruption and disputed completion expose truthful recovery",
+      "routeFamilies": ["salon", "confirm", "confirmed", "visit", "complete", "support"],
+      "dependencies": ["Salon / Parlour launch scope", "native Flutter amendment", "provider readiness"],
+      "approvalNeeded": "founder selects the exact salon capability before repair or live booking",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31P-PERSONAL-TASK-PROOF-CASE-RESOLUTION-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_supporting",
+      "capability": "request a bounded task, review state, observe progress and proof, complete or open a case and resolution",
+      "authoritativeOutcome": "request, assignee capability, proof, completion, dispute and resolution states remain authoritative",
+      "failureRecovery": "unavailable provider, rejected proof, missed update, offline retry and disputed completion never create duplicate work or false resolution",
+      "routeFamilies": ["task", "review", "live", "proof", "completed", "support", "case", "resolution"],
+      "dependencies": ["exact service-provider actor selection", "Get It Done Provider remains beyond-MVP disabled unless explicitly expanded"],
+      "approvalNeeded": "founder selects and classifies the exact actor/capability; no provider or funds action is implied",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31Q-PERSONAL-PAY-RECHARGE-BILL-REQUEST-OUTCOME-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_supporting",
+      "capability": "inspect recharge, bills, scan, requests, confirmation, receipt, status and outcome surfaces without executing a real funds movement",
+      "authoritativeOutcome": "amount, payee, confirmation, receipt and status are never fabricated and no disabled control suggests money moved",
+      "failureRecovery": "invalid payee, duplicate submit, timeout, uncertain outcome and return from a regulated provider fail closed",
+      "routeFamilies": ["Pay home", "recharge", "bills", "scan", "requests", "confirm", "receipt", "status", "outcome"],
+      "dependencies": ["separate financial, regulatory, provider and funds authority"],
+      "approvalNeeded": "founder must separately authorize the exact financial-provider audit; this backlog permits source/read-only review only",
+      "state": "staged_non_executable"
+    },
+    {
+      "id": "UAW-C31R-PERSONAL-WORK-OPPORTUNITY-PROOF-STATUS-AUDIT",
+      "actor": "Personal user",
+      "classification": "mvp_required",
+      "capability": "discover an eligible opportunity, review work, use the workspace, submit bounded proof and follow status",
+      "authoritativeOutcome": "eligibility, terms, work state, proof, review and payout representation are truthful",
+      "failureRecovery": "ineligible work, withdrawn opportunity, invalid proof, offline retry, dispute and relaunch preserve authoritative state",
+      "routeFamilies": ["Work opportunity", "my work", "workspace", "proof", "status", "ready"],
+      "dependencies": ["native Flutter amendment", "Freelancer / Field Partner launch scope", "separate payout authority"],
+      "approvalNeeded": "founder selects the exact work capability; no payout or live external mutation is implied",
+      "state": "staged_non_executable"
+    }
+  ],
+  "exactLaunchActorAuditTickets": [
+    {"id": "UAW-C31S-FMCG-MANUFACTURER-BOUNDED-PILOT-WORKSPACE-AUDIT", "actor": "FMCG Manufacturer", "classification": "mvp_supporting", "disposition": "bounded_launch_pilot_dependency_held", "sharedRouteFamily": "manufacturer", "state": "staged_non_executable"},
+    {"id": "UAW-C31T-FMCG-SUPPLIER-DISTRIBUTOR-WHOLESALE-WORKSPACE-AUDIT", "actor": "FMCG Supplier / Distributor", "classification": "mvp_required", "disposition": "current_wholesale_launch_scope", "sharedRouteFamily": "provider_or_manufacturer_reuse_inventory", "state": "staged_non_executable"},
+    {"id": "UAW-C31U-GROCERY-KIRANA-SHOP-RETAIL-WORKSPACE-AUDIT", "actor": "Grocery / Kirana Shop", "classification": "mvp_required", "disposition": "current_launch_scope", "sharedRouteFamily": "retailer", "state": "staged_non_executable"},
+    {"id": "UAW-C31V-GENERAL-RETAIL-SHOP-DUKAAN-APPROVED-CATEGORY-AUDIT", "actor": "General Retail Shop / Dukaan", "classification": "mvp_required", "disposition": "founder_approved_launch_categories_only", "sharedRouteFamily": "retailer", "state": "staged_non_executable"},
+    {"id": "UAW-C31W-RESTAURANT-DHABA-CAFE-ORDER-TABLE-WORKSPACE-AUDIT", "actor": "Restaurant / Dhaba / Cafe", "classification": "mvp_required", "disposition": "current_order_food_and_book_table_launch_scope", "sharedRouteFamily": "provider", "state": "staged_non_executable"},
+    {"id": "UAW-C31X-INDIVIDUAL-DOCTOR-APPOINTMENT-WORKSPACE-AUDIT", "actor": "Individual Doctor", "classification": "mvp_required", "disposition": "current_bounded_doctor_booking_launch_scope", "sharedRouteFamily": "provider", "state": "staged_non_executable"},
+    {"id": "UAW-C31Y-MEDICAL-STORE-PHARMACY-REGULATED-WORKSPACE-AUDIT", "actor": "Medical Store / Pharmacy", "classification": "mvp_required", "disposition": "current_launch_scope_regulated_gates_retained", "sharedRouteFamily": "retailer_or_provider_reuse_inventory", "state": "staged_non_executable"},
+    {"id": "UAW-C31Z-SALON-PARLOUR-BOOKING-WORKSPACE-AUDIT", "actor": "Salon / Parlour", "classification": "mvp_required", "disposition": "current_bounded_salon_booking_launch_scope", "sharedRouteFamily": "provider", "state": "staged_non_executable"},
+    {"id": "UAW-C32A-BIKE-CAPTAIN-RIDE-FULFILMENT-AUDIT", "actor": "Bike Captain", "classification": "mvp_required", "disposition": "current_bounded_ride_launch_scope", "sharedRouteFamily": "captain", "state": "staged_non_executable"},
+    {"id": "UAW-C32B-AUTO-CAPTAIN-RIDE-FULFILMENT-AUDIT", "actor": "Auto Captain", "classification": "mvp_required", "disposition": "current_bounded_ride_launch_scope", "sharedRouteFamily": "captain", "state": "staged_non_executable"},
+    {"id": "UAW-C32C-CAB-CAR-CAPTAIN-RIDE-FULFILMENT-AUDIT", "actor": "Cab / Car Captain", "classification": "mvp_required", "disposition": "current_bounded_ride_launch_scope", "sharedRouteFamily": "captain", "state": "staged_non_executable"},
+    {"id": "UAW-C32D-DELIVERY-PARTNER-BUY-FULFILMENT-AUDIT", "actor": "Delivery Partner", "classification": "mvp_required", "disposition": "current_buy_fulfilment_launch_scope", "sharedRouteFamily": "captain_or_provider_reuse_inventory", "state": "staged_non_executable"},
+    {"id": "UAW-C32E-LOCAL-PORTER-GOODS-TRANSPORTER-WHOLESALE-PILOT-AUDIT", "actor": "Local Porter / Goods Transporter", "classification": "mvp_supporting", "disposition": "wholesale_pilot_dependency_held", "sharedRouteFamily": "captain_or_provider_reuse_inventory", "state": "staged_non_executable"},
+    {"id": "UAW-C32F-SHORTS-CREATOR-YOUTUBE-COMPLIANT-STUDIO-AUDIT", "actor": "Shorts Creator", "classification": "mvp_required", "disposition": "founder_deferred_pending_youtube_compliance_sequence", "sharedRouteFamily": "creator", "state": "staged_non_executable"},
+    {"id": "UAW-C32G-MULTI-FORMAT-CREATOR-SOCIAL-YOUTUBE-STUDIO-AUDIT", "actor": "Multi-Format Creator", "classification": "mvp_required", "disposition": "founder_deferred_pending_social_youtube_sequence", "sharedRouteFamily": "creator", "state": "staged_non_executable"},
+    {"id": "UAW-C32H-FREELANCER-FIELD-PARTNER-WORKSPACE-AUDIT", "actor": "Freelancer / Field Partner", "classification": "mvp_required", "disposition": "current_work_launch_scope", "sharedRouteFamily": "earn_or_work", "state": "staged_non_executable"}
+  ],
+  "registeredDisabledProfiles": [
+    "Raw Material Supplier",
+    "Packaging Supplier",
+    "Individual Product Seller",
+    "Cloud Kitchen",
+    "Tiffin Provider",
+    "Clinic",
+    "Hospital",
+    "Home Beauty Provider",
+    "Individual Service Provider",
+    "Transport / Fleet Operator",
+    "Long-Form Video Creator",
+    "Get It Done Provider"
+  ],
+  "separateExistingPortfolio": {
+    "id": "SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-AND-CONTROL-END-TO-END-JOURNEY",
+    "reasonNotDuplicated": "already registered under its own exact authorization and must not be silently absorbed into this planning backlog"
+  },
+  "completedSourceAuditFindings": [
+    {
+      "finding": "REG-20260815-2246-POST-YOUTUBE-AUDIT-C27D-CANONICAL-PROJECTION-REJECTION",
+      "ticket": "UAW-C32I-PERSONAL-MVP-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-RECONCILIATION",
+      "classification": "mvp_supporting",
+      "outcome": "stale_C27D_Shorts_first_assertion_reconciled_to_C29E_Home_Shorts_Create_Feed_without_runtime_source_change",
+      "qualification": "two_identical_source_cycles_passed",
+      "sourceFingerprintSha256": "0CACB094CA6D6E816E80783516BDCAB46A56F24B501A7627D9D92C760BA2A644",
+      "runtimeAcceptance": false,
+      "buildOrDeviceAction": false
+    },
+    {
+      "findings": [
+        "REG-20260815-2297-POST-SEAL-C20E-ADAPTIVE-FAMILY-CONTRACT-FAILURE",
+        "REG-20260815-2300-POST-SEAL-C17D-C21E-REMAINING-FAMILY-GLASS-CONTRACT-FAILURE",
+        "REG-20260815-2308-RIDE-FOUR-ACTION-COMPACT-RAIL-MINIMUM-WIDTH-ASSERTION",
+        "REG-20260815-2312-POST-C33C-C16F-EXACT-FIT-BUS-ACTION-OFFSCREEN"
+      ],
+      "tickets": [
+        "UAW-C33A-PERSONAL-MVP-C20E-CURRENT-LOCAL-DESTINATION-RAIL-TEST-SUCCESSOR",
+        "UAW-C33B-PERSONAL-MVP-C17D-C21E-CURRENT-LOCAL-DESTINATION-RAIL-TEST-SUCCESSOR",
+        "UAW-C33C-PERSONAL-MVP-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY",
+        "UAW-C33D-PERSONAL-MVP-FOUR-ACTION-EXACT-FIT-DESTINATION-RAIL-RECOVERY"
+      ],
+      "classification": "mvp_required",
+      "outcome": "current_shared_destination_rail_tests_reconciled_and_320dp_four_action_Travel_Bus_direct_hit_recovered_with_overflow_only_below_182px",
+      "qualification": "C33A_through_C33D_passed_on_Windows_PowerShell_and_PowerShell_7_with_61_C33D_tests_4_declared_skips_and_whole_mobile_analyzer_clean",
+      "runtimeAcceptance": false,
+      "buildOrDeviceAction": false
+    }
+  ],
+  "implementedSourceAuditFindingsHeldAtProtectedBoundary": {
+    "findings": [
+      "REG-20260815-2248-POST-YOUTUBE-AUDIT-C28E-R60-27-MACHINE-STATE-HASH-REJECTION",
+      "REG-20260815-2249-POST-YOUTUBE-AUDIT-C26C-EMBEDDED-SWITCHER-TOPLEFT-ANCHOR-REJECTION",
+      "REG-20260815-2252-POST-YOUTUBE-AUDIT-C26D-SOCIAL-SHARED-BOTTOM-NAV-REJECTION"
+    ],
+    "tickets": [
+      "UAW-C32J-PERSONAL-MVP-C28E-IMMUTABLE-R60-27-EVIDENCE-BINDING-RECONCILIATION",
+      "UAW-C32K-PERSONAL-MVP-C26C-C29N-LEFT-EDGE-SWITCHER-GATE-RECONCILIATION",
+      "UAW-C32L-PERSONAL-MVP-C26D-C29N-SPECIALIZED-SOCIAL-DOCK-GATE-RECONCILIATION"
+    ],
+    "implemented": true,
+    "qualified": false,
+    "preflightPassedThrough": ["navigation", "route_resolution", "customer_copy", "interaction", "MVP_scope", "regression_memory"],
+    "protectedHold": "current_Buy_tree_does_not_match_any_founder_approved_protected_baseline",
+    "founderApprovalNeeded": "review_exact_Buy_delta_and_authorize_or_reject_a_versioned_successor_baseline_before_preflight_retry",
+    "runtimeAcceptance": false,
+    "buildOrDeviceAction": false
+  },
+  "findingWorkflow": [
+    "retain_exact_observation_and_evidence",
+    "register_any_Codex_mistake_before_retry",
+    "map_finding_to_one_exact_actor_capability_outcome_and_recovery_ticket",
+    "run_robustness_reuse_duplicate_and_MVP_scope_checkpoint",
+    "present_smallest_complete_scope_exclusions_dependencies_and_test_plan",
+    "wait_for_exact_founder_selection_and_every_protected_boundary_approval",
+    "implement_source_only_with_affected_tests_and_two_fresh_cycles",
+    "separately_gate_backend_provider_release_Play_and_device_acceptance"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SOURCE-MANIFEST-RELEASE-HELPER-COVERAGE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_implementation_complete_syntax_and_static_gate_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_source_fingerprint_coverage_gap",
+  "actor": "C30T_source_manifest_and_single_AAB_wrapper",
+  "customerOutcome": "The exact registrant verifier used before release authority is sealed into the qualified source fingerprint and cannot change between qualification and the AAB wrapper.",
+  "minimumCorrection": [
+    "add_the_registrant_restore_helper_to_the_source_manifest_inventory",
+    "require_exactly_three_qualifier_references_for_preflight_post_test_and_manifest_ownership"
+  ],
+  "explicitExclusions": [
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "syntaxEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/45-c30t-source-manifest-contract-syntax.log",
+    "syntaxEvidenceSha256": "321695F877164073B7C2F9A4F032A8494CE2B34CD7A9022DF053BCFE1F219509",
+    "staticReadinessEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/46-c30t-static-release-readiness-final-source-manifest-audit.log",
+    "staticReadinessEvidenceSha256": "B816E991461E9A927EC606CAABF1E2CAC4CBAE27DD3E384CCEB1D43D4EC44083"
+  }
+}

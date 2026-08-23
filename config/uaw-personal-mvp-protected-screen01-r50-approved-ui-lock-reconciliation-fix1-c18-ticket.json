@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-PROTECTED-SCREEN01-R50-APPROVED-UI-LOCK-RECONCILIATION-FIX1-C18",
+  "parentBlocker": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+  "state": "c18d_host_refresh_qualified_new_c17f_preselection_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "The accepted progressive MoolSocial launch remains intact and release qualification truthfully locks the active Screen01 production owner.",
+  "founderAuthority": "docs/quality/UAW-C18-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-PROTECTED-SCREEN01-R50-APPROVED-UI-LOCK-RECONCILIATION-FIX1-C18-PRESELECTION-ASSESSMENT-20260808.md",
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-SCREEN01-R50-PROVENANCE-AND-EQUIVALENCE-FIX1-C18A",
+    "UAW-PERSONAL-MVP-SCREEN01-ADDITIVE-V4-PRODUCTION-ACCEPTANCE-FIX1-C18B",
+    "UAW-PERSONAL-MVP-SCREEN01-V4-MACHINE-LOCK-QUALIFICATION-FIX1-C18C",
+    "UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D"
+  ],
+  "lineage": {
+    "preservedVersion": "approved-references/screens/01-app-splash-first-open/v3",
+    "preservedSourceSha256": "B0E7B099B70BE7240A4E7699596AB7F16B77285FBA9C23C4F3708AFDA7AE218D",
+    "preservedTestSha256": "AD8B6173B903114A24F41DDF408A91043DD7621116A51AAA7D4E5AFF215D7008",
+    "acceptedR50CandidateId": "BUY-R50-139-PROGRESSIVE-BRAND-LOCKUP-FIX1",
+    "acceptedR50VersionName": "1.0.0-r50",
+    "acceptedR50VersionCode": "2026080116",
+    "acceptedR50ApkSha256": "F8C21E4B9C32356A451909C2FD9FB7B845E8ED393199A8356EA5EA4ED4BA74F3",
+    "acceptedR50ManifestSha256": "7E9E76F2753D72E9034D68DD4825405D826D67065F77DFDACB808099689103D5",
+    "acceptedR50SourceSha256": "D08DBA928B884554984D28891F5E465B1F7FA910D3884EBE49B6466D199147BE",
+    "acceptedR50TestSha256": "39DDD73796415048784471D34612DB8C575C85F48AC8C243B3F35F22FB78D3B8"
+  },
+  "sharedDependencyDisposition": {
+    "owner": "apps/mobile/lib/core/design/moolsocial_brand_motion.dart",
+    "r50Sha256": "3BC44E5619CD825EF36A056152679DDAA478BE5E8D1ABF17BAD377EA76BB6D26",
+    "currentSha256": "C0DFEDB28E587515B66EB46D9523AC916C40C247A1B0C2C5DC8EB63062E67EB3",
+    "laterTicket": "BUY-FV2-077-R51-CONTEXTUAL-GLASS-HEADER",
+    "laterTicketFounderState": "not_founder_approved",
+    "screen01Policy": "do_not_claim_byte_exact_R50_dependency; require_existing_brand_integrity_and_screen01_behavior_gates"
+  },
+  "c18aDisposition": {
+    "state": "rejected_three_state_v3_golden_divergence_and_locked_device",
+    "hostAnalysis": "passed_7_items",
+    "brandMotionTests": "passed_8_of_8",
+    "screen01BehaviorTests": "passed_3_of_3",
+    "interruptionTests": "passed_4_of_4",
+    "fitmentTests": "passed_3_of_3",
+    "v3GoldenNormal": "rejected_7_06_percent_18299_pixels",
+    "v3GoldenSlowHandoff": "rejected_9_45_percent_24494_pixels",
+    "v3GoldenRecovery": "rejected_10_37_percent_26874_pixels",
+    "deviceState": "connected_deviceLocked_1_keyguard_showing_screencap_blocked",
+    "referenceMutationPerformed": false,
+    "runtimeMutationPerformed": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SCREEN01-R50-PROVENANCE-AND-EQUIVALENCE-FIX1-C18A-DISPOSITION-20260808.md"
+  },
+  "c18bAuthorization": {
+    "state": "founder_authorized_after_unlocked_device_replay",
+    "ticketId": "UAW-PERSONAL-MVP-SCREEN01-ADDITIVE-V4-PRODUCTION-ACCEPTANCE-FIX1-C18B",
+    "authority": "docs/quality/UAW-C18B-FOUNDER-AUTHORIZATION-20260808.md",
+    "referenceWriteAuthorized": true,
+    "testGoldenWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false
+  },
+  "c18bDisposition": {
+    "state": "implementation_complete_qualification_paused",
+    "screen01V4Created": true,
+    "activeGoldenCount": 3,
+    "runtimeSourceMutationPerformed": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "qualificationPause": "independent_Screen03_v2_platform_provenance_test_lock",
+    "successorTicket": "UAW-PERSONAL-MVP-SCREEN03-PROFILE-PROVENANCE-TEST-LOCK-RECONCILIATION-FIX1-C19",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SCREEN01-ADDITIVE-V4-PRODUCTION-ACCEPTANCE-FIX1-C18B-IMPLEMENTATION-DISPOSITION-20260808.md"
+  },
+  "c18cDisposition": {
+    "state": "passed_after_C19_Screen03_lock_reconciliation",
+    "screen01ActiveVersion": "v4",
+    "lockedOwnerCount": 12,
+    "approvedUiLock": "passed",
+    "brandIntegrity": "passed",
+    "runtimeSourceMutationPerformed": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SCREEN01-V4-MACHINE-LOCK-QUALIFICATION-FIX1-C18C-OUTCOME-20260808.md"
+  },
+  "c18dDisposition": {
+    "state": "passed_two_consecutive_unchanged_source_cycles",
+    "sourceFingerprint": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "testsPerCycle": 591,
+    "totalPasses": 1182,
+    "runtimeSourceMutationPerformed": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "successorTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+    "successorSelectionState": "new_preselection_required",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-C17-HOST-QUALIFICATION-REFRESH-AFTER-SCREEN01-LOCK-FIX1-C18D-COMPLETION-20260808.md"
+  },
+  "implementationDisposition": [
+    "reuse",
+    "configuration",
+    "test_only_acceptance",
+    "new_necessary_work"
+  ],
+  "newScreens": [],
+  "newRoutes": [],
+  "newBackendOwners": [],
+  "newPersistentStateOwners": [],
+  "referencePolicy": {
+    "restoreV3SourceAllowed": false,
+    "overwriteV3Allowed": false,
+    "additiveV4AllowedAfterEquivalence": true,
+    "copyHtmlScreenbookAllowed": false,
+    "singleProductionAcceptedScreen01Required": true
+  },
+  "requiredGates": [
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-brand-integrity.ps1",
+    "scripts/check-customer-copy-machine.ps1",
+    "scripts/check-personal-subaction-clear-glass-host-qualification-c17e.ps1"
+  ],
+  "buildAndInstall": {
+    "authorizedNow": false,
+    "c17fMustBeReselectedAfterC18D": true,
+    "predecessorMustRemainInstalled": true
+  },
+  "explicitExclusions": [
+    "no_screen01_runtime_redesign_or_v3_source_restoration",
+    "no_v1_v2_v3_overwrite_or_deletion",
+    "no_HTML_screenbook_copy",
+    "no_new_screen_route_copy_feature_backend_provider_state_or_business_owner",
+    "no_C17_subaction_global_rail_Buy_header_or_Social_mutation",
+    "no_build_install_uninstall_data_clear_downgrade_or_protected_runtime_replacement_during_C18",
+    "no_credentials_external_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ]
+}

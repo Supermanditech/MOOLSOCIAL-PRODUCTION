@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "authorizationId": "BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-AUTHORIZATION-20260805",
+  "portfolioId": "BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-20260805",
+  "portfolioManifest": "config/buy-mvp-ready-order-delivery-portfolio.json",
+  "portfolioManifestSha256": "5CE81AB6332607A71B960C57A1E99466109E13299CD8A5995FFC3163F35893AF",
+  "founderEvidence": "docs/quality/BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-AUTHORIZATION-20260805.md",
+  "state": "founder_authorized_execution_active_subject_to_independent_gates",
+  "authorizedActionsWhenExecutionIsLaterActivated": [
+    "bounded_local_implementation",
+    "bounded_local_execution",
+    "machine_gated_builds",
+    "checksum_matched_oppo_testing"
+  ],
+  "independentGatesRetained": [
+    "one_active_ticket",
+    "mvp_scope_execution_gate",
+    "payment_finance_legal_tax",
+    "clinical_regulatory_privacy",
+    "provider_security_environment_and_credentials",
+    "html_founder_final_before_new_flutter_states",
+    "apk_machine_and_release_gates"
+  ],
+  "notAuthorized": [
+    "commit",
+    "push",
+    "deploy",
+    "promote",
+    "production_write",
+    "credential_access",
+    "funds_movement",
+    "live_payment",
+    "live_whatsapp",
+    "live_telephony"
+  ],
+  "currentExecutionState": "next_child_dependency_held",
+  "activeChildTicket": null,
+  "completedChildTickets": [
+    "BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY",
+    "BUY-MVP-MARKET-SCHEDULE-TIMER-OVERRIDES",
+    "BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT",
+    "BUY-MVP-PROVIDER-READY-BUSY-PAUSE-STATE",
+    "BUY-MVP-ACCEPTANCE-POLICY-AUDIT-ROLLBACK"
+  ],
+  "nextAuthorizedActivity": "await_named_inventory_and_fulfilment_owners_and_qualified_fresh_serviceability_truth",
+  "lastCompletionEvidence": "docs/quality/BUY-MVP-ACCEPTANCE-POLICY-AUDIT-ROLLBACK-COMPLETION-20260807.md",
+  "activationEvidence": "docs/quality/BUY-MVP-NO-RESERVATION-OFFER-READINESS-DEPENDENCY-HOLD-20260807.md"
+}

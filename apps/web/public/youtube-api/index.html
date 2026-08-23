@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en-IN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="MoolSocial's current YouTube API Services use is limited to its private pre-launch Android mobile application. Review the exact platform and access boundary.">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+    <meta name="theme-color" content="#000080">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="MoolSocial">
+    <meta property="og:locale" content="en_IN">
+    <meta property="og:title" content="YouTube API use and review access — MoolSocial">
+    <meta property="og:description" content="The exact website, Android and iOS boundary for MoolSocial's current YouTube API Services use.">
+    <meta property="og:url" content="https://moolsocial.com/youtube-api">
+    <meta property="og:image" content="https://moolsocial.com/og-2026-10-24.png">
+    <title>YouTube API use and review access — MoolSocial</title>
+    <link rel="canonical" href="https://moolsocial.com/youtube-api">
+    <link rel="alternate" hreflang="en-IN" href="https://moolsocial.com/youtube-api">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="stylesheet" href="/site.css?v=20260805-1">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-row">
+        <a class="brand" href="/" aria-label="MoolSocial home"><strong>MoolSocial</strong><span aria-hidden="true"></span></a>
+        <nav class="primary-nav" aria-label="Primary navigation"><a href="/">Home</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/support/">Support</a><a href="mailto:hello@moolsocial.com?subject=MoolSocial%20contact">Contact</a></nav>
+      </div>
+    </header>
+    <main>
+      <section class="legal-hero">
+        <div class="shell">
+          <p class="eyebrow">YouTube API Services</p>
+          <h1>Mobile app use and reviewer access</h1>
+          <p>This page states the exact platform boundary of MoolSocial's current YouTube API use and how an authorized reviewer can inspect it.</p>
+        </div>
+      </section>
+      <div class="shell legal-layout">
+        <nav class="legal-nav" aria-label="YouTube API review sections"><a href="#platforms">Platforms</a><a href="#current-use">Current use</a><a href="#not-used">Not used</a><a href="#review-access">Review access</a><a href="#controls">Controls</a></nav>
+        <article class="legal-copy">
+          <section id="platforms">
+            <h2>1. Platform status</h2>
+            <ul>
+              <li><strong>Website: No.</strong> The MoolSocial public website provides company, policy and support information. It does not call or use YouTube API Services.</li>
+              <li><strong>Android mobile application: Yes.</strong> YouTube API Services are integrated only in the private pre-launch Android review candidate described below.</li>
+              <li><strong>iOS mobile application: No.</strong> There is no current iOS YouTube API client included in this compliance review.</li>
+            </ul>
+          </section>
+          <section id="current-use">
+            <h2>2. Current Android use</h2>
+            <p>
+              The Android review client uses the Google Cloud project
+              <code>moolsocial-dev-503018</code> and package
+              <code>com.moolsocial.app</code>. Its bounded declared use is
+              limited to:
+            </p>
+            <ul>
+              <li>eligible public-video and Shorts discovery through <code>videos.list</code>, <code>channels.list</code> and bounded <code>search.list</code> requests;</li>
+              <li>YouTube metadata displayed in MoolSocial's native mobile cards;</li>
+              <li>playback through the official embedded YouTube player with YouTube branding, controls, advertising and the Watch on YouTube route available; and</li>
+              <li>a separate, user-initiated owner-channel connection using only the <code>youtube.readonly</code> scope after Google authorization.</li>
+            </ul>
+          </section>
+          <section id="not-used">
+            <h2>3. Capabilities not active in the reviewed client</h2>
+            <p>
+              The reviewed client does not provide YouTube upload, Like,
+              Comment, Subscribe, playlist, channel or asset mutations. It does
+              not provide YouTube Analytics, Reporting, Live, partner,
+              membership, Super Chat or Content Owner capability. Broader
+              future ideas are not part of this current API client.
+            </p>
+          </section>
+          <section id="review-access">
+            <h2>4. Secure Android review access</h2>
+            <p>
+              The Android application is in private pre-launch review and is not
+              publicly listed in Google Play. Access is provided only through
+              Google Play Internal Testing to an eligible reviewer account. The
+              same-thread reviewer package will contain the exact tester link
+              and release identity after the final Play-installed candidate
+              passes device qualification.
+            </p>
+            <ul>
+              <li>Distribution: <code>Google Play Internal Testing (private)</code></li>
+              <li>Android package: <code>com.moolsocial.app</code></li>
+              <li>Tester link and release identity: supplied after final Play-installed device qualification</li>
+            </ul>
+            <p>
+              An authorized reviewer can email
+              <a href="mailto:hello@moolsocial.com?subject=MoolSocial%20YouTube%20API%20review%20access">hello@moolsocial.com</a>
+              to identify the accepted secure-access method and reviewer account.
+            </p>
+          </section>
+          <section id="controls">
+            <h2>5. Policies, account controls and support</h2>
+            <ul>
+              <li><a href="/privacy/">MoolSocial Privacy Policy</a></li>
+              <li><a href="/terms/">MoolSocial Terms</a></li>
+              <li><a href="/disconnect/">Disconnect a connected service</a></li>
+              <li><a href="/delete-account/">Request account or data deletion</a></li>
+              <li><a href="/support/">MoolSocial support</a></li>
+              <li><a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a></li>
+              <li><a href="https://policies.google.com/privacy">Google Privacy Policy</a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-row">
+        <a class="brand" href="/"><strong>MoolSocial</strong><span aria-hidden="true"></span></a>
+        <nav aria-label="Legal and support"><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/support/">Support</a><a href="mailto:hello@moolsocial.com?subject=MoolSocial%20contact">Contact</a></nav>
+        <p>© 2026 moolsocial.com</p>
+      </div>
+    </footer>
+  </body>
+</html>

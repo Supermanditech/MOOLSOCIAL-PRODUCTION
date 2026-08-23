@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-FOUNDER-DOMAIN-NAMING-AND-PLACEMENT-CONTRACT-FIX8-C25A",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "The approved Social, Shop, Food, Travel, Care and Work hierarchy is frozen with truthful route-owner reuse before runtime mutation.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration","test_only_acceptance"],"sharedImplementationOwners":["moolActionFamilies","mvp-personal-action-projection-v1 internal owner inventory","existing Medicine Buy route/session","existing Bus Book route/session/gateway"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"A derived navigation presentation contract and gate are sufficient; protected internal business owners remain unchanged."},
+  "acceptance": ["exact_six_main_labels_and_order","main_menu_contains_no_subactions","exact_subactions_per_domain","Medicine_presented_once_under_Care_reuses_Buy_owner","Bus_presented_once_under_Travel_reuses_Book_owner","no_new_route_screen_backend_or_state_owner"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-FOUNDER-DOMAIN-NAMING-AND-PLACEMENT-CONTRACT-FIX8-C25A-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

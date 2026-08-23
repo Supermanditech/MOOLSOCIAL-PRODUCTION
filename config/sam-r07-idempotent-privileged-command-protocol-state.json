@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "SAM-R07-IDEMPOTENT-PRIVILEGED-COMMAND-PROTOCOL",
+  "state": "locally_complete_no_environment_or_device_action_required",
+  "classification": "mvp_required",
+  "contractPath": "backend/functions/src/workspace/privileged_command_contract.ts",
+  "contractSha256": "C77FF1696B1D7A332FFACA49F670EF356D27A838255365FEAA7BF759919C8697",
+  "testPath": "backend/functions/src/workspace/privileged_command_contract.test.ts",
+  "testSha256": "8534BB3AFC3FE64301F0D17D8BBF4C0033232C344E638AC0A38C268F9C953443",
+  "focusedCycles": ["16_pass_0_fail", "16_pass_0_fail"],
+  "fullBackendCycles": ["380_pass_0_fail", "380_pass_0_fail"],
+  "cycle1Evidence": "artifacts/quality/sam-r07-idempotent-privileged-command-protocol-20260807-01/01-full-backend-cycle-1.tap",
+  "cycle1Sha256": "54590BFE85112B9969CCBEA3DB7F75683A8E44A144952EE86780158138D1B7A5",
+  "cycle2Evidence": "artifacts/quality/sam-r07-idempotent-privileged-command-protocol-20260807-01/01-full-backend-cycle-2.tap",
+  "cycle2Sha256": "1803E9D7170A28384EB2F32E947685B8E5CA81E46267A1A9C1B322ADC87534EC",
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "liveCommands": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "completionEvidence": "docs/quality/SAM-R07-IDEMPOTENT-PRIVILEGED-COMMAND-PROTOCOL-COMPLETION-20260807.md"
+}

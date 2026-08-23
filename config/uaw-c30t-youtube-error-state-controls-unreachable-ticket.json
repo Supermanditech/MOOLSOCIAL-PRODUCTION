@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-YOUTUBE-ERROR-STATE-CONTROLS-UNREACHABLE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocker",
+  "actualResult": "When the catalogue has no snapshot and fails, _buildVideos returns the status card before building _YouTubeHomeHeader, hiding Search, notifications and channel connection status.",
+  "expectedResult": "The branded YouTube Home header and its distinct Search and account controls remain reachable in loading, empty and retry states.",
+  "acceptance": ["header_present_in_loading_empty_error_and_success", "search_reachable_from_error", "account_consent_status_disconnect_reachable_from_error", "retry_remains_visible"],
+  "authority": {"sourceImplementationAuthorized": true, "buildUploadAndInstallInheritedFromParent": true}
+}

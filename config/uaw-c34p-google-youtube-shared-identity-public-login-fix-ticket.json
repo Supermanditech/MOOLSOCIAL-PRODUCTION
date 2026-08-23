@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-GOOGLE-YOUTUBE-SHARED-IDENTITY-PUBLIC-LOGIN-FIX",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_acceptance_child_source_fix_pending_parent_scope_activation",
+  "classification": "mvp_required",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A Personal user can select Google from the public login gateway, privately choose an account, establish one Firebase session, and return to the exact requested destination; the YouTube identity control reuses that same Google identity without another credential flow.",
+  "observedFailure": {
+    "candidate": "1.0.0-r60.72",
+    "publicClass": "google_sign_in_could_not_be_completed",
+    "accountSpecificCauseProved": false,
+    "candidateRejectedAndRetryBlocked": true,
+    "privateIdentifiersRetained": false
+  },
+  "minimumCompleteScope": [
+    "map_every_GoogleSignInExceptionCode_and_FirebaseAuthException_to_one_sanitized enumerated public failure",
+    "verify_nonblank_exact_web_server_client_ID_is_used_for_ID token authentication",
+    "verify_Firebase_Google provider_package_name_google_app_ID_and_exact_Play signing_SHA bindings",
+    "keep_Google_and_YouTube_in_one_availability_identity_and_session contract",
+    "cover_cancel_interrupted_ui_unavailable_configuration_provider_configuration_user mismatch_empty token_network_account collision_and unknown sanitized class",
+    "preserve_bootstrap_rollback_protected_return_authenticated_relaunch_and_sign out"
+  ],
+  "explicitExclusions": [
+    "no_private_account_identifier_logging_or_evidence",
+    "no_separate_YouTube OAuth_or_credential",
+    "no_r60_72_retry_or_acceptance",
+    "no_provider_console_or_secret action_by_Codex"
+  ],
+  "testAndEvidencePlan": [
+    "unit_test_each_Google_plugin_and_Firebase_error_class",
+    "configuration_gate_for_server_client_ID_google_app_ID_package_and_signing SHA",
+    "widget_test_shared_Google_YouTube_availability_dispatch_and_public recovery copy",
+    "integration_test_one_session_exact destination_return_relaunch_and sign out",
+    "one_new_Play_installed_OPPO_attempt_with_founder_only_account handling"
+  ],
+  "authority": {
+    "runtimeAndTestSourceAuthorizedUnderParent": true,
+    "providerConsoleOrSecretWriteAuthorized": false,
+    "founderAccountChooserRequired": true,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "stateId": "MOOLSOCIAL-PRE-BUY-BASELINE-CUTOVER-20260820",
+  "signal": "PRE_BUY_BASELINE_CUTOVER_READY",
+  "state": "desktop_source_frozen_cursor_reconstruction_authorized",
+  "repository": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "originalCheckoutFrozen": true
+  },
+  "registryBinding": {
+    "entryCount": 3006,
+    "sha256": "1226BCDE7E1EEA6C924C4E1D5AD81BEF818D63A17E5F5B8DCA10530B65912D92"
+  },
+  "cursor": {
+    "task": "/root/pre_buy_baseline_b0",
+    "worktree": "codex-cursor-baseline-reconciliation",
+    "branch": "reconcile/codex-cursor/pre-buy-baseline-v1",
+    "baselineTag": "moolsocial-mvp-pre-buy-baseline-v1",
+    "tagType": "annotated"
+  },
+  "reconstruction": {
+    "auditOwner": "docs/quality/PRE-BUY-BASELINE-AUDIT-20260820.md",
+    "manifestOwner": "artifacts/quality/pre-buy-baseline-cutover-20260820-01/source-manifest-pre-buy.txt",
+    "qualificationOwner": "docs/quality/PRE-BUY-BASELINE-CUTOVER-QUALIFICATION-20260820.md",
+    "retainedBuyManifest": "artifacts/quality/uaw-c32n-c32p-buy-shared-router-attribution-20260815-01/source-manifest-c32n-c32p.txt",
+    "authQualification": "docs/quality/UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION-QUALIFICATION-20260818.md",
+    "activeHandoff": "docs/quality/ACTIVE-CODEX-HANDOFF.md",
+    "providerState": "config/public-auth-live-provider-readiness-state-c34p-fix5.json",
+    "trackedMode": "reconstruct_current_tracked_bytes_from_frozen_original_checkout_without_status_body_emission",
+    "untrackedMode": "include_only_exact_source_config_test_script_doc_and_reference_owners_admitted_to_the_cursor_generated_manifest",
+    "secretExclusions": [
+      ".env",
+      ".env.*",
+      "**/google-services.json",
+      "**/*service-account*.json",
+      "**/*private-key*",
+      "**/*credential*"
+    ]
+  },
+  "authority": {
+    "createSeparateWorktree": true,
+    "createReconciliationBranch": true,
+    "readFrozenOriginalCheckout": true,
+    "writeManifestAndQualificationEvidence": true,
+    "stageOnlyManifestAdmittedOwners": true,
+    "createBaselineCommit": true,
+    "createAnnotatedBaselineTag": true,
+    "push": false,
+    "mainBranch": false,
+    "authenticationOrProvider": false,
+    "buildOrArtifact": false,
+    "playOrOppo": false,
+    "externalAction": false,
+    "buyImplementation": false
+  },
+  "desktopCheckpoint": {
+    "appleState": "blocked_account_recovery",
+    "providerReadinessState": "sanitized_configuration_broker_iam_ttl_hosting_complete_external_review_and_private_acceptance_pending",
+    "repositoryWritersInFlight": 0,
+    "sourceCommandsInFlight": 0,
+    "dirtyDigestCapturedInCutoverPacketOnly": true
+  }
+}

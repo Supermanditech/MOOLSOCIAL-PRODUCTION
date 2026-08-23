@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33G-FIX3-FEED-CREATE-ORIGIN-STATE-PROCESS-CONTAINMENT",
+  "parentTicket": "UAW-C33G-R60-49-FAILED-ACCEPTANCE-REPAIR",
+  "findings": ["REG-20260815-2429-C33F-R60-49-SOCIAL-CREATE-CRASH-ESCAPED-RELEASE", "REG-20260815-2430-C33F-R60-49-GUEST-SOCIAL-FEED-REDIRECTED-TO-LOGIN", "REG-20260815-2451-C33G-PROTECTED-SOCIAL-INTENT-NOT-RESUMED-AFTER-RESTART"],
+  "state": "source_repair_focused_matrix_affected_regressions_dual_host_gate_and_analyzer_passed_future_Play_device_acceptance_required",
+  "classification": "mvp_required",
+  "severity": "release_blocking",
+  "actor": "MoolSocial_signed_out_and_authenticated_real_user_entering_Feed_or_Create_from_each_supported_origin",
+  "capability": "read_public_Feed_or_complete_protected_Create_without_process_exit_and_with_exact_authentication_return",
+  "customerOutcome": "Public Feed remains readable while Create requests authentication when needed, returns to the exact draft destination after sign-in, and never exits or crashes from Home, Feed, shared-post or retained-state origins.",
+  "classificationReason": "Feed reading and post creation are core Social journeys and the founder reported both as failed on r60.49.",
+  "minimumCompleteScope": ["enumerate_every_supported_Feed_and_Create_origin_and_signed_in_state", "preserve_guest_public_Feed", "preserve_protected_Create_return_intent", "add_process_survival_and_state_restoration_tests", "keep_both_founder_reports_open_until_the_complete_matrix_passes"],
+  "explicitExclusions": ["no_new_screen_route_session_service_or_backend_owner", "no_demo_bypass_or_fake_authenticated_state", "no_build_Play_OPPO_backend_Hosting_email_quota_or_deployment"],
+  "dependenciesAndApprovals": ["C33G_FIX1_Google_session_completion", "founder_r60_49_OPPO_failure_evidence", "existing_Social_Feed_Create_and_router_owners_reused"],
+  "testAndEvidencePlan": ["signed_out_and_authenticated_origin_matrix", "process_survival_and_exit_reason_assertions", "pending_intent_cancel_retry_success_return", "two_affected_regressions_and_whole_mobile_analyzer"],
+  "authority": {"runtimeSourceWriteAuthorized": true, "testAndGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildPlayOrDeviceMutationAuthorized": false}
+}

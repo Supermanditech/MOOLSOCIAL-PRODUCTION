@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-FIREBASE-STARTUP-RECOVERY-C30S",
+  "state": "founder_authorized_implementation_prebuild_gated",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user_and_YouTube_API_reviewer",
+  "customerOutcome": "One r60.45 Google Play Internal successor preserves the installed Play identity and data, restores real Dev YouTube and public Feed reads, exposes truthful YouTube recovery and account controls, preserves every Create format with accessible controls, replaces prototype Chat with an authenticated real Dev persistence boundary, and keeps Work Care Travel Shop and Food limited to verified global navigation until their later dedicated product phases.",
+  "classificationReason": "r60.44 starts successfully but is not a truthful reviewer candidate: YouTube and Feed reject real data, recovery controls disappear, Feed-to-Create is inert on device, Create selectors clip, and Chat presents hardcoded review fixtures through a no-op send gateway. These are release blockers inside the already declared Social MVP and do not authorize redesign of other domains.",
+  "defectTickets": [
+    "config/uaw-c30t-youtube-public-read-rejected-ticket.json",
+    "config/uaw-c30t-public-feed-read-rejected-ticket.json",
+    "config/uaw-c30t-youtube-error-state-controls-unreachable-ticket.json",
+    "config/uaw-c30t-feed-error-create-cta-inert-ticket.json",
+    "config/uaw-c30t-create-format-selector-touch-target-clipped-ticket.json",
+    "config/uaw-c30t-chat-review-fixtures-masquerade-as-live-ticket.json"
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/features/chat/chat_models.dart",
+      "apps/mobile/lib/features/chat/chat_services.dart",
+      "apps/mobile/lib/features/chat/chat_session.dart",
+      "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart",
+      "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+      "backend/functions/src/index.ts",
+      "backend/functions/src/social/request_security.ts",
+      "backend/functions/src/social/firestore_store.ts",
+      "config/play-internal-live-read-recovery-gate-state-c30t.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [
+      "backend/functions/src/chat/contracts.ts",
+      "backend/functions/src/chat/service.ts",
+      "backend/functions/src/chat/firestore_store.ts"
+    ],
+    "necessityProof": "The existing Social content and YouTube providers remain the authoritative owners and need bounded configuration/auth corrections. Chat has no production gateway or backend owner at all; a user-scoped authenticated Dev service is the minimum complete replacement for deceptive fixtures. No new customer-facing route or non-Social product surface is needed."
+  },
+  "minimumCompleteScope": [
+    "preserve_r60_44_Play_install_data_package_installer_signer_Internal_track_and_all_existing_evidence",
+    "add_the_existing_Play_app_signing_SHA1_to_the_existing_Firebase_Android_API_key_application_restrictions_without_removing_the_upload_or_prior_certificate_identity_and_without_reading_the_key_value",
+    "make_public_Feed_list_read_App_Check_only_while retaining_Firebase_Auth_plus_App_Check_for_Create_vote_and_other_mutations",
+    "replace_public_review_fake_signed_in_state_with_a_truthful_guest_ready_boundary_and_real_user_initiated_Firebase_sign_in_for_Create_and_Chat",
+    "keep_YouTube_search_account_status_consent_disconnect_notifications_and_retry_reachable_when_the_catalogue_is_loading_empty_or_failed",
+    "make_the_Feed_Create_a_post_CTA_and_bottom_Create route converge on_the_same_composer_state",
+    "ensure_every_visible_Create format and tool selector exports_at_least_48_by_48_logical_tap_semantics_and_preserves_text_image_carousel_image_poll_quick_poll_and_quiz validation",
+    "replace_hardcoded_Chat_threads_messages_and_no_op_send_with_authenticated_user_scoped_Dev list_create_read_send persistence idempotency and truthful_empty_offline_error_retry_states",
+    "prove_global_navigation_only_for_Work_Care_Travel_Shop_and_Food_without_expanding_their_UI_UX_backend_database_or_user_journeys",
+    "deploy_only_the_smallest_Dev_provider_changes_after_tests_then_build_exactly_one_r60_45_AAB_upload_only_to_Internal_and_update_OPPO_in_place_through_Play",
+    "execute_the_complete_OPPO_YouTube_Feed_Create_Chat_refresh_relaunch_offline_retry_C28D_and_global_navigation_acceptance_before_preparing_an_unsent_YouTube_package"
+  ],
+  "explicitExclusions": [
+    "no_YouTube_upload_viewer_mutation_playlist_channel_asset_Analytics_Reporting_Live_partner_membership_Super_Chat_or_content_owner_scope",
+    "no_Work_Care_Travel_Shop_Food_design_UI_UX_backend_database_or_deep_user_journey_work",
+    "no_Play_Production_open_testing_public_listing_Staging_Production_backend_or_Hosting",
+    "no_email_quota_submission_provider_customer_message_or_call",
+    "no_password_MFA_token_API_key_value_OAuth_credential_App_Check_token_nonce_private_verdict_attestation_payload_or_private_key_access",
+    "no_uninstall_data_clear_downgrade_ADB_install_second_AAB_second_upload_or_second_install",
+    "no_commit_push_merge_rebase_main_fund_or_destructive_git_action"
+  ],
+  "authority": {
+    "founderExecutionAuthority": "explicit_2026_08_13_deep_micro_test_full_Social_create_comprehensive_tickets_implement_full_Social_and_global_navigation_then_one_AAB_update_and_retest_before_YouTube_submission",
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "backendWriteAuthorized": true,
+    "backendWriteBoundary": "Dev_only_existing_social_and_youtube_configuration_plus_one_minimum_authenticated_chat_owner_no_Staging_or_Production",
+    "runtimeDevCreateWritesAuthorized": true,
+    "runtimeDevCreateWriteLimit": 6,
+    "runtimeDevChatMessagesAuthorized": false,
+    "buildAuthorized": true,
+    "buildBoundary": "exactly_one_r60_45_AAB_after_source_backend_configuration_tests_fingerprint_and_machine_gates_pass",
+    "uploadAuthorized": true,
+    "uploadBoundary": "Google_Play_Internal_Testing_only_after_candidate_qualification",
+    "deviceInstallAuthorized": true,
+    "deviceInstallBoundary": "one_in_place_Google_Play_update_no_uninstall_data_clear_downgrade_or_ADB_install",
+    "deviceLaunchAndTapAuthorized": true,
+    "productionWriteAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "candidate": {
+    "versionName": "1.0.0-r60.45",
+    "versionCode": "2026081345",
+    "packageName": "com.moolsocial.app",
+    "distribution": "Google_Play_Internal_Testing",
+    "aabBuildLimit": 1,
+    "uploadLimit": 1,
+    "inPlacePlayUpdateLimit": 1
+  },
+  "protectedState": {
+    "deviceSerial": "2b3e0f71",
+    "installedVersionName": "1.0.0-r60.44",
+    "installedVersionCode": "2026081244",
+    "installedInstaller": "com.android.vending",
+    "installedPlaySignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "installedPlaySignerSha1": "078145A1EB2FFEC009192FF1E82DAED12FB1E8AC",
+    "uninstallDataClearDowngradeOrAdbInstallForbidden": true,
+    "createWritesAttempted": 0,
+    "chatMessagesSent": 0
+  },
+  "findings": "docs/quality/UAW-C30T-PLAY-INTERNAL-LIVE-READ-RECOVERY-FINDINGS-20260813.md"
+}

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30U-POST-R60-45-SOCIAL-REPAIRS-PLAY-INTERNAL-ACCEPTANCE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "founder_authorized_production_grade_pre_AAB_reconciliation_in_progress",
+  "classification": "mvp_required",
+  "severity": "release_acceptance_gate",
+  "actor": "MoolSocial_guest_reader_and_authenticated_social_user",
+  "customerOutcome": "One immutable r60.46 Internal Testing candidate delivers the source-qualified Social, YouTube handoff and player repairs through Google Play, updates the existing OPPO app in place, and is accepted only after complete real-device journeys pass without regression.",
+  "classificationReason": "The repairs are required for the supported Social launch slice and must be delivered and proved through the exact Play-installed path before any YouTube API compliance submission can truthfully reference the client.",
+  "minimumCompleteScope": [
+    "seal_one_final_source_fingerprint_after_all_machine_gate_owners_are_complete",
+    "run_two_identical_comprehensive_non_build_pre_AAB_cycles",
+    "deploy_only_the_changed_Dev_moolSocialContent_function_and_verify_its_new_revision",
+    "preserve_Hosting_youtubeProvider_youtubeOAuthCallback_moolSocialChat_and_rules_when_their_source_or_required_contract_did_not_change",
+    "build_exactly_one_release_AAB_as_1_0_0_r60_46_versionCode_2026081346",
+    "upload_and_activate_only_Google_Play_Internal_Testing",
+    "perform_exactly_one_in_place_OPPO_update_through_Google_Play",
+    "prove_installer_signer_version_package_and_AAB_relationship",
+    "execute_complete_OPPO_Social_YouTube_Chat_auth_return_offline_retry_relaunch_and_global_navigation_acceptance",
+    "fail_the_candidate_and_register_successor_defects_for_any_truthful_failure"
+  ],
+  "explicitExclusions": [
+    "no_second_AAB_without_new_explicit_founder_authorization",
+    "no_uninstall_data_clear_downgrade_sideload_or_ADB_install",
+    "no_Production_open_closed_public_listing_or_non_Dev_backend",
+    "no_Hosting_youtubeProvider_youtubeOAuthCallback_moolSocialChat_rules_or_IAM_mutation_without_a_new_proven_delta",
+    "no_email_quota_submission_provider_message_customer_contact_or_funds",
+    "no_secret_token_private_verdict_nonce_private_key_password_or_attestation_payload_access_by_the_agent",
+    "no_commit_push_merge_rebase_branch_switch_main_or_destructive_Git_action",
+    "Firebase_Phone_Auth_and_Firebase_passwordless_email_link_remain_separately_registered_pre_public_launch_work"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "existing_C30T_runtime_and_test_owners",
+      "existing_moolSocialContent_Firebase_function",
+      "existing_Google_Play_Internal_Testing_track",
+      "existing_OPPO_Play_install"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The backend delta is confined to the existing moolSocialContent owner; Hosting is byte-identical to the deployed fingerprint. A successor release gate and one Play candidate are required because the consumed r60.45 authority and evidence cannot be reset or reused.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_13_AAB_upload_deployment_and_OPPO_mutation_authorization",
+    "founder_requires_production_grade_machine_state_reconciliation_before_AAB",
+    "r60_45_consumed_state_and_all_evidence_remain_immutable",
+    "current_authoritative_58_file_Flutter_manifest_405_passed_3_declared_skips_0_failed_after_four_C30U_account_entry_tests",
+    "backend_516_passed_Hosting_7_passed_whole_mobile_analyzer_clean",
+    "OTP_successors_remain_registered_for_completion_before_full_public_launch"
+  ],
+  "testAndEvidencePlan": [
+    "two_identical_final_source_and_machine_cycles",
+    "complete_authoritative_Flutter_backend_Hosting_analyzer_release_manifest_signing_and_secret_boundary_gates",
+    "exact_Dev_moolSocialContent_predeploy_dry_run_deploy_revision_and_postdeploy_readback",
+    "one_AAB_provenance_checksum_package_version_signer_Firebase_Crashlytics_and_payload_seal",
+    "Internal_Testing_release_readback_and_one_Play_in_place_OPPO_update",
+    "real_OPPO_guest_and_authenticated_Feed_actions_Create_exact_six_write_limit_YouTube_connect_player_fullscreen_Chat_recovery_global_navigation_offline_retry_relaunch"
+  ],
+  "authority": {
+    "sourceAndGateWriteAuthorized": true,
+    "DevMoolSocialContentDeploymentAuthorized": true,
+    "buildAuthorized": true,
+    "uploadAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "buildLimit": 1,
+    "uploadLimit": 1,
+    "installLimit": 1,
+    "authorizedTrack": "internal",
+    "HostingDeploymentAuthorized": false,
+    "youtubeProviderDeploymentAuthorized": false,
+    "youtubeOAuthCallbackDeploymentAuthorized": false,
+    "moolSocialChatDeploymentAuthorized": false,
+    "rulesOrIamMutationAuthorized": false,
+    "productionOpenClosedOrPublicAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "root": "artifacts/quality/uaw-c30u-post-r60-45-social-repairs-play-internal-acceptance-20260813-01",
+    "providerHostingSourceManifest": "artifacts/quality/uaw-c30u-post-r60-45-social-repairs-play-internal-acceptance-20260813-01/01-provider-hosting-source-manifest.json"
+  }
+}

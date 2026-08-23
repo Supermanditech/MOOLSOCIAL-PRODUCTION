@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+  "parentTicket": "UAW-C30U-POST-R60-45-SOCIAL-REPAIRS-PLAY-INTERNAL-ACCEPTANCE",
+  "state": "founder_authorized_fresh_two_cycle_qualification_required",
+  "classification": "mvp_required",
+  "severity": "release_acceptance_gate",
+  "actor": "MoolSocial_guest_reader_and_authenticated_social_user",
+  "customerOutcome": "One immutable r60.47 Internal Testing candidate delivers the already source-qualified Social, YouTube handoff, fullscreen player and Feed action repairs through Google Play, updates the existing OPPO app in place, and is accepted only after complete real-device journeys pass without regression.",
+  "classificationReason": "The supported Social launch slice cannot reach truthful Play-installed acceptance while r60.46 remains lawfully unuploaded after its governance seal changed. A separately authorized successor is required without changing product behavior or bypassing the source gate.",
+  "minimumCompleteScope": [
+    "preserve_r60_46_AAB_and_all_evidence_unuploaded_and_immutable",
+    "seal_one_new_stable_product_source_fingerprint_after_all_C30V_release_gate_owners_are_complete",
+    "run_two_identical_comprehensive_non_build_pre_AAB_cycles",
+    "preserve_the_existing_Dev_moolSocialContent_revision_and_every_unchanged_Hosting_provider_callback_Chat_rules_and_IAM_owner",
+    "build_exactly_one_release_AAB_as_1_0_0_r60_47_versionCode_2026081347",
+    "upload_and_activate_only_Google_Play_Internal_Testing",
+    "perform_exactly_one_in_place_OPPO_update_through_Google_Play",
+    "prove_installer_signer_version_package_and_AAB_relationship",
+    "execute_complete_OPPO_Social_YouTube_Chat_auth_return_offline_retry_relaunch_and_global_navigation_acceptance",
+    "fail_the_candidate_and_register_successor_defects_for_any_truthful_failure"
+  ],
+  "explicitExclusions": [
+    "no_r60_46_upload",
+    "no_second_r60_47_AAB_without_new_explicit_founder_authorization",
+    "no_uninstall_data_clear_downgrade_sideload_or_ADB_install",
+    "no_Production_open_closed_public_listing_or_non_Dev_backend",
+    "no_backend_Hosting_youtubeProvider_youtubeOAuthCallback_moolSocialChat_rules_or_IAM_mutation",
+    "no_email_quota_submission_provider_message_customer_contact_or_funds",
+    "no_secret_token_private_verdict_nonce_private_key_password_or_attestation_payload_access_by_the_agent",
+    "no_commit_push_merge_rebase_branch_switch_main_or_destructive_Git_action",
+    "Firebase_Phone_Auth_and_Firebase_passwordless_email_link_remain_separately_registered_pre_public_launch_work"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "existing_C30U_runtime_test_and_Dev_service_owners",
+      "existing_C30T_Google_Play_Internal_Testing_track",
+      "existing_OPPO_Play_install",
+      "existing_generic_single_AAB_build_wrapper"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "No product or backend behavior is being added. Separate C30V release-control, source-seal and evidence owners are necessary because r60.46 consumed its one build authority and must remain sealed but unuploaded after governance memory changed its source fingerprint.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_14_one_r60_47_AAB_one_Internal_upload_and_activation_one_in_place_OPPO_Play_update_authorization",
+    "r60_46_AAB_sha256_105242061939B1557B3BCCCBFD40F8CEBBEDFB59BE3ED30839C3FFA90049D145_remains_unuploaded",
+    "fresh_two_identical_cycles_are_required_after_all_C30V_governance_and_release_owners_settle",
+    "r60_45_remains_the_installed_Google_Play_predecessor_until_the_one_authorized_update",
+    "OTP_successors_remain_registered_for_completion_before_full_public_launch"
+  ],
+  "testAndEvidencePlan": [
+    "two_identical_final_stable_product_source_and_machine_cycles",
+    "complete_authoritative_Flutter_backend_Hosting_analyzer_release_manifest_signing_and_secret_boundary_gates",
+    "unchanged_Dev_service_revision_and_Hosting_readback",
+    "one_AAB_provenance_checksum_package_version_signing_Firebase_Crashlytics_and_payload_seal",
+    "Internal_Testing_release_readback_and_one_Play_in_place_OPPO_update",
+    "real_OPPO_guest_and_authenticated_Feed_actions_Create_exact_six_write_limit_YouTube_connect_player_fullscreen_Chat_recovery_global_navigation_offline_retry_relaunch"
+  ],
+  "authority": {
+    "sourceAndGateWriteAuthorized": true,
+    "DevMoolSocialContentDeploymentAuthorized": false,
+    "buildAuthorized": true,
+    "uploadAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "buildLimit": 1,
+    "uploadLimit": 1,
+    "installLimit": 1,
+    "authorizedTrack": "internal",
+    "HostingDeploymentAuthorized": false,
+    "youtubeProviderDeploymentAuthorized": false,
+    "youtubeOAuthCallbackDeploymentAuthorized": false,
+    "moolSocialChatDeploymentAuthorized": false,
+    "rulesOrIamMutationAuthorized": false,
+    "productionOpenClosedOrPublicAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "root": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01",
+    "preselection": "artifacts/quality/uaw-c30v-r60-47-seal-recovery-play-internal-acceptance-20260814-01/00-pre-ticket-selection-assessment.json"
+  }
+}

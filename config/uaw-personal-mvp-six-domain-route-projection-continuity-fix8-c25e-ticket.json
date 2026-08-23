@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SIX-DOMAIN-ROUTE-PROJECTION-CONTINUITY-FIX8-C25E",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Social, Shop, Food, Travel, Care and Work use their correct local rails across main and nested screens while preserving carts, sessions, Back, Forward, MoolSocial and Chat return continuity.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SIX-DOMAIN-ROUTE-PROJECTION-CONTINUITY-FIX8-C25E-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["SocialUniversalV2","BuyV2Screen and BuyV2Session","EatPageScaffold and EatSession","RidePageScaffold and RideSession","BookPageScaffold BookSession BookGateway and BusBookingScreen","WorkPageScaffold and WorkSession","MoolDestinationNavigationV2"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"Each production scaffold already owns its current session and direct callbacks. C25E only projects the completed catalogue into those existing owners and cross-links the existing Medicine and Bus routes."},
+  "acceptance": ["Social_exact_four","Shop_Products_Wholesale_Orders","Food_exact_two","Travel_Bike_Auto_Cab_Bus","Care_Doctor_Medicine_Salon","Work_exact_two","Medicine_reuses_Buy_business_screen","Bus_reuses_Book_business_screen","no_intermediate_MoolSocial_detour"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SIX-DOMAIN-ROUTE-PROJECTION-CONTINUITY-FIX8-C25E-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

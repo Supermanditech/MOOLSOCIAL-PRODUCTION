@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-PLAYER-RETRY-LIFECYCLE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "official_player_recovery_control_contract_blocker",
+  "actor": "reviewer_recovering_an_official_embedded_YouTube_player_or_backgrounding_during_playback",
+  "customerOutcome": "The in-player retry appears only for the one provider failure that is truly retryable, consumes that exact retry API once, and lifecycle pause failures become contained terminal recovery without an uncaught asynchronous error.",
+  "minimumCorrection": [
+    "wire_the_visible_retry_control_to_retryPlayerFailureFromUser",
+    "show_Try_again_only_when_the_controller_snapshot_marks_the_provider_failure_retryable",
+    "keep_native_terminal_ineligible_and_nonretryable_provider_failures_on_Open_YouTube_only",
+    "contain_lifecycle_pause_channel_failure_detach_the_player_and_release_the_global_lease",
+    "prove_provider_retry_budget_and_lifecycle_pause_failure_state_machine"
+  ],
+  "explicitExclusions": [
+    "no_player_library_or_provider_API_expansion",
+    "no_custom_playback_controls_metadata_ads_branding_or_link_changes",
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "45 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/youtube-player-retry-lifecycle-focused-tests.log",
+    "evidenceSha256": "49CDF5E4FE5A0FDD319D09975C74D323445CF91AC6026C138904620D6B305F37",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

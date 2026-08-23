@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX1-X-NATIVE-PKCE-FIREBASE-CUSTOM-TOKEN-BROKER",
+  "parentTicketId": "UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "state": "registered_acceptance_child_source_pending_parent_scope_selection",
+  "classification": "beyond_mvp",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can choose X, authorize privately through an exact native/public-client OAuth 2.0 PKCE handoff, return once to MoolSocial, receive one Firebase session and continue to the exact protected destination, or safely retry after cancellation, denial, expiry, replay or provider failure.",
+  "minimumCompleteScope": [
+    "reuse_X_PKCE_protocol_contract_shared_gateway_JourneySession_and_AUTH_API base configuration",
+    "add_one_App_Check_protected_begin_operation_that_creates_a_high entropy_one time_server retained_PKCE attempt_and_returns_only_the_authorization URL_and expiry",
+    "add_one_complete_operation_that_validates_exact_redirect_state_cardinality_expiry_and_attempt_before_public client_code exchange",
+    "request_exactly_tweet read_and_users read_with_no_offline access",
+    "verify_the_transient_X_subject_through_users me_derive_a_nonreversible_project scoped Firebase UID_mint_a_custom token_and_immediately_revoke_the_X access token",
+    "add_mobile_external browser_launch_foreground callback_and cold callback_paths_without_persisting_private OAuth material",
+    "complete_bootstrap_rollback_exact return_authenticated relaunch_and sign out"
+  ],
+  "explicitExclusions": [
+    "no_OAuth1_TwitterAuthProvider_client secret_refresh token_or offline access",
+    "no_X_content_read_write_follow_DM_email_analytics_or publishing use_after_identity verification",
+    "no_raw_provider subject_state_verifier_code_token_or_custom token_in logs_persistence_crash reports_or evidence",
+    "no_provider console_app_credits_external build_Play_OPPO_or private account_action"
+  ],
+  "testAndEvidencePlan": [
+    "backend_exact_runtime_schema_and_strict TypeScript validation",
+    "App_Check_missing_invalid_replay_attempt_and_body size negative tests",
+    "PKCE_state_redirect_cardinality_expiry_duplicate_callback_and_exchange error tests",
+    "provider subject_HMAC_Firebase UID_custom token_and_always revoke tests",
+    "mobile_cold_foreground_cancel_offline_process death_and exact return tests",
+    "no_private OAuth material_static and rendered error evidence"
+  ],
+  "authority": {
+    "runtimeBackendTestAndPlatformSourceAuthorizedUnderParent": true,
+    "providerConsoleCreditsOrExternalWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

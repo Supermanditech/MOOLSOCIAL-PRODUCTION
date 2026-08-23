@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-PRIVACY-YOUTUBE-READONLY-SCOPE-TRUTH",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_static_tests_passed_hosting_held",
+  "classification": "mvp_required",
+  "severity": "youtube_privacy_scope_truth_and_non_expansion",
+  "actor": "YouTube_compliance_reviewer_or_MoolSocial_user",
+  "customerOutcome": "The public privacy policy describes the candidate's exact youtube.readonly channel connection and does not imply any consented YouTube action or mutation authority.",
+  "minimumCorrection": [
+    "replace_generic_data_or_actions_consent_language_with_youtube_readonly",
+    "state_no_upload_edit_delete_viewer_playlist_channel_or_asset_mutations",
+    "lock_the_privacy_copy_against_restoring_the_broader_statement"
+  ],
+  "explicitExclusions": [
+    "no_OAuth_provider_or_runtime_change",
+    "no_Hosting_deploy_AAB_APK_upload_install_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "hostingDeployAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "webTests": "7 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/56-privacy-youtube-readonly-scope-tests.log",
+    "evidenceSha256": "B23088029D5156D20789F8B00CFC65274886EB6F10469C537A44E58906ED13B0"
+  }
+}

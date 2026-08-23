@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-C29E",
+  "rejectedPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PUBLIC-DATA-OPPO-QUALIFICATION-SUCCESSOR-C29D",
+  "state": "device_gate_rejected_successor_source_ticket_registered",
+  "classification": "mvp_supporting",
+  "actor": "founder-authorized Personal review user on OPPO serial 2b3e0f71",
+  "customerOutcome": "The founder reviews the source-qualified YouTube-native Social Home and full-viewport Shorts, plus truthful MoolSocial Feed/Create and common Chat/Mool access, on one checksum-qualified r60.31 OPPO build.",
+  "founderDirection": "complete_production_grade_Flutter_Social_then_test_on_OPPO_before_founder_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/check-youtube-public-dev-build-context.ps1",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "C29E sealed the complete Flutter source in two identical 42-file host cycles. C29F only consumes the existing one-build and in-place device-review path. C29D/r60.30 cannot be retried because its build/install authority is consumed and its founder-rejected evidence is immutable."
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F",
+    "versionName": "1.0.0-r60.31",
+    "versionCode": "2026081131",
+    "buildMode": "profile",
+    "runtimeProfile": "YouTubePublicDevReview",
+    "sourceManifestSha256": "A5F4E76BC0F51614D5BF6F049E50ED91EE0E67F6CBE81DE4FEC555D88B355BB2",
+    "oneBuildOnly": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "minimumCompleteScope": [
+    "fresh_prebuild_process_source_and_exact_OPPO_identity_gate_for_C29F_only",
+    "one_profile_APK_wrapper_invocation_and_no_second_build",
+    "checksum_v2_signature_badging_version_source_and_serial_qualification",
+    "one_in_place_OPPO_install_without_uninstall_or_data_clear_only_after_artifact_qualification",
+    "real_App_Check_Home_Shorts_player_navigation_Feed_Create_Chat_Mool_lifecycle_and_recovery_replay",
+    "founder_review_handoff"
+  ],
+  "explicitExclusions": [
+    "no_C29D_or_r60_30_retry_reuse_or_evidence_mutation",
+    "no_cloud_write_redeploy_or_agent_access_copy_output_hash_or_persistence_of_token_API_key_or_Firebase_configuration_values",
+    "no_owner_OAuth_upload_live_or_analytics_capability",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install",
+    "no_Production_Staging_HTML_commit_push_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29E_two_complete_42_file_host_cycles_passed",
+    "C29E_protected_Social_baseline_passed_180_files",
+    "FSC02D_no_persisted_secret_PublicDataReview_runtime_qualified",
+    "FSC02E_exact_Dev_Firebase_Android_client_key_restriction_passed",
+    "FSC02G_official_99_method_exact_contract_gate_passed",
+    "founder_OPPO_and_production_grade_Dev_authority_2026_08_11",
+    "exact_OPPO_serial_and_r60_30_predecessor_identity",
+    "checksum_unique_same_certificate_successor_before_install",
+    "permanent_regression_memory"
+  ],
+  "testAndEvidencePlan": [
+    "prebuild_process_context_source_and_device_identity_audit",
+    "one_wrapper_profile_build_with_ephemeral_in_memory_Firebase_client_configuration",
+    "APK_checksum_v2_signature_badging_version_and_source_audit",
+    "single_in_place_install_and_installed_checksum_match",
+    "real_Home_Shorts_catalogue_player_navigation_Feed_Create_Chat_Mool_and_recovery_replay"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorizedAfterMachineGate": false,
+    "buildAuthorizationConsumed": true,
+    "installAuthorizedAfterChecksumQualification": false,
+    "installAuthorizationConsumed": true,
+    "externalServiceWriteAuthorized": false,
+    "agentSecretValueAccessAuthorized": false,
+    "qualifiedWrapperEphemeralFirebaseClientReadAuthorized": true,
+    "credentialOrConfigurationValuePersistenceAuthorized": false
+  },
+  "protectedState": {
+    "c29dBuildAndInstallAuthorizationConsumed": true,
+    "c29dEvidenceImmutable": true,
+    "c28dEvidenceImmutable": true,
+    "installedVersionName": "1.0.0-r60.30",
+    "installedVersionCode": "2026081130",
+    "installedApkSha256": "8C4C0BA08B18605C9C5E6AF036B5BB86B93778ED602AA9C4638A384DB7E95BCF",
+    "installedSerial": "2b3e0f71",
+    "installedIdentityMustRemainPreservedUntilQualifiedInPlaceInstall": true,
+    "currentInstalledVersionName": "1.0.0-r60.31",
+    "currentInstalledVersionCode": "2026081131",
+    "currentInstalledApkSha256": "497F00B5E52D17788B25353ADD36A4C91AA5C0A2BDD7967367BC3815F50AAA89",
+    "c29fBuildAuthorizationConsumed": true,
+    "c29fInstallAuthorizationConsumed": true
+  },
+  "deviceGateResult": {
+    "state": "rejected_no_rebuild_no_reinstall",
+    "reason": "Shorts did not match the founder's edge-to-edge reference, Social dock controls exported below 44 logical pixels, and two reachable Create states exposed internal delivery commentary.",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F-DEVICE-GATE-REJECTION-20260811.md",
+    "installedCandidateMustRemainPreserved": true,
+    "successorTicket": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R06-PERSONAL-EAT-EXPOSURE-INTERACTION-NAVIGATION-V1",
+  "ticketId": "UAW-R06-PERSONAL-EAT-EXPOSURE",
+  "actor": "Personal user",
+  "entryRoute": "/app/eat",
+  "classification": "mvp_required",
+  "actions": [
+    {
+      "id": "order-food",
+      "label": "Order Food",
+      "route": "/app/eat/home",
+      "existingOwner": "EatHomeScreen"
+    },
+    {
+      "id": "book-table",
+      "label": "Book Table",
+      "route": "/app/eat/table",
+      "existingOwner": "EatTableScreen"
+    }
+  ],
+  "excludedActions": ["tiffin"],
+  "navigation": {
+    "back": "pop_prior_surface_else_/app/mool?from=eat",
+    "mool": "/app/mool?from=eat",
+    "chat": "/app/chat/inbox?return=/app/eat",
+    "choiceTransition": "push"
+  },
+  "presentation": {
+    "owner": "MvpActionChoiceRootV2",
+    "nativeFlutter": true,
+    "sharedConfigurationOwner": true,
+    "arrivalDurationMs": 240,
+    "loops": false,
+    "reducedMotion": "settled_static_state",
+    "minimumTapTargetLogicalPixels": 48
+  },
+  "explicitExclusions": [
+    "no_tiffin_exposure",
+    "no_new_route_session_backend_or_data_owner",
+    "no_downstream_restaurant_payment_fulfilment_or_delivery_change",
+    "no_build_install_device_external_service_commit_push_deploy_or_promotion"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-EMBEDDED-VERTICAL-MOOL-SWITCHER-FIX9-C26C",
+  "parentTicket": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Mool expands in place into a thin connected vertical glass switcher for all six families and never looks like a separate modal page.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-EMBEDDED-VERTICAL-MOOL-SWITCHER-FIX9-C26C-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["MoolGlobalNavigationV2","MoolConnectedActionNavigator","MoolMainDomainMenu","moolActionFamilies","OverlayPortal"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"The existing global launcher, catalogue and overlay primitives can be recomposed in place; a route or page is unnecessary."},
+  "acceptance": ["six_vertical_family_rows","connected_to_Mool_anchor","no_modal_barrier_dimming_header_or_close_chrome","tap_or_swipe_up_opens","family_tap_swipe_down_outside_tap_and_Back_close","finite_motion_reduced_motion_immediate","family_coloured_native_icons","56px_rows"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-EMBEDDED-VERTICAL-MOOL-SWITCHER-FIX9-C26C-COMPLETION-20260810.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

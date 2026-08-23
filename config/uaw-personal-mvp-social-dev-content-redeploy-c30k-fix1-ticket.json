@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DEV-CONTENT-REDEPLOY-C30K-FIX1",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-BACKEND-DEPLOYMENT-C29U",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-REVIEW-PERSONAS-AND-CONTENT-C30K"
+  ],
+  "state": "founder_authorized_predeployment_correction_and_qualification",
+  "classification": "mvp_required",
+  "actor": "authenticated_MoolSocial_Dev_user",
+  "customerOutcome": "The exact Dev moolSocialContent function persists and returns all six accepted MoolSocial Feed/Create formats, including four-choice Quick Poll and Quiz records, through the existing Firebase Auth and App Check contract without shipping Dev review-corpus operator tooling.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "firebase.json",
+      "backend/functions/src/index.ts",
+      "backend/functions/src/social/firestore_store.ts",
+      "backend/functions/src/social/firestore_store.test.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C29U deployed revision moolsocialcontent-00001-fef before the C30K text-choice persistence correction. The current Firebase source upload also includes compiled Dev corpus operator files that are not HTTP exports. A bounded ignore-list correction plus one exact Dev-only function redeployment is the smallest complete successor."
+  },
+  "auditBaseline": {
+    "project": "moolsocial-dev-503018",
+    "region": "asia-south1",
+    "currentRevision": "moolsocialcontent-00001-fef",
+    "currentState": "ACTIVE",
+    "runtime": "nodejs22",
+    "runtimeServiceAccount": "social-content-runtime@moolsocial-dev-503018.iam.gserviceaccount.com",
+    "invokerIamCheckDisabled": true,
+    "unauthenticatedApplicationStatus": 401,
+    "firestoreDirectClientStatus": 403,
+    "storageDirectClientStatus": 403,
+    "billingEnabled": true,
+    "requiredApisEnabled": true
+  },
+  "minimumCompleteScope": [
+    "exclude_Dev_review_corpus_source_runner_and_compiled_output_from_the_Firebase_function_upload",
+    "replace_the_obsolete_C29U_hash_seal_with_a_successor_gate_bound_to_the_current_C30K_source",
+    "run_backend_build_typecheck_full_tests_rules_denial_and_exact_Firebase_deploy_dry_run",
+    "redeploy_only_functions_moolSocialContent_to_the_exact_Dev_project",
+    "verify_new_ACTIVE_revision_runtime_identity_limits_invoker_mode_and_application_level_Auth_App_Check_denial",
+    "verify_Firestore_and_Storage_direct_client_rules_remain_deny_all_without_redeployment"
+  ],
+  "explicitExclusions": [
+    "no_youtubeProvider_youtubeOAuthCallback_rules_Hosting_Production_or_Staging_deployment",
+    "no_Dev_corpus_reapply_user_enablement_overwrite_delete_or_cleanup",
+    "no_secret_token_password_API_key_or_credential_value_read_copy_or_output",
+    "no_APK_build_install_launch_uninstall_data_clear_or_downgrade_under_this_ticket",
+    "no_commit_push_promotion_provider_submission_message_call_or_fund"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_12_full_deployment_preparation_audit_then_Dev_only_moolSocialContent_redeployment_with_C30L_separate",
+    "sourceConfigurationWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "externalServiceWriteAuthorized": true,
+    "functionTarget": "functions:moolSocialContent",
+    "rulesWriteAuthorized": false,
+    "youtubeFunctionWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "testPlan": [
+    "operator_tooling_upload_exclusion_static_gate",
+    "backend_build_typecheck_and_complete_test_suite",
+    "Firebase_15_5_1_exact_target_dry_run",
+    "pre_and_post_revision_runtime_IAM_and_invoker_metadata_comparison",
+    "unauthenticated_function_401_and_direct_client_rules_403_probes"
+  ],
+  "successor": {
+    "ticketId": "UAW-PERSONAL-MVP-SOCIAL-POST-R60-38-SUCCESSOR-OPPO-QUALIFICATION-C30L",
+    "state": "not_registered_until_Dev_redeployment_is_verified"
+  }
+}

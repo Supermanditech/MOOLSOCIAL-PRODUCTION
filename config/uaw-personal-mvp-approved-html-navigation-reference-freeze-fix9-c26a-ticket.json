@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-APPROVED-HTML-NAVIGATION-REFERENCE-FREEZE-FIX9-C26A",
+  "parentTicket": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "The founder-approved navigation HTML and its three exact replacement points are frozen with immutable checksums before native Flutter mutation.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-APPROVED-HTML-NAVIGATION-REFERENCE-FREEZE-FIX9-C26A-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["tmp/founder-navigation-prototype-v1/index.html","approved-references manifest and immutable version workflow"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":["one immutable navigation reference package","one machine-readable C26 interaction contract"],"necessityProof":"The temporary founder-review file must become durable immutable authority before it can govern Flutter replacement; no runtime owner is created."},
+  "acceptance": ["exact_source_SHA256_frozen","only_three_founder_approved_points_are_authority","interaction_motion_accessibility_and_exclusion_contract_recorded","approved_reference_manifest_additive_only","Screens_01_03_and_existing_accepted_references_unchanged"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-APPROVED-HTML-NAVIGATION-REFERENCE-FREEZE-FIX9-C26A-COMPLETION-20260810.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

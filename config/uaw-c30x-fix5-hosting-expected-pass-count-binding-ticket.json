@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-FIX5-HOSTING-EXPECTED-PASS-COUNT-BINDING",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_release_count_binding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "C30X release qualification records and enforces the exact current eight-test Hosting suite instead of accepting a stale historical count.",
+  "classificationReason": "Current Hosting tests pass, but the successor release state understates their count and the build gate does not bind it. Exact regression accounting is mandatory before the authorized AAB.",
+  "minimumCompleteScope": [
+    "bind_hostingPassed_8_in_C30X_state_and_aggregate",
+    "require_exact_state_and_aggregate_Hosting_count_equality_in_the_build_phase",
+    "rerun_the_exact_two_file_Hosting_suite_with_8_passes_and_0_failures",
+    "supersede_but_preserve_all_pre_FIX5_provisional_C30X_manifests"
+  ],
+  "explicitExclusions": [
+    "no_apps_web_runtime_public_content_test_or_build_configuration_change",
+    "no_expected_count_change_without_exact_current_test_output",
+    "no_AAB_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX5"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2167_registered_before_correction",
+    "current_apps_web_suite_produced_8_passes_0_failures"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/web/tests/firebase-public-site.test.mjs",
+      "apps/web/tests/rendered-html.test.mjs",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c30x.json",
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The current test owners already prove the eight-test contract. Updating two machine counts and one gate predicate is the smallest complete repair and adds no new Hosting behavior or owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "run_node_test_against_the_exact_two_apps_web_test_files",
+    "require_tests_8_pass_8_fail_0",
+    "run_C30X_reconcile_and_negative_build_gate",
+    "include_the_gate_change_in_a_fresh_manifest_and_two_identical_cycles"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30X-FIX5-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30x-fix5-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30X-STALE-HOSTING-EXPECTED-PASS-COUNT-20260814.md"
+  }
+}

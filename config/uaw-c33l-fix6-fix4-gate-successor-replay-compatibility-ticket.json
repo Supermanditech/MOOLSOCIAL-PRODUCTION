@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33L-FIX6-FIX4-GATE-SUCCESSOR-REPLAY-COMPATIBILITY",
+  "parentTicketId": "UAW-C33L-R60-50-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "findingId": "REG-20260816-2562-C33L-FIX4-GATE-ACTIVE-TICKET-ONLY-SUCCESSOR-REPLAY-RISK",
+  "state": "source_test_gate_repair_qualified_dual_host_parent_successor_replay_ready",
+  "classification": "mvp_required",
+  "customerOutcome": "Every later release candidate replays the qualified aggregate build-mirror prevention without weakening ticket selection or rejecting a valid successor lifecycle.",
+  "classificationReason": "A successor release cannot run its mandatory prevention suite while FIX4 is bound only to the child-active ticket. Exact successor replay is required before another AAB can be considered.",
+  "minimumCompleteScope": [
+    "preserve_direct_FIX4_child_active_scope_validation",
+    "add_one_pure_FIX4_selection_binding_for_exact_qualified_successor_replay",
+    "require_current_ticket_selected_ticket_manifest_hash_qualified_FIX4_hash_state_and_evidence_consistency",
+    "add_dual_host_active_successor_wrong_ticket_wrong_hash_wrong_state_and_missing_evidence_fixtures",
+    "requalify_FIX4_without_build_Play_OPPO_or_external_action"
+  ],
+  "explicitExclusions": [
+    "no_change_to_wrapper_transition_product_runtime_UI_backend_Hosting_provider_or_service",
+    "no_AAB_APK_Play_upload_activation_OPPO install_update_or_device_action",
+    "no_Firebase_Google_YouTube_email_SMS_quota_funds_or_other_external_write",
+    "no_secret_private_link_token_nonce_verdict_key_attestation_or_exception_payload_access",
+    "no_wildcard_successor_acceptance_without_exact_selected_and_prior_assessment_binding"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_continue_as_needed_for_production_grade_full_in_scope_authority_2026_08_16",
+    "REG_2562_and_qualified_FIX4_evidence",
+    "qualified_FIX5_launcher_result_owner",
+    "existing_MVP_scope_state_and_gate"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_7_active_and_successor_fixture_pass",
+    "Windows_PowerShell_5_1_active_and_successor_fixture_pass",
+    "wrong_current_selected_ticket_rejected",
+    "wrong_FIX4_manifest_hash_rejected",
+    "wrong_FIX4_qualification_state_rejected",
+    "missing_FIX4_evidence_rejected",
+    "live_FIX6_selected_replay_and_existing_FIX4_behavioral_matrix_pass"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/check-uaw-c33l-fix4-generic-aab-postbuild-aggregate-mirror-atomicity.ps1",
+      "scripts/check-mvp-scope-gate-state.ps1",
+      "config/mvp-scope-gate-state.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33l-fix6-fix4-gate-successor-replay-compatibility.ps1"
+    ],
+    "necessityProof": "The existing FIX4 gate remains the sole behavioral prevention owner. One pure selection-binding function inside it and one dual-host fixture gate are the smallest complete repair; no alternate wrapper, release state, product owner, screen, route, backend or provider is created.",
+    "robustnessCoverage": [
+      "direct_child_active_mode",
+      "generic_exact_successor_replay_mode",
+      "current_and_selected_ticket_consistency",
+      "qualified_FIX4_ticket_hash_state_and_evidence_binding",
+      "negative_fixtures_and_dual_PowerShell_hosts"
+    ],
+    "adjustments": [
+      "reuse_FIX4_behavioral_matrix_unchanged",
+      "add_only_selection_lifecycle_compatibility",
+      "hold_parent_candidate_selection_until_FIX6_qualifies"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "artifacts/quality/uaw-c33l-r60-50-authentication-no-regression-preparation-20260815-01/07-postbuild-lifecycle-recovery-incident.md"
+  },
+  "authority": {
+    "sourceTestAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "powerShell7ActiveFixture": "passed",
+    "powerShell7SuccessorFixture": "passed",
+    "powerShell7NegativeFixtures": "4_of_4_rejected",
+    "windowsPowerShell51ActiveFixture": "passed",
+    "windowsPowerShell51SuccessorFixture": "passed",
+    "windowsPowerShell51NegativeFixtures": "4_of_4_rejected",
+    "liveFix6SelectedFix4Replay": "passed",
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "secretValuesObserved": false,
+    "evidence": "docs/quality/UAW-C33L-FIX6-FIX4-GATE-SUCCESSOR-REPLAY-COMPATIBILITY-QUALIFICATION-20260816.md"
+  }
+}

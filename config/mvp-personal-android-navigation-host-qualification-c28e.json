@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-C28E-20260810",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E",
+  "ticketManifestPath": "config/uaw-personal-mvp-android-navigation-exported-semantics-host-remediation-fix12-c28e-ticket.json",
+  "ticketManifestSha256": "E415F225477ACBEB05D44ED9A83A6B47E9A2EB0E4DCF9D32C7A0A4452A9FC125",
+  "state": "complete_two_cycle_host_qualification_passed",
+  "baseTopology": {
+    "path": "config/mvp-personal-uniform-navigation-host-qualification-c27e.json",
+    "sha256": "A6CE9B4C16E5CFC817A7DDFD541FD0A42CF396BFA4BE3BA6431876654F8A75E0",
+    "requiredTestCount": 51,
+    "requiredGateCount": 21,
+    "replacedGate": "scripts/check-personal-uniform-navigation-host-qualification-c27e.ps1"
+  },
+  "reusedC28CTopology": {
+    "path": "config/mvp-personal-android-navigation-host-qualification-c28c.json",
+    "sha256": "062F3E28C1DA906D75C5092C34A5BE7537B678026C274EC12A314B2E5524C09C"
+  },
+  "addedTests": [
+    "apps/mobile/test/core/platform/mool_system_ui_viewport_c28b_test.dart",
+    "apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart"
+  ],
+  "addedFormatOwners": [
+    "apps/mobile/lib/core/platform/mool_system_ui_viewport.dart",
+    "apps/mobile/lib/main.dart"
+  ],
+  "addedGates": [
+    "scripts/check-personal-android-navigation-host-qualification-c28e.ps1",
+    "scripts/check-personal-android-navigation-exported-semantics-c28e.ps1"
+  ],
+  "expectedTotals": {
+    "requiredTests": 53,
+    "requiredGates": 22,
+    "formatOwners": 4
+  },
+  "predecessorStates": [
+    {"path": "config/uaw-personal-mvp-android-navigation-viewport-contract-fix11-c28a-ticket.json", "state": "complete"},
+    {"path": "config/uaw-personal-mvp-android-navigation-viewport-implementation-fix11-c28b-ticket.json", "state": "complete"},
+    {"path": "config/uaw-personal-mvp-android-navigation-host-qualification-fix11-c28c-ticket.json", "state": "complete"},
+    {"path": "config/uaw-personal-mvp-android-navigation-oppo-qualification-fix11-c28d-ticket.json", "state": "device_gate_rejected_successor_required"},
+    {"path": "config/moolsocial-fsc01-social-redundant-family-root-removal-ticket.json", "state": "completed_nonbuild_gates_passed"},
+    {"path": "config/moolsocial-fsc06-shop-products-cell-disposition-ticket.json", "state": "completed_nonbuild_gates_passed"}
+  ],
+  "protectedRuntimeSeals": [
+    {
+      "id": "social",
+      "path": "artifacts/quality/social-protected-candidate-c28e-screen04-fsc06-migration-20260810-01/BASELINE.json",
+      "manifestSha256": "DF892B09572E437D3E4C16CD06961EE359E5506C519031D35BDA2DF6052D3F0D",
+      "expectedFiles": 178,
+      "portableTreeSha256": "0d76c606e921bd863f64b3cf88bde48d2218bf993aab23e8d3c10be3709b3e8f"
+    },
+    {
+      "id": "buy",
+      "path": "artifacts/quality/moolsocial-fsc06-shop-products-cell-disposition-20260810-01/BASELINE.json",
+      "manifestSha256": "D3BC8CA83D0F9C2A4FB633AA62FEE7C4BF65543667A2A645D163CFC6E17F9CBF",
+      "expectedFiles": 43,
+      "portableTreeSha256": "6e2c18af399d8c2e0a3ab8cb63d76d5e32228f2ea69d26f0d1df662c3f3bbd8e"
+    }
+  ],
+  "expectedInstalledPredecessor": {
+    "machineState": "c28d_r60_27_device_gate_rejected_exported_semantic_height_successor_required",
+    "versionName": "1.0.0-r60.27",
+    "versionCode": "2026081027",
+    "apkSha256": "E4651AEADFD2A98A7617021B8DEF645BC5D428DD1593D882D278F3706FF6BD0C",
+    "buildAuthorization": "consumed_no_second_build"
+  },
+  "hostQualification": {
+    "requiredConsecutiveCycles": 2,
+    "unchangedSourceFingerprintRequired": true,
+    "completeAnalysisRequired": true,
+    "completeRequiredSuiteRequired": true,
+    "evidenceDirectory": "artifacts/quality/uaw-c28e-host-qualification-20260810-04",
+    "sourceFingerprintAlgorithm": "SHA256_OF_SORTED_PER_FILE_SHA256_AND_REPOSITORY_RELATIVE_PATH_USING_LF",
+    "sourceFingerprintScope": [
+      "apps/mobile/lib",
+      "apps/mobile/test",
+      "scripts",
+      "config",
+      "docs/quality",
+      "docs/delivery"
+    ],
+    "qualifiedSourceFingerprint": "52E505B59809E920ED128E16CE8AD0DB0DDD7CB7CEAE0C3C8C5CD89CAA3B3989",
+    "cycleOneEvidenceSha256": "5E331824CA86F6B7CF1FDA948048F0B93A183491BDB3847B6EC0D470AC91EA6E",
+    "cycleTwoEvidenceSha256": "B87A444576C69C6FDFE286B1DC6B20805FB42D4B3B381677B8B90A7A4AA3184C"
+  }
+}

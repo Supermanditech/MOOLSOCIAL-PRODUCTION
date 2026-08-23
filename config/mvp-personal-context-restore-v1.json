@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R14-PERSONAL-CONTEXT-RESTORE-V1",
+  "ticketId": "UAW-R14-PERSONAL-CONTEXT-RESTORE",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "runtimeOwner": "JourneySession_pending_route_then_social_cold_launch",
+  "contextCanonicalizationOwner": "JourneySession_canonical_persisted_ready_route",
+  "storageOwner": "existing_JourneySnapshot_lastReadyRoute_diagnostic_not_cold_launch",
+  "coldLaunchRoute": "/app/social",
+  "pendingRoutePrecedence": true,
+  "lastReadyRouteLaunchBehavior": "ignored_without_an_explicit_pending_route",
+  "fallbackRoute": "/app/social",
+  "contexts": [
+    {"id":"social","root":"/app/social","subActions":{"shorts":"/app/social?sub=shorts","videos":"/app/social?sub=videos","feed":"/app/social?sub=feed","create":"/app/social?sub=create"}},
+    {"id":"buy","root":"/app/buy?sub=shop","owner":"existing_canonicalBuyResumeRoute","subActions":{"shop":"/app/buy?sub=shop","wholesale":"/app/buy?sub=wholesale","medicine":"/app/buy?sub=medicine","orders":"/app/buy?sub=orders"}},
+    {"id":"mool","root":"/app/mool","allowedOrigins":["social","buy","eat","ride","book","work"]},
+    {"id":"eat","root":"/app/eat","subActions":{"order-food":"/app/eat/home","book-table":"/app/eat/table"}},
+    {"id":"ride","root":"/app/ride","subActions":{"bike":"/app/ride/book?type=bike","auto":"/app/ride/book?type=auto","cab":"/app/ride/book?type=cab"}},
+    {"id":"book","root":"/app/book","subActions":{"doctor":"/app/book/doctor","salon":"/app/book/salon"}},
+    {"id":"work","root":"/app/work","subActions":{"earn-today":"/app/work/earn","workspace":"/app/work/my-work"}}
+  ],
+  "transientContextRules": [
+    {"id":"chat","paths":["/app/chat","/app/chat/inbox","/app/chat/thread/*"],"restore":"canonical_return_query_or_fallback"},
+    {"id":"legacy-containment","path":"/app/action-unavailable","reasonRoots":{"tiffin":"/app/eat","get-it-done":"/app/book","standalone-pay":"/app/mool","delivery":"/app/work","onboard":"/app/work","verify":"/app/work"}}
+  ],
+  "depthReductionRules": [
+    {"pathPrefix":"/app/eat/order","restore":"/app/eat/home"},
+    {"pathPrefix":"/app/eat/table/","restore":"/app/eat/table"},
+    {"pathPrefix":"/app/ride/trip/","restore":"/app/ride"},
+    {"pathPrefix":"/app/book/doctor/","restore":"/app/book/doctor"},
+    {"pathPrefix":"/app/book/salon/","restore":"/app/book/salon"},
+    {"pathPrefix":"/app/work/opportunity/","restore":"/app/work/earn"},
+    {"pathPrefix":"/app/work/workspace/","restore":"/app/work/my-work"}
+  ],
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newStoreOwners": 0,
+  "newBackendOwners": 0,
+  "explicitExclusions": [
+    "no_removed_action_or_exact_record_identifier_restore",
+    "no_external_malformed_unknown_cross_workspace_or_capability_restore",
+    "no_storage_migration_screen_route_backend_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

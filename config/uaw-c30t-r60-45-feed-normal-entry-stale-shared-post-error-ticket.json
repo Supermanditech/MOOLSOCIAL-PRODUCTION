@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-FEED-NORMAL-ENTRY-STALE-SHARED-POST-ERROR",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "public_feed_retained_state_truth_blocker",
+  "actor": "user_opening_public_Feed_from_the_normal_Social_rail_after_relaunch",
+  "customerOutcome": "Normal Feed entry shows only current public Feed state; a shared-post unavailable banner appears only for an explicit shared-link lookup and never leaks into later ordinary browsing.",
+  "observedFailure": {"entry": "Open Feed, MoolSocial from normal rail after app relaunch", "unexpectedBanner": "This shared post is not available", "sharedLinkOpenedThisSession": false},
+  "minimumSuccessorCorrection": ["scope_shared_post_lookup_and_error_to_the_explicit_shared_link_route", "clear_shared_lookup_state_on_normal_Feed_entry_and_return", "preserve_public_posts_pagination_and_refresh", "prove_retained_data_relaunch_and_normal_rail_entry_without_the_banner"],
+  "explicitExclusions": ["no_data_clear_or_uninstall_as_a_fix", "no_hiding_real_shared_link_errors", "no_second_C30T_AAB_upload_or_install"],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/test/social_v2_create_publication_test.dart"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The existing consumer owns both explicit shared-link resolution and local Social rail selection; one ephemeral active-context flag can cancel and clear only stale link state on normal Feed entry without changing routing or Feed data.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {"ticketAndEvidenceWriteAuthorized": true, "sourceImplementationAuthorizedByFounder": true, "executionSelectionPendingFullAcceptance": false, "executionSelectedAfterMvpReuseAssessment": true, "sourceNonBuildQualified": true, "successorBuildUploadInstallAuthorized": false},
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "explicit_missing_shared_link_retains_the_truthful_unavailable_notice",
+      "normal_Feed_rail_entry_clears_only_shared_link_presentation_context",
+      "normal_entry_increments_request_identity_so_late_old_results_cannot_reorder_or_restore_notice",
+      "loaded_public_posts_pagination_refresh_and_errors_remain_owned_by_SharedSession",
+      "new_explicit_shared_link_still_supersedes_an_older_resolution"
+    ],
+    "feedCreatePublicationPartition": "25_passed_0_failed",
+    "c30tGuestAuthFeedPartition": "15_passed_0_failed",
+    "analyzer": "2_exact_owned_items_clean",
+    "routesAdded": 0,
+    "screensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayAcceptancePending": true
+  },
+  "evidence": {"screenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/39-public-feed-live.png", "screenshotSha256": "C022DF821A0AF780213BA7C7C7C5647ECDB0A69FACD628D52BBE52CC9013FD93", "uiHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/39-public-feed-live.xml", "finding": "docs/quality/UAW-C30T-R60-45-FEED-NORMAL-ENTRY-STALE-SHARED-POST-ERROR-20260813.md"}
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "authorizationId": "SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PORTFOLIO-AUTHORIZATION-20260807",
+  "portfolioId": "SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-CONTROL-PORTFOLIO-20260807",
+  "parentTicketId": "SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-AND-CONTROL-END-TO-END-JOURNEY",
+  "portfolioManifest": "config/superadmin-mvp-exact-launch-participant-provisioning-control-portfolio.json",
+  "portfolioManifestSha256": "1D322686A59DA40639F72BCAD2FFA0077A37D1B68E3DDC7B120EC7FB32C2D502",
+  "founderEvidence": "docs/quality/SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-CONTROL-PORTFOLIO-AUTHORIZATION-20260807.md",
+  "state": "founder_authorized_sequential_execution_subject_to_independent_gates",
+  "activeChildTicket": null,
+  "completedChildTickets": [
+    "SAM-R01-SERVER-STABLE-WORKSPACE-MEMBERSHIP-READ-CONTRACT",
+    "SAM-R05-SERVER-CAPABILITY-GEOGRAPHY-POLICY-CONTRACT",
+    "SAM-R06-SERVER-WORKSPACE-LIFECYCLE-AUDIT-CONTRACT",
+    "SAM-R07-IDEMPOTENT-PRIVILEGED-COMMAND-PROTOCOL"
+  ],
+  "nextAuthorizedActivity": "run_the_reuse_scope_and_dependency_checkpoint_for_the_next_independently_executable_child",
+  "authorizedActions": [
+    "local_repository_planning_and_source_writes_within_each_disclosed_child",
+    "local_automated_tests_and_static_quality_gates",
+    "browser_or_OPPO_review_only_when_the_active_child_independently_authorizes_it"
+  ],
+  "independentGatesRetained": [
+    "mvp_scope_and_reuse",
+    "exact_actor_capability_and_dependency",
+    "accepted_reference_for_UI",
+    "security_privacy_accessibility_and_release",
+    "provider_payment_regulatory_and_environment",
+    "APK_build_install_and_device"
+  ],
+  "notAuthorized": [
+    "beyond_mvp_scope",
+    "credentials_or_live_role_claims",
+    "live_provider_messages_calls_or_money_movement",
+    "Production_read_write_or_experiment",
+    "commit_push_deploy_or_promotion"
+  ]
+}

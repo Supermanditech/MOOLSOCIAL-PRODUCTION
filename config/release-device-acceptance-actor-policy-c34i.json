@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C34I-PRIVACY-SAFE-DEVICE-ACCEPTANCE-ACTOR-POLICY-001",
+  "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.73",
+    "versionCode": "2026081373",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "predecessorRejection": {
+    "ticketId": "UAW-C34H-R60-72-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+    "versionCode": "2026081372",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "deviceAcceptanceCount": 0,
+    "artifactReusable": false,
+    "reasonRegistryId": "REG-20260817-2709-C34H-YOUTUBE-PROVIDER-ACCOUNT-CHOOSER-PRIVATE-IDENTIFIER-EXPOSURE-RECURRENCE",
+    "evidencePath": "docs/quality/UAW-C34H-R60-72-POSTINSTALL-ACCOUNT-CHOOSER-PRIVACY-REJECTION-20260817.md"
+  },
+  "actors": {
+    "codex": {
+      "allowedSanitizedReadOnlyChecks": [
+        "package_name",
+        "version_name",
+        "version_code",
+        "installer_package",
+        "current_activity",
+        "current_process_id",
+        "fatal_priority_count_for_current_process",
+        "anr_count_for_current_process",
+        "non_private_visible_heading_and_state"
+      ],
+      "allowedPredeclaredDeviceActions": [
+        "open_existing_Play_installed_MoolSocial_after_postinstall_gate",
+        "navigate_public_Guest_Feed_without_authentication",
+        "navigate_protected_Social_Create_until_generic_sign_in_gateway",
+        "close_or_back_from_local_non_private_MoolSocial_surface",
+        "capture_sanitized_non_private_MoolSocial_evidence"
+      ],
+      "neverAllowedActions": [
+        "tap_any_account_capable_identity_provider",
+        "open_or_inspect_Android_system_account_chooser",
+        "select_or_infer_any_private_account_identifier",
+        "enter_or_inspect_email_phone_OTP_password_API_key_OAuth_client_ID_or_credential",
+        "open_or_inspect_private_email_action_link_or_private_deep_link",
+        "capture_persist_log_copy_or_emit_private_identifier_or_private_system_surface",
+        "continue_after_unplanned_provider_or_private_surface_becomes_visible"
+      ]
+    },
+    "founder": {
+      "requiredActions": [
+        "enter_all_hidden_AAB_inputs_in_founder_owned_visible_console",
+        "tap_every_account_capable_identity_provider",
+        "handle_every_system_account_chooser_and_account_selection",
+        "enter_every_email_phone_OTP_or_other_private_authentication_value",
+        "open_every_private_email_action_link_or_private_deep_link",
+        "close_every_private_system_surface_before_returning_control_to_Codex",
+        "report_only_sanitized_completion_or_cancellation_state"
+      ]
+    },
+    "androidSystem": {
+      "privateSurfaces": [
+        "account_chooser",
+        "credential_manager",
+        "private_email_or_phone_autofill",
+        "private_deep_link_chooser"
+      ],
+      "owner": "founder_only_when_private_surface_is_visible"
+    }
+  },
+  "handoff": {
+    "freshExactDeviceWindowSelectionAfterFounderAction": true,
+    "discardAllPriorScreenshotsCoordinatesAndElementIndices": true,
+    "resumeOnlyAfterFounderConfirmsPrivateSurfaceClosed": true,
+    "resumeFromSanitizedMoolSocialStateOnly": true
+  },
+  "failClosed": {
+    "privateIdentifierVisibleToCodexRejectsCandidate": true,
+    "accountChooserVisibleToCodexRejectsCandidate": true,
+    "privateLinkVisibleToCodexRejectsCandidate": true,
+    "credentialOrSecretVisibleToCodexRejectsCandidate": true,
+    "unplannedProviderSurfaceVisibleToCodexRejectsCandidate": true,
+    "staleDeviceHandleInputRejectsCurrentJourney": true,
+    "newOrHistoricalRegressionRejectsCandidate": true,
+    "waiversAllowed": false
+  },
+  "journeyOrder": [
+    {
+      "id": "sanitized_install_and_runtime_proof",
+      "actor": "codex",
+      "statusBeforeInstall": "held_postupload_gate_required"
+    },
+    {
+      "id": "public_Guest_Feed",
+      "actor": "codex",
+      "statusBeforeInstall": "held_postinstall_gate_required"
+    },
+    {
+      "id": "protected_Social_Create_generic_gateway",
+      "actor": "codex",
+      "stopBefore": "any_identity_provider_tap"
+    },
+    {
+      "id": "Google_account_selection_and_return",
+      "actor": "founder",
+      "codexResumeAfter": "private_system_surface_closed_and_sanitized_MoolSocial_state_reported"
+    },
+    {
+      "id": "Mobile_OTP",
+      "actor": "founder",
+      "separateRealSmsAuthorityRequired": true
+    },
+    {
+      "id": "Firebase_passwordless_email_link",
+      "actor": "founder",
+      "separateLiveEmailAuthorityRequired": true
+    },
+    {
+      "id": "post_authentication_protected_destination_and_whole_app_journeys",
+      "actor": "codex",
+      "startAfter": "private_system_surface_closed_and_sanitized_authenticated_MoolSocial_state"
+    }
+  ],
+  "acceptance": {
+    "deviceAcceptanceCountMayBecomeOneOnlyAfterEveryRequiredJourneyPasses": true,
+    "allSixC33GBlockersRequireCandidateSpecificEvidence": true,
+    "sanitizedEvidenceOnly": true,
+    "productionReadinessImplied": false
+  }
+}

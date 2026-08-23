@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30O",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ACCOUNT-STATE-JOURNEY-C30J",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-REVIEW-PERSONAS-AND-CONTENT-C30K",
+    "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-CREATE-OPPO-QUALIFICATION-C30N"
+  ],
+  "state": "founder_authorized_preimplementation_qualification",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_creator_and_YouTube_API_reviewer",
+  "customerOutcome": "One production-grade release-signed Dev Android App Bundle is distributed only through Google Play Internal Testing, installed in place from Google Play on the OPPO, and truthfully proves distinct MoolSocial Feed/Create value together with source-attributed public YouTube discovery, official embedded playback and separately user-initiated read-only channel connection controls.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "targeted_compliance_correction",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_creator_upload.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/build.gradle.kts",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/release/kotlin/com/moolsocial/youtube_embedded_player_private_dev/YouTubeEmbeddedPlayerPrivateDevRegistrar.kt",
+      "apps/mobile/android/app/build.gradle.kts",
+      "scripts/check-apk-regression-gate-state.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newProviderCapabilities": [],
+    "necessityProof": "The current production route already owns real channel state but exposes upload-purpose consent and a private Short upload composer outside the declared reviewed use case, while the existing official embedded-player owner is disabled for release. Reusing those exact owners for a read-only connection presentation and release registration is the smallest correction. C30K, the current Dev provider revisions and r60.40 evidence remain preserved; no duplicate screen, route, backend or corpus owner is needed."
+  },
+  "minimumCompleteScope": [
+    "preserve_and_reverify_the_C30N_C28D_YouTube_Home_and_C30K_3_persona_36_post_48_media_baselines",
+    "remove_the_reachable_YouTube_upload_action_from_MoolSocial_Create_and_bind_the_existing_channel_route_to_minimum_youtube_readonly_connection_only",
+    "keep_YouTube_source_attribution_metadata_standard_player_controls_branding_ads_links_privacy_deletion_revocation_disconnect_and_user_control_visible_and_truthful",
+    "enable_the_existing_official_embedded_player_owner_for_the_exact_release_internal_review_candidate_without_adding_a_second_player",
+    "qualify_a_separate_upload_key_Play_App_Signing_identity_and_the_Play_app_signing_SHA256_in_Dev_Firebase_App_Check_without_exposing_secret_values",
+    "build_exactly_one_machine_gated_release_signed_Dev_AAB_and_seal_source_provenance_version_package_signing_and_SHA256",
+    "create_or_configure_only_the_Google_Play_Internal_Testing_app_track_add_the_founder_tester_and_generate_the_valid_private_tester_link",
+    "install_the_checksum_and_provenance_qualified_successor_in_place_from_Google_Play_on_OPPO_2b3e0f71_without_uninstall_data_clear_or_downgrade",
+    "prove_Play_distributed_identity_App_Check_signed_in_Feed_read_then_exactly_six_Dev_Create_writes_and_Feed_readback",
+    "prove_cold_launch_C28D_YouTube_Home_search_video_Shorts_attribution_player_unconnected_connected_consent_disconnect_error_retry_offline_refresh_relaunch_and_global_navigation",
+    "prepare_but_do_not_send_the_same_thread_YouTube_response_and_reviewer_package_with_the_private_valid_Android_tester_link"
+  ],
+  "explicitExclusions": [
+    "no_YouTube_upload_viewer_mutation_playlist_channel_asset_mutation_Analytics_Reporting_Live_partner_membership_Super_Chat_or_content_owner_claims",
+    "no_broad_Shop_Care_Work_Travel_Food_or_global_redesign_and_no_new_social_screen_route_backend_or_provider_capability",
+    "no_Google_Play_Production_open_testing_public_listing_or_non_internal_release",
+    "no_Staging_or_Production_backend_provider_rules_or_Hosting_deployment",
+    "no_YouTube_quota_submission_email_send_reply_or_provider_customer_message_without_founder_approval",
+    "no_password_MFA_token_API_key_OAuth_credential_App_Check_token_private_attestation_verdict_or_private_key_access_output_copy_or_persistence",
+    "no_commit_push_merge_rebase_main_uninstall_data_clear_downgrade_second_build_second_install_or_fund_movement",
+    "exactly_six_signed_in_Dev_Create_writes_only_after_a_successful_live_Feed_read"
+  ],
+  "authority": {
+    "founderObservationAndTicketRegistration": "explicit_2026_08_12_Play_Internal_Testing_and_YouTube_compliance_successor_with_hello_Firebase_and_supermanditech_Play_account_split",
+    "founderExecutionAuthority": "explicit_2026_08_12_one_release_AAB_Internal_Testing_only_Play_install_OPPO_journeys_six_Dev_Create_writes_and_unsent_reviewer_package",
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "accountBoundary": {
+    "firebaseAndAuthenticatedGmailAccount": "hello@moolsocial.com",
+    "googlePlayConsoleAccount": "supermanditech@gmail.com",
+    "passwordAndMfaFounderVisibleOnly": true,
+    "crossAccountCredentialCopyForbidden": true
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.40",
+    "installedVersionCode": "2026081240",
+    "installedApkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "installedSerial": "2b3e0f71",
+    "installedArtifactMustRemainUntilQualifiedPlaySuccessorInstall": true,
+    "uninstallDataClearDowngradeOrAdbSuccessorInstallForbidden": true,
+    "C28DAndC30LC30MC30NEvidenceImmutable": true,
+    "protectedBaselineUpdated": false,
+    "successorBuildsPerformed": 0,
+    "successorInstallsPerformed": 0,
+    "createWritesAttempted": 0
+  },
+  "dependencies": [
+    "moolsocialcontent_00003_juw_ACTIVE",
+    "youtubeprovider_00036_qer_ACTIVE",
+    "youtubeoauthcallback_00035_cir_accepted_and_read_only_reconfirmed_before_use",
+    "C30K_three_persona_36_post_48_media_corpus_preserved",
+    "Google_Play_Supermandi_Tech_Private_Limited_organization_under_supermanditech_gmail",
+    "Firebase_Dev_project_moolsocial_dev_503018_under_hello_moolsocial",
+    "founder_visible_upload_key_password_MFA_and_account_switch_checkpoints",
+    "Play_App_Signing_certificate_SHA256_registered_for_Firebase_Android_app_1_760290687711_android_4202409fd3ab38f6ce076a",
+    "secret_safe_Firebase_release_build_configuration_without_agent_access_to_API_key_values",
+    "permanent_regression_MVP_delivery_environment_C28D_release_signing_and_machine_AAB_gates"
+  ],
+  "testPlan": [
+    "official_YouTube_policy_source_and_route_action_copy_audit",
+    "focused_readonly_connection_no_upload_action_release_player_and_privacy_control_tests",
+    "two_identical_complete_Social_source_cycles_and_release_static_gates",
+    "release_upload_signing_AAB_manifest_package_version_certificate_checksum_and_provenance_controls",
+    "Play_Internal_Testing_track_tester_link_and_in_place_OPPO_install_provenance",
+    "OPPO_C28D_YouTube_discovery_search_video_Shorts_attribution_standard_player_account_consent_disconnect_error_retry_matrix",
+    "OPPO_live_Dev_Feed_all_authors_formats_then_exactly_six_Create_round_trips_vote_quiz_media_carousel_offline_refresh_relaunch",
+    "unsent_YouTube_same_thread_draft_reviewer_steps_privacy_deletion_revocation_links_and_updated_screencast_evidence"
+  ],
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30O-FINDINGS-20260812.md"
+}

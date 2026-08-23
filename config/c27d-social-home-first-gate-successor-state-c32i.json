@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "stateId": "C32I-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-STATE",
+  "ticketId": "UAW-C32I-PERSONAL-MVP-C27D-SOCIAL-HOME-FIRST-GATE-SUCCESSOR-RECONCILIATION",
+  "state": "source_gate_repair_two_identical_cycles_qualified_live_and_release_actions_held",
+  "finding": "REG-20260815-2246-POST-YOUTUBE-AUDIT-C27D-CANONICAL-PROJECTION-REJECTION",
+  "sourceManifest": {
+    "path": "artifacts/quality/uaw-c32i-personal-mvp-c27d-social-home-first-gate-successor-20260815-01/source-manifest-c32i.txt",
+    "files": 9,
+    "fingerprintSha256": "0CACB094CA6D6E816E80783516BDCAB46A56F24B501A7627D9D92C760BA2A644",
+    "verifiedBeforeEachCycle": true
+  },
+  "qualification": {
+    "identicalCycles": 2,
+    "powerShell7C27D": "passed_each_cycle",
+    "windowsPowerShellC27D": "passed_each_cycle",
+    "powerShell7C32I": "passed_each_cycle",
+    "windowsPowerShellC32I": "passed_each_cycle",
+    "focusedFlutterFiles": 2,
+    "focusedFlutterTests": 3,
+    "focusedFlutterPassed": 3,
+    "analyzedItems": 3,
+    "analyzer": "no_issues_each_cycle",
+    "personalActionProjection": "passed_each_cycle",
+    "regressionMemory": "passed_each_cycle",
+    "mvpScopeAndDelivery": "passed_each_cycle",
+    "approvedUiLocks": "passed_each_cycle"
+  },
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "liveDataWriteAuthorized": false,
+    "deploymentAuthorized": false,
+    "buildAuthorized": false,
+    "playUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "protectedReleaseState": {
+    "candidate": "1.0.0-r60.48+2026081348",
+    "candidateState": "failed_social_authentication_and_protected_action_journeys",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "changedByC32I": false
+  }
+}

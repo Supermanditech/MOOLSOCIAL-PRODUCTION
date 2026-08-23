@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SUBACTION-PROFESSIONAL-REGRESSION-GATES-FIX3-C20F",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-GALLERY-PROFESSIONAL-RECOVERY-FIX3-C20",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal MoolSocial customer navigating any existing Social Buy Eat Ride Book or Work subaction",
+  "capability": "retain the complete professional subaction contract across all seventeen selected states, disclosure states, motion modes and existing navigation continuity paths",
+  "customerOutcome": "Every existing subaction stays discoverable, legible, neutral, one tap and reachable behind one anchored shell, with machine gates preventing regressions in visual tokens, semantics, disclosure, motion, Back, Mool, Chat and content access.",
+  "failureRecovery": "Any drift in the seventeen-state inventory, contrast, geometry, selected or pressed state, collapse recovery, overflow affordance, reduced motion, route continuity or content reachability rejects host qualification before build authorization.",
+  "classificationReason": "C20B through C20E now prove the repaired system by child; C20F is the required MVP consolidation that prevents a later partial suite or source change from silently restoring the founder-rejected r60.18 defects.",
+  "minimumCompleteScope": [
+    "reuse_C20B_C20C_C20D_C20E_static_gates_and_focused_tests",
+    "lock_six_families_seventeen_selected_states_and_two_three_four_action_counts",
+    "lock_disclosure_default_hide_show_zero_height_session_recovery_and_truthful_overflow",
+    "lock_neutral_glass_contrast_48x16_20px_icon_13px_700_label_and_no_family_tint_shadow_band_scroll_filler",
+    "lock_semantics_one_tap_inert_selected_finite_motion_immediate_reduced_motion_Back_Mool_Chat_and_content_reachability",
+    "add_one_C20F_aggregate_machine_contract_test_and_static_gate"
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "existingGates": ["C20B", "C20C", "C20D", "C20E"],
+    "existingSelectedStateCount": 17,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentBusinessStateOwners": [],
+    "newSubactions": []
+  },
+  "aggregateContract": {
+    "families": ["social", "buy", "eat", "ride", "book", "work"],
+    "selectedStateCount": 17,
+    "supportedActionCounts": [2, 3, 4],
+    "defaultDisclosureExpanded": true,
+    "collapsedHeight": 0.0,
+    "minimumDisclosureTarget": 48.0,
+    "minimumOverflowTarget": 44.0,
+    "railSurfaceOpacity": 0.0,
+    "minimumCompositedContrast": 4.5,
+    "controlHeight": 48.0,
+    "controlRadius": 16.0,
+    "labelFontSize": 13.0,
+    "labelFontWeight": 700,
+    "maximumNavigationTextScale": 1.3,
+    "iconOpticalBox": 20.0,
+    "normalControlMotionMilliseconds": 160,
+    "reducedMotionImmediate": true,
+    "selectedActionInert": true,
+    "availableActionOneTap": true,
+    "BackMoolChatContinuityRequired": true,
+    "contentReachabilityRequired": true,
+    "familyTintedFillAllowed": false,
+    "blockingBandOrTrapezoidAllowed": false,
+    "horizontalScrollOrPanelAllowed": false,
+    "distributedSparseCellsAllowed": false,
+    "fillerActionAllowed": false,
+    "selectedShadowAllowed": false
+  },
+  "plannedFiles": [
+    "config/mvp-personal-subaction-professional-recovery-regression-c20.json",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_subaction_professional_regression_c20f_test.dart",
+    "scripts/check-personal-subaction-professional-regression-c20f.ps1"
+  ],
+  "testAndEvidencePlan": [
+    "machine_readable_six_family_seventeen_state_inventory_and_child_gate_chain",
+    "visual_geometry_typography_icon_neutral_glass_contrast_and_forbidden_pattern_contract",
+    "disclosure_overflow_semantics_one_tap_motion_and_reduced_motion_contract",
+    "Back_Mool_Chat_content_reachability_and_anchored_shell_required_suite_inventory",
+    "scope_memory_approved_UI_brand_copy_interaction_placement_navigation_and_prebuild_closed_gates"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "explicitExclusions": [
+    "no_runtime_UI_route_feature_subaction_backend_provider_or_business_state_mutation",
+    "no_C20G_two_cycle_host_qualification_or_C20H_build_install_work",
+    "no_screenbook_protected_reference_business_copy_or_commercial_logic_change",
+    "no_build_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "founderAuthority": "docs/quality/UAW-C20F-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SUBACTION-PROFESSIONAL-REGRESSION-GATES-FIX3-C20F-PRESELECTION-ASSESSMENT-20260808.md"
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX2-FACEBOOK-NATIVE-SDK-PUBLIC-LOGIN-ADAPTER",
+  "parentTicketId": "UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "state": "registered_acceptance_child_source_pending_parent_scope_selection",
+  "classification": "beyond_mvp",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can choose Facebook, authorize privately through the supported native Facebook Login SDK with minimum permission, establish one Firebase session and continue to the exact protected destination, or safely retry after cancellation, denial, configuration failure, account collision or network failure.",
+  "minimumCompleteScope": [
+    "reuse_Facebook_contract_shared_gateway_FirebaseAuth_JourneySession_bootstrap_rollback_and protected return",
+    "add_one_native_Facebook SDK adapter_requesting_exactly_public profile_and_no_email_by default",
+    "exchange_the_transient_native_access token_for_a_Firebase_Facebook credential_without_logging_or_persisting_it",
+    "add_build time_Android_and_iOS_configuration owners_for_app identity_callback_scheme_and_client token_without_committed real values",
+    "keep_the_control_disabled_until_app_package_activity_debug and release_key hash_redirect_privacy_revocation_and data deletion facts_are qualified",
+    "cover_cancel_denied_failed_operation in progress_collision_provider disabled_network_logout_revocation_and deletion recovery",
+    "complete_bootstrap_rollback_exact return_authenticated relaunch_and sign out"
+  ],
+  "explicitExclusions": [
+    "no_email_permission_by_default_and_no_friends_pages_groups_ads_posts_messaging_business_or analytics permissions",
+    "no_committed_real_app ID_client token_app secret_access token_key hash_account name_email_or identifier",
+    "no_direct_Graph_API_business publishing_or social content capability",
+    "no_Meta_console_live mode_app review_external build_Play_OPPO_or private account_action"
+  ],
+  "testAndEvidencePlan": [
+    "native adapter_success_cancel_denied_failure_and_operation in progress fixtures",
+    "exact_public profile_permission_and_no_email_static assertions",
+    "Firebase_credential_collision_disabled_network_unknown_and sanitized error tests",
+    "Android_iOS_build configuration_missing_placeholder_mismatch_and_disabled fail closed tests",
+    "logout_revocation_data deletion_bootstrap rollback_exact return_and relaunch tests",
+    "no_private provider token_identifier_or provider message_in logs_exceptions_or evidence"
+  ],
+  "authority": {
+    "runtimePlatformTestSourceAuthorizedUnderParent": true,
+    "providerConsoleAppReviewLiveModeOrExternalWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

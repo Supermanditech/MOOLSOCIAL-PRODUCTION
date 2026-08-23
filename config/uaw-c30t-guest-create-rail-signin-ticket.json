@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-GUEST-CREATE-RAIL-SIGNIN",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "authentication_boundary_blocker",
+  "actor": "guest_MoolSocial_reader",
+  "customerOutcome": "Every Create entry point starts the same real sign-in journey for a guest and preserves /app/social?sub=create as the exact return location.",
+  "minimumCorrection": [
+    "gate_the_local_Create_rail_before_changing_the_active_tab",
+    "begin_real_signin_with_exact_Create_return_location",
+    "keep_the_Create_workbench_unmounted_for_the_guest",
+    "preserve_existing_signed_in_Create_navigation"
+  ],
+  "explicitExclusions": [
+    "no_auto_publish_after_signin",
+    "no_backend_or_provider_change",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "22 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/guest-create-rail-signin-focused-tests.log",
+    "evidenceSha256": "1B4DE63E29654C915F04B37917CDDCF1C4EB8D27AF7DAE39971E4141A190EEBD",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

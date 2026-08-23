@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PROTECTED-PLATFORM-TEST-ISOLATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_authoritative_manifest_passed_aab_held",
+  "classification": "mvp_supporting",
+  "actor": "release_qualifier",
+  "customerOutcome": "Release signing and candidate-provenance controls stay enforced without modifying a platform test locked to Screens 01–03.",
+  "smallestCompleteScope": [
+    "move_only_the_two_successor_release_assertions_to_a_C30T_owned_test",
+    "restore_platform_configuration_test_to_its_exact_accepted_checksum",
+    "add_the_new_test_exactly_once_to_C30T_qualification"
+  ],
+  "explicitExclusions": [
+    "no_platform_runtime_change",
+    "no_approved_manifest_change",
+    "no_Screens_01_03_change",
+    "no_AAB"
+  ],
+  "testPlan": [
+    "flutter_test_platform_release_signing_and_provenance_test",
+    "check_approved_ui_locks",
+    "C30T_static_release_readiness"
+  ],
+  "verification": {
+    "isolatedOwner": "apps/mobile/test/platform_release_signing_and_provenance_test.dart",
+    "authoritativeFocusedManifest": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-04/focused-test-manifest-accepted.txt",
+    "presentExactlyOnceInManifest": true,
+    "focusedPairResult": "6_passed_0_failed",
+    "authoritativeManifestResult": "401_passed_3_declared_skips_0_failed",
+    "AabAuthorizedOrBuilt": false
+  }
+}

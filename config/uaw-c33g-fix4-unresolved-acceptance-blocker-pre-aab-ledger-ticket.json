@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33G-FIX4-UNRESOLVED-ACCEPTANCE-BLOCKER-PRE-AAB-LEDGER",
+  "parentTicket": "UAW-C33G-R60-49-FAILED-ACCEPTANCE-REPAIR",
+  "finding": "REG-20260815-2432-C33F-UNRESOLVED-FOUNDER-JOURNEY-BLOCKERS-NOT-CARRIED-INTO-PRE-AAB-GATE",
+  "state": "phase_contract_repaired_dual_host_selftest_prebuild_source_pass_postinstall_device_fail_closed_57_affected_tests_and_analyzer_passed",
+  "classification": "mvp_required",
+  "severity": "release_process_blocking",
+  "actor": "MoolSocial_release_operator_selecting_a_future_Internal_Testing_candidate",
+  "capability": "prove_every_applicable_founder_reported_acceptance_blocker_resolved_before_AAB_authority",
+  "customerOutcome": "No future AAB can be built while a founder-reported release blocker is unresolved, lacks an exact repair ticket, or lacks focused and release-equivalent journey evidence.",
+  "classificationReason": "The missing carry-forward gate caused r60.49 to repeat the r60.48 defects and consume another release cycle.",
+  "minimumCompleteScope": ["create_one_durable_candidate_independent_acceptance_blocker_ledger", "bind_each_blocker_to_regression_ticket_source_test_and_device_evidence", "reject_candidate_selection_prebuild_and_authority_consumption_on_any_open_or_missing_item", "prove_cold_start_alone_never_satisfies_complete_journey_acceptance"],
+  "explicitExclusions": ["no_candidate_version_selection_or_release_authority", "no_waiver_of_any_existing_gate", "no_build_Play_OPPO_provider_backend_Hosting_email_quota_or_deployment"],
+  "dependenciesAndApprovals": ["C33G_FIX1_FIX2_FIX3_exact_resolution_states", "r60_48_and_r60_49_failure_histories_preserved", "founder_no_repeat_release_direction"],
+  "testAndEvidencePlan": ["open_blocker_missing_ticket_missing_test_missing_device_and_stale_candidate_negative_cases", "resolved_complete_positive_fixture", "PowerShell_7_and_Windows_PowerShell_replay", "future_candidate_gate_composition_before_hidden_input_prompt"],
+  "authority": {"testAndGateWriteAuthorized": true, "runtimeSourceWriteAuthorized": false, "buildPlayOrDeviceMutationAuthorized": false, "externalServiceWriteAuthorized": false}
+}

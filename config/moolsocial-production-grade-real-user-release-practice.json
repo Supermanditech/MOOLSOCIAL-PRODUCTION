@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PRODUCTION-GRADE-REAL-USER-RELEASE-PRACTICE-001",
+  "state": "permanent_active_until_and_after_go_live",
+  "founderDirectionDate": "2026-08-13",
+  "phaseVocabulary": {
+    "preAabQualified": "source_backend_configuration_tests_and_build_readiness_only",
+    "internalCandidateActive": "candidate_available_for_controlled_real_user_testing_only",
+    "postInstallQualified": "installed_identity_proved_journeys_still_separately_gated",
+    "productionGrade": "all_required_exact_Play_candidate_live_journeys_passed_zero_unresolved_blockers",
+    "goLiveReady": "production_grade_plus_all_separately_authorized_release_policy_regulatory_store_and_operational_gates_passed"
+  },
+  "mandatoryPractice": [
+    "automated_tests_are_necessary_never_sufficient",
+    "actively_search_for_unexpected_defects_beyond_scripted_happy_paths",
+    "test_exact_Play_installed_identity_and_real_backend_provider_content",
+    "test_signed_out_signed_in_cancel_failure_retry_offline_relaunch_process_death_system_Back_and_accessibility_geometry",
+    "test_Email_OTP_and_Mobile_OTP_independently",
+    "test_each_exposed_external_provider_independently_or_truthfully_disable_it",
+    "register_every_mistake_false_result_and_escaped_defect_before_continuing",
+    "implement_only_exact_founder_authorized_selected_tickets",
+    "preserve_all_failures_evidence_and_dirty_tree_ownership",
+    "withhold_complete_production_grade_reviewer_ready_and_go_live_ready_claims_until_zero_required_journey_failures_and_zero_unresolved_blockers"
+  ],
+  "claimBlockers": ["pending_required_live_journey", "unresolved_mvp_required_defect", "unproved_external_auth_or_provider_path", "unproved_exact_Play_identity", "unproved_offline_retry_relaunch_or_system_return", "unproved_accessibility_or_customer_copy_boundary"],
+  "doesNotAuthorize": ["build", "upload", "install", "production_rollout", "backend_or_provider_write", "email_or_quota_submission", "secret_access"]
+}

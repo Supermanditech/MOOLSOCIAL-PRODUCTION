@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-INBOX-START-ROUTE-ORDER-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "chat_recipient_navigation_blocker",
+  "actor": "signed_in_member_opening_a_new_Chat_recipient_route_while_an_older_recipient_request_is_pending",
+  "customerOutcome": "The newest Chat inbox filter, recipient and return route always own conversation creation and navigation; a late older request cannot open the wrong recipient.",
+  "minimumCorrection": [
+    "reapply_route_inputs_when_the_reused_inbox_widget_changes",
+    "assign_generation_ownership_to_filter_load_and_direct_thread_creation",
+    "serialize_route_application_and_drain_to_the_newest_requested_recipient",
+    "reject_stale_navigation_after_each_await",
+    "prove_a_late_old_recipient_creation_opens_only_the_new_recipient"
+  ],
+  "explicitExclusions": [
+    "no_chat_backend_or_message_contract_change",
+    "no_message_send",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "5 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-inbox-start-route-order-focused-tests.log",
+    "evidenceSha256": "98B902860F1AF2038D5729BCE168006A13EAC78A18CCB4B065AEDCA01929B0DD",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

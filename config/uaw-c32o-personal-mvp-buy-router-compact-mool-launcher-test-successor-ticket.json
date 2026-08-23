@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32O-PERSONAL-MVP-BUY-ROUTER-COMPACT-MOOL-LAUNCHER-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32N-PERSONAL-MVP-BUY-PROTECTED-SHARED-ROUTER-DELTA-ATTRIBUTION-HOLD",
+  "finding": "REG-20260815-2264-C32N-BUY-ROUTER-TEST-REMOVED-MOOL-HOME-LAUNCHER-KEY-REJECTION",
+  "state": "founder_authorized_test_successor_selected_all_runtime_baseline_and_live_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal Shop user relying on the accepted compact Mool switcher for connected Buy routes",
+  "customerOutcome": "Buy router regression tests exercise the same accepted compact Mool launcher that the real Shop and Social shells render, so connected Shop, Wholesale and Orders journeys remain truthfully protected.",
+  "classificationReason": "The runtime already conforms and later accepted C26D/C29N tests prove the compact key; only one predecessor test helper and its direct assertion are stale.",
+  "minimumCompleteScope": [
+    "preserve_all_runtime_reference_protected_baseline_and_business_owner_bytes",
+    "replace_only_three_mool_home_launcher_test_references_with_mool_compact_launcher",
+    "retain_all_existing_Buy_route_content_recovery_and_legacy_shell_assertions",
+    "preserve_C32N_through_its_exact_prior_ticket_manifest_hash_and_blocked_implementation_state",
+    "add_one_C32O_successor_checker_and_restart_focused_cycles_with_a_fresh_fingerprint"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_route_screen_copy_reference_navigation_or_Buy_behavior_change",
+    "no_protected_baseline_replacement_reseal_bypass_or_full_C28E_preflight_retry",
+    "no_backend_provider_cloud_live_data_build_Play_OPPO_funds_secret_or_external_communication_action"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user autonomous audit finding ticket and source implementation direction",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "acceptance": [
+    "buy_v2_router_test_contains_exactly_three_mool_compact_launcher_references_and_zero_mool_home_launcher_references",
+    "current_shared_owner_contains_both_compact_and_noncompact_keys",
+    "C26D_and_C29N_accepted_tests_continue_to_bind_compact_launcher",
+    "C32N_and_C32O_pass_on_both_PowerShell_hosts",
+    "all_Buy_router_tests_and_focused_connected_journeys_pass_in_two_fresh_cycles",
+    "runtime_and_protected_baseline_bytes_remain_unchanged"
+  ]
+}

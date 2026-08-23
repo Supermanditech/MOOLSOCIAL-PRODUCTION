@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "contractId": "RELEASE-RUNTIME-CONFIGURATION-C30W-001",
+  "ticketId": "UAW-C30W-R60-47-PLAY-COLD-START-MISSING-SERVER-CLIENT-ID",
+  "machineState": "source_repair_two_identical_cycles_qualified_successor_build_authorization_required",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "failedCandidate": {
+    "id": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+    "versionName": "1.0.0-r60.47",
+    "versionCode": "2026081347",
+    "machineState": "acceptance_failed_r60_47_cold_start_release_config_successor_required",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "successClaimed": false
+  },
+  "runtimeContract": {
+    "requiredReleaseDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY",
+      "MOOLSOCIAL_FIREBASE_APP_ID",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID",
+      "MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID"
+    ],
+    "requiredSecretDefineNamesForFutureCandidate": [
+      "MOOLSOCIAL_FIREBASE_API_KEY",
+      "MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID"
+    ],
+    "hiddenFounderPromptCount": 3,
+    "safeFirstFrameRequired": true,
+    "knownConfigurationThrowBeforeRunAppForbidden": true,
+    "secretValuesMayBePrintedCopiedLoggedOrInspected": false,
+    "transientSecretCleanupRequired": true
+  },
+  "sourceQualification": {
+    "sourceManifest": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/source-manifest-c30w.txt",
+    "sourceManifestSha256": "2CBABF3E5C7400E3193A3083624B09C975DD279BFE1CF34A2F1A628D0BBC9DDA",
+    "sourceFiles": 1091,
+    "focusedManifest": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/focused-test-manifest-c30w.txt",
+    "focusedManifestSha256": "6F6C9C7AE281510F156CA4869854A37D0424338F88839D23F64C8A1114F47147",
+    "focusedFiles": 59,
+    "cycle1": {
+      "evidence": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/01-source-cycle-1.json",
+      "sha256": "D25546C09F8AC152000AA30974DADE558AE254F60C4EF319FE7C0CCF7FADC88D",
+      "passed": 409,
+      "skipped": 3,
+      "failed": 0
+    },
+    "cycle2": {
+      "evidence": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/02-source-cycle-2.json",
+      "sha256": "145C4AB6462BEE2ED1D77D5ABBE96B7455222B5E457827AD49F38435ED9A039E",
+      "passed": 409,
+      "skipped": 3,
+      "failed": 0
+    },
+    "twoIdenticalCyclesPassed": true,
+    "wholeMobileAnalyzerPassed": true,
+    "powerShell7SourceGatePassed": true,
+    "windowsPowerShellSourceGatePassed": true,
+    "wrapperStaticGatePassed": true,
+    "failedR60_47BuildPhaseRejectedByNewGate": true
+  },
+  "futureCandidateGate": {
+    "gate": "scripts/check-release-runtime-configuration-c30w.ps1",
+    "buildPhaseRequiredBeforeAppBundleInvocation": true,
+    "founderLauncherPathRequiredInCandidateState": true,
+    "googleServerClientIdFounderQualificationRequired": true,
+    "postinstallPhaseRequired": true,
+    "playInstallerRequired": "com.android.vending",
+    "interactiveNamedFirstScreenRequired": true,
+    "blankHierarchyAllowed": false,
+    "timeoutAllowed": false,
+    "flutterFatalErrorCountAllowed": 0,
+    "androidRuntimeFatalCountAllowed": 0,
+    "anrCountAllowed": 0,
+    "artifactRelationshipRequired": true,
+    "inPlaceUpdateProofRequired": true
+  },
+  "authority": {
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "installAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "backendOrHostingOrProviderDeploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualificationFindings": "docs/quality/UAW-C30W-R60-47-COLD-START-SOURCE-REPAIR-QUALIFICATION-20260814.md"
+}

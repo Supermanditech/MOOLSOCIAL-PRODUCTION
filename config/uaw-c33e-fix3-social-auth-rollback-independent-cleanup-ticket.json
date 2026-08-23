@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33E-FIX3-SOCIAL-AUTH-ROLLBACK-INDEPENDENT-CLEANUP",
+  "parentTicket": "UAW-C33E-R60-48-PLAY-INSTALLED-AUTH-LOGIN-DEVICE-REPRODUCTION",
+  "finding": "REG-20260815-2344-C33E-SOCIAL-AUTH-ROLLBACK-SKIPS-SECOND-CLEANUP-AFTER-FIRST-FAILURE",
+  "state": "founder_authorized_runtime_and_test_repair_selected_no_build_provider_device_external_or_secret_authority",
+  "classification": "mvp_required",
+  "severity": "release_blocking_partial_authentication_failure_recovery",
+  "actor": "signed_out_personal_user_returning_to_an_exact_protected_Social_action_after_provider_identity_succeeds_but_MoolSocial_account_bootstrap_fails",
+  "customerOutcome": "A failed account bootstrap attempts both Firebase-session and native Google-account cleanup independently, never reports cleanup success when either owner fails, and leaves MoolSocial signed out on the exact originating action with the original retryable account error.",
+  "classificationReason": "Authentication rollback is part of the core MVP entry journey. Skipping the second cleanup after a first-leg exception can retain an ambiguous provider identity and invalidate retry, relaunch and reviewer-login behavior.",
+  "minimumCompleteScope": [
+    "replace_success_only_sequential_social_sign_out_with_independent_attempts_for_both_existing_cleanup_owners",
+    "rethrow_the_first_cleanup_failure_after_both_attempts_so_cleanup_never_reports_false_success",
+    "retain_JourneySession_signed_out_sign_in_stage_original_bootstrap_error_not_busy_and_exact_return_route_when_cleanup_throws",
+    "add_ticket_specific_success_first_leg_failure_second_leg_failure_and_session_continuity_tests",
+    "add_a_static_successor_gate_and_replay_C30Z_authentication_truth_and_C33E_FIX2_readiness_gates"
+  ],
+  "explicitExclusions": [
+    "no_locked_Screen03_presentation_accepted_test_golden_reference_asset_copy_or_route_change",
+    "no_new_auth_provider_screen_route_backend_endpoint_persistence_field_or_duplicate_gateway",
+    "no_Firebase_Google_Cloud_OAuth_YouTube_Play_console_CLI_project_or_provider_mutation",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_tap_or_other_device_action",
+    "no_password_API_key_OAuth_identifier_token_nonce_private_verdict_private_key_attestation_payload_or_debug_log_access",
+    "no_backend_Hosting_rules_IAM_deployment_email_quota_submission_external_message_or_funds"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_login_first_and_audit_findings_to_ticket_implementation_direction_2026_08_15",
+    "REG_20260815_2344_registered_before_runtime_retry",
+    "C30Z_source_qualification_C33E_FIX1_lifecycle_and_C33E_FIX2_live_readiness_gate_preserved",
+    "future_live_provider_readiness_and_separately_authorized_successor_release_remain_required"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart",
+      "apps/mobile/test/firebase_social_auth_gateway_test.dart",
+      "apps/mobile/test/screen03_session_test.dart",
+      "scripts/check-c30z-authentication-method-truth-and-guest-feed-recovery.ps1",
+      "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/uaw_c33e_fix3_social_auth_rollback_independent_cleanup_test.dart",
+      "scripts/check-uaw-c33e-fix3-social-auth-rollback-independent-cleanup.ps1"
+    ],
+    "necessityProof": "The existing FirebaseSocialAuthGateway and JourneySession already own the complete runtime path. One bounded method correction, one ticket-specific regression file and one source gate are sufficient; no duplicate provider, route, session, backend or presentation owner is needed.",
+    "robustnessCoverage": [
+      "successful_Firebase_then_Google_cleanup_order",
+      "Firebase_cleanup_failure_still_attempts_Google_cleanup",
+      "Google_cleanup_failure_occurs_after_Firebase_cleanup",
+      "first_failure_is_rethrown_after_both_attempts",
+      "original_bootstrap_error_and_exact_return_route_survive_cleanup_failure",
+      "signed_out_sign_in_stage_not_busy_and_no_false_success",
+      "locked_Screen03_and_release_provider_device_authority_containment"
+    ],
+    "adjustments": [
+      "reuse_the_existing_two_cleanup_owners_and_preserve_their_success_order",
+      "add_failure_aggregation_inside_the_existing_gateway_only",
+      "place_new_behavioral_coverage_in_a_ticket_specific_non_locked_test_owner"
+    ],
+    "explicitExclusions": [
+      "no_provider_or_persistence_architecture_expansion",
+      "no_release_device_external_or_secret_action"
+    ],
+    "dependenciesAndApprovals": [
+      "C30Z_qualified_authentication_source",
+      "C33E_FIX2_qualified_release_readiness_gate",
+      "future_live_console_evidence_and_Play_successor"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33e-fix3-social-auth-rollback-independent-cleanup-ticket.json"
+  },
+  "testAndEvidencePlan": [
+    "approved_UI_lock_before_and_after_runtime_change",
+    "Dart_format_and_no_format_diff_check",
+    "focused_analyzer_for_changed_runtime_and_new_test_owner",
+    "ticket_specific_success_and_two_cleanup_failure_tests",
+    "ticket_specific_JourneySession_bootstrap_and_cleanup_failure_continuity_test",
+    "existing_firebase_social_auth_gateway_screen03_session_and_C30T_auth_feed_suites",
+    "C30Z_C33E_FIX2_and_new_FIX3_source_gates",
+    "whole_mobile_analyzer_and_two_identical_source_cycles_before_any_future_release"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "existingPlayClientLaunchAndTapAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

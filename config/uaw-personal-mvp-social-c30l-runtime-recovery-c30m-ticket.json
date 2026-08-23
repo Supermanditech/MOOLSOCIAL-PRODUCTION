@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-C30L-RUNTIME-RECOVERY-C30M",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-POST-R60-38-SUCCESSOR-OPPO-QUALIFICATION-C30L",
+    "UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A",
+    "UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ACCOUNT-STATE-JOURNEY-C30J"
+  ],
+  "state": "Dev_youtubeProvider_00036_deployed_and_installed_r60_39_live_Shorts_preproof_passed_successor_build_held",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_and_creator",
+  "customerOutcome": "A fresh successor calls the real Dev MoolSocial Feed, plays real YouTube Shorts, and presents truthful public-versus-connected creator state before founder review.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/build-buy-device-review.ps1",
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "backend/functions/src/youtube/shared_catalogue.ts",
+      "backend/functions/src/youtube/provider_service.ts",
+      "scripts/deploy-youtube-provider-c30m.ps1",
+      "scripts/test-youtube-provider-c30m-deployment-controls.ps1",
+      "scripts/check-youtube-private-dev-package.ps1",
+      "config/apk-regression-gate-state-c30l.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C30L proved both failures on the installed checksum-matched client: its exact runtime allowlist cannot carry the already-implemented Social content endpoint, while live youtubeprovider-00035-jis predates the pageSize 25 Shorts fix and current creator capability source. A second r60.39 build or install is forbidden."
+  },
+  "minimumCompleteScope": [
+    "add_MOOLSOCIAL_SOCIAL_CONTENT_URL_to_the_exact_APK_gate_allowlist_with_a_Dev_only_endpoint_contract",
+    "add_focused_controls_that_reject_missing_empty_non_Dev_or_unregistered_Social_content_endpoints",
+    "diff_current_sealed_YouTube_source_against_live_provider_and_callback_revisions_without_secret_values",
+    "request_and_use_only_the_minimum_separate_Dev_provider_owner_deployment_authority_proven_by_the_diff",
+    "prove_live_Shorts_and_truthful_disconnected_connected_or_unavailable_creator_state_before_build",
+    "qualify_a_fresh_source_manifest_and_two_identical_complete_Social_cycles",
+    "only_then_register_one_fresh_successor_build_install_and_C28D_OPPO_replay"
+  ],
+  "explicitExclusions": [
+    "no_second_r60_39_build_or_install",
+    "no_redeploy_of_moolSocialContent_rules_Hosting_Production_or_Staging",
+    "no_secret_token_password_API_key_OAuth_credential_or_provider_payload_value_access",
+    "no_fake_Feed_Shorts_channel_upload_or_local_success_state",
+    "no_commit_push_promotion_provider_message_call_or_fund"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "backendWriteAuthorized": true,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.39",
+    "installedVersionCode": "2026081239",
+    "installedApkSha256": "F1CED62759C9AC45CE790014397177D0921F2EC95958FC11AA71F949676D7DC3",
+    "installedSerial": "2b3e0f71",
+    "uninstallDataClearDowngradeOrSecondInstallForbidden": true,
+    "C28DAndC30LEvidenceImmutable": true,
+    "protectedBaselineUpdated": false
+  },
+  "dependencies": [
+    "Dev_youtubeProvider_00036_qer_is_ACTIVE_and_live_Shorts_preproof_passed_on_installed_r60_39",
+    "separate_fresh_successor_machine_authority_after_live_preproof",
+    "moolsocialcontent_00003_juw_remains_ACTIVE_and_is_not_redeployed",
+    "permanent_regression_MVP_delivery_YouTube_compliance_and_C28D_gates"
+  ],
+  "testPlan": [
+    "endpoint_gate_positive_and_missing_empty_non_Dev_negative_controls",
+    "targeted_then_complete_mobile_and_backend_source_qualification",
+    "exact_live_revision_and_sealed_source_diff_without_secret_values",
+    "Firebase_exact_function_dry_run_then_Dev_only_youtubeProvider_deploy",
+    "postdeploy_revision_runtime_identity_unauthenticated_denial_and_public_catalogue_proof",
+    "installed_checksum_matched_r60_39_Shorts_and_creator_truth_replay",
+    "Feed_endpoint_call_remains_successor_only_because_r60_39_compile_time_define_is_immutable"
+  ],
+  "founderAuthorization": "explicit_2026_08_12_you_are_authorised_in_direct_response_to_C30M_source_gate_and_Dev_only_youtubeProvider_request",
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-C30L-RUNTIME-RECOVERY-C30M-FINDINGS-20260812.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-C30M-YOUTUBE-PROVIDER-DEPLOYMENT-AND-R60-39-LIVE-PREPROOF-20260812.md"
+}

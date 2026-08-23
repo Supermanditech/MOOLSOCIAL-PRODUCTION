@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATE-MEDIA-SELECTION-ROUTE-OWNERSHIP",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "create_hidden_media_publication_blocker",
+  "actor": "signed_in_creator_changing_Create_format_or_route_while_a_native_media_picker_is_pending",
+  "customerOutcome": "Only media visibly selected for the active Create format can enter the public publish request; a late picker result from an older tool is ignored without losing text or choices.",
+  "minimumCorrection": [
+    "assign_request_generation_and_format_tool_ownership_to_every_media_picker_call",
+    "invalidate_pending_selection_when_the_active_Create_format_or_route_changes",
+    "ignore_late_results_that_no_longer_match_the_visible_format_and_tool",
+    "derive_publish_media_only_from_the_active_visible_media_owner",
+    "prove_a_late_image_result_cannot_attach_to_or_publish_with_a_quiz"
+  ],
+  "explicitExclusions": [
+    "no_picker_plugin_or_backend_contract_expansion",
+    "no_real_media_selection_or_Create_write",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "17 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/create-media-selection-route-ownership-focused-tests.log",
+    "evidenceSha256": "EE8DC3EEDD1FC1F7C9F36F6E96C17C4541F6908DC9BBB320F6654BD9A93F5DDD",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

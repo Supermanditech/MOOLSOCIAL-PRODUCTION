@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-DIRECT-DEFAULT-SUBACTION-LANDING-FIX1-C13",
+  "parentTicket": "UAW-PERSONAL-MVP-TRANSLUCENT-SUBACTION-FAMILY-RAIL-FIX1-C12",
+  "state": "founder_authorized_prewrite",
+  "classification": "mvp_required",
+  "interactionContractVersion": "C13-V1-20260807",
+  "actor": "Personal account customer",
+  "customerOutcome": "A person reaches the default sub-action and its thin family rail on the first tap of every main action, without an intermediate chooser or extra tap.",
+  "directLandingContract": {
+    "social": {
+      "route": "/app/social",
+      "defaultSubaction": "shorts"
+    },
+    "buy": {
+      "route": "/app/buy",
+      "defaultSubaction": "shop"
+    },
+    "eat": {
+      "route": "/app/eat/home",
+      "defaultSubaction": "order_food",
+      "retiredRoot": "/app/eat"
+    },
+    "ride": {
+      "route": "/app/ride/book?type=bike",
+      "defaultSubaction": "bike",
+      "retiredRoot": "/app/ride"
+    },
+    "book": {
+      "route": "/app/book/doctor",
+      "defaultSubaction": "doctor",
+      "retiredRoot": "/app/book"
+    },
+    "work": {
+      "route": "/app/work/earn",
+      "defaultSubaction": "earn_today",
+      "retiredRoot": "/app/work"
+    }
+  },
+  "navigationRules": {
+    "mainActionTapBudget": 1,
+    "firstLandedFrameShowsFamilyRail": true,
+    "legacyChoiceRootReachableInProduction": false,
+    "selectedMainActionRetapHasSideEffect": false,
+    "globalRailGeometryOrderAndMeaning": "unchanged",
+    "subactionRailPattern": "founder_approved_c12_maximum_48px_translucent_family_rail",
+    "staleRootLinksResolveToDefaultSubaction": true,
+    "backPreservesExactPreviousContext": true
+  },
+  "implementationBoundary": {
+    "reuseOwners": [
+      "personalMoolRootActions",
+      "personalMvpActionChoiceRoots",
+      "JourneyRouter",
+      "MoolDestinationNavigationV2",
+      "existing_Social_Buy_Eat_Ride_Book_Work_route_and_state_owners"
+    ],
+    "newNecessaryOwner": "none_route_configuration_and_production_redirect_only",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentStateOwners": []
+  },
+  "explicitExclusions": [
+    "no_change_to_founder_approved_global_bottom_rail_geometry_order_or_meaning",
+    "no_change_to_the_c12_thin_translucent_family_rail_visual_contract",
+    "no_new_screen_route_menu_modal_palette_backend_provider_or_persistent_state_owner",
+    "no_Screens_01_03_Social_provider_or_Buy_commercial_logic_change",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "each_global_main_action_reaches_its_default_subaction_and_family_rail_in_one_tap",
+    "Eat_Ride_Book_and_Work_legacy_choice_roots_are_not_production_reachable",
+    "stale_root_links_resolve_to_the_same_default_subaction_without_chooser_flash",
+    "selected_main_action_retap_is_disabled_and_side_effect_free",
+    "Back_and_Mool_or_Chat_return_restore_the_exact_selected_subaction",
+    "two_complete_affected_host_regression_cycles_pass",
+    "one_new_machine_gated_APK_matches_the_installed_OPPO_checksum",
+    "real_OPPO_first_frame_forward_back_and_interruption_screenshots_pass_before_founder_acceptance"
+  ]
+}

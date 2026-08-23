@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-HISTORICAL-HTTP-NOINDEX-VALIDATION-FIX1",
+  "recordedAt": "2026-08-08T12:12:00+05:30",
+  "state": "owner_actions_complete_google_validation_processing",
+  "target": {
+    "origin": "https://moolsocial.com",
+    "searchConsoleProperty": "sc-domain:moolsocial.com"
+  },
+  "searchConsoleReport": {
+    "lastUpdate": "2026-08-05",
+    "noindex": {
+      "example": "http://moolsocial.com/",
+      "lastCrawled": "2026-07-18",
+      "validationReceipt": "Validation Started",
+      "validationStarted": "2026-08-08"
+    },
+    "crawledCurrentlyNotIndexed": {
+      "examples": [
+        "https://moolsocial.com/",
+        "https://moolsocial.com/youtube-api"
+      ],
+      "lastCrawled": "2026-08-05",
+      "validationReceipt": "Validation Started",
+      "validationStarted": "2026-08-08"
+    },
+    "previousPriorityCrawlRequests": {
+      "home": "Indexing requested",
+      "youtubeApi": "Indexing requested",
+      "repeatedByThisTicket": false
+    }
+  },
+  "liveVerification": {
+    "httpHomeStatus": 301,
+    "httpHomeLocation": "https://moolsocial.com/",
+    "httpsHomeStatus": 200,
+    "httpsHomeRobots": "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1",
+    "httpsHomeCanonical": "https://moolsocial.com/",
+    "youtubeApiStatus": 200,
+    "youtubeApiRobots": "index,follow,max-image-preview:large,max-snippet:-1",
+    "youtubeApiCanonical": "https://moolsocial.com/youtube-api",
+    "xRobotsNoindexObserved": false,
+    "robotsAllowsRoot": true,
+    "sitemapIncludesBoth": true,
+    "liveLastModifiedUtc": "2026-08-07T08:01:28Z"
+  },
+  "localQualification": {
+    "homeSha256": "45C5B891C2C78B83476B930D387AED81F797F1F6D85F91E837F6EA16EAC0CE89",
+    "youtubeApiSha256": "851256D11D1516516498B5C78A936DF906B098B9CB025A6F904CC8E5B4B8CFFC",
+    "robotsSha256": "99D2452FA8C3DBE40199E14996F8E826537F49EC06AA2BD5C9FC7AC220E61F0E",
+    "sitemapSha256": "9D9D0316529F8E851F51AFEDF1DF3C92456FAC90ACCB669471A550BEF3B7D796",
+    "publicSiteTestsPassed": 6,
+    "publicSiteTestsFailed": 0,
+    "regressionMemoryEntries": 299,
+    "regressionMemoryApplicable": 195
+  },
+  "safetyAssertions": {
+    "publicSourceChanged": false,
+    "firebaseHostingDeployAttempted": false,
+    "dnsChanged": false,
+    "temporaryUrlRemovalUsed": false,
+    "robotsBlockingAdded": false,
+    "intentionalUtilityNoindexPreserved": true,
+    "mobileBackendApkOrOppoChangedByThisTicket": false,
+    "providerEmailOrYouTubeReplySent": false
+  },
+  "externalProviderState": {
+    "owner": "Google Search",
+    "state": "validation_started_recrawl_and_index_decision_pending",
+    "immediateIndexingOrRankingClaimed": false
+  },
+  "regressionRegistered": "REG-20260808-299-WEB-HISTORICAL-HTTP-NOINDEX-REPORT-MISCLASSIFICATION",
+  "completionEvidence": "docs/quality/WEB-MVP-GOOGLE-HISTORICAL-HTTP-NOINDEX-VALIDATION-FIX1-COMPLETION-20260808.md",
+  "nextSafeAction": "monitor_both_validation_groups_later_without_repeat_submission"
+}

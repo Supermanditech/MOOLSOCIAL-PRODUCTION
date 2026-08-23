@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-MOOL-BOTTOM-RAIL-NAVIGATION-FIX1-C09-MOOL-HOME-RESELECT-BACK-STACK-MOTION",
+  "state": "installed_device_rejected_internal_copy_successor_fix_active",
+  "classification": "mvp_required",
+  "customerOutcome": "Mool behaves as a first-class stable Home with production-grade main-action navigation, finite motion and deterministic Back behavior instead of looking or acting like a temporary return page.",
+  "confirmedOppoDefects": [
+    "mool_home_exposes_a_header_back_arrow_after_bottom_rail_selection",
+    "mool_home_centres_its_content_on_continue_origin_instead_of_home_outcomes",
+    "main_action_selection_pushes_new_route_depths_while_mool_pushes_another_return_depth",
+    "the_six_main_actions_require_horizontal_discovery_without_a_clear_overflow_or_position_cue",
+    "mool_route_arrival_animates_cards_but_does_not_express_top_level_forward_back_ownership"
+  ],
+  "reuseOwners": [
+    "PersonalMoolRootV2",
+    "MoolOutcomeDock",
+    "personalMoolRootActions",
+    "GoRouter_app_section_owner",
+    "JourneySession_primary_section_memory",
+    "existing_MoolMotion_primitives",
+    "existing_Social_Buy_Eat_Ride_Book_Work_and_Chat_state_owners"
+  ],
+  "minimumCompleteScope": [
+    "remove_return_sheet_visual_and_interaction_ownership_from_the_Mool_home",
+    "make_selected_Mool_retap_a_true_no_op_without_route_or_haptic_side_effect",
+    "make_main_action_and_Mool_transitions_add_at_most_one_restorable_top_level_history_entry",
+    "retain_each_main_action_subaction_and_authoritative_session_state",
+    "add_directional_180_to_320_ms_route_or_container_motion_with_reduced_motion",
+    "make_all_six_main_actions_discoverable_reachable_and_semantically_truthful",
+    "contain_obsolete_navigation_patterns_from_the_compiled_reachable_runtime"
+    ,"replace_all_internal_implementation_commentary_with_customer_grade_visible_and_semantic_copy"
+  ],
+  "explicitExclusions": [
+    "no_new_screen_named_route_backend_provider_or_persistent_business_state_owner",
+    "no_change_to_locked_screens_01_03_or_protected_social_content_and_youtube_player",
+    "no_optional_perpetual_or_decorative_motion",
+    "no_uninstall_data_clear_downgrade_or_old_evidence_deletion",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "widget_router_semantics_reduced_motion_and_history_tests",
+    "two_affected_regression_cycles",
+    "machine_gated_unique_APK_build_and_in_place_OPPO_upgrade",
+    "checksum_matched_OPPO_real_tap_forward_back_retap_and_interruption_replay",
+    "founder_review_pack_with_ticket_wise_Codex_disposition"
+    ,"untouched_OPPO_frame_copy_quality_review_before_qualification"
+  ]
+}

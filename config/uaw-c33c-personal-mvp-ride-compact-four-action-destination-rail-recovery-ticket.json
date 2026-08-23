@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33C-PERSONAL-MVP-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY",
+  "parentOutcome": "UAW-C31L-PERSONAL-RIDE-BOOKING-TRIP-SUPPORT-AUDIT",
+  "finding": "REG-20260815-2308-RIDE-FOUR-ACTION-COMPACT-RAIL-MINIMUM-WIDTH-ASSERTION",
+  "classification": "mvp_required",
+  "state": "selected_for_bounded_source_implementation",
+  "customerOutcome": "A customer using Ride on a 320-logical-pixel phone can reach Bike, Auto, Cab and the connected Travel action without a navigation assertion, while Mool, Ride home and Chat remain available and reduced-motion selection stays immediate.",
+  "classificationReason": "The focused C16E journey reproduces a current build-time layout assertion in the founder-bounded Ride launch journey, so correcting the confirmed compact navigation regression is required for MVP usability and accessibility.",
+  "minimumCompleteScope": [
+    "reuse_MoolDestinationNavigationV2_MoolLocalNavigationRail_and_existing_Ride_session",
+    "provide_bounded_horizontal_overflow_only_when_the_local_action_cluster_cannot_preserve_44_pixel_targets",
+    "preserve_existing_compact_leading_geometry_when_the_cluster_fits",
+    "preserve_global_Mool_family_root_Chat_and_all_existing_Ride_action_semantics",
+    "preserve_reduced_motion_and_in_place_Ride_type_selection",
+    "run_C16E_current_shared_navigation_regressions_analyzer_and_dual_host_repository_gates"
+  ],
+  "explicitExclusions": [
+    "no_new_screen_route_session_service_backend_or_provider_owner",
+    "no_new_Ride_provider_maps_live_trip_payment_funds_or_Bus_launch_scope",
+    "no_protected_Screens_01_03_Social_or_Buy_reference_change",
+    "no_build_Play_OPPO_provider_secret_email_quota_deployment_or_external_action"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_15_autonomous_audit_ticket_and_source_implementation_authority",
+    "REG_20260815_2308_registered_with_preserved_C16E_0_of_2_evidence",
+    "C27B_C27D_C33A_C33B_current_destination_navigation_authorities_preserved",
+    "future_device_or_release_acceptance_requires_separate_current_authority"
+  ],
+  "testAndEvidencePlan": [
+    "focused_C16E_normal_and_reduced_motion_cases",
+    "Ride_vertical_slice_and_R07_Ride_exposure",
+    "C20E_C17D_C27B_C27D_shared_navigation_replay",
+    "analyzer_on_all_changed_and_Ride_runtime_test_owners",
+    "MVP_scope_delivery_regression_UI_lock_and_C33C_dual_host_gates",
+    "fresh_post_C33C_source_manifest_with_every_member_hash_validated"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/features/ride/widgets/ride_widgets.dart",
+      "apps/mobile/lib/features/ride/ride_session.dart",
+      "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The existing shared rail is the only failing implementation owner. A bounded overflow branch inside that owner is sufficient; duplicating Ride navigation or adding a route, screen, session, service or backend owner would violate the delivery lock.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

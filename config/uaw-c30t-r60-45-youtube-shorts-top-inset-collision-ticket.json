@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-YOUTUBE-SHORTS-TOP-INSET-COLLISION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_and_non_build_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocker_customer_content_and_system_status_collision",
+  "actor": "viewer_opening_real_YouTube_Shorts_on_OPPO_CPH2375",
+  "customerOutcome": "YouTube Shorts keeps its title and channel identity fully readable below Android system status content without covering the provider video or bottom navigation.",
+  "observedCandidate": {
+    "versionName": "1.0.0-r60.45",
+    "versionCode": "2026081345",
+    "packageName": "com.moolsocial.app",
+    "distribution": "Google_Play_Internal_Testing",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375",
+    "physicalSize": "720x1612",
+    "densityDpi": 320
+  },
+  "observedFailure": "The title and channel header visibly overlap the Android clock and status icons at the top of the live Shorts screen.",
+  "minimumSuccessorCorrection": [
+    "diagnose_the_exact_Shorts_header_and_system_inset_owner",
+    "place_all_MoolSocial_title_and_channel_content_below_the_effective_top_system_inset",
+    "preserve_the_provider_owned_video_composition_and_official_player_boundary",
+    "add_a_current_owner_top_inset_regression_for_OPPO_720x1612_at_320_dpi",
+    "replay_Home_Search_Video_Player_Shorts_and_return_continuity_on_the_successor"
+  ],
+  "explicitExclusions": [
+    "no_custom_YouTube_player_or_provider_interface_copy",
+    "no_backend_provider_Hosting_Play_or_communication_mutation",
+    "no_second_C30T_AAB_upload_or_install",
+    "no_Work_Care_Travel_Shop_or_Food_scope_expansion"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "sourceNonBuildQualified": true,
+    "successorBuildUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "founderSuccessorSelectionRequired": false,
+    "founderSourceSelectionEvidence": "2026-08-13 direction to register and implement production-grade defects while withholding every successor AAB authority"
+  },
+  "evidence": {
+    "screenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/20-youtube-shorts-live.png",
+    "screenshotSha256": "DDE9828749C044F60473350E26E08D347B390624633EB0627DB160EF41BC6BE8",
+    "stableUiXml": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/20-youtube-shorts-live.xml",
+    "finding": "docs/quality/UAW-C30T-R60-45-YOUTUBE-SHORTS-TOP-INSET-COLLISION-20260813.md"
+  }
+}

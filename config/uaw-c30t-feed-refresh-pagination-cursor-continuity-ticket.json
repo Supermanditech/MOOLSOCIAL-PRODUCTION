@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-REFRESH-PAGINATION-CURSOR-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "feed_pagination_recovery_blocker",
+  "actor": "public_MoolSocial_Feed_reader_with_cached_first_page",
+  "customerOutcome": "A failed Feed refresh keeps the previous next-page cursor, so Load more continues from the correct page instead of silently requesting page one again.",
+  "minimumCorrection": [
+    "do_not_mutate_the_active_cursor_before_a_refresh_succeeds",
+    "preserve_cached_posts_hasMore_and_cursor_on_refresh_failure",
+    "replace_cursor_only_from_the_authoritative_successful_response",
+    "prove_load_more_after_failure_uses_the_previous_next_page_cursor"
+  ],
+  "explicitExclusions": [
+    "no_backend_provider_or_pagination_contract_change",
+    "no_Feed_redesign_or_new_interaction",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "5 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-refresh-pagination-focused-tests.log",
+    "evidenceSha256": "DD28798FBD387C945E322ED0F7007AD0F3ECC924D1E0A51D3D4DB85ACA1E187B",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

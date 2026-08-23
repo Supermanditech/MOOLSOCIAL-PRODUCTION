@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "stateId": "POST-YOUTUBE-RETAILER-BUSINESS-SERVICES-COMPACT-ACCESSIBILITY-C32Q",
+  "ticketId": "UAW-C32Q-PERSONAL-MVP-RETAILER-BUSINESS-SERVICES-COMPACT-ACCESSIBILITY-OVERFLOW",
+  "state": "source_qualified_two_identical_acceptance_cycles_and_final_state_rebind_cycle_passed_live_release_and_external_actions_held",
+  "preservedParentFinding": "UAW-POST-YOUTUBE-RETAILER-BUSINESS-SERVICES-COMPACT-OVERFLOW",
+  "finding": {
+    "originalCrossVerticalResult": {
+      "passed": 183,
+      "failed": 1,
+      "completedCases": 184
+    },
+    "viewport": "320x700",
+    "textScale": 1.3,
+    "overflowPixelsRight": 16,
+    "phase": "access_denied_shell",
+    "exactOwner": "apps/mobile/lib/core/design/mool_design_system.dart",
+    "rootCause": "MoolOutcomeDock three-action center Row had 216 pixels available but required three 72-pixel capsules plus two 8-pixel gaps, totaling 232 pixels."
+  },
+  "repair": {
+    "owner": "MoolOutcomeDock actions.length <= 3 branch",
+    "change": "Each middle action is Flexible around the existing maximum-72-pixel SizedBox.",
+    "compactWidthPerActionApprox": 66.67,
+    "minimumTapTarget": 44,
+    "copyChanged": false,
+    "semanticsChanged": false,
+    "routesChanged": false,
+    "businessRulesChanged": false,
+    "backendChanged": false
+  },
+  "qualification": {
+    "sourceManifestPath": "artifacts/quality/uaw-c32q-retailer-business-services-compact-accessibility-overflow-20260815-01/source-manifest-c32q.txt",
+    "sourceFileCount": 32,
+    "sourceFingerprintSha256": "FA2546C71453C29DBD825C9AF9CCCA05A53088E424A5BA3F6CA310CB53BA87F9",
+    "crossVerticalFiles": 17,
+    "crossVerticalTestsPassedPerCycle": 185,
+    "crossVerticalAcceptanceCyclesPassed": 3,
+    "directDockTestsPassedPerCycle": 7,
+    "retailerBusinessServicesTestsPassed": 8,
+    "analyzerFiles": 2,
+    "analyzerResult": "clean",
+    "c32pAndC32qDualHostGateRunsPerFinalCycle": 4,
+    "regressionMemoryEntries": 2246,
+    "overbroadPredecessorBatchQualified": false,
+    "overbroadPredecessorBatchRetried": false
+  },
+  "preserved": {
+    "c32pHistoricalScopeBinding": true,
+    "buyProtectedBaselineUpdated": false,
+    "fullC28eRetried": false,
+    "r60_48FailedPlayInstalledState": true,
+    "r60_48Counts": {
+      "build": 1,
+      "upload": 1,
+      "install": 1
+    }
+  },
+  "authority": {
+    "buildAuthorized": false,
+    "playUploadOrActivationAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  }
+}

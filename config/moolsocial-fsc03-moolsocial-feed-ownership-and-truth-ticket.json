@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC03-MOOLSOCIAL-FEED-OWNERSHIP-AND-TRUTH",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "reference_candidate_rejected_founder_successor_fsc03a_registered_runtime_held",
+  "classification": "mvp_required",
+  "customerOutcome": "A Personal user enters a professional, distinctly MoolSocial-owned Feed that shows only authoritative MoolSocial items or a truthful empty, loading or recovery state, with a clear Create-a-post handoff and no fabricated post, engagement or publication result.",
+  "founderAuthority": "docs/quality/MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-FINDINGS-20260810.md",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC03-MOOLSOCIAL-FEED-OWNERSHIP-AND-TRUTH-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "C:/GUARANTEED OUTCOME/supermandi-uiux-screenbook/screens/04-universal-focus-shell.html",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The current Feed renders one hard-coded representative post in every mode and exposes an in-memory quick-publish owner. A new backend is neither necessary nor authorized for the truthful reference correction: the smallest lawful candidate reuses the existing Feed surface, existing Create destination and existing rail while designing authoritative-item bindings plus honest empty, loading and retry states."
+  },
+  "designContract": {
+    "brandOwner": "MoolSocial",
+    "visuallyDistinctFromYouTube": true,
+    "primaryEmptyAction": "Create a post",
+    "primaryEmptyActionOwner": "existing Social Create destination",
+    "errorRecoveryAction": "Try again",
+    "fabricatedPostsAllowed": false,
+    "fabricatedEngagementAllowed": false,
+    "publicationSuccessClaimAllowed": false,
+    "acceptedGlobalNavigationChangeAllowed": false
+  },
+  "minimumCompleteScope": [
+    "create_one_editable_professional_Feed_HTML_candidate_without_overwriting_accepted_references",
+    "make_the_default_Feed_truthfully_empty_until_an_authoritative_read_owner_exists",
+    "show_distinct_MoolSocial_brand_hierarchy_and_no_YouTube_trade_dress_or_provider_identity",
+    "provide_one_clear_Create_a_post_handoff_to_the_existing_Create_destination_without_claiming_publication",
+    "define_loading_empty_error_retry_and_authoritative_item_binding_states",
+    "preserve_Mool_switcher_Shorts_Videos_Feed_Create_order_one_tap_reach_and_44_by_44_targets",
+    "stop_for_exact_founder_FINAL_before_any_Flutter_runtime_write"
+  ],
+  "explicitExclusions": [
+    "no_fabricated_feed_post_creator_engagement_commerce_or_promoted_content",
+    "no_publish_success_durable_readback_or_social_graph_claim",
+    "no_new_screen_route_backend_service_or_feed_owner",
+    "no_FSC04_Create_runtime_or_FSC02_YouTube_runtime_implementation",
+    "no_APK_build_install_uninstall_data_clear_downgrade_or_OPPO_mutation",
+    "no_credentials_Production_commit_push_deploy_promotion_or_external_service_write"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authority_to_continue_FSC03_and_create_professional_CTA_ready_UI_received_2026_08_10",
+    "explicit_founder_FINAL_required_for_the_exact_HTML_candidate_before_Flutter",
+    "authoritative_feed_read_owner_or_empty_state_only_runtime_scope_required_before_native_item_rendering",
+    "FSC04_persistent_posting_gateway_required_before_any_publication_success",
+    "mvp_delivery_discipline_preselection_and_permanent_regression_memory_gates",
+    "C28F_r60_28_founder_review_candidate_and_all_C28D_evidence_remain_separate_and_untouched"
+  ],
+  "testAndEvidencePlan": [
+    "HTML_syntax_and_customer_copy_checks",
+    "seven_founder_phone_viewports_at_100_and_140_percent_text",
+    "zero_horizontal_overflow_clipped_CTA_or_target_below_44_by_44",
+    "default_empty_loading_error_retry_and_Create_handoff_interactions",
+    "no_fabricated_post_or_YouTube_identity_in_the_Feed_candidate",
+    "accepted_navigation_slice_hash_and_locked_reference_regressions",
+    "exact_URL_SHA256_and_rendered_founder_review_evidence"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

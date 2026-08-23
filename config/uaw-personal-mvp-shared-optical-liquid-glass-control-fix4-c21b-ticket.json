@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SHARED-OPTICAL-LIQUID-GLASS-CONTROL-FIX4-C21B",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "actor": "customer using any personal main-action family",
+  "capability": "use one shared independent optical liquid-glass control with controlled neutral compositing and professional states",
+  "customerOutcome": "Every sub-action is visibly an independent, legible, refined glass button instead of a generic second navigation bar.",
+  "classificationReason": "The shared control owner is the smallest non-duplicated implementation that fixes the founder-rejected visual language across all families.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SHARED-OPTICAL-LIQUID-GLASS-CONTROL-FIX4-C21B-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["reuse", "configuration"], "sharedImplementationOwners": ["MoolGlassSurface", "MoolLocalNavigationTokens", "MoolLocalNavigationRail"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["independent_44_to_48px_lenses", "controlled_light_and_media_neutral_luminance", "real_blur_specular_edge_and_calibrated_depth", "single_selected_grammar", "80_to_120ms_press_and_immediate_reduced_motion", "13px_700_label_and_normalized_20px_icon_box"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": true, "testOrGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SHARED-OPTICAL-LIQUID-GLASS-CONTROL-FIX4-C21B-COMPLETION-20260808.md",
+  "explicitExclusions": ["no_family_fill", "no_full_width_surface", "no_new_route_screen_backend_or_subaction", "no_build_or_install"]
+}

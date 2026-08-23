@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33A-PERSONAL-MVP-C20E-CURRENT-LOCAL-DESTINATION-RAIL-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_runtime_unchanged_C17D_separate_finding_preserved",
+  "ticketSha256": "9A5BE524089D65E0904D2714BA2D795D44BB152099733BA4593A5618BA94D1F4",
+  "testOwner": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
+  "testSha256": "9F5E461291133081B64CD34D4886E7874DBB24C93A4AB96627AC16EFCBF35382",
+  "runtimeOwner": "apps/mobile/lib/core/design/mool_design_system.dart",
+  "runtimeSha256": "D66C9A8E34E49FF58DF25EF6DC0694B22DB91E5C33B6A04CA5CD7A63C7F76BFE",
+  "currentAuthorities": {
+    "C27BSha256": "6AFDEFE148F0E36A6EEBAE77F214A415344606157471C8D847E004D4F8DE54AD",
+    "C27DSha256": "7E156B6EA30F099E27236998A6ADCFAADAFE8C5E6356C37D687C04EF512FDCFC",
+    "R06Sha256": "9E77FDC5CA5259740C7F4B8AB3A5F4EE2A116EABDD3B79CAFF921B591DCF23A6"
+  },
+  "separatePendingFinding": {
+    "registryId": "REG-20260815-2300-POST-SEAL-C17D-C21E-REMAINING-FAMILY-GLASS-CONTRACT-FAILURE",
+    "owner": "apps/mobile/test/core/design/mool_remaining_family_clear_glass_conformance_c17d_test.dart",
+    "sha256": "BE49A30A02272D7DD91477A4211F2825D39F8C6B0301C51BDA64DD9EEA25F954",
+    "result": {"passed": 0, "failed": 10},
+    "includedInC33A": false
+  },
+  "validation": {
+    "C20E": {"passed": 6, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "R06": {"passed": 12, "failed": 0},
+    "combinedCurrentAuthorityBatch": {"files": 4, "passed": 24, "failed": 0, "warnings": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  },
+  "eatAuditContext": {
+    "verticalSlice": {"passed": 10, "failed": 0},
+    "C16D": {"passed": 2, "failed": 0},
+    "C24C": {"passed": 5, "declaredSkips": 2, "failed": 0}
+  },
+  "authority": {
+    "runtimeChanged": false,
+    "backendChanged": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

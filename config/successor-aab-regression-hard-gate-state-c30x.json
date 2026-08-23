@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "contractId": "SUCCESSOR-AAB-REGRESSION-HARD-GATE-C30X-001",
+  "ticketId": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "aggregateStatePath": "config/successor-aab-regression-hard-gate-aggregate-c30x.json",
+  "machineState": "acceptance_failed_r60_48_social_auth_and_action_journey_defects_successor_required",
+  "buildAuthorization": "consumed",
+  "uploadAuthorization": "consumed",
+  "installAuthorization": "consumed",
+  "deviceAuthorization": "consumed",
+  "candidate": {
+    "id": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "versionName": "1.0.0-r60.48",
+    "versionCode": "2026081348",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "packageName": "com.moolsocial.app",
+    "authorizedTrack": "internal"
+  },
+  "authority": {
+    "candidateIdentityApproved": true,
+    "buildAuthorized": true,
+    "uploadAndInternalActivationAuthorized": true,
+    "inPlacePlayUpdateAuthorized": true,
+    "deviceMutationAuthorized": true,
+    "backendOrHostingDeploymentAuthorized": false,
+    "providerDeploymentAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "founderAuthorization": {
+    "evidence": "docs/quality/UAW-C30X-FOUNDER-END-TO-END-AAB-PLAY-OPPO-AUTHORIZATION-20260814.md",
+    "oneSuccessorAabBuildApprovedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationApprovedAfterPostbuildGate": true,
+    "oneInPlaceOppoPlayUpdateApprovedAfterPostuploadGate": true,
+    "candidateIdentitySealed": true,
+    "hiddenFounderInputsEntered": true,
+    "productionOpenClosedPublicOrOtherTrackAuthorized": false,
+    "adbInstallUninstallDataClearDowngradeOrSideloadAuthorized": false,
+    "deploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "historicalFailedCandidate": {
+    "statePath": "config/play-internal-aab-regression-gate-state-c30v.json",
+    "aggregatePath": "config/play-internal-seal-recovery-acceptance-gate-state-c30v.json",
+    "id": "UAW-C30V-R60-47-SEAL-RECOVERY-PLAY-INTERNAL-ACCEPTANCE",
+    "versionName": "1.0.0-r60.47",
+    "versionCode": "2026081347",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "successClaimed": false,
+    "failure": "cold_start_release_configuration_abort_before_runApp_missing_google_server_client_id"
+  },
+  "chatPredecessorQualification": {
+    "ticketId": "UAW-C31C-PERSONAL-MVP-CHAT-FORWARD-RECIPIENT-CONTINUITY",
+    "manifestPath": "artifacts/quality/uaw-c31c-personal-mvp-chat-forward-recipient-continuity-20260814-01/source-manifest-c31c.txt",
+    "manifestFileSha256": "3955CB437304D0994722B584FF61350741DAFA822D147E7C9D84666956D90EFC",
+    "historicalManifestFingerprint": "0A8A2142DB52D737185A0D384CA65E1EDF8D2862CDE40DF69458299D10CEE43F",
+    "preservedOwnerCountExcludingSupersededC31CGate": 33,
+    "historicalC31CGateSupersededByC30XTransition": true,
+    "chatRuntimeBackendTestAndGoldenOwnersMustRemainExact": true
+  },
+  "sourceQualification": {
+    "state": "two_identical_current_source_cycles_qualified",
+    "manifestPath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix5.txt",
+    "manifestSha256": "54645062FBAA0233759B0F3C6F5C1C4C539D1A322DE7E7FA14629ECF3EDCDED4",
+    "fileCount": 1135,
+    "focusedManifestPath": "artifacts/quality/uaw-c30w-r60-47-play-cold-start-config-recovery-20260814-01/focused-test-manifest-c30w.txt",
+    "focusedManifestSha256": "6F6C9C7AE281510F156CA4869854A37D0424338F88839D23F64C8A1114F47147",
+    "focusedManifestFileCount": 59,
+    "expectedFlutterPassed": 417,
+    "expectedFlutterSkipped": 3,
+    "twoIdenticalCyclesPassed": true,
+    "completeRegressionGatePassed": true,
+    "backendVerifyPassed": true,
+    "backendPassed": 528,
+    "hostingVerifyPassed": true,
+    "hostingPassed": 8,
+    "focusedSocialSuitePassed": true,
+    "focusedFlutterPassed": 417,
+    "focusedFlutterSkipped": 3,
+    "analyzerPassed": true,
+    "deploymentPassed": true,
+    "sourceReleaseControlsPassed": true,
+    "releasePreflightPassed": true,
+    "supersededQualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/cycle-01-summary-c30x.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/cycle-02-summary-c30x.json"
+    ],
+    "supersededPostFix6QualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/post-fix6-cycle-01-summary-c30x.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/post-fix6-cycle-02-summary-c30x.json"
+    ],
+    "candidateQualifyingCycleEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix5-cycle-01-attempt-07-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix5-cycle-02-attempt-05-summary.json"
+    ],
+    "supersededFailedStaticAttempts": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix3-cycle-01-static.log",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix3-cycle-01-static.exit.txt"
+    ],
+    "supersededPostFix1CandidateEvidence": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix1-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix1-cycle-02-summary.json"
+    ],
+    "supersededC30YQualification": [
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-cycle-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix1.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix2-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix3-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix3-provisional-attempt-02.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix4-provisional-attempt-01.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/source-manifest-c30y-post-fix4-provisional-attempt-02.txt",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-02-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-03-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-03-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-04-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-04-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-01-attempt-05-summary.json",
+      "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-post-fix4-cycle-02-attempt-05-summary.json"
+    ]
+  },
+  "regressionQualification": {
+    "regressionMemoryPassed": true,
+    "mvpScopeGatePassed": true,
+    "deliveryDisciplineGatePassed": true,
+    "approvedUiLocksPassed": true,
+    "releaseRuntimePowerShell7Passed": true,
+    "releaseRuntimeWindowsPowerShellPassed": true,
+    "wrapperStaticPowerShell7Passed": true,
+    "wrapperStaticWindowsPowerShellPassed": true,
+    "newIssueCountAfterBuild": 2,
+    "newDefectCountAfterBuild": 3,
+    "openReleaseBlockers": [
+      "r60_48_google_youtube_sign_in_failed_after_account_choice",
+      "r60_48_email_otp_non_operational",
+      "r60_48_phone_otp_non_operational"
+    ]
+  },
+  "runtimeConfiguration": {
+    "founderLauncherPath": "tmp/run-c30x-successor-single-aab-founder.ps1",
+    "secretDefineFileEnvironmentName": "MOOLSOCIAL_FIREBASE_DART_DEFINE_FILE",
+    "googleServicesFileEnvironmentName": "MOOLSOCIAL_GOOGLE_SERVICES_JSON",
+    "transientGoogleServicesPath": "apps/mobile/android/app/src/release/google-services.json",
+    "googleServicesFileQualifiedByFounder": true,
+    "googleServicesFileReadByAgent": false,
+    "secretDefineFileQualifiedByFounder": true,
+    "secretDefineFileReadByAgent": false,
+    "googleServerClientIdQualifiedByFounder": true,
+    "requiredNonSecretDefines": {
+      "MOOLSOCIAL_DEVICE_REVIEW": "true",
+      "MOOLSOCIAL_USE_EMULATORS": "false",
+      "MOOLSOCIAL_CANDIDATE_ID": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+      "MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "true",
+      "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "true",
+      "MOOLSOCIAL_YOUTUBE_PROVIDER_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider",
+      "MOOLSOCIAL_SOCIAL_CONTENT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent",
+      "MOOLSOCIAL_CHAT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat",
+      "MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED": "true",
+      "MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED": "false",
+      "MOOLSOCIAL_FIREBASE_APP_ID": "1:760290687711:android:4202409fd3ab38f6ce076a",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID": "760290687711",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID": "moolsocial-dev-503018"
+    },
+    "requiredSecretDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY",
+      "MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID"
+    ]
+  },
+  "signingQualification": {
+    "releaseUsesDebugSigning": false,
+    "uploadKeyEnvironmentNames": [
+      "MOOLSOCIAL_UPLOAD_STORE_FILE",
+      "MOOLSOCIAL_UPLOAD_STORE_PASSWORD",
+      "MOOLSOCIAL_UPLOAD_KEY_ALIAS",
+      "MOOLSOCIAL_UPLOAD_KEY_PASSWORD"
+    ],
+    "founderControlledUploadKeyPresent": true,
+    "uploadKeyStorePath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRIVATE-SIGNING\\moolsocial-upload-2026.p12",
+    "uploadKeyAlias": "moolsocial-upload-2026",
+    "uploadCertificateSha256": "63:49:1B:E7:8A:01:F4:51:43:19:AE:5D:2A:39:57:61:18:33:F3:2C:A1:CB:FD:57:AB:29:82:B0:1D:39:C0:D6",
+    "playAppSigningCertificateSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "secretValuesRecorded": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "toolingQualification": {
+    "requiredPowerShellMajorMinimum": 7,
+    "launcherRejectsWindowsPowerShellBeforePrompt": true,
+    "wrapperRejectsWindowsPowerShellBeforeAuthorityMutation": true,
+    "nativeExitCodeAuthoritative": true,
+    "releaseConfigOnlyCommandQualified": true,
+    "releaseConfigOnlyProducesNoApkOrAab": true,
+    "releaseRegistrantExactPluginSetQualified": true,
+    "releaseRegistrantPluginCount": 16,
+    "googleServicesTaskRegistered": true,
+    "crashlyticsBuildIdTaskRegistered": true,
+    "appBundleInvocationCountRequired": 1,
+    "standaloneBundletoolPath": "tmp/bundletool-all-1.18.3.jar",
+    "standaloneBundletoolSha256": "A099CFA1543F55593BC2ED16A70A7C67FE54B1747BB7301F37FDFD6D91028E29",
+    "standaloneBundletoolVersion": "1.18.3"
+  },
+  "firebaseAppCheck": {
+    "projectId": "moolsocial-dev-503018",
+    "androidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "packageName": "com.moolsocial.app",
+    "provider": "Play_Integrity",
+    "playProjectLinked": true,
+    "playIntegrityApiEnabled": true,
+    "playIntegrityCloudProjectNumber": "760290687711",
+    "playIntegrityProviderConfigured": true,
+    "playAppSigningCertificateRegistered": true,
+    "playRecognizedRequired": true,
+    "privateVerdictReadAuthorized": false
+  },
+  "providerRevisions": {
+    "moolsocialcontent": "moolsocialcontent-00005-lep",
+    "moolsocialchat": "moolsocialchat-00001-yaf",
+    "youtubeprovider": "youtubeprovider-00038-cic",
+    "youtubeoauthcallback": "youtubeoauthcallback-00035-cir",
+    "runtimeServiceAccount": "social-content-runtime@moolsocial-dev-503018.iam.gserviceaccount.com",
+    "backendDeploymentCompleted": false,
+    "additionalBackendDeploymentAuthorized": false
+  },
+  "buildResult": {
+    "state": "single_release_AAB_succeeded_authority_consumed",
+    "buildCount": 1,
+    "wrapperInvocationCount": 1,
+    "configOnlyCount": 1,
+    "artifactPath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/MoolSocial-1.0.0-r60.48-2026081348-release.aab",
+    "artifactSha256": "342A8AF46FD8C01E7C156A62A2C01F1B74FB798F07F08E108B39B3928BCDAA9F",
+    "artifactBytes": 94589100,
+    "uploadSignerSha256": "63491BE78A01F4514319AE5D2A3957611833F32CA1CBFD57AB2982B01D39C0D6",
+    "packageVersionManifestProved": true,
+    "googleAppIdResourceProved": true,
+    "crashlyticsBuildIdResourceProved": true,
+    "splitAndArm64PayloadProved": true,
+    "mergedReleaseManifestProved": true,
+    "provenance": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/06-release-aab-provenance-attempt-2.json"
+  },
+  "playResult": {
+    "uploadCount": 1,
+    "internalActivationCount": 1,
+    "evidencePath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-play-internal-activation-evidence.json"
+  },
+  "installResult": {
+    "installCount": 1,
+    "coldStartEvidencePath": "",
+    "retainedDataEvidencePath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-play-installed-retained-data-evidence.json",
+    "journeyEvidencePath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-founder-device-defect-evidence.json",
+    "acceptanceSucceeded": false,
+    "failureEvidencePath": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-r60-48-founder-device-defect-evidence.json"
+  },
+  "promotionRule": {
+    "allRegressionGatesMustPassBeforeBuild": true,
+    "exactArtifactMustRebindAfterBuildAndImmediatelyBeforeUpload": true,
+    "zeroNewIssuesAfterBuildRequired": true,
+    "zeroNewDefectsAfterBuildRequired": true,
+    "coldStartInteractiveRequired": true,
+    "retainedDataInPlacePlayUpdateRequired": true,
+    "zeroFlutterFatalRequired": true,
+    "zeroAndroidRuntimeFatalRequired": true,
+    "zeroAnrRequired": true,
+    "allMandatoryJourneysRequired": true
+  }
+}

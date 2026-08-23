@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-HISTORICAL-UNIVERSAL-NAVIGATION-CONTRACT-RECONCILIATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "classified_current_runtime_contracts_pass_historical_test_migration_deferred",
+  "classification": "mvp_supporting",
+  "severity": "repository_full_suite_historical_contract_conflict",
+  "actor": "release_engineer_and_reviewer_relying_on_global_navigation_regression_truth",
+  "customerOutcome": "Current Social and six-domain navigation remain governed by the accepted C25-C27 and C29-C30 owners rather than mutually exclusive retired rail, glass, in-place Home and thumb-composer contracts.",
+  "finding": {
+    "fullSuite": "1314 passed, 36 skipped, 301 failed across all mobile tests",
+    "failureFiles": 76,
+    "historicalUniversalFiles": 23,
+    "historicalUniversalFailureMarkers": 89,
+    "directNamedSocialYouTubeChatFiles": 48,
+    "directNamedFailures": [
+      "ui_v2/universal/uaw_personal_mvp_social_buy_clear_glass_conformance_c17c_test.dart",
+      "ui_v2/universal/uaw_personal_mvp_social_buy_four_action_conformance_c20d_test.dart"
+    ],
+    "currentReleaseSet": "349 passed, 3 skipped, 0 failed across 57 files"
+  },
+  "minimumCorrection": [
+    "retain_current_C25_C26_C27_C29_C30_runtime_and_navigation_owners",
+    "never_regress_runtime_to_removed_mool_home_social_videos_local_rail_thumb_composer_or_per_cell_glass_contracts",
+    "migrate_each_historical_test_only_to_an_existing_authoritative_owner_without_weakening_its_customer_outcome",
+    "keep_historical_migration_out_of_the_time_critical_YouTube_reviewer_candidate_unless_a_current_owner_fails",
+    "continue_current_global_navigation_release_tests_and_OPPO_replay_before_any_future_AAB"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_redesign_or_reintroduction_of_retired_navigation",
+    "no_blanket_skip_delete_or_quarantine_of_historical_tests",
+    "no_AAB_APK_upload_install_deploy_or_communication_action"
+  ],
+  "authority": {
+    "runtimeImplementationAuthorized": false,
+    "historicalTestMigrationAuthorized": true,
+    "migrationDeferredByRobustMvpAndReviewerDeadline": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "evidence": {
+    "fullSuite": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/21-full-mobile-flutter-regression.log",
+    "fullSuiteSha256": "98273A5F7F6977397B136A6120BD9831D832E0E2D66CE20D5DE8FDD97AEFBDE9",
+    "currentReleaseSetSha256": "71115A25D3786DEA9A9C3AF0FE5FC53CC89D42CB4FCBA55ABB537CA8C404AA68"
+  }
+}

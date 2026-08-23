@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R03-PERSONAL-MOOL-MVP-ACTION-ROOT-INTERACTION-V1",
+  "version": "2026-08-08.2",
+  "route": "/app/mool",
+  "sourceProjection": {
+    "path": "config/mvp-personal-action-projection-v1.json",
+    "sha256": "5F963AD44DC7B8ABD4527B99A609150CA7003998AE9BD7A7FFE57EAEFF9FE6B2"
+  },
+  "mainActions": [
+    {"id": "social", "label": "Social", "route": "/app/social"},
+    {"id": "buy", "label": "Buy", "route": "/app/buy"},
+    {"id": "eat", "label": "Eat", "route": "/app/eat/home"},
+    {"id": "ride", "label": "Ride", "route": "/app/ride/book?type=bike"},
+    {"id": "book", "label": "Book", "route": "/app/book/doctor"},
+    {"id": "work", "label": "Work", "route": "/app/work/earn"}
+  ],
+  "globalActions": [
+    {
+      "id": "chat",
+      "label": "Chat",
+      "route": "/app/chat/inbox?return=/app/mool"
+    }
+  ],
+  "prohibitedVisibleActions": ["pay"],
+  "navigation": {
+    "oneTapMainActionJump": true,
+    "oneTapGlobalChat": true,
+    "pushedDestinationRestoresMoolOnBack": true,
+    "directOpenFallback": "/app/social"
+  },
+  "motion": {
+    "finite": true,
+    "arrivalMilliseconds": 240,
+    "perpetualLoops": false,
+    "reducedMotionImmediate": true
+  },
+  "authorityBoundary": {
+    "localCapabilityGrant": false,
+    "backendActivation": false,
+    "providerActivation": false,
+    "paymentActivation": false
+  }
+}

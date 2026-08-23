@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-YOUTUBE-CHANNEL-SIGNED-OUT-DEAD-END",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "resolved_by_existing_channel_handoff_source_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "creator_connection_authentication_recovery_blocker",
+  "actor": "signed_out_content_creator_opening_optional_read_only_YouTube_channel_connection",
+  "customerOutcome": "A signed-out creator can start MoolSocial authentication from the YouTube channel screen and returns to the same optional read-only consent journey without re-navigation or credential ambiguity.",
+  "observedFailure": [
+    "screen_says_sign_in_to_MoolSocial_again_then_reconnect_YouTube",
+    "only_recovery_action_is_Try_again",
+    "one_exact_Try_again_returns_to_the_same_unavailable_signed_out_state",
+    "no_direct_MoolSocial_sign_in_action_is_reachable_on_the_route"
+  ],
+  "minimumSuccessorCorrection": [
+    "add_one_explicit_MoolSocial_sign_in_action_to_the_signed_out_channel_state",
+    "reuse_the_existing_real_user_initiated_Firebase_authentication_owner",
+    "return_to_the_YouTube_channel_route_after_successful_authentication",
+    "preserve_optional_youtube_readonly_consent_privacy_permissions_deletion_and_revocation_controls",
+    "prove_cancel_auth_failure_retry_unconnected_connected_and_disconnect_continuity"
+  ],
+  "explicitExclusions": [
+    "no_password_MFA_token_API_key_OAuth_credential_nonce_private_verdict_or_attestation_access",
+    "no_YouTube_upload_edit_delete_playlist_channel_or_viewer_mutation_scope",
+    "no_backend_provider_Hosting_Play_or_communication_mutation_without_separate_authority",
+    "no_second_C30T_AAB_upload_or_install"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorizedByFounder": true,
+    "founderAuthorizationText": "you need to be real user and do full detailed in depth real user testing from social screens ,global navigation then make new tickets if any defects/issues then implement those tickets",
+    "executionSelectionPendingFullAcceptance": false,
+    "resolvedBySourceQualifiedTicket": "UAW-C30T-R60-45-YOUTUBE-EXISTING-CHANNEL-ACCOUNT-HANDOFF-CLARITY",
+    "successorBuildUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "resolutionEvidence": {
+    "resolvedOn": "2026-08-13",
+    "runtimeContracts": [
+      "signed_out_channel_action_starts_explicit_MoolSocial_Google_authentication",
+      "success_returns_to_app_creator_youtube_connect",
+      "cancel_and_system_Back_return_to_the_originating_Social_surface",
+      "YouTube_handoff_hides_Email_Mobile_OTP_and_unrelated_social_providers",
+      "process_restart_restores_purpose_without_account_or_credential_persistence"
+    ],
+    "authSessionFirebaseAndYouTubeReturnPartition": "32_passed_0_failed",
+    "livePlayAcceptancePending": true
+  },
+  "evidence": {
+    "initialScreenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/25-youtube-channel-unavailable-signed-out.png",
+    "initialScreenshotSha256": "9D5C349D790E70127CFCEA8044DB9A7C60926BEFF97DB9AB15A47A75D635118B",
+    "retryScreenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/27-youtube-channel-after-retry.png",
+    "retryScreenshotSha256": "2B1C69BDED8E90181558FD45AAABC86E28658407F0426E5CB43975ADE78A62F9",
+    "finding": "docs/quality/UAW-C30T-R60-45-YOUTUBE-CHANNEL-SIGNED-OUT-DEAD-END-20260813.md"
+  }
+}

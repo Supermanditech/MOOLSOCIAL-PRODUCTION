@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C33F-R60-49-SUCCESSOR-RELEASE-STATE-001",
+  "ticketId": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "aggregateStatePath": "config/successor-aab-regression-hard-gate-aggregate-c33f.json",
+  "machineState": "acceptance_failed_r60_49_google_auth_guest_feed_social_identity_and_create_crash_successor_required",
+  "buildAuthorization": "consumed",
+  "uploadAuthorization": "consumed",
+  "installAuthorization": "consumed",
+  "deviceAuthorization": "consumed",
+  "repositoryIdentity": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "candidate": {
+    "id": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.49",
+    "versionCode": "2026081349",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "authorizedTrack": "internal",
+    "playTrack": "internal",
+    "deviceSerial": "2b3e0f71",
+    "deviceModel": "CPH2375"
+  },
+  "historicalFailedCandidate": {
+    "statePath": "config/successor-aab-regression-hard-gate-state-c30x.json",
+    "versionName": "1.0.0-r60.48",
+    "versionCode": "2026081348",
+    "failureState": "acceptance_failed_r60_48_social_auth_and_action_journey_defects_successor_required",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "deviceCount": 1,
+    "allAuthoritiesConsumed": true,
+    "runtimeSuccessClaimed": false,
+    "artifactReusable": false
+  },
+  "sourcePrerequisites": {
+    "fix3Ticket": "config/uaw-c33e-fix3-social-auth-rollback-independent-cleanup-ticket.json",
+    "fix3Gate": "scripts/check-uaw-c33e-fix3-social-auth-rollback-independent-cleanup.ps1",
+    "fix4Ticket": "config/uaw-c33e-fix4-protected-social-action-intent-return-continuity-ticket.json",
+    "fix4Gate": "scripts/check-uaw-c33e-fix4-protected-social-action-intent-return-continuity.ps1",
+    "fix4Qualification": "docs/quality/UAW-C33E-FIX4-PROTECTED-SOCIAL-ACTION-INTENT-RETURN-CONTINUITY-QUALIFICATION-20260815.md",
+    "releaseRuntimeGate": "scripts/check-release-runtime-configuration-c30w.ps1",
+    "liveReadinessGate": "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1"
+  },
+  "liveReadiness": {
+    "statePath": "config/google-auth-live-provider-readiness-state-c33e-fix2.json",
+    "qualifiedFacts": 4,
+    "requiredFacts": 4,
+    "secretValuesObserved": false
+  },
+  "priorQualifiedSource": {
+    "supersededByTicket": "UAW-C33F-FIX4-HIDDEN-FOUNDER-INPUT-FLAG-PREBUILD-GATE-ORDER",
+    "manifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/source-manifest-c33f-fix2.txt",
+    "manifestSha256": "55EC0F438F990E9D47A85EBEB68A84DBD1B219B377305CBA228B180EC989F87D",
+    "fileCount": 1146,
+    "completedIdenticalCycles": 2,
+    "preserved": true
+  },
+  "sourceQualification": {
+    "requiredIdenticalCycles": 2,
+    "completedIdenticalCycles": 2,
+    "freshManifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/source-manifest-c33f-fix4.txt",
+    "freshManifestSha256": "8E448668E56EACE3A92382189439A94C161FD1E7A4FD296DD374DE9DE05C668A",
+    "freshSourceFingerprint": "8E448668E56EACE3A92382189439A94C161FD1E7A4FD296DD374DE9DE05C668A",
+    "freshSourceFileCount": 1147,
+    "manifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/source-manifest-c33f-fix4.txt",
+    "manifestSha256": "8E448668E56EACE3A92382189439A94C161FD1E7A4FD296DD374DE9DE05C668A",
+    "fileCount": 1147,
+    "releasePreflightPassed": true,
+    "wholeMobileAnalyzerPassed": true,
+    "flutterTestsPassed": true,
+    "backendTestsPassed": true,
+    "hostingTestsPassed": true,
+    "dualPowerShellHostsPassed": true,
+    "focusedManifestPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/focused-test-manifest-c33f.txt",
+    "focusedManifestSha256": "2D81F66952726A7CFC3F1A497660D20E84407C46D1B8BAC3FB0BC41814F31E60",
+    "expectedFlutterPassed": 426,
+    "expectedFlutterSkipped": 3,
+    "backendPassed": 537,
+    "hostingPassed": 8,
+    "cycleEvidence": [
+      "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/cycle-fix4-01-summary.json",
+      "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/cycle-fix4-02-summary.json"
+    ]
+  },
+  "authority": {
+    "candidateIdentityApproved": true,
+    "oneAabBuildAuthorizedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationAuthorizedAfterPostbuild": true,
+    "oneInPlaceOppoPlayUpdateAuthorizedAfterActivation": true,
+    "founderHiddenInputEntryRequired": true,
+    "agentSecretValueAccessAuthorized": false,
+    "otherTrackAuthorized": false,
+    "adbOrSideloadAuthorized": false,
+    "backendOrHostingDeploymentAuthorized": false,
+    "providerDeploymentAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "founderAuthorization": {
+    "evidence": "docs/quality/UAW-C33F-R60-49-FOUNDER-END-TO-END-AUTHORIZATION-20260815.md",
+    "oneSuccessorAabBuildApprovedAfterAllGates": true,
+    "oneInternalTestingUploadAndActivationApprovedAfterPostbuildGate": true,
+    "oneInPlaceOppoPlayUpdateApprovedAfterPostuploadGate": true,
+    "candidateIdentitySealed": true,
+    "hiddenFounderInputsEntered": true,
+    "productionOpenClosedPublicOrOtherTrackAuthorized": false,
+    "adbInstallUninstallDataClearDowngradeOrSideloadAuthorized": false,
+    "deploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "releaseAuthorities": {
+    "build": "consumed",
+    "uploadAndInternalActivation": "consumed",
+    "inPlaceOppoPlayUpdate": "consumed",
+    "postinstallAcceptance": "failed_consumed"
+  },
+  "actionCounts": {
+    "build": 1,
+    "upload": 1,
+    "install": 1,
+    "deviceAcceptance": 0
+  },
+  "releaseBinding": {
+    "founderLauncher": "tmp/run-c30x-successor-single-aab-founder.ps1",
+    "authoritativeAabWrapper": "scripts/invoke-play-internal-aab-build-c30t.ps1",
+    "c33fGate": "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1",
+    "c33fGateRequiredBeforeFounderPrompt": true,
+    "c33fGateRequiredBeforeAabAuthorityConsumption": true
+  },
+  "runtimeConfiguration": {
+    "founderLauncherPath": "tmp/run-c30x-successor-single-aab-founder.ps1",
+    "secretDefineFileEnvironmentName": "MOOLSOCIAL_FIREBASE_DART_DEFINE_FILE",
+    "googleServicesFileEnvironmentName": "MOOLSOCIAL_GOOGLE_SERVICES_JSON",
+    "transientGoogleServicesPath": "apps/mobile/android/app/src/release/google-services.json",
+    "googleServicesFileQualifiedByFounder": true,
+    "googleServicesFileReadByAgent": false,
+    "secretDefineFileQualifiedByFounder": true,
+    "secretDefineFileReadByAgent": false,
+    "googleServerClientIdQualifiedByFounder": true,
+    "requiredNonSecretDefines": {
+      "MOOLSOCIAL_DEVICE_REVIEW": "true",
+      "MOOLSOCIAL_USE_EMULATORS": "false",
+      "MOOLSOCIAL_CANDIDATE_ID": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+      "MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "true",
+      "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "true",
+      "MOOLSOCIAL_YOUTUBE_PROVIDER_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider",
+      "MOOLSOCIAL_SOCIAL_CONTENT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent",
+      "MOOLSOCIAL_CHAT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat",
+      "MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED": "true",
+      "MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED": "false",
+      "MOOLSOCIAL_FIREBASE_APP_ID": "1:760290687711:android:4202409fd3ab38f6ce076a",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID": "760290687711",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID": "moolsocial-dev-503018"
+    },
+    "requiredSecretDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY",
+      "MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID"
+    ]
+  },
+  "signingQualification": {
+    "releaseUsesDebugSigning": false,
+    "uploadKeyEnvironmentNames": [
+      "MOOLSOCIAL_UPLOAD_STORE_FILE",
+      "MOOLSOCIAL_UPLOAD_STORE_PASSWORD",
+      "MOOLSOCIAL_UPLOAD_KEY_ALIAS",
+      "MOOLSOCIAL_UPLOAD_KEY_PASSWORD"
+    ],
+    "founderControlledUploadKeyPresent": true,
+    "uploadKeyStorePath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRIVATE-SIGNING\\moolsocial-upload-2026.p12",
+    "uploadKeyAlias": "moolsocial-upload-2026",
+    "uploadCertificateSha256": "63:49:1B:E7:8A:01:F4:51:43:19:AE:5D:2A:39:57:61:18:33:F3:2C:A1:CB:FD:57:AB:29:82:B0:1D:39:C0:D6",
+    "playAppSigningCertificateSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "secretValuesRecorded": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "toolingQualification": {
+    "requiredPowerShellMajorMinimum": 7,
+    "launcherRejectsWindowsPowerShellBeforePrompt": true,
+    "wrapperRejectsWindowsPowerShellBeforeAuthorityMutation": true,
+    "nativeExitCodeAuthoritative": true,
+    "releaseConfigOnlyCommandQualified": true,
+    "releaseConfigOnlyProducesNoApkOrAab": true,
+    "releaseRegistrantExactPluginSetQualified": true,
+    "releaseRegistrantPluginCount": 16,
+    "googleServicesTaskRegistered": true,
+    "crashlyticsBuildIdTaskRegistered": true,
+    "appBundleInvocationCountRequired": 1,
+    "standaloneBundletoolPath": "tmp/bundletool-all-1.18.3.jar",
+    "standaloneBundletoolSha256": "A099CFA1543F55593BC2ED16A70A7C67FE54B1747BB7301F37FDFD6D91028E29",
+    "standaloneBundletoolVersion": "1.18.3"
+  },
+  "providerRevisions": {
+    "moolsocialcontent": "moolsocialcontent-00005-lep",
+    "moolsocialchat": "moolsocialchat-00001-yaf",
+    "youtubeprovider": "youtubeprovider-00038-cic",
+    "youtubeoauthcallback": "youtubeoauthcallback-00035-cir",
+    "backendDeploymentCompleted": false,
+    "additionalBackendDeploymentAuthorized": false
+  },
+  "buildResult": {
+    "state": "single_release_AAB_succeeded_authority_consumed",
+    "buildCount": 1,
+    "wrapperInvocationCount": 1,
+    "configOnlyCount": 1,
+    "artifactPath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/MoolSocial-1.0.0-r60.49-2026081349-release.aab",
+    "artifactSha256": "53D44C5DB061C88FC27198E405828B673422D875835456A5C6F56B3BB2AE7BD2",
+    "artifactBytes": 94673097,
+    "uploadSignerSha256": "63491BE78A01F4514319AE5D2A3957611833F32CA1CBFD57AB2982B01D39C0D6",
+    "packageVersionManifestProved": true,
+    "googleAppIdResourceProved": true,
+    "crashlyticsBuildIdResourceProved": true,
+    "splitAndArm64PayloadProved": true,
+    "mergedReleaseManifestProved": true,
+    "provenance": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/06-release-aab-provenance.json"
+  },
+  "playResult": {
+    "uploadCount": 1,
+    "internalActivationCount": 1,
+    "evidencePath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/08-play-internal-activation-evidence.json"
+  },
+  "installResult": {
+    "installCount": 1,
+    "coldStartEvidencePath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/11-oppo-play-installed-cold-start-evidence.json",
+    "retainedDataEvidencePath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/10-oppo-play-installed-retained-data-evidence.json",
+    "journeyEvidencePath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/12-founder-real-user-acceptance-failure-evidence.json",
+    "acceptanceSucceeded": false,
+    "failureEvidencePath": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/12-founder-real-user-acceptance-failure-evidence.json"
+  },
+  "promotionRule": {
+    "allRegressionGatesMustPassBeforeBuild": true,
+    "exactArtifactMustRebindAfterBuildAndImmediatelyBeforeUpload": true,
+    "zeroNewIssuesAfterBuildRequired": true,
+    "zeroNewDefectsAfterBuildRequired": true,
+    "coldStartInteractiveRequired": true,
+    "retainedDataInPlacePlayUpdateRequired": true,
+    "zeroFlutterFatalRequired": true,
+    "zeroAndroidRuntimeFatalRequired": true,
+    "zeroAnrRequired": true,
+    "allMandatoryJourneysRequired": true
+  },
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "privateAccountIdentifiersObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false,
+    "firebaseDebugLogRead": false
+  }
+}

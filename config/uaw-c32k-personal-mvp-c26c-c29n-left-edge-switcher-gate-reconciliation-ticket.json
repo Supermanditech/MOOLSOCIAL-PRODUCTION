@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32K-PERSONAL-MVP-C26C-C29N-LEFT-EDGE-SWITCHER-GATE-RECONCILIATION",
+  "parentOutcome": "UAW-C32J-PERSONAL-MVP-C28E-IMMUTABLE-R60-27-EVIDENCE-BINDING-RECONCILIATION",
+  "predecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-CREATOR-ERGONOMICS-AND-GLOBAL-EDGE-CONSISTENCY-C29N",
+  "finding": "REG-20260815-2249-POST-YOUTUBE-AUDIT-C26C-EMBEDDED-SWITCHER-TOPLEFT-ANCHOR-REJECTION",
+  "state": "founder_authorized_source_gate_repair_selected_live_and_release_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal user opening the shared Mool switcher from the C29N left-edge launcher",
+  "customerOutcome": "The accepted left-edge Mool launcher opens an on-screen connected switcher while Chat remains at the right edge, and historical C26C qualification validates the current conditional alignment owner instead of rejecting it for lacking an obsolete direct literal.",
+  "classificationReason": "The current C29N runtime behavior is already accepted and source-qualified; only a stale predecessor gate blocks truthful qualification.",
+  "minimumCompleteScope": [
+    "preserve_C29N_Mool_left_Chat_right_and_Social_middle_runtime_bytes",
+    "replace_only_C26C_direct_topLeft_bottomLeft_literals_with_the_current_conditional_target_and_follower_anchor_contract",
+    "require_default_left_and_optional_compact_end_alignment_branches_without_selecting_end_alignment_for_current_Social",
+    "add_one_C32K_successor_checker_binding_C26C_C27C_C29N_runtime_and_focused_edge_test",
+    "run_two_identical_source_gate_Flutter_analyzer_and_full_C28E_preflight_cycles"
+  ],
+  "explicitExclusions": [
+    "no_runtime_Flutter_UI_route_screen_copy_reference_navigation_order_or_alignment_change",
+    "no_removal_or_activation_of_the_existing_optional_compact_end_alignment_API",
+    "no_backend_provider_cloud_Hosting_rules_IAM_CORS_lifecycle_or_live_data_write",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_or_device_mutation",
+    "no_funds_credential_secret_token_nonce_private_verdict_key_attestation_or_external_communication_action",
+    "no_commit_push_merge_rebase_branch_switch_reset_clean_or_main_mutation"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user: autonomously audit, convert findings into tickets and implement for founder review; exact external and release actions remain gated",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingRuntimeOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart"
+    ],
+    "existingGates": [
+      "scripts/check-personal-embedded-vertical-mool-switcher-c26c.ps1",
+      "scripts/check-personal-uniform-embedded-switcher-c27c.ps1"
+    ],
+    "existingAuthority": "config/uaw-personal-mvp-social-creator-ergonomics-global-edge-consistency-c29n-ticket.json",
+    "existingFocusedTest": "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_creator_ergonomics_global_edge_consistency_c29n_test.dart",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c32k-c26c-c29n-left-edge-switcher-gate.ps1"
+    ],
+    "necessityProof": "C29N explicitly superseded C29E's right-edge Mool placement with white Mool left and Chat right. The runtime owner therefore uses the default left branch of a conditional alignment API, while retaining an unused opt-in end branch for compatible callers. C26C requires an obsolete direct literal that cannot exist in the conditional expression."
+  },
+  "acceptance": [
+    "C26C_requires_conditional_compact_end_target_and_follower_anchor_owners",
+    "C26C_requires_topRight_bottomRight_optional_and_topLeft_bottomLeft_default_branches",
+    "C29N_authority_and_focused_test_bind_Mool_left_and_Chat_right",
+    "current_Social_dock_orders_Mool_then_Home_Shorts_Create_Feed_then_Chat_and_does_not_opt_into_end_alignment",
+    "C26C_C27C_and_C32K_pass_on_both_PowerShell_hosts",
+    "C29N_edge_test_analyzer_and_full_C28E_gate_only_preflight_pass_in_two_identical_cycles"
+  ]
+}

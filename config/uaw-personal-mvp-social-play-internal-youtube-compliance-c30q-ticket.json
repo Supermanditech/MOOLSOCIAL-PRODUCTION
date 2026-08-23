@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30Q",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30P",
+    "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30O"
+  ],
+  "state": "founder_authorized_exact_release_config_successor_prequalification",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_creator_and_YouTube_API_reviewer",
+  "customerOutcome": "One release-config-regenerated production-grade Dev Android App Bundle is distributed only through Google Play Internal Testing, installed in place from Google Play on the OPPO, and truthfully proves distinct MoolSocial Feed/Create value with attributed public YouTube discovery, official playback and separately initiated read-only channel controls.",
+  "predecessorDisposition": {
+    "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30P",
+    "state": "failed_authority_consumed_no_artifact",
+    "buildCount": 1,
+    "wrapperInvocationCount": 1,
+    "artifactProduced": false,
+    "uploadPerformed": false,
+    "installPerformed": false,
+    "failureClass": "Flutter_no_pub_release_retained_debug_registrant_for_dev_only_integration_test",
+    "evidence": "docs/quality/UAW-C30P-RELEASE-DEV-PLUGIN-REGISTRANT-COMPILE-FAILURE-20260812.md",
+    "retryForbidden": true
+  },
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/pubspec.yaml",
+      "apps/mobile/integration_test",
+      "apps/mobile/test_driver/shared_integration_test.dart",
+      "apps/mobile/android/app/build.gradle.kts",
+      "scripts/check-apk-regression-gate-state.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newProviderCapabilities": [],
+    "newNecessaryToolingOwners": [
+      "scripts/check-play-internal-aab-build-wrapper-c30q.ps1",
+      "scripts/check-play-internal-aab-regression-gate-state-c30q.ps1",
+      "scripts/invoke-play-internal-aab-build-c30q.ps1",
+      "scripts/qualify-play-internal-youtube-compliance-c30q.ps1",
+      "tmp/run-c30q-single-aab-founder.ps1"
+    ],
+    "necessityProof": "C30P proved PowerShell-safe execution but exposed Flutter issue #169336: --no-pub retained the debug registrant while release Gradle removed integration_test. The repository genuinely uses integration_test, so removal is invalid. One official release config-only regeneration step plus a static absence gate is the smallest complete successor; it changes no application screen, route, backend, provider, corpus, player, dependency version or declared use case."
+  },
+  "minimumCompleteScope": [
+    "preserve_C30O_and_C30P_failures_and_all_qualified_application_Play_Firebase_signing_tester_and_C30K_state",
+    "preserve_integration_test_as_a_dev_dependency_and_never_add_it_to_the_release_classpath",
+    "run_release_apk_config_only_with_no_pub_to_regenerate_platform_tooling_without_building_an_APK",
+    "prove_the_generated_release_registrant_contains_no_IntegrationTestPlugin_before_exactly_one_appbundle_build",
+    "require_PowerShell_7_secret_safety_two_identical_complete_source_cycles_and_all_MVP_delivery_release_and_machine_gates",
+    "upload_only_to_Google_Play_Internal_Testing_install_from_Google_Play_on_OPPO_and_run_the_bounded_reviewer_journeys",
+    "prepare_but_do_not_send_the_same_thread_YouTube_response_and_reviewer_package"
+  ],
+  "explicitExclusions": [
+    "no_C30O_or_C30P_rerun_and_no_second_C30Q_AAB_upload_or_install",
+    "no_integration_test_removal_release_classpath_promotion_generated_registrant_hand_edit_Flutter_upgrade_or_broad_dependency_change",
+    "no_YouTube_upload_or_any_declared_use_case_expansion",
+    "no_new_screen_route_backend provider corpus or broad redesign",
+    "no_Play_Production_open_public_Staging_Production_backend_Hosting_email_or_quota_submission",
+    "no_secret_private_verdict_nonce_commit_push_uninstall_data_clear_downgrade_ADB_successor_install_message_call_or_fund_movement"
+  ],
+  "authority": {
+    "founderExecutionAuthority": "explicit_2026_08_12_original_instruction_to_register_each_failure_and_exact_successor_then_continue_Internal_Testing_only_execution",
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.40",
+    "installedVersionCode": "2026081240",
+    "installedApkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "installedSerial": "2b3e0f71",
+    "installedArtifactMustRemainUntilQualifiedPlaySuccessorInstall": true,
+    "C30OAndC30PFailureEvidenceImmutable": true,
+    "successorBuildsPerformed": 0,
+    "successorInstallsPerformed": 0,
+    "createWritesAttempted": 0
+  },
+  "dependencies": [
+    "Flutter_issue_169336_official_release_config_only_workaround",
+    "Flutter_PR_185615_open_upstream_fix_not_locally_patched",
+    "C30P_PowerShell_7_native_output_controls_reused",
+    "moolsocialcontent_00003_juw_youtubeprovider_00036_qer_youtubeoauthcallback_00035_cir_and_C30K_corpus_preserved",
+    "Play_app_4974778280277295872_Internal_Testing_tester_project_link_and_Firebase_Play_Integrity_signing_registration_preserved",
+    "founder_visible_existing_upload_password_and_Firebase_Android_API_key_prompt_only"
+  ],
+  "testPlan": [
+    "prove_real_integration_test_usage_and_dev_dependency_classification",
+    "PowerShell_5_1_negative_control_before_prompt_or_state_mutation",
+    "release_config_only_no_APK_output_and_generated_registrant_IntegrationTestPlugin_absence",
+    "two_identical_complete_source_cycles_and_static wrapper machine gates",
+    "one_release_AAB_version_package_signer_checksum_and_provenance",
+    "Play_Internal_Testing_install_App_Check_and_full_bounded_OPPO_reviewer_matrix",
+    "unsent_YouTube_reviewer_package"
+  ],
+  "findings": "docs/quality/UAW-C30Q-FLUTTER-NO-PUB-RELEASE-REGISTRANT-OFFICIAL-FINDINGS-20260812.md"
+}

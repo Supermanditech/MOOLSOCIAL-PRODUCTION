@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC01-SOCIAL-REDUNDANT-FAMILY-ROOT-REMOVAL",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "completed_nonbuild_gates_passed",
+  "classification": "mvp_required",
+  "customerOutcome": "A Personal user sees Shorts, Videos, Feed and Create directly under Social without a redundant Social cell, while the Mool switcher and one-handed one-tap navigation remain intact.",
+  "founderAuthority": "docs/quality/MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-FINDINGS-20260810.md",
+  "completionEvidence": "docs/quality/MOOLSOCIAL-FSC01-SOCIAL-REDUNDANT-FAMILY-ROOT-REMOVAL-COMPLETION-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The shared destination shell unconditionally injects Social between the Mool switcher and a complete four-action Social rail; this duplicates family identity without owning a distinct customer destination."
+  },
+  "minimumCompleteScope": [
+    "omit_only_the_social_family_root_cell",
+    "preserve_compact_mool_switcher",
+    "preserve_shorts_videos_feed_create_order_and_one_tap_routes",
+    "preserve_bottom_one_handed_reach_and_44_by_44_host_geometry",
+    "focused_social_navigation_and_shared_shell_regression_tests"
+  ],
+  "explicitExclusions": [
+    "no_change_to_other_family_root_cells",
+    "no_route_copy_backend_api_or_provider_change",
+    "no_c28d_successor_semantics_viewport_fix_in_this_ticket",
+    "no_build_install_device_or_external_service_action",
+    "no_credentials_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authority_received_2026_08_10",
+    "mvp_delivery_discipline_preselection_gate",
+    "permanent_regression_memory_gate",
+    "current_branch_HEAD_dirty_tree_and_accepted_references_preserved",
+    "C28D_r60_27_identity_and_rejection_evidence_preserved"
+  ],
+  "testAndEvidencePlan": [
+    "focused_widget_test_absence_of_social_root_and_presence_of_mool_plus_four_actions",
+    "one_tap_social_action_route_outcomes",
+    "other_family_root_regression_coverage",
+    "format_analyze_and_nonbuild_navigation_gates"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

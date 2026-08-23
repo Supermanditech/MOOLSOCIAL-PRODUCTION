@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "SAM-R01-SERVER-STABLE-WORKSPACE-MEMBERSHIP-READ-CONTRACT",
+  "state": "locally_complete_no_environment_or_device_action_required",
+  "classification": "mvp_required",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "portfolioManifest": "config/superadmin-mvp-exact-launch-participant-provisioning-control-portfolio.json",
+  "portfolioManifestSha256": "1D322686A59DA40639F72BCAD2FFA0077A37D1B68E3DDC7B120EC7FB32C2D502",
+  "implementation": {
+    "contractPath": "backend/functions/src/workspace/workspace_membership_contract.ts",
+    "contractSha256": "480C629920D90BB7E002E2D60465055B1175E885D40CB07CC843BCF5657C4D76",
+    "testPath": "backend/functions/src/workspace/workspace_membership_contract.test.ts",
+    "testSha256": "113ED6307E03CE2B1BFFAAB33625B22DF2F7646989BB5FE6964869D5A266992E",
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newStoresOrEndpoints": 0,
+    "apkBuilds": 0,
+    "deviceMutations": 0
+  },
+  "qualification": {
+    "focusedStrictTypecheck": "passed",
+    "focusedTestCycles": ["15_pass_0_fail", "15_pass_0_fail"],
+    "fullBackendTypecheck": "passed",
+    "fullBackendCycles": ["332_pass_0_fail", "332_pass_0_fail"],
+    "cycle1Evidence": "artifacts/quality/sam-r01-server-stable-workspace-membership-read-contract-20260807-01/05-full-backend-cycle-1.tap",
+    "cycle1Sha256": "5E2ED149CB7F18D86470741B88638B25120DF193DFD724166B0CE2F4A28B59D5",
+    "cycle2Evidence": "artifacts/quality/sam-r01-server-stable-workspace-membership-read-contract-20260807-01/06-full-backend-cycle-2.tap",
+    "cycle2Sha256": "F66685B8C075667702AD5D8CF3B1042EDC9D4D5BAB78BF5A8AB7F0AEB7745314",
+    "mvpScopeGate": "passed",
+    "deliveryDisciplineGate": "passed",
+    "regressionMemoryEntries": 84
+  },
+  "oppoPreserved": {
+    "serial": "2b3e0f71",
+    "versionName": "1.0.0-r60.8",
+    "versionCode": 2026080708,
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "installPerformed": false
+  },
+  "completionEvidence": "docs/quality/SAM-R01-SERVER-STABLE-WORKSPACE-MEMBERSHIP-READ-CONTRACT-COMPLETION-20260807.md"
+}

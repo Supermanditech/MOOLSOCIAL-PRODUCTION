@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-PUBLIC-FEED-READ-REJECTED",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_and_dev_provider_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocker",
+  "surface": ["MoolSocial Public Feed", "Create authentication"],
+  "actualResult": "The Feed shows a refresh rejection before Cloud Run and no C30K post. The public-review shell reports signed in through ReviewOtpGateway while FirebaseAuth.currentUser is null, but the shared content client requires a Firebase ID token even for the public list operation.",
+  "expectedResult": "The C30K public corpus is readable to an App-Check-qualified guest; Create, voting and other mutations require a real user-initiated Firebase-authenticated account.",
+  "rootCauseState": "confirmed_review_shell_authentication_divergence_and_overbroad_client_server_read_auth_requirement",
+  "correction": [
+    "allow_only_the_public_listFeed_operation_with_valid_App_Check_and_no_Firebase_ID_token",
+    "retain_Firebase_Auth_plus_App_Check_for_publish_vote_and_every_mutation",
+    "replace_fake_public_review_sign_in_with_truthful_guest_ready_state_and_real_user_initiated_sign_in"
+  ],
+  "acceptance": [
+    "real_C30K_Feed_loads_all_three_authors",
+    "text_image_carousel_image_poll_quick_poll_and_quiz_are_present_and_interactive",
+    "guest_read_does_not_enable_Create_vote_or_other_mutations",
+    "real_sign_in_enables_exactly_six_authorized_Dev_Create_writes_and_readback_without_duplicates",
+    "refresh_relaunch_offline_and_retry_preserve_truthful_states"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "DevBackendWriteAuthorized": true,
+    "runtimeDevCreateWritesAuthorized": true,
+    "runtimeDevCreateWriteLimit": 6,
+    "buildUploadAndInstallInheritedFromParent": true,
+    "secretOrPrivateVerdictAccessAuthorized": false
+  }
+}

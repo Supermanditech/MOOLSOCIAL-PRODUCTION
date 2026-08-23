@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02C-ANDROID-PROFILE-YOUTUBE-PLAYER-PACKAGING",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "source_profile_and_release_compile_gates_passed_provider_runtime_and_fresh_apk_qualification_required",
+  "classification": "mvp_supporting",
+  "actor": "authenticated Personal user on an authorized Android profile review candidate",
+  "customerOutcome": "A Personal user can use the existing official YouTube embedded player in an authorized Android profile review build while release remains disabled and every existing origin, message, lifecycle, eligibility and recovery boundary remains enforced.",
+  "founderDirection": "all_required_production_grade_Shorts_dependencies_authorized_before_OPPO_founder_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC02C-ANDROID-PROFILE-YOUTUBE-PLAYER-PACKAGING-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/debug/kotlin/com/moolsocial/app/youtube/YouTubeEmbeddedPlayerPlatformView.kt",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/debug/kotlin/com/moolsocial/app/youtube/YouTubeEmbeddedPlayerPlatformViewFactory.kt",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/profile/kotlin/com/moolsocial/youtube_embedded_player_private_dev/YouTubeEmbeddedPlayerPrivateDevRegistrar.kt",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/build.gradle.kts",
+      "scripts/check-youtube-embedded-player-android.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The closed native WebView implementation, one-time transferred message port, controller, bootstrap digest and debug registration already exist. Profile can compile the exact same implementation source through Gradle source-set configuration and its existing registrar, so no duplicate player, bridge, source copy or service is necessary."
+  },
+  "minimumCompleteScope": [
+    "allow_the_existing_Dart_player_feature_flag_in_debug_and_profile_but_not_release",
+    "allow_the_existing_Android_surface_in_debug_and_profile_but_not_release",
+    "compile_the_exact_existing_debug_native_player_implementation_source_into_profile_without_copying_it",
+    "register_the_existing_factory_in_profile_while_release_registrar_remains_noop",
+    "disable_WebView_remote_debugging_outside_the_debug_variant",
+    "update_the_closed_Android_source_gate_and_focused_tests",
+    "preserve_all_bootstrap_digest_origin_message_permission_lifecycle_and_recovery_contracts"
+  ],
+  "explicitExclusions": [
+    "no_release_player_registration_or_release_feature_enablement",
+    "no_iOS_packaging_change",
+    "no_new_WebView_bridge_javascript_interface_message_listener_or_evaluateJavascript_surface",
+    "no_provider_URL_API_OAuth_scope_upload_backend_credential_or_external_service_write",
+    "no_Social_UI_Videos_Feed_Create_Shop_route_or_screen_change",
+    "no_APK_machine_state_build_install_OPPO_mutation_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_direct_production_grade_dependency_authority_received_2026_08_11",
+    "existing_33_test_player_baseline_and_Android_source_gate_passed_before_mutation",
+    "focused_Dart_Kotlin_Gradle_and_source_gate_verification",
+    "existing_FSC02A_provider_runtime_authority_gate_before_available_state_APK",
+    "fresh_APK_host_qualification_before_any_build",
+    "checksum_unique_successor_before_any_OPPO_install"
+  ],
+  "testAndEvidencePlan": [
+    "closed_Android_source_gate_requires_shared_implementation_in_profile_and_release_noop",
+    "source_test_requires_debug_and_profile_only_feature_contract",
+    "WebView_debugging_is_true_only_for_debug_variant",
+    "Android_port_and_full_player_runtime_tests",
+    "focused_Flutter_analysis",
+    "MVP_delivery_scope_approved_UI_lock_and_permanent_regression_gates"
+  ],
+  "implementationEvidence": {
+    "state": "source_and_profile_packaging_gates_passed",
+    "changedOwners": [
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/build.gradle.kts",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/profile/kotlin/com/moolsocial/youtube_embedded_player_private_dev/YouTubeEmbeddedPlayerPrivateDevRegistrar.kt",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/android/src/debug/kotlin/com/moolsocial/app/youtube/YouTubeEmbeddedPlayerPlatformView.kt",
+      "apps/mobile/packages/youtube_embedded_player_private_dev/pubspec.yaml",
+      "apps/mobile/test/youtube_embedded_player_android_test.dart",
+      "scripts/check-youtube-embedded-player-android.ps1"
+    ],
+    "verifiedContracts": [
+      "Dart_feature_flag_allows_debug_and_profile_only_and_is_false_in_release",
+      "Android_surface_rejects_release_web_and_non_Android",
+      "profile_library_build_type_exists_and_reuses_the_exact_debug_native_implementation_directory",
+      "profile_registrar_registers_the_existing_factory",
+      "release_registrar_remains_noop",
+      "WebView_remote_debugging_uses_BuildConfig_DEBUG_and_is_false_in_release_derived_profile",
+      "bootstrap_digest_origin_nonce_typed_port_message_permission_lifecycle_eligibility_and_recovery_contracts_preserved",
+      "no_duplicate_native_player_source_copy_created"
+    ],
+    "gateResults": {
+      "bootstrapSha256": "F63983016541BF07FD5390EACB34B8CCA7B6A564957DCD647A643689B27D0FBB",
+      "androidSourceGate": "passed",
+      "gradleProjectConfiguration": "passed",
+      "profileKotlinCompile": "passed",
+      "releaseKotlinCompile": "passed_release_registrar_closed",
+      "flutterAnalyze": "no_issues_changed_Dart_and_test_owners",
+      "playerFlutterTestsPassed": 34,
+      "focusedSocialFlutterTestsPassed": 76,
+      "approvedUiLocks": "passed",
+      "mvpDeliveryScopeAndRegressionMemory": "passed_after_final_manifest_reseal"
+    },
+    "remainingProviderRuntimeGate": "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF_true_non_emulator_moolsocial_dev_503018_authorized_provider_URL_Firebase_Auth_Play_Integrity_App_Check_and_capabilities_publicData_true",
+    "buildState": "no_APK_assembled_fresh_machine_and_host_qualification_required_after_provider_runtime_authority",
+    "deviceState": "not_started_installed_r60_28_preserved"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

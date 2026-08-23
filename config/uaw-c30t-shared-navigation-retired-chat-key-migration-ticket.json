@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SHARED-NAVIGATION-RETIRED-CHAT-KEY-MIGRATION",
+  "parentTicket": "UAW-C30T-HISTORICAL-UNIVERSAL-NAVIGATION-CONTRACT-RECONCILIATION",
+  "state": "implementation_complete_full_shared_suite_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "current_shared_global_chat_reachability_defect",
+  "actor": "user_opening_Activity_Settings_or_Workspaces_and_then_Chat",
+  "customerOutcome": "Every shared account hub exposes the current global Chat companion and returns from Chat to the exact originating shared route.",
+  "finding": "SharedHubScreen supplies an exact onOpenChat callback, but its standalone MoolGlobalNavigationV2 does not render or invoke that callback. The retired test key exposed the missing runtime control; direct substitution failed because the current control was not mounted.",
+  "minimumCorrection": [
+    "mount_the_current_MoolGlobalChatNavigationV2_companion_on_SharedHubScreen_without_moving_the_existing_Mool_launcher",
+    "replace_only_the_retired_test_key_with_the_mounted_current_global_Chat_key",
+    "preserve_the_expected_Chat_inbox_destination",
+    "run_the_exact_failed_journey_after_migration"
+  ],
+  "explicitExclusions": [
+    "no_change_to_destination_rails_or_nonshared_screens",
+    "no_blanket_historical_test_rewrite_skip_or_deletion",
+    "no_backend_provider_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "testMigrationAuthorized": true,
+    "runtimeImplementationAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "exactJourney": "1 passed, 0 failed",
+    "exactEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/65-shared-global-chat-and-creator-entry-tests.log",
+    "exactEvidenceSha256": "0467EAB4BDE85EBE28807570BD2FF9EAEEFB0E8415E79DD5FCD71E7FAA165BDB",
+    "fullSharedVerticalSuite": "20 passed, 0 failed",
+    "fullEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/66-shared-vertical-full-after-global-chat-fix.log",
+    "fullEvidenceSha256": "FDA9B12689EC801A3126854C4AC9955E7D523903021BCD73A073402841B7DCF9",
+    "compactFitment": "320x568_at_140_percent_text_Mool_and_Chat_at_least_48x48_nonoverlapping_and_Chat_opens",
+    "compactFitmentEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/74-shared-compact-global-chat-fitment-test.log",
+    "compactFitmentEvidenceSha256": "FA212172489F0131A4D44A54BB4AB30E1B62EB0EAFB977FFCBB12BC9C4325172",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidenceSha256": "DB82A50BDB1316A81BFCE2DCFB14C83DC43D21A82CC65FA5ED26D58BEF10A9C1",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkExists": false
+  }
+}

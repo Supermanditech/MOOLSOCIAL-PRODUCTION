@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY-V1",
+  "ticketId": "UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "viewports": [
+    {"width":320,"height":568},
+    {"width":360,"height":640},
+    {"width":360,"height":720},
+    {"width":375,"height":667},
+    {"width":390,"height":844},
+    {"width":412,"height":915},
+    {"width":430,"height":932}
+  ],
+  "textScales": [1.0, 1.4],
+  "matrixRows": 14,
+  "rootOwners": ["PersonalMoolRootV2","MvpActionChoiceRootV2:eat","MvpActionChoiceRootV2:ride","MvpActionChoiceRootV2:book","MvpActionChoiceRootV2:work"],
+  "projectionStates": ["loading","held","disabled","stale","offline","denied"],
+  "legacyRecoveryReasons": ["tiffin","get-it-done","standalone-pay","delivery","onboard","verify"],
+  "requirements": {
+    "allDeclaredCopyPresent": true,
+    "renderOverflowAllowed": false,
+    "maxLineTruncationAllowed": false,
+    "minimumTapTargetLogicalPixels": 44,
+    "accessibleActionNamesRequired": true,
+    "compactCallbacksOperable": true,
+    "safeAreaInsetsExercised": true,
+    "reducedMotionExercisedAt140Percent": true,
+    "artificialTextScaleCapAllowed": false
+  },
+  "keyboardImeApplicability": "not_applicable_no_input_surface",
+  "deviceQualificationState": "held_for_later_machine_gated_ticket",
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "implementationDisposition": "test_only_acceptance_unless_defect_proven",
+  "explicitExclusions": [
+    "no_unproven_copy_layout_or_accessibility_runtime_change",
+    "no_artificial_text_scale_cap_hidden_action_or_omitted_truthful_state",
+    "no_keyboard_ime_or_device_claim",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

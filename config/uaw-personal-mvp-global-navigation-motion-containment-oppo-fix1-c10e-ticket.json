@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-NAVIGATION-MOTION-CONTAINMENT-OPPO-FIX1-C10E",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "r60_10_checksum_matched_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "interactionContractVersion": "C10E-V1-20260807",
+  "scope": [
+    "finite_directional_main_destination_motion_180_to_320_ms",
+    "reduced_motion_zero_or_near_zero_transition",
+    "static_rejection_of_retired_destination_owned_bottom_navigation",
+    "two_complete_affected_host_regression_cycles",
+    "machine_gated_successor_build_install_and_OPPO_real_user_qualification"
+  ],
+  "acceptance": [
+    "no_unapproved_second_build",
+    "checksum_runtime_marker_and_in_place_install_identity_match",
+    "founder_screenshot_journeys_replayed_from_fresh_launch_through_mool_social_buy_work_and_chat",
+    "fresh_authenticated_no_deep_link_launch_visibly_lands_on_social_not_workspace",
+    "global_bottom_rail_geometry_and_meaning_remain_stable_on_every_main_root",
+    "mool_social_mool_round_trip_uses_finite_motion_without_top_level_back",
+    "retired_destination_owned_navigation_has_no_compiled_reachable_call_site"
+  ],
+  "latestFounderOppoJourney": {
+    "observedInstalledRuntime": "rejected_r60_9_evidence_not_the_host_fixed_candidate",
+    "steps": [
+      "fresh_open_landed_on_work_workspace_instead_of_social",
+      "tap_mool_opened_personal_mool",
+      "tap_social_opened_social",
+      "tap_mool_returned_to_personal_mool"
+    ],
+    "founderDisposition": [
+      "route_reachability_is_partly_correct",
+      "top_level_transitions_still_feel_like_unrelated_new_pages",
+      "changing_bottom_navigation_models_destroy_location_continuity",
+      "top_level_header_back_is_not_required",
+      "retired_navigation_source_must_be_statically_contained"
+    ]
+  },
+  "implementationBoundary": {
+    "reuseOwners": [
+      "MoolGlobalNavigationV2",
+      "MoolOutcomeDock",
+      "GoRouter_app_section_owner",
+      "MoolMotion",
+      "existing_Eat_Ride_Book_Work_Chat_and_Buy_state_owners"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "buildOrInstallAuthorizedNow": false
+  },
+  "oppoQualification": {
+    "state": "passed",
+    "candidateVersion": "1.0.0-r60.10 (2026080710)",
+    "apkSha256": "666810333E99531592145ADA8B04EFDE608C796C39BB21DE3DEF78269993A947",
+    "runtimeMarker": "passed_exact_candidate_ready_authenticated",
+    "freshLaunchOwner": "social",
+    "founderExactJourney": "passed_social_mool_social_mool_system_back_social",
+    "globalRoots": "passed_mool_social_buy_eat_ride_book_work_chat",
+    "localActions": "passed_eat_ride_book_work",
+    "stateRestoration": "passed_buy_scroll_chat_draft_focus_ime",
+    "buildCount": 1,
+    "installCount": 1,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "evidence": "artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/19-oppo-real-user-navigation-matrix.md",
+    "founderReviewScreen": "artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/oppo-real-user/34-founder-review-final-mool-home.png",
+    "founderAcceptance": "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md"
+  }
+}

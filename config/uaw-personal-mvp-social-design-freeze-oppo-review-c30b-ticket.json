@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-OPPO-REVIEW-C30B",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X",
+    "UAW-PERSONAL-MVP-SOCIAL-POST-READY-CREATE-AND-FOUR-CHOICE-POLLS-C29Y",
+    "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-TIMELINE-AND-POST-CTA-C29Z",
+    "UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A"
+  ],
+  "state": "device_review_ready_founder_acceptance_pending",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user",
+  "customerOutcome": "One fresh checksum-matched OPPO profile candidate exposes the corrected Social Home, Feed, direct Create and Chat design plus the truthful Shorts unavailable state for founder freeze review while every deployment remains held.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "configuration"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart",
+      "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",
+      "scripts/build-buy-device-review.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "run_two_identical_complete_Social_source_qualification_cycles",
+    "qualify_one_unique_profile_APK_with_exact_source_checksum_signature_package_and_version",
+    "install_once_in_place_on_exact_OPPO_2b3e0f71_without_uninstall_data_clear_or_downgrade",
+    "replay_Home_Feed_direct_Create_four_choice_poll_Chat_global_edges_and_Social_navigation",
+    "show_Shorts_truthful_unavailable_state_and_preserve_the_C30A_provider_deployment_hold",
+    "request_founder_design_freeze_review_without_claiming_live_Shorts_acceptance"
+  ],
+  "explicitExclusions": [
+    "no_backend_function_rule_provider_profile_Firebase_or_app_store_deployment",
+    "no_fake_demo_seed_or_MoolSocial_hosted_YouTube_content",
+    "no_OAuth_channel_connection_upload_recommender_or_secret_value_copy",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install",
+    "no_promotion_commit_push_reference_write_message_call_or_fund"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_ticket_fix_OPPO_testing_founder_review_deployment_on_hold",
+    "sourceAuditAndFocusedTestFixAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C29X_C29Y_C29Z_source_complete",
+    "C30A_source_complete_with_real_Shorts_provider_deployment_held",
+    "OPPO_2b3e0f71_online_with_rejected_r60_35_preserved_until_fresh_artifact_qualification",
+    "fresh_host_APK_machine_and_permanent_regression_gates"
+  ],
+  "testPlan": [
+    "two_identical_complete_Social_Flutter_cycles",
+    "full_backend_source_suite_for_the_held_Shorts_fix",
+    "unique_APK_identity_checksum_signature_certificate_and_build_context",
+    "single_in_place_install_and_installed_identity_proof",
+    "OPPO_semantic_tap_replay_with_no_stale_coordinate_reuse"
+  ],
+  "liveShortsLimitation": {
+    "state": "separately_authorized_Dev_provider_deployment_required",
+    "founderReviewClaim": "truthful_unavailable_state_only",
+    "deploymentHeld": true,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-DESIGN-FREEZE-AUDIT-AND-REAL-SHORTS-C30A-COMPLETION-20260811.md"
+  }
+}

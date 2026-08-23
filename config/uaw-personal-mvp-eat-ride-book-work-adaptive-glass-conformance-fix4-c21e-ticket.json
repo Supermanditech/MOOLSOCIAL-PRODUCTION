@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-ADAPTIVE-GLASS-CONFORMANCE-FIX4-C21E",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_host_qualified_build_install_closed", "classification": "mvp_required",
+  "actor": "customer using Eat, Ride, Book or Work outcomes",
+  "capability": "use compact two- and three-action glass clusters without segmented-switch weight, filler or unnatural spread",
+  "customerOutcome": "Smaller families look intentional, consistent and professional while preserving one-tap reachability and content space.",
+  "classificationReason": "The shared owner needs explicit two/three-action conformance so four-action fixes do not stretch sparse families.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-ADAPTIVE-GLASS-CONFORMANCE-FIX4-C21E-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["configuration", "test_only_acceptance"], "sharedImplementationOwners": ["MoolLocalNavigationRail", "existing_family_action_specs"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["compact_two_action_cluster", "compact_three_action_cluster", "no_filler_scroll_or_sparse_stretch", "uniform_shape_type_icon_spacing_and_states", "all_existing_routes_and_state_preserved"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": true, "testOrGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-ADAPTIVE-GLASS-CONFORMANCE-FIX4-C21E-COMPLETION-20260808.md",
+  "explicitExclusions": ["no_new_subaction_for_symmetry", "no_route_copy_or_business_change", "no_build_or_install"]
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-YOUTUBE-PLAYER-FULLSCREEN-CONTROL-NONFUNCTIONAL",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_and_non_build_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "youtube_player_interaction_and_reviewer_acceptance_blocker",
+  "actor": "personal_user_or_YouTube_API_reviewer_watching_a_real_public_video",
+  "customerOutcome": "The official embedded YouTube player expands from inline playback into full-screen when the user taps its full-screen control, then returns to the same video and playback context.",
+  "observedCandidate": {
+    "versionName": "1.0.0-r60.45",
+    "versionCode": "2026081345",
+    "packageName": "com.moolsocial.app",
+    "installerPackageName": "com.android.vending"
+  },
+  "observedFailure": [
+    "founder_played_a_real_video_inside_MoolSocial",
+    "founder_tapped_the_player_expand_or_fullscreen_control",
+    "player_did_not_enter_fullscreen"
+  ],
+  "minimumSuccessorCorrection": [
+    "trace_the_existing_closed_YouTube_player_bridge_fullscreen_command_and_Android_host_lifecycle",
+    "enter_fullscreen_only_from_an_explicit_user_tap",
+    "preserve_the_exact_video_playback_and_return_context",
+    "honor_system_Back_orientation_safe_area_and_single_player_lease",
+    "prove_inline_to_fullscreen_to_inline_continuity_on_the_future_Play_candidate"
+  ],
+  "explicitExclusions": [
+    "no_custom_video_playback_download_or_YouTube_attribution_bypass",
+    "no_autoplay_scope_or_declared_use_case_expansion",
+    "no_secret_account_token_or_private_player_payload_access",
+    "no_AAB_upload_install_or_external_write_without_separate_authority"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorizedByFounder": true,
+    "executionSelectionPending": false,
+    "successorBuildUploadInstallAuthorized": false
+  },
+  "evidence": {
+    "founderObservation": "A real YouTube video played inline in MoolSocial, but tapping its expand/full-screen control did not enter full-screen.",
+    "finding": "docs/quality/UAW-C30T-R60-45-YOUTUBE-PLAYER-FULLSCREEN-CONTROL-NONFUNCTIONAL-20260813.md"
+  }
+}

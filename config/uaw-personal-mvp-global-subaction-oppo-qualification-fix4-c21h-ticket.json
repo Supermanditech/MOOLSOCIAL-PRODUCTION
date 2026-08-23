@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "founder_rejected_r60_20_installed_checksum_identity_preserved_successor_build_install_closed", "classification": "mvp_required",
+  "actor": "release operator producing the one C21 successor for founder review on connected OPPO CPH2375",
+  "capability": "build one unique host-qualified profile APK, install it once in place, prove checksum identity and capture the cumulative device matrix",
+  "customerOutcome": "The founder can review the exact optically qualified six-family successor on the preserved OPPO installation.",
+  "classificationReason": "Founder acceptance requires real-device compositing and interaction evidence after host qualification.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["reuse", "configuration"], "sharedImplementationOwners": ["existing_single_build_wrapper", "existing_APK_machine_gate", "existing_in_place_install_workflow"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["one_unique_candidate_only", "one_adb_install_r_in_place_only", "installed_checksum_identity", "first_install_time_preserved", "six_family_seventeen_state_matrix", "motion_Back_Mool_Chat_content_reachability", "founder_acceptance_pending_review"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "explicitExclusions": ["no_second_build_or_install", "no_uninstall_data_clear_or_downgrade", "no_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"]
+}

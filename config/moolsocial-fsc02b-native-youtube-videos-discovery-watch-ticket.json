@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC02B-NATIVE-YOUTUBE-VIDEOS-DISCOVERY-WATCH",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "native_implementation_and_focused_gates_passed_provider_runtime_player_packaging_and_fresh_apk_host_qualification_required",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user discovers only real eligible public YouTube videos and opens one official watch surface with supported provider metadata, native Back restoration and truthful loading, empty, unavailable, error and retry behavior.",
+  "founderDirection": "html_path_stopped_direct_Flutter_microtickets_authorized_2026_08_10",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-FSC02B-NATIVE-YOUTUBE-VIDEOS-PRESELECTION-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_android.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_contract.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "The real public catalogue, positive public-video admission, discovery/watch widgets and official Android player already exist. The defect is the fixture catalogue fallback and incomplete provider state contract."
+  },
+  "minimumCompleteScope": [
+    "remove_fixture_video_catalogue_and_fixture_watch_resolution",
+    "reuse_current_public_processed_embeddable_region_allowed_provider_records",
+    "reuse_one_official_active_YouTube_player",
+    "preserve_provider_discovery_watch_supported_metadata_and_native_Back_restoration",
+    "provide_provider_access_loading_empty_unavailable_error_and_retry_states",
+    "separate_MoolSocial_Save_Discuss_Share_actions",
+    "preserve_Mool_switcher_global_navigation_one_tap_reach_and_44_by_44_targets",
+    "add_focused_native_tests_before_any_APK_work"
+  ],
+  "explicitExclusions": [
+    "no_personalized_YouTube_Home_pixel_clone_or_fabricated_provider_content",
+    "no_upload_plus_OAuth_like_comment_subscribe_or_fake_provider_action",
+    "no_Feed_Create_or_Shorts_redesign",
+    "no_new_screen_route_backend_API_client_OAuth_owner_or_player",
+    "no_build_install_OPPO_mutation_credentials_Firebase_submission_external_service_write_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "focused_Flutter_tests_and_static_gates",
+    "authorized_private_Dev_Firebase_App_Check_provider_runtime_with_publicData_capability",
+    "separately_authorized_private_Dev_Android_player_packaging_for_the_qualified_build_mode",
+    "fresh_APK_host_qualification_before_any_build",
+    "checksum_unique_successor_before_any_OPPO_install",
+    "checksum_matched_OPPO_replay_and_founder_acceptance"
+  ],
+  "testAndEvidencePlan": [
+    "native_widget_source_and_customer_copy_tests",
+    "provider_only_discovery_watch_and_no_fixture_catalogue_tests",
+    "loading_empty_unavailable_error_and_retry_state_tests",
+    "single_active_official_player_and_no_overlay_checks",
+    "native_Back_restoration_and_MoolSocial_action_checks",
+    "minimum_44_by_44_taps_and_compact_fitment",
+    "fresh_APK_host_qualification_then_checksum_matched_OPPO_test"
+  ],
+  "implementationEvidence": {
+    "state": "native_source_and_focused_tests_passed",
+    "runtimeOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart"
+    ],
+    "testOwners": [
+      "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
+      "apps/mobile/test/ui_v2_social_continuous_batch_test.dart",
+      "apps/mobile/test/ui_v2_social_named_state_parity_test.dart",
+      "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+      "apps/mobile/test/ui_v2_social_fitment_matrix_test.dart",
+      "apps/mobile/test/ui_v2_social_customer_copy_gate_test.dart"
+    ],
+    "verifiedContracts": [
+      "no_fixture_video_catalogue_or_fixture_named_watch_resolution",
+      "provider_access_loading_empty_error_unavailable_and_retry_states",
+      "provider_returned_public_records_only_in_discovery_and_watch",
+      "native_Back_restores_exact_provider_discovery_position",
+      "separate_MoolSocial_Save_Discuss_Share_details_actions",
+      "no_upload_like_comment_subscribe_or_provider_action_impersonation",
+      "minimum_44_by_44_actions_and_compact_320_by_568_text_140_fitment",
+      "accepted_global_navigation_Mool_switcher_and_one_tap_Social_destinations_preserved"
+    ],
+    "testOnlyProviderSeam": "Provider-shaped Screen04YouTubePublicVideo records are injected only through @visibleForTesting loaders. Runtime defaults remain the real public provider loader and no fixture catalogue is reachable in production.",
+    "finalHostGateResults": {
+      "flutterAnalyze": "no_issues_changed_runtime_and_test_owners",
+      "flutterTestsPassed": 76,
+      "flutterTestFiles": 6,
+      "minimumAvailableStateViewport": "320x568_text_140_percent",
+      "mvpDeliveryDiscipline": "passed",
+      "mvpScope": "passed_authorized",
+      "permanentRegressionMemory": "passed_phase_implementation_build_mode_none"
+    },
+    "providerRuntimeGate": {
+      "state": "external_authority_required_before_available_state_APK_candidate",
+      "requiredProofDefine": "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF=true",
+      "requiredEmulatorBoundary": "MOOLSOCIAL_USE_EMULATORS=false",
+      "requiredFirebaseProject": "moolsocial-dev-503018",
+      "requiredProviderConfiguration": "authorized valid MOOLSOCIAL_YOUTUBE_PROVIDER_URL supplied without copying credentials",
+      "requiredRuntimeAttestation": "Firebase Auth identity plus Play Integrity App Check accepted by the provider",
+      "requiredCapability": "capabilities.publicData=true",
+      "prohibitedSubstitute": "no fixture catalogue hard-coded video ID copied credential or simulated success"
+    },
+    "androidPlayerPackagingGate": {
+      "state": "separate_shared_system_qualification_required_before_APK_candidate",
+      "currentContract": "youtubeEmbeddedPlayerEnabled and the Android adapter require kDebugMode",
+      "currentSelectedBuildMode": "profile",
+      "currentProfileCapability": "official_embedded_player_not_enabled_or_registered_for_profile",
+      "exactRequirement": "Authorize and qualify secure private-Dev Android player packaging and plugin registration for the chosen candidate build mode, or qualify a debug-only proof candidate under a separate ticket.",
+      "prohibitedSubstitute": "no claim that a profile APK can play provider videos until packaging registration and device playback tests pass"
+    },
+    "oppoReadOnlyReconciliation": {
+      "state": "connected_protected_predecessor_unchanged",
+      "serial": "2b3e0f71",
+      "model": "CPH2375",
+      "installedVersionName": "1.0.0-r60.28",
+      "installedVersionCode": "2026081028",
+      "lastUpdateTime": "2026-08-10 20:18:55",
+      "newCandidateRegistered": false,
+      "installPerformed": false,
+      "dataClearPerformed": false,
+      "uninstallPerformed": false
+    },
+    "buildState": "not_started_provider_runtime_player_packaging_and_fresh_APK_host_qualification_required",
+    "deviceState": "not_started_installed_r60_28_preserved"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

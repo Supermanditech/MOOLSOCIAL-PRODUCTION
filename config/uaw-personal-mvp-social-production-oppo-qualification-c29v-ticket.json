@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-OPPO-QUALIFICATION-C29V",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-BACKEND-DEPLOYMENT-C29U",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-PRIVATE-UPLOAD-DEV-PROVIDER-QUALIFICATION-C29M"
+  ],
+  "state": "registered_dependency_held",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user_and_connected_creator",
+  "customerOutcome": "One checksum-matched successor APK gives the founder the complete real Dev Social journey on OPPO without disturbing protected r60.34 until all backend and build gates pass.",
+  "minimumCompleteScope": [
+    "fresh_host_qualification_after_C29U_and_C29M",
+    "unique_candidate_r60_35_or_later_and_new_APK_machine_state",
+    "wrapper_only_profile_build_with_exact_Dev_defines",
+    "in_place_install_only_after_checksum_identity_signature_and_predecessor_certificate_checks",
+    "OPPO_replay_Social_Home_Shorts_Watch_Feed_Create_connect_private_upload_progress_cancel_retry_error_offline_background_process_restore_and_global_navigation",
+    "founder_review_handoff_with_exact_installed_checksum"
+  ],
+  "explicitExclusions": [
+    "no_Production_staging_public_or_unlisted_upload",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install_without_new_machine_authority",
+    "no_provider_message_secret_value_access_commit_push_or_fund_movement"
+  ],
+  "authority": {
+    "registeredByFounderDirection": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "dependencies": [
+    "C29U_dev_backend_qualified",
+    "C29M_private_upload_proof_passed_and_public_review_profile_restored",
+    "fresh_APK_machine_preselection_and_one_build_authorization",
+    "OPPO_2b3e0f71_online"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "c26a_through_c26h_device_qualified_founder_review_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "Social, Shop, Food, Travel, Care and Work share one embedded vertical Mool switcher and one compact transparent bottom action language without old straps, capsules, themed panels or horizontal scrolling.",
+  "founderApprovalEvidence": "docs/quality/UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26-FOUNDER-DIRECTION-20260810.md",
+  "rejectedPredecessor": {
+    "candidateId": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-OPPO-QUALIFICATION-FIX8-C25H",
+    "versionName": "1.0.0-r60.24",
+    "versionCode": "2026080924",
+    "apkSha256": "4B261C09AA771CDEBFCEA201A1D198EA01B6E46522826C4202A9D83150DE3BF5",
+    "installedAndPreserved": true,
+    "deviceGateState": "care_medicine_cross_family_rail_contrast_rejected"
+  },
+  "approvedHtml": {
+    "source": "tmp/founder-navigation-prototype-v1/index.html",
+    "sourceSha256": "8A4C7575727AA16A193B9C6C145881FD71EB48B6612B2C9D6E434C5681792B00",
+    "approvedPoints": [
+      "embedded_vertical_glass_Mool_switcher",
+      "compact_named_family_root_and_direct_bottom_actions",
+      "replace_old_personal_Flutter_navigation_visuals_across_all_six_families"
+    ]
+  },
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-APPROVED-HTML-NAVIGATION-REFERENCE-FREEZE-FIX9-C26A",
+    "UAW-PERSONAL-MVP-TRANSPARENT-UNBOXED-DESTINATION-RAIL-FIX9-C26B",
+    "UAW-PERSONAL-MVP-EMBEDDED-VERTICAL-MOOL-SWITCHER-FIX9-C26C",
+    "UAW-PERSONAL-MVP-SOCIAL-SHOP-NAVIGATION-CONFORMANCE-FIX9-C26D",
+    "UAW-PERSONAL-MVP-FOOD-TRAVEL-NAVIGATION-CONFORMANCE-FIX9-C26E",
+    "UAW-PERSONAL-MVP-CARE-WORK-NAVIGATION-CONFORMANCE-FIX9-C26F",
+    "UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G",
+    "UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H"
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "existing MoolDestinationNavigationV2 call sites for Social Buy Eat Ride Book Work",
+      "existing moolActionFamilies and route projection",
+      "existing Social Buy Eat Ride Book Work sessions routes and content owners",
+      "existing global Chat header shortcuts and Back restoration"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newStateOwners": [],
+    "newSubactions": [],
+    "necessityProof": "One shared presentation refactor and focused acceptance gates are sufficient; every customer route, family action, business state and Chat owner already exists."
+  },
+  "children": [
+    {"ticketId":"UAW-PERSONAL-MVP-APPROVED-HTML-NAVIGATION-REFERENCE-FREEZE-FIX9-C26A","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-TRANSPARENT-UNBOXED-DESTINATION-RAIL-FIX9-C26B","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-EMBEDDED-VERTICAL-MOOL-SWITCHER-FIX9-C26C","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-SOCIAL-SHOP-NAVIGATION-CONFORMANCE-FIX9-C26D","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-FOOD-TRAVEL-NAVIGATION-CONFORMANCE-FIX9-C26E","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-CARE-WORK-NAVIGATION-CONFORMANCE-FIX9-C26F","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G","state":"complete"},
+    {"ticketId":"UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H","state":"device_qualified_founder_review_pending"}
+  ],
+  "explicitExclusions": [
+    "no_new_product_service_subaction_route_screen_backend_or_state_owner",
+    "no_change_to_Social_provider_or_Buy_commercial_content",
+    "no_copy_of_screenbook_into_Flutter_or_WebView",
+    "no_credentials_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion",
+    "no_uninstall_data_clear_downgrade_or_reuse_of_consumed_C25H_build_authority"
+  ],
+  "execution": {
+    "currentChild": "UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H",
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

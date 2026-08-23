@@ -1,0 +1,3 @@
+# C29Z public Feed timeline and post CTA preselection
+
+C29Z is `mvp_required` because the supported Feed journey must read as a real public MoolSocial timeline. The smallest complete fix reuses the current session-backed public feed and card owners, renders only authoritative returned posts, places the post CTA after loaded timeline content and keeps truthful empty/loading/error/retry/pagination states. Duplicate search found no need for a new screen, route, state owner, service, backend owner or recommender. Fake seed posts, deployment, build and install are excluded. Timeline impact is bounded to one source/test wave and remains inside the 60–75-day lock.

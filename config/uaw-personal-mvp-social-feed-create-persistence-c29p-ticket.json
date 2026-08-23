@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "source_qualified_external_dev_deploy_and_oppo_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "A signed-in Personal user publishes and later reads MoolSocial-hosted Text, Image, Carousel, Image Poll, Quick Poll and Quiz content with truthful durable state and recovery.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/features/shared/social_media_picker.dart"
+    ],
+    "newNecessaryOwners": ["authenticated_social_content_gateway", "app_check_protected_social_backend", "durable_media_and_content_store"],
+    "necessityProof": "The selection-time audit found no Social publish/read backend owner and a review-only process-local default. The qualified implementation adds one necessary authenticated durable owner and leaves no production Social fake fallback."
+  },
+  "minimumCompleteScope": [
+    "Firebase_Auth_and_App_Check_protected_publish_read_contract",
+    "idempotent_publish_and_durable_media_metadata",
+    "cursor_feed_loading_empty_error_retry_and_offline_state",
+    "durable_like_save_vote_reply_share_repost_or_fail_closed_unsupported_actions",
+    "server_author_and_audience_authority",
+    "no_local_success_before_server_acknowledgement",
+    "emulator_contract_security_and_Flutter_integration_tests"
+  ],
+  "explicitExclusions": ["no_YouTube_hosting", "no_fake_backend_state", "no_deploy_until_separate_authority_and_source_qualification"],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "externalDevQualificationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true
+  },
+  "deviceEvidence": {
+    "state": "pending_OPPO_reconnection_and_separately_qualified_successor_APK",
+    "installedApkReadOnlyCrossComparisonRequired": true,
+    "newBuildOrInstallPerformed": false
+  },
+  "qualification": {
+    "state": "source_qualified_external_dev_deploy_and_oppo_pending",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P-HOST-QUALIFICATION-20260811.md",
+    "sourceAggregateSha256": "24E2D0BE9E67C34C77AA9652FB34EABC997001F19E2116B26C42900A34F4B3AA",
+    "sourceAggregateFiles": 24,
+    "freshIdenticalCycles": 2,
+    "formattedFilesPerCycle": 9,
+    "formatChangesPerCycle": 0,
+    "fullFlutterAnalysisPerCycle": "no_issues",
+    "protectedFlutterTestFilesPerCycle": 20,
+    "protectedFlutterAssertionsPerCycle": 123,
+    "protectedFlutterSkippedPerCycle": 1,
+    "backendUnitTestsPerCycle": 487,
+    "firebaseRulesEmulatorTestsPerCycle": 2,
+    "dependencyAuditHigh": 0,
+    "dependencyAuditCritical": 0,
+    "dependencyAuditModerateUpstreamRecorded": 7,
+    "buildInstallDeployPerformed": false,
+    "oppoCrossComparisonState": "pending_device_reconnection"
+  }
+}

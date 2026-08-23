@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-PUBLIC-BRAND-IDENTITY-COPY-REMOVAL-20260807",
+  "recordedAt": "2026-08-07T13:12:48.0029805+05:30",
+  "state": "production_verified_complete",
+  "target": {
+    "origin": "https://moolsocial.com",
+    "firebaseProject": "moolsocial-dev-503018",
+    "deployScope": "hosting_only"
+  },
+  "localQualification": {
+    "normalizedRetiredBrandMatches": 0,
+    "buildPassed": true,
+    "publicSiteTestsPassed": 7,
+    "publicSiteTestsFailed": 0,
+    "lintErrors": 0,
+    "lintWarnings": 2,
+    "regressionGateEntries": 122,
+    "mvpScopeGateAuthorized": true
+  },
+  "localHtmlSha256": {
+    "/": "45C5B891C2C78B83476B930D387AED81F797F1F6D85F91E837F6EA16EAC0CE89",
+    "/privacy": "14A70AA456E1CBC932A9A79A62081AD93D57B29E67A4A47D7F2E0AD37068CD47",
+    "/terms": "2CC11509B90C02758ADED015790D8FEE1160AEB02D984716C2259A3EA468698C",
+    "/support": "71CE77C9025DC9628702B51490C6700459A976A00B7F478F6F4C8933463F637D",
+    "/disconnect": "EDBFF783CE57B00AC3D867303726A5E93D39F45806CDE44DBCF2EAB1768888C3",
+    "/delete-account": "884C28D082E750ACB72583D9E581226E4D2D583AAB722476D2AFB7BA47BCF29A",
+    "/youtube-api": "851256D11D1516516498B5C78A936DF906B098B9CB025A6F904CC8E5B4B8CFFC"
+  },
+  "deployment": {
+    "attempted": true,
+    "succeeded": true,
+    "initialFailureClass": "firebase_cli_saved_session_expired",
+    "founderReauthenticatedSavedSession": true,
+    "credentialsAccessedByCodex": false,
+    "authenticatedProjectPreflightPassed": true,
+    "successfulReleaseReported": true,
+    "hostingSite": "moolsocial-dev-503018",
+    "firebaseDefaultHostingUrl": "https://moolsocial-dev-503018.web.app"
+  },
+  "liveVerification": {
+    "allRoutesHttp200": true,
+    "requestedCopyLive": true,
+    "normalizedRetiredBrandMatches": 0,
+    "footerIdentity": "moolsocial.com",
+    "routesVerified": [
+      "/",
+      "/privacy",
+      "/terms",
+      "/support",
+      "/disconnect",
+      "/delete-account",
+      "/youtube-api"
+    ],
+    "homeStructuredLegalName": "moolsocial.com",
+    "allLocalLiveHtmlSha256Identical": true
+  },
+  "nextSafeAction": "none_ticket_complete_scope_gate_closed",
+  "emailSent": false,
+  "apkDistributed": false
+}

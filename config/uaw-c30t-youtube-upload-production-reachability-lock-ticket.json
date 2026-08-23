@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-UPLOAD-PRODUCTION-REACHABILITY-LOCK",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_declared_use_case_boundary_regression_prevention",
+  "actor": "YouTube_compliance_reviewer_or_MoolSocial_user_opening_Create_or_channel_connection",
+  "customerOutcome": "The reviewer candidate exposes only MoolSocial Create and separately user-initiated minimum read-only YouTube connection; YouTube upload remains unreachable from every production route.",
+  "minimumCorrection": [
+    "lock_the_production_youtube_connect_route_to_the_default_readonly_mode",
+    "lock_current_Social_Create_to_no_YouTube_upload_callback",
+    "prove_no_production_library_owner_sets_uploadCapabilityAuthorized_true",
+    "retain_test_only_upload_coverage_without_exposing_it_to_the_candidate"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_or_provider_change",
+    "no_scope_expansion_or_upload_authorization",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "testAndGateImplementationAuthorized": true,
+    "youtubeUploadAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "focusedTests": "61 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/23-youtube-upload-production-reachability-lock-tests.log",
+    "evidenceSha256": "8F381942F9EC6ABFA1BCC387CB5A053F3BE9A7D729EC076A109B805DCD2119B4"
+  }
+}

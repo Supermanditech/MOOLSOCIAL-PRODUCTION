@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-FIX11-C28C",
+  "parentTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-OWNERSHIP-FIX11-C28",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "The bounded C28B viewport correction and unchanged C27 navigation pass two consecutive complete host cycles with one identical source fingerprint before any successor APK authority opens.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-FIX11-C28C-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "config/mvp-personal-uniform-navigation-host-qualification-c27e.json",
+      "scripts/qualify-personal-uniform-navigation-c27e.ps1",
+      "scripts/check-personal-android-navigation-viewport-c28b.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one C28C aggregate host contract",
+      "one C28C two-cycle qualifier and immutable evidence package"
+    ],
+    "necessityProof": "C27E predates the Android viewport owner and cannot qualify its source, tests, gate or installed r60.26 predecessor identity."
+  },
+  "acceptance": [
+    "53 unique required Flutter test files",
+    "22 unique required machine gates",
+    "complete mobile analyzer in each cycle",
+    "clean format in each cycle",
+    "identical source fingerprint across two consecutive cycles",
+    "installed r60.26 and closed build install authority preserved"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-HOST-QUALIFICATION-FIX11-C28C-COMPLETION-20260810.md",
+  "qualifiedSourceFingerprint": "D113BFBD62BD0E183B3D289653C4F793CA9D2F8EFF8E30D53541DCB371408F18",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

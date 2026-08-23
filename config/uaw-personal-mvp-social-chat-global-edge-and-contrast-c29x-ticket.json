@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-FRESH-CLIENT-PREPROOF-OPPO-QUALIFICATION-C29W",
+  "state": "source_complete_combined_device_replay_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_chat_user",
+  "customerOutcome": "Chat keeps a visible Start new chat action and a compact professional global rail with Mool fixed left and Chat fixed right.",
+  "classificationReason": "The installed MVP candidate exposed founder-confirmed contrast and one-handed global-navigation regressions in the supported Chat journey.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart",
+      "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",
+      "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart",
+      "apps/mobile/lib/core/design/mool_design_system.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "raise_Start_new_chat_control_contrast_in_all_supported_themes",
+    "replace_oversized_Chat_footer_with_compact_white_backed_Mool_left_and_Chat_right_global_edges",
+    "retain_exact_chat_state_back_behavior_44dp_targets_and_one_thumb_reach"
+  ],
+  "explicitExclusions": [
+    "no_new_chat_route_service_or_backend_owner",
+    "no_message_send_or_external_write",
+    "no_build_install_deploy_provider_change_or_promotion_under_C29X"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11_design_freeze_request",
+    "sourceImplementationAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "testPlan": [
+    "focused_chat_widget_navigation_and_accessibility_tests",
+    "140_percent_text_scale_and_narrow_viewport_fitment",
+    "source_only_contrast_and_global_edge_contract_gate",
+    "later_combined_OPPO_replay_under_a_separate_candidate_ticket"
+  ],
+  "preselectionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X-PRESELECTION-20260811.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-CHAT-GLOBAL-EDGE-AND-CONTRAST-C29X-COMPLETION-20260811.md"
+}

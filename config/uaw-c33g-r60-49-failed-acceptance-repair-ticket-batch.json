@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "batchId": "UAW-C33G-R60-49-FAILED-ACCEPTANCE-REPAIR",
+  "state": "four_exact_mvp_required_children_registered_fix1_selected_no_release_authority",
+  "parentFailureTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "failureEvidence": "artifacts/quality/uaw-c33f-r60-49-successor-preparation-20260815-01/12-founder-real-user-acceptance-failure-evidence.json",
+  "executionOrder": ["C33G-FIX1", "C33G-FIX2", "C33G-FIX3", "C33G-FIX4"],
+  "selectedTicket": "C33G-FIX1",
+  "tickets": [
+    {
+      "shortId": "C33G-FIX1",
+      "manifest": "config/uaw-c33g-fix1-google-account-selection-return-configuration-parity-ticket.json",
+      "classification": "mvp_required",
+      "state": "selected_source_test_and_gate_implementation_authorized_release_actions_held"
+    },
+    {
+      "shortId": "C33G-FIX2",
+      "manifest": "config/uaw-c33g-fix2-social-identity-provider-truth-ticket.json",
+      "classification": "mvp_required",
+      "state": "registered_dependency_C33G_FIX1"
+    },
+    {
+      "shortId": "C33G-FIX3",
+      "manifest": "config/uaw-c33g-fix3-feed-create-origin-state-process-containment-ticket.json",
+      "classification": "mvp_required",
+      "state": "registered_dependency_C33G_FIX1"
+    },
+    {
+      "shortId": "C33G-FIX4",
+      "manifest": "config/uaw-c33g-fix4-unresolved-acceptance-blocker-pre-aab-ledger-ticket.json",
+      "classification": "mvp_required",
+      "state": "registered_dependency_C33G_FIX1_through_FIX3"
+    }
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "providerOrExternalServiceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "playUploadOrActivationAuthorized": false,
+    "deviceInstallOrUpdateAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

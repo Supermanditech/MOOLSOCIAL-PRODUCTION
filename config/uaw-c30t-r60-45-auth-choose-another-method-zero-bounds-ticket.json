@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-AUTH-CHOOSE-ANOTHER-METHOD-ZERO-BOUNDS",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_UIAutomator_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "authentication_recovery_accessibility_blocker",
+  "actor": "keyboard_switch_or_assistive_technology_user_recovering_from_social_sign_in_failure",
+  "customerOutcome": "Choose another method is one visible, focusable and tappable recovery control with valid minimum touch geometry that returns to the provider grid.",
+  "observedFailure": {
+    "semantic": "Choose another method",
+    "clickable": true,
+    "bounds": "[0,0][0,0]",
+    "visibleInScreenshot": true
+  },
+  "minimumSuccessorCorrection": [
+    "export_one_non_empty_clickable_secondary_recovery_node",
+    "provide_at_least_48_by_48_logical_touch_geometry",
+    "preserve_focus_and_reading_order_after_Try_again",
+    "prove_visual_and_semantic_return_to_the_provider_grid_on_OPPO",
+    "add_a_current_owner_auth_sheet_semantics_bounds_regression"
+  ],
+  "explicitExclusions": [
+    "no_authentication_provider_or_backend_expansion",
+    "no_secret_account_or_OAuth_data_access",
+    "no_second_C30T_AAB_upload_or_install"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/ui_v2/screens/screen03_login/login_screen_v2.dart",
+      "apps/mobile/test/ui_v2_screen03_login_test.dart"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The existing recovery TextButton owns the exact visible action; explicit minimum size, semantic verification and focus-order coverage are sufficient without a new authentication or navigation owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorizedByFounder": true,
+    "executionSelectionPendingFullAcceptance": false,
+    "executionSelectedAfterMvpReuseAssessment": true,
+    "sourceNonBuildQualified": true,
+    "successorBuildUploadInstallAuthorized": false
+  },
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "secondary_recovery_is_one_non_empty_tappable_semantic_node",
+      "secondary_recovery_width_and_height_are_each_at_least_48_logical_pixels",
+      "Try_again_has_explicit_focus_order_1_and_secondary_recovery_order_2",
+      "Choose_another_method_clears_only_the_failed_result_and_returns_to_provider_grid",
+      "YouTube_specific_recovery_retains_Cancel_and_return_without_alternate_OTP_or_social_methods"
+    ],
+    "authAndReturnPartition": "32_passed_0_failed",
+    "fitmentAndFeedPartition": "18_passed_0_failed",
+    "analyzer": "2_exact_owned_items_clean",
+    "routesAdded": 0,
+    "screensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayUiAutomatorAcceptancePending": true
+  },
+  "evidence": {
+    "uiHierarchy": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/34-auth-google-retry-loop.xml",
+    "screenshot": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/34-auth-google-retry-loop.png",
+    "finding": "docs/quality/UAW-C30T-R60-45-AUTH-CHOOSE-ANOTHER-METHOD-ZERO-BOUNDS-20260813.md"
+  }
+}

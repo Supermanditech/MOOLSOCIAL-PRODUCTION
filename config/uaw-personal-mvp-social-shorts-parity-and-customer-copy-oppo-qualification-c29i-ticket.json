@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-C29G",
+  "failedPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29H",
+  "rejectedInstalledPredecessorTicket": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-NATIVE-OWNERSHIP-REDESIGN-OPPO-QUALIFICATION-C29F",
+  "state": "device_gate_rejected_chat_mool_exported_semantic_height",
+  "classification": "mvp_supporting",
+  "actor": "founder-authorized Personal review user on OPPO serial 2b3e0f71",
+  "customerOutcome": "The founder reviews the source-qualified Social corrections on one checksum-qualified r60.33 OPPO build after the same-shell Google Cloud CLI path is proven.",
+  "founderDirection": "close_the_internal_daemon_continue_to_production_grade_OPPO_testing_and_founder_review_2026_08_11",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I-PRESELECTION-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/check-youtube-public-dev-build-context.ps1",
+      "scripts/test-youtube-public-dev-review-build-controls.ps1",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/core/youtube/youtube_embedded_player_bridge.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [],
+    "necessityProof": "C29I reuses the sealed C29G runtime plus the existing build wrapper and APK gate. Its only successor correction is exact same-shell discovery of the already installed Google Cloud CLI; C29H is consumed without an APK and cannot be retried."
+  },
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-SHORTS-PARITY-AND-CUSTOMER-COPY-OPPO-QUALIFICATION-C29I",
+    "versionName": "1.0.0-r60.33",
+    "versionCode": "2026081133",
+    "buildMode": "profile",
+    "runtimeProfile": "YouTubePublicDevReview",
+    "sourceManifestSha256": "AA941EDFFA45470BDCC77AC085F8B8236A5F2FC3CA5B45455DF9FC3558379B29",
+    "oneBuildOnly": true,
+    "inPlaceUpgradeOnly": true
+  },
+  "minimumCompleteScope": [
+    "two_fresh_cycles_over_the_18_file_runtime_test_and_build_gate_manifest",
+    "same_shell_exact_no_token_gcloud_context_and_zero_process_gate",
+    "one_profile_r60_33_wrapper_invocation_and_no_second_build",
+    "checksum_v2_signature_badging_version_source_and_serial_qualification",
+    "one_in_place_OPPO_install_without_uninstall_or_data_clear_after_artifact_qualification",
+    "real_Social_runtime_semantic_recovery_and_founder_review_replay"
+  ],
+  "explicitExclusions": [
+    "no_C29H_retry_or_r60_32_artifact_claim",
+    "no_C29F_rebuild_reinstall_or_evidence_mutation",
+    "no_cloud_write_redeploy_or_credential_configuration_value_logging_or_persistence",
+    "no_owner_OAuth_upload_analytics_or_fabricated_YouTube_engagement_capability",
+    "no_uninstall_data_clear_downgrade_second_build_or_second_install",
+    "no_Production_Staging_HTML_commit_push_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "C29G_source_host_qualification",
+    "C29H_no_build_failure_registered_and_consumed",
+    "same_shell_gcloud_path_context_self_test_passed",
+    "founder_OPPO_and_production_grade_Dev_authority_2026_08_11",
+    "exact_OPPO_serial_and_r60_31_predecessor_identity",
+    "permanent_regression_memory_and_MVP_delivery_lock"
+  ],
+  "testAndEvidencePlan": [
+    "two_expanded_source_cycles",
+    "fresh_process_context_source_and_device_identity_prebuild_audit",
+    "one_wrapper_profile_build_with_ephemeral_in_memory_Firebase_client_configuration",
+    "APK_checksum_v2_signature_badging_version_and_source_audit",
+    "single_in_place_install_and_installed_checksum_match",
+    "real_Home_Shorts_player_Create_Feed_Chat_Mool_semantics_and_recovery_replay"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "buildAuthorizedAfterMachineGate": true,
+    "buildAuthorizationConsumed": true,
+    "installAuthorizedAfterChecksumQualification": true,
+    "installAuthorizationConsumed": true,
+    "externalServiceWriteAuthorized": false,
+    "agentSecretValueAccessAuthorized": false,
+    "qualifiedWrapperEphemeralFirebaseClientReadAuthorized": true,
+    "credentialOrConfigurationValuePersistenceAuthorized": false
+  },
+  "artifactCandidate": {
+    "path": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-device-review-profile.apk",
+    "sha256": "8DF33A827C6C85C33B90D8BE46F1256ACD37975D387E7E9F402F27C5931953B3",
+    "bytes": 134133661,
+    "builtAt": "2026-08-11T08:59:54.6069868+05:30",
+    "qualificationState": "passed",
+    "qualificationEvidence": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/04-artifact-qualification.json",
+    "installHeld": false
+  },
+  "installAttempt": {
+    "state": "installed_identity_passed_device_gate_rejected",
+    "deviceSerial": "2b3e0f71",
+    "installCount": 1,
+    "uninstallPerformed": false,
+    "dataClearPerformed": false,
+    "downgradePerformed": false,
+    "secondInstallPerformed": false
+  },
+  "deviceGateResult": {
+    "state": "rejected",
+    "reason": "chat_mool_exported_semantic_height_23_logical_below_44",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-shorts-parity-and-customer-copy-oppo-qualification-c29i-r60-33-20260811-01/17-device-gate-rejection.json",
+    "protectedBaselineUpdated": false
+  },
+  "protectedState": {
+    "c29hBuildAuthorizationConsumedWithoutBuild": true,
+    "c29hEvidenceImmutable": true,
+    "c29fBuildAndInstallAuthorizationConsumed": true,
+    "c29fEvidenceImmutable": true,
+    "c28dEvidenceImmutable": true,
+    "installedVersionName": "1.0.0-r60.31",
+    "installedVersionCode": "2026081131",
+    "installedApkSha256": "497F00B5E52D17788B25353ADD36A4C91AA5C0A2BDD7967367BC3815F50AAA89",
+    "installedSerial": "2b3e0f71",
+    "firstInstallTime": "2026-08-04 02:51:59",
+    "installedIdentityMustRemainPreservedUntilQualifiedInPlaceInstall": true
+  }
+}

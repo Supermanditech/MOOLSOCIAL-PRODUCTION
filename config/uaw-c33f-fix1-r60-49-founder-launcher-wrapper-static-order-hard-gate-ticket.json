@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33F-FIX1-R60-49-FOUNDER-LAUNCHER-WRAPPER-STATIC-ORDER-HARD-GATE",
+  "parentTicket": "UAW-C33F-R60-49-GOOGLE-AUTH-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "finding": "REG-20260815-2374-C33F-R60-49-LAUNCHER-WRAPPER-STATIC-ORDER-GAP",
+  "state": "source_qualified_two_identical_cycles_live_readiness_hold_no_authority_consumed",
+  "classification": "mvp_required",
+  "severity": "release_blocking_pre_AAB_authority_ordering_gap",
+  "customerOutcome": "The exact r60.49 launcher and generic single-AAB wrapper fail closed unless C33F qualification runs before every founder prompt, generated release preflight, authority consumption and appbundle execution.",
+  "minimumCompleteScope": [
+    "parse_the_exact_current_founder_launcher_and_generic_AAB_wrapper",
+    "bind_launcher_state_candidate_gate_machine_state_and_wrapper_to_C33F_r60_49",
+    "prove_one_C33F_build_gate_invocation_before_all_three_hidden_founder_prompts",
+    "prove_wrapper_C33F_selection_then_gate_config_manifest_preflight_authority_consumption_and_appbundle_order",
+    "reject_secret_output_and_clipboard_owners",
+    "pass_PowerShell_7_and_Windows_PowerShell_5_1",
+    "generate_a_new_immutable_manifest_and_complete_two_identical_full_cycles"
+  ],
+  "explicitExclusions": [
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_private_key_attestation_or_private_verdict_access",
+    "no_AAB_Play_upload_activation_OPPO_update_launch_tap_or_device_action",
+    "no_provider_backend_Hosting_email_quota_track_or_external_service_mutation",
+    "no_runtime_UI_route_backend_or_customer_copy_change"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "sharedImplementationOwners": [
+      "scripts/check-uaw-c33f-r60-49-successor-release-readiness.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "Historical C30V and C30X static gates intentionally validate earlier owners. Extending the already selected C33F gate is the smallest non-duplicate fail-closed owner for the exact current launcher and wrapper.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "current_owner_parser_validation",
+    "exact_literal_and_invocation_cardinality_checks",
+    "launcher_pre_prompt_order_assertions",
+    "wrapper_pre_consume_and_pre_appbundle_order_assertions",
+    "dual_PowerShell_host_replay",
+    "new_manifest_and_two_identical_full_cycles",
+    "build_phase_expected_rejection_while_live_readiness_is_less_than_4_of_4"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

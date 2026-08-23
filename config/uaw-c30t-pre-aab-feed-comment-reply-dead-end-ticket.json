@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-COMMENT-REPLY-DEAD-END",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "Feed_write_journey_blocker",
+  "actor": "authenticated_personal_MoolSocial_Feed_reader",
+  "customerOutcome": "A reader opens comments in place, reads public replies, signs in only when writing, posts one validated reply with server acknowledgement, and recovers from offline or rejected submission without losing text.",
+  "classificationReason": "The visible Reply control currently ends in an unavailable notice, while the accepted supported Feed contract requires comments to open immediately in place and Back to restore the originating post.",
+  "minimumCompleteScope": [
+    "load_public_comments_for_the_exact_post_in_the_existing_Social_sheet",
+    "gate_only_comment_creation_behind_MoolSocial_identity_with_exact_post_return",
+    "validate_and_persist_one_text_reply_through_the_existing_moolSocialContent_owner",
+    "update_reply_count_only_from_server_acknowledged_state",
+    "preserve_draft_on_offline_rejected_timeout_retry_and_Back"
+  ],
+  "explicitExclusions": [
+    "no_nested_threads_mentions_reactions_edit_delete_moderation_console_or_notifications",
+    "no_new_route_or_route_level_screen",
+    "no_backend_deployment_cloud_Play_AAB_upload_install_or_device_write"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "backend/functions/src/social/contracts.ts",
+      "backend/functions/src/social/service.ts",
+      "backend/functions/src/social/firestore_store.ts"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The current content function, Firestore store, session and native sheet own the trust and presentation boundaries; only bounded comment contracts/adapters are missing.",
+    "timelineImpactDays": 1,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "Feed_action_authentication_truth_matrix_source_qualified",
+    "founder_source_implementation_authority",
+    "backend_source_may_change_but_no_Dev_deployment_or_external_write_is_authorized",
+    "successor_AAB_remains_withheld"
+  ],
+  "testAndEvidencePlan": [
+    "backend_public_read_authenticated_write_validation_and_acknowledged_count_tests",
+    "Flutter_guest_read_authenticated_write_exact_return_draft_retry_and_Back_tests",
+    "offline_timeout_rejected_duplicate_and_stale_response_containment",
+    "authoritative_Flutter_backend_analyzer_and_release_non_build_gates"
+  ],
+  "authority": {
+    "sourceImplementationAuthorizedByFounder": true,
+    "selectionPending": false,
+    "backendDeploymentAuthorized": false,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "public_comments_load_in_the_existing_Social_sheet_without_identity",
+      "reply_creation_uses_exact_post_authentication_return",
+      "bounded_reply_updates_comment_and_count_only_after_server_acknowledgement",
+      "draft_and_retry_identity_survive_offline_rejected_timeout_and_authentication_Back",
+      "idempotent_retry_creates_one_comment_and_increments_once",
+      "cross_post_comment_or_acknowledgement_responses_are_rejected"
+    ],
+    "flutterFocused": "50_passed_0_failed",
+    "backendVerify": "512_passed_0_failed",
+    "analyzer": "8_exact_owned_items_clean",
+    "routesAdded": 0,
+    "routeLevelScreensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayAcceptancePending": true
+  },
+  "evidence": "docs/quality/UAW-C30T-PRE-AAB-FEED-COMMENT-REPLY-DEAD-END-20260813.md"
+}

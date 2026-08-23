@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C31A-PERSONAL-MVP-CHAT-REPLY-REACTION-CONTINUITY",
+  "parentOutcome": "FOUNDER-AUTHORIZED-FULL-CHAT-MODULE-IMPLEMENTATION-20260814",
+  "state": "founder_authorized_implementation_active",
+  "classification": "mvp_required",
+  "actor": "signed_in_MoolSocial_member_in_an_existing_conversation",
+  "customerOutcome": "A signed-in member can reply to the exact visible message and add or remove one persistent reaction, with thread-safe recovery and authoritative state after refresh or relaunch.",
+  "referenceBoundary": {
+    "approvedChatScreenshotInManifest": false,
+    "behavioralReference": "supplied_messaging_screenshots_behavior_only",
+    "prohibitedCopying": [
+      "WhatsApp_name_logo_or_green_trade_dress",
+      "proprietary_icons",
+      "exact_screen_composition"
+    ],
+    "nativeAuthority": "docs/delivery/MVP-NATIVE-FLUTTER-WHIRLPOOL-NAVIGATION-MOTION-DIRECTIVE-20260805.md"
+  },
+  "minimumCompleteScope": [
+    "extend_the_existing_Chat_message_contract_with_an_immutable_reply_reference_owned_by_the_same_thread",
+    "persist_one_authenticated_member_reaction_per_message_with_idempotent_set_or_clear_semantics",
+    "return_only_aggregate_reaction_state_and_the_current_members_own_reaction_without_exposing_other_reactor_identities",
+    "render_an_accessible_reply_action_reaction_action_quoted_context_and_cancelable_composer_state_in_the_existing_thread_screen",
+    "keep_reply_composer_send_error_retry_and_late_completion_state_isolated_to_the_exact_thread_and_message",
+    "restore_authoritative_reply_and_reaction_state_after_message_refresh",
+    "preserve_all_C30T_direct_thread_text_send_retry_navigation_and_truthful_unavailable_contracts"
+  ],
+  "explicitExclusions": [
+    "no_new_screen_route_state_owner_backend_service_or_Firestore_top_level_collection",
+    "no_attachment_upload_download_camera_gallery_document_voice_note_poll_forward_group_contact_invite_presence_notification_audio_call_or_video_call_capability_in_this_child",
+    "no_live_Dev_message_or_reaction_write_backend_deployment_Hosting_provider_callback_rules_or_IAM_mutation",
+    "no_AAB_build_Play_upload_activation_OPPO_install_update_launch_or_device_mutation",
+    "no_secret_API_key_OAuth_client_ID_token_nonce_App_Check_token_private_verdict_private_key_or_attestation_payload_access",
+    "no_commit_push_merge_rebase_branch_switch_reset_clean_or_main_mutation"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-14 user: next action is to start implementations non stop; work on full chat module",
+    "runtimeSourceWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "liveDevDataWriteAuthorized": false,
+    "backendOrProviderDeploymentAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingRoutes": [
+      "/app/chat/inbox",
+      "/app/chat/thread/:threadId"
+    ],
+    "existingFlutterOwners": [
+      "apps/mobile/lib/features/chat/chat_models.dart",
+      "apps/mobile/lib/features/chat/chat_services.dart",
+      "apps/mobile/lib/features/chat/chat_session.dart",
+      "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart"
+    ],
+    "existingBackendOwners": [
+      "backend/functions/src/chat/contracts.ts",
+      "backend/functions/src/chat/service.ts",
+      "backend/functions/src/chat/firestore_store.ts",
+      "backend/functions/src/index.ts"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "acceptance": [
+    "reply_send_persists_the_exact_same_thread_message_reference_and_server_captured_preview",
+    "missing_or_cross_thread_reply_targets_fail_closed_without_creating_a_message",
+    "reaction_set_repeat_and_clear_are_idempotent_and_member_scoped",
+    "reaction_summary_never_exposes_other_member_ids",
+    "switching_threads_cannot_leak_reply_context_send_feedback_or_late_reaction_completion",
+    "failed_reply_send_preserves_the_text_and_reply_context_for_retry",
+    "message_refresh_restores_server_reply_and_reaction_state",
+    "minimum_48_by_48_tap_targets_semantics_keyboard_focus_and_compact_phone_fit_pass",
+    "two_identical_focused_source_cycles_pass_with_zero_failures"
+  ],
+  "successorBacklogBoundary": "The next full-Chat child must be selected only after C31A qualification and a fresh reuse assessment; C31A creates no authority for its excluded capabilities."
+}

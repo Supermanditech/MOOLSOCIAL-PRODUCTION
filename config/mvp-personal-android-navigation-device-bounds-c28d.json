@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PERSONAL-ANDROID-NAVIGATION-DEVICE-BOUNDS-C28D-001",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-OPPO-QUALIFICATION-FIX11-C28D",
+  "packageName": "com.moolsocial.app",
+  "densityBaseDpi": 160,
+  "minimumLogicalSize": {
+    "width": 44,
+    "height": 44
+  },
+  "moolSemantics": [
+    "Open MoolSocial main menu",
+    "Close MoolSocial main menu"
+  ],
+  "families": [
+    {
+      "id": "social",
+      "familyRootSemantic": "Open Social home",
+      "localLabels": ["YouTube Shorts", "YouTube Videos", "Feed", "Create"]
+    },
+    {
+      "id": "buy",
+      "familyRootSemantic": "Open Shop home",
+      "localLabels": ["Products", "Wholesale", "Orders"]
+    },
+    {
+      "id": "eat",
+      "familyRootSemantic": "Open Food home",
+      "localLabels": ["Order Food", "Book Table"]
+    },
+    {
+      "id": "ride",
+      "familyRootSemantic": "Open Travel home",
+      "localLabels": ["Bike", "Auto", "Cab", "Bus"]
+    },
+    {
+      "id": "book",
+      "familyRootSemantic": "Open Care home",
+      "localLabels": ["Doctor", "Medicine", "Salon"]
+    },
+    {
+      "id": "work",
+      "familyRootSemantic": "Open Work home",
+      "localLabels": ["Earn Today", "Workspace"]
+    }
+  ],
+  "requirements": {
+    "exactlyOneVisibleMoolNode": true,
+    "exactlyOneVisibleFamilyRootNode": true,
+    "everyFamilyLocalNodePresentExactlyOnce": true,
+    "explicitVisibleFalseNodesExcluded": true,
+    "physicalBoundsNormalizedByDensity": true
+  },
+  "preservedRejectionFixture": {
+    "path": "artifacts/quality/uaw-personal-mvp-uniform-navigation-oppo-qualification-fix10-c27f-r60-26-20260810-01/18-initial-root.xml",
+    "sha256": "63AAC908A9A3EA4AECB2E1AF4935616D7991B24B61C0BB3DCE0714867187B964",
+    "densityDpi": 320,
+    "expectedLogicalHeight": 19
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "caseId": "visible-prohibited-pay",
+  "baseProjection": "config/mvp-personal-action-projection-v1.json",
+  "mutation": {
+    "type": "append_main_action",
+    "action": {
+      "id": "pay",
+      "label": "Pay",
+      "disposition": "active",
+      "routeOwner": "legacy_pay",
+      "dependencies": [],
+      "subActions": []
+    }
+  },
+  "expectedErrorContains": "main action ids differ"
+}

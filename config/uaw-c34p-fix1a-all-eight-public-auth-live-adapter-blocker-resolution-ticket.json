@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "predecessorTicketId": "UAW-C34P-FIX1-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "state": "registered_founder_corrected_runtime_backend_platform_and_local_test_source_pending_scope_reselection",
+  "classification": "beyond_mvp",
+  "founderExplicitAuthorizationDate": "2026-08-18",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can use the exact eight-method MoolSocial gateway—Google, YouTube through the same Google identity, Apple, X, eligible Instagram professional login, Facebook, passwordless Email Link or Mobile OTP—and each qualified method establishes one Firebase-backed session to the exact protected destination or returns one truthful sanitized recovery.",
+  "acceptanceChildren": [
+    {
+      "ticketId": "UAW-C34P-FIX1-X-NATIVE-PKCE-FIREBASE-CUSTOM-TOKEN-BROKER",
+      "path": "config/uaw-c34p-fix1-x-native-pkce-firebase-custom-token-broker-ticket.json",
+      "sha256": "96ABF472CFA94889F8ADD3CDA3050D6207DF7B2310930751709A93D20A32CF34"
+    },
+    {
+      "ticketId": "UAW-C34P-FIX2-FACEBOOK-NATIVE-SDK-PUBLIC-LOGIN-ADAPTER",
+      "path": "config/uaw-c34p-fix2-facebook-native-sdk-public-login-adapter-ticket.json",
+      "sha256": "A6CC914E925BE47151A599D12F9931D8C8C8E298A23AA75AD8451F5A3C5CFFB9"
+    },
+    {
+      "ticketId": "UAW-C34P-FIX3-APPLE-FIREBASE-PUBLIC-LOGIN-ADAPTER",
+      "path": "config/uaw-c34p-fix3-apple-firebase-public-login-adapter-ticket.json",
+      "sha256": "EC437CD3BDBA446234A3745755F48418265AC35673404E4E278B5145FD6A9ACC"
+    },
+    {
+      "ticketId": "UAW-C34P-FIX4-INSTAGRAM-PROFESSIONAL-OAUTH-PUBLIC-LOGIN-ADAPTER",
+      "path": "config/uaw-c34p-fix4-instagram-professional-oauth-public-login-adapter-ticket.json",
+      "sha256": "7B8EC0ECBC945B0AF28D0B8D2AA5F0EFF97A29F23326E1BF986533BBD13C7302"
+    }
+  ],
+  "oneLogicalImplementationWave": true,
+  "alreadyQualifiedReuse": [
+    "Google_and_YouTube_one_Google_ID token_and_Firebase identity",
+    "Firebase_passwordless_Email_Link_cold_foreground_process loss_and exact return",
+    "Firebase_Mobile_OTP_send_verify_resend_rollback_and independent lifecycle",
+    "shared_failure_taxonomy_availability_bootstrap_rollback_and protected return"
+  ],
+  "minimumCompleteScope": [
+    "preserve_the_locked_Screen03_eight_visible methods_one_route_one_JourneySession_and_one_Firebase session",
+    "retain_Google_YouTube_Email Link_and_Mobile OTP_qualified behavior_while adding exact Apple_X_Instagram_and_Facebook adapters",
+    "implement_X_App Check_protected_PKCE_broker_mobile callback_custom token_and immediate transient token revocation",
+    "implement_Facebook_native SDK_public profile_only_Firebase credential_and platform configuration",
+    "implement_Apple_Firebase_provider_dispatch_platform readiness_revocation_and sanitized failures",
+    "implement_Instagram_professional_only_exact OAuth broker_mobile callback_custom token_and transient provider revocation",
+    "keep_every method_disabled_until_all_exact provider_platform_privacy_revocation_and deletion facts_are qualified",
+    "run_backend_mobile_platform_configuration_privacy_static_and_two identical affected regression cycles"
+  ],
+  "explicitExclusions": [
+    "no_duplicate_login screen_route_session_or backend package",
+    "no_separate_YouTube credential_numeric email OTP_X_OAuth1_or fake Instagram personal login",
+    "no_X_content_or offline access_and_no_Instagram content_messages_comments_insights_ads_or publishing",
+    "no_Facebook_email_or unrelated permissions_and_no_Apple_custom UI_or private key_in_source",
+    "no_committed_real provider IDs_client tokens_secrets_private keys_key hashes_tokens_subjects_or account identifiers",
+    "no_provider console_real authentication_email_SMS_funds_build_Play_OPPO_commit_push_or merge"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_all_eight_public_authentication_correction_2026_08_18",
+    "existing_C34P_source qualification_and_FIX1_planning_preserved_as predecessor",
+    "keyless_Firebase_Admin_App Check_Auth_and Firestore_runtime",
+    "founder_owned_Google_Apple_X_Meta_and_Instagram provider configuration",
+    "later_external readback_build_Internal Testing_and founder private acceptance"
+  ],
+  "testAndEvidencePlan": [
+    "provider_by_provider_availability_dispatch_success_cancel_denial_collision_network_revocation_and unknown sanitized matrices",
+    "X_and_Instagram_broker_App Check_state_redirect_PKCE_or_OAuth exchange_subject projection_custom token_revocation_and redaction tests",
+    "Facebook_public profile_only_native credential_and Apple_Firebase_provider_configuration tests",
+    "Email Link_and_Mobile OTP_independent lifecycle regression tests",
+    "cold_foreground_process death_bootstrap rollback_exact return_relaunch_and sign out tests",
+    "whole_backend_mobile_analysis_dual host_static_UI lock_and_two identical_affected regression cycles"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorizedAfterMvpGate": true,
+    "platformConfigurationSourceWriteAuthorizedAfterMvpGate": true,
+    "backendSourceWriteAuthorizedAfterMvpGate": true,
+    "testAndGateWriteAuthorizedAfterMvpGate": true,
+    "providerConsoleOrExternalServiceWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "realEmailSmsOrPrivateLoginAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false,
+    "commitPushMergeAuthorized": false
+  }
+}

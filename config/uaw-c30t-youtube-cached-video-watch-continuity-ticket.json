@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-CACHED-VIDEO-WATCH-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "reviewer_deep_link_continuity_blocker",
+  "actor": "public_MoolSocial_YouTube_viewer_opening_a_valid_watch_link",
+  "customerOutcome": "A valid YouTube watch route opens immediately from a fresh provider snapshot and remains open when the background refresh is offline.",
+  "minimumCorrection": [
+    "resolve_initial_video_watch_from_the_fresh_snapshot_before_first_render",
+    "retain_the_cached_watch_item_during_a_failed_background_refresh",
+    "resolve_refresh_completion_from_the_retained_authoritative_catalogue",
+    "prove_the_watch_surface_survives_an_offline_refresh"
+  ],
+  "explicitExclusions": [
+    "no_stale_or_expired_snapshot_playback",
+    "no_provider_backend_or_player_contract_change",
+    "no_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "4 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/youtube-catalogue-continuity-focused-tests.log",
+    "evidenceSha256": "D7A73A4EC24A58A8D50BA4E4A664E2B6DFC22AE69FDF618AEBF31345F31E097E",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

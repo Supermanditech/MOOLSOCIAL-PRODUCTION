@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-MEDIA-GLASS-CONFORMANCE-FIX4-C21C",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_host_qualified_build_install_closed", "classification": "mvp_required",
+  "actor": "customer switching among Shorts, YouTube, Instagram and Facebook",
+  "capability": "read and tap four optically standardized glass controls over media",
+  "customerOutcome": "Social remains visually light and legible over media without four heavy grey blocks or mismatched provider icons.",
+  "classificationReason": "Social is the only declared media-tone family and needs focused compositing and provider-asset proof after the shared owner exists.",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-R60-19-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C21-AUDIT-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-MEDIA-GLASS-CONFORMANCE-FIX4-C21C-PRESELECTION-ASSESSMENT-20260808.md",
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "implementationDisposition": ["configuration", "test_only_acceptance"], "sharedImplementationOwners": ["MoolLocalNavigationRail", "existing_social_provider_assets"], "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newSubactions": []},
+  "acceptance": ["four_action_compact_fit", "deep_neutral_media_lens_not_opaque_grey_row", "provider_and_Material_icon_optical_normalization", "stable_white_label_contrast", "background_visible_between_controls"],
+  "execution": {"referenceWriteAuthorized": true, "runtimeSourceWriteAuthorized": true, "testOrGateWriteAuthorized": true, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-MEDIA-GLASS-CONFORMANCE-FIX4-C21C-COMPLETION-20260808.md",
+  "explicitExclusions": ["no_provider_route_copy_or_business_change", "no_build_or_install"]
+}

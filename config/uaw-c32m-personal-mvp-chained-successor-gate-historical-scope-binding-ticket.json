@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32M-PERSONAL-MVP-CHAINED-SUCCESSOR-GATE-HISTORICAL-SCOPE-BINDING",
+  "parentOutcome": "UAW-C32L-PERSONAL-MVP-C26D-C29N-SPECIALIZED-SOCIAL-DOCK-GATE-RECONCILIATION",
+  "finding": "REG-20260815-2255-C32J-CHAINED-SUCCESSOR-GATE-PERMANENT-ACTIVE-SCOPE-ASSUMPTION",
+  "state": "founder_authorized_source_gate_repair_selected_live_and_release_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal user relying on a truthful chained navigation regression audit after exact child-ticket transitions",
+  "customerOutcome": "Qualified or implementation-complete predecessor gates remain verifiable after an exact child finding becomes active, without weakening ticket identity, manifest or authority checks.",
+  "classificationReason": "The repair corrects gate lifecycle truth only and adds no customer feature or scope.",
+  "minimumCompleteScope": [
+    "preserve_C32J_C32K_and_C32L_product_and_gate_business_assertions",
+    "allow_C32J_and_C32K_checkers_to_validate_either_active_exact_scope_or_their_exact_preserved_prior_assessment",
+    "bind_preserved_ticket_id_manifest_hash_and_implementation_state",
+    "add_one_C32M_checker_for_the_chained_scope_lifecycle",
+    "restart_two_focused_cycles_with_a_fresh_exact_source_fingerprint"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_route_screen_copy_reference_or_navigation_behavior_change",
+    "no_Buy_baseline_replacement_bypass_or_preflight_retry",
+    "no_backend_provider_cloud_live_data_build_Play_OPPO_funds_secret_or_external_communication_action"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user autonomous finding ticket and source implementation direction",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "reuse": {
+    "existingGateOwners": ["scripts/check-uaw-c32j-c28e-immutable-r60-27-evidence-binding.ps1", "scripts/check-uaw-c32k-c26c-c29n-left-edge-switcher-gate.ps1", "scripts/check-uaw-c32l-c26d-c29n-specialized-social-dock-gate.ps1"],
+    "existingScopeOwner": "config/mvp-scope-gate-state.json",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": ["scripts/check-uaw-c32m-chained-successor-gate-historical-scope-binding.ps1"]
+  },
+  "acceptance": [
+    "active_ticket_path_requires_exact_current_scope_id",
+    "transitioned_C32J_and_C32K_paths_require_exact_prior_assessment_id_manifest_hash_and_implementation_state",
+    "C32L_preserved_prior_and_C32M_active_scope_are_exact",
+    "C32J_C32K_C32L_C32M_pass_on_both_PowerShell_hosts",
+    "two_fresh_focused_cycles_pass_while_full_preflight_remains_Buy_baseline_held"
+  ]
+}

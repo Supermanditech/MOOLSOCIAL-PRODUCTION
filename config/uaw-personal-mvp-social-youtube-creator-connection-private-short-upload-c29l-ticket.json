@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CREATOR-CONNECTION-PRIVATE-SHORT-UPLOAD-C29L",
+  "parentTicket": "MOOLSOCIAL-FSC05-YOUTUBE-SHORTS-UPLOAD-AFFORDANCE",
+  "state": "source_qualified_provider_gate_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "An authenticated eligible creator uses the Social plus to connect the exact YouTube channel and privately upload a Short through MoolSocial with truthful metadata, progress, cancel, retry and processing states.",
+  "founderDirection": "add_the_missing_dedicated_youtube_short_creator_and_real_channel_connect_login_journey_without_moolsocial_hosting",
+  "findings": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CREATOR-CONNECTION-PRIVATE-SHORT-UPLOAD-C29L-FINDINGS-20260811.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/youtube/youtube_private_dev_client.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_models.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_system_browser.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_workflow.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_uploader.dart",
+      "apps/mobile/lib/core/youtube/youtube_private_dev_transport.dart",
+      "apps/mobile/lib/features/shared/social_media_picker.dart",
+      "backend/functions/src/youtube/provider_service.ts",
+      "backend/functions/src/youtube/oauth.ts",
+      "backend/functions/src/youtube/token_vault.ts"
+    ],
+    "newScreens": [
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_creator_upload.dart"
+    ],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "customer_safe_upload_cancellation_contract"
+    ],
+    "necessityProof": "No existing native customer presentation owns real capability discovery, exact-channel OAuth status, Short media metadata, direct resumable upload progress, cancel/retry and processing recovery; the existing youtube-connect screen only shares a YouTube link into MoolSocial and contains non-authoritative local connection state."
+  },
+  "minimumCompleteScope": [
+    "split_the_Social_plus_into_MoolSocial_post_and_YouTube_Short_customer_choices",
+    "show_YouTube_creator_choice_only_from_truthful_provider_capabilities",
+    "connect_or_reconnect_the_exact_channel_in_the_system_browser_with_upload_scope",
+    "return_to_the_existing_allowlisted_app_route_and_refresh_authoritative_channel_status",
+    "select_camera_or_gallery_video_without_MoolSocial_media_hosting",
+    "validate_title_description_private_visibility_audience_synthetic_and_paid_promotion_disclosures",
+    "upload_directly_to_YouTube_with_resumable_progress_cancel_retry_and_processing_reconciliation",
+    "disconnect_and_revoke_the_channel_through_the_existing_backend_owner",
+    "cover_disconnected_connected_denied_revoked_capability_off_file_failure_progress_cancel_retry_and_processing_states",
+    "run_full_analysis_and_two_fresh_source_host_qualification_cycles_before_any_successor_device_ticket"
+  ],
+  "explicitExclusions": [
+    "no_public_or_unlisted_upload_before_YouTube_compliance_audit",
+    "no_claim_that_YouTube_classified_the_upload_as_a_Short_before_provider_result",
+    "no_MoolSocial_video_hosting_fake_content_fake_channel_fake_success_or_local_auth_boolean",
+    "no_service_account_channel_identity_token_secret_or_credential_value_access_or_copy",
+    "no_new_backend_owner_live_streaming_analytics_creator_assets_or_other_social_network",
+    "no_HTML_accepted_navigation_reference_commit_push_deploy_Production_provider_message_call_or_fund_movement",
+    "no_build_install_uninstall_data_clear_downgrade_or_C29K_evidence_mutation"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_native_production_grade_social_creator_authority",
+    "Firebase_Auth_and_Play_Integrity_App_Check_qualification",
+    "existing_keyless_Dev_provider_and_Secret_Manager_bindings_without_value_access",
+    "Google_OAuth_test_user_consent_for_youtube_upload_scope",
+    "YouTube_unverified_project_private_only_constraint_and_later_compliance_audit",
+    "MVP_delivery_lock_permanent_regression_memory_and_C28D_successor_gate"
+  ],
+  "testAndEvidencePlan": [
+    "focused_controller_and_widget_tests_with_injected_gateway_and_picker",
+    "direct_uploader_cancellation_and_retry_transport_tests",
+    "existing_OAuth_PKCE_token_vault_private_upload_idempotency_and_callback_tests",
+    "protected_Social_navigation_customer_copy_and_YouTube_public_runtime_tests",
+    "full_Flutter_analysis",
+    "two_fresh_identical_source_host_qualification_cycles",
+    "separate_supervised_Dev_PrivateUpload_profile_and_one_private_upload_qualification_after_runtime_authority",
+    "separate_fresh_APK_and_OPPO_ticket_only_after_host_and_provider_qualification"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": true,
+    "externalDevQualificationAuthorized": true,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "qualificationResult": {
+    "state": "passed_source_host_provider_activation_blocked",
+    "stableSourceManifest": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-host-qualification-20260811-03/source-aggregate-manifest.txt",
+    "stableSourceManifestSha256": "0096B43790D3E0466D8225F1407FF29104E7A3E2F0A7D0B7E8456E166FD7F393",
+    "sourceFiles": 31,
+    "qualifyingCycles": [
+      "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-host-qualification-20260811-03/qualifying-cycle-1.json",
+      "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-host-qualification-20260811-03/qualifying-cycle-2.json"
+    ],
+    "backendTestSuite": "passed_twice",
+    "flutterAnalysis": "clean_twice",
+    "flutterTestsPerCycle": 87,
+    "providerReadAudit": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-provider-read-audit-20260811-01/deployment-metadata.json",
+    "providerBlocker": "deployed_functions_predate_c29l_and_privateUpload_is_false_deploy_authority_closed",
+    "apkBuildPerformed": false,
+    "deviceMutationPerformed": false,
+    "providerMutationPerformed": false,
+    "secretValueAccessPerformed": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true,
+    "protectedBaselineUpdated": false
+  }
+}

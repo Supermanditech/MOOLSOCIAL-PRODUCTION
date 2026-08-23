@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-ENTITY-DISASSOCIATION-FIX1",
+  "state": "owner_actions_complete_google_processing",
+  "classification": "mvp_required",
+  "customerOutcome": "Google is given the strongest safe owner-controlled signals to stop cross-associating MoolSocial and SuperMandi while valid MoolSocial pages remain discoverable.",
+  "founderAuthority": "docs/quality/WEB-MVP-PUBLIC-DISCOVERY-AND-YOUTUBE-REVIEW-ACCESS-AUTHORIZATION-20260805.md",
+  "founderDirection": "MoolSocial and SuperMandi are separate entities and Google searches in either direction must not connect them through MoolSocial-owned results.",
+  "escapedDefectEvidence": "docs/quality/WEB-MVP-GOOGLE-ENTITY-DISASSOCIATION-ESCAPED-DEFECT-20260807.md",
+  "affectedCanonicalUrls": [
+    "https://moolsocial.com/",
+    "https://moolsocial.com/privacy",
+    "https://moolsocial.com/youtube-api"
+  ],
+  "minimumCompleteScope": [
+    "prove all current live MoolSocial public pages contain zero normalized retired-identity matches",
+    "preserve both brand-query directions and the domain-restricted Google query as evidence",
+    "use Search Console Clear snippet in search for the three affected exact canonical URLs without hiding the valid pages",
+    "request indexing for Home and YouTube API while preserving the already accepted Privacy priority-crawl request",
+    "record every Search Console receipt and leave Google recrawl AI Overview and result refresh as an external-provider pending state"
+  ],
+  "explicitExclusions": [
+    "no temporary whole-URL removal noindex robots blocking 404 410 or DNS change",
+    "no attempt to delete or alter independent SuperMandi company-registry or third-party results",
+    "no misleading structured data cloaking keyword stuffing or search manipulation",
+    "no Firebase deploy source change mobile backend APK OPPO Gmail YouTube reply or provider feedback message",
+    "no promise of immediate crawl AI Overview rebuild ranking or snippet replacement",
+    "no commit push merge branch switch cleanup or deletion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder direction in the active Codex task",
+    "existing 2026-08-05 founder public-discovery and Search Console authorization",
+    "verified Search Console owner or full-user access for sc-domain:moolsocial.com",
+    "current live pages remaining free of the retired identity",
+    "Google-controlled processing after snippet-clear and indexing requests"
+  ],
+  "testAndEvidencePlan": [
+    "normalized retired-identity scan over all live public MoolSocial routes",
+    "Google query evidence for moolsocial exact SuperMandi entity and site-restricted retired identity",
+    "Search Console removal history proving snippet clear rather than temporary URL removal",
+    "URL Inspection indexing-request receipts for Home Privacy and YouTube API",
+    "closed MVP scope and permanent regression gates after external-service action"
+  ],
+  "completionEvidence": "docs/quality/WEB-MVP-GOOGLE-ENTITY-DISASSOCIATION-FIX1-COMPLETION-20260807.md",
+  "machineEvidence": "config/web-mvp-google-entity-disassociation-fix1-state.json"
+}

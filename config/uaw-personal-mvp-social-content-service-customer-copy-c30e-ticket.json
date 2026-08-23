@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-CONTENT-SERVICE-CUSTOMER-COPY-C30E",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-FOOTER-VISUAL-COMPACTION-C30D",
+  "state": "source_qualified_successor_review_candidate_pending",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_user_recovering_from_a_content_service_configuration_failure",
+  "customerOutcome": "A Social content-service validation failure never exposes the prohibited technical label endpoint, and the complete user-facing copy gate passes without weakening its policy.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_policy_adapter",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "scripts/check-user-facing-copy.ps1",
+      "apps/mobile/test/social_content_authenticated_gateway_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The unchanged broad copy gate reports exactly one quoted prohibited word in the existing Social content client: the ArgumentError parameter label endpoint. Replacing that diagnostic label with customer-safe serviceAddress is the smallest correction and changes no URL, request, authentication, route or backend contract."
+  },
+  "minimumCompleteScope": [
+    "replace_only_the_quoted_ArgumentError_parameter_label_endpoint_with_serviceAddress",
+    "preserve_the_exact_HTTPS_host_path_query_fragment_port_and_user_info_validation",
+    "pass_the_full_user_facing_copy_gate_without_allowlisting_or_weakening",
+    "pass_the_authenticated_content_gateway_and_complete_Social_regressions_twice_on_one_stable_source"
+  ],
+  "explicitExclusions": [
+    "no_endpoint_URL_host_path_auth_request_response_or_backend_change",
+    "no_copy_gate_allowlist_regex_or_policy_change",
+    "no_new_route_screen_database_provider_credential_or_external_service_work",
+    "no_deploy_commit_push_promotion_uninstall_data_clear_or_downgrade"
+  ],
+  "authority": {
+    "founderAuthorization": "standing_2026_08_11_production_grade_social_commentary_copy_removal_and_ticket_fix_OPPO_review_deployment_hold",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C30D_two_identical_164_test_cycles_passed",
+    "REG_20260812_1375_exact_copy_gate_rejection",
+    "C30B_r60_36_preserved_until_a_fresh_combined_successor_is_qualified"
+  ],
+  "testPlan": [
+    "full_user_facing_copy_gate",
+    "focused_authenticated_Social_content_gateway_validation_tests",
+    "full_Flutter_analysis",
+    "two_identical_complete_Social_cycles_after_the_single_final_copy_change",
+    "one_fresh_checksum_matched_in_place_OPPO_candidate_for_founder_review"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "backendAndProviderDeploymentHeld": true,
+    "founderReviewRequiredBeforeAnyDeployment": true
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-QUOTED-POST-EMPTY-THOUGHTS-RECOVERY-UNREACHABLE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "Feed_quote_recovery_truth_blocker",
+  "actor": "signed_in_MoolSocial_reader_adding_thoughts_to_a_shared_public_post",
+  "customerOutcome": "An empty quoted-post submission receives the exact Add your thoughts recovery, keeps the quoted draft, and makes no gateway call; an ordinary empty Post retains its separate generic recovery.",
+  "classificationReason": "Client generic Post validation currently runs before the quote-specific rule, making the intended recovery unreachable and diverging from the backend contract.",
+  "minimumCompleteScope": [
+    "run_the_quote_specific_empty_thoughts_check_before_generic_format_validation",
+    "preserve_the_exact_quoted_post_and_draft_without_a_gateway_call",
+    "retain_the_ordinary_empty_Post_generic_recovery",
+    "prove_client_backend_validation_order_parity_and_retry_readiness"
+  ],
+  "explicitExclusions": [
+    "no_new_format_route_screen_backend_owner_or_backend_change",
+    "no_automatic_repost_empty_quote_or_draft_clear",
+    "no_backend_deployment_Play_AAB_upload_install_or_device_write"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/test/social_content_authenticated_gateway_test.dart",
+      "apps/mobile/test/social_v2_create_publication_test.dart"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "SharedSession already owns all client preflight and retained error state, and the backend already implements the correct quote-first order; moving one existing check plus focused negative coverage is the smallest complete correction.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "Repost_and_Add_thoughts_source_repairs_qualified",
+    "backend_quote_specific_validation_order_already_correct",
+    "founder_source_implementation_authority_and_no_AAB_authority"
+  ],
+  "testAndEvidencePlan": [
+    "empty_quoted_Post_exact_recovery_zero_gateway_calls_and_retained_quote",
+    "ordinary_empty_Post_generic_recovery_unchanged",
+    "valid_quoted_Post_server_acknowledgement_regression",
+    "focused_Flutter_analyzer_and_non_build_scope_gates"
+  ],
+  "authority": {
+    "sourceImplementationAuthorizedByFounder": true,
+    "executionSelectedAfterMvpReuseAssessment": true,
+    "sourceNonBuildQualified": true,
+    "backendDeploymentAuthorized": false,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "quoted_Post_empty_body_uses_exact_Add_your_thoughts_recovery_before_generic_validation",
+      "invalid_empty_quote_makes_zero_gateway_calls_and_adds_no_optimistic_item",
+      "quoted_post_context_remains_visible_for_user_correction",
+      "ordinary_empty_Post_retains_Write_something_or_add_an_image_recovery",
+      "valid_quoted_Post_publish_and_server_acknowledgement_remain_unchanged"
+    ],
+    "flutterFocused": "48_passed_0_failed",
+    "analyzer": "3_exact_owned_items_clean",
+    "backendChanged": false,
+    "routesAdded": 0,
+    "screensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayAcceptancePending": true
+  },
+  "evidence": "docs/quality/UAW-C30T-PRE-AAB-FEED-QUOTED-POST-EMPTY-THOUGHTS-RECOVERY-UNREACHABLE-20260813.md"
+}

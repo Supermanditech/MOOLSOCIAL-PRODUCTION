@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "contractId": "GOOGLE-AUTH-LIVE-PROVIDER-READINESS-C33E-FIX2-001",
+  "ticketId": "UAW-C33E-FIX2-GOOGLE-AUTH-LIVE-PROVIDER-READINESS-HARD-GATE",
+  "machineState": "qualified_sanitized_non_secret_evidence_release_gate_open_for_separately_authorized_candidate",
+  "repositoryIdentity": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0"
+  },
+  "applicationIdentity": {
+    "project": "moolsocial-dev-503018",
+    "package": "com.moolsocial.app",
+    "authorizedTrack": "Internal Testing"
+  },
+  "failedCandidateBinding": {
+    "candidate": "1.0.0-r60.48+2026081348",
+    "state": "acceptance_failed_social_auth_and_action_journey_defects_successor_required",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "installCount": 1,
+    "runtimeSuccessClaimed": false,
+    "sourceRepairContainedInInstalledCandidate": false
+  },
+  "sourceRepairBinding": {
+    "ticketId": "UAW-C30Z-R60-48-AUTHENTICATION-METHOD-TRUTH-AND-GUEST-FEED-RECOVERY",
+    "ticketPath": "config/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-ticket.json",
+    "ticketSha256": "5A03AD26DAE2AAA9CD724A1F05AE1D0CE0FB4F0D5DFEEFB05AF3DDE58F7B1AD8",
+    "qualificationState": "two_identical_cycles_passed_partial_ticket_qualification",
+    "historicalCountsPreserved": "1/1/1",
+    "newReleaseActions": "0/0/0"
+  },
+  "readinessFacts": [
+    {
+      "id": "firebase_android_app_play_signer",
+      "requirement": "The Firebase Android app lists the Play app-signing certificate fingerprint.",
+      "status": "qualified_sanitized_non_secret_evidence",
+      "evidencePath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/firebase-play-app-signing-sha1-qualified.json",
+      "evidenceSha256": "942B7F0FCC551D36D617F3A0468FF9106C79F7B8597880F842D6D16677020423"
+    },
+    {
+      "id": "firebase_google_provider_enabled",
+      "requirement": "The Firebase Authentication Google provider is enabled for the exact Dev project.",
+      "status": "qualified_sanitized_non_secret_evidence",
+      "evidencePath": "artifacts/quality/uaw-c33e-firebase-google-provider-enabled-evidence-20260815.json",
+      "evidenceSha256": "329FD9C8D0556C2AF4A165FBAA048A5BFB4F113774FEB8A92D27D9A5E8E57CE3"
+    },
+    {
+      "id": "android_oauth_package_play_signer_relationship",
+      "requirement": "An Android OAuth relationship matches the exact package and Play app-signing certificate.",
+      "status": "qualified_sanitized_non_secret_evidence",
+      "evidencePath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/android-oauth-package-play-signer-qualified.json",
+      "evidenceSha256": "8C26E94FF359EDD5C8D63F6EEB018FB7216D2AD53C1CC413D62B6ED2FD326A91"
+    },
+    {
+      "id": "web_server_client_mobile_relationship",
+      "requirement": "The mobile runtime's server-side Google relationship is the qualified Web application relationship for the exact Dev project.",
+      "status": "qualified_sanitized_non_secret_evidence",
+      "evidencePath": "artifacts/quality/uaw-c33f-google-auth-live-readiness-20260815-01/web-server-client-mobile-relationship-qualified.json",
+      "evidenceSha256": "D018CDBD8BED7F5362B63974A03FA9379495C495207D8A7A794377A17B127423"
+    }
+  ],
+  "privacyBoundary": {
+    "secretValuesObserved": false,
+    "privateAccountIdentifiersObserved": false,
+    "oauthClientIdentifierValuesObserved": false,
+    "tokenOrAttestationPayloadObserved": false,
+    "firebaseDebugLogRead": false
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "playUploadOrActivationAuthorized": false,
+    "deviceInstallOrUpdateAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "releaseBinding": {
+    "founderLauncher": "tmp/run-c30x-successor-single-aab-founder.ps1",
+    "authoritativeAabWrapper": "scripts/invoke-play-internal-aab-build-c30t.ps1",
+    "gate": "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1",
+    "gateRequiredBeforeFounderPrompt": true,
+    "gateRequiredBeforeAabAuthorityConsumption": true
+  },
+  "implementationQualification": {
+    "state": "dual_host_behavioral_and_pre_AAB_order_qualified_live_facts_pending",
+    "powerShell7": "passed",
+    "windowsPowerShell51": "passed",
+    "pendingImplementationPhase": "passed",
+    "pendingBuildPhase": "rejected_expected",
+    "fullyQualifiedSanitizedFixture": "passed",
+    "missingFactNegativeCases": 4,
+    "failedFactNegativeCases": 1,
+    "authorityDriftNegativeCases": 1,
+    "privateValuePropertyNegativeCases": 1,
+    "scopeDriftNegativeCases": 1,
+    "c30zSourceGate": "passed",
+    "c30xPreflightOrderContract": "passed",
+    "c30yMutationSafePreflightContract": "passed",
+    "c30vSingleAabWrapperContract": "passed",
+    "qualifiedLiveFacts": 4,
+    "requiredLiveFacts": 4,
+    "newBuildUploadInstallActions": "0/0/0",
+    "temporaryFixtureResidue": 0
+  }
+}

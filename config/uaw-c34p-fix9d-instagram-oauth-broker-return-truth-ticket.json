@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX9D-INSTAGRAM-OAUTH-BROKER-RETURN-TRUTH",
+  "parentTicketId": "UAW-C34P-FIX9-CROSS-PROVIDER-RETURN-TRUTH-HARD-GATE",
+  "status": "fix10_instagram_oauth_broker_hosted_and_custom_scheme_return_truth_locally_qualified_device_provider_reproof_pending_no_build",
+  "classification": "mvp_required",
+  "selectedForImplementation": true,
+  "provider": "instagram",
+  "directlySharesGoogleIdentityBoundary": false,
+  "providerSpecificBoundary": "Instagram professional OAuth browser launch, exact callback/state validation, Dev broker exchange, Firebase custom-token exchange and verified session bootstrap.",
+  "minimumCompleteScope": [
+    "keep_browser_open_pending_distinct_from_cancel_and_failure",
+    "prove_callback_state_attempt_expiry_denial_provider_error_network_and_replay_separately",
+    "prove_professional_account_requirements_without_exposing_private_identity",
+    "prove_broker_to_firebase_custom_token_exchange_and_verified_session_bootstrap",
+    "reject_duplicate_stale_or_wrong_origin_callbacks",
+    "prove_offline_timeout_retry_process_death_relaunch_rollback_and_signout",
+    "run_separately_authorized_founder_private_oppo_acceptance"
+  ],
+  "mandatoryEvidence": [
+    "browser_launch_or_pending_stage",
+    "same_attempt_callback_validation_stage",
+    "broker_exchange_stage",
+    "firebase_custom_token_exchange_stage",
+    "verified_session_bootstrap_stage",
+    "sanitized_customer_failure_origin"
+  ],
+  "r60_83DeviceFailure": {
+    "safeCode": "auth-provider-unavailable",
+    "provenBoundary": "local_runtime_availability_guard_before_instagram_authorization_launch",
+    "browserLaunchReached": false,
+    "incidentId": "REG-20260822-3363-R60-83-OPPO-INSTAGRAM-SIGN-IN-STILL-NOT-COMPLETED",
+    "privateIdentityTokenEmailOrAccountRecorded": false,
+    "providerRetryRebuildOrReinstallAuthorized": false
+  },
+  "localForensicRepair": {
+    "state": "qualified_locally_not_device_success",
+    "appCheckConfigurationNetworkTimeoutAndProviderDependenciesDistinct": true,
+    "brokerResponseBeginAuthorizationCallbackAndTokenStagesDistinct": true,
+    "allBrokerErrorCodesMappedToFixedSafeCodes": true,
+    "mobileBackendContractParityGateRequired": true,
+    "sharedBrokeredFocusedSuitePassed": 16,
+    "latestCrossProviderFocusedTerminalSuitePassed": 115,
+    "exactHostedReturnBridgeQualified": true,
+    "customSchemeDeliveryNormalizedToExactBrokerCallback": true,
+    "publicHostedReturnBridgeTestsPassed": 10,
+    "functionalDeviceSuccessClaimed": false,
+    "publicAppReviewOrLiveModeStillHeld": true,
+    "buildDeployOrDeviceMutationAuthorized": false
+  },
+  "providerReadinessCheckpoint": {
+    "readbackDate": "2026-08-22",
+    "dedicatedInstagramAppQualified": true,
+    "businessLoginSetupQualified": true,
+    "professionalAccountFounderAcceptanceQualified": true,
+    "exactCallbackQualified": true,
+    "exactCallbackContract": "https://moolsocial.com/app/auth/instagram",
+    "loginOnlyScopeHeld": true,
+    "webhookConfigurationRequiredForLogin": false,
+    "publicAppReviewOrLiveModeQualified": false,
+    "providerIdentifierSecretTokenOrAccountRecorded": false,
+    "consoleWriteCount": 0,
+    "agentPrivateLoginCount": 0,
+    "callbackBrokerFirebaseAndSessionStagesQualified": false,
+    "priorSourceQualificationSupersededByDevicePrelaunchUnavailable": true,
+    "sanitizedTransientReceiptQualified": true,
+    "focusedSourceTestsQualified": true,
+    "returnTruthImplementationQualified": true,
+    "oppoAcceptanceQualified": false,
+    "evidence": "founder Instagram API Business Login completion and redirect screenshot readback; identifiers and credential values deliberately excluded"
+  },
+  "authority": {
+    "ticketRegistrationAuthorized": true,
+    "implementationAuthorized": true,
+    "localReadOnlyForensicsAndTestsAuthorized": true,
+    "buildOrInstallAuthorized": false,
+    "privateProviderLoginAuthorized": false,
+    "metaConsoleWriteOrPublishAuthorized": false,
+    "deploymentAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33E-FIX1-C30Z-QUALIFIED-SUCCESSOR-GATE-LIFECYCLE",
+  "parentTicket": "UAW-C33E-R60-48-PLAY-INSTALLED-AUTH-LOGIN-DEVICE-REPRODUCTION",
+  "finding": "REG-20260815-2336-C33E-C30Z-GATE-REJECTS-LEGITIMATE-AUTH-DEVICE-SUCCESSOR-LIFECYCLE",
+  "state": "test_gate_repair_qualified_dual_host_exact_lifecycle_and_negative_drift_cases_passed_all_runtime_live_device_and_secret_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "release_qualifier_replaying_the_qualified_C30Z_authentication_source_gate_during_exact_C33E_device_evidence",
+  "customerOutcome": "The qualified authentication repair remains machine-verifiable after its implementation ticket closes, while the gate continues to fail closed for any unrelated successor or authority drift.",
+  "classificationReason": "The static active-ticket assertion blocks truthful auth acceptance evidence. A narrow lifecycle-safe gate correction is necessary for the core login journey but adds no customer capability.",
+  "minimumCompleteScope": [
+    "preserve_the_original_active_C30Z_source_implementation_branch",
+    "add_only_the_exact_preserved_qualified_C30Z_to_C33E_test_evidence_successor_branch",
+    "validate_C30Z_ticket_state_C33E_ticket_identity_and_current_authority_tuple",
+    "continue_rejecting_runtime_build_install_provider_external_and_secret_authority_drift",
+    "add_behavioral_negative_cases_and_replay_on_PowerShell_7_and_Windows_PowerShell"
+  ],
+  "explicitExclusions": [
+    "no_Flutter_runtime_screen_route_session_auth_gateway_or_customer_copy_change",
+    "no_backend_Hosting_provider_rules_IAM_or_external_service_change",
+    "no_build_Play_upload_activation_OPPO_install_update_or_private_account interaction",
+    "no_credential_token_nonce_private_verdict_key_or_attestation_access"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_auth_login_OPPO_audit_and_finding_to_ticket_implementation_direction",
+    "REG2336_registered_before_gate_change",
+    "C30Z_source_qualification_and_C33E_parent_ticket_preserved",
+    "C33E_device_reproduction_resumes_only_after_FIX1_qualification"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/check-c30z-authentication-method-truth-and-guest-feed-recovery.ps1",
+      "config/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-ticket.json",
+      "config/uaw-c33e-r60-48-play-installed-auth-login-device-reproduction-ticket.json",
+      "config/mvp-scope-gate-state.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33e-fix1-c30z-qualified-successor-gate-lifecycle.ps1"
+    ],
+    "necessityProof": "The existing C30Z gate owns source invariants but cannot behaviorally self-test both lifecycle branches without mutating the live scope owner. One temporary-fixture behavioral checker is the smallest necessary test-only owner.",
+    "robustnessCoverage": [
+      "original_active_C30Z_branch",
+      "exact_C33E_successor_branch",
+      "unrelated_ticket_rejection",
+      "runtime_build_install_provider_external_and_secret_drift_rejection",
+      "dual_PowerShell_host_replay"
+    ],
+    "adjustments": [
+      "pause_C33E_device_taps_during_gate_repair",
+      "reuse_all_C30Z_source_and_ticket_owners",
+      "add_one_test_only_behavioral_checker"
+    ],
+    "explicitExclusions": [
+      "no_product_or_provider_behavior_change",
+      "no_release_or_device_mutation"
+    ],
+    "dependenciesAndApprovals": [
+      "REG2336",
+      "qualified_C30Z_ticket",
+      "selected_C33E_parent"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33e-fix1-c30z-qualified-successor-gate-lifecycle-ticket.json"
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_parser_validation",
+    "behavioral_active_C30Z_and_exact_C33E_pass_cases",
+    "behavioral_unrelated_ticket_and_authority_drift_rejections",
+    "C30Z_gate_current_scope_replay",
+    "PowerShell_7_and_Windows_PowerShell_replay",
+    "focused_auth_Flutter_tests_remain_31_of_31_passed"
+  ],
+  "qualification": {
+    "powerShell7": "passed",
+    "windowsPowerShell51": "passed",
+    "activeC30Z": "passed",
+    "exactC33E": "passed",
+    "activeFix1": "passed",
+    "negativeCases": ["unrelated_ticket", "runtime_write", "build", "secret", "external"],
+    "temporaryFixtureResidue": 0,
+    "mobileRuntimeChanged": false,
+    "buildOrDeviceChanged": false,
+    "providerOrExternalChanged": false,
+    "evidence": "docs/quality/UAW-C33E-FIX1-C30Z-QUALIFIED-SUCCESSOR-GATE-LIFECYCLE-QUALIFICATION-20260815.md"
+  },
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "existingPlayClientLaunchAndTapAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

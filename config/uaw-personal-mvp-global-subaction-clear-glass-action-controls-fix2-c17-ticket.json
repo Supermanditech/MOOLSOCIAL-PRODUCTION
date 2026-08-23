@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CLEAR-GLASS-ACTION-CONTROLS-FIX2-C17",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-PROFESSIONAL-DESIGN-SYSTEM-FIX1-C16",
+  "state": "r60_18_installed_checksum_matched_founder_rejected_c20_successor_registered",
+  "classification": "mvp_required",
+  "customerOutcome": "Every existing Social, Buy, Eat, Ride, Book and Work subaction is an individually designed, legible clear-glass control that keeps destination content visible and preserves one-tap family navigation.",
+  "founderRejectedCandidate": {
+    "id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX1-C16H",
+    "versionName": "1.0.0-r60.16",
+    "versionCode": "2026080816",
+    "apkSha256": "1CC2A0186CA5DC8C9A09D0B4CC949B94CEE91DE6C70246A4B0168ADE6255150D",
+    "evidence": "docs/quality/UAW-C16H-R60-16-GLOBAL-SUBACTION-FOUNDER-DEVICE-REJECTION-20260808.md"
+  },
+  "founderApprovedDirection": {
+    "id": "CLEAR-GLASS-COMPACT-INDIVIDUAL-ACTION-CONTROLS",
+    "state": "approved_20260808",
+    "scope": ["social", "buy", "eat", "ride", "book", "work"],
+    "authority": "docs/quality/UAW-C17-CLEAR-GLASS-ACTION-CONTROLS-FOUNDER-AUTHORIZATION-20260808.md"
+  },
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-VISUAL-CONTRACT-FIX2-C17A",
+    "UAW-PERSONAL-MVP-SHARED-CLEAR-GLASS-ACTION-CONTROL-FIX2-C17B",
+    "UAW-PERSONAL-MVP-SOCIAL-BUY-CLEAR-GLASS-CONFORMANCE-FIX2-C17C",
+    "UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-CLEAR-GLASS-CONFORMANCE-FIX2-C17D",
+    "UAW-PERSONAL-MVP-SUBACTION-LEGIBILITY-CONTRAST-OCCLUSION-MOTION-GATES-FIX2-C17E",
+    "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F"
+  ],
+  "children": [
+    {
+      "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-VISUAL-CONTRACT-FIX2-C17A",
+      "scope": "freeze the founder-approved clear-glass individual-action visual contract and source references without runtime mutation"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-SHARED-CLEAR-GLASS-ACTION-CONTROL-FIX2-C17B",
+      "scope": "implement one adaptive native-Flutter clear-glass action-control owner with light and media tones, professional typography, selected and pressed states"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-SOCIAL-BUY-CLEAR-GLASS-CONFORMANCE-FIX2-C17C",
+      "scope": "connect Social and Buy to the approved owner and remove the rejected saturated or background-blocking treatment"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-EAT-RIDE-BOOK-WORK-CLEAR-GLASS-CONFORMANCE-FIX2-C17D",
+      "scope": "prove Eat Ride Book and Work two and three-action families use the same compact individual-control system without filler or stretched distribution"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-SUBACTION-LEGIBILITY-CONTRAST-OCCLUSION-MOTION-GATES-FIX2-C17E",
+      "scope": "machine-readable 17-state typography contrast background visibility adaptive fitment selected pressed motion and reduced-motion qualification"
+    },
+    {
+      "ticketId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+      "scope": "two complete host cycles then one separately machine-gated checksum-matched in-place OPPO successor and full six-family replay"
+    }
+  ],
+  "clearGlassDesignContract": {
+    "sharedOwner": "MoolLocalNavigationRail",
+    "individualControlRequired": true,
+    "railSurfaceMustRemainTransparent": true,
+    "filledFamilyBandOrTrapezoidAllowed": false,
+    "backgroundMustRemainVisibleBetweenAndBehindControls": true,
+    "lightGlassFillAlpha": 0.52,
+    "mediaGlassFillAlpha": 0.58,
+    "backdropBlurSigma": 16.0,
+    "controlHeight": 48.0,
+    "railHeight": 52.0,
+    "cornerRadius": 14.0,
+    "iconSize": 20.0,
+    "labelFontSize": 12.0,
+    "labelFontWeight": 700,
+    "maximumNavigationTextScale": 1.3,
+    "minimumTapTarget": 48.0,
+    "selectedAccentLimitedToIconBorderIndicatorAndRestrainedGlow": true,
+    "inactiveControlsMustNotAppearDisabled": true,
+    "connectionLineMaximumStrokeWidth": 1.5,
+    "connectionLineMaximumOpacity": 0.35,
+    "perpetualMotionAllowed": false,
+    "selectionMotionMilliseconds": 200,
+    "reducedMotionSettlesImmediately": true,
+    "compactCenteredVariableCounts": [2, 3, 4],
+    "horizontalScrollOrSidePanelAllowed": false
+  },
+  "familyInventory": {
+    "social": ["shorts", "videos", "feed", "create"],
+    "buy": ["shop", "wholesale", "medicine", "orders"],
+    "eat": ["order", "table"],
+    "ride": ["bike", "auto", "cab"],
+    "book": ["doctor", "salon"],
+    "work": ["earn", "workspace"]
+  },
+  "featureExpansionRule": {
+    "newSubactionsAllowed": false,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentBusinessStateOwners": []
+  },
+  "explicitExclusions": [
+    "no_new_filler_action_screen_route_menu_modal_palette_or_extra_tap",
+    "no_change_to_global_rail_geometry_order_position_or_meaning",
+    "no_saturated_gradient_flood_filled_family_band_or_background_blocking_trapezoid",
+    "no_copy_business_state_session_backend_provider_or_commercial_logic_change",
+    "no_Screens_01_03_approved_HTML_screenbook_reference_or_protected_runtime_change",
+    "no_credentials_provider_customer_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "referenceEvidence": {
+    "root": "artifacts/quality/uaw-personal-mvp-global-subaction-clear-glass-action-controls-fix2-c17a-founder-visual-contract-20260808-01",
+    "navigationClaritySha256": "0535C00CB385742BCE1409FCEA88BA914D36F5DAAB0E4BD2B67001385A63C751",
+    "saturatedGlassRejectedSha256": "3496692EA295EAA9477140236A406EF54831097F0B51AA10A53CAC21382FEFA2",
+    "liquidGlassDirectionSha256": "B19046013D095F6B5EBFD934817CB253AC3A2164C5F816C25C2BD1050C8259C2"
+  },
+  "buildAndInstall": {
+    "authorizedAfterC17EHostQualification": true,
+    "authorizedNow": false,
+    "oneUniqueBuildAndOneInPlaceInstallOnly": true
+  },
+  "c17fPreselection": {
+    "state": "rejected_protected_screen01_approved_ui_lock",
+    "ticketSelected": false,
+    "buildAuthorizationOpened": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "gate": "scripts/check-approved-ui-locks.ps1",
+    "expectedSha256": "B0E7B099B70BE7240A4E7699596AB7F16B77285FBA9C23C4F3708AFDA7AE218D",
+    "actualSha256": "D08DBA928B884554984D28891F5E465B1F7FA910D3884EBE49B6466D199147BE",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F-PRESELECTION-REJECTION-20260808.md"
+  },
+  "c18dHostRefresh": {
+    "state": "passed_two_consecutive_unchanged_source_cycles",
+    "sourceFingerprint": "04FB5C9DD229666CF6302C42EF5B4760A1255474ED84519D3D9A1FE4A7C420FD",
+    "testsPerCycle": 591,
+    "totalPasses": 1182,
+    "buildAuthorizationOpened": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "newC17fPreselectionRequired": true,
+    "evidence": "artifacts/quality/uaw-personal-mvp-c17-host-qualification-refresh-after-screen01-lock-fix1-c18d-20260808-01/01-host-qualification.md"
+  },
+  "c17fR6017Attempt": {
+    "state": "rejected_single_build_attempt_consumed_no_candidate",
+    "candidateId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-FIX2-C17F",
+    "versionName": "1.0.0-r60.17",
+    "versionCode": "2026080817",
+    "prebuildGates": "passed_17_of_17",
+    "buildInvocationCount": 1,
+    "candidateApkProduced": false,
+    "installPerformed": false,
+    "secondBuildAuthorized": false,
+    "predecessorPreserved": true,
+    "evidence": "artifacts/quality/uaw-personal-mvp-global-subaction-cumulative-oppo-qualification-fix2-c17f-r60-17-20260808-01/12-build-validation.md"
+  },
+  "c17gC17hR6018Review": {
+    "state": "installed_checksum_matched_founder_gallery_rejected_preserved",
+    "candidateId": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-CUMULATIVE-OPPO-QUALIFICATION-BUILD-RECOVERY-FIX1-C17G",
+    "versionName": "1.0.0-r60.18",
+    "versionCode": "2026080818",
+    "apkSha256": "88F82D203E1C8C565BE5DEBB61E6C1EF1F9E588017EADB9120D97B4B3081ED2C",
+    "installedCandidatePreserved": true,
+    "successorBuildAuthorized": false,
+    "successorInstallAuthorized": false,
+    "founderReview": "docs/quality/UAW-PERSONAL-MVP-R60-18-FOUNDER-GALLERY-VISUAL-REJECTION-AND-C20-TICKETS-20260808.md",
+    "successorTicket": "config/uaw-personal-mvp-global-subaction-founder-gallery-professional-recovery-fix3-c20-ticket.json"
+  },
+  "acceptance": [
+    "one_shared_native_Flutter_owner_and_17_individual_clear_glass_controls",
+    "background_visible_between_and_behind_controls_with_no_filled_trapezoid_or_band",
+    "professional_12px_semibold_labels_and_20px_icons_with_light_and_media_contrast",
+    "48px_controls_selected_pressed_available_and_reduced_motion_states",
+    "compact_centered_two_three_four_action_fitment_without_scroll_distribution_or_filler",
+    "all_existing_routes_Back_Mool_Chat_content_and_global_shell_contracts_preserved",
+    "two_complete_host_cycles_before_one_machine_gated_OPPO_candidate",
+    "founder_OPPO_acceptance_required_before_completion"
+  ]
+}

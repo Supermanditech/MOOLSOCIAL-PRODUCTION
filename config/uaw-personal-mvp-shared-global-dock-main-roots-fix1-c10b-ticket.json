@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SHARED-GLOBAL-DOCK-MAIN-ROOTS-FIX1-C10B",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "r60_10_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "scope": [
+    "one_shared_global_dock_component_for_mool_social_eat_ride_book_and_work",
+    "stable_mool_main_action_chat_geometry_and_keys",
+    "selected_destination_disabled_retap",
+    "social_subactions_render_as_local_content_tabs",
+    "eat_ride_book_work_choices_remain_local_content_actions",
+    "remove_top_level_action_choice_header_back"
+  ],
+  "founderAcceptance": "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md",
+  "acceptance": [
+    "widget_semantics_fitment_reduced_motion_and_route_history_tests",
+    "no_reachable_screen04_or_action_choice_destination_owned_bottom_rail"
+  ]
+}

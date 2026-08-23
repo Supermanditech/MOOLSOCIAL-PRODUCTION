@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-WATCH-RETURN-SEMANTIC-TRUTH-C30G",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-SEARCH-FOOTER-COPY-OPPO-REVIEW-C30F",
+  "state": "source_qualified_successor_APK_ticket_required",
+  "classification": "mvp_required",
+  "actor": "personal_MoolSocial_user_returning_from_a_YouTube_Watch_surface",
+  "customerOutcome": "The Watch Back action truthfully names and restores YouTube Search results when Watch was opened from Search, and truthfully names and restores YouTube Home when Watch was opened from Home.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "thin_policy_adapter",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_full_page_search_ime_copy_c30c_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C30F OPPO evidence proves the existing Watch Back behavior is correct but its fixed Home-oriented native label is false for Search-origin Watch. Passing the already-owned return-state boolean into the existing Watch header is the smallest complete correction."
+  },
+  "minimumCompleteScope": [
+    "pass_the_existing_returnToYouTubeSearchAfterVideo_state_into_the_existing_Watch_header",
+    "export_Back_to_YouTube_Search_results_for_Search_origin_Watch",
+    "export_Back_to_YouTube_Home_for_Home_origin_Watch",
+    "preserve_exact_return_behavior_top_logo_removal_content_attribution_Search_footer_and_provider_contracts",
+    "run_focused_semantic_navigation_tests_full_analysis_copy_gate_and_two_complete_Social_cycles"
+  ],
+  "explicitExclusions": [
+    "no_new_route_screen_state_service_backend_database_provider_or_credential_work",
+    "no_behavior_change_to_Search_results_or_Home_restoration",
+    "no_backend provider Firebase app_store or Production deployment",
+    "no_build install uninstall data_clear downgrade commit push or promotion_under_C30G"
+  ],
+  "authority": {
+    "founderAuthorization": "standing_production_grade_ticket_fix_OPPO_review_authority_after_C30F_device_rejection",
+    "sourceImplementationAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "dependencies": [
+    "C30F_r60_37_device_rejection_and_installed_identity_preserved",
+    "existing_returnToYouTubeSearchAfterVideo_state",
+    "permanent_regression_memory_and_MVP_delivery_lock"
+  ],
+  "testPlan": [
+    "focused_Search_origin_Watch_label_behavior_and_return_state",
+    "focused_Home_origin_Watch_label_behavior_and_return_state",
+    "C30C_C30D_copy_navigation_and_exported_semantics_regressions",
+    "full_Flutter_analysis_and_user_facing_copy_gate",
+    "two_identical_complete_Social_cycles_before_any_separate_APK_successor_ticket"
+  ]
+}

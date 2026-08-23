@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R13-PERSONAL-EXPOSURE-FAILURE-STATES-V1",
+  "ticketId": "UAW-R13-PERSONAL-EXPOSURE-FAILURE-STATES",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "sourceProjection": "config/mvp-personal-action-projection-v1.json",
+  "sourceProjectionState": "static_reference_fixture_not_runtime_authority",
+  "futureRuntimeOwner": "launch_policy_owner",
+  "presentationOwner": "MvpActionProjectionStatePanelV2",
+  "states": [
+    {"id":"loading","title":"Updating your actions","detail":"Your last safe choices stay in place while MoolSocial checks the current action list.","safeContext":"retained","recovery":"none","committingActionAllowed":false},
+    {"id":"held","title":"This action is not available yet","detail":"A required approval or dependency is still pending. Nothing was activated.","safeContext":"retained","recovery":"return_safe","committingActionAllowed":false},
+    {"id":"disabled","title":"This action is unavailable","detail":"It is not enabled for this account or location. No capability was granted.","safeContext":"retained","recovery":"return_safe","committingActionAllowed":false},
+    {"id":"stale","title":"Your actions need an update","detail":"Your last safe choices remain visible, but a fresh action list is required before continuing.","safeContext":"retained","recovery":"retry_projection","committingActionAllowed":false},
+    {"id":"offline","title":"You are offline","detail":"Your last safe choices remain visible. Reconnect and check again before opening an action.","safeContext":"retained","recovery":"retry_projection","committingActionAllowed":false},
+    {"id":"denied","title":"This action is not permitted","detail":"It cannot open for this account. No other workspace or account details were disclosed.","safeContext":"retained","recovery":"return_safe","committingActionAllowed":false}
+  ],
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "runtimeIntegrationState": "dependency_held_until_authoritative_projection_owner",
+  "explicitExclusions": [
+    "no_live_fetch_connectivity_authorization_geography_capability_or_retry_owner",
+    "no_local_capability_grant_fabricated_liveness_success_or_failure_transition",
+    "no_root_router_integration_without_authoritative_runtime_state",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

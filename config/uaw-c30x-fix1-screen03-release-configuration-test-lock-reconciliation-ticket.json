@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-FIX1-SCREEN03-RELEASE-CONFIGURATION-TEST-LOCK-RECONCILIATION",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_protected_test_only_lock_reconciliation",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The global approved-UI lock passes without changing any Screen03 customer-visible byte, while the accepted production lock truthfully retains the C30W safe release first-frame and profile/startup provenance regression coverage.",
+  "classificationReason": "The global approved-UI gate is the remaining confirmed release blocker, and its only mismatch is a non-visual test owner changed by the already authorized cold-start repair.",
+  "minimumCompleteScope": [
+    "preserve_approved_Screen03_v1_v2_and_v3_directories_byte_exact",
+    "create_one_new_native_production_v4_acceptance_package_with_no_UI_copy_route_asset_golden_or_runtime_change",
+    "lock_the_current_platform_configuration_test_hash_and_the_unchanged_other_eleven_Screen03_owners",
+    "add_one_static_v4_acceptance_gate_and_replay_the_global_approved_UI_lock"
+  ],
+  "explicitExclusions": [
+    "no_edit_to_platform_configuration_test_runtime_UI_HTML_assets_goldens_or_existing_approved_reference_versions",
+    "no_manifest_weakening_or_silent_hash_reseal_inside_v1_v2_or_v3",
+    "no_AAB_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX1"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "C30W_safe_first_frame_source_and_current_platform_configuration_test_are_already_implemented_and_passing",
+    "C30X_all_release_actions_remain_machine_blocked_until_FIX1_and_fresh_two_cycle_qualification_pass"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "approved-references/manifest.json",
+      "apps/mobile/test/platform_configuration_test.dart",
+      "scripts/check-approved-ui-locks.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "approved-references/screens/03-login-account-handoff/v4",
+      "scripts/check-screen03-v4-production-acceptance-c30x-fix1.ps1"
+    ],
+    "necessityProof": "Screen03 v3 correctly locks the earlier profile/startup test, but C30W added safe first-frame release coverage to that same non-visual test owner. A new immutable test-only acceptance version is required; changing v3 or weakening the global hash gate is prohibited.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "prove_all_v1_v2_and_v3_files_and_hashes_remain_exact",
+    "prove_v4_changes_only_the_locked_platform_configuration_test_hash",
+    "run_the_platform_configuration_test_release_runtime_configuration_test_v4_static_gate_and_global_UI_lock",
+    "replay_C30W_C30X_and_C31C_static_gates_on_both_PowerShell_hosts_where_applicable"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30X-FIX1-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30x-fix1-pre-ticket-selection-assessment.json",
+    "priorAcceptance": "approved-references/screens/03-login-account-handoff/v3/production-acceptance.json"
+  }
+}

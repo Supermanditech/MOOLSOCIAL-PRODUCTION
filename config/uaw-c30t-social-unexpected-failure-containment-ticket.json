@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SOCIAL-UNEXPECTED-FAILURE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "social_runtime_recovery_blocker",
+  "actor": "Feed_reader_or_creator_when_a_Firebase_plugin_or_runtime_boundary_fails_unexpectedly",
+  "customerOutcome": "Unexpected Social runtime failures never escape the UI future: cached Feed posts, the Create draft and interaction state remain unchanged with sanitized retry guidance.",
+  "minimumCorrection": [
+    "contain_untyped_Feed_errors_with_cached_posts_preserved",
+    "contain_untyped_publish_errors_with_the_composer_draft_preserved",
+    "contain_untyped_interaction_errors_per_post_without_optimistic_mutation",
+    "never_render_or_persist_private_exception_detail",
+    "prove_all_three_paths_fail_closed"
+  ],
+  "explicitExclusions": [
+    "no_change_to_typed_provider_error_copy_or_backend_contract",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "7 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/social-unexpected-failure-containment-focused-tests.log",
+    "evidenceSha256": "D5DB1F09D0CC74587753BD8A1365BA4CA184032F4FB2B74CA92F3E5B88A26C7A",
+    "privateExceptionDetailExposed": false,
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

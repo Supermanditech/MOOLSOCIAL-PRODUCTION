@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-IMPLEMENTATION-FIX11-C28B",
+  "parentTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-OWNERSHIP-FIX11-C28",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Mool, family and local destination cells remain visually unchanged but are wholly owned by the Android interactive and accessibility viewport on supported devices.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-IMPLEMENTATION-FIX11-C28B-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/lib/core/platform/mool_system_ui_viewport.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one shared Dart system-UI viewport mode owner",
+      "one C28B source and test gate"
+    ],
+    "necessityProof": "The C27 Flutter cells are already full-sized; the outer Android window and exported viewport divergence requires one shared SystemChrome policy while locked MainActivity remains unchanged."
+  },
+  "acceptance": [
+    "shared Flutter startup requests both visible system overlays where the OS permits it",
+    "pre-Android-15 Flutter window uses visible status and navigation overlays",
+    "Android 15 and later retain mandatory edge-to-edge behavior",
+    "C27 58px rail width colour icon typography selected state and motion remain unchanged",
+    "shared-shell insets semantics keyboard text-scale and reduced-motion tests pass",
+    "bounded C28B source gate passes",
+    "no build or install"
+  ],
+  "protectedOwnerRejectionEvidence": "docs/quality/UAW-C28B-MAINACTIVITY-PROTECTED-UI-LOCK-REJECTION-20260810.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-IMPLEMENTATION-FIX11-C28B-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

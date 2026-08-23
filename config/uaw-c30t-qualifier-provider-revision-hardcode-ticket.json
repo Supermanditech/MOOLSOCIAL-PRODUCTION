@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-QUALIFIER-PROVIDER-REVISION-HARDCODE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "local_implementation_complete_syntax_and_static_gate_passed_deployment_held",
+  "classification": "mvp_required",
+  "severity": "pre_aab_live_qualification_impossible_contract",
+  "actor": "C30T_source_qualifier",
+  "customerOutcome": "After a separately authorized Dev YouTube provider deployment, qualification compares the live revision and callback with the exact updated machine-state identities instead of requiring the obsolete revision.",
+  "minimumCorrection": [
+    "load_the_exact_C30T_machine_state_before_live_provider_checks",
+    "compare_live_youtubeprovider_and_callback_revisions_to_machine_state",
+    "reject_empty_unsealed_revision_identity",
+    "retain_the_exact_ownerConnect_true_and_all_mutation_upload_analytics_live_flags_false_contract"
+  ],
+  "explicitExclusions": [
+    "no_Dev_provider_or_Hosting_deployment",
+    "no_machine_revision_update_before_deployment_evidence",
+    "no_AAB_APK_upload_install_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "DevDeploymentAuthorized": false,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "powershellSyntaxEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/41-c30t-powershell-contract-syntax.log",
+    "powershellSyntaxEvidenceSha256": "D3DEE9DC2201545500A42FC6B42737FC73B4252905C0DD5E9A8AEB868DB5E7FE",
+    "staticReadinessEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/42-c30t-static-release-readiness-final-pre-aab-audit.log",
+    "staticReadinessEvidenceSha256": "B816E991461E9A927EC606CAABF1E2CAC4CBAE27DD3E384CCEB1D43D4EC44083"
+  }
+}

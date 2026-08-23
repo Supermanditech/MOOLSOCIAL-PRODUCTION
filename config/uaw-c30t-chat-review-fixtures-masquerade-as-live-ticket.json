@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-CHAT-REVIEW-FIXTURES-MASQUERADE-AS-LIVE",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_and_dev_provider_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "release_blocker",
+  "actualResult": "ChatSession constructs six hardcoded threads and messages, ReviewChatSendGateway delays then succeeds without persistence, Start a new chat only changes a filter, and Voice search is a typed form. The UI presents this as live people, business, order and support conversation data.",
+  "expectedResult": "Chat exposes only authenticated user-scoped real Dev threads and messages with persistent create/read/send idempotency plus truthful empty, signed-out, offline, error and retry states; unavailable business/order/support integrations are not fabricated.",
+  "minimumCompleteScope": [
+    "new_authenticated_App_Check_qualified_Dev_chat_provider",
+    "user_scoped_thread_and_message_Firestore_repository",
+    "direct_conversation_creation_from_a_discoverable_public_profile_identifier_without_email_phone_or_account_enumeration",
+    "idempotent_message_send_and_paginated_read",
+    "remove_all_runtime_fixture_threads_messages_verified_badges_order_quotes_calls_and_fake_success",
+    "truthful_empty_signed_out_loading_error_retry_and_offline_UI",
+    "retain_attachment_call_business_order_and_support_actions_only_when_a_real_capability_owner_exists_otherwise_label_unavailable_or_hide"
+  ],
+  "acceptance": [
+    "signed_out_Chat_prompts_real_MoolSocial_sign_in",
+    "signed_in_empty_account_shows_zero_real_threads_not_fixtures",
+    "real_direct_thread_can_be_created_without_account_enumeration",
+    "message_send_is_backend_persisted_idempotent_and_visible_after_relaunch",
+    "no_runtime_ReviewChatSendGateway_or_hardcoded_thread_fallback",
+    "no_live_Dev_message_is_sent_during_C30T_without_separate_explicit_authority"
+  ],
+  "authority": {"sourceImplementationAuthorized": true, "DevBackendWriteAuthorized": true, "runtimeDevChatMessagesAuthorized": false, "buildUploadAndInstallInheritedFromParent": true}
+}

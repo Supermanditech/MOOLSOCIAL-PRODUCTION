@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DEV-BACKEND-DEPLOYMENT-C29U",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-SOCIAL-FEED-CREATE-AUTHENTICATED-PERSISTENCE-C29P",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CREATOR-CONNECTION-PRIVATE-SHORT-UPLOAD-C29L",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-QUOTA-PURPOSE-AND-CATALOGUE-REFRESH-C29R"
+  ],
+  "state": "selected_founder_authorized_predeployment_qualification",
+  "classification": "mvp_required",
+  "actor": "founder_supervised_Dev_release_operator",
+  "customerOutcome": "The exact Dev Social backend serves authenticated MoolSocial Feed/Create, shared eligible YouTube discovery, creator channel connection and private-only upload truthfully before any successor APK is built.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sealedSourceOwners": [
+      "youtubeProvider",
+      "youtubeOAuthCallback",
+      "moolSocialContent",
+      "backend/firestore/youtube-private-dev.rules",
+      "backend/storage/moolsocial-private-dev.rules"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": []
+  },
+  "minimumCompleteScope": [
+    "verify_exact_project_account_billing_Auth_App_Check_APIs_service_accounts_IAM_and_secret_presence_without_reading_values",
+    "deploy_only_sealed_youtubeProvider_youtubeOAuthCallback_and_moolSocialContent_to_moolsocial_dev_503018",
+    "deploy_deny_all_direct_client_Firestore_and_Storage_rules",
+    "bind_exact_runtime_service_accounts_and_secret_access_with_least_privilege",
+    "verify_revision_identity_health_App_Check_denial_Auth_denial_rules_denial_shared_catalogue_and_social_persistence",
+    "retain_before_after_metadata_checksums_cost_quota_and_rollback_evidence"
+  ],
+  "explicitExclusions": [
+    "no_Production_staging_or_provider_submission",
+    "no_secret_credential_token_or_API_key_value_read_copy_or_output",
+    "no_public_or_unlisted_YouTube_upload",
+    "no_APK_build_install_launch_tap_uninstall_data_clear_or_downgrade",
+    "no_commit_push_message_call_fund_or_reference_write"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_11",
+    "externalReadAuthorized": true,
+    "devRulesDeployAuthorized": true,
+    "devFunctionsDeployAuthorized": true,
+    "requiredDevApiEnablementAuthorized": true,
+    "leastPrivilegeIamMutationAuthorized": true,
+    "secretMetadataAndBindingAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false
+  },
+  "dependencies": [
+    "C29P_C29L_C29R_sealed_source",
+    "moolsocial_dev_503018_only",
+    "founder_available_if_Google_requires_reauthentication",
+    "permanent_regression_and_environment_promotion_gates"
+  ],
+  "testPlan": [
+    "local_typecheck_and_complete_backend_suite",
+    "Firebase_rules_emulator_direct_client_denial",
+    "predeploy_metadata_and_source_hash_seal",
+    "postdeploy_function_revision_service_account_secret_binding_and_ingress_metadata",
+    "unauthenticated_and_missing_App_Check_denial",
+    "authenticated_App_Check_Social_and_public_YouTube_Dev_smoke",
+    "quota_cache_error_measurement_and_rollback_readiness"
+  ]
+}

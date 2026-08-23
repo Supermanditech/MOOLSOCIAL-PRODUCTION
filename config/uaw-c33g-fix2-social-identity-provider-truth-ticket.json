@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33G-FIX2-SOCIAL-IDENTITY-PROVIDER-TRUTH",
+  "parentTicket": "UAW-C33G-R60-49-FAILED-ACCEPTANCE-REPAIR",
+  "finding": "REG-20260815-2431-C33F-R60-49-VISIBLE-SOCIAL-IDENTITY-METHODS-NO-USABLE-OUTCOME",
+  "state": "source_truth_focused_tests_and_dual_host_gate_passed_future_Play_device_acceptance_required",
+  "classification": "mvp_required",
+  "severity": "release_blocking",
+  "actor": "MoolSocial_signed_out_real_user_choosing_a_visible_identity_method",
+  "capability": "receive_the_exact_supported_provider_flow_or_a_truthful_local_unavailable_result",
+  "customerOutcome": "Each visible identity choice is truthful: Google and YouTube identity use the supported Google-account relationship, while unavailable Apple, X, Instagram and Facebook choices never launch a misleading provider or claim success.",
+  "classificationReason": "Identity-method truth is part of the accepted launch surface and prevents repeated unusable login journeys.",
+  "minimumCompleteScope": [
+    "prove_Google_and_YouTube_identity_share_the_supported_Google_account_relationship",
+    "prove_unavailable_methods_fail_locally_without_invoking_Google_or_an_unconfigured_external_provider",
+    "preserve_exact_recovery_copy_semantics_and_keyboard_accessibility",
+    "add_per_provider_gateway_and_screen_contract_tests_without_changing_the_locked_visual_reference"
+  ],
+  "explicitExclusions": [
+    "no_Screen_03_visual_or_reference_change_without_a_separate_versioned_founder_amendment",
+    "no_Apple_X_Instagram_Facebook_provider_integration_console_write_or_credential_request",
+    "no_build_Play_OPPO_backend_Hosting_email_quota_or_deployment"
+  ],
+  "dependenciesAndApprovals": ["C33G_FIX1_source_qualification", "founder_failed_r60_49_repair_direction", "locked_Screen_03_reference_preserved"],
+  "testAndEvidencePlan": ["six_provider_local_invocation_matrix", "Google_and_YouTube_shared_identity_contract", "unsupported_provider_zero_external_invocation", "approved_UI_lock_gate"],
+  "authority": {"runtimeSourceWriteAuthorized": true, "testAndGateWriteAuthorized": true, "referenceWriteAuthorized": false, "providerWriteAuthorized": false, "buildPlayOrDeviceMutationAuthorized": false}
+}

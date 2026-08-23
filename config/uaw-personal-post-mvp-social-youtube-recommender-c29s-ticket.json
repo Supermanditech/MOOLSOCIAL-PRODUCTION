@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-POST-MVP-SOCIAL-YOUTUBE-DISCLOSED-RECOMMENDER-C29S",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "dependency_held_quota_and_compliance_approval_required",
+  "classification": "beyond_mvp",
+  "customerOutcome": "After approval, a consenting user may receive a disclosed MoolSocial ordering of eligible public YouTube items based only on allowed MoolSocial signals.",
+  "founderCondition": "start_only_after_YouTube_quota_approval",
+  "entryDependencies": [
+    "quota_and_compliance_approval",
+    "explicit_privacy_consent_and_deletion_contract",
+    "allowed_data_and_derived_metric_legal_review",
+    "C29R_shared_refresh_and_measurement_proof",
+    "remote_kill_switch_and_founder_scope_authorization"
+  ],
+  "guardrails": [
+    "no_YouTube_Watch_History_or_Watch_Later_claim",
+    "no_per_user_provider_polling",
+    "no_unofficial_YouTube_metric_or_native_YouTube_recommendation_claim",
+    "separate_provider_data_from_MoolSocial_ranking_explanation",
+    "respect_cache_refresh_revocation_and_deletion_requirements"
+  ],
+  "implementationAuthorized": false
+}

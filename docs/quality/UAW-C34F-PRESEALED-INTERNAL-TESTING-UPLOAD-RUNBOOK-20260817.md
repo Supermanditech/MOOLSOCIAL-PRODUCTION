@@ -1,0 +1,67 @@
+# C34F pre-sealed Internal Testing upload runbook
+
+Date: 2026-08-17 IST
+
+Candidate:
+`UAW-C34F-R60-70-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE`,
+`1.0.0-r60.70` / `2026081370`.
+
+The only Play route is Testing > Internal testing. Browser control opens one
+fresh known MoolSocial Internal Testing tab in the signed-in Chrome session.
+It must not enumerate or emit open tabs, browser history, unrelated tab
+metadata, authenticated query strings or fragments, accounts, testers,
+private links, cookies, storage or session values. Only a query-free
+allowlisted Play host/path projection and non-private release fields may leave
+the browser runtime.
+
+Before the source seal:
+
+1. Bind the C34F cycle runner to
+   `source-manifest-c34f-registry-2646.txt` and assert exact state parity.
+2. Run its `PrerequisiteOnly` preflight and prove the exact state,
+   source-manifest and focused-manifest paths exist with
+   `testsStarted=false`.
+3. Create, parse and execute the complete dual-host preprompt/postinput
+   positive and crossed fail-closed fixture matrix against the draft manifest.
+4. Prove the real state, aggregate and all four fixtures have the same 21
+   historical candidates and end with rejected C34E r60.69 at `1/0/0/0`.
+5. Promote unchanged draft bytes to the official source seal and pass the
+   cycles-zero source gate in PowerShell 7 and Windows PowerShell.
+
+The authoritative Flutter runner receives the focused manifest as a
+repository-relative argument. Two independent cycles must each prove Flutter
+`501` passed, `3` declared skips, zero failure/error/non-JSON/blank/null/untyped
+events, whole-mobile analyzer clean, backend typecheck plus `537` tests, web
+production build plus `8` tests, unchanged source and zero Play writes.
+
+After both cycles, persist
+`source_regression_memory_two_identical_cycles_qualified_build_authority_held`
+while all later authorities remain held. Replay the source gate in both hosts,
+then expose one founder prompt authority and persist
+`source_regression_memory_two_identical_cycles_qualified_founder_prompt_required`.
+
+The `preprompt` phase requires all three founder-qualification flags false and
+hidden input not entered. After the founder validates all three hidden values,
+persist `founder_inputs_validated_single_aab_build_required` with the three
+qualification flags true and both agent-read flags false. The wrapper's
+existing `build` replay requires that exact postinput state. Those two
+lifecycle transitions cannot be combined.
+
+The launcher erases process values and transient files on every exit, retains
+only a sanitized terminal result, and never displays or persists a secret.
+The founder launches it only by pasting the literal command into an already
+visible PowerShell console.
+
+After the source seal, repository discovery commands are prohibited. No
+post-seal source, registry, ticket, runbook or gate mutation is allowed. Any
+mismatch rejects C34F before retry.
+
+Postbuild, preupload, postupload, preinstall, postinstall and journey gates
+remain distinct. Upload and activation are Internal Testing only. The OPPO
+action is one Play in-place update after its exact gate; no ADB install,
+sideload, uninstall, data clear or downgrade is allowed.
+
+`REG-20260813-1863-C30T-CLOUD-TAB-URL-QUERY-EXPOSURE` and
+`REG-20260817-2664-C34E-PREUPLOAD-RAW-CHROME-TAB-URL-QUERY-EXPOSURE-RECURRENCE`
+are permanent prevention. C34E's AAB is rejected and cannot be uploaded,
+installed, promoted, repaired or reused.

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MOOLSOCIAL-FSC03A-FEED-X-INFORMED-OWNERSHIP-REFERENCE",
+  "parentBatch": "MOOLSOCIAL-FOUNDER-SOCIAL-SHOP-CORRECTIONS-20260810",
+  "state": "html_path_stopped_by_founder_native_successor_registered",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal user",
+  "customerOutcome": "A Personal user reads and participates in a professional MoolSocial-owned text, image and carousel Feed that is visually distinct from YouTube and truthful when content is empty, loading or unavailable.",
+  "preselectionAssessment": "docs/quality/MOOLSOCIAL-SOCIAL-OWNERSHIP-REDESIGN-MICRO-TICKET-PRESELECTION-20260810.md",
+  "successorTicketId": "MOOLSOCIAL-FSC03A-NATIVE-MOOLSOCIAL-FEED-OWNERSHIP",
+  "successorTicketPath": "config/moolsocial-fsc03a-native-moolsocial-feed-ownership-ticket.json",
+  "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+  "newScreens": [],
+  "newRoutes": [],
+  "newBackendOwners": [],
+  "minimumCompleteScope": ["X_informed_low_effort_feed_patterns_with_MoolSocial_identity", "text_image_carousel_items_only", "truthful_empty_loading_error_retry", "direct_Create_handoff"],
+  "explicitExclusions": ["no_X_trade_dress_copy", "no_YouTube_identity", "no_fake_post_or_engagement", "no_publication_success_without_authoritative_gateway", "no_runtime_build_device_or_external_write_before_selection"],
+  "execution": {"referenceWriteAuthorized": false, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "backendWriteAuthorized": false, "externalServiceWriteAuthorized": false}
+}

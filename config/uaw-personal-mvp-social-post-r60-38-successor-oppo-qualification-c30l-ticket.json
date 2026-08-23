@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-POST-R60-38-SUCCESSOR-OPPO-QUALIFICATION-C30L",
+  "parentTickets": [
+    "UAW-PERSONAL-MVP-GLOBAL-ANDROID-ROOT-FOCUS-EDGE-SUPPRESSION-C30I",
+    "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-ACCOUNT-STATE-JOURNEY-C30J",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-REVIEW-PERSONAS-AND-CONTENT-C30K",
+    "UAW-PERSONAL-MVP-SOCIAL-DEV-CONTENT-REDEPLOY-C30K-FIX1"
+  ],
+  "state": "r60_39_device_rejected_runtime_recovery_required",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_user",
+  "customerOutcome": "One fresh checksum-unique OPPO successor proves the approved complete Social design together with the C30I Android focus-edge fix, truthful YouTube public-versus-connected account state and the real persisted multi-author Feed/Create runtime, then waits for founder review.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "scripts/build-buy-device-review.ps1",
+      "scripts/check-apk-regression-gate-state.ps1",
+      "scripts/test-youtube-public-dev-review-build-controls.ps1",
+      "config/apk-regression-gate-state-c30l.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "C30I and C30J are source-qualified but absent from the rejected installed r60.38 APK, while C30K's real Dev corpus and C30K-FIX1 runtime are now verified. One separately qualified in-place r60.39 candidate is the smallest complete founder-review proof."
+  },
+  "minimumCompleteScope": [
+    "fresh_host_and_toolchain_qualification_with_no_reuse_of_C30H_build_authority",
+    "seal_the_current_mobile_source_manifest_and_two_identical_complete_Social_cycles",
+    "build_and_checksum_qualify_exactly_one_r60_39_profile_APK",
+    "install_exactly_once_in_place_over_preserved_r60_38_without_uninstall_clear_or_downgrade",
+    "pass_C28D_first_native_exported_clickable_semantic_size_before_any_interaction",
+    "prove_the_green_root_focus_edges_are_absent_without_hiding_real_focus_semantics",
+    "exercise_YouTube_Home_Search_Watch_Shorts_public_and_connected_account_truth",
+    "exercise_real_Dev_Feed_and_Create_text_image_carousel_and_all_four_choice_poll_quiz_formats",
+    "leave_the_candidate_open_for_founder_review_without_any_further_build_install_or_deployment"
+  ],
+  "explicitExclusions": [
+    "no_source_design_backend function rule provider Hosting Production or_Staging_changes_under_device_qualification",
+    "no_credential token password API_key secret or_provider_payload_output",
+    "no_uninstall data_clear downgrade second_build second_install or_predecessor_evidence_mutation",
+    "no_commit push promotion provider_submission message call or_fund"
+  ],
+  "authority": {
+    "founderAuthorization": "explicit_2026_08_12_after_Dev_only_content_redeploy_fresh_C30L_qualification_one_APK_build_install_OPPO_founder_review",
+    "testAndGateWriteAuthorized": true,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "sourceImplementationAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "candidate": {
+    "versionName": "1.0.0-r60.39",
+    "versionCode": "2026081239",
+    "buildMode": "profile",
+    "deviceSerial": "2b3e0f71",
+    "packageName": "com.moolsocial.app",
+    "sourceManifestPath": "artifacts/quality/uaw-personal-mvp-social-post-r60-38-successor-oppo-qualification-c30l-r60-39-20260812-01/source-aggregate-manifest.txt",
+    "oneBuildOnly": true,
+    "oneInPlaceInstallOnly": true
+  },
+  "dependencies": [
+    "C30K_FIX1_revision_moolsocialcontent_00003_juw_ACTIVE_and_security_verified",
+    "C30I_and_C30J_source_qualified",
+    "C30K_three_persona_36_post_48_media_corpus_verified",
+    "C30H_r60_38_rejected_installed_identity_and_evidence_preserved",
+    "fresh_APK_machine_permanent_regression_C28D_and_host_gates"
+  ],
+  "deploymentHold": {
+    "active": true,
+    "allFurtherBackendProviderRulesHostingAndProductionDeploymentHeld": true,
+    "founderReviewRequired": true
+  },
+  "deviceResult": {
+    "state": "rejected_preserved_no_second_build_or_install",
+    "passed": [
+      "C28D_first_native_clickable_semantic_height",
+      "green_root_focus_edges_absent",
+      "real_YouTube_Home_Video_Watch_and_Search",
+      "keyboard_safe_one_tap_Create_and_four_choice_poll_quiz_formats",
+      "global_left_Mool_and_right_Chat_white_footer_contrast"
+    ],
+    "rejected": [
+      "Shorts_live_provider_revision_rejects_maxResults_50_while_source_fix_25_is_undeployed",
+      "Feed_client_runtime_define_omitted_so_no_moolSocialContent_request_was_made",
+      "YouTube_creator_connection_remains_truthfully_unavailable_until_current_provider_profile_is_separately_qualified"
+    ],
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-POST-R60-38-SUCCESSOR-OPPO-QUALIFICATION-C30L-DEVICE-REJECTION-20260812.md",
+    "successorTicket": "config/uaw-personal-mvp-social-c30l-runtime-recovery-c30m-ticket.json",
+    "secondBuildPerformed": false,
+    "secondInstallPerformed": false,
+    "protectedBaselineUpdated": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-FIX3-APPLE-FIREBASE-PUBLIC-LOGIN-ADAPTER",
+  "parentTicketId": "UAW-C34P-FIX1A-ALL-EIGHT-PUBLIC-AUTH-LIVE-ADAPTER-BLOCKER-RESOLUTION",
+  "state": "registered_founder_authorized_acceptance_child_source_pending_parent_reseal",
+  "classification": "beyond_mvp",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can choose Apple on the existing MoolSocial login gateway, privately complete Sign in with Apple through Firebase, establish one MoolSocial session and reach the exact protected destination, or recover safely from cancellation, configuration failure, account collision, revocation or provider failure.",
+  "minimumCompleteScope": [
+    "reuse_AppleAuthProvider_FirebaseSocialAuthGateway_JourneySession_bootstrap_rollback_and protected return",
+    "gate_availability_on_Firebase_Apple_provider_Apple_App ID_or Services ID_exact return_and platform capability readiness",
+    "use_Firebase_signInWithProvider_on_supported_native platforms_without_a_second_authentication backend",
+    "map_cancel_network_provider disabled_collision_nonce_and unknown failures_to sanitized public outcomes",
+    "retain_authenticated relaunch_sign out_and provider revocation contract",
+    "cover_iOS_capability_and_Android_web handoff_configuration_without_committed Apple_private key_or client secret"
+  ],
+  "explicitExclusions": [
+    "no_Apple_private key_team ID_services ID_client secret_identity token_email_or private relay value_in_source_logs_tests_or evidence",
+    "no_custom_Apple_UI_or_duplicate_login route_session_or backend",
+    "no_Apple_Developer_console_Firebase_provider_external build_Play_OPPO_or private account_action"
+  ],
+  "testAndEvidencePlan": [
+    "Apple_availability_and_single_Firebase_provider_dispatch tests",
+    "cancel_collision_disabled_network_nonce_unknown_and sanitized error fixtures",
+    "bootstrap rollback_exact return_relaunch_and sign out tests",
+    "iOS_capability_Android_return_and_missing configuration fail closed static tests",
+    "no_private Apple value_or provider message leakage tests"
+  ],
+  "authority": {
+    "runtimePlatformTestSourceAuthorizedUnderParent": true,
+    "providerConsolePrivateKeyOrExternalWriteAuthorized": false,
+    "secretOrPrivateValueAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

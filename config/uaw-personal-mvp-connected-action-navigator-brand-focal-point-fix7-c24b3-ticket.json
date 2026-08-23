@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-CONNECTED-ACTION-NAVIGATOR-BRAND-FOCAL-POINT-FIX7-C24B3",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "From any destination, one MoolSocial launcher opens the connected six-family/direct-action chooser over the current screen and switches directly without returning through Home.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-CONNECTED-ACTION-NAVIGATOR-BRAND-FOCAL-POINT-FIX7-C24B3-PRESELECTION-ASSESSMENT-20260809.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-CONNECTED-ACTION-NAVIGATOR-BRAND-FOCAL-POINT-FIX7-C24B3-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","new_necessary_work","configuration"],"sharedImplementationOwners":["MoolDestinationNavigationV2","MoolGlobalNavigationV2","PersonalMoolRootV2_action_catalogue","existing_family_and_direct_route_callbacks","existing_destination_state_and_Back_behavior"],"newNecessarySharedOwners":["MoolConnectedActionNavigator_and_shared_action_chooser"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["launcher_visible_as_MoolSocial_minimum_44px","launcher_is_only_persistent_brand_navigation_focal_point","overlay_preserves_current_destination_underneath","six_main_families_and_selected_family_actions_share_Home_catalogue","direct_switch_never_navigates_to_intermediate_Home","dismiss_and_system_Back_return_to_unchanged_destination","remove_redundant_feature_MoolSocial_header_or_reserved_brand_tile_only","Social_and_Buy_business_content_routes_and_state_preserved","finite_and_reduced_motion","320_390_430_text_scale_and_tap_semantics"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33B-PERSONAL-MVP-C17D-C21E-CURRENT-LOCAL-DESTINATION-RAIL-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_runtime_unchanged",
+  "ticketSha256": "B3B52E5E5742FE8CA17D1DCA70DB8CE49A3CE239719C49583AA9AE081F221D8A",
+  "testOwner": "apps/mobile/test/core/design/mool_remaining_family_clear_glass_conformance_c17d_test.dart",
+  "testSha256": "9C3C6F199E3D082B54CAE3325E5CE064BA19209FDAA91034924F4DAD83A76BF1",
+  "runtimeOwner": "apps/mobile/lib/core/design/mool_design_system.dart",
+  "runtimeSha256": "D66C9A8E34E49FF58DF25EF6DC0694B22DB91E5C33B6A04CA5CD7A63C7F76BFE",
+  "preservedAuthorities": {
+    "C20ESha256": "9F5E461291133081B64CD34D4886E7874DBB24C93A4AB96627AC16EFCBF35382",
+    "C27BSha256": "6AFDEFE148F0E36A6EEBAE77F214A415344606157471C8D847E004D4F8DE54AD",
+    "C27DSha256": "7E156B6EA30F099E27236998A6ADCFAADAFE8C5E6356C37D687C04EF512FDCFC",
+    "C33AStateSha256": "37F6044342991FDA91198AD2E032C61CD246D3AFBC317A3D6D60D5BB9C6118C0"
+  },
+  "validation": {
+    "C17D": {"passed": 10, "failed": 0},
+    "C20E": {"passed": 6, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "combinedCurrentAuthorityBatch": {"files": 4, "passed": 22, "failed": 0, "warnings": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  },
+  "authority": {
+    "runtimeChanged": false,
+    "backendChanged": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

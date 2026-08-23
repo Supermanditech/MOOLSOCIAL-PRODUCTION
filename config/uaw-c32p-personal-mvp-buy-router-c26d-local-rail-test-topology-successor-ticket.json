@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32P-PERSONAL-MVP-BUY-ROUTER-C26D-LOCAL-RAIL-TEST-TOPOLOGY-SUCCESSOR",
+  "parentOutcome": "UAW-C32O-PERSONAL-MVP-BUY-ROUTER-COMPACT-MOOL-LAUNCHER-TEST-SUCCESSOR",
+  "finding": "REG-20260815-2265-C32O-BUY-ROUTER-TEST-OBSOLETE-NO-LOCAL-RAIL-AND-CHOOSER-ACTION-KEYS",
+  "state": "founder_authorized_test_topology_successor_selected_all_runtime_baseline_and_live_actions_held",
+  "classification": "mvp_supporting",
+  "actor": "Personal Shop user moving between Shop, Wholesale and Orders through the accepted compact family chooser and local rail",
+  "customerOutcome": "Buy router tests protect the accepted one-tap Buy family root plus direct Wholesale and Orders local actions instead of an obsolete all-actions-in-chooser topology.",
+  "classificationReason": "C26D is the later accepted source authority and the current runtime already conforms; only predecessor test topology is stale.",
+  "minimumCompleteScope": [
+    "preserve_all_runtime_reference_protected_baseline_route_content_Back_and_recovery_bytes_and_assertions",
+    "expect_the_existing_Buy_local_destination_rail",
+    "select_Buy_from_the_family_chooser_then_use_buy_local tabs_for_nonroot_actions",
+    "remove_only_obsolete_mool_navigator_buy_action_expectations",
+    "preserve_C32O_as_an_exact_blocked_prior_assessment_and_add_one_C32P_checker",
+    "restart_C32N_attribution_focused_cycles_with_a_fresh_fingerprint"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_route_screen_copy_reference_navigation_or_Buy_behavior_change",
+    "no_protected_baseline_replacement_reseal_bypass_or_full_C28E_preflight_retry",
+    "no_backend_provider_cloud_live_data_build_Play_OPPO_funds_secret_or_external_communication_action"
+  ],
+  "authority": {
+    "founderAuthorizationEvidence": "2026-08-15 user autonomous audit finding ticket and source implementation direction",
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "acceptance": [
+    "Buy_router_test_expects_buy_local_destination_tabs_present",
+    "Buy_family_selection_opens_Shop_root_without_obsolete_direct_action_keys",
+    "Wholesale_and_Orders_use_buy_local_tab_keys",
+    "all_nine_Buy_router_cases_pass",
+    "C32N_C32O_C32P_pass_on_both_PowerShell_hosts",
+    "runtime_and_protected_baseline_bytes_remain_unchanged"
+  ]
+}

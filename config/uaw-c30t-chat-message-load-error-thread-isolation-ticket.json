@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-MESSAGE-LOAD-ERROR-THREAD-ISOLATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "chat_error_state_truth_blocker",
+  "actor": "member_viewing_a_successfully_loaded_Chat_thread_after_an_older_thread_fails_late",
+  "customerOutcome": "A message-load failure is shown only on its owning conversation and cannot display a false failure banner on the current successful thread.",
+  "minimumCorrection": [
+    "store_message_load_errors_by_thread_ID",
+    "clear_only_the_thread_error_when_that_thread_retries_or_succeeds",
+    "render_the_current_thread_error_in_the_current_thread_body",
+    "prove_a_late_old_thread_failure_is_not_visible_on_the_new_thread"
+  ],
+  "explicitExclusions": [
+    "no_change_to_send_or_global_inbox_error_contracts",
+    "no_backend_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "4 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-thread-route-order-focused-tests.log",
+    "evidenceSha256": "5FD793862990172731AFBB43314FD24703583A6B87D42D50508E8A0F282CA99A",
+    "privateExceptionDetailExposed": false,
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "SAM-R05-SERVER-CAPABILITY-GEOGRAPHY-POLICY-CONTRACT",
+  "state": "locally_complete_no_environment_or_device_action_required",
+  "classification": "mvp_required",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "contract": {
+    "path": "backend/functions/src/workspace/workspace_capability_policy_contract.ts",
+    "sha256": "8666188DFD259C760611348D48C1E0EB2EDB1506AA5F1DAEB9A837A59506736C"
+  },
+  "tests": {
+    "path": "backend/functions/src/workspace/workspace_capability_policy_contract.test.ts",
+    "sha256": "4A5871A95311A57D3D4D5B6981DFC8ED76D21A385ABEE5D9D04F7FA6F5824730",
+    "focusedCycles": ["17_pass_0_fail", "17_pass_0_fail"],
+    "fullBackendCycles": ["349_pass_0_fail", "349_pass_0_fail"],
+    "cycle1Evidence": "artifacts/quality/sam-r05-server-capability-geography-policy-contract-20260807-01/02-full-backend-cycle-1.tap",
+    "cycle1Sha256": "CD9E6338561E861E992DCAD8BAF34D12DE8E990705E039F641BFBD3B94F0267D",
+    "cycle2Evidence": "artifacts/quality/sam-r05-server-capability-geography-policy-contract-20260807-01/02-full-backend-cycle-2.tap",
+    "cycle2Sha256": "2CAF08D27056E7BA6832CB3C35DE1296C265A8C27BEB4CB5D9F9DF9860FBC71F"
+  },
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "completionEvidence": "docs/quality/SAM-R05-SERVER-CAPABILITY-GEOGRAPHY-POLICY-CONTRACT-COMPLETION-20260807.md"
+}

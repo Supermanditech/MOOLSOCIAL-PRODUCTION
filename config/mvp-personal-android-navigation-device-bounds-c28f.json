@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PERSONAL-ANDROID-NAVIGATION-DEVICE-BOUNDS-C28F-001",
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-OPPO-QUALIFICATION-FIX12-C28F",
+  "packageName": "com.moolsocial.app",
+  "densityBaseDpi": 160,
+  "minimumLogicalSize": {
+    "width": 44,
+    "height": 44
+  },
+  "moolSemantics": [
+    "Open MoolSocial main menu",
+    "Close MoolSocial main menu"
+  ],
+  "families": [
+    {
+      "id": "social",
+      "familyRootExpected": false,
+      "familyRootSemantic": "Open Social home",
+      "localLabels": ["YouTube Shorts", "YouTube Videos", "Feed", "Create"]
+    },
+    {
+      "id": "buy",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Shop home",
+      "forbiddenLocalLabels": ["Products", "Shop"],
+      "localLabels": ["Wholesale", "Orders"]
+    },
+    {
+      "id": "eat",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Food home",
+      "localLabels": ["Order Food", "Book Table"]
+    },
+    {
+      "id": "ride",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Travel home",
+      "localLabels": ["Bike", "Auto", "Cab", "Bus"]
+    },
+    {
+      "id": "book",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Care home",
+      "localLabels": ["Doctor", "Medicine", "Salon"]
+    },
+    {
+      "id": "work",
+      "familyRootExpected": true,
+      "familyRootSemantic": "Open Work home",
+      "localLabels": ["Earn Today", "Workspace"]
+    }
+  ],
+  "requirements": {
+    "exactlyOneVisibleMoolNode": true,
+    "familyRootPresenceMatchesCurrentCatalogue": true,
+    "everyFamilyLocalNodePresentExactlyOnce": true,
+    "socialFamilyRootAbsent": true,
+    "buyProductsAndLocalShopAbsent": true,
+    "explicitVisibleFalseNodesExcluded": true,
+    "physicalBoundsNormalizedByDensity": true
+  },
+  "preservedRejectionFixture": {
+    "path": "artifacts/quality/uaw-personal-mvp-android-navigation-oppo-qualification-fix11-c28d-r60-27-20260810-01/18-first-installed-root.xml",
+    "sha256": "63AAC908A9A3EA4AECB2E1AF4935616D7991B24B61C0BB3DCE0714867187B964",
+    "densityDpi": 320,
+    "expectedLogicalHeight": 19
+  }
+}

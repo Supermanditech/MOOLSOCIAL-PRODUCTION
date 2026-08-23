@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SCREEN03-PROFILE-PROVENANCE-TEST-LOCK-RECONCILIATION-FIX1-C19",
+  "parentBlocker": "UAW-PERSONAL-MVP-SCREEN01-V4-MACHINE-LOCK-QUALIFICATION-FIX1-C18C",
+  "state": "host_qualified_device_runtime_proof_deferred_to_successor_apk",
+  "classification": "mvp_required",
+  "customerOutcome": "Future profile review APKs retain independently verifiable candidate and startup provenance without changing the accepted Screen03 experience.",
+  "founderAuthority": "docs/quality/UAW-C19-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SCREEN03-PROFILE-PROVENANCE-TEST-LOCK-RECONCILIATION-FIX1-C19-PRESELECTION-ASSESSMENT-20260808.md",
+  "implementationDisposition": [
+    "reuse",
+    "configuration",
+    "test_only_acceptance",
+    "new_necessary_work"
+  ],
+  "lineage": {
+    "preservedVersion": "approved-references/screens/03-login-account-handoff/v2",
+    "successorVersion": "approved-references/screens/03-login-account-handoff/v3",
+    "v2PlatformTestSha256": "490721029D88301E42DC593526618B4F94198AB586C1E55D709CAE12776123BC",
+    "currentPlatformTestSha256": "DEFFE5CFD7CD7C1432D6057E5C045A1569DC3F71FBD5F9D8EF26251E984A68CA",
+    "unchangedOwnerCount": 11,
+    "changedOwnerCount": 1
+  },
+  "mandatoryRegression": {
+    "id": "REG-20260806-006-PROFILE-RUNTIME-MARKER-SUPPRESSED",
+    "state": "open_blocking_future_profile_build",
+    "requiredTest": "profile device-review builds retain candidate provenance markers",
+    "gates": [
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-buy-device-review-runtime.ps1"
+    ]
+  },
+  "reuseInventory": [
+    "approved_references_manifest_and_additive_versioning",
+    "Screen03_v2_immutable_package",
+    "check_approved_ui_locks_existing_owner",
+    "three_existing_Screen03_native_Flutter_owners",
+    "existing_provider_youtube_asset",
+    "existing_Screen03_behavior_golden_copy_and_fitment_tests",
+    "existing_platform_configuration_test",
+    "existing_profile_candidate_and_startup_marker_regression_gates"
+  ],
+  "newScreens": [],
+  "newRoutes": [],
+  "newBackendOwners": [],
+  "newPersistentStateOwners": [],
+  "referencePolicy": {
+    "overwriteV1OrV2Allowed": false,
+    "additiveV3Allowed": true,
+    "copyHtmlScreenbookAllowed": false,
+    "singleProductionAcceptedScreen03Required": true
+  },
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "qualification": {
+    "focusedAnalyze": "passed_10_files",
+    "focusedFlutterTests": "passed_21_of_21",
+    "screen03GoldenTests": "passed_3_of_3_unchanged",
+    "userFacingCopyGate": "passed",
+    "focusedC19Gate": "passed",
+    "approvedUiLock": "passed",
+    "runtimeDeviceMarkerGate": "deferred_until_authorized_successor_candidate_is_installed",
+    "runtimeSourceMutationPerformed": false,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SCREEN03-PROFILE-PROVENANCE-TEST-LOCK-RECONCILIATION-FIX1-C19-QUALIFICATION-20260808.md"
+  },
+  "requiredGates": [
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-mvp-scope-gate-state.ps1",
+    "scripts/check-screen03-v3-production-acceptance-c19.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-user-facing-copy.ps1",
+    "scripts/check-buy-device-review-runtime.ps1"
+  ],
+  "explicitExclusions": [
+    "no_Screen03_runtime_presentation_route_copy_asset_or_golden_mutation",
+    "no_v1_v2_overwrite_deletion_or_HTML_screenbook_copy",
+    "no_new_screen_route_copy_feature_backend_provider_state_or_business_owner",
+    "no_C17_subaction_global_rail_Buy_header_Social_or_Screen01_mutation",
+    "no_build_install_uninstall_data_clear_downgrade_or_protected_runtime_replacement_during_C19",
+    "no_credentials_external_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ]
+}

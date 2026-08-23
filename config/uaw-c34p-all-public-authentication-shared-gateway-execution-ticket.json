@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_founder_authorized_source_implementation_and_local_test_pending_scope_activation",
+  "classification": "beyond_mvp",
+  "classificationReason": "Google, YouTube shared identity, passwordless email link and mobile OTP are launch authentication requirements; X and Facebook are separately founder-authorized beyond-MVP provider expansions. One shared implementation wave prevents duplicate screens, routes, sessions and release candidates.",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A signed-out Personal user can use every founder-requested public authentication control on the existing MoolSocial login gateway—Google, YouTube through the same Google identity, passwordless email link, mobile SMS OTP, X or Facebook—and each method either authenticates to the exact requested destination or returns one truthful recoverable public error without exposing private account data.",
+  "predecessors": [
+    "UAW-C34L-R60-76-CONSOLIDATED-RELEASE-TRANSACTION-EVIDENCE-PLAY-OPPO-ACCEPTANCE",
+    "UAW-C34M-SUPPORTED-AUTHENTICATION-OPPO-ACCEPTANCE-QUEUE",
+    "UAW-C34N-X-PROVIDER-INTEGRATION-READINESS-QUEUE",
+    "UAW-C34O-FACEBOOK-PROVIDER-INTEGRATION-READINESS-QUEUE"
+  ],
+  "acceptanceChildren": [
+    "UAW-C34P-GOOGLE-YOUTUBE-SHARED-IDENTITY-PUBLIC-LOGIN-FIX",
+    "UAW-C34P-PASSWORDLESS-EMAIL-LINK-PUBLIC-LOGIN",
+    "UAW-C34P-MOBILE-OTP-PUBLIC-LOGIN",
+    "UAW-C34P-X-OAUTH2-PKCE-PUBLIC-LOGIN",
+    "UAW-C34P-FACEBOOK-LOGIN-PUBLIC-LOGIN"
+  ],
+  "oneLogicalImplementationWave": true,
+  "sharedImplementation": {
+    "reuseExistingLoginScreen": true,
+    "reuseExistingProtectedReturn": true,
+    "reuseExistingJourneySessionAndRollback": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessaryWork": [
+      "sanitized_enumerated_provider_failure_contract",
+      "X_OAuth2_authorization_code_PKCE_adapter",
+      "Facebook_Login_adapter_and_configuration_contract",
+      "provider_specific_runtime_configuration_without_committed_secrets",
+      "candidate_specific_public_gateway_and_OPPO_acceptance_tests"
+    ]
+  },
+  "minimumCompleteScope": [
+    "preserve_the_existing_locked_MoolSocial_login_presentation_and_use_one_shared_gateway",
+    "make_Google_and_YouTube_use_one_Google_identity_session_without_a_fake_separate_YouTube credential",
+    "replace_generic_Google_catch_all_with_sanitized_enumerated_failure_classes_and_verify_server_client_Play signing_and_Firebase provider binding",
+    "complete_passwordless_email_link_cold_foreground_same_device_process_death_invalid_expired_used_cancel_retry_and_exact return",
+    "complete_mobile_OTP_send_verify_timeout_invalid_cancel_retry_Play_Integrity_or_reCAPTCHA_return_and_exact return",
+    "implement_X_native_public_client_authorization_code_with_PKCE_state_exact_redirect_minimal_scopes_and_revocation",
+    "implement_Facebook_Login_with_exact_app_redirect_key_hash_minimal public profile permission_cancellation_revocation_and_data deletion contract",
+    "preserve_account_collision_bootstrap_rollback_session_retention_sign out_and protected destination recovery",
+    "fail_closed_when_provider_configuration_or_external authority_is_missing",
+    "run_unit_widget_integration_configuration_privacy_recovery_and_two affected regression suites_before any build",
+    "use_one_later_Play_Internal_Testing_candidate_for_all_child_OPPO_acceptance_evidence"
+  ],
+  "explicitExclusions": [
+    "no_duplicate_login_screen_route_session_gateway_or_backend",
+    "no_separate_YouTube_credential_or_provider_claim",
+    "no_numeric_email_OTP_claim",
+    "no_Instagram_or_Apple_expansion_under_this_ticket",
+    "no_committed_OAuth_client_secret_token_email_phone_OTP_private_link_or_account_identifier",
+    "no_provider_console_app_or_credential_creation_without_action_time_founder_confirmation",
+    "no_real_SMS_email_send_funds_billing_API_quota_Play_upload_or_OPPO_install_before_separate phase gates",
+    "no_Codex_account_chooser_provider_account_email_phone_OTP_or_private_link_handling",
+    "no_claim_that_r60_72_is_accepted_or_reusable"
+  ],
+  "dependenciesAndApprovals": [
+    "fresh_MVP_scope_state_selection_and_robustness_reuse_assessment_for_this_parent",
+    "C34L_changes_preserved_and_paused_without_build_upload_or_device mutation",
+    "founder_supplies_or_enters_provider_console_values_and_secrets_only_at_their_private surfaces",
+    "Google_server_client_ID_Firebase_Google_provider_and_exact_Play signing_SHA_configuration",
+    "Firebase_passwordless_email_domain_action_code_and_mobile_phone_Play_Integrity_or_reCAPTCHA configuration",
+    "X_Developer_app_exact_callback_public_client_ID_and_any_required_paid credits",
+    "Meta_app_Facebook_Login_product_package_redirect_key hashes_privacy_policy_and_data deletion URL",
+    "new_candidate_release_transaction_source seal_two cycles_build_Internal Testing_and_in place_OPPO authorities"
+  ],
+  "testAndEvidencePlan": [
+    "provider_availability_and_dispatch_allowlist_tests_for_all_six_public controls",
+    "Google_plugin_and_Firebase_sanitized_error_matrix_including configuration_token_network_cancel_interrupt_and account collision",
+    "YouTube_shared_Google_identity_and_no_second_credential_tests",
+    "email_link_and_mobile_OTP_independent_lifecycle_recovery_and_replay tests",
+    "X_PKCE_state_nonce_redirect_scope_token_revocation_cancel_offline_and_account collision tests",
+    "Facebook_redirect_key_hash_permission_cancel_revocation_data deletion_and account collision tests",
+    "unknown_missing_stale_or_mismatched_provider_configuration_fail_closed tests",
+    "no_private_identifier_secret_token_email_phone_OTP_or_link_in logs evidence_or exceptions",
+    "protected_destination_return_authenticated_relaunch_sign out_and rollback tests",
+    "one_exact_Play_installed_OPPO_candidate_with_founder_only_private actions_and_sanitized evidence"
+  ],
+  "overnightExecution": {
+    "continuousImplementTestFixRetestAuthorized": true,
+    "targetReviewTimeIst": "2026-08-18T08:00:00+05:30",
+    "stopForPrivateOrExternalFounderInput": true,
+    "reportProductionReadySourceSeparatelyFromLiveProviderCompletion": true
+  },
+  "authority": {
+    "founderExplicitAllPublicAuthenticationAuthority": true,
+    "runtimeSourceWriteAuthorizedAfterMvpGate": true,
+    "testAndGateWriteAuthorizedAfterMvpGate": true,
+    "backendSourceWriteAuthorized": false,
+    "providerConsoleMetadataPreparationAuthorized": true,
+    "providerAppCredentialOrSecretCreationAuthorizedWithoutActionTimeConfirmation": false,
+    "buildPlayUploadOrDeviceMutationAuthorized": false,
+    "realSmsOrEmailSendAuthorized": false,
+    "fundsOrBillingAuthorized": false,
+    "founderPrivateAuthenticationActionRequired": true,
+    "secretValueAccessAuthorized": false
+  }
+}

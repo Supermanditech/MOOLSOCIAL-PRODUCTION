@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-PRE-AAB-FEED-REPOST-AND-SHARE-CHOICES-MISSING",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_focused_tests_passed_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "Feed_share_journey_blocker",
+  "actor": "personal_MoolSocial_Feed_reader_sharing_a_public_post",
+  "customerOutcome": "A reader can always copy a public link, while a signed-in member can Repost or Undo, add thoughts through the existing Post composer, or open Chat with the exact post attached without any automatic message send.",
+  "classificationReason": "The visible Repost action always rejects and Share exposes Copy link only, leaving the supported sharing capability incomplete.",
+  "minimumCompleteScope": [
+    "keep_Copy_link_public_and_truthful",
+    "gate_Repost_Undo_Add_thoughts_and_Send_in_Chat_behind_MoolSocial_identity",
+    "persist_Repost_or_Undo_through_the_existing_content_interaction_owner",
+    "open_the_existing_Post_composer_with_exact_original_post_context_for_Add_thoughts",
+    "open_existing_Chat_with_exact_post_context_and_never_send_automatically"
+  ],
+  "explicitExclusions": [
+    "no_external_share_SDK_contact_picker_auto_send_or_share_count_guess",
+    "no_new_route_route_level_screen_or_messaging_backend_owner",
+    "no_backend_deployment_cloud_Play_AAB_upload_install_or_device_write"
+  ],
+  "robustnessAndReuseAssessment": {
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedOwners": [
+      "apps/mobile/lib/features/shared/social_content_gateway.dart",
+      "apps/mobile/lib/features/shared/shared_session.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_public_content.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
+      "backend/functions/src/social/contracts.ts",
+      "backend/functions/src/social/service.ts",
+      "backend/functions/src/social/firestore_store.ts"
+    ],
+    "duplicateSearchComplete": true,
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "Existing content interaction, Post composer and Chat-start owners can complete all accepted choices with thin exact-post adapters.",
+    "timelineImpactDays": 1,
+    "within60To75DayLock": true
+  },
+  "dependenciesAndApprovals": [
+    "Feed_action_authentication_truth_matrix_source_qualified",
+    "stable_public_post_link_and_exact_shared_item_resolution_predecessors_preserved",
+    "founder_source_implementation_authority_and_no_AAB_authority"
+  ],
+  "testAndEvidencePlan": [
+    "guest_Copy_link_and_account_action_auth_matrix",
+    "server_acknowledged_Repost_Undo_idempotence_and_single_flight",
+    "Add_thoughts_exact_original_context_and_draft_retention",
+    "Chat_exact_context_no_auto_send_Back_retry_and_relaunch",
+    "authoritative_Flutter_backend_analyzer_and_non_build_release_gates"
+  ],
+  "authority": {
+    "sourceImplementationAuthorizedByFounder": true,
+    "selectionPending": false,
+    "backendDeploymentAuthorized": false,
+    "chatMessageSendAuthorized": false,
+    "buildUploadInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "implementationEvidence": {
+    "qualifiedAt": "2026-08-13",
+    "runtimeContracts": [
+      "public_Copy_link_preserved",
+      "guest_Repost_Add_thoughts_and_Send_in_Chat_use_exact_authentication_returns",
+      "signed_in_Repost_and_Undo_wait_for_server_acknowledgement",
+      "Add_thoughts_publishes_a_structured_snapshot_of_the_exact_public_source_post",
+      "post_sign_in_shared_post_return_restores_the_exact_quote",
+      "Send_in_Chat_prefills_the_exact_post_link_and_never_auto_sends"
+    ],
+    "flutterFocused": "48_passed_0_failed",
+    "backendVerify": "508_passed_0_failed",
+    "analyzer": "15_owned_items_clean",
+    "routesAdded": 0,
+    "routeLevelScreensAdded": 0,
+    "backendOwnersAdded": 0,
+    "buildUploadInstallCountsChanged": false,
+    "livePlayAcceptancePending": true
+  },
+  "evidence": "docs/quality/UAW-C30T-PRE-AAB-FEED-REPOST-AND-SHARE-CHOICES-MISSING-20260813.md"
+}

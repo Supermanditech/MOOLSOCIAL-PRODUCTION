@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32W-PERSONAL-MVP-R15-CURRENT-MOOL-HOME-ACCESSIBILITY-TEST-SUCCESSOR",
+  "state": "known_Mool_Home_root_migration_complete_hidden_action_choice_successor_required",
+  "testOwner": "apps/mobile/test/ui_v2/universal/uaw_r15_personal_copy_fitment_accessibility_test.dart",
+  "testSha256": "0331232117ACAC11D3D0B431CD828D927A0EC8A6066A87830A179B484E5B7262",
+  "validation": {
+    "passed": 15,
+    "failed": 1,
+    "failureOwner": "hidden_MvpActionChoiceRoot_navigation_assertions",
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  },
+  "successorTicketId": "UAW-C32X-PERSONAL-MVP-R15-ACTION-CHOICE-NAVIGATION-ACCESSIBILITY-TEST-SUCCESSOR",
+  "runtimeChanged": false
+}

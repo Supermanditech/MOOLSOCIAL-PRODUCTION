@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33D-PERSONAL-MVP-FOUR-ACTION-EXACT-FIT-DESTINATION-RAIL-RECOVERY",
+  "parentOutcome": "UAW-C33C-PERSONAL-MVP-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY",
+  "finding": "REG-20260815-2312-POST-C33C-C16F-EXACT-FIT-BUS-ACTION-OFFSCREEN",
+  "classification": "mvp_required",
+  "state": "selected_for_bounded_source_implementation",
+  "customerOutcome": "At 320 logical pixels, a customer can tap all four Travel actions directly—including Bus—while every local control remains at least 44 pixels; horizontal overflow is reserved only for widths that physically cannot fit the minimum cluster.",
+  "classificationReason": "C16F reproduces a C33C-introduced missed tap in the bounded Ride-to-Bus/Book journey, so correcting the confirmed compact navigation regression is required for MVP usability and accessibility.",
+  "minimumCompleteScope": [
+    "reuse_the_existing_shared_destination_rail_and_exact_C33C_overflow_branch",
+    "treat_182_physical_pixels_as_an_edge_to_edge_four_action_fit",
+    "retain_44_pixel_cells_and_2_pixel_compact_gaps",
+    "use_horizontal_overflow_only_below_the_real_cluster_minimum",
+    "preserve_Mool_family_root_Chat_action_order_semantics_and_reduced_motion",
+    "replay_C16E_C16F_remaining_Book_and_shared_navigation_authorities"
+  ],
+  "explicitExclusions": [
+    "no_new_screen_route_session_service_backend_or_provider_owner",
+    "no_live_Bus_Ride_captain_maps_booking_payment_or_funds_scope",
+    "no_protected_reference_Social_or_Buy_change",
+    "no_build_Play_OPPO_provider_secret_email_quota_deployment_or_external_action"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_explicit_2026_08_15_autonomous_audit_ticket_and_source_implementation_authority",
+    "REG_20260815_2312_and_2313_registered_before_source_or_gate_change",
+    "C33C_source_qualification_and_original_0_of_2_then_48_passed_evidence_preserved",
+    "future_device_or_release_acceptance_requires_separate_current_authority"
+  ],
+  "testAndEvidencePlan": [
+    "C16E_exact_fit_and_below_minimum_overflow_cases",
+    "C16F_direct_Bus_and_reduced_motion_cases",
+    "Book_vertical_C24E_C24F_R08_and_C20E",
+    "C17D_C27B_C27D_shared_navigation_replay",
+    "whole_mobile_analyzer_and_dual_host_C33A_through_C33D_gates",
+    "fresh_post_C33D_manifest_with_every_member_hash_validated"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart",
+      "apps/mobile/test/uaw_personal_mvp_book_subaction_professional_conformance_c16f_test.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "necessityProof": "The shared rail already owns both the exact-fit and overflow decisions. One corrected physical-width branch plus existing acceptance owners is sufficient; duplicating Book or Ride navigation would violate the delivery lock.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

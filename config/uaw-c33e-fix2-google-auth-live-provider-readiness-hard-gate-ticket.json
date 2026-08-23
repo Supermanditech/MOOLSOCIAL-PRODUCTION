@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33E-FIX2-GOOGLE-AUTH-LIVE-PROVIDER-READINESS-HARD-GATE",
+  "parentTicket": "UAW-C33E-R60-48-PLAY-INSTALLED-AUTH-LOGIN-DEVICE-REPRODUCTION",
+  "finding": "REG-20260815-2218-C30Z-R60-48-GOOGLE-YOUTUBE-AUTH-FAILS-AFTER-ACCOUNT-CHOICE",
+  "state": "founder_authorized_test_gate_implementation_selected_no_build_provider_device_or_secret_authority",
+  "classification": "mvp_required",
+  "severity": "release_blocking_authentication_configuration_escape_prevention",
+  "actor": "release_qualifier_preparing_a_future_Google_authenticated_Play_Internal_successor_for_a_signed_out_personal_user",
+  "customerOutcome": "A future MoolSocial Play candidate cannot consume AAB authority until the non-secret Google and Firebase relationships required for real account sign-in are independently evidenced, preventing another source-green but live-login-broken release.",
+  "classificationReason": "Google login is a core MVP entry journey and r60.48 escaped with source regression success while live provider readiness remained unproven. A fail-closed release gate is required before another candidate can be built.",
+  "minimumCompleteScope": [
+    "record_only_non_secret_yes_no_readiness_for_the_Play_signing_SHA_1_on_the_Firebase_Android_app",
+    "record_only_non_secret_yes_no_readiness_for_the_enabled_Firebase_Google_provider",
+    "record_only_non_secret_yes_no_readiness_for_the_Android_OAuth_package_and_Play_signer_relationship",
+    "record_only_non_secret_yes_no_readiness_for_the_Web_server_client_relationship_used_by_the_mobile_runtime",
+    "pass_implementation_phase_while_missing_live_facts_remain_truthfully_pending",
+    "fail_the_build_phase_before_AAB_authority_consumption_until_all_four_facts_have_existing_sanitized_evidence",
+    "bind_the_failed_r60_48_counts_and_the_qualified_C30Z_source_repair_without_changing_either",
+    "prove_the_gate_on_PowerShell_7_and_Windows_PowerShell_5_1_with_positive_and_negative_fixtures"
+  ],
+  "explicitExclusions": [
+    "no_Flutter_screen_route_session_gateway_customer_copy_or_accepted_Screen03_change",
+    "no_Firebase_Google_Cloud_OAuth_YouTube_Play_console_CLI_provider_or_project_mutation",
+    "no_AAB_APK_build_Play_upload_activation_OPPO_install_update_launch_tap_or_other_device_action",
+    "no_password_API_key_OAuth_client_ID_token_nonce_App_Check_verdict_private_key_attestation_payload_or_debug_log_access",
+    "no_backend_Hosting_rules_IAM_deployment_email_quota_submission_external_message_or_funds"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_login_first_and_audit_findings_to_ticket_implementation_direction_2026_08_15",
+    "C30Z_source_qualification_and_C33E_FIX1_lifecycle_gate_qualification",
+    "founder_visible_or_later_separately_authorized_non_secret_console_evidence_for_each_pending_fact",
+    "a_separate_exact_successor_candidate_and_release_authority_after_all_readiness_facts_qualify"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": [
+      "reuse",
+      "configuration",
+      "test_only_acceptance"
+    ],
+    "sharedImplementationOwners": [
+      "scripts/check-c30z-authentication-method-truth-and-guest-feed-recovery.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1",
+      "config/uaw-c30z-r60-48-authentication-method-truth-and-guest-feed-recovery-ticket.json",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/mvp-scope-gate-state.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "config/google-auth-live-provider-readiness-state-c33e-fix2.json",
+      "scripts/check-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1",
+      "scripts/test-uaw-c33e-fix2-google-auth-live-provider-readiness.ps1"
+    ],
+    "necessityProof": "Existing runtime and source gates cover client behavior but no owner fails a future release before AAB authority consumption when live Google/Firebase relationships are merely assumed. One sanitized state owner, one fail-closed gate and one fixture checker are the smallest complete prevention and add no duplicate product or backend path.",
+    "robustnessCoverage": [
+      "all_four_independent_live_readiness_facts",
+      "pending_failed_missing_and_secret_contaminated_evidence_rejection",
+      "historical_r60_48_failure_and_qualified_C30Z_source_binding",
+      "authority_drift_rejection",
+      "pre_AAB_authority_consumption_order",
+      "dual_PowerShell_host_behavior"
+    ],
+    "adjustments": [
+      "reuse_the_existing_C30Z_source_gate_and_C30X_single_AAB_wrapper",
+      "insert_one_non_secret_readiness_gate_before_any_founder_prompt_or_AAB_authority_consumption",
+      "keep_all_live_provider_and_release_actions_held_while_facts_are_pending"
+    ],
+    "explicitExclusions": [
+      "no_new_UI_route_service_backend_or_provider_owner",
+      "no_release_device_external_or_secret_action"
+    ],
+    "dependenciesAndApprovals": [
+      "C30Z_qualified_source",
+      "C33E_FIX1_qualified_gate_lifecycle",
+      "future_sanitized_console_evidence_and_separate_release_authority"
+    ],
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true,
+    "evidencePath": "config/uaw-c33e-fix2-google-auth-live-provider-readiness-hard-gate-ticket.json"
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_parser_validation_for_every_new_or_changed_script",
+    "implementation_phase_pending_state_pass",
+    "build_phase_pending_state_fail_before_authority_consumption",
+    "fully_qualified_sanitized_fixture_pass",
+    "each_missing_failed_or_unqualified_fact_rejects",
+    "secret_shaped_property_or_content_rejects",
+    "runtime_build_device_provider_external_and_secret_authority_drift_rejects",
+    "C30Z_gate_and_C30X_preflight_order_contract_replay",
+    "PowerShell_7_and_Windows_PowerShell_5_1_behavioral_replay"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "existingPlayClientLaunchAndTapAuthorized": false,
+    "buildPlayOrDeviceInstallAuthorized": false,
+    "providerOrExternalServiceAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

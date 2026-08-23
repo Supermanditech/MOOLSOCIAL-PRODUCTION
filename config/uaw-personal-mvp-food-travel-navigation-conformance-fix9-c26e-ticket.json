@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-FOOD-TRAVEL-NAVIGATION-CONFORMANCE-FIX9-C26E",
+  "parentTicket": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Food and Travel keep their existing transaction screens and direct actions, including Bus, under the approved shared navigation presentation.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","test_only_acceptance"],"sharedImplementationOwners":["EatPageScaffold","EatSession","RidePageScaffold","RideSession","Book Bus route/session/gateway","MoolDestinationNavigationV2"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"Existing route and session owners already project Food and Travel; no new journey owner is required."},
+  "acceptance": ["Food_root_Order_Food_Book_Table","Travel_root_Bike_Auto_Cab_Bus","Bus_reuses_Book_owner","direct_one_tap_actions","no_old_scroll_or_strap"],
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-FOOD-TRAVEL-NAVIGATION-CONFORMANCE-FIX9-C26E-PRESELECTION-ASSESSMENT-20260810.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-FOOD-TRAVEL-NAVIGATION-CONFORMANCE-FIX9-C26E-COMPLETION-20260810.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

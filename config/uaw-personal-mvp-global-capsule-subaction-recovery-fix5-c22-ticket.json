@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-GLOBAL-CAPSULE-SUBACTION-RECOVERY-FIX5-C22",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPTICAL-LIQUID-GLASS-RECOVERY-FIX4-C21",
+  "state": "complete_founder_rejected_installed_r60_21_preserved_successor_c23_ticketed",
+  "classification": "mvp_required",
+  "customerOutcome": "Social, Buy, Eat, Ride, Book and Work share one professional transparent medicine-capsule action system with internal selected color emission, a clear reverse-U family relationship and no full-width subaction strap.",
+  "founderRejectedCandidate": {"id": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-OPPO-QUALIFICATION-FIX4-C21H", "versionName": "1.0.0-r60.20", "versionCode": "2026080820", "apkSha256": "FF3932D84794BA8802946CBB04F8A346F34386F4A5C8321F3970AD8E6228EF8A", "installedAndPreserved": true, "evidence": "docs/quality/UAW-PERSONAL-MVP-R60-20-FOUNDER-DEVICE-VISUAL-REJECTION-AND-C22-TICKETS-20260808.md"},
+  "implementationSequence": ["UAW-PERSONAL-MVP-FOUNDER-CAPSULE-CONTRACT-FIX5-C22A", "UAW-PERSONAL-MVP-SHARED-TRANSPARENT-CAPSULE-PRIMITIVE-FIX5-C22B", "UAW-PERSONAL-MVP-GLOBAL-MAIN-ACTION-CAPSULE-CONFORMANCE-FIX5-C22C", "UAW-PERSONAL-MVP-SIX-FAMILY-ZERO-STRAP-SUBACTION-CONFORMANCE-FIX5-C22D", "UAW-PERSONAL-MVP-REVERSE-U-FAMILY-BRIDGE-FIX5-C22E", "UAW-PERSONAL-MVP-INNER-CHROMA-SELECTION-MOTION-ACCESSIBILITY-FIX5-C22F", "UAW-PERSONAL-MVP-COMPOSITE-GLASS-LEGIBILITY-FIX5-C22F1", "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-HOST-QUALIFICATION-FIX5-C22G", "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H"],
+  "children": [
+    {"ticketId": "UAW-PERSONAL-MVP-FOUNDER-CAPSULE-CONTRACT-FIX5-C22A", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-SHARED-TRANSPARENT-CAPSULE-PRIMITIVE-FIX5-C22B", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-GLOBAL-MAIN-ACTION-CAPSULE-CONFORMANCE-FIX5-C22C", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-SIX-FAMILY-ZERO-STRAP-SUBACTION-CONFORMANCE-FIX5-C22D", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-REVERSE-U-FAMILY-BRIDGE-FIX5-C22E", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-INNER-CHROMA-SELECTION-MOTION-ACCESSIBILITY-FIX5-C22F", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-COMPOSITE-GLASS-LEGIBILITY-FIX5-C22F1", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-HOST-QUALIFICATION-FIX5-C22G", "state": "complete", "runtimeWriteAuthorized": false},
+    {"ticketId": "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H", "state": "founder_rejected_installed_checksum_preserved", "runtimeWriteAuthorized": false}
+  ],
+  "sharedRuntimeOwners": ["apps/mobile/lib/core/design/mool_design_system.dart::MoolLocalNavigationTokens", "apps/mobile/lib/core/design/mool_design_system.dart::MoolLocalNavigationRail", "apps/mobile/lib/core/design/mool_design_system.dart::_MoolMiddleDockAction", "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolDestinationNavigationV2"],
+  "reuseInventory": {"complete": true, "duplicateSearchComplete": true, "newScreens": [], "newRoutes": [], "newBackendOwners": [], "newPersistentBusinessStateOwners": [], "newSubactions": []},
+  "execution": {"currentChild": null, "lastCompletedChild": "UAW-PERSONAL-MVP-CAPSULE-SYSTEM-OPPO-QUALIFICATION-FIX5-C22H", "nextEligibleChild": null, "referenceWriteAuthorized": false, "runtimeSourceWriteAuthorized": false, "testOrGateWriteAuthorized": false, "backendWriteAuthorized": false, "buildAuthorized": false, "installAuthorized": false, "externalServiceWriteAuthorized": false},
+  "explicitExclusions": ["no_screenbook_copy_or_mutation", "no_global_rail_order_position_or_meaning_change", "no_new_screen_route_backend_owner_business_state_or_subaction", "no_second_build_or_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"]
+}

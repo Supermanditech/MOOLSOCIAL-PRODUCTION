@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-EMBEDDED-FAMILY-NAVIGATION-V1-20260810",
+  "status": "founder_approved_HTML_navigation_points",
+  "founderApprovedAt": "2026-08-10",
+  "source": {
+    "reviewPath": "tmp/founder-navigation-prototype-v1/index.html",
+    "frozenPath": "approved-references/navigation/moolsocial-embedded-family-navigation/v1/index.html",
+    "sha256": "8A4C7575727AA16A193B9C6C145881FD71EB48B6612B2C9D6E434C5681792B00"
+  },
+  "authority": {
+    "approvedPoints": [
+      "embedded_vertical_glass_Mool_switcher",
+      "compact_named_family_root_and_direct_bottom_actions",
+      "replace_old_personal_Flutter_navigation_visuals_across_Social_Shop_Food_Travel_Care_Work"
+    ],
+    "illustrativeContentIsProductionAuthority": false,
+    "screenbookCopiedIntoFlutter": false
+  },
+  "moolSwitcher": {
+    "owner": "one_shared_native_Flutter_overlay_owner",
+    "position": "connected_above_bottom_left_Mool_control",
+    "orientation": "vertical",
+    "families": ["Social", "Shop", "Food", "Travel", "Care", "Work"],
+    "rowMinimumHeight": 56,
+    "surface": "transparent_neutral_glass_without_gradient",
+    "backdropDimming": false,
+    "separatePageOrModalAppearance": false,
+    "open": ["tap_Mool", "swipe_up_on_Mool"],
+    "close": ["family_tap", "swipe_down_on_dock", "outside_tap", "system_Back"],
+    "motionMilliseconds": 180,
+    "reducedMotionImmediate": true,
+    "familyIconTreatment": "filled_native_icon_with_restrained_semantic_family_colour"
+  },
+  "bottomNavigation": {
+    "order": ["Mool", "named_family_root", "all_truthful_family_actions"],
+    "moolIcon": "four_square_grid",
+    "genericHomeLabelAllowed": false,
+    "horizontalScrollAllowed": false,
+    "capsuleOrPillAllowed": false,
+    "perActionBackgroundAllowed": false,
+    "familyThemePanelAllowed": false,
+    "gradientBlurCardShadowOrStrapAllowed": false,
+    "minimumTapTarget": 44,
+    "selectedState": "native_icon_label_weight_and_two_pixel_indicator",
+    "unselectedState": "transparent_icon_and_label",
+    "contentOcclusionAllowed": false,
+    "tapBudget": 1
+  },
+  "families": [
+    {"id":"social","label":"Social","root":"Social","actions":["Shorts","Videos","Feed","Create"]},
+    {"id":"buy","label":"Shop","root":"Shop","actions":["Products","Wholesale","Orders"]},
+    {"id":"eat","label":"Food","root":"Food","actions":["Order Food","Book Table"]},
+    {"id":"ride","label":"Travel","root":"Travel","actions":["Bike","Auto","Cab","Bus"]},
+    {"id":"book","label":"Care","root":"Care","actions":["Doctor","Medicine","Salon"]},
+    {"id":"work","label":"Work","root":"Work","actions":["Earn Today","Workspace"]}
+  ],
+  "continuity": {
+    "existingRoutesSessionsBusinessOwnersRetained": true,
+    "globalChatRemainsOneTapInExistingHeaderOwner": true,
+    "systemAndVisibleBackRestoreExactContext": true,
+    "MedicineRetainsBuyBusinessOwnerButCareShell": true,
+    "BusRetainsBookBusinessOwnerButTravelShell": true,
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "newSubactions": 0
+  }
+}

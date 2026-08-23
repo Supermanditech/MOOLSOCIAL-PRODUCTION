@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 3,
+  "contractId": "MOOLSOCIAL-C34L-CAPTURE-ARTIFACT-CONTRACT-003",
+  "ticketId": "UAW-C34L-PRE-AAB-2-FIX3-AUTHORITATIVE-CAPTURE-PRODUCER-RECEIPT",
+  "productionProducer": {
+    "producerId": "MOOLSOCIAL-C34L-AUTHORITATIVE-CAPTURE-PRODUCER-001",
+    "ownerPath": "scripts/write-release-authoritative-capture-receipt-c34l.ps1",
+    "receiptContractId": "MOOLSOCIAL-C34L-AUTHORITATIVE-CAPTURE-RECEIPT-001",
+    "journalContractId": "MOOLSOCIAL-C34L-AUTHORITATIVE-CAPTURE-JOURNAL-001",
+    "productionParameterNames": ["EvidenceType", "Attempt", "StatePath", "RepositoryRoot"],
+    "forbiddenProductionParameterShapes": ["success_boolean", "success_count", "producer_identity", "session_identity", "nonce", "artifact_identity", "capture_digest", "source_path"],
+    "challengeDerivation": "SHA256(contractId|ticketId|attempt|latestCommittedTransitionJournalPath|latestCommittedTransitionJournalSha256|transactionId|sequence|stateAfterSha256|aggregateAfterSha256|producerOwnerSha256|sealedSourceManifestSha256)",
+    "sessionDerivation": "c34l-authoritative-session-<first24-lowercase-hex-of-SHA256(challengeSha256|producerOwnerSha256|sealedSourceManifestSha256)>",
+    "singleUseOwner": "<evidenceRoot>/authoritative-capture-journals/attempt-<attempt>/<evidenceType>.json",
+    "fixtureRunRootPattern": "tmp/c34l-authoritative-capture-fixtures-<32-lowercase-hex>",
+    "fixtureAdaptersAllowedInProduction": false
+  },
+  "authoritativeReceipt": {
+    "pathPattern": "<evidenceRoot>/captures/attempt-<attempt>/<kind>/authoritative-capture-receipt.json",
+    "topLevelFields": ["schemaVersion", "receiptContractId", "producerId", "evidenceType", "ticketId", "attempt", "packageName", "versionName", "versionCode", "challengeSha256", "sessionId", "captureArtifactContract", "producerOwner", "sealedSourceManifest", "detailedState", "aggregateState", "artifact", "actionCounts", "releaseAuthorities", "transitionJournal", "observationAdapter", "observationSources", "captureManifest", "previousJournalHeadSha256", "producedUtc"],
+    "fileBindingFields": ["path", "sha256", "bytes"],
+    "observationAdapterFields": ["adapterId", "ownerPath", "ownerSha256", "ownerBytes"],
+    "producerOwns": ["challenge", "session", "producerIdentity", "observation", "artifacts", "captureManifest", "receipt", "journal"],
+    "immutableCreateOnly": true,
+    "replayAllowed": false
+  },
+  "captureAttemptRootPattern": "<evidenceRoot>/captures/attempt-<attempt>",
+  "captureManifestPathPattern": "<evidenceRoot>/captures/attempt-<attempt>/<kind>/capture-manifest.json",
+  "captureArtifactPathPattern": "<evidenceRoot>/captures/attempt-<attempt>/<kind>/<leaf>",
+  "captureArtifactFields": ["role", "path", "sha256", "bytes", "mediaType"],
+  "mediaType": "application/json",
+  "evidenceTypes": {
+    "play_internal_testing_activation": {
+      "kind": "play",
+      "productionAdapterId": "MOOLSOCIAL-C34L-PLAY-BROWSER-TRANSACTION-ADAPTER-001",
+      "productionSourceOwners": ["scripts/check-release-blocker-browser-proof-integration-c34l.ps1", "scripts/invoke-release-lifecycle-transition-c34l.ps1"],
+      "roles": ["internal_testing_release_receipt", "internal_testing_status_observation"],
+      "leafByRole": {
+        "internal_testing_release_receipt": "internal-testing-release-receipt.json",
+        "internal_testing_status_observation": "internal-testing-status-observation.json"
+      }
+    },
+    "oppo_play_in_place_update_pair": {
+      "kind": "oppo",
+      "productionAdapterId": "MOOLSOCIAL-C34L-OPPO-READONLY-PACKAGE-INSTALLER-TIME-LOG-ADAPTER-001",
+      "productionSourceOwners": ["adb_shell_dumpsys_package", "adb_shell_dumpsys_activity_processes", "adb_logcat_dump_current_process", "read_only_interactive_hierarchy_observer"],
+      "forbiddenDeviceCommands": ["install", "install-multiple", "uninstall", "pm clear", "pm install", "pm uninstall", "am force-stop", "reboot", "root", "remount", "push", "pull_private_data", "downgrade"],
+      "roles": ["cold_start_observation", "retained_state_observation"],
+      "leafByRole": {
+        "cold_start_observation": "cold-start-observation.json",
+        "retained_state_observation": "retained-state-observation.json"
+      }
+    },
+    "mandatory_whole_app_journey_acceptance": {
+      "kind": "journey",
+      "productionAdapterId": "MOOLSOCIAL-C34L-JOURNEY-GATE-OUTPUT-ADAPTER-001",
+      "productionSourceOwners": ["scripts/read-release-authoritative-journey-source-c34l.ps1"],
+      "missingAdapterDisposition": "fail_closed_without_writing_success_artifacts",
+      "roles": ["journey_acceptance_manifest"],
+      "leafByRole": {
+        "journey_acceptance_manifest": "journey-acceptance-manifest.json"
+      },
+      "journeyManifestRowFields": ["journeyId", "path", "sha256", "bytes", "passed"],
+      "journeyArtifactRootPattern": "<evidenceRoot>/captures/attempt-<attempt>/journey/journeys",
+      "journeyArtifactLeafPattern": "<journeyId>.json"
+    }
+  },
+  "deviceBinding": {
+    "derivationId": "MOOLSOCIAL-C34L-DEVICE-BINDING-001",
+    "derivationPattern": "<derivationId>|<lowercaseBrand>|<model>|<authoritativeSerialFromActorPolicy>",
+    "expectedSha256": "97D9B2320D5FF975C73199BE18F7C50BE23A1C3C45D4F361FF713A7EB93532AF",
+    "retainedField": "deviceBindingSha256",
+    "forbiddenRawFields": ["deviceSerial", "serial", "androidId", "imei", "imsi", "advertisingId"]
+  },
+  "privacy": {
+    "inlineCapturePayloadAllowed": false,
+    "queryOrFragmentAllowed": false,
+    "rawDeviceIdentifierAllowed": false,
+    "privateValuesAllowed": false,
+    "rawExceptionOrStackAllowed": false,
+    "callerAuthoredProducerSessionNonceArtifactClaimsAllowed": false
+  }
+}

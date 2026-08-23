@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "checkpointId": "MOOLSOCIAL-OVERNIGHT-8AM-CHECKPOINT-20260807",
+  "createdBefore": "2026-08-07T08:00:00+05:30",
+  "workspace": "C:\\GUARANTEED OUTCOME",
+  "repository": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRODUCTION",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "humanCheckpoint": "docs/quality/MOOLSOCIAL-OVERNIGHT-8AM-HANDOFF-20260807.md",
+  "founderAcceptanceClaimed": false,
+  "dirtyInventory": {
+    "entryCount": 50885,
+    "sha256": "D0EDB9D316685A1608E0D4C970AABD2715CE50519FA4A863EB393F3EE64DB757",
+    "warningCount": 0,
+    "captureMode": "memory_only_git_porcelain_longpaths"
+  },
+  "completedChildTickets": [
+    {
+      "id": "BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY",
+      "contractSha256": "969CDA34D065127FDEB0D3BFF1E1D1E92CCF37F1C2640C087B7D6400369B7C4B",
+      "completionEvidence": "docs/quality/BUY-MVP-ADMIN-ACCEPTANCE-SLA-POLICY-COMPLETION-20260807.md"
+    },
+    {
+      "id": "BUY-MVP-MARKET-SCHEDULE-TIMER-OVERRIDES",
+      "contractSha256": "0C6129297194FE48AD376BF75F2F84EAF50FFF5A0E677A6760B1390F98F44460",
+      "completionEvidence": "docs/quality/BUY-MVP-MARKET-SCHEDULE-TIMER-OVERRIDES-COMPLETION-20260807.md"
+    },
+    {
+      "id": "BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT",
+      "contractSha256": "296D27B67029CA5616952BEA8D9D5F0AC576570494C85BDE7A54595AE6C3424F",
+      "completionEvidence": "docs/quality/BUY-MVP-ORDER-TIMER-POLICY-SNAPSHOT-COMPLETION-20260807.md"
+    },
+    {
+      "id": "BUY-MVP-PROVIDER-READY-BUSY-PAUSE-STATE",
+      "contractSha256": "79A7D742F69A6B8030326A07E40BF783EF3542B5D1A75F2B3866DF14B4F48246",
+      "focusedCycles": ["14_pass_0_fail", "14_pass_0_fail"],
+      "fullBackendCycles": ["453_pass_0_fail", "453_pass_0_fail"],
+      "completionEvidence": "docs/quality/BUY-MVP-PROVIDER-READY-BUSY-PAUSE-STATE-COMPLETION-20260807.md"
+    },
+    {
+      "id": "BUY-MVP-ACCEPTANCE-POLICY-AUDIT-ROLLBACK",
+      "contractSha256": "F641682B1F0EAFD35B89C9526C4A2F727976E9D9C1C355FB07A835E0CABF6A3C",
+      "focusedCycles": ["18_pass_0_fail", "18_pass_0_fail"],
+      "fullBackendCycles": ["471_pass_0_fail", "471_pass_0_fail"],
+      "completionEvidence": "docs/quality/BUY-MVP-ACCEPTANCE-POLICY-AUDIT-ROLLBACK-COMPLETION-20260807.md"
+    }
+  ],
+  "activeChildTicket": null,
+  "heldChildTicket": {
+    "id": "BUY-MVP-NO-RESERVATION-OFFER-READINESS",
+    "state": "dependency_held_before_execution",
+    "missingDependencies": [
+      "named_inventory_owner",
+      "named_fulfilment_owner",
+      "qualified_fresh_inventory_and_serviceability_truth_contract"
+    ],
+    "holdEvidence": "docs/quality/BUY-MVP-NO-RESERVATION-OFFER-READINESS-DEPENDENCY-HOLD-20260807.md"
+  },
+  "mvpScopeGate": {
+    "state": "awaiting_next_ticket_classification",
+    "activeTicketId": null,
+    "executionAuthorized": false
+  },
+  "regressionRegistryEntries": 118,
+  "oppo": {
+    "serial": "2b3e0f71",
+    "model": "CPH2375",
+    "state": "device",
+    "package": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.8",
+    "versionCode": "2026080708",
+    "apkSha256": "4B7C7EACA6D141D0ABDD98E33481929D5D6F373EAAFEFA5197C4507FCDF6487B",
+    "topActivity": "com.moolsocial.app/.MainActivity",
+    "mutationAfterBackendTickets": false,
+    "founderReviewPending": true
+  },
+  "build": {
+    "newBuildsAfterR60_8": 0,
+    "newInstallsAfterR60_8": 0,
+    "successorBuildAuthorization": "not_authorized"
+  },
+  "nextBoundedAction": "await durable named inventory and fulfilment owner evidence plus qualified fresh serviceability truth before selecting Ticket 6",
+  "prohibitedActionsPreserved": [
+    "commit_push_deploy_promote",
+    "production_write_credentials_funds",
+    "live_provider_message_or_call",
+    "uninstall_data_clear_downgrade",
+    "protected_baseline_replacement"
+  ]
+}

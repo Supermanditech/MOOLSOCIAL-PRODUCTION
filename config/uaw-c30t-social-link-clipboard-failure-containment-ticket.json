@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-SOCIAL-LINK-CLIPBOARD-FAILURE-CONTAINMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "reviewer_link_action_unhandled_platform_failure",
+  "actor": "reviewer_copying_a_public_Feed_post_or_official_YouTube_video_link_when_the_platform_clipboard_is_unavailable",
+  "customerOutcome": "Feed and YouTube link actions contain clipboard failures, avoid false success, preserve the current journey, and show fixed retry guidance without leaking platform details.",
+  "minimumCorrection": [
+    "contain_platform_clipboard_failures_for_public_Feed_post_links",
+    "contain_platform_clipboard_failures_for_official_YouTube_video_links",
+    "show_fixed_sanitized_retry_copy_and_never_show_copied_on_failure",
+    "preserve_the_Feed_share_sheet_when_copy_did_not_complete",
+    "prove_success_and_failure_paths_for_both_link_actions"
+  ],
+  "explicitExclusions": [
+    "no_share_plugin_or_external_app_expansion",
+    "no_backend_provider_Hosting_AAB_Play_OPPO_or_communication_action",
+    "no_platform_exception_code_or_message_in_user_copy_or_evidence"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "4 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/social-link-clipboard-failure-focused-tests.log",
+    "evidenceSha256": "20F1A929921702B30B53DA2901C5B94B0402B92534EFFEFEB1680D481725557F",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34L-PRE-AAB-2-FIX2-AUTHORITATIVE-CAPTURE-DEVICE-PRIVACY-PROOF-BINDING",
+  "parentTicketId": "UAW-C34L-PRE-AAB-2-FIX1-EVIDENCE-PROVENANCE-ATOMICITY-PRIVACY",
+  "findingId": "REG-20260817-2837-C34L-EVIDENCE-FIX1-INDEPENDENT-AUDIT-GAPS",
+  "state": "registered_implementation_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "C34L can accept Play, OPPO and journey success only when every claimed capture digest resolves to an immutable sanitized capture artifact, no raw device identifier is retained, and the exact lifecycle proof record authorizing that evidence is identical in detailed and aggregate history.",
+  "classificationReason": "Independent FIX1 audit proved capture manifests remained caller-fabricable, raw deviceSerial was retained, lifecycle proof identity was incomplete, and recovery/privacy/atomic fixtures missed production trust boundaries.",
+  "minimumCompleteScope": [
+    "bind_every_capture_digest_to_exact_retained_capture_artifact_path_SHA256_bytes_role_and_media_type_under_the_capture_manifest",
+    "require_capture_artifacts_and_capture_manifest_to_be_immutable_repo_confined_exact_schema_private_free_and_leaf_plus_ancestor_reparse_free",
+    "replace_raw_deviceSerial_with_one_nonreversible_deviceBindingSha256_and_reject_raw_device_identifier_fields_everywhere",
+    "bind_full_newest_lifecycle_proof_transition_phase_evidence_path_SHA256_browserEvidence_and_vector_with_exact_detailed_aggregate_history_equality",
+    "reject_single_backslash_noncanonical_paths_and_forbidden_property_names_in_retained_and_recovery_walkers",
+    "add_deterministic_finally_cleanup_for_every_combined_and_retained_fixture_root_including_junction unlink",
+    "invoke_real_recovery_audit_and_apply_only_inside_exact_fixture confinement_and_assert_idempotent result",
+    "cover_OPPO_cold_move_before_journal_update_and_retained_move_before_journal_update_crash windows",
+    "pass_independent_source_audit_and_dual_host_producer_retained_transition_recovery fixtures"
+  ],
+  "captureArtifactContract": {
+    "commonFields": ["role", "path", "sha256", "bytes", "mediaType"],
+    "playRoles": ["internal_testing_release_receipt", "internal_testing_status_observation"],
+    "oppoRoles": ["cold_start_observation", "retained_state_observation"],
+    "journeyRoles": ["journey_acceptance_manifest"],
+    "journeyManifestRowFields": ["journeyId", "path", "sha256", "bytes", "passed"],
+    "forbidden": ["inline_payload", "raw_device_identifier", "private_URL_or_query", "credential_token_cookie", "exception_or_stack"]
+  },
+  "deviceContract": {
+    "retainedField": "deviceBindingSha256",
+    "rawFieldsForbidden": ["deviceSerial", "serial", "androidId", "imei", "imsi", "advertisingId"]
+  },
+  "explicitExclusions": [
+    "no_real_Play_console_upload_activation_or_track_action",
+    "no_real_OPPO_ADB_install_update_capture_or_device_action",
+    "no_real_authentication_private_journey_browser_or_account_action",
+    "no_secret_private_identifier_link_token_exception_payload_or_credential inspection",
+    "no_source_seal_cycle_founder_prompt_AAB_backend_hosting_provider_or_external action",
+    "no_product_runtime_UI_route_service_or_backend change"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authorized_C34L_parent_and_immediate_pre_AAB batch",
+    "REG2837_preserved_before repair",
+    "PRE_AAB_4_held_until_FIX2_independent_audit_and_dual_host qualification"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_capture_attestation_producer_OPPO_retained_transition_and_recovery fixtures",
+    "missing_wrong_tampered_replayed_alias_reparse_or_unbound_capture_artifact negatives",
+    "raw_device_identifier_and_forbidden_property_name_value negatives",
+    "full_lifecycle_proof_path_hash_transition_phase_browser_and_history_mismatch negatives",
+    "real_confined_recovery_audit_apply_and_two_post_move_pre_journal crash boundaries",
+    "independent_source_audit_before_phase matrix",
+    "zero_real_state_Play_OPPO_browser_device_private_secret_or_external action"
+  ],
+  "authority": {
+    "sourceAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "state": "pending",
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "externalActions": 0,
+    "secretOrPrivateValuesObserved": false
+  }
+}

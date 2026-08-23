@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "SAM-R06-SERVER-WORKSPACE-LIFECYCLE-AUDIT-CONTRACT",
+  "state": "locally_complete_no_environment_or_device_action_required",
+  "classification": "mvp_required",
+  "contractPath": "backend/functions/src/workspace/workspace_lifecycle_contract.ts",
+  "contractSha256": "A712F35054E37B222674E81B725D350C1027D3B7CD3573F93056473B372CF170",
+  "testPath": "backend/functions/src/workspace/workspace_lifecycle_contract.test.ts",
+  "testSha256": "4881A2855900A20D2C90F0727B47B7F83E4FADC56F0535D299CB995453CB5443",
+  "focusedCycles": ["15_pass_0_fail", "15_pass_0_fail"],
+  "fullBackendCycles": ["364_pass_0_fail", "364_pass_0_fail"],
+  "cycle1Evidence": "artifacts/quality/sam-r06-server-workspace-lifecycle-audit-contract-20260807-01/02-full-backend-cycle-1.tap",
+  "cycle1Sha256": "690DAA69F5C5F8EEAF5A7665BA622985C2086E3DF39EEEE43A5AD76B418D5226",
+  "cycle2Evidence": "artifacts/quality/sam-r06-server-workspace-lifecycle-audit-contract-20260807-01/02-full-backend-cycle-2.tap",
+  "cycle2Sha256": "4220F575E00AE31BAA1005C3C4795A8791303C0B464AB49D7A8C1CD7C4ECDC1E",
+  "newScreens": 0,
+  "newRoutes": 0,
+  "newStoresOrEndpoints": 0,
+  "apkBuilds": 0,
+  "deviceMutations": 0,
+  "completionEvidence": "docs/quality/SAM-R06-SERVER-WORKSPACE-LIFECYCLE-AUDIT-CONTRACT-COMPLETION-20260807.md"
+}

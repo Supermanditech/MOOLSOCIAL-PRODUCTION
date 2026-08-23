@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32U-PERSONAL-MVP-C07-CURRENT-MOOL-HOME-DASHBOARD-TEST-SUCCESSOR",
+  "state": "test_only_successor_qualified_runtime_unchanged",
+  "testOwner": "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart",
+  "testSha256": "45CC9BA9A62FF292FE5069B572801564CE55652A5AE24994568589283B56CFDB",
+  "productionMoolHomeSha256": "F73F8CC73417ED07B2816B41E5B8E3FA7015D5584E7769DC967F61EDF2573FDA",
+  "validation": {
+    "C07": {"passed": 5, "failed": 0},
+    "R03": {"passed": 11, "failed": 0},
+    "C24B2": {"passed": 4, "declaredSkips": 1, "failed": 0},
+    "C26D": {"passed": 1, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "analyzer": "clean",
+    "dualHostGate": "passed"
+  }
+}

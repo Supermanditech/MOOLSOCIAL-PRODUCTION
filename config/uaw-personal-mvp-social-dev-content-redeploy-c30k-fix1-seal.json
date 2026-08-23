@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-SOCIAL-DEV-CONTENT-REDEPLOY-C30K-FIX1-SEAL",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-DEV-CONTENT-REDEPLOY-C30K-FIX1",
+  "project": "moolsocial-dev-503018",
+  "region": "asia-south1",
+  "deployTarget": "functions:moolSocialContent",
+  "files": [
+    {"path": "config/uaw-personal-mvp-social-dev-content-redeploy-c30k-fix1-ticket.json", "sha256": "1308766E1F1B767EE6F4D92FDFDF348BE66B319B8E03E5861D6B74882EB388A5"},
+    {"path": "firebase.json", "sha256": "6E59F2B40C4AF6C7BECBFB306367B5FAA30A6B957729D62D471B6BA43415318B"},
+    {"path": "backend/functions/package.json", "sha256": "110342F98559FB18CDC28ACC91C730FF83AF3C9406FF19FE13AB21F052E89C25"},
+    {"path": "backend/functions/package-lock.json", "sha256": "82CD01AC25C5463E2D2DDF490D179F7AE3149ABB8235CCAB2C5196EB64A887BC"},
+    {"path": "backend/functions/src/index.ts", "sha256": "19A4DCB751A4E5E5862B25BD72B5CD02DDDFB0C566827C7272FF1371B67A0F95"},
+    {"path": "backend/functions/src/social/firestore_store.ts", "sha256": "02EE75557EB9E10788C6DF48AFA17388809F7AAAE75AFCD435F9516262809168"},
+    {"path": "backend/functions/src/social/firestore_store.test.ts", "sha256": "5CF7613843E503071952FD93B78BF24D7C59ADA73359CB13D5B3FBC3D62C297A"},
+    {"path": "backend/firestore/youtube-private-dev.rules", "sha256": "CD5089E4E5116DBB994013DC5FD5E7E411EC348935B8D06D13ACD00173CCA15B"},
+    {"path": "backend/storage/moolsocial-private-dev.rules", "sha256": "709A97B54435900F36EA789C0A7F83E69D62E37FA1430102353F8E2ABE0068CD"}
+  ],
+  "sourceTree": {
+    "fileCount": 110,
+    "aggregateSha256": "42BFD0A47FD22C1E4142ED8E9CE85020BF958740057921C71250360CABA74C1E"
+  },
+  "holds": {
+    "youtubeFunctions": true,
+    "rules": true,
+    "hosting": true,
+    "production": true,
+    "credentials": true,
+    "apkBuildAndInstall": true
+  }
+}

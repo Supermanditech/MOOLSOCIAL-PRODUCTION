@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "packageId": "YOUTUBE-API-COMPLIANCE-REVIEWER-PACKAGE-C31E-20260815",
+  "state": "not_ready_r60_48_failed_successor_Play_acceptance_screencast_and_founder_send_approval_pending",
+  "predecessorPackage": "YOUTUBE-API-COMPLIANCE-REVIEWER-PACKAGE-C30T-20260813",
+  "mailbox": "hello@moolsocial.com",
+  "threadSubject": "Re: YouTube API Services: Thank you for your submission",
+  "latestRequestDate": "2026-08-06",
+  "hardInternalDeadline": "2026-08-14",
+  "deadlineState": "elapsed_do_not_send_unqualified_evidence",
+  "application": {
+    "product": "MoolSocial",
+    "projectId": "moolsocial-dev-503018",
+    "packageName": "com.moolsocial.app",
+    "distribution": "Google_Play_Internal_Testing_only",
+    "playLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "currentPlayInstalledVersionName": "1.0.0-r60.48",
+    "currentPlayInstalledVersionCode": "2026081348",
+    "currentRuntimeState": "failed_social_auth_and_action_journey_acceptance",
+    "currentBuildUploadInstallCounts": "1/1/1",
+    "successorVersion": null,
+    "successorArtifactSha256": null,
+    "successorPlayReleaseEvidence": null,
+    "successorPlayInstalledProvenanceEvidence": null,
+    "successorOppoJourneyEvidence": null
+  },
+  "sourceState": {
+    "authenticationRepair": "C30Z_two_identical_cycles_source_qualified_live_provider_and_successor_acceptance_pending",
+    "chatPhotoRepair": "C31E_two_identical_cycles_source_qualified_backend_deployment_and_successor_acceptance_pending"
+  },
+  "reviewerPrerequisites": [
+    "reviewer_uses_a_Google_or_Google_Workspace_account",
+    "reviewer_account_is_added_to_the_Internal_Testing_email_list_or_required_Google_Group_before_opt_in",
+    "Internal_Testing_release_is_Published_and_available_in_the_reviewers_country",
+    "reviewer_opens_the_private_link_and_opts_in_before_install",
+    "if_Google_Auth_publishing_status_is_Testing_the_reviewer_is_an_OAuth_test_user_for_youtube_readonly",
+    "MoolSocial_sign_in_and_exact_YouTube_consent_return_are_device_qualified_on_the_same_Play_candidate"
+  ],
+  "founderPublicChannelReference": "https://www.youtube.com/@VetoNewslive",
+  "declaredUseCaseUnchanged": true,
+  "youtubeUploadAuthorized": false,
+  "draft": "docs/quality/YOUTUBE-API-COMPLIANCE-C31E-R60-48-FAILED-HOLD-AND-SUCCESSOR-READINESS-20260815.md",
+  "screencastEvidence": null,
+  "gmailDraftCreated": false,
+  "emailSent": false,
+  "quotaSubmitted": false,
+  "founderApproved": false
+}

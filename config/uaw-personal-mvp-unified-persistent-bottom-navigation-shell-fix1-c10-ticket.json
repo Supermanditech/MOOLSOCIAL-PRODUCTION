@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "c10a_through_c10e_r60_10_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "predecessor": "UAW-PERSONAL-MVP-GLOBAL-MOOL-BOTTOM-RAIL-NAVIGATION-FIX1-C09-MOOL-HOME-RESELECT-BACK-STACK-MOTION",
+  "implementationSequence": [
+    "UAW-PERSONAL-MVP-COLD-LAUNCH-SOCIAL-DEFAULT-FIX1-C10A",
+    "UAW-PERSONAL-MVP-SHARED-GLOBAL-DOCK-MAIN-ROOTS-FIX1-C10B",
+    "UAW-PERSONAL-MVP-BUY-LOCAL-TABS-GLOBAL-DOCK-FIX1-C10C",
+    "UAW-PERSONAL-MVP-CHAT-GLOBAL-DOCK-EXACT-RETURN-FIX1-C10D",
+    "UAW-PERSONAL-MVP-GLOBAL-NAVIGATION-MOTION-CONTAINMENT-OPPO-FIX1-C10E"
+  ],
+  "customerOutcome": "A person always sees one stable global bottom-navigation model, knows which main area is selected, switches areas smoothly, and returns to the exact prior subaction without a top-level Back-arrow trap.",
+  "founderConfirmedOppoDefects": [
+    "fresh_authenticated_launch_restored_work_workspace_instead_of_social",
+    "work_root_showed_header_back_and_work_specific_bottom_navigation",
+    "mool_home_showed_a_different_main_action_bottom_navigation",
+    "social_showed_a_third_social_subaction_bottom_navigation",
+    "top_level_switches_looked_like_new_pages_instead_of_one_app_shell",
+    "exact_prior_subaction_and_landed_state_were_difficult_to_restore",
+    "retired_navigation_owners_remained_in_compiled_reachable_source"
+  ],
+  "singleGlobalNavigationContract": {
+    "fixedEdges": ["mool", "chat"],
+    "mainActions": ["social", "buy", "eat", "ride", "book", "work"],
+    "currentSelection": "selected_and_non_reentrant",
+    "subactions": "destination_local_content_controls_never_global_bottom_navigation",
+    "topLevelHeaderBack": "forbidden",
+    "motion": "directional_finite_180_to_320_ms_with_reduced_motion",
+    "back": "content_depth_then_exact_restorable_route_history"
+  },
+  "minimumCompleteScope": [
+    "default_fresh_authenticated_no_deep_link_launch_to_social",
+    "reuse_one_global_dock_contract_on_mool_social_buy_eat_ride_book_and_work_roots",
+    "move_social_and_other_destination_subactions_into_local_content_navigation",
+    "remove_top_header_back_from_top_level_action_choice_roots",
+    "make_selected_global_destination_retap_a_true_disabled_no_op",
+    "preserve_exact_destination_subaction_item_scroll_and_form_state_across_global_switches",
+    "apply_finite_directional_motion_without_decorative_or_perpetual_animation",
+    "remove_or_statically_contain_replaced_bottom_navigation_owners_from_compiled_reachable_runtime",
+    "cover_cold_launch_deep_link_system_back_process_restore_and_interruption_cases"
+  ],
+  "explicitExclusions": [
+    "no_change_to_protected_social_content_youtube_player_or_provider_contracts",
+    "no_new_backend_persistent_business_state_or_named_screen",
+    "no_modal_popup_palette_or_rail_toggle_as_global_navigation",
+    "no_uninstall_data_clear_downgrade_or_evidence_deletion",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "static_single_owner_and_legacy_containment_gate",
+    "widget_semantics_motion_reduced_motion_and_fitment_tests",
+    "production_router_cold_launch_deep_link_retap_and_exact_back_restoration_tests",
+    "two_complete_affected_regression_cycles",
+    "machine_gated_single_successor_APK_only_after_separate_build_authorization",
+    "checksum_matched_OPPO_real_user_journey_and_screenshot_review"
+  ],
+  "deviceEvidence": [
+    "artifacts/quality/uaw-personal-mvp-unified-persistent-bottom-navigation-shell-fix1-c10-20260807-01/oppo-founder-audit/Screenshot_2026-08-07-15-39-40-08_5f4356efd97aa738c62fbb50c227b3a3.jpg",
+    "artifacts/quality/uaw-personal-mvp-unified-persistent-bottom-navigation-shell-fix1-c10-20260807-01/oppo-founder-audit/Screenshot_2026-08-07-15-39-49-58_5f4356efd97aa738c62fbb50c227b3a3.jpg",
+    "artifacts/quality/uaw-personal-mvp-unified-persistent-bottom-navigation-shell-fix1-c10-20260807-01/oppo-founder-audit/Screenshot_2026-08-07-15-39-57-56_5f4356efd97aa738c62fbb50c227b3a3.jpg",
+    "artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/19-oppo-real-user-navigation-matrix.md",
+    "artifacts/quality/uaw-personal-mvp-global-navigation-motion-containment-oppo-fix1-c10e-r60-10-20260807-01/oppo-real-user/34-founder-review-final-mool-home.png",
+    "docs/quality/UAW-C10E-R60-10-FOUNDER-BOTTOM-RAIL-ACCEPTANCE-20260807.md",
+    "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md"
+  ]
+}

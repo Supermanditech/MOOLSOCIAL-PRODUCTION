@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E",
+  "parentTicket": "UAW-PERSONAL-MVP-ANDROID-NAVIGATION-VIEWPORT-OWNERSHIP-FIX11-C28",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "A Personal customer can reach Mool and every visible family and local destination through an Android-exported accessibility target of at least 44 by 44 logical pixels while the accepted 58-pixel rail, direct routes and one-handed placement remain intact.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E-PRESELECTION-ASSESSMENT-20260810.md",
+  "founderAuthorization": {
+    "receivedAt": "2026-08-10",
+    "scope": "implement_C28E_complete_fresh_host_qualification_then_open_a_separate_OPPO_candidate_for_testing",
+    "buildAndInstallBoundary": "closed_until_C28E_two_cycle_host_qualification_completes"
+  },
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/platform/mool_system_ui_viewport.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+      "apps/mobile/test/core/platform/mool_system_ui_viewport_c28b_test.dart",
+      "apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart",
+      "config/mvp-personal-android-navigation-device-bounds-c28d.json",
+      "config/mvp-personal-android-navigation-host-qualification-c28c.json",
+      "scripts/qualify-personal-android-navigation-c28c.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "one_C28E_static_owner_gate",
+      "one_C28E_two_cycle_host_qualification_contract_and_qualifier",
+      "one_additive_C28E_host_evidence_directory"
+    ],
+    "necessityProof": "Flutter 3.44 targets Android API 36, where C28B's manual non-edge system mode is ignored. C28D proves the accepted 58-pixel cells are clipped to 19 logical pixels in the OPPO exported hierarchy, so the existing shared edge-to-edge and rail owners require one inset-derived compatibility correction before another build."
+  },
+  "minimumCompleteScope": [
+    "replace_the_unsupported_manual_system_UI_request_with_explicit_edge_to_edge",
+    "derive_shared_Android_exported_semantics_clearance_from_live_top_inset_and_the_44_pixel_minimum",
+    "preserve_58_pixel_cells_routes_labels_state_FSC01_and_FSC06",
+    "migrate_the_device_bounds_contract_to_the_current_Social_and_Buy_catalogue",
+    "pass_focused_tests_and_two_identical_fingerprint_complete_host_cycles"
+  ],
+  "explicitExclusions": [
+    "no_screen_route_visual_token_copy_content_backend_provider_or_credential_change",
+    "no_MainActivity_or_accepted_Screen_01_03_owner_change",
+    "no_build_install_uninstall_data_clear_downgrade_or_device_mutation_during_C28E",
+    "no_Production_commit_push_deploy_or_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_go_ahead_and_OPPO_test_direction_received_2026_08_10",
+    "C28D_device_rejection_and_installed_r60_27_identity_preserved",
+    "FSC01_and_FSC06_nonbuild_navigation_corrections_complete",
+    "active_MVP_delivery_discipline_and_preselection_lock",
+    "permanent_regression_memory",
+    "fresh_two_cycle_host_qualification_before_any_build"
+  ],
+  "testAndEvidencePlan": [
+    "focused_system_UI_method_channel_test",
+    "OPPO_viewport_exported_height_simulation_with_text_scale_keyboard_and_reduced_motion",
+    "C28E_static_owner_and_device_contract_gates",
+    "complete_mobile_analyzer_and_required_navigation_suite",
+    "approved_UI_Social_Buy_copy_brand_interaction_and_regression_gates",
+    "two_consecutive_identical_source_fingerprint_host_cycles"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-ANDROID-NAVIGATION-EXPORTED-SEMANTICS-HOST-REMEDIATION-FIX12-C28E-COMPLETION-20260810.md",
+  "qualifiedSourceFingerprint": "52E505B59809E920ED128E16CE8AD0DB0DDD7CB7CEAE0C3C8C5CD89CAA3B3989",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

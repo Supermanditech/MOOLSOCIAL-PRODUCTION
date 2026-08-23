@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33C-PERSONAL-MVP-RIDE-COMPACT-FOUR-ACTION-DESTINATION-RAIL-RECOVERY",
+  "state": "source_repair_qualified_device_and_release_acceptance_held",
+  "ticketSha256": "C8721DB35BB6D145024F2CD45465D30CE2C1735F3DF5D60C23FFC01F5ACA046C",
+  "finding": {
+    "registryId": "REG-20260815-2308-RIDE-FOUR-ACTION-COMPACT-RAIL-MINIMUM-WIDTH-ASSERTION",
+    "result": {"passed": 0, "failed": 2},
+    "logSha256": "248E77ED232F3091707AF5ACC756795F67ED0289051266EB47FEAD6409D9E20E"
+  },
+  "changedOwners": {
+    "runtime": {
+      "path": "apps/mobile/lib/core/design/mool_design_system.dart",
+      "sha256": "6430044F7DA73EB54634A6EE54F9664D7CF362B64D073DF58201CA0CE98E9832"
+    },
+    "test": {
+      "path": "apps/mobile/test/uaw_personal_mvp_ride_subaction_professional_conformance_c16e_test.dart",
+      "sha256": "4895CECEC1214FDF8C982F6A96BC2545B2591A52DA0A6BDCA00DDBA3D5437381"
+    }
+  },
+  "preservedOwners": {
+    "navigationShellSha256": "591D92DDB791E3EED2D5B3967E7FAA75A63087126A8965C45D070A3357F1DD62",
+    "rideWidgetsSha256": "BA0CE8592D7FF813EBFC2841715FAA7F36E08829A924A0E1E6120420642C1B06",
+    "rideSessionSha256": "B6BAC2FB9C1427ACD10A97DF1DDB8BBE40E0752BD4FBD99734BFEDAAE5B976F8",
+    "C20ESha256": "9F5E461291133081B64CD34D4886E7874DBB24C93A4AB96627AC16EFCBF35382",
+    "C17DSha256": "9C3C6F199E3D082B54CAE3325E5CE064BA19209FDAA91034924F4DAD83A76BF1",
+    "C27BSha256": "6AFDEFE148F0E36A6EEBAE77F214A415344606157471C8D847E004D4F8DE54AD",
+    "C27DSha256": "7E156B6EA30F099E27236998A6ADCFAADAFE8C5E6356C37D687C04EF512FDCFC"
+  },
+  "validation": {
+    "C16E": {"passed": 2, "failed": 0},
+    "C24D": {"passed": 6, "failed": 0, "declaredSkips": 1},
+    "R07": {"passed": 8, "failed": 0},
+    "rideVerticalSlice": {"passed": 10, "failed": 0},
+    "C20E": {"passed": 6, "failed": 0},
+    "C17D": {"passed": 10, "failed": 0},
+    "C27B": {"passed": 5, "failed": 0},
+    "C27D": {"passed": 1, "failed": 0},
+    "combined": {"files": 8, "passed": 48, "failed": 0, "declaredSkips": 1},
+    "analyzer": {"owners": 17, "state": "clean"},
+    "dualHostGate": "passed"
+  },
+  "authority": {
+    "runtimeChanged": true,
+    "testChanged": true,
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "backendChanged": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "liveAcceptance": {
+    "PlayInstalledR60_48FailedStatePreserved": true,
+    "successorBuildOrInstallPerformed": false,
+    "deviceAcceptanceRequiredLater": true
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SLIM-UNBOXED-SUBACTION-FAMILY-STRIP-FIX1-C14",
+  "parentTicket": "UAW-PERSONAL-MVP-DIRECT-DEFAULT-SUBACTION-LANDING-FIX1-C13",
+  "state": "founder_authorized_prewrite",
+  "classification": "mvp_required",
+  "interactionContractVersion": "C14-V1-20260807",
+  "actor": "Personal account customer",
+  "customerOutcome": "A person recognizes and changes destination sub-actions in one tap through a visually slim category strip that keeps product content dominant and clearly belongs to the selected main action.",
+  "founderDesignEvidence": {
+    "source": "founder_supplied_OPPO_Myntra_category_screenshot",
+    "path": "artifacts/quality/uaw-personal-mvp-direct-default-subaction-landing-fix1-c13-design-reference-20260807-01/01-founder-myntra-category-reference.jpg",
+    "reusePrinciple": "unboxed_category_labels_compact_selected_identity_and_content_dominance_without_copying_third_party_brand_assets_or_layout"
+  },
+  "visualContract": {
+    "position": "immediately_above_founder_approved_global_bottom_rail",
+    "maximumHeight": 44,
+    "minimumTapTarget": 44,
+    "surface": "transparent_or_maximum_45_percent_neutral_tint_with_no_raised_card_shadow",
+    "unselectedAction": "unboxed_transparent_label_and_compact_icon",
+    "selectedAction": "family_coherent_text_weight_tint_and_two_pixel_identity_line_without_filled_tile",
+    "familyRelationship": "thin_family_accent_connector_plus_selected_main_action_directly_below",
+    "separateFamilyTile": false,
+    "perActionBoxBorder": false,
+    "filledSelectedPill": false,
+    "tapBudget": 1,
+    "globalRailGeometryOrderAndMeaning": "unchanged"
+  },
+  "subactions": {
+    "social": ["shorts", "videos", "feed", "create"],
+    "buy": ["shop", "wholesale", "medicine", "orders"],
+    "eat": ["order_food", "book_table"],
+    "ride": ["bike", "auto", "cab"],
+    "book": ["doctor", "salon"],
+    "work": ["earn_today", "workspace"]
+  },
+  "motion": {
+    "selection": "finite_160_to_200_ms_text_tint_and_identity_line_acknowledgement",
+    "scaleOrSheen": false,
+    "reducedMotion": "zero_nonessential_animation",
+    "perpetualMotion": false
+  },
+  "implementationBoundary": {
+    "reuseOwners": [
+      "MoolDestinationNavigationV2",
+      "MoolLocalNavigationRail",
+      "Screen04ContextTabs",
+      "BuyV2DestinationTabs",
+      "C13_direct_default_route_and_state_owners"
+    ],
+    "newNecessaryOwner": "none_restyle_existing_three_local_control_variants_and_shared_wrapper",
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentStateOwners": []
+  },
+  "explicitExclusions": [
+    "no_copy_of_Myntra_brand_assets_product_taxonomy_promotions_or_layout",
+    "no_change_to_founder_approved_global_bottom_rail_geometry_order_or_meaning",
+    "no_new_screen_route_menu_modal_palette_backend_provider_or_persistent_state_owner",
+    "no_target_smaller_than_44_by_44_or_extra_subaction_tap",
+    "no_Screens_01_03_Social_provider_or_Buy_commercial_logic_change",
+    "no_credentials_live_messages_calls_payments_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "acceptance": [
+    "all_six_destinations_use_one_maximum_44px_unboxed_transparent_family_strip",
+    "every_keyed_action_measures_at_least_44_by_44_and_remains_one_tap_reachable",
+    "no_separate_family_tile_per_action_border_or_filled_selected_pill_remains",
+    "family_accent_connector_and_selected_global_action_make_ownership_clear",
+    "Buy_grids_and_each_destination_primary_content_remain_visually_dominant",
+    "C13_direct_default_Back_Mool_Chat_and_reduced_motion_contracts_remain_green",
+    "two_complete_affected_host_regression_cycles_pass",
+    "one_combined_machine_gated_APK_matches_the_installed_OPPO_checksum",
+    "real_OPPO_first_frame_and_one_handed_journeys_pass_before_founder_acceptance"
+  ]
+}

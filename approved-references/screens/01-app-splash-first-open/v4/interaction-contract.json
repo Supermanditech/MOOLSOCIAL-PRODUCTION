@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 1,
+    "id": "app-splash-first-open",
+    "routeOwner": "app.launch",
+    "productionRoute": "/boot",
+    "approvalVersion": "native-production-v4",
+    "founderVisualAcceptedAt": "2026-08-01",
+    "productionLockReconciledAt": "2026-08-08",
+    "status": "Accepted",
+    "taglineStatus": "research-pending-temporary-copy-approved"
+  },
+  "referenceCapture": {
+    "hostViewportLogicalPixels": {
+      "width": 360,
+      "height": 720
+    },
+    "device": "OPPO CPH2375",
+    "deviceEvidence": "artifacts/quality/uaw-personal-mvp-screen01-r50-provenance-and-equivalence-fix1-c18a-20260808-01",
+    "activeGoldenOwners": [
+      "apps/mobile/test/goldens/ui_v2_screen01_normal-motion-midpoint-360x720.png",
+      "apps/mobile/test/goldens/ui_v2_screen01_handoff-360x720.png",
+      "apps/mobile/test/goldens/ui_v2_screen01_recovery-360x720.png"
+    ]
+  },
+  "copy": {
+    "wordmark": "MoolSocial",
+    "category": "India Ka Socio Commerce App",
+    "promisePrimary": "Create. Connect. Work. Grow.",
+    "promiseSecondary": "One app for life and business.",
+    "openingStatus": "Opening your MoolSocial space",
+    "slowOpeningStatus": "Still opening your MoolSocial space",
+    "recoveryHeading": "Connection paused",
+    "recoveryBody": "Check your internet connection, then try again.",
+    "retry": "Retry",
+    "help": "Help"
+  },
+  "states": [
+    {
+      "id": "normal-open",
+      "condition": "the uninterrupted foreground presentation interval has not elapsed and boot has not failed",
+      "minimumPresentationMs": 3000,
+      "revealDurationMs": 2400,
+      "requiresTap": false,
+      "presentation": "complete wordmark then category then business promise then unified settle"
+    },
+    {
+      "id": "slow-start",
+      "condition": "the minimum interval elapsed while the existing session owner is still resolving the safe next route",
+      "requiresTap": false,
+      "presentation": "complete static settled lockup with truthful slow-opening status"
+    },
+    {
+      "id": "recovery",
+      "condition": "the existing session owner reports a recoverable boot failure",
+      "requiresTap": true,
+      "presentation": "complete wordmark, connection recovery copy, Retry and Help"
+    }
+  ],
+  "interactions": [
+    {
+      "state": "normal-open",
+      "action": "none",
+      "result": "the existing session owner chooses Screen02, Screen03, Universal or a preserved safe route"
+    },
+    {
+      "state": "slow-start",
+      "action": "none",
+      "result": "remain on the branded presentation until the existing session owner chooses a route or reports failure"
+    },
+    {
+      "state": "recovery",
+      "action": "Retry",
+      "result": "retry boot without losing setup, authentication or deep-link state"
+    },
+    {
+      "state": "recovery",
+      "action": "Help",
+      "result": "preserve the help intent while completing required setup and authentication"
+    }
+  ],
+  "motion": {
+    "wordmarkInterval": [0.0, 0.26],
+    "categoryInterval": [0.2, 0.5],
+    "businessInterval": [0.44, 0.76],
+    "settleInterval": [0.72, 1.0],
+    "perpetualMotionAllowed": false,
+    "reducedMotion": "render the complete final lockup immediately"
+  },
+  "lifecycle": {
+    "inactivePausedHiddenOrLocked": "cancel the pending handoff",
+    "resume": "begin a new uninterrupted foreground interval on Screen01",
+    "processDeath": "a new customer open begins at Screen01"
+  },
+  "platformLaunchContinuity": {
+    "androidSystemWindow": "plain MoolSocial navy without visible branding",
+    "flutterScreenMinimumMs": 3000,
+    "visibleBrandedScreenCount": 1
+  },
+  "semanticDependency": {
+    "owner": "apps/mobile/lib/core/design/moolsocial_brand_motion.dart",
+    "enforcedBy": "scripts/check-brand-integrity.ps1",
+    "requiredOutcome": "one complete MoolSocial wordmark, approved four-colour palette, finite motion and immediate reduced-motion result"
+  },
+  "prohibited": [
+    "technical version, network, session or route checks in customer copy",
+    "a second visible logo launch screen",
+    "permission prompt",
+    "HTML or WebView in Flutter",
+    "copying the read-only screenbook into production",
+    "mixing the legacy Flutter launch presentation into UI V2"
+  ]
+}

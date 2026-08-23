@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33A-PERSONAL-MVP-C20E-CURRENT-LOCAL-DESTINATION-RAIL-TEST-SUCCESSOR",
+  "parentOutcome": "MOOLSOCIAL-POST-YOUTUBE-WHOLE-APP-PRODUCTION-AUDIT-BACKLOG-20260815",
+  "finding": "REG-20260815-2297-POST-SEAL-C20E-ADAPTIVE-FAMILY-CONTRACT-FAILURE",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "The retained C20E four-family matrix verifies the current compact leading local-destination rail, truthful selected semantics, one-tap outcomes and reduced motion without requiring removed centered glass-capsule owners.",
+  "minimumCompleteScope": [
+    "migrate_only_C20E_geometry_widget_type_copy_and_motion_assertions_to_current_C27B_destination_rail_owners",
+    "retain_exact_Eat_Ride_Book_Work_family_and_nine_action_inventory",
+    "require_58_pixel_destination_cells_152_232_compact_leading_clusters_and_no_scroll_or_sparse_expansion",
+    "require_current_selected_indicator_pressed_scale_semantics_and_one_tap_outcomes",
+    "require_zero_removed_glass_BackdropFilter_FittedBox_and_inner_chroma_owners",
+    "run_C20E_C27B_C27D_R06_analyzer_and_dual_host_successor_gate"
+  ],
+  "explicitExclusions": [
+    "no_runtime_design_navigation_route_copy_semantics_or_business_behavior_change",
+    "no_C17D_C21E_migration_under_this_ticket",
+    "no_Tiffin_exposure_or_provider_confirmation",
+    "no_backend_build_Play_OPPO_provider_secret_email_quota_funds_or_external_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

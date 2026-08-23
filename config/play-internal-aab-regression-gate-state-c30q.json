@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "contractId": "PLAY-INTERNAL-AAB-REGRESSION-GATES-C30Q-001",
+  "machineState": "founder_removed_debug_predecessor_candidate_absent_exact_successor_recovery_required",
+  "buildAuthorization": "consumed",
+  "candidate": {
+    "id": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30Q",
+    "versionName": "1.0.0-r60.43",
+    "versionCode": "2026081243",
+    "buildMode": "release",
+    "artifactType": "AAB",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "packageName": "com.moolsocial.app"
+  },
+  "toolingQualification": {
+    "requiredPowerShellMajorMinimum": 7,
+    "launcherRejectsWindowsPowerShellBeforePrompt": true,
+    "wrapperRejectsWindowsPowerShellBeforeAuthorityMutation": true,
+    "nativeStderrPromotionDisabledOnlyDuringNativeCommands": true,
+    "nativeExitCodeAuthoritative": true,
+    "preferencesRestoredAfterNativeCommands": true,
+    "releaseConfigOnlyCommandQualified": true,
+    "releaseConfigOnlyProducesNoApk": true,
+    "releaseRegistrantExcludesIntegrationTestPlugin": true,
+    "appBundleInvocationCountRequired": 1,
+    "c30oRetryForbidden": true,
+    "c30pRetryForbidden": true,
+    "officialFindingEvidence": "docs/quality/UAW-C30Q-FLUTTER-NO-PUB-RELEASE-REGISTRANT-OFFICIAL-FINDINGS-20260812.md"
+  },
+  "distribution": {
+    "provider": "Google_Play",
+    "account": "supermanditech@gmail.com",
+    "organization": "Supermandi Tech Private Limited",
+    "authorizedTrack": "internal",
+    "productionTrackAuthorized": false,
+    "openTestingAuthorized": false,
+    "publicListingAuthorized": false,
+    "appCreated": true,
+    "playAppId": "4974778280277295872",
+    "releaseUploaded": true,
+    "testerOptInLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "founderTesterEligible": true,
+    "founderTesterListName": "MoolSocial Founder Internal",
+    "founderTesterUserCount": 1,
+    "founderTesterListAttached": true,
+    "founderTesterListEvidence": "docs/quality/UAW-C30O-PLAY-INTERNAL-FOUNDER-TESTER-LIST-ATTACHMENT-EVIDENCE-20260812.md",
+    "releaseEvidence": "docs/quality/UAW-C30Q-PLAY-INTERNAL-ACTIVE-RELEASE-EVIDENCE-20260812.md"
+  },
+  "firebaseAppCheck": {
+    "account": "hello@moolsocial.com",
+    "projectId": "moolsocial-dev-503018",
+    "androidAppId": "1:760290687711:android:4202409fd3ab38f6ce076a",
+    "packageName": "com.moolsocial.app",
+    "provider": "Play_Integrity",
+    "playProjectLinked": true,
+    "playIntegrityApiEnabled": true,
+    "playIntegrityCloudProjectNumber": "760290687711",
+    "playAccountCloudRoleBindingPresent": false,
+    "playAccountCloudOwnerBindingPresent": false,
+    "domainRestrictedSharingInheritanceRestored": true,
+    "playIntegrityProviderConfigured": true,
+    "playIntegrityTokenTtl": "3600s",
+    "playAppSigningSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "playAppSigningCertificateRegistered": true,
+    "playRecognizedRequired": true,
+    "privateVerdictReadAuthorized": false
+  },
+  "signingQualification": {
+    "releaseUsesDebugSigning": false,
+    "uploadKeyEnvironmentNames": [
+      "MOOLSOCIAL_UPLOAD_STORE_FILE",
+      "MOOLSOCIAL_UPLOAD_STORE_PASSWORD",
+      "MOOLSOCIAL_UPLOAD_KEY_ALIAS",
+      "MOOLSOCIAL_UPLOAD_KEY_PASSWORD"
+    ],
+    "founderControlledUploadKeyPresent": true,
+    "uploadKeyStorePath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-PRIVATE-SIGNING\\moolsocial-upload-2026.p12",
+    "uploadKeyAlias": "moolsocial-upload-2026",
+    "uploadCertificateSha256": "63:49:1B:E7:8A:01:F4:51:43:19:AE:5D:2A:39:57:61:18:33:F3:2C:A1:CB:FD:57:AB:29:82:B0:1D:39:C0:D6",
+    "playAppSigningCertificateSha256": "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+    "secretValuesRecorded": false,
+    "agentSecretValueAccessAuthorized": false
+  },
+  "runtimeConfiguration": {
+    "secretDefineFileEnvironmentName": "MOOLSOCIAL_FIREBASE_DART_DEFINE_FILE",
+    "secretDefineFileQualifiedByFounder": true,
+    "secretDefineFileReadByAgent": false,
+    "requiredNonSecretDefines": {
+      "MOOLSOCIAL_DEVICE_REVIEW": "true",
+      "MOOLSOCIAL_USE_EMULATORS": "false",
+      "MOOLSOCIAL_CANDIDATE_ID": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30Q",
+      "MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "true",
+      "MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "true",
+      "MOOLSOCIAL_YOUTUBE_PROVIDER_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider",
+      "MOOLSOCIAL_SOCIAL_CONTENT_URL": "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent",
+      "MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED": "true",
+      "MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED": "false",
+      "MOOLSOCIAL_FIREBASE_APP_ID": "1:760290687711:android:4202409fd3ab38f6ce076a",
+      "MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID": "760290687711",
+      "MOOLSOCIAL_FIREBASE_PROJECT_ID": "moolsocial-dev-503018"
+    },
+    "requiredSecretDefineNames": [
+      "MOOLSOCIAL_FIREBASE_API_KEY"
+    ]
+  },
+  "sourceQualification": {
+    "state": "passed_two_identical_complete_C30Q_cycles",
+    "manifestPath": "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/source-aggregate-manifest-accepted.txt",
+    "manifestSha256": "5F65E0D4477B8F2943C176029A7DCCE3801740652DE39B7B8A8486E116536912",
+    "fileCount": 74,
+    "identicalQualifyingCycles": 2,
+    "implementationRegressionGatePassed": true,
+    "youtubeComplianceFocusedTestsPassed": true,
+    "releasePlayerGatePassed": true,
+    "completeSocialCyclesPassed": true,
+    "cycleEvidence": [
+      "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/01-source-qualifying-cycle-1.json",
+      "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/02-source-qualifying-cycle-2.json"
+    ]
+  },
+  "failedBuildPredecessors": [
+    {
+      "statePath": "config/play-internal-aab-regression-gate-state-c30o.json",
+      "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30O",
+      "expectedState": "single_release_AAB_failed_authority_consumed",
+      "expectedBuildCount": 1,
+      "retryForbidden": true
+    },
+    {
+      "statePath": "config/play-internal-aab-regression-gate-state-c30p.json",
+      "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30P",
+      "expectedState": "single_release_AAB_failed_authority_consumed",
+      "expectedBuildCount": 1,
+      "retryForbidden": true
+    }
+  ],
+  "protectedPredecessor": {
+    "statePath": "config/apk-regression-gate-state-c30n.json",
+    "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PUBLIC-FEED-CREATE-OPPO-QUALIFICATION-C30N",
+    "versionName": "1.0.0-r60.40",
+    "versionCode": "2026081240",
+    "installedSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "deviceSerial": "2b3e0f71",
+    "mustRemainInstalledUntilQualifiedPlayInstall": true,
+    "uninstallDataClearDowngradeOrAdbSuccessorInstallForbidden": true
+  },
+  "buildResult": {
+    "state": "single_release_AAB_succeeded_authority_consumed",
+    "buildCount": 1,
+    "wrapperInvocationCount": 1,
+    "configOnlyCount": 1,
+    "artifactPath": "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/MoolSocial-1.0.0-r60.43-2026081243-release.aab",
+    "artifactSha256": "E7E7DF249C71195FF9EDF8FD0247AEB64C91FEC3DD541F4A5A8FD11690AD8A69",
+    "artifactBytes": 94475642,
+    "uploadSignerSha256": "63491BE78A01F4514319AE5D2A3957611833F32CA1CBFD57AB2982B01D39C0D6",
+    "provenance": "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/05-release-aab-provenance.json",
+    "secondBuildPerformed": false
+  },
+  "playReleaseResult": {
+    "state": "internal_release_active_upload_consumed",
+    "uploadCount": 1,
+    "track": "internal",
+    "releaseName": "2026081243 (1.0.0-r60.43)",
+    "versionCode": "2026081243",
+    "testerLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "productionRolloutPerformed": false
+  },
+  "installResult": {
+    "state": "founder_removed_debug_predecessor_after_signer_rejection_no_candidate_installed",
+    "candidateInstallCount": 0,
+    "deviceSerial": "2b3e0f71",
+    "installerPackageName": null,
+    "versionName": null,
+    "versionCode": null,
+    "playArtifactRelationshipProved": false,
+    "founderReportedInstallComplete": true,
+    "readbackObservedAt": "2026-08-12T22:21:01.4788794+05:30",
+    "observedInstalledVersionName": "1.0.0-r60.40",
+    "observedInstalledVersionCode": "2026081240",
+    "observedInstallerPackageName": "pc",
+    "observedInstalledApkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "observedInstalledSignerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+    "playAppSigningSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "signingLineageCompatible": false,
+    "failureEvidence": "docs/quality/UAW-C30Q-PLAY-INSTALL-PREDECESSOR-SIGNER-INCOMPATIBILITY-REJECTION-20260812.md",
+    "founderPerformedUninstall": true,
+    "founderUninstallReadbackAt": "2026-08-12T22:43:43.8127646+05:30",
+    "packagePresentAfterFounderUninstall": false,
+    "privateLocalAppDataRemovedByUninstall": true,
+    "founderUninstallEvidence": "docs/quality/UAW-C30Q-FOUNDER-R60-40-REMOVAL-READBACK-20260812.md",
+    "uninstallPerformed": true,
+    "dataClearPerformed": false,
+    "downgradePerformed": false,
+    "adbSuccessorInstallPerformed": false,
+    "secondInstallPerformed": false
+  },
+  "journeyResult": {
+    "state": "not_started",
+    "c28d": "not_started",
+    "youtubeReviewerMatrix": "not_started",
+    "liveFeedRead": "not_started",
+    "createWritesAttempted": 0,
+    "createReadbacksPassed": 0,
+    "globalNavigation": "not_started"
+  },
+  "communicationHold": {
+    "reviewerPackage": "config/youtube-api-compliance-reviewer-package-c30q.json",
+    "gmailDraftCreated": false,
+    "emailSent": false,
+    "quotaSubmitted": false,
+    "founderFinalApproval": false
+  }
+}

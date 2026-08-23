@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-AND-OVERFLOW-AFFORDANCE-FIX3-C20B",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-GALLERY-PROFESSIONAL-RECOVERY-FIX3-C20",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal MoolSocial customer on a selected Social Buy Eat Ride Book or Work destination",
+  "capability": "hide or restore the selected family's local subactions and reach off-screen main actions through truthful controls",
+  "customerOutcome": "The customer can reclaim destination space by tapping the already selected 48px main action, always sees how to restore that family's options, and can tap non-overlapping Previous or Next controls when main actions are off screen.",
+  "failureRecovery": "Every family starts expanded after a fresh process; a visible up/down disclosure badge and exact Show or Hide family-options semantics remain on the selected main action, while system Back preserves navigation meaning and never becomes disclosure recovery.",
+  "classificationReason": "The installed r60.18 MVP navigation blocks content with an always-expanded second row and exposes an untappable arrow-like cue; discoverable recovery and reachable existing main actions are required behavior for the already approved MVP destinations.",
+  "minimumCompleteScope": [
+    "reuse_MoolDestinationNavigationV2_for_default_expanded_session_only_family_disclosure_state",
+    "reuse_the_selected_MoolGlobalNavigationV2_main_action_as_the_48px_show_hide_owner",
+    "add_visible_up_down_disclosure_badge_and_exact_show_hide_semantics_without_navigation_or_history",
+    "replace_IgnorePointer_arrow_cues_with_reserved_nonoverlapping_44px_previous_next_buttons_or_arrowless_inactive_space",
+    "add_focused_normal_reduced_motion_semantics_geometry_session_state_and_overflow_tests",
+    "pass_scope_memory_approved_UI_brand_copy_navigation_and_placement_gates"
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "runtimeOwners": [
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolDestinationNavigationV2",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolGlobalNavigationV2",
+      "apps/mobile/lib/core/design/mool_design_system.dart::MoolOutcomeDock",
+      "apps/mobile/lib/core/design/mool_design_system.dart::MoolDockAction",
+      "apps/mobile/lib/core/design/mool_design_system.dart::_MoolScrollableDockActions"
+    ],
+    "duplicateSearchResult": "No existing destination-local family disclosure owner or truthful tappable main-overflow owner exists; unrelated content expansion owners are not reused for persistent navigation.",
+    "implementationDisposition": ["reuse", "new_necessary_work", "test_only_acceptance"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentBusinessStateOwners": [],
+    "newSubactions": []
+  },
+  "interactionContract": {
+    "defaultExpanded": true,
+    "selectedMainActionTapTogglesOnlyLocalVisibility": true,
+    "minimumDisclosureTapTarget": 48.0,
+    "visibleExpandedBadge": "keyboard_arrow_down_rounded",
+    "visibleCollapsedBadge": "keyboard_arrow_up_rounded",
+    "exactExpandedSemanticPattern": "current. Hide family options",
+    "exactCollapsedSemanticPattern": "current. Show family options",
+    "collapsedRailLayoutHeight": 0.0,
+    "sessionOnlyPerFamilyMemory": true,
+    "freshProcessPersistenceAllowed": false,
+    "navigationOrHistoryMutationAllowed": false,
+    "systemBackOverrideAllowed": false,
+    "expandedRoutineSubactionTapBudget": 1,
+    "normalMotionMilliseconds": 160,
+    "reducedMotionImmediate": true,
+    "minimumOverflowTapTarget": 44.0,
+    "overflowMayOverlapMainActionHitTargets": false,
+    "inactiveOverflowArrowGlyphAllowed": false
+  },
+  "plannedFiles": [
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+    "apps/mobile/lib/core/design/mool_design_system.dart",
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_subaction_disclosure_overflow_c20b_test.dart",
+    "scripts/check-personal-subaction-disclosure-overflow-c20b.ps1",
+    "config/mvp-personal-subaction-professional-recovery-regression-c20.json"
+  ],
+  "testAndEvidencePlan": [
+    "six_family_default_expanded_and_selected_main_exact_semantics",
+    "expanded_to_collapsed_to_expanded_zero_height_content_and_route_stability",
+    "session_only_per_family_restore_and_fresh_harness_default",
+    "160ms_normal_motion_and_immediate_reduced_motion",
+    "44px_previous_next_overflow_targets_with_no_action_overlap",
+    "existing_subaction_one_tap_Back_Mool_Chat_global_order_and_content_reachability",
+    "C20B_focused_gate_then_affected_navigation_and_placement_regressions"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "explicitExclusions": [
+    "no_C20C_colour_glass_typography_icon_or_spacing_redesign",
+    "no_new_screen_route_feature_subaction_backend_or_business_state",
+    "no_global_rail_order_position_meaning_or_outer_shell_geometry_change",
+    "no_system_Back_repurposing_hidden_gesture_or_sub_44px_control",
+    "no_screenbook_protected_reference_business_copy_provider_or commercial_logic_change",
+    "no_build_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "completion": {
+    "state": "complete",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-AND-OVERFLOW-AFFORDANCE-FIX3-C20B-COMPLETION-20260808.md",
+    "focusedTestsPassed": 9,
+    "dockCompatibilityTestsPassed": 12,
+    "navigationCompatibilityTestsPassed": 70,
+    "formatAndAnalysisPassed": true,
+    "staticAndMachineGatesPassed": true,
+    "buildPerformed": false,
+    "installPerformed": false,
+    "oppoInstalledCandidatePreserved": "1.0.0-r60.18"
+  },
+  "founderAuthority": "docs/quality/UAW-C20B-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SUBACTION-DISCLOSURE-AND-OVERFLOW-AFFORDANCE-FIX3-C20B-PRESELECTION-ASSESSMENT-20260808.md"
+}

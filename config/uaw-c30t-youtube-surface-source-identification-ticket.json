@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-YOUTUBE-SURFACE-SOURCE-IDENTIFICATION",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "youtube_anti_mimic_source_identification",
+  "actor": "YouTube_compliance_reviewer_or_MoolSocial_user",
+  "customerOutcome": "Provider catalogue and shelf titles clearly identify YouTube content inside MoolSocial while MoolSocial Home, Create, Feed and Chats navigation remains distinct.",
+  "minimumCorrection": [
+    "rename_the_provider_catalogue_header_from_Videos_to_YouTube_videos",
+    "rename_the_embedded_provider_shelf_from_Shorts_to_YouTube_Shorts",
+    "preserve_MoolSocial_owned_navigation_layout_actions_and_provider_attribution"
+  ],
+  "explicitExclusions": [
+    "no_broad_Social_or_global_redesign",
+    "no_provider_OAuth_or_backend_change",
+    "no_AAB_APK_upload_install_deploy_or_external_communication"
+  ],
+  "authority": {
+    "localImplementationAndTestsAuthorized": true,
+    "AabUploadInstallAuthorized": false
+  },
+  "verification": {
+    "status": "passed",
+    "focusedTests": "11 passed, 0 failed",
+    "testEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/32-youtube-source-identification-tests.log",
+    "testEvidenceSha256": "0150FAB69B98BCA27A8647211F201763F76B57A2DB9ABF6DC23636D0998AD11D",
+    "flutterAnalyze": "no issues",
+    "analyzeEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-04/33-flutter-analyze-youtube-source-identification.log",
+    "analyzeEvidenceSha256": "3346AFE9E74674AF8280ABE0653AD51475FFFF9607002A64848CDCC8F668A25B"
+  }
+}

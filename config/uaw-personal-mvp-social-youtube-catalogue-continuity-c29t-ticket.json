@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CATALOGUE-CONTINUITY-C29T",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PRODUCTION-READINESS-20260811",
+  "state": "source_qualified_apk_cross_comparison_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "A Personal user reopening Social sees the last eligible YouTube Videos and Shorts catalogue immediately, while refresh happens in the content surface without a repeated loading popup.",
+  "founderObservation": "every_time_Social_opens_Videos_and_Shorts_keep_showing_loading_over_popup",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+      "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
+      "backend/functions/src/youtube/cache.ts"
+    ],
+    "newNecessaryOwners": ["mobile_last_successful_catalogue_snapshot"],
+    "necessityProof": "The widget stores provider results only in State, so leaving and reopening Social reconstructs an empty catalogue and shows the loading surface again even when the app just fetched the same eligible public data. No mobile continuity owner exists."
+  },
+  "minimumCompleteScope": [
+    "retain_only_last_successful_provider_returned_Videos_and_Shorts_snapshot_with_short_TTL",
+    "hydrate_a_recreated_Social_screen_before_first_frame_when_snapshot_is_fresh",
+    "refresh_in_background_without_replacing_visible_catalogue_with_loading_UI",
+    "retain_visible_snapshot_on_transient_refresh_failure_and_offer_nonmodal_retry",
+    "use_in_surface_cold_start_skeleton_only_when_no_snapshot_exists",
+    "never_add_filler_fabricated_or_MoolSocial_hosted_Shorts",
+    "test_dispose_reopen_TTL_refresh_error_and_host_separation"
+  ],
+  "explicitExclusions": [
+    "no_long_term_provider_cache_or_per_user_polling",
+    "no_recommender_or_history_signal",
+    "no_backend_shared_refresh_which_belongs_to_C29R",
+    "no_build_install_deploy_provider_message_or_secret_access"
+  ],
+  "execution": {
+    "runtimeSourceWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "externalDevQualificationAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "deployAuthorized": false,
+    "productionWriteAuthorized": false,
+    "providerMessageAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "referenceWriteAuthorized": false
+  },
+  "protectedState": {
+    "installedVersionName": "1.0.0-r60.34",
+    "installedVersionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29",
+    "installedSerial": "2b3e0f71",
+    "c28dEvidenceImmutable": true,
+    "c29kEvidenceImmutable": true
+  },
+  "deviceEvidence": {
+    "state": "pending_OPPO_reconnection",
+    "question": "distinguish_repeated_loading_surface_from_provider_access_gate_on_installed_r60_34"
+  },
+  "qualification": {
+    "state": "source_qualified_apk_cross_comparison_pending",
+    "evidence": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-YOUTUBE-CATALOGUE-CONTINUITY-C29T-HOST-QUALIFICATION-20260811.md",
+    "sourceAggregateSha256": "5CFB047E3E94607A13634EE8EE18DB74D3BC2931D622BA202466615B5A959D9B",
+    "focusedAssertions": 12,
+    "repositoryGates": [
+      "C29T_source_gate_passed",
+      "MVP_delivery_lock_passed",
+      "MVP_scope_gate_passed",
+      "Codex_regression_memory_passed"
+    ],
+    "freshIdenticalCycles": 2,
+    "formattedFilesPerCycle": 21,
+    "formatChangesPerCycle": 0,
+    "fullFlutterAnalysisPerCycle": "no_issues",
+    "protectedTestFilesPerCycle": 19,
+    "protectedAssertionsPerCycle": 142,
+    "buildInstallDeployPerformed": false,
+    "oppoCrossComparisonState": "pending_device_reconnection"
+  }
+}

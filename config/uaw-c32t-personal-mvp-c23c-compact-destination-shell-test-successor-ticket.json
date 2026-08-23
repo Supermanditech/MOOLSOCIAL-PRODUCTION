@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32T-PERSONAL-MVP-C23C-COMPACT-DESTINATION-SHELL-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "finding": "REG-20260815-2278-C32R-C23C-SUPERSEDED-SINGLE-HOME-LAUNCHER-CONTRACT",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "Destination-shell regression evidence follows the accepted compact Mool, local destination and Chat topology while preserving the no-bottom-control Mool Home rule.",
+  "minimumCompleteScope": [
+    "migrate_only_apps_mobile_test_ui_v2_universal_mool_single_home_launcher_shell_c23c_test_dart",
+    "replace_removed_full_width_launcher_assertions_with_compact_destination_shell_owners",
+    "assert_local_navigation_Mool_Chat_semantics_geometry_and_menu_disclosure",
+    "preserve_Mool_Home_no_bottom_navigation_control_assertion",
+    "run_C23C_C26D_C27B_C27D_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_navigation_widget_key_route_semantics_geometry_or_copy_change",
+    "no_restoration_of_removed_mool_home_launcher_compatibility",
+    "no_backend_build_device_external_or_secret_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

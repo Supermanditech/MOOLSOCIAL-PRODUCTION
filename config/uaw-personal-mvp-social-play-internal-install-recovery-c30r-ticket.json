@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-INSTALL-RECOVERY-C30R",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-YOUTUBE-COMPLIANCE-C30Q",
+  "state": "founder_authorized_package_absent_one_existing_Play_release_install_prequalification",
+  "classification": "mvp_required",
+  "actor": "founder_review_personal_MoolSocial_viewer_creator_and_YouTube_API_reviewer",
+  "customerOutcome": "The already active production-grade Dev r60.43 bundle is installed exactly once from Google Play Internal Testing on the now-package-empty OPPO and truthfully proves Play signing, Play installer provenance, App Check, distinct MoolSocial Feed/Create value and the bounded YouTube reviewer journeys.",
+  "classificationReason": "The YouTube compliance reviewer requires a valid Android application link and the existing C30Q release is already active only on Internal Testing. The founder removed the incompatible debug-signed predecessor, so one clean Play installation and device acceptance is now the smallest complete path; no new build, upload, application owner or provider capability is needed.",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "config/play-internal-aab-regression-gate-state-c30q.json",
+      "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/05-release-aab-provenance.json",
+      "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/06-play-internal-active-release.json",
+      "config/youtube-api-compliance-reviewer-package-c30q.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newProviderCapabilities": [],
+    "newNecessaryToolingOwners": [
+      "config/play-internal-install-recovery-gate-state-c30r.json",
+      "scripts/check-play-internal-install-recovery-gate-state-c30r.ps1"
+    ],
+    "necessityProof": "C30Q already owns the exact active Internal release, signing identities, tester access, source qualification, AAB and reviewer package. Only a fail-closed recovery state is necessary to reconcile the founder-performed predecessor removal, prohibit a rebuild or re-upload, authorize one Play install and seal its device evidence."
+  },
+  "minimumCompleteScope": [
+    "preserve_the_exact_r60_40_APK_identity_signer_Play_failure_and_founder_removal_evidence_without_claiming_local_data_recovery",
+    "reuse_the_single_active_C30Q_r60_43_Internal_release_without_build_or_upload",
+    "prove_com_moolsocial_app_absent_before_exactly_one_founder_visible_Google_Play_install",
+    "seal_package_version_installer_Play_signer_split_APK_identity_and_App_Check_transport_acceptance",
+    "run_C28D_YouTube_real_Dev_Feed_then_exactly_six_Create_readbacks_resilience_and_global_navigation",
+    "prepare_but_do_not_send_the_same_thread_YouTube_reviewer_package"
+  ],
+  "explicitExclusions": [
+    "no_r60_40_reinstall_private_local_data_recovery_claim_or_second_uninstall",
+    "no_new_build_AAB_APK_upload_release_track_or_store_listing_change",
+    "no_ADB_sideload_downgrade_second_install_or_signature_workaround",
+    "no_new_screen_route_backend provider corpus redesign or declared_YouTube_use_case_expansion",
+    "no_Play_Production_open_public_Staging_Production_backend_Hosting_email_or_quota_submission",
+    "no_password_MFA_token_API_key_OAuth_credential_App_Check_token_private_verdict_nonce_or_private_key_access",
+    "no_commit_push_merge_rebase_main_message_call_or_fund_movement"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_original_2026_08_12_one_Internal_Testing_Play_install_OPPO_journeys_and_six_Dev_Create_writes_authority",
+    "founder_reported_r60_40_uninstall_and_read_only_package_absence_evidence",
+    "C30Q_single_active_Internal_release_2026081243_and_tester_access_preserved",
+    "Firebase_Play_App_Signing_SHA256_and_Play_Integrity_provider_configuration_preserved",
+    "moolsocialcontent_00003_juw_youtubeprovider_00036_qer_youtubeoauthcallback_00035_cir_and_C30K_corpus_preserved",
+    "founder_handles_any_visible_Google_Play_account_password_MFA_or_device_confirmation"
+  ],
+  "testPlan": [
+    "preinstall_package_absence_exact_device_active_release_hash_and_single_action_machine_gate",
+    "postinstall_version_code_installer_com_android_vending_and_Play_App_Signing_certificate",
+    "installed_split_APK_checksums_and_relationship_to_the_exact_C30Q_release_version_and_signing_identity",
+    "cold_launch_C28D_YouTube_Home_search_video_Shorts_attribution_player_account_consent_disconnect_error_retry",
+    "real_Dev_Feed_all_authors_formats_then_exactly_six_Create_writes_and_readbacks",
+    "vote_quiz_media_carousel_refresh_relaunch_offline_retry_and_global_navigation",
+    "unsent_reviewer_package_and_founder_final_approval_hold"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "sourceImplementationAuthorized": false,
+    "backendWriteAuthorized": false,
+    "runtimeDevCreateWritesAuthorized": true,
+    "externalServiceWriteAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceInstallAuthorized": true,
+    "deviceLaunchAndTapAuthorized": true,
+    "secretValueAccessAuthorized": false,
+    "productionWriteAuthorized": false,
+    "emailOrQuotaSubmissionAuthorized": false
+  },
+  "protectedState": {
+    "deviceSerial": "2b3e0f71",
+    "packageName": "com.moolsocial.app",
+    "packageAbsentAfterFounderRemoval": true,
+    "removedVersionName": "1.0.0-r60.40",
+    "removedVersionCode": "2026081240",
+    "removedApkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "removedPrivateLocalDataRecoverable": false,
+    "candidateVersionName": "1.0.0-r60.43",
+    "candidateVersionCode": "2026081243",
+    "candidateAabSha256": "E7E7DF249C71195FF9EDF8FD0247AEB64C91FEC3DD541F4A5A8FD11690AD8A69",
+    "candidateBuildCount": 1,
+    "candidateUploadCount": 1,
+    "candidateInstallCount": 0,
+    "remainingInstallAuthority": 1,
+    "createWritesAttempted": 0
+  },
+  "findings": "docs/quality/UAW-C30R-PLAY-INTERNAL-INSTALL-RECOVERY-FINDINGS-20260812.md"
+}

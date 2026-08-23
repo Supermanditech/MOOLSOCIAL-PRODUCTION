@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Screen 03 v5 Passwordless Email Link - MoolSocial Founder Review</title>
+  <link rel="stylesheet" href="../shared/moolsocial-ui-foundation.css" />
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .review-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .review-header {
+      display: grid;
+      gap: 12px;
+    }
+
+    .review-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .screenbook-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 14px;
+      font-weight: 900;
+      text-decoration: none;
+    }
+
+    .back-glyph {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .back-glyph svg,
+    .inline-icon svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .proposal-badge {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: var(--ms-white);
+      color: var(--ms-green);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .review-lead {
+      max-width: 840px;
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .review-panel {
+      overflow: hidden;
+      border: 1px solid var(--ms-navy);
+      border-radius: 24px;
+      background: #f7f8fc;
+    }
+
+    .review-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--ms-navy);
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 13px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .review-panel-head span {
+      color: var(--ms-green);
+      font-size: 11px;
+      text-transform: none;
+    }
+
+    .review-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(280px, 1fr);
+      gap: 22px;
+      align-items: start;
+      padding: 22px;
+    }
+
+    .device-stage {
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .stage-label {
+      width: min(100%, 390px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .stage-label span {
+      color: var(--ms-green);
+      text-transform: none;
+    }
+
+    .phone {
+      --ui-scale: 1;
+      width: min(100%, 360px);
+      min-height: 700px;
+      display: grid;
+      grid-template-rows: 32px 1fr;
+      justify-self: center;
+      overflow: hidden;
+      border: 10px solid var(--ms-navy);
+      border-radius: 32px;
+      background: var(--ms-navy);
+      box-shadow: none;
+      font-size: calc(16px * var(--ui-scale));
+    }
+
+    .phone-status {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 0;
+      color: var(--ms-white);
+      font-size: calc(11px * var(--ui-scale));
+      font-weight: 900;
+    }
+
+    .phone-app {
+      min-height: 668px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .app-head {
+      display: block;
+      padding: 18px 18px 15px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .head-action {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 16px;
+      background: transparent;
+      color: var(--ms-white);
+      cursor: pointer;
+    }
+
+    .head-action[hidden] {
+      display: none;
+    }
+
+    .brand-lockup {
+      min-width: 0;
+      display: grid;
+      justify-items: start;
+      gap: 10px;
+    }
+
+    .wordmark {
+      color: var(--ms-white);
+      font-size: calc(25px * var(--ui-scale));
+      font-weight: 950;
+      line-height: .95;
+      white-space: nowrap;
+    }
+
+    .identity-line {
+      width: 126px;
+      height: 4px;
+      display: grid;
+      grid-template-columns: 45fr 14fr 41fr;
+      overflow: hidden;
+      border-radius: 999px;
+    }
+
+    .identity-line span:nth-child(1) { background: var(--ms-saffron); }
+    .identity-line span:nth-child(2) { background: var(--ms-white); }
+    .identity-line span:nth-child(3) { background: var(--ms-green); }
+
+    .top-copy {
+      margin: 0;
+      color: var(--ms-white);
+      font-size: calc(12px * var(--ui-scale));
+      font-weight: 820;
+      line-height: 1.35;
+    }
+
+    .app-body {
+      min-width: 0;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--ms-green);
+      font-size: .75em;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .screen-title {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: clamp(1.7em, 8vw, 2.125em);
+      line-height: 1.04;
+      letter-spacing: -.025em;
+    }
+
+    .screen-copy {
+      margin: -6px 0 0;
+      color: #25255e;
+      font-size: .875em;
+      line-height: 1.45;
+    }
+
+    .method-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .method-stack,
+    .form-stack,
+    .message-card {
+      display: grid;
+      gap: 9px;
+    }
+
+    .provider-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--ms-navy);
+      border-radius: var(--ms-radius);
+      padding: 13px;
+      background: var(--ms-white);
+    }
+
+    .provider-card h3 {
+      margin: 0;
+      color: var(--ms-green);
+      font-size: .75em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .provider {
+      appearance: none;
+      min-width: 0;
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--ms-navy);
+      font-family: var(--ms-font);
+      cursor: pointer;
+    }
+
+    .provider:focus-visible {
+      outline: 3px solid var(--ms-saffron);
+      outline-offset: 1px;
+    }
+
+    .provider-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 128, .14);
+      border-radius: 50%;
+      background: var(--ms-white);
+      color: var(--ms-white);
+      box-shadow: 0 7px 15px rgba(0, 0, 128, .12);
+    }
+
+    .provider-icon svg {
+      width: 25px;
+      height: 25px;
+      display: block;
+    }
+
+    .provider b {
+      max-width: 72px;
+      color: var(--ms-navy);
+      font-size: calc(10px * var(--ui-scale));
+      line-height: 1.15;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    .provider-apple .provider-icon,
+    .provider-x .provider-icon {
+      border-color: #111;
+      background: #111;
+    }
+
+    .provider-instagram .provider-icon {
+      border-color: #df3f8f;
+      background: radial-gradient(circle at 30% 105%, #feda75 0 18%, #fa7e1e 32%, #d62976 54%, #962fbf 72%, #4f5bd5 100%);
+    }
+
+    .provider-facebook .provider-icon {
+      border-color: #1877f2;
+      background: #1877f2;
+    }
+
+    .provider-youtube .provider-icon {
+      border-color: #ff0033;
+      background: var(--ms-white);
+    }
+
+    .provider-instagram svg {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .method-button,
+    .primary-button,
+    .secondary-button,
+    .text-button,
+    .scenario-button {
+      appearance: none;
+      min-height: 50px;
+      border: 1px solid var(--ms-navy);
+      border-radius: 16px;
+      font-family: var(--ms-font);
+      cursor: pointer;
+    }
+
+    .method-button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 50px;
+      border-radius: var(--ms-radius);
+      padding: 9px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      text-align: left;
+    }
+
+    .method-button:focus-visible,
+    .primary-button:focus-visible,
+    .secondary-button:focus-visible,
+    .text-button:focus-visible,
+    .head-action:focus-visible,
+    .scenario-button:focus-visible,
+    .email-input:focus-visible {
+      outline: 3px solid var(--ms-saffron);
+      outline-offset: 2px;
+    }
+
+    .method-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: var(--ms-navy);
+    }
+
+    .method-icon svg {
+      width: 30px;
+      height: 30px;
+      display: block;
+    }
+
+    .method-copy {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .method-copy strong {
+      color: var(--ms-navy);
+      font-size: calc(13px * var(--ui-scale));
+      line-height: 1.15;
+    }
+
+    .method-copy small {
+      color: #4d4d73;
+      font-size: calc(11px * var(--ui-scale));
+      line-height: 1.25;
+    }
+
+    .chevron {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .chevron svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .google-icon {
+      background: var(--ms-white);
+      border: 1px solid #e1e4ed;
+    }
+
+    .method-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: -2px 2px 0;
+      color: #4d4d73;
+      font-size: .6875em;
+      line-height: 1.4;
+    }
+
+    .method-note svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: var(--ms-green);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .field-label {
+      color: var(--ms-navy);
+      font-size: .8125em;
+      font-weight: 900;
+    }
+
+    .email-input {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid var(--ms-navy);
+      border-radius: 15px;
+      padding: 0 14px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 1em;
+    }
+
+    .email-input[aria-invalid="true"] {
+      border-width: 2px;
+      border-color: #aa1e27;
+    }
+
+    .field-help,
+    .field-error {
+      margin: -4px 2px 0;
+      font-size: .75em;
+      line-height: 1.4;
+    }
+
+    .field-help { color: #4d4d73; }
+    .field-error { color: #9c1721; font-weight: 800; }
+
+    .field-error[hidden] {
+      display: none;
+    }
+
+    .primary-button,
+    .secondary-button {
+      width: 100%;
+      display: grid;
+      place-items: center;
+      padding: 0 18px;
+      font-size: .875em;
+      font-weight: 950;
+    }
+
+    .primary-button {
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .secondary-button {
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .primary-button[disabled] {
+      opacity: .52;
+      cursor: not-allowed;
+    }
+
+    .text-actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px 16px;
+      flex-wrap: wrap;
+    }
+
+    .text-button {
+      min-height: 44px;
+      border-color: transparent;
+      padding: 0 4px;
+      background: transparent;
+      color: var(--ms-navy);
+      font-size: .8125em;
+      font-weight: 900;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .message-card {
+      border: 1px solid rgba(0, 0, 128, .2);
+      border-radius: 20px;
+      padding: 18px;
+      background: #f8f9ff;
+    }
+
+    .message-icon {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .message-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .message-card strong {
+      color: var(--ms-navy);
+      font-size: 1.0625em;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .message-card p {
+      margin: 0;
+      color: #353566;
+      font-size: .8125em;
+      line-height: 1.5;
+    }
+
+    .security-note {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      border-left: 3px solid var(--ms-green);
+      padding: 10px 11px;
+      background: #f4fbf6;
+      color: #2d4c36;
+      font-size: .75em;
+      line-height: 1.45;
+    }
+
+    .security-note svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: var(--ms-green);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .otp-row {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .otp-cell {
+      min-height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ms-navy);
+      border-radius: 12px;
+      color: var(--ms-navy);
+      font-size: 1.0625em;
+      font-weight: 950;
+    }
+
+    .legal-copy {
+      margin: 0;
+      padding: 10px 18px 16px;
+      color: #5a5a76;
+      font-size: .625em;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    .phone[data-current-state="choose"] .screen-title {
+      font-size: calc(29px * var(--ui-scale));
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .phone[data-current-state="choose"] .screen-copy {
+      margin: 0;
+      color: var(--ms-navy);
+      font-size: calc(13px * var(--ui-scale));
+      line-height: 1.42;
+    }
+
+    .phone[data-current-state="choose"] .legal-copy {
+      display: none;
+    }
+
+    .review-controls {
+      display: grid;
+      gap: 16px;
+    }
+
+    .review-card {
+      display: grid;
+      gap: 12px;
+      border: 1px solid rgba(0, 0, 128, .22);
+      border-radius: 18px;
+      padding: 16px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+    }
+
+    .review-card h2,
+    .review-card h3,
+    .review-card p {
+      margin: 0;
+    }
+
+    .review-card h2 {
+      font-size: 19px;
+      line-height: 1.2;
+    }
+
+    .review-card h3 {
+      color: var(--ms-green);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .review-card p,
+    .review-card li {
+      font-size: 13px;
+      line-height: 1.48;
+    }
+
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .scenario-button {
+      padding: 8px 10px;
+      background: var(--ms-white);
+      color: var(--ms-navy);
+      font-size: 12px;
+      font-weight: 850;
+      text-align: left;
+    }
+
+    .scenario-button[aria-pressed="true"] {
+      background: var(--ms-navy);
+      color: var(--ms-white);
+    }
+
+    .review-status {
+      min-height: 52px;
+      display: grid;
+      align-content: center;
+      border: 1px solid var(--ms-green);
+      border-radius: 15px;
+      padding: 10px 12px;
+      background: #f4fbf6;
+      color: #25472e;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+
+    .contract-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    [data-view][hidden] {
+      display: none;
+    }
+
+    @media (max-width: 820px) {
+      .review-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .ms-page {
+        padding-inline: 0;
+      }
+
+      .review-header {
+        padding-inline: 14px;
+      }
+
+      .review-panel {
+        border-inline: 0;
+        border-radius: 0;
+      }
+
+      .review-grid {
+        padding: 12px 0 18px;
+      }
+
+      .review-controls {
+        padding-inline: 14px;
+      }
+
+      .phone {
+        width: min(100%, 360px);
+        min-height: 660px;
+        border-width: 9px;
+        border-radius: 32px;
+        box-shadow: none;
+      }
+
+      .phone-status {
+        display: flex;
+      }
+
+      .phone-app {
+        min-height: 628px;
+        border-radius: 0;
+      }
+
+      .stage-label {
+        padding-inline: 14px;
+      }
+    }
+
+    @media (max-width: 350px) {
+      .app-body {
+        gap: 12px;
+        padding: 16px 14px 14px;
+      }
+
+      .screen-title {
+        font-size: 1.6875em;
+      }
+
+      .method-button {
+        grid-template-columns: 40px minmax(0, 1fr) 26px;
+        gap: 8px;
+        padding-inline: 8px;
+      }
+
+      .method-icon {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body class="ms-doc">
+  <main class="ms-page review-shell">
+    <header class="review-header">
+      <div class="review-row">
+        <a class="screenbook-link" href="../index.html">
+          <span class="back-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" /></svg></span>
+          Back to Screenbook
+        </a>
+        <span class="proposal-badge">v5 proposal · awaiting founder FINAL</span>
+      </div>
+      <h1 class="ms-title">Screen 03: Passwordless email-link successor</h1>
+      <p class="review-lead">
+        A versioned founder-review proposal that replaces only the unsupported numeric Email OTP journey with a secure email sign-in link. Google and Mobile OTP remain available. No email is sent by this prototype.
+      </p>
+    </header>
+
+    <section class="review-panel" aria-labelledby="preview-heading">
+      <div class="review-panel-head" id="preview-heading">Exact customer viewport <span>Interactive local proposal</span></div>
+      <div class="review-grid">
+        <article class="device-stage">
+          <div class="stage-label">Screen 03 <span data-stage-label>Choose method</span></div>
+          <section class="phone" data-current-state="choose" aria-label="MoolSocial Screen 03 passwordless email-link proposal">
+            <div class="phone-status"><span>9:41</span><span>5G&nbsp;&nbsp;100%</span></div>
+            <div class="phone-app">
+              <header class="app-head">
+                <div class="brand-lockup">
+                  <div class="wordmark">MoolSocial</div>
+                  <div class="identity-line" aria-hidden="true"><span></span><span></span><span></span></div>
+                  <p class="top-copy">India Ka Socio Commerce App</p>
+                </div>
+              </header>
+
+              <div class="app-body">
+                <section data-view="choose">
+                  <div class="method-list">
+                    <h2 class="screen-title">Sign in</h2>
+                    <p class="screen-copy">Choose one method to continue.</p>
+
+                    <div class="provider-card">
+                      <h3>Social account</h3>
+                      <div class="provider-grid" aria-label="Social sign-in providers">
+                        <button class="provider provider-google" type="button" aria-label="Continue with Google" data-action="provider" data-provider="Google">
+                          <span class="provider-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                              <path fill="#4285F4" d="M22.1 12.2c0-.7-.1-1.3-.2-1.9H12v3.8h5.7c-.3 1.3-1 2.4-2.1 3.1v2.6H19c2-1.8 3.1-4.5 3.1-7.6Z" />
+                              <path fill="#34A853" d="M12 22c2.8 0 5.2-.9 7-2.6l-3.4-2.6c-.9.6-2.1 1-3.6 1-2.8 0-5.1-1.9-5.9-4.4H2.6v2.7C4.3 19.6 7.9 22 12 22Z" />
+                              <path fill="#FBBC05" d="M6.1 13.4a6.1 6.1 0 0 1 0-3.8V6.9H2.6a10 10 0 0 0 0 10.2l3.5-2.7Z" />
+                              <path fill="#EA4335" d="M12 6.2c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0 0 2.6 6.9l3.5 2.7C6.9 8.1 9.2 6.2 12 6.2Z" />
+                            </svg>
+                          </span>
+                          <b>Google</b>
+                        </button>
+                        <button class="provider provider-youtube" type="button" aria-label="Continue with YouTube" data-action="provider" data-provider="YouTube">
+                          <span class="provider-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#FF0033" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8Z" /><path fill="#fff" d="m9.6 15.6 6.2-3.6-6.2-3.6v7.2Z" /></svg></span>
+                          <b>YouTube</b>
+                        </button>
+                        <button class="provider provider-apple" type="button" aria-label="Continue with Apple" data-action="provider" data-provider="Apple">
+                          <span class="provider-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M16.6 13.1c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.1-2.8.9-3.6.9-.7 0-1.9-.9-3.1-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 6.8 1.1 9.1.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3.1.7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.3-.9-2.3-3.7ZM14.3 6.2c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.6 1 .1 2-.5 2.6-1.2Z" /></svg></span>
+                          <b>Apple</b>
+                        </button>
+                        <button class="provider provider-x" type="button" aria-label="Continue with X" data-action="provider" data-provider="X">
+                          <span class="provider-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M14.3 10.2 22 2h-1.8l-6.7 7.1L8.2 2H2l8.1 10.8L2 22h1.8l7.1-7.6 5.7 7.6H22l-7.7-11.8Zm-2.5 2.7-.8-1.1L4.5 3.4h2.8l5.2 6.9.8 1.1 6.8 9.2h-2.8l-5.5-7.7Z" /></svg></span>
+                          <b>X</b>
+                        </button>
+                        <button class="provider provider-instagram" type="button" aria-label="Continue with Instagram" data-action="provider" data-provider="Instagram">
+                          <span class="provider-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="4" /><circle cx="12" cy="12" r="3.2" /><path d="M16.8 7.4h.1" /></svg></span>
+                          <b>Instagram</b>
+                        </button>
+                        <button class="provider provider-facebook" type="button" aria-label="Continue with Facebook" data-action="provider" data-provider="Facebook">
+                          <span class="provider-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.1 8H17V4.8c-.3 0-1.5-.1-2.8-.1-2.8 0-4.6 1.7-4.6 4.8V12H6.5v3.6h3.1V22h3.7v-6.4h3.1l.5-3.6h-3.6V9.8c0-1 .3-1.8 1.8-1.8Z" /></svg></span>
+                          <b>Facebook</b>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="method-stack">
+                      <button class="method-button" type="button" data-action="email">
+                        <span class="method-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path fill="#EA4335" d="M3 6.5 12 13l9-6.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5Z" /><path fill="#FBBC05" d="M3.8 5h16.4L12 11.2 3.8 5Z" /><path fill="#34A853" d="M3 6.5 10.8 12 3 18V6.5Z" /><path fill="#4285F4" d="M21 6.5 13.2 12 21 18V6.5Z" /></svg>
+                        </span>
+                        <span class="method-copy"><strong>Email link</strong><small>Use any email address</small></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span>
+                      </button>
+
+                      <button class="method-button" type="button" data-action="mobile">
+                        <span class="method-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><rect x="6" y="2.8" width="12" height="18.4" rx="2.5" fill="#138808" /><rect x="7.7" y="5.3" width="8.6" height="11.6" rx="1.2" fill="#E8F5FF" /><circle cx="12" cy="18.8" r="1" fill="#fff" /><circle cx="10" cy="10.8" r="1.1" fill="#4285F4" /><circle cx="14" cy="10.8" r="1.1" fill="#4285F4" /><circle cx="12" cy="13.8" r="1.1" fill="#EA4335" /></svg>
+                        </span>
+                        <span class="method-copy"><strong>Mobile OTP</strong><small>Use mobile number</small></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span>
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section data-view="email" hidden>
+                  <form class="form-stack" data-email-form novalidate>
+                    <p class="eyebrow">Secure email sign-in</p>
+                    <h2 class="screen-title">Enter your email</h2>
+                    <p class="screen-copy">We’ll email you a secure link that signs you in.</p>
+                    <label class="field-label" for="emailAddress">Email address</label>
+                    <input class="email-input" id="emailAddress" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@example.com" aria-describedby="email-help email-error" />
+                    <p class="field-help" id="email-help">Open the link on this device for the quickest return.</p>
+                    <p class="field-error" id="email-error" role="alert" hidden>Enter a valid email address.</p>
+                    <button class="primary-button" type="submit">Send sign-in link</button>
+                    <button class="text-button" type="button" data-action="choose">Choose another method</button>
+                  </form>
+                </section>
+
+                <section data-view="sent" hidden>
+                  <div class="message-card">
+                    <div class="message-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m5 7 7 5 7-5" /></svg></div>
+                    <p class="eyebrow">Link sent</p>
+                    <h2 class="screen-title">Check your email</h2>
+                    <p>We sent a secure sign-in link to</p>
+                    <strong data-masked-email>a•••@example.com</strong>
+                    <p>Tap the link in the email to return and finish signing in.</p>
+                  </div>
+                  <div class="security-note">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.8 8.4 7 10 4.2-1.6 7-5.5 7-10V6l-7-3Z" /><path d="m9.5 12 1.7 1.7 3.6-4" /></svg>
+                    Never share or forward your sign-in link. MoolSocial will never ask you for the link.
+                  </div>
+                  <button class="secondary-button" type="button" data-action="simulate-link">Preview link return</button>
+                  <button class="primary-button" type="button" disabled data-resend>Resend available in 30s</button>
+                  <div class="text-actions">
+                    <button class="text-button" type="button" data-action="email">Use a different email</button>
+                    <button class="text-button" type="button" data-action="choose">Choose another method</button>
+                  </div>
+                </section>
+
+                <section data-view="different-device" hidden>
+                  <form class="form-stack" data-confirm-form novalidate>
+                    <p class="eyebrow">One more check</p>
+                    <h2 class="screen-title">Confirm your email</h2>
+                    <p class="screen-copy">You opened the link on a different device. Enter the same email to finish signing in.</p>
+                    <label class="field-label" for="confirmEmail">Email address</label>
+                    <input class="email-input" id="confirmEmail" name="confirmEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@example.com" aria-describedby="confirm-help confirm-error" />
+                    <p class="field-help" id="confirm-help">This protects your account if a link is forwarded by mistake.</p>
+                    <p class="field-error" id="confirm-error" role="alert" hidden>Enter the email address that received this link.</p>
+                    <button class="primary-button" type="submit">Finish signing in</button>
+                    <button class="text-button" type="button" data-action="choose">Choose another method</button>
+                  </form>
+                </section>
+
+                <section data-view="expired" hidden>
+                  <div class="message-card">
+                    <div class="message-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg></div>
+                    <p class="eyebrow">Try again</p>
+                    <h2 class="screen-title">This link has expired</h2>
+                    <p>Sign-in links can be used only once and expire for your security.</p>
+                  </div>
+                  <button class="primary-button" type="button" data-action="email">Send a new link</button>
+                  <button class="text-button" type="button" data-action="choose">Choose another method</button>
+                </section>
+
+                <section data-view="mobile" hidden>
+                  <div class="form-stack">
+                    <p class="eyebrow">Mobile OTP</p>
+                    <h2 class="screen-title">Enter OTP</h2>
+                    <p class="screen-copy">Sent to +91 ******4821</p>
+                    <div class="otp-row" aria-label="Six-digit mobile OTP">
+                      <span class="otp-cell">4</span><span class="otp-cell">8</span><span class="otp-cell">2</span><span class="otp-cell">7</span><span class="otp-cell">1</span><span class="otp-cell">9</span>
+                    </div>
+                    <button class="primary-button" type="button" data-action="mobile-verify">Verify</button>
+                    <div class="text-actions"><button class="text-button" type="button" data-action="choose">Choose another method</button></div>
+                  </div>
+                </section>
+              </div>
+
+              <p class="legal-copy">By continuing, you agree to MoolSocial’s Terms and acknowledge its Privacy Policy.</p>
+            </div>
+          </section>
+        </article>
+
+        <aside class="review-controls" aria-label="Founder review controls">
+          <article class="review-card">
+            <h2>Review every reachable state</h2>
+            <p>These controls change only the local preview. They do not contact Firebase or send an email.</p>
+            <div class="scenario-grid" role="group" aria-label="Preview state">
+              <button class="scenario-button" type="button" data-scenario="choose" aria-pressed="true">Choose method</button>
+              <button class="scenario-button" type="button" data-scenario="email" aria-pressed="false">Enter email</button>
+              <button class="scenario-button" type="button" data-scenario="sent" aria-pressed="false">Link sent</button>
+              <button class="scenario-button" type="button" data-scenario="different-device" aria-pressed="false">Different device</button>
+              <button class="scenario-button" type="button" data-scenario="expired" aria-pressed="false">Expired / used</button>
+              <button class="scenario-button" type="button" data-scenario="mobile" aria-pressed="false">Mobile OTP</button>
+            </div>
+            <div class="review-status" role="status" aria-live="polite" data-review-status>Choose method is visible. No external action occurred.</div>
+          </article>
+
+          <article class="review-card">
+            <h3>Customer contract</h3>
+            <ul class="contract-list">
+              <li>Google and Mobile OTP remain available.</li>
+              <li>Email uses a sign-in link, never a numeric email code.</li>
+              <li>The link returns to the exact protected destination.</li>
+              <li>Different-device completion asks for the same email.</li>
+              <li>Expired or already-used links recover without a dead end.</li>
+              <li>No provider, API, test or implementation wording enters the customer viewport.</li>
+            </ul>
+          </article>
+
+          <article class="review-card">
+            <h3>Held after this proposal</h3>
+            <p>Founder FINAL, immutable v5 freeze, Flutter parity, Firebase configuration, Android App Links, Hosting review, email sending, build and OPPO evidence remain separate gates.</p>
+          </article>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const views = Array.from(document.querySelectorAll('[data-view]'));
+      const scenarios = Array.from(document.querySelectorAll('[data-scenario]'));
+      const phone = document.querySelector('.phone');
+      const stageLabel = document.querySelector('[data-stage-label]');
+      const reviewStatus = document.querySelector('[data-review-status]');
+      const emailInput = document.querySelector('#emailAddress');
+      const confirmInput = document.querySelector('#confirmEmail');
+      const maskedEmail = document.querySelector('[data-masked-email]');
+      let current = 'choose';
+      let savedEmail = 'account@example.com';
+      const params = new URLSearchParams(window.location.search);
+      const textScale = params.get('textScale') === '140' ? '1.4' : '1';
+      document.querySelector('.phone')?.style.setProperty('--ui-scale', textScale);
+
+      const labels = {
+        choose: 'Choose method',
+        email: 'Enter email',
+        sent: 'Check email',
+        'different-device': 'Confirm email',
+        expired: 'Expired or used',
+        mobile: 'Mobile OTP'
+      };
+
+      function mask(value) {
+        const parts = value.split('@');
+        if (parts.length !== 2) return 'your email address';
+        const local = parts[0];
+        return `${local.slice(0, 1)}${'•'.repeat(Math.max(3, Math.min(6, local.length - 1)))}@${parts[1]}`;
+      }
+
+      function setState(next, message) {
+        current = labels[next] ? next : 'choose';
+        views.forEach((view) => { view.hidden = view.dataset.view !== current; });
+        scenarios.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.scenario === current)));
+        if (stageLabel) stageLabel.textContent = labels[current];
+        if (phone) phone.dataset.currentState = current;
+        if (reviewStatus) reviewStatus.textContent = message || `${labels[current]} is visible. No external action occurred.`;
+        const url = new URL(window.location.href);
+        url.searchParams.set('founderReview', '1');
+        url.searchParams.set('state', current);
+        history.replaceState({ state: current }, '', url);
+      }
+
+      function validEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+      }
+
+      function showFieldError(input, error, visible) {
+        input.setAttribute('aria-invalid', String(visible));
+        error.hidden = !visible;
+        if (visible) input.focus();
+      }
+
+      document.addEventListener('click', (event) => {
+        const scenario = event.target.closest('[data-scenario]');
+        if (scenario) {
+          setState(scenario.dataset.scenario);
+          return;
+        }
+
+        const action = event.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
+
+        if (action === 'back' || action === 'choose') {
+          setState('choose');
+        } else if (action === 'email') {
+          setState('email');
+          window.setTimeout(() => emailInput?.focus(), 0);
+        } else if (action === 'mobile') {
+          setState('mobile');
+        } else if (action === 'simulate-link') {
+          setState('different-device', 'Different-device confirmation is visible. The proposal did not open or consume a real link.');
+        } else if (action === 'provider') {
+          const provider = event.target.closest('[data-provider]')?.dataset.provider || 'Social account';
+          if (reviewStatus) reviewStatus.textContent = `${provider} sign-in is preserved from the earlier Screen 03. The local proposal did not open a provider.`;
+        } else if (action === 'mobile-verify') {
+          if (reviewStatus) reviewStatus.textContent = 'Mobile OTP verification remains preserved. The local proposal did not verify a code.';
+        }
+      });
+
+      document.querySelector('[data-email-form]')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const error = document.querySelector('#email-error');
+        const value = emailInput.value.trim();
+        const invalid = !validEmail(value);
+        showFieldError(emailInput, error, invalid);
+        if (invalid) return;
+        savedEmail = value;
+        if (maskedEmail) maskedEmail.textContent = mask(savedEmail);
+        setState('sent', 'Link-sent confirmation is visible. No email was sent by this proposal.');
+      });
+
+      document.querySelector('[data-confirm-form]')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const error = document.querySelector('#confirm-error');
+        const value = confirmInput.value.trim().toLowerCase();
+        const invalid = !validEmail(value) || value !== savedEmail.toLowerCase();
+        showFieldError(confirmInput, error, invalid);
+        if (invalid) return;
+        setState('sent', 'The matching email would complete authentication and return to the exact pending destination. No sign-in occurred.');
+      });
+
+      window.addEventListener('popstate', (event) => setState(event.state?.state || 'choose'));
+
+      const requested = params.get('state');
+      setState(labels[requested] ? requested : 'choose');
+    })();
+  </script>
+  <script type="application/json" id="proposalContract">{"ticketId":"UAW-C33I-SCREEN03-PASSWORDLESS-EMAIL-LINK-REFERENCE-SUCCESSOR","proposalVersion":"v5","status":"founder-review-proposal-not-final","acceptedReferenceMutation":false,"runtimeImplementationAuthorized":false,"hostingDeploymentAuthorized":false,"emailSendAuthorized":false,"preservedMethods":["google","mobile_otp"],"emailMethod":"firebase_passwordless_email_link","requiredReturn":"exact_pending_destination"}</script>
+</body>
+</html>

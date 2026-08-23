@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "contractId": "PLAY-INTERNAL-INSTALL-RECOVERY-GATES-C30R-001",
+  "machineState": "Play_installed_identity_sealed_runtime_rejected_missing_Crashlytics_build_ID",
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-INSTALL-RECOVERY-C30R",
+  "branch": "remediation/prototype-conformance-2026-07-20",
+  "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+  "device": {
+    "serial": "2b3e0f71",
+    "model": "CPH2375",
+    "androidUserId": 0
+  },
+  "candidate": {
+    "packageName": "com.moolsocial.app",
+    "versionName": "1.0.0-r60.43",
+    "versionCode": "2026081243",
+    "artifactType": "AAB",
+    "artifactPath": "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/MoolSocial-1.0.0-r60.43-2026081243-release.aab",
+    "artifactSha256": "E7E7DF249C71195FF9EDF8FD0247AEB64C91FEC3DD541F4A5A8FD11690AD8A69",
+    "playAppSigningSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9"
+  },
+  "distribution": {
+    "provider": "Google_Play",
+    "track": "internal",
+    "playAppId": "4974778280277295872",
+    "trackId": "4700716609720808604",
+    "testerLink": "https://play.google.com/apps/internaltest/4700716609720808604",
+    "releaseActive": true,
+    "releaseVersionCode": "2026081243",
+    "buildCount": 1,
+    "uploadCount": 1,
+    "newBuildAuthorized": false,
+    "newUploadAuthorized": false,
+    "productionRolloutAuthorized": false,
+    "openTestingAuthorized": false,
+    "publicListingAuthorized": false
+  },
+  "predecessor": {
+    "versionName": "1.0.0-r60.40",
+    "versionCode": "2026081240",
+    "apkSha256": "50A5CBA08A68895B3BCCCB235E5BD7209CBDDC45673BA5FC607F365C611F5121",
+    "founderRemoved": true,
+    "packageAbsentReadback": true,
+    "privateLocalDataRecoverable": false,
+    "preservationEvidence": "docs/quality/UAW-C30Q-OPPO-R60-40-PRE-REMOVAL-PRESERVATION-RECORD-20260812.md",
+    "removalEvidence": "docs/quality/UAW-C30Q-FOUNDER-R60-40-REMOVAL-READBACK-20260812.md"
+  },
+  "installResult": {
+    "state": "founder_Play_install_succeeded_identity_qualified_authority_consumed",
+    "installAuthority": "consumed",
+    "candidateInstallCount": 1,
+    "founderInstalledBeforeMachinePreinstallGateCompleted": true,
+    "preinstallPackageAbsenceEvidence": "docs/quality/UAW-C30Q-FOUNDER-R60-40-REMOVAL-READBACK-20260812.md",
+    "installerPackageName": "com.android.vending",
+    "installedVersionName": "1.0.0-r60.43",
+    "installedVersionCode": "2026081243",
+    "installedSignerSha256": "47B28C7DDE2B61CAB6A7748C9019A3B57376B3BE1DC163D48253BBA35B63CDD9",
+    "playArtifactRelationshipProved": true,
+    "adbInstallPerformed": false,
+    "secondInstallPerformed": false,
+    "postinstallEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-youtube-compliance-c30q-r60-43-20260812-01/15-play-installed-identity-and-cold-stall-rejection.json"
+  },
+  "journeyResult": {
+    "state": "rejected_before_first_frame_missing_Crashlytics_build_ID",
+    "c28d": "rejected_zero_Flutter_semantic_nodes",
+    "youtubeReviewerMatrix": "blocked_not_started",
+    "liveFeedRead": "blocked_not_started",
+    "createWritesAttempted": 0,
+    "createReadbacksPassed": 0,
+    "globalNavigation": "blocked_not_started",
+    "failureEvidence": "docs/quality/UAW-C30R-PLAY-R60-43-COLD-SCREEN-MISSING-CRASHLYTICS-BUILD-ID-REJECTION-20260812.md"
+  },
+  "communicationHold": {
+    "reviewerPackage": "config/youtube-api-compliance-reviewer-package-c30q.json",
+    "gmailDraftCreated": false,
+    "emailSent": false,
+    "quotaSubmitted": false,
+    "founderFinalApproval": false
+  }
+}

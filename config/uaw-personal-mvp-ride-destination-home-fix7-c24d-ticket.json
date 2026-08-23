@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-RIDE-DESTINATION-HOME-FIX7-C24D",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Bike, Auto and Cab open a destination-first booking home with current pickup, recent/saved places, fare and arrival information before confirmation.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-RIDE-DESTINATION-HOME-FIX7-C24D-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["RideBookingScreen","RideSession","RidePackage","existing_ride_book_route","shared_service_home_primitives"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["current_pickup_visible","where_to_search_is_primary","recent_and_saved_places_direct","Bike_Auto_Cab_meanings_preserved","fare_arrival_capacity_and_payment_before_book","no_map_or_promo_clutter","adaptive_and_accessible"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false},
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-RIDE-DESTINATION-HOME-FIX7-C24D-COMPLETION-20260809.md"
+}

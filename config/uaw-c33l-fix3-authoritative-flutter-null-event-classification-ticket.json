@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33L-FIX3-AUTHORITATIVE-FLUTTER-NULL-EVENT-CLASSIFICATION",
+  "parentTicketId": "UAW-C33L-R60-50-AUTHENTICATION-NO-REGRESSION-PLAY-OPPO-ACCEPTANCE",
+  "findingId": "REG-20260816-2546-C33L-AUTHORITATIVE-FLUTTER-RUNNER-NULL-EVENT-BINDING-CRASH",
+  "state": "runner_null_and_blank_classification_qualified_parent_reselection_and_new_source_seal_required",
+  "classification": "mvp_required",
+  "customerOutcome": "Every authoritative Flutter cycle returns a truthful bounded pass or fail summary even when the process emits a blank line or JSON null, so a release cannot lose or misclassify regression evidence.",
+  "classificationReason": "The no-regression release gate depends on the authoritative Flutter runner and cannot qualify a candidate when its summarizer crashes before reporting exact counts.",
+  "minimumCompleteScope": [
+    "classify_blank_raw_lines_before_JSON_conversion",
+    "classify_JSON_null_before_mandatory_event_helpers",
+    "preserve_typed_untyped_non_JSON_and_failure_counting",
+    "add_behavioral_fixture_coverage_without_logging_event_values",
+    "pass_dual_PowerShell_hosts_then_reseal_and_restart_two_complete_cycles"
+  ],
+  "explicitExclusions": [
+    "no_mobile_runtime_UI_route_session_service_backend_or_provider_change",
+    "no_AAB_Play_OPPO_email_SMS_or_external_service_action",
+    "no_backend_Hosting_provider_Firebase_or_Production_deployment",
+    "no_raw_JSON_value_secret_token_nonce_private_verdict_key_or_attestation_output",
+    "no_waiver_or_expected_failure_promotion"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_no_regression_repeat_and_finding_to_ticket_repair_authority",
+    "REG_2546_preserved_cycle_2_failure_evidence",
+    "existing_C30Y_event_shape_parser_and_authoritative_runner",
+    "parent_C33L_release_ticket"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_behavioral_fixture_for_blank_JSON_null_typed_and_untyped_inputs",
+    "sanitized_property_names_only_and_no_event_values",
+    "PowerShell_7_and_Windows_PowerShell_5_1",
+    "fresh_parent_source_seal",
+    "two_new_complete_zero_failure_C33L_cycles"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/c30y-flutter-json-event-shape-parser.ps1",
+      "tmp/run-c30t-authoritative-flutter-manifest-audit.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-uaw-c33l-fix3-authoritative-flutter-null-event-classification.ps1"
+    ],
+    "necessityProof": "The existing parser and runner remain authoritative. One bounded pre-classification branch and one behavioral checker are the smallest complete repair and create no alternate test, product, backend, provider, or build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "sourceTestAndGateRepairAuthorized": true,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "powerShell7BehavioralGate": "passed",
+    "windowsPowerShell51BehavioralGate": "passed",
+    "predecessorC30YFix5Gate": "passed",
+    "blankNullWhitespaceClassified": true,
+    "jsonNullClassified": true,
+    "nonJsonClassified": true,
+    "typedAndUntypedObjectsPreserved": true,
+    "rawEventValuesExposed": false,
+    "runtimeSourceChanged": false,
+    "newScreens": 0,
+    "newRoutes": 0,
+    "newBackendOwners": 0,
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "secretValuesObserved": false,
+    "evidence": "docs/quality/UAW-C33L-FIX3-AUTHORITATIVE-FLUTTER-NULL-EVENT-CLASSIFICATION-QUALIFICATION-20260816.md"
+  }
+}

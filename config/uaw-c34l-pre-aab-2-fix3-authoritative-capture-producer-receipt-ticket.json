@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34L-PRE-AAB-2-FIX3-AUTHORITATIVE-CAPTURE-PRODUCER-RECEIPT",
+  "parentTicketId": "UAW-C34L-PRE-AAB-2-FIX2-AUTHORITATIVE-CAPTURE-DEVICE-PRIVACY-PROOF-BINDING",
+  "findingId": "REG-20260818-2912-C34L-CAPTURE-SUCCESS-GRAPH-CALLER-FABRICATION-P0",
+  "state": "registered_selection_only_implementation_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "C34L can accept Play, OPPO and journey success only from one producer-owned receipt backed by a real qualified observation source, never from caller-authored success claims.",
+  "classificationReason": "Independent audit proved capture contract v2 and the final writers permit a caller to fabricate a hash-consistent success graph because no production owner performs observation or owns session, artifact, manifest and receipt creation.",
+  "minimumCompleteScope": [
+    "upgrade_the_capture_contract_to_one_authoritative_producer_receipt_schema",
+    "make_the_producer_own_observation_session_challenge_artifact_manifest_receipt_and_immutable_journal_creation",
+    "bind_exact_producer_script_path_SHA256_sealed_source_manifest_current_state_aggregate_artifact_vector_attempt_session_and_journal_chain",
+    "reuse_current_session_Play_browser_proof_and_release_transaction_proof_as_the_Play_observation_source",
+    "use_only_read_only_OPPO_package_installer_time_log_and_interactive_observation_sources_and_never_mutate_the_device",
+    "consume_only_executable_authoritative_journey_gate_outputs_and_fail_closed_when_an_exact_adapter_is_absent",
+    "remove_success_booleans_counts_and_caller_authored_producer_session_nonce_or_artifact_claims_from_every_production_final_writer_interface",
+    "allow_exact_fixture_adapters_only_in_a_distinct_parameter_set_under_one_unique_confined_fixture_run_root",
+    "bind_final_source_attestation_Play_OPPO_journey_transition_and_retained validation_to_the_same_receipt",
+    "pass_dual_host_forgery_wrong_producer_script_seal_session_replay_tamper_fixture_escape_and_missing_adapter_fixtures"
+  ],
+  "productionReceiptContract": {
+    "contractId": "MOOLSOCIAL-C34L-AUTHORITATIVE-CAPTURE-RECEIPT-001",
+    "producerId": "MOOLSOCIAL-C34L-AUTHORITATIVE-CAPTURE-PRODUCER-001",
+    "producerOwner": "scripts/write-release-authoritative-capture-receipt-c34l.ps1",
+    "productionInputs": ["evidenceType", "attempt", "statePath"],
+    "productionCallerClaimsForbidden": ["success_boolean", "success_count", "producer_id", "session_id", "nonce", "artifact_binding", "capture_digest"],
+    "boundOwners": ["producer_script_path_SHA256_bytes", "sealed_source_manifest_path_SHA256_bytes", "detailed_state_path_SHA256_bytes", "aggregate_state_path_SHA256_bytes", "AAB_path_SHA256_bytes", "action_and_authority_vector", "observation_source_owner_path_SHA256_bytes", "session_and_nonce_hash", "previous_journal_head", "capture_manifest_path_SHA256_bytes"]
+  },
+  "productionAdapters": {
+    "play": "MOOLSOCIAL-C34L-PLAY-BROWSER-TRANSACTION-ADAPTER-001",
+    "oppo": "MOOLSOCIAL-C34L-OPPO-READONLY-PACKAGE-INSTALLER-TIME-LOG-ADAPTER-001",
+    "journey": "MOOLSOCIAL-C34L-JOURNEY-GATE-OUTPUT-ADAPTER-001",
+    "missingAdapterDisposition": "fail_closed_without_creating_capture_artifact_manifest_receipt_or_journal_success"
+  },
+  "explicitExclusions": [
+    "no_source_seal_cycle_build_founder_launcher_AAB_or_browser_action",
+    "no_real_Play_upload_activation_console_track_or_external_action",
+    "no_real_OPPO_install_uninstall_data_clear_downgrade_sideload_launch_or_device_mutation",
+    "no_real_authentication_account_chooser_private_identifier_private_link_or_journey_action",
+    "no_secret_credential_token_cookie_raw_exception_stack_or_private_value_access",
+    "no_product_runtime_UI_route_service_backend_Hosting_or_provider_change"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_authorized_C34L_parent_and_immediate_pre_AAB_batch",
+    "REG2837_REG2878_through_REG2914_preserved_before_repair",
+    "qualified_C34L_browser_transition_journal_source_attestation_retained_and_recovery_owners",
+    "PRE_AAB_4_source_seal_cycles_build_Play_OPPO_and_real_journeys_remain_held"
+  ],
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_producer_receipt_final_writer_transition_and_retained fixtures",
+    "caller_forged_JSON_and_success_switch_production_interface_rejection",
+    "wrong_producer_script_hash_sealed_manifest_state_aggregate_artifact_vector_session_nonce_and_journal_head_rejections",
+    "receipt_replay_capture_or_receipt_tamper_and_partial_atomic_write_rejections",
+    "fixture_adapter_sibling_alias_reparse_and_production_escape_rejections",
+    "real_path_missing_journey_or_retained_continuity_adapter_fail_closed",
+    "zero_real_state_build_browser_Play_OPPO_device_private_secret_or_external_action"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": ["scripts/check-release-blocker-browser-proof-integration-c34l.ps1", "scripts/invoke-release-lifecycle-transition-c34l.ps1", "scripts/check-release-transaction-journal-c34l.ps1", "scripts/write-release-source-attestation-c34l.ps1", "scripts/write-release-play-evidence-c34l.ps1", "scripts/write-release-oppo-evidence-c34l.ps1", "scripts/write-release-journey-evidence-c34l.ps1", "scripts/check-release-retained-evidence-c34l.ps1"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": ["scripts/write-release-authoritative-capture-receipt-c34l.ps1"],
+    "necessityProof": "Existing qualified browser, transition, journal, state, artifact, OPPO read-only observation and journey gate owners remain sources. One producer/receipt owner is necessary because no existing owner controls the full observation-to-receipt trust boundary. No product, backend, browser automation, device mutation or release action owner is added.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "authority": {
+    "sourceAndGateRepairAuthorized": true,
+    "selectionOnly": true,
+    "sourceSealOrCycleAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAuthorized": false,
+    "browserActionAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "qualification": {
+    "state": "pending",
+    "releaseActions": {"build": 0, "upload": 0, "install": 0, "deviceAcceptance": 0},
+    "browserActions": 0,
+    "deviceActions": 0,
+    "externalActions": 0,
+    "secretOrPrivateValuesObserved": false
+  }
+}

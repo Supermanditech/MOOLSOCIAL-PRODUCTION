@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-COMPACT-DESTINATION-LOCAL-SUBACTION-RAIL-FIX8-C25D",
+  "parentTicket": "UAW-PERSONAL-MVP-DOMAIN-NAVIGATION-AND-DESTINATION-RAIL-RECOVERY-FIX8-C25",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "Each destination keeps all of its subactions directly reachable in a compact bottom rail with Back and Forward, while content and product grids remain unobscured.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-COMPACT-DESTINATION-LOCAL-SUBACTION-RAIL-FIX8-C25D-PRESELECTION-ASSESSMENT-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["MoolDestinationNavigationV2","MoolLocalNavigationRail","MoolLocalNavigationTokens","MoolGlobalNavigationV2 compact launcher","existing local action callbacks"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"The dormant localNavigation input and existing shared action cells can be recomposed with compact navigation controls inside the existing Scaffold bottomNavigationBar."},
+  "acceptance": ["direct_local_subactions_no_home_return","Back_and_Forward_in_each_rail","no_large_MoolSocial_stripe","no_opaque_full_width_panel","scaffold_reserves_non_obscuring_safe_space","no_horizontal_scroll","adaptive_two_three_four_action_counts","uniform_tokens_and_selected_state"],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-COMPACT-DESTINATION-LOCAL-SUBACTION-RAIL-FIX8-C25D-COMPLETION-20260809.md",
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

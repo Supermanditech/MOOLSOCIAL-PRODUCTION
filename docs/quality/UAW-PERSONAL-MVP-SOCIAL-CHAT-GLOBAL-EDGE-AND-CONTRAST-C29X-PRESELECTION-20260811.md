@@ -1,0 +1,3 @@
+# C29X Chat global-edge and contrast preselection
+
+C29X is `mvp_required` because r60.35 exposed founder-confirmed contrast and global-navigation regressions in the supported Chat journey. The smallest fix reuses the existing Chat inbox/shell and shared global-navigation components: make Start new chat visibly distinct, render white-backed Mool at the fixed left edge and Chat at the fixed right edge, and retain the current route/state and 44dp accessibility contract. Duplicate search found no need for a new screen, route, controller, service or backend owner. Build, install, deployment, messages and provider writes are excluded. Timeline impact is bounded to one source/test wave and remains inside the 60–75-day lock.

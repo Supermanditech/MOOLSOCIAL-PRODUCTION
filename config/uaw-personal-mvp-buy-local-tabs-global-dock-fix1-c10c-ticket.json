@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-BUY-LOCAL-TABS-GLOBAL-DOCK-FIX1-C10C",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFIED-PERSISTENT-BOTTOM-NAVIGATION-SHELL-FIX1-C10",
+  "state": "r60_10_oppo_qualified_founder_approved",
+  "classification": "mvp_required",
+  "scope": [
+    "replace_buy_owned_bottom_dock_with_the_shared_global_dock",
+    "keep_shop_wholesale_medicine_and_orders_as_buy_local_tabs",
+    "keep_buy_help_as_a_truthful_local_help_action_not_global_chat",
+    "preserve_cart_checkout_product_order_search_and_scroll_state_across_global_switches"
+  ],
+  "founderAcceptance": "docs/quality/UAW-C10A-C10E-R60-10-FOUNDER-CUMULATIVE-ACCEPTANCE-20260807.md",
+  "acceptance": [
+    "all_existing_buy_state_motion_checkout_and_route_continuity_tests_reconciled",
+    "global_chat_opens_chat_and_never_aliases_buy_assist",
+    "reachable_legacy_buy_scaffold_has_no_owned_bottom_dock_or_top_back",
+    "compact_local_rail_has_readable_cells_overflow_cues_and_selected_reveal",
+    "deterministic_real_asset_navigation_goldens_pass_strict_comparison",
+    "flutter_analysis_and_repository_navigation_copy_memory_gates_pass"
+  ],
+  "hostQualification": {
+    "focusedBuyScreen": "69_of_69_passed",
+    "c10cCombined": "82_of_82_passed",
+    "broaderAffectedRoutes": "80_of_80_passed",
+    "homeDelivery": "included_and_passed",
+    "strictGoldens": "5_of_5_passed_after_visible_asset_precache",
+    "analysis": "no_issues_found",
+    "deviceStatus": "not_built_or_installed_installed_r60_9_remains_rejected_evidence"
+  }
+}

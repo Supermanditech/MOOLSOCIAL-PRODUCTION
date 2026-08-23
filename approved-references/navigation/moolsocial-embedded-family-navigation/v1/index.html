@@ -1,0 +1,2155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>MoolSocial navigation concept — temporary founder review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #10122c;
+      --muted: #666b80;
+      --faint: #9296a6;
+      --line: #e6e8ef;
+      --soft: #f5f6fa;
+      --brand: #0b0b89;
+      --brand-soft: #ececff;
+      --white: #fff;
+      --danger: #b42318;
+      --safe-bottom: max(10px, env(safe-area-inset-bottom));
+      --shadow: 0 24px 70px rgba(24, 27, 67, .17);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #eef0f5;
+      overflow-x: hidden;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) minmax(280px, 420px);
+      justify-content: center;
+      align-items: center;
+      gap: 52px;
+      padding: 34px;
+    }
+
+    .phone {
+      position: relative;
+      width: min(390px, 100vw);
+      height: min(844px, calc(100dvh - 48px));
+      min-height: 690px;
+      overflow: hidden;
+      border: 8px solid #171822;
+      border-radius: 46px;
+      background: var(--white);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 20;
+      top: 8px;
+      left: 50%;
+      width: 96px;
+      height: 25px;
+      border-radius: 18px;
+      background: #171822;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .app {
+      position: relative;
+      height: 100%;
+      display: grid;
+      grid-template-rows: 40px minmax(0, 1fr) auto;
+      background: var(--white);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 21px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: -.2px;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #22242e;
+    }
+
+    .signal {
+      display: inline-flex;
+      align-items: end;
+      gap: 2px;
+      height: 13px;
+    }
+
+    .signal i {
+      display: block;
+      width: 3px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+
+    .signal i:nth-child(1) { height: 5px; }
+    .signal i:nth-child(2) { height: 8px; }
+    .signal i:nth-child(3) { height: 11px; }
+    .signal i:nth-child(4) { height: 13px; }
+
+    .battery {
+      padding: 1px 4px;
+      border: 1.5px solid currentColor;
+      border-radius: 4px;
+      font-size: 9px;
+    }
+
+    .family-menu-action:focus-visible,
+    .sub-action:focus-visible,
+    .mool-menu:focus-visible,
+    .content-button:focus-visible {
+      outline: 3px solid rgba(11, 11, 137, .24);
+      outline-offset: -3px;
+    }
+
+    .viewport {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--white);
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      padding: 22px 21px 34px;
+      scrollbar-width: none;
+      transition: opacity 150ms ease, transform 210ms cubic-bezier(.2, .8, .2, 1);
+    }
+
+    .screen::-webkit-scrollbar {
+      display: none;
+    }
+
+    .screen.changing {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 300px;
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -1.2px;
+    }
+
+    .lead {
+      max-width: 320px;
+      margin: 9px 0 19px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 0 15px;
+      border: 1px solid #dfe2eb;
+      border-radius: 17px;
+      color: var(--muted);
+      background: var(--white);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 7px 20px rgba(28, 31, 70, .055);
+    }
+
+    .search .material-symbols-rounded {
+      color: var(--ink);
+      font-size: 22px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 24px 0 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -.45px;
+    }
+
+    .section-title span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .feature-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 88px;
+      margin-bottom: 11px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--white);
+      box-shadow: 0 10px 24px rgba(26, 29, 68, .06);
+    }
+
+    .feature-icon {
+      display: grid;
+      width: 48px;
+      height: 48px;
+      place-items: center;
+      border-radius: 15px;
+      color: var(--brand);
+      background: var(--brand-soft);
+    }
+
+    .feature-icon .material-symbols-rounded {
+      font-size: 25px;
+    }
+
+    .feature-copy strong,
+    .feature-copy span {
+      display: block;
+    }
+
+    .feature-copy strong {
+      margin-bottom: 4px;
+      font-size: 14px;
+      letter-spacing: -.25px;
+    }
+
+    .feature-copy span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .feature-card > .material-symbols-rounded {
+      color: var(--faint);
+      font-size: 20px;
+    }
+
+    .summary-card {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--line);
+    }
+
+    .summary-card div {
+      min-height: 66px;
+      padding: 12px 8px;
+      background: var(--white);
+      text-align: center;
+    }
+
+    .summary-card strong,
+    .summary-card span {
+      display: block;
+    }
+
+    .summary-card strong {
+      margin-bottom: 5px;
+      color: var(--brand);
+      font-size: 16px;
+    }
+
+    .summary-card span {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .icon-button {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--brand);
+      cursor: pointer;
+    }
+
+    .icon-button .material-symbols-rounded {
+      font-size: 24px;
+    }
+
+    [data-category-swipe] {
+      touch-action: pan-y;
+    }
+
+    .overlay-category-scroll {
+      position: absolute;
+      z-index: 9;
+      top: 7px;
+      right: 7px;
+      left: 7px;
+      height: 44px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      overscroll-behavior-x: contain;
+    }
+
+    .overlay-category-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .overlay-category-strip {
+      display: flex;
+      width: max-content;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .overlay-category-button {
+      min-width: max-content;
+      min-height: 44px;
+      padding: 0 13px;
+      border: 1px solid rgb(255 255 255 / 32%);
+      border-radius: 11px;
+      background: rgb(18 20 26 / 68%);
+      color: rgb(255 255 255 / 86%);
+      backdrop-filter: blur(12px);
+      font: inherit;
+      font-size: 10px;
+      font-weight: 780;
+      cursor: pointer;
+    }
+
+    .overlay-category-button.active {
+      border-color: #fff;
+      background: #fff;
+      color: #181b21;
+    }
+
+    .content-taxonomy {
+      display: block;
+      margin: 0 0 4px;
+      color: var(--brand);
+      font-size: 8px;
+      font-style: normal;
+      font-weight: 850;
+      letter-spacing: .08em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .discovery-feature {
+      overflow: hidden;
+      margin: 0 0 17px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--white);
+    }
+
+    .discovery-visual {
+      position: relative;
+      display: grid;
+      min-height: 154px;
+      place-items: center;
+      overflow: hidden;
+      background: #20232a;
+      color: #fff;
+    }
+
+    .discovery-visual::before,
+    .discovery-visual::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: #7135a5;
+      opacity: .78;
+    }
+
+    .discovery-visual::before {
+      width: 112px;
+      height: 112px;
+      top: -38px;
+      right: -18px;
+    }
+
+    .discovery-visual::after {
+      width: 76px;
+      height: 76px;
+      bottom: -32px;
+      left: 24px;
+      background: #ee6d51;
+    }
+
+    .discovery-visual > .material-symbols-rounded {
+      position: relative;
+      z-index: 1;
+      transform: translateY(14px);
+      font-size: 56px;
+      font-variation-settings: "FILL" 1;
+    }
+
+    .discovery-label {
+      position: absolute;
+      z-index: 1;
+      top: 12px;
+      left: 13px;
+      padding: 6px 9px;
+      border: 1px solid rgb(255 255 255 / 28%);
+      border-radius: 8px;
+      background: rgb(13 15 19 / 68%);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .discovery-copy {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 10px;
+      padding: 12px 13px 14px;
+    }
+
+    .discovery-copy > .material-symbols-rounded:last-child {
+      color: var(--muted);
+      font-size: 21px;
+    }
+
+    .discovery-avatar {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 12px;
+      background: var(--soft);
+      color: var(--brand);
+    }
+
+    .discovery-avatar .material-symbols-rounded {
+      font-size: 21px;
+    }
+
+    .discovery-copy strong,
+    .discovery-copy span {
+      display: block;
+    }
+
+    .discovery-copy strong {
+      margin-bottom: 4px;
+      font-size: 12px;
+      line-height: 1.28;
+    }
+
+    .discovery-copy span {
+      color: var(--muted);
+      font-size: 8.5px;
+      font-weight: 620;
+      line-height: 1.4;
+    }
+
+    .feed-list {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 8px;
+    }
+
+    .family-home {
+      margin-top: -22px;
+    }
+
+    button.feature-card {
+      width: 100%;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .discovery-action {
+      width: 100%;
+      border: 0;
+      background: var(--white);
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .direct-card-cta {
+      display: grid;
+      min-width: 54px;
+      min-height: 44px;
+      place-items: center;
+      padding: 0 9px;
+      border-radius: 12px;
+      background: var(--brand);
+      color: #fff !important;
+      font-size: 8.5px !important;
+      font-weight: 820 !important;
+      line-height: 1.1 !important;
+      text-align: center;
+    }
+
+    .direct-detail {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--white);
+      box-shadow: 0 12px 28px rgb(26 29 68 / 8%);
+    }
+
+    .direct-detail-icon {
+      display: grid;
+      width: 58px;
+      height: 58px;
+      margin-bottom: 16px;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--brand-soft);
+      color: var(--brand);
+    }
+
+    .direct-detail-icon .material-symbols-rounded {
+      font-size: 30px;
+    }
+
+    .primary-action {
+      width: 100%;
+      min-height: 52px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 16px;
+      background: var(--brand);
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 820;
+      cursor: pointer;
+    }
+
+    .home-callout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 42px;
+      align-items: center;
+      gap: 12px;
+      min-height: 86px;
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--soft);
+    }
+
+    .home-callout strong,
+    .home-callout span {
+      display: block;
+    }
+
+    .home-callout strong {
+      margin-bottom: 5px;
+      font-size: 15px;
+      letter-spacing: -.3px;
+    }
+
+    .home-callout span {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .home-callout > .material-symbols-rounded {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 13px;
+      color: var(--white);
+      background: var(--brand);
+      font-size: 22px;
+    }
+
+    .social-home {
+      margin: -22px -21px -34px;
+      padding: 0 21px 32px;
+      background: #f7f7fa;
+    }
+
+    .compact-tools {
+      display: flex;
+      gap: 1px;
+    }
+
+    .featured-reel,
+    .video-thumbnail {
+      position: relative;
+      overflow: hidden;
+      border-radius: 21px;
+      background: #20222d;
+      color: var(--white);
+    }
+
+    .featured-reel {
+      min-height: 265px;
+      padding: 18px;
+    }
+
+    .featured-reel::before,
+    .shorts-stage::before,
+    .video-thumbnail::before {
+      content: "";
+      position: absolute;
+      inset: auto -15% -25% 26%;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: #3e4252;
+    }
+
+    .featured-reel::after,
+    .shorts-stage::after,
+    .video-thumbnail::after {
+      content: "";
+      position: absolute;
+      top: 12%;
+      right: 12%;
+      width: 90px;
+      height: 120px;
+      border-radius: 45px 45px 16px 16px;
+      background: #666b78;
+      transform: rotate(12deg);
+    }
+
+    .media-label {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: rgba(255,255,255,.78);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .play-button {
+      position: absolute;
+      z-index: 3;
+      top: 50%;
+      left: 50%;
+      display: grid;
+      width: 54px;
+      height: 54px;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,.6);
+      border-radius: 50%;
+      background: rgba(255,255,255,.18);
+      color: var(--white);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+    }
+
+    .featured-caption {
+      position: absolute;
+      z-index: 3;
+      right: 18px;
+      bottom: 18px;
+      left: 18px;
+    }
+
+    .featured-caption strong,
+    .featured-caption span {
+      display: block;
+    }
+
+    .featured-caption strong {
+      margin-bottom: 5px;
+      font-size: 19px;
+      line-height: 1.15;
+      letter-spacing: -.5px;
+    }
+
+    .featured-caption span {
+      color: rgba(255,255,255,.72);
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .media-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 10px;
+    }
+
+    .media-section-head strong {
+      font-size: 16px;
+      letter-spacing: -.35px;
+    }
+
+    .media-section-head button {
+      min-width: 44px;
+      min-height: 44px;
+      border: 0;
+      background: transparent;
+      color: var(--brand);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .media-section-head > span {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 760;
+    }
+
+    .compact-video-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .compact-video {
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .compact-video .video-thumbnail {
+      min-height: 94px;
+      border-radius: 15px;
+      background: #343746;
+    }
+
+    .compact-video:nth-child(2) .video-thumbnail {
+      background: #242c41;
+    }
+
+    .duration {
+      position: absolute;
+      z-index: 4;
+      right: 7px;
+      bottom: 7px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background: rgba(0,0,0,.72);
+      color: var(--white);
+      font-size: 8px;
+      font-weight: 800;
+    }
+
+    .compact-video strong,
+    .compact-video span {
+      display: block;
+    }
+
+    .compact-video strong {
+      overflow: hidden;
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .compact-video span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 8.5px;
+      font-weight: 600;
+    }
+
+    .video-home {
+      margin: -22px -21px -34px;
+      padding: 0 15px 32px;
+      background: var(--white);
+    }
+
+    .large-video-card {
+      margin-bottom: 18px;
+    }
+
+    .large-video-card .video-thumbnail {
+      min-height: 194px;
+      border-radius: 17px;
+      background: #26334a;
+    }
+
+    .video-meta {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr) 30px;
+      gap: 10px;
+      align-items: start;
+      padding-top: 10px;
+    }
+
+    .channel-avatar {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--brand);
+      color: var(--white);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .video-meta strong,
+    .video-meta span {
+      display: block;
+    }
+
+    .video-meta strong {
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .video-meta span {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 8.5px;
+      font-weight: 600;
+    }
+
+    .video-meta > .material-symbols-rounded {
+      color: var(--muted);
+      font-size: 20px;
+    }
+
+    .shorts-home {
+      height: 100%;
+      margin: -22px -21px -34px;
+      background: #15161d;
+      color: var(--white);
+    }
+
+    .shorts-stage {
+      position: relative;
+      min-height: 100%;
+      overflow: hidden;
+      padding: 18px 16px;
+      background: #20232b;
+    }
+
+    .shorts-stage::before {
+      inset: auto -22% -12% 14%;
+      width: 390px;
+      height: 390px;
+      background: #3b3e49;
+    }
+
+    .shorts-stage::after {
+      top: 19%;
+      right: 20%;
+      width: 122px;
+      height: 180px;
+      border-radius: 65px 65px 23px 23px;
+      background: #6b6f7b;
+    }
+
+    .shorts-top {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .shorts-top strong {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 18px;
+    }
+
+    .shorts-side-actions {
+      position: absolute;
+      z-index: 5;
+      right: 12px;
+      bottom: 103px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .shorts-side-actions div {
+      display: grid;
+      justify-items: center;
+      gap: 2px;
+      font-size: 8px;
+      font-weight: 700;
+    }
+
+    .shorts-side-actions .material-symbols-rounded {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(0,0,0,.34);
+      font-size: 23px;
+    }
+
+    .shorts-caption {
+      position: absolute;
+      z-index: 5;
+      right: 68px;
+      bottom: 30px;
+      left: 16px;
+    }
+
+    .shorts-creator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 9px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .shorts-creator i {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--white);
+      color: var(--brand);
+      font-style: normal;
+    }
+
+    .shorts-caption strong,
+    .shorts-caption span {
+      display: block;
+    }
+
+    .shorts-caption strong {
+      margin-bottom: 6px;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .shorts-caption span {
+      color: rgba(255,255,255,.72);
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .bottom-dock {
+      position: relative;
+      display: grid;
+      z-index: 16;
+      grid-template-columns: 58px minmax(0, 1fr);
+      min-height: calc(61px + var(--safe-bottom));
+      padding: 3px 6px var(--safe-bottom);
+      border-top: 1px solid var(--line);
+      background: transparent;
+    }
+
+    .mool-menu {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      min-height: 58px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 4px;
+      padding: 3px 7px 2px 0;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: var(--brand);
+      cursor: pointer;
+      touch-action: none;
+      transition: background-color 160ms ease;
+    }
+
+    .mool-mark {
+      display: grid;
+      grid-template-columns: repeat(2, 7px);
+      grid-template-rows: repeat(2, 7px);
+      gap: 3px;
+      width: 17px;
+      height: 17px;
+    }
+
+    .mool-mark i {
+      display: block;
+      border-radius: 2px;
+      background: currentColor;
+    }
+
+    .mool-menu span:last-child {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: -.1px;
+    }
+
+    .mool-menu::after {
+      content: "";
+      position: absolute;
+      left: calc(50% - 4px);
+      bottom: 0;
+      width: 16px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--brand);
+      opacity: 0;
+      transform: translateX(-50%);
+    }
+
+    .mool-menu[aria-expanded="true"]::after {
+      opacity: 1;
+    }
+
+    .mool-menu[aria-expanded="true"] {
+      background: rgba(255, 255, 255, .58);
+      backdrop-filter: blur(20px) saturate(1.18);
+      -webkit-backdrop-filter: blur(20px) saturate(1.18);
+    }
+
+    .subactions {
+      display: flex;
+      min-width: 0;
+      overflow-x: auto;
+      padding-right: 18px;
+      scrollbar-width: none;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+    }
+
+    .subactions::-webkit-scrollbar {
+      display: none;
+    }
+
+    .sub-action {
+      position: relative;
+      display: flex;
+      flex: 0 0 72px;
+      min-width: 72px;
+      min-height: 58px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 3px;
+      padding: 3px 1px 5px;
+      border: 0;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      scroll-snap-align: center;
+    }
+
+    .sub-action .material-symbols-rounded {
+      font-size: 21px;
+      line-height: 22px;
+      transition: transform 170ms ease;
+    }
+
+    .sub-action span:last-child {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 11px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sub-action::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 14px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--brand);
+      opacity: 0;
+      transform: translateX(-50%) scaleX(.3);
+      transition: opacity 150ms ease, transform 180ms ease;
+    }
+
+    .sub-action[aria-selected="true"] {
+      color: var(--brand);
+    }
+
+    .sub-action[data-family-home] .material-symbols-rounded {
+      color: var(--family-color);
+      font-variation-settings: "FILL" 1;
+    }
+
+    .sub-action[data-family-home][aria-selected="true"] {
+      color: var(--family-color);
+    }
+
+    .sub-action[data-family-home]::after {
+      background: var(--family-color);
+    }
+
+    .sub-action[aria-selected="true"] .material-symbols-rounded {
+      transform: translateY(-1px);
+      font-variation-settings: "FILL" 1;
+    }
+
+    .sub-action[aria-selected="true"]::after {
+      opacity: 1;
+      transform: translateX(-50%) scaleX(1);
+    }
+
+    .main-menu {
+      position: absolute;
+      z-index: 15;
+      bottom: calc(61px + var(--safe-bottom));
+      left: 4px;
+      display: flex;
+      width: 142px;
+      flex-direction: column;
+      gap: 0;
+      overflow: visible;
+      padding: 4px;
+      border: 1px solid rgba(255, 255, 255, .76);
+      border-bottom: 0;
+      border-radius: 16px 16px 14px 0;
+      background: rgba(255, 255, 255, .58);
+      box-shadow: 0 14px 30px rgba(24, 27, 67, .14);
+      backdrop-filter: blur(20px) saturate(1.18);
+      -webkit-backdrop-filter: blur(20px) saturate(1.18);
+      transform-origin: bottom left;
+      touch-action: none;
+      animation: main-menu-enter 180ms cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    .main-menu[hidden] {
+      display: none;
+    }
+
+    .main-menu.closing {
+      pointer-events: none;
+      animation: main-menu-exit 120ms ease both;
+    }
+
+    @keyframes main-menu-enter {
+      from { opacity: 0; transform: translateY(10px) scale(.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes main-menu-exit {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(7px) scale(.98); }
+    }
+
+    .family-menu-action {
+      position: relative;
+      display: flex;
+      width: 100%;
+      min-height: 56px;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .family-menu-action .material-symbols-rounded {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, .62);
+      border-radius: 50%;
+      background: var(--family-soft);
+      color: var(--family-color);
+      font-size: 20px;
+      line-height: 22px;
+      text-align: center;
+      font-variation-settings: "FILL" 1;
+    }
+
+    .family-menu-action span:last-child {
+      font-size: 10px;
+      font-weight: 760;
+      line-height: 14px;
+    }
+
+    .family-menu-action[aria-current="true"] {
+      background: var(--family-soft);
+      color: var(--ink);
+    }
+
+    .family-menu-action[aria-current="true"]::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 3px;
+      height: 18px;
+      border-radius: 2px;
+      background: var(--family-color);
+      transform: translateY(-50%);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .main-menu,
+      .mool-menu[aria-expanded="true"] {
+        background: rgba(255, 255, 255, .94);
+      }
+    }
+
+    .review-panel {
+      max-width: 420px;
+    }
+
+    .review-kicker {
+      margin: 0 0 10px;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .review-panel h2 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.04;
+      letter-spacing: -1.8px;
+    }
+
+    .review-panel > p {
+      margin: 18px 0 25px;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .review-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .review-list li {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 11px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid rgba(16, 18, 44, .08);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .55);
+    }
+
+    .review-list .material-symbols-rounded {
+      color: var(--brand);
+      font-size: 22px;
+    }
+
+    .review-list strong,
+    .review-list span {
+      display: block;
+    }
+
+    .review-list strong {
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .review-list span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .temporary-note {
+      margin-top: 16px;
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 880px) {
+      body {
+        background: var(--white);
+      }
+
+      .page {
+        display: block;
+        min-height: 100dvh;
+        padding: 0;
+      }
+
+      .phone {
+        width: 100vw;
+        height: 100dvh;
+        min-height: 640px;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .phone::before,
+      .review-panel {
+        display: none;
+      }
+    }
+
+    @media (max-width: 365px) {
+      .bottom-dock {
+        grid-template-columns: 52px minmax(0, 1fr);
+        padding-inline: 4px;
+      }
+
+      .sub-action {
+        flex-basis: 68px;
+        min-width: 68px;
+      }
+
+      .sub-action span:last-child {
+        font-size: 8px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0ms !important;
+        animation-duration: 0ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="phone" aria-label="Interactive MoolSocial navigation prototype">
+      <div class="app">
+        <div class="status" aria-hidden="true">
+          <span>9:41</span>
+          <span class="status-icons">
+            <span>●</span>
+            <span class="signal"><i></i><i></i><i></i><i></i></span>
+            <span class="battery">100</span>
+          </span>
+        </div>
+
+        <div class="viewport">
+          <section class="screen" id="screen" aria-live="polite"></section>
+        </div>
+
+        <nav class="main-menu" aria-label="Main actions" id="mainMenu" hidden></nav>
+
+        <nav class="bottom-dock" aria-label="Current destination actions">
+          <button class="mool-menu" id="moolMenu" type="button" aria-label="Open main actions"
+            aria-controls="mainMenu" aria-expanded="false">
+            <span class="mool-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <span>Mool</span>
+          </button>
+          <div class="subactions" id="subActions" role="tablist" aria-label="Current family actions"></div>
+        </nav>
+      </div>
+    </section>
+
+    <aside class="review-panel">
+      <p class="review-kicker">Temporary interaction study</p>
+      <h2>One connected glass dock. Every local action at your thumb.</h2>
+      <p>Mool grows into a connected glass dock with coloured native icons. Tap or swipe up to open; choose a family or swipe down to close. Each bottom rail begins with that named family root, followed by its local actions.</p>
+      <ul class="review-list">
+        <li>
+          <span class="material-symbols-rounded" aria-hidden="true">apps</span>
+          <div><strong>Connected glass, not a new screen</strong><span>All six families appear above Mool without moving, dimming or permanently covering customer content.</span></div>
+        </li>
+        <li>
+          <span class="material-symbols-rounded" aria-hidden="true">conversion_path</span>
+          <div><strong>Named family root plus every action</strong><span>Shop, Food, Travel, Care, Work or Social replaces a duplicate generic Home label and keeps every destination one direct tap away.</span></div>
+        </li>
+        <li>
+          <span class="material-symbols-rounded" aria-hidden="true">bottom_navigation</span>
+          <div><strong>Dedicated Social media Homes</strong><span>Videos uses a familiar video-discovery Home; Shorts uses an immersive vertical viewing Home.</span></div>
+        </li>
+      </ul>
+      <p class="temporary-note">This local HTML is for visual review only. It is not production UI, an accepted reference or a replacement for native Flutter.</p>
+    </aside>
+  </main>
+
+  <script>
+    const domains = [
+      {
+        id: 'social', label: 'Social', icon: 'groups', title: 'Your social world',
+        accent: '#3155c6', soft: 'rgba(49, 85, 198, .13)',
+        lead: 'Watch, connect and create without leaving the current destination.',
+        search: 'Search people, creators and videos',
+        categories: ['All', 'Following', 'Podcasts', 'News', 'Live', 'Nearby'],
+        actions: [
+          { id: 'shorts', label: 'Shorts', icon: 'smart_display', title: 'Shorts for you' },
+          { id: 'videos', label: 'Videos', icon: 'video_library', title: 'Videos you follow' },
+          { id: 'feed', label: 'Feed', icon: 'dynamic_feed', title: 'Your latest feed' },
+          { id: 'create', label: 'Create', icon: 'add_circle', title: 'Create and share' }
+        ],
+        cards: [
+          ['local_mall', 'Fresh near you', 'Useful local offers from trusted sellers'],
+          ['play_circle', 'Watch next', 'A short queue shaped by what you follow'],
+          ['group', 'People you know', 'Continue recent conversations and communities']
+        ]
+      },
+      {
+        id: 'shop', label: 'Shop', icon: 'storefront', title: 'Shop what you need',
+        accent: '#7b3fb5', soft: 'rgba(123, 63, 181, .13)',
+        lead: 'Products, wholesale packs and orders stay together without changing navigation style.',
+        search: 'Search products, brands and orders',
+        categories: ['All', 'Grocery', 'Home', 'Electronics', 'Fashion', 'Local'],
+        actions: [
+          { id: 'products', label: 'Products', icon: 'shopping_bag', title: 'Products for today' },
+          { id: 'wholesale', label: 'Wholesale', icon: 'inventory_2', title: 'Wholesale value' },
+          { id: 'orders', label: 'Orders', icon: 'receipt_long', title: 'Your orders' }
+        ],
+        cards: [
+          ['nutrition', 'Fresh essentials', 'Price and delivery shown before checkout'],
+          ['inventory_2', 'Better pack value', 'Compare quantity and landed cost clearly'],
+          ['local_shipping', 'Track every order', 'Retail, wholesale and medicine in one place']
+        ]
+      },
+      {
+        id: 'food', label: 'Food', icon: 'restaurant', title: 'Food around you',
+        accent: '#c64e2b', soft: 'rgba(198, 78, 43, .13)',
+        lead: 'Order delivery or reserve a table with clear timing and cost.',
+        search: 'Search food, cuisine or restaurant',
+        categories: ['All', 'Delivery', 'Dining', 'Cafes', 'Breakfast', 'Offers'],
+        actions: [
+          { id: 'order', label: 'Order Food', icon: 'restaurant_menu', title: 'Order food nearby' },
+          { id: 'table', label: 'Book Table', icon: 'table_restaurant', title: 'Book a table' }
+        ],
+        cards: [
+          ['restaurant', 'Spice Darbar', 'North Indian · 22–35 min · from ₹149'],
+          ['local_cafe', 'Cafe Circuit', 'Coffee and snacks · 18–25 min'],
+          ['table_restaurant', 'Tables available', 'See time, fee and cancellation first']
+        ]
+      },
+      {
+        id: 'travel', label: 'Travel', icon: 'commute', title: 'Choose how you travel',
+        accent: '#087e9a', soft: 'rgba(8, 126, 154, .13)',
+        lead: 'Bike, Auto, Cab and Bus remain direct choices under one Travel destination.',
+        search: 'Where are you going?',
+        categories: ['All', 'Nearby', 'Airport', 'Station', 'Intercity', 'Offers'],
+        actions: [
+          { id: 'bike', label: 'Bike', icon: 'two_wheeler', title: 'Book a bike' },
+          { id: 'auto', label: 'Auto', icon: 'electric_rickshaw', title: 'Book an auto' },
+          { id: 'cab', label: 'Cab', icon: 'local_taxi', title: 'Book a cab' },
+          { id: 'bus', label: 'Bus', icon: 'directions_bus', title: 'Find a bus' }
+        ],
+        cards: [
+          ['two_wheeler', 'Bike to Railway Station', '3 min away · estimated fare ₹54'],
+          ['electric_rickshaw', 'Auto to Clock Tower', '6 min away · estimated fare ₹128'],
+          ['directions_bus', 'Bus to Jaipur', '6:30 PM · seats available · from ₹420']
+        ]
+      },
+      {
+        id: 'care', label: 'Care', icon: 'medical_services', title: 'Care when you need it',
+        accent: '#16825d', soft: 'rgba(22, 130, 93, .13)',
+        lead: 'Doctor, Medicine and Salon share one consistent Care navigation system.',
+        search: 'Search care, medicine or service',
+        categories: ['All', 'Doctors', 'Medicine', 'Labs', 'Salon', 'Wellness'],
+        actions: [
+          { id: 'doctor', label: 'Doctor', icon: 'medical_services', title: 'Find a doctor' },
+          { id: 'medicine', label: 'Medicine', icon: 'medication', title: 'Order medicine' },
+          { id: 'salon', label: 'Salon', icon: 'content_cut', title: 'Book a salon' }
+        ],
+        cards: [
+          ['medical_services', 'Doctor available today', 'Fee and wait time shown before booking'],
+          ['medication', 'Everyday medicine', 'Prescription and delivery requirements shown clearly'],
+          ['content_cut', 'Salon nearby', 'Choose service, place and starting price']
+        ]
+      },
+      {
+        id: 'work', label: 'Work', icon: 'business_center', title: 'Work and earn',
+        accent: '#9a6400', soft: 'rgba(154, 100, 0, .14)',
+        lead: 'Find genuine opportunities and manage active work from one destination.',
+        search: 'Search opportunities and work',
+        categories: ['All', 'Nearby', 'Today', 'Remote', 'Skilled', 'Part-time'],
+        actions: [
+          { id: 'earn', label: 'Earn Today', icon: 'bolt', title: 'Earn today' },
+          { id: 'workspace', label: 'Workspace', icon: 'dashboard_customize', title: 'Your workspace' }
+        ],
+        cards: [
+          ['task_alt', 'Local task available', '₹650 · verified business · today'],
+          ['schedule', 'Your active work', 'Next milestone due at 4:30 PM'],
+          ['account_balance_wallet', 'Earnings', 'Approved and pending amounts stay visible']
+        ]
+      }
+    ];
+
+    const state = {
+      domain: 'shop',
+      selected: Object.fromEntries(domains.map(domain => [domain.id, null])),
+      directSelection: null,
+      category: Object.fromEntries(domains.map(domain => [domain.id, 'All'])),
+      videoCategory: 'All',
+      menuOpen: false
+    };
+
+    const actionHints = {
+      shorts: 'Vertical discovery', videos: 'Video discovery Home', feed: 'Posts and communities', create: 'Create and publish',
+      products: 'Everyday shopping', wholesale: 'Bulk value and supply', orders: 'Track purchases',
+      order: 'Delivery near you', table: 'Reserve before arrival',
+      bike: 'Fast local ride', auto: 'Everyday city travel', cab: 'Comfort and luggage', bus: 'Routes and schedules',
+      doctor: 'Consult and book', medicine: 'Pharmacy and delivery', salon: 'Services and appointments',
+      earn: 'Verified opportunities', workspace: 'Active work and earnings'
+    };
+
+    const videoCategories = ['All', 'Podcasts', 'News', 'Live', 'Music', 'Learning'];
+
+    const directCardActions = {
+      shop: ['products', 'wholesale', 'orders'],
+      food: ['order', 'order', 'table'],
+      travel: ['bike', 'auto', 'bus'],
+      care: ['doctor', 'medicine', 'salon'],
+      work: ['earn', 'workspace', 'earn']
+    };
+
+    const directCardCtas = {
+      shop: ['Buy now', 'View pack', 'Track'],
+      food: ['Order now', 'Order now', 'Reserve'],
+      travel: ['Book bike', 'Book auto', 'Book bus'],
+      care: ['Book', 'Order', 'Book'],
+      work: ['Apply', 'Open', 'View']
+    };
+
+    const mainMenu = document.querySelector('#mainMenu');
+    const subActions = document.querySelector('#subActions');
+    const screen = document.querySelector('#screen');
+    const moolMenu = document.querySelector('#moolMenu');
+    let menuCloseTimer = 0;
+    let menuHistoryActive = false;
+    let menuHistoryClosing = false;
+    let suppressMenuOutsideClick = false;
+    let suppressMenuOutsideTimer = 0;
+    let moolGestureStart = null;
+    let dockGestureStart = null;
+    let suppressMoolGestureClick = false;
+    let suppressDockGestureClick = false;
+    let suppressMoolGestureTimer = 0;
+    let suppressDockGestureTimer = 0;
+
+    const icon = name => `<span class="material-symbols-rounded" aria-hidden="true">${name}</span>`;
+    const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function activeDomain() {
+      return domains.find(domain => domain.id === state.domain);
+    }
+
+    function activeAction(domain = activeDomain()) {
+      return domain.actions.find(action => action.id === state.selected[domain.id]) || null;
+    }
+
+    function renderMainMenu({ animateClose = false } = {}) {
+      window.clearTimeout(menuCloseTimer);
+      moolMenu.setAttribute('aria-expanded', String(state.menuOpen));
+
+      if (!state.menuOpen) {
+        if (animateClose && !prefersReducedMotion() && !mainMenu.hidden) {
+          mainMenu.classList.add('closing');
+          menuCloseTimer = window.setTimeout(() => {
+            mainMenu.hidden = true;
+            mainMenu.classList.remove('closing');
+          }, 120);
+        } else {
+          mainMenu.hidden = true;
+          mainMenu.classList.remove('closing');
+        }
+        return;
+      }
+
+      mainMenu.hidden = false;
+      mainMenu.classList.remove('closing');
+      mainMenu.innerHTML = domains.map(domain => `
+        <button class="family-menu-action" type="button" data-domain="${domain.id}"
+          style="--family-color:${domain.accent}; --family-soft:${domain.soft}"
+          aria-current="${state.domain === domain.id}"
+          aria-label="Open ${domain.label} Home">
+          ${icon(domain.icon)}
+          <span>${domain.label}</span>
+        </button>
+      `).join('');
+
+      mainMenu.querySelectorAll('[data-domain]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.domain = button.dataset.domain;
+          state.selected[state.domain] = null;
+          state.directSelection = null;
+          transitionRender();
+        });
+      });
+    }
+
+    function openMainMenu() {
+      if (state.menuOpen || menuHistoryClosing) return;
+      state.menuOpen = true;
+      menuHistoryActive = true;
+      window.history.pushState({ moolMenu: true }, '');
+      renderMainMenu();
+    }
+
+    function closeMainMenu({ consumeHistory = true, restoreFocus = false } = {}) {
+      if (!state.menuOpen) return;
+      state.menuOpen = false;
+      renderMainMenu({ animateClose: true });
+      if (restoreFocus) moolMenu.focus({ preventScroll: true });
+      if (consumeHistory && menuHistoryActive) {
+        menuHistoryActive = false;
+        menuHistoryClosing = true;
+        window.history.back();
+      }
+    }
+
+    function renderSubActions() {
+      const domain = activeDomain();
+      const selectedId = state.selected[domain.id];
+      subActions.setAttribute('aria-label', `${domain.label} Home and actions`);
+      subActions.innerHTML = `
+        <button class="sub-action" type="button" role="tab" data-family-home
+          style="--family-color:${domain.accent}"
+          aria-selected="${selectedId === null}"
+          aria-label="Open ${domain.label} Home">
+          ${icon(domain.icon)}
+          <span>${domain.label}</span>
+        </button>
+      ` + domain.actions.map(action => `
+        <button class="sub-action" type="button" role="tab" data-subaction="${action.id}"
+          aria-selected="${selectedId === action.id}"
+          aria-label="Open ${action.label}">
+          ${icon(action.icon)}
+          <span>${action.label}</span>
+        </button>
+      `).join('');
+
+      subActions.querySelector('[data-family-home]').addEventListener('click', () => {
+        state.selected[domain.id] = null;
+        state.directSelection = null;
+        transitionRender();
+      });
+
+      subActions.querySelectorAll('[data-subaction]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.selected[domain.id] = button.dataset.subaction;
+          state.directSelection = null;
+          transitionRender();
+        });
+      });
+
+      requestAnimationFrame(() => {
+        const selectedButton = subActions.querySelector('[aria-selected="true"]');
+        selectedButton?.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      });
+    }
+
+    function bindFamilyActionEntries() {
+      screen.querySelectorAll('[data-family-action]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.selected[state.domain] = button.dataset.familyAction;
+          state.directSelection = null;
+          transitionRender();
+        });
+      });
+    }
+
+    function bindDirectHomeCards(domain) {
+      screen.querySelectorAll('[data-direct-card]').forEach(button => {
+        button.addEventListener('click', () => {
+          const cardIndex = Number(button.dataset.directCard);
+          state.selected[domain.id] = button.dataset.directAction;
+          state.directSelection = { domainId: domain.id, cardIndex };
+          transitionRender();
+        });
+      });
+    }
+
+    function overlayCategoryStrip(categories, selectedCategory, scope = 'family') {
+      return `
+        <div class="overlay-category-scroll" aria-label="Browse categories">
+          <div class="overlay-category-strip">
+            ${categories.map(category => `
+              <button class="overlay-category-button ${category === selectedCategory ? 'active' : ''}" type="button"
+                data-category-choice="${category}" data-category-scope="${scope}"
+                aria-pressed="${category === selectedCategory}">${category}</button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function selectCategory(scope, category) {
+      if (scope === 'videos') {
+        state.videoCategory = category;
+      } else {
+        state.category[state.domain] = category;
+      }
+      state.directSelection = null;
+      transitionRender();
+    }
+
+    function bindCategoryDiscovery(categories, selectedCategory, scope = 'family') {
+      screen.querySelectorAll(`[data-category-scope="${scope}"]`).forEach(button => {
+        button.addEventListener('click', event => {
+          event.stopPropagation();
+          selectCategory(scope, button.dataset.categoryChoice);
+        });
+      });
+
+      const surface = screen.querySelector(`[data-category-swipe="${scope}"]`);
+      if (!surface) return;
+      let tracking = false;
+      let startX = 0;
+      let startY = 0;
+      let suppressClick = false;
+
+      surface.addEventListener('pointerdown', event => {
+        if (event.target.closest('[data-category-choice]')) return;
+        tracking = true;
+        startX = event.clientX;
+        startY = event.clientY;
+      });
+
+      surface.addEventListener('pointerup', event => {
+        if (!tracking) return;
+        tracking = false;
+        const deltaX = event.clientX - startX;
+        const deltaY = event.clientY - startY;
+        if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.15) return;
+        suppressClick = true;
+        window.setTimeout(() => { suppressClick = false; }, 320);
+        const currentIndex = Math.max(0, categories.indexOf(selectedCategory));
+        const direction = deltaX < 0 ? 1 : -1;
+        const nextIndex = (currentIndex + direction + categories.length) % categories.length;
+        selectCategory(scope, categories[nextIndex]);
+      });
+
+      surface.addEventListener('pointercancel', () => { tracking = false; });
+      surface.addEventListener('click', event => {
+        if (!suppressClick) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressClick = false;
+      }, true);
+
+      requestAnimationFrame(() => {
+        screen.querySelector(`[data-category-scope="${scope}"].active`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+      });
+    }
+
+    function renderSocialHome(domain) {
+      const selectedCategory = state.category[domain.id];
+      screen.innerHTML = `
+        <div class="social-home">
+          <article class="featured-reel" data-category-swipe="family">
+            ${overlayCategoryStrip(domain.categories, selectedCategory)}
+            <button class="play-button" type="button" data-family-action="shorts" aria-label="Open Shorts">${icon('play_arrow')}</button>
+            <div class="featured-caption">
+              <strong>Fresh basket packed this morning</strong>
+              <span>Mahadev Fresh Mart · Jodhpur · promoted</span>
+            </div>
+          </article>
+          <div class="media-section-head">
+            <strong>Continue watching</strong>
+            <button type="button" data-family-action="videos">View all</button>
+          </div>
+          <div class="compact-video-list">
+            <button class="compact-video content-button" type="button" data-family-action="videos">
+              <span class="video-thumbnail"><span class="duration">8:42</span></span>
+              <em class="content-taxonomy">Podcasts</em>
+              <strong>Inside a growing local business</strong>
+              <span>Mool Stories · 18K views</span>
+            </button>
+            <button class="compact-video content-button" type="button" data-family-action="videos">
+              <span class="video-thumbnail"><span class="duration">12:16</span></span>
+              <em class="content-taxonomy">News</em>
+              <strong>What Jodhpur is watching today</strong>
+              <span>City Life · 9.4K views</span>
+            </button>
+          </div>
+          <div class="media-section-head"><strong>From people you follow</strong><button type="button" data-family-action="feed">Open feed</button></div>
+          <button class="feature-card content-button" type="button" data-family-action="feed" aria-label="Open your community feed">
+            <span class="feature-icon">${icon('group')}</span>
+            <span class="feature-copy"><em class="content-taxonomy">Following</em><strong>New from your community</strong><span>12 posts and 4 conversations since your last visit</span></span>
+            <span class="direct-card-cta">Open</span>
+          </button>
+        </div>
+      `;
+      bindFamilyActionEntries();
+      bindCategoryDiscovery(domain.categories, selectedCategory);
+    }
+
+    function renderStandardFamilyHome(domain) {
+      const callouts = {
+        shop: ['MoolSocial value', 'Compare useful products, truthful prices and delivery before checkout.', 'savings'],
+        food: ['Delivering to Home', 'Sardarpura, Jodhpur · restaurants open now.', 'location_on'],
+        travel: ['Start from your current pickup', 'Choose the destination first, then compare Bike, Auto, Cab or Bus.', 'my_location'],
+        care: ['Care available today', 'See provider, fee, availability and fulfilment before you continue.', 'health_and_safety'],
+        work: ['Your work at a glance', 'Find verified opportunities and continue active work without losing context.', 'task_alt']
+      };
+      const callout = callouts[domain.id];
+      const selectedCategory = state.category[domain.id];
+      const categoryIndex = Math.max(0, domain.categories.indexOf(selectedCategory));
+      const featuredIndex = selectedCategory === 'All' ? 0 : (categoryIndex - 1) % domain.cards.length;
+      const featuredCard = domain.cards[featuredIndex];
+      const remainingCards = domain.cards
+        .map((card, cardIndex) => ({ card, cardIndex }))
+        .filter(entry => entry.cardIndex !== featuredIndex);
+      const cardActions = directCardActions[domain.id];
+      const cardCtas = directCardCtas[domain.id];
+      screen.innerHTML = `
+        <div class="family-home">
+          <article class="discovery-feature" data-category-swipe="family">
+            <div class="discovery-visual">
+              ${overlayCategoryStrip(domain.categories, selectedCategory)}
+              ${icon(featuredCard[0])}
+            </div>
+            <button class="discovery-copy discovery-action content-button" type="button" data-direct-card="${featuredIndex}" data-direct-action="${cardActions[featuredIndex]}" aria-label="${cardCtas[featuredIndex]}: ${featuredCard[1]}">
+              <span class="discovery-avatar">${icon(domain.icon)}</span>
+              <span><em class="content-taxonomy">${selectedCategory === 'All' ? domain.categories[featuredIndex + 1] : selectedCategory}</em><strong>${featuredCard[1]}</strong><span>${featuredCard[2]}</span></span>
+              <span class="direct-card-cta">${cardCtas[featuredIndex]}</span>
+            </button>
+          </article>
+          <article class="home-callout">
+            <span><strong>${callout[0]}</strong><span>${callout[1]}</span></span>
+            ${icon(callout[2])}
+          </article>
+          <div class="section-title"><h2>More for you</h2><span>See all</span></div>
+          <div class="feed-list">
+            ${remainingCards.map(entry => `
+              <button class="feature-card content-button" type="button" data-direct-card="${entry.cardIndex}" data-direct-action="${cardActions[entry.cardIndex]}" aria-label="${cardCtas[entry.cardIndex]}: ${entry.card[1]}">
+                <span class="feature-icon">${icon(entry.card[0])}</span>
+                <span class="feature-copy"><em class="content-taxonomy">${domain.categories[entry.cardIndex + 1]}</em><strong>${entry.card[1]}</strong><span>${entry.card[2]}</span></span>
+                <span class="direct-card-cta">${cardCtas[entry.cardIndex]}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      bindFamilyActionEntries();
+      bindDirectHomeCards(domain);
+      bindCategoryDiscovery(domain.categories, selectedCategory);
+    }
+
+    function renderFamilyHome(domain) {
+      if (domain.id === 'social') {
+        renderSocialHome(domain);
+      } else {
+        renderStandardFamilyHome(domain);
+      }
+    }
+
+    function renderVideosHome() {
+      const selectedCategory = state.videoCategory;
+      screen.innerHTML = `
+        <div class="video-home">
+          <article class="large-video-card" data-category-swipe="videos">
+            <div class="video-thumbnail">
+              ${overlayCategoryStrip(videoCategories, selectedCategory, 'videos')}
+              <button class="play-button" type="button" aria-label="Play video">${icon('play_arrow')}</button>
+              <span class="duration">12:16</span>
+            </div>
+            <div class="video-meta">
+              <span class="channel-avatar">MS</span>
+              <span><strong>How local businesses are growing with digital customers</strong><span>Mool Stories · 18K views · 2 hours ago</span></span>
+              ${icon('more_vert')}
+            </div>
+          </article>
+          <article class="large-video-card">
+            <div class="video-thumbnail" style="background:#39333f">
+              <span class="discovery-label">${videoCategories[1]}</span>
+              <button class="play-button" type="button" aria-label="Play video">${icon('play_arrow')}</button>
+              <span class="duration">8:42</span>
+            </div>
+            <div class="video-meta">
+              <span class="channel-avatar" style="background:#7135a5">JL</span>
+              <span><strong>Jodhpur food and culture: a neighbourhood guide</strong><span>Jodhpur Life · 9.4K views · today</span></span>
+              ${icon('more_vert')}
+            </div>
+          </article>
+        </div>
+      `;
+      bindCategoryDiscovery(videoCategories, selectedCategory, 'videos');
+    }
+
+    function renderShortsHome() {
+      screen.innerHTML = `
+        <div class="shorts-home">
+          <div class="shorts-stage">
+            <div class="shorts-top"><strong>${icon('smart_display')} Shorts</strong><span class="compact-tools"><button class="icon-button" type="button" aria-label="Search Shorts" style="color:white">${icon('search')}</button><button class="icon-button" type="button" aria-label="Shorts camera" style="color:white">${icon('photo_camera')}</button></span></div>
+            <button class="play-button" type="button" aria-label="Play Short">${icon('play_arrow')}</button>
+            <div class="shorts-side-actions">
+              <div>${icon('favorite')}<span>24K</span></div>
+              <div>${icon('mode_comment')}<span>832</span></div>
+              <div>${icon('share')}<span>Share</span></div>
+              <div>${icon('more_horiz')}<span>More</span></div>
+            </div>
+            <div class="shorts-caption">
+              <div class="shorts-creator"><i>MF</i><span>@mahadevfresh</span></div>
+              <strong>Fresh produce arriving before the market opens</strong>
+              <span>Swipe vertically for the next Short · sponsored label shown when applicable</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDirectSelection(domain, action, selection) {
+      const card = domain.cards[selection.cardIndex];
+      const category = domain.categories[selection.cardIndex + 1];
+      const cta = directCardCtas[domain.id][selection.cardIndex];
+      screen.innerHTML = `
+        <p class="eyebrow">${domain.label} · ${action.label}</p>
+        <h1>${card[1]}</h1>
+        <p class="lead">${card[2]}</p>
+        <article class="direct-detail">
+          <span class="direct-detail-icon">${icon(card[0])}</span>
+          <em class="content-taxonomy">${category}</em>
+          <h2>Ready when you are</h2>
+          <p>Review the exact price, timing and fulfilment shown above, then continue.</p>
+          <button class="primary-action" type="button">${cta}</button>
+        </article>
+      `;
+    }
+
+    function renderActionPage(domain, action) {
+      screen.innerHTML = `
+        <p class="eyebrow">${domain.label} · ${action.label}</p>
+        <h1>${action.title}</h1>
+        <p class="lead">${domain.lead}</p>
+        <div class="search">${icon('search')}<span>${domain.search}</span></div>
+        <div class="section-title"><h2>Ready for you</h2><span>See all</span></div>
+        ${domain.cards.map(card => `
+          <article class="feature-card">
+            <span class="feature-icon">${icon(card[0])}</span>
+            <span class="feature-copy"><strong>${card[1]}</strong><span>${card[2]}</span></span>
+            ${icon('arrow_forward')}
+          </article>
+        `).join('')}
+        <div class="summary-card">
+          <div><strong>Home</strong><span>Mool returns one level</span></div>
+          <div><strong>${domain.actions.length}</strong><span>${domain.label} subactions</span></div>
+          <div><strong>0</strong><span>bottom capsules</span></div>
+        </div>
+      `;
+    }
+
+    function renderDestination() {
+      const domain = activeDomain();
+      const action = activeAction(domain);
+      if (!action) {
+        renderFamilyHome(domain);
+      } else if (state.directSelection?.domainId === domain.id) {
+        renderDirectSelection(domain, action, state.directSelection);
+      } else if (domain.id === 'social' && action.id === 'videos') {
+        renderVideosHome();
+      } else if (domain.id === 'social' && action.id === 'shorts') {
+        renderShortsHome();
+      } else {
+        renderActionPage(domain, action);
+      }
+    }
+
+    function render() {
+      renderMainMenu();
+      renderSubActions();
+      renderDestination();
+    }
+
+    function transitionRender() {
+      closeMainMenu();
+      screen.classList.add('changing');
+      window.setTimeout(() => {
+        render();
+        screen.scrollTop = 0;
+        requestAnimationFrame(() => screen.classList.remove('changing'));
+      }, prefersReducedMotion() ? 0 : 130);
+    }
+
+    moolMenu.addEventListener('pointerdown', event => {
+      if (!event.isPrimary) return;
+      moolGestureStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      moolMenu.setPointerCapture?.(event.pointerId);
+    });
+
+    moolMenu.addEventListener('pointerup', event => {
+      if (!moolGestureStart || moolGestureStart.id !== event.pointerId) return;
+      const deltaX = event.clientX - moolGestureStart.x;
+      const deltaY = event.clientY - moolGestureStart.y;
+      moolGestureStart = null;
+      if (deltaY >= -36 || Math.abs(deltaY) <= Math.abs(deltaX) * 1.2) return;
+      suppressMoolGestureClick = true;
+      window.clearTimeout(suppressMoolGestureTimer);
+      suppressMoolGestureTimer = window.setTimeout(() => {
+        suppressMoolGestureClick = false;
+      }, 700);
+      openMainMenu();
+    });
+
+    moolMenu.addEventListener('pointercancel', () => {
+      moolGestureStart = null;
+    });
+
+    moolMenu.addEventListener('click', () => {
+      if (suppressMoolGestureClick) {
+        suppressMoolGestureClick = false;
+        window.clearTimeout(suppressMoolGestureTimer);
+        return;
+      }
+      state.menuOpen ? closeMainMenu() : openMainMenu();
+    });
+
+    mainMenu.addEventListener('pointerdown', event => {
+      if (!event.isPrimary) return;
+      dockGestureStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      mainMenu.setPointerCapture?.(event.pointerId);
+    });
+
+    mainMenu.addEventListener('pointerup', event => {
+      if (!dockGestureStart || dockGestureStart.id !== event.pointerId) return;
+      const deltaX = event.clientX - dockGestureStart.x;
+      const deltaY = event.clientY - dockGestureStart.y;
+      dockGestureStart = null;
+      if (deltaY <= 42 || Math.abs(deltaY) <= Math.abs(deltaX) * 1.2) return;
+      suppressDockGestureClick = true;
+      window.clearTimeout(suppressDockGestureTimer);
+      suppressDockGestureTimer = window.setTimeout(() => {
+        suppressDockGestureClick = false;
+      }, 700);
+      closeMainMenu({ restoreFocus: true });
+    });
+
+    mainMenu.addEventListener('pointercancel', () => {
+      dockGestureStart = null;
+    });
+
+    mainMenu.addEventListener('click', event => {
+      if (!suppressDockGestureClick) return;
+      suppressDockGestureClick = false;
+      window.clearTimeout(suppressDockGestureTimer);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+
+    document.addEventListener('pointerdown', event => {
+      if (!state.menuOpen) return;
+      if (mainMenu.contains(event.target) || moolMenu.contains(event.target)) return;
+      suppressMenuOutsideClick = true;
+      window.clearTimeout(suppressMenuOutsideTimer);
+      suppressMenuOutsideTimer = window.setTimeout(() => {
+        suppressMenuOutsideClick = false;
+      }, 600);
+      closeMainMenu();
+    }, true);
+
+    document.addEventListener('click', event => {
+      if (!suppressMenuOutsideClick) return;
+      suppressMenuOutsideClick = false;
+      window.clearTimeout(suppressMenuOutsideTimer);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !state.menuOpen) return;
+      event.preventDefault();
+      closeMainMenu({ restoreFocus: true });
+    });
+
+    window.addEventListener('popstate', () => {
+      if (menuHistoryClosing) {
+        menuHistoryClosing = false;
+        return;
+      }
+      if (!menuHistoryActive || !state.menuOpen) return;
+      menuHistoryActive = false;
+      closeMainMenu({ consumeHistory: false, restoreFocus: true });
+    });
+
+    render();
+  </script>
+</body>
+</html>

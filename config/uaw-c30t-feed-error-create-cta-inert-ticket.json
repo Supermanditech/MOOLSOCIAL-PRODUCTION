@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30T-FEED-ERROR-CREATE-CTA-INERT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_device_retest_pending",
+  "classification": "mvp_required",
+  "severity": "major",
+  "actualResult": "One exact enabled Create a post CTA tap on the r60.44 Feed error card left the Feed visible and did not open the composer, while bottom navigation Create works.",
+  "expectedResult": "Feed empty/error Create and bottom navigation Create use one tested creation gateway and open the same composer state.",
+  "acceptance": ["Feed_error_Create_opens_text_composer_once", "Feed_empty_Create_opens_text_composer_once", "bottom_Create_and_Feed_Create_share_postcondition", "no_backend_write_on_navigation"],
+  "authority": {"sourceImplementationAuthorized": true, "buildUploadAndInstallInheritedFromParent": true}
+}

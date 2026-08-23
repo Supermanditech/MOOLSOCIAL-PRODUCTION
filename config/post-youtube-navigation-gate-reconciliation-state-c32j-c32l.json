@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "stateId": "POST-YOUTUBE-NAVIGATION-GATE-RECONCILIATION-C32J-C32M",
+  "state": "source_gate_repairs_implemented_C32M_two_final_focused_cycles_passed_full_preflight_Buy_protected_baseline_hold",
+  "tickets": [
+    "UAW-C32J-PERSONAL-MVP-C28E-IMMUTABLE-R60-27-EVIDENCE-BINDING-RECONCILIATION",
+    "UAW-C32K-PERSONAL-MVP-C26C-C29N-LEFT-EDGE-SWITCHER-GATE-RECONCILIATION",
+    "UAW-C32L-PERSONAL-MVP-C26D-C29N-SPECIALIZED-SOCIAL-DOCK-GATE-RECONCILIATION",
+    "UAW-C32M-PERSONAL-MVP-CHAINED-SUCCESSOR-GATE-HISTORICAL-SCOPE-BINDING"
+  ],
+  "implementedRepairs": {
+    "c32j": "C28E_historical_r60_27_host_gate_bound_to_two_contract_hashed_immutable_cycle_files_not_mutable_APK_pointer",
+    "c32k": "C26C_bound_to_conditional_alignment_owner_and_C29N_default_left_edge",
+    "c32l": "C26D_bound_to_C29N_specialized_Social_dock_while_Buy_assertions_remain",
+    "c32m": "C32J_C32K_C32L_bound_to_active_exact_scope_or_exact_preserved_prior_ticket_id_manifest_hash_and_implementation_state"
+  },
+  "individualGateResults": {
+    "c28eHost": "passed",
+    "c32j": "passed",
+    "c26c": "passed",
+    "c27c": "passed",
+    "c32k": "passed",
+    "c26d": "passed",
+    "c32l": "passed",
+    "c32m": "passed"
+  },
+  "focusedValidation": {
+    "qualified": true,
+    "aggregateC28EQualified": false,
+    "sourceManifestPath": "artifacts/quality/uaw-c32m-chained-successor-gate-historical-scope-binding-20260815-01/source-manifest-c32m.txt",
+    "sourceFileCount": 20,
+    "sourceFingerprintSha256": "F206A95FA9A77E4715C1A0D2249F6FEC206962747CC6B5447B2788C610EA0AA3",
+    "cycles": [
+      {
+        "cycle": 1,
+        "result": "passed",
+        "powerShellHosts": 2,
+        "gateScriptsPerHost": 8,
+        "hostScriptRuns": 16,
+        "flutterFiles": 2,
+        "flutterTestsPassed": 4,
+        "analyzerFiles": 5,
+        "analyzerResult": "clean"
+      },
+      {
+        "cycle": 2,
+        "result": "passed",
+        "powerShellHosts": 2,
+        "gateScriptsPerHost": 8,
+        "hostScriptRuns": 16,
+        "flutterFiles": 2,
+        "flutterTestsPassed": 4,
+        "analyzerFiles": 5,
+        "analyzerResult": "clean"
+      }
+    ],
+    "regressionMemoryEntries": 2229,
+    "regressionMemoryApplicableImplementationEntries": 1313,
+    "fullPreflightRetried": false,
+    "buyProtectedHoldPreserved": true
+  },
+  "aggregatePreflight": {
+    "qualified": false,
+    "passedBeforeHold": [
+      "C28E_host",
+      "C28E_exported_semantics",
+      "C27B",
+      "C27C",
+      "C27D",
+      "C26B",
+      "C26C",
+      "C26D",
+      "C26E",
+      "C26F",
+      "C25A",
+      "subaction_placement",
+      "approved_UI_locks",
+      "brand_integrity",
+      "user_facing_copy",
+      "interaction_contract_155_routes",
+      "Personal_action_projection",
+      "MVP_delivery",
+      "MVP_scope",
+      "regression_memory"
+    ],
+    "holdGate": "scripts/check-buy-protected-baseline.ps1",
+    "expectedBuyTreeSha256": "6e2c18af399d8c2e0a3ab8cb63d76d5e32228f2ea69d26f0d1df662c3f3bbd8e",
+    "currentBuyTreeSha256": "12a9880a51c172f060133a90bcffc38d84f68959ff1caf88e13be43e86631bc5",
+    "founderApprovedSuccessorBaselineExists": false,
+    "retryAuthorized": false
+  },
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "deploymentAuthorized": false,
+    "buildAuthorized": false,
+    "playAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false,
+    "externalCommunicationAuthorized": false
+  }
+}

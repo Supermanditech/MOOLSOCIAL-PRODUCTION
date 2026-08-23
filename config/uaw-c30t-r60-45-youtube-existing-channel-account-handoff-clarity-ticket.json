@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-R60-45-YOUTUBE-EXISTING-CHANNEL-ACCOUNT-HANDOFF-CLARITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "source_implemented_and_non_build_qualified_live_Play_acceptance_pending",
+  "classification": "mvp_required",
+  "severity": "creator_authentication_purpose_and_consent_clarity_blocker",
+  "actor": "content_creator_recovering_from_signed_out_YouTube_channel_status",
+  "customerOutcome": "The user first understands they are signing in to MoolSocial, then is returned to YouTube channel connection and clearly chooses the existing Google account that owns the channel under read-only no-upload consent.",
+  "minimumSuccessorCorrection": ["label_the_first_boundary_as_MoolSocial_sign_in", "retain_the_YouTube_channel_return_destination", "ask_for_the_existing_Google_account_containing_the_channel_on_the_connection_route", "state_youtube_readonly_and_no_upload_before_consent", "prove_cancel_error_retry_connected_disconnect_and_return_continuity"],
+  "explicitExclusions": ["no_generic_claim_that_MoolSocial_auth_itself_is_YouTube_connection", "no_YouTube_upload_edit_delete_or_viewer_mutation_scope", "no_secret_or_account_identity_capture", "no_second_C30T_AAB_upload_or_install"],
+  "authority": {"ticketAndEvidenceWriteAuthorized": true, "sourceImplementationAuthorizedByFounder": true, "executionSelectedAfterMvpReuseAssessment": true, "sourceNonBuildQualified": true, "successorBuildUploadInstallAuthorized": false},
+  "evidence": {"channelSignedOutScreen": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/25-youtube-channel-unavailable-signed-out.png", "authScreen": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-r60-45-20260813-01/31-create-auth-entry.png", "founderDirection": "The flow should explain that an existing YouTube account is required.", "finding": "docs/quality/UAW-C30T-R60-45-YOUTUBE-EXISTING-CHANNEL-ACCOUNT-HANDOFF-CLARITY-20260813.md"}
+}

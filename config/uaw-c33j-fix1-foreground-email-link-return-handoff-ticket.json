@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C33J-FIX1-FOREGROUND-EMAIL-LINK-RETURN-HANDOFF",
+  "parentTicket": "UAW-C33J-SCREEN03-PASSWORDLESS-EMAIL-LINK-NATIVE-PARITY",
+  "state": "audit_finding_registered_source_implementation_authorized",
+  "classification": "mvp_required",
+  "severity": "authentication_completion_blocker",
+  "actor": "customer_opening_a_passwordless_sign_in_link_while_MoolSocial_is_already_running",
+  "capability": "consume_a_qualified_foreground_email_link_once_then_complete_or_show_same_email_confirmation",
+  "customerOutcome": "When a customer opens the sign-in email while MoolSocial is already running, the app handles the incoming link without a dead end, completes with the in-memory matching email or asks for the same email, and returns to the exact pending destination without exposing the link.",
+  "classificationReason": "C33J cold-start wiring alone does not receive a new route-information event while the app process remains active. Same-device completion is an accepted MVP authentication state and requires one lifecycle handoff.",
+  "minimumCompleteScope": [
+    "reuse_JourneySession_prepareEmailLinkReturn_as_the_only_validation_and_completion_owner",
+    "add_one_WidgetsBindingObserver_route_information_handoff_in_MoolSocialApp",
+    "consume_only_links_recognized_by_the_injected_EmailLinkGateway_and_leave_unrelated_routes_unhandled",
+    "navigate_to_readyRoute_after_completion_or_existing_sign_in_route_for_same_email_confirmation",
+    "prove_foreground_same_process_and_different_process_returns_plus_unrelated_route_noninterception"
+  ],
+  "explicitExclusions": [
+    "no_Android_manifest_domain_assetlinks_Hosting_authorized_domain_or_Firebase_provider_write",
+    "no_live_email_send_or_real_email_link_access",
+    "no_link_action_code_nonce_or_token_logging_persistence_or_test_fixture_value",
+    "no_AAB_Play_OPPO_build_install_update_or_device_mutation",
+    "no_change_to_locked_Screen03_reference_or_v4_owner"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_FINAL_and_native_implementation_authority_2026_08_15",
+    "C33J_gateway_session_and_v5_route_source_present",
+    "REG_20260815_2498_registered_before_lifecycle_mutation",
+    "separate_future_App_Link_and_live_email_configuration_gate"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "thin_policy_adapter", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/features/journey01/journey_services.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/uaw_c33j_fix1_foreground_email_link_return_handoff_test.dart",
+      "scripts/check-uaw-c33j-fix1-foreground-email-link-return-handoff.ps1"
+    ],
+    "necessityProof": "No current WidgetsBindingObserver handles incoming route information for email links. The existing MoolSocialApp lifecycle observer and JourneySession email-link method are the reusable owners; one thin callback and focused matrix are sufficient without a route, screen or backend owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "foreground_same_session_link_completes_and_opens_exact_pending_route",
+    "foreground_process_return_without_email_shows_same_email_confirmation",
+    "unrecognized_route_information_returns_false_and_does_not_change_auth_state",
+    "duplicate_or_post_auth_link_cannot_repeat_account_bootstrap",
+    "C33J_focused_and_affected_regressions_analyzer_and_dual_host_gates"
+  ],
+  "authority": {
+    "ticketAndEvidenceWriteAuthorized": true,
+    "nativeRuntimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "hostingProviderOrAppLinkWriteAuthorized": false,
+    "liveEmailSendAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

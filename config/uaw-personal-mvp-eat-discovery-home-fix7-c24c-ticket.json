@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-EAT-DISCOVERY-HOME-FIX7-C24C",
+  "parentTicket": "UAW-PERSONAL-MVP-REFERENCE-SERVICE-HOME-RECOVERY-FIX7-C24",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "customerOutcome": "Order Food and Book Table open clean location-and-search-led discovery with truthful cuisine, restaurant, price, rating, time and direct action information.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-EAT-DISCOVERY-HOME-FIX7-C24C-PRESELECTION-ASSESSMENT-20260809.md",
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-EAT-DISCOVERY-HOME-FIX7-C24C-COMPLETION-20260809.md",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["EatHomeScreen","EatTableScreen","EatSession","EatRestaurant","existing_eat_routes","shared_service_home_primitives"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newSubactions":[]},
+  "acceptance": ["Order_Food_and_Book_Table_only","location_and_search_first","compact_food_categories_and_filters","restaurant_cards_show_price_rating_time_distance_and_availability","direct_order_or_table_action","no_ads_brand_copy_tiffin_or obstructive overlay","adaptive_and_accessible"],
+  "execution": {"referenceWriteAuthorized":false,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"backendWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"externalServiceWriteAuthorized":false}
+}

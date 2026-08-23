@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "WEB-MVP-GOOGLE-ENTITY-DISASSOCIATION-FIX1",
+  "recordedAt": "2026-08-07T13:48:57.0600977+05:30",
+  "state": "owner_actions_complete_google_processing",
+  "founderOutcome": "MoolSocial and SuperMandi are separate entities and MoolSocial-owned Google results must not cross-associate them.",
+  "target": {
+    "origin": "https://moolsocial.com",
+    "searchConsoleProperty": "sc-domain:moolsocial.com"
+  },
+  "liveSourceVerification": {
+    "routes": [
+      "https://moolsocial.com/",
+      "https://moolsocial.com/privacy",
+      "https://moolsocial.com/terms",
+      "https://moolsocial.com/support",
+      "https://moolsocial.com/disconnect",
+      "https://moolsocial.com/delete-account",
+      "https://moolsocial.com/youtube-api"
+    ],
+    "allHttp200": true,
+    "normalizedRetiredIdentityMatchesPerRoute": 0,
+    "sourceChangeRequired": false,
+    "firebaseDeploymentRequired": false
+  },
+  "googleAudit": {
+    "queryDirections": [
+      "moolsocial",
+      "exact_supermandi_tech_pvt_ltd",
+      "site_moolsocial_com_exact_supermandi_tech"
+    ],
+    "moolsocialAiOverviewCrossAssociationObserved": true,
+    "affectedMoolsocialCanonicalUrls": [
+      "https://moolsocial.com/",
+      "https://moolsocial.com/privacy",
+      "https://moolsocial.com/youtube-api"
+    ],
+    "thirdPartySupermandiResultsMutated": false
+  },
+  "searchConsoleSnippetRequests": [
+    {
+      "url": "https://moolsocial.com/",
+      "type": "Clear snippet",
+      "requestedDate": "2026-08-07",
+      "statusAtRecord": "Processing request"
+    },
+    {
+      "url": "https://moolsocial.com/privacy",
+      "type": "Clear snippet",
+      "requestedDate": "2026-08-07",
+      "statusAtRecord": "Processing request"
+    },
+    {
+      "url": "https://moolsocial.com/youtube-api",
+      "type": "Clear snippet",
+      "requestedDate": "2026-08-07",
+      "statusAtRecord": "Processing request"
+    }
+  ],
+  "searchConsoleIndexingRequests": [
+    {
+      "url": "https://moolsocial.com/",
+      "receipt": "Indexing requested",
+      "detail": "URL was added to a priority crawl queue."
+    },
+    {
+      "url": "https://moolsocial.com/privacy",
+      "receipt": "Indexing requested",
+      "detail": "URL was added to a priority crawl queue in the predecessor ticket."
+    },
+    {
+      "url": "https://moolsocial.com/youtube-api",
+      "receipt": "Indexing requested",
+      "detail": "URL was added to a priority crawl queue."
+    }
+  ],
+  "safetyAssertions": {
+    "temporarilyRemoveUrlUsed": false,
+    "wholeUrlRemovalUsed": false,
+    "validMoolsocialPagesRemainDiscoverable": true,
+    "noindexOrRobotsBlockUsed": false,
+    "dnsChanged": false,
+    "sourceOrFirebaseChanged": false,
+    "mobileBackendApkOrOppoChanged": false,
+    "providerFeedbackOrEmailSent": false
+  },
+  "evidence": {
+    "moolsocialQueryScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/moolsocial-query-ai-overview.jpg",
+      "sha256": "CA54C69C498B8F70A80C1DE083982820F44D878A31787AFDC6EDD6C0AEF23FD9"
+    },
+    "supermandiQueryScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/supermandi-query-cross-results.jpg",
+      "sha256": "35F4EA6906B111DEDF1233B9D9E3E9A1C860E0947AB175F01E9D655B772A965C"
+    },
+    "siteQueryScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/site-moolsocial-retired-identity-results.jpg",
+      "sha256": "38DA05DB7B3E6BEB76DBCABFCE6CEF823A5203D12DA738D42C4734F88C7CEA43"
+    },
+    "snippetQueueScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/search-console-three-snippet-clear-requests.jpg",
+      "sha256": "3A4DAB3A15301486A5219247B97A1F829F01FBAAEB6ACB0192E4CC1EDB042325"
+    },
+    "homeIndexingScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/search-console-home-indexing-requested.jpg",
+      "sha256": "CB75045CD5B47CA4A01EF6FD6CD93DC7F46A19DE7F0F0A1E82BC5562EBD5F3D4"
+    },
+    "youtubeApiIndexingScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-entity-disassociation-20260807-01/search-console-youtube-api-indexing-requested.jpg",
+      "sha256": "081FE222782C9400A94885AFE96198876F4E4B4B86CD48BE20B8248B4DF52FF4"
+    },
+    "privacyIndexingScreenshot": {
+      "path": "artifacts/quality/web-mvp-google-index-retired-brand-refresh-20260807-01/search-console-privacy-indexing-requested.jpg",
+      "sha256": "A24DCEA202EA5FD5B57424E039DB0068AE7C91A3E8E1E72B3FC65162752B0B98"
+    }
+  },
+  "regressionRegistered": "REG-20260807-127-PUBLIC-ENTITY-DISASSOCIATION-QUERY-AUDIT-INCOMPLETE",
+  "externalProviderState": {
+    "owner": "Google Search",
+    "state": "snippet_requests_processing_and_recrawl_pending",
+    "aiOverviewRefreshPending": true,
+    "immediateCrossAssociationRemovalClaimed": false
+  },
+  "nextSafeAction": "monitor_search_console_later_without_repeating_requests"
+}

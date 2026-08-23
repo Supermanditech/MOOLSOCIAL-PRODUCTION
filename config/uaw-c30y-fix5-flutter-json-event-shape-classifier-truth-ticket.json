@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30Y-FIX5-FLUTTER-JSON-EVENT-SHAPE-CLASSIFIER-TRUTH",
+  "parentTicket": "UAW-C30Y-R60-48-SUCCESSOR-AAB-PLAY-INTERNAL-OPPO-ACCEPTANCE",
+  "state": "founder_authorized_aab_audit_finding_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_evidence_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The authoritative Flutter regression runner classifies every decoded JSON reporter object without crashing, and fails closed with bounded shape-only evidence when an object lacks an event type.",
+  "classificationReason": "Attempt-06 crashed in strict mode before producing authoritative Flutter counts. The founder requires every AAB audit finding to be ticketed, repaired and requalified before build.",
+  "minimumCompleteScope": [
+    "preserve_attempt_06_cycle_1_Flutter_log_and_exit_as_non_qualifying_evidence",
+    "add_one_reusable_optional_JSON_event_type_parser",
+    "count_untyped_JSON_objects_and_emit_only_bounded_property_names_without_values",
+    "fail_closed_when_any_untyped_JSON_object_remains",
+    "add_dual_PowerShell_host_typed_untyped_and_blank_type_behavioral_coverage",
+    "extend_the_existing_qualification_evidence_binder_for_post_FIX5_generation",
+    "reseal_source_and_run_two_fresh_complete_cycles_before_build_authority"
+  ],
+  "explicitExclusions": [
+    "no_weakening_of_expected_Flutter_pass_skip_failure_or_error_counts",
+    "no_logging_of_JSON_values_credentials_tokens_or_private_payloads",
+    "no_runtime_UI_chat_social_backend_Hosting_provider_or_service_source_change",
+    "no_AAB_APK_upload_Play_OPPO_deployment_external_write_or_secret_access_under_FIX5"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_implemented_and_requalified_before_build",
+    "REG_20260815_2194_registered_before_repair",
+    "C30Y_FIX1_through_FIX4_completed_and_successor_counts_remain_zero"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "tmp/run-c30t-authoritative-flutter-manifest-audit.ps1",
+      "scripts/check-c30y-fix3-qualification-evidence-file-binding-truth.ps1",
+      "scripts/check-codex-development-regression-memory.ps1"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/c30y-flutter-json-event-shape-parser.ps1",
+      "scripts/check-c30y-fix5-flutter-json-event-shape-classifier-truth.ps1"
+    ],
+    "necessityProof": "The existing authoritative runner remains the sole Flutter cycle owner. One tiny parser and one behavioral checker are the smallest complete repair and create no alternate test or build path.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "PowerShell_7_and_Windows_PowerShell_typed_untyped_and_blank_type_parser_behavior",
+    "runner_static_binding_to_the_reusable_parser_and_fail_closed_untyped_count",
+    "PowerShell_7_and_Windows_PowerShell_post_FIX5_evidence_binding_contract",
+    "one_recovery_Flutter_run_with_bounded_shape_only_diagnostics",
+    "fresh_source_manifest_and_two_complete_post_FIX5_cycles",
+    "failed_attempt_paths_remain_immutable_and_new_attempt_paths_are_unique"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30Y-FIX5-FOUNDER-AUTHORIZATION-20260815.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30y-fix5-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30Y-FLUTTER-JSON-EVENT-MISSING-TYPE-CRASH-20260815.md"
+  }
+}

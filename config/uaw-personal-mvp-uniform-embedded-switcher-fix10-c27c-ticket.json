@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-UNIFORM-EMBEDDED-SWITCHER-FIX10-C27C",
+  "parentTicket": "UAW-PERSONAL-MVP-UNIFORM-NAVIGATION-DESIGN-SYSTEM-FIX10-C27",
+  "state": "complete",
+  "classification": "mvp_required",
+  "customerOutcome": "The accepted six-family vertical glass Mool switcher looks and behaves like an embedded part of the same navigation system on every destination, with legible neutral glass and one icon, type, accent and selected-state standard.",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-EMBEDDED-SWITCHER-FIX10-C27C-PRESELECTION-ASSESSMENT-20260810.md",
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+    "sharedImplementationOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "apps/mobile/test/ui_v2/universal/mool_uniform_embedded_switcher_c27c_test.dart",
+      "scripts/check-personal-uniform-embedded-switcher-c27c.ps1"
+    ],
+    "necessityProof": "C26C interaction tests do not enforce shared C27 typography, icon, accent, selected-state and neutral-glass presentation tokens."
+  },
+  "acceptance": [
+    "six 56px family rows in approved order",
+    "136px embedded glass width with 16px radius",
+    "one neutral high-legibility translucent canvas",
+    "same 10.5px Inter type and 22px icon standard as dock",
+    "same family accent map as dock context",
+    "one 2px vertical selected marker and restrained tint",
+    "tap swipe outside Back and reduced motion unchanged",
+    "no modal barrier dimming close button subactions or extra tap"
+  ],
+  "completionEvidence": "docs/quality/UAW-PERSONAL-MVP-UNIFORM-EMBEDDED-SWITCHER-FIX10-C27C-COMPLETION-20260810.md",
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeSourceWriteAuthorized": false,
+    "testOrGateWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "backendWriteAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-R11-PERSONAL-GLOBAL-CHAT-CONTINUITY-V1",
+  "ticketId": "UAW-R11-PERSONAL-GLOBAL-CHAT-CONTINUITY",
+  "actor": "Personal user",
+  "classification": "mvp_required",
+  "chatOwnerRoute": "/app/chat/inbox",
+  "origins": [
+    {"id":"mool","entryRoute":"/app/mool","chatKey":"mool-root-chat","returnRoute":"/app/mool","returnOwnerKey":"personal-mool-root-v2"},
+    {"id":"eat","entryRoute":"/app/eat/home","chatKey":"mool-root-chat","returnRoute":"/app/eat/home","returnOwnerKey":"eat-home-screen"},
+    {"id":"ride","entryRoute":"/app/ride/book?type=bike","chatKey":"mool-root-chat","returnRoute":"/app/ride/book?type=bike","returnOwnerKey":"ride-booking-screen"},
+    {"id":"book","entryRoute":"/app/book/doctor","chatKey":"mool-root-chat","returnRoute":"/app/book/doctor","returnOwnerKey":"book-doctor"},
+    {"id":"work","entryRoute":"/app/work/earn","chatKey":"mool-root-chat","returnRoute":"/app/work/earn","returnOwnerKey":"work-earn-screen"}
+  ],
+  "navigation": {
+    "entry": "push_chat_inbox_with_exact_return_query",
+    "inboxBack": "go_exact_permitted_return",
+    "threadBack": "go_inbox_then_exact_permitted_return",
+    "invalidReturn": "existing_safe_chat_fallback"
+  },
+  "runtimeDisposition": "production_acceptance",
+  "newScreenOwners": 0,
+  "newRouteOwners": 0,
+  "newBackendOwners": 0,
+  "explicitExclusions": [
+    "no_message_thread_attachment_notification_presence_call_support_or_backend_change",
+    "no_external_messenger_as_authoritative_record",
+    "no_removed_route_containment_until_UAW_R12",
+    "no_build_install_device_commit_push_deploy_or_promotion"
+  ]
+}

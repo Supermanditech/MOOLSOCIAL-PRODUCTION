@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-SOCIAL-BUY-FOUR-ACTION-CONFORMANCE-FIX3-C20D",
+  "parentTicket": "UAW-PERSONAL-MVP-GLOBAL-SUBACTION-FOUNDER-GALLERY-PROFESSIONAL-RECOVERY-FIX3-C20",
+  "state": "complete_host_qualified_build_install_closed",
+  "classification": "mvp_required",
+  "actor": "authenticated Personal MoolSocial customer using the existing Social or Buy destination",
+  "capability": "read and operate all four existing Social or Buy subactions at compact and standard phone widths through the shared C20C neutral brand-glass owner",
+  "customerOutcome": "Social and Buy keep four professional legible one-tap subactions with correct media or light compositing, provider attribution, long-label fitment and destination background visibility at supported text scales.",
+  "failureRecovery": "The current subaction stays explicit and inert, all available subactions remain one tap and at least 48px, reduced motion is immediate, and existing routes, content, Back, Mool, Chat and disclosure state remain unchanged.",
+  "classificationReason": "The founder explicitly identified weak text visibility, wrong Buy colours and content-blocking presentation; C20C repaired the shared owner and C20D must qualify the two dense four-action production consumers before adaptive sparse-family work.",
+  "minimumCompleteScope": [
+    "reuse_C20C_shared_neutral_brand_glass_owner_without_family_renderer_fork",
+    "qualify_Social_four_action_media_compositing_Short_Video_Feed_Create_provider_assets_and_selected_states",
+    "qualify_Buy_four_action_light_compositing_Shop_Wholesale_Medicine_Orders_and_selected_states",
+    "qualify_320_to_430_width_1_0_to_1_3_navigation_text_scale_and_representative_background_visibility",
+    "preserve_48px_targets_one_tap_inert_selected_finite_motion_immediate_reduced_motion_and_disclosure",
+    "add_focused_C20D_tests_and_static_gate_with_C20C_predecessor"
+  ],
+  "reuseInventory": {
+    "complete": true,
+    "duplicateSearchComplete": true,
+    "runtimeOwners": [
+      "apps/mobile/lib/core/design/mool_design_system.dart::MoolLocalNavigationRail",
+      "apps/mobile/lib/core/design/mool_design_system.dart::_MoolLocalNavigationCell",
+      "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart::Screen04ContextTabs",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart::_buildBuyLocalNavigation",
+      "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart::MoolDestinationNavigationV2"
+    ],
+    "existingActions": {
+      "social": ["shorts", "videos", "feed", "create"],
+      "buy": ["shop", "wholesale", "medicine", "orders"]
+    },
+    "duplicateSearchResult": "Social and Buy already consume the same C20C renderer and existing routes; C20D adds conformance coverage and only a thin test harness or correction inside those owners if a qualifying test proves it necessary.",
+    "implementationDisposition": ["reuse", "test_only_acceptance"],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newPersistentBusinessStateOwners": [],
+    "newSubactions": []
+  },
+  "fourActionContract": {
+    "families": ["social", "buy"],
+    "actionsPerFamily": 4,
+    "selectedStateCount": 8,
+    "surfaceToneSocial": "media",
+    "surfaceToneBuy": "light",
+    "controlHeight": 48.0,
+    "minimumTapTarget": 48.0,
+    "controlRadius": 16.0,
+    "labelFontSize": 13.0,
+    "labelFontWeight": 700,
+    "maximumNavigationTextScale": 1.3,
+    "iconOpticalBox": 20.0,
+    "providerIconOpticalBox": 20.0,
+    "minimumCompositedLabelContrast": 4.5,
+    "supportedWidths": [320, 360, 390, 412, 430],
+    "horizontalScrollOrPanelAllowed": false,
+    "blockingBandOrTrapezoidAllowed": false,
+    "familyTintedFillAllowed": false,
+    "fillerActionAllowed": false,
+    "selectedActionInert": true,
+    "availableActionOneTap": true,
+    "normalStateMotionMilliseconds": 160,
+    "reducedMotionImmediate": true
+  },
+  "plannedFiles": [
+    "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_social_buy_four_action_conformance_c20d_test.dart",
+    "scripts/check-personal-social-buy-four-action-conformance-c20d.ps1",
+    "config/mvp-personal-subaction-professional-recovery-regression-c20.json"
+  ],
+  "testAndEvidencePlan": [
+    "eight_selected_states_and_exact_action_semantics",
+    "320_360_390_412_430_width_and_1_0_1_3_text_scale_fitment",
+    "Social_media_and_Buy_light_neutral_glass_composited_contrast_and_background_visibility",
+    "YouTube_provider_20px_optical_box_and_long_Wholesale_Medicine_labels",
+    "one_tap_inert_selected_finite_press_and_immediate_reduced_motion",
+    "C20D_static_gate_then_C20C_disclosure_placement_navigation_brand_and_scope_compatibility"
+  ],
+  "execution": {
+    "referenceWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": true,
+    "testAndGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "installAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "explicitExclusions": [
+    "no_C20E_sparse_family_or_C20F_full_matrix_qualification",
+    "no_new_screen_route_feature_subaction_backend_provider_or_business_state",
+    "no_global_rail_C20B_disclosure_or_C20C_shared_grammar_change_without_a_failing_C20D_test",
+    "no_screenbook_protected_reference_business_copy_or_commercial_logic_change",
+    "no_build_install_uninstall_data_clear_downgrade_credentials_messages_calls_funds_Production_commit_push_deploy_or_promotion"
+  ],
+  "founderAuthority": "docs/quality/UAW-C20D-FOUNDER-AUTHORIZATION-20260808.md",
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-SOCIAL-BUY-FOUR-ACTION-CONFORMANCE-FIX3-C20D-PRESELECTION-ASSESSMENT-20260808.md"
+}

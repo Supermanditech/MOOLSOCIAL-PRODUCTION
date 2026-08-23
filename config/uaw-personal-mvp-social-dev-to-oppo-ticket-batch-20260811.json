@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "batchId": "UAW-PERSONAL-MVP-SOCIAL-DEV-TO-OPPO-20260811",
+  "state": "c29u_selected_c29m_and_c29v_dependency_held",
+  "executionOrder": ["C29U", "C29M", "C29V"],
+  "selectedTicket": "C29U",
+  "tickets": [
+    {
+      "shortId": "C29U",
+      "manifest": "config/uaw-personal-mvp-social-dev-backend-deployment-c29u-ticket.json",
+      "state": "selected_founder_authorized_predeployment_qualification"
+    },
+    {
+      "shortId": "C29M",
+      "manifest": "config/uaw-personal-mvp-social-youtube-private-upload-dev-provider-qualification-c29m-ticket.json",
+      "state": "founder_authorized_dependency_waiting_c29u_dev_deploy"
+    },
+    {
+      "shortId": "C29V",
+      "manifest": "config/uaw-personal-mvp-social-production-oppo-qualification-c29v-ticket.json",
+      "state": "registered_dependency_held"
+    }
+  ],
+  "protectedBaseline": {
+    "serial": "2b3e0f71",
+    "versionName": "1.0.0-r60.34",
+    "versionCode": "2026081134",
+    "installedApkSha256": "96FD2F2E958D682481737A4DEA069086DE42E616409345E6218CF8831F999F29"
+  }
+}

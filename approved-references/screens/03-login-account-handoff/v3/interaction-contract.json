@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "routeOwner": "journey01",
+    "productionRoutes": [
+      "/sign-in",
+      "/verify"
+    ],
+    "approvalVersion": "native-production-v3",
+    "founderVisualAcceptedAt": "2026-07-20",
+    "productionLockReconciledAt": "2026-08-08",
+    "status": "Accepted",
+    "presentationInheritedFrom": "approved-references/screens/03-login-account-handoff/v2"
+  },
+  "presentation": {
+    "changedFromV2": false,
+    "nativeFlutterOwnerCount": 3,
+    "providerAssetChanged": false,
+    "copyChanged": false,
+    "goldenChanged": false,
+    "referenceImagesCopiedIntoV3": false
+  },
+  "customerJourney": {
+    "entry": "explicitly completed Screen02 with setup state preserved",
+    "methodActions": [
+      "Continue with Google",
+      "Continue with YouTube",
+      "Continue with Apple",
+      "Continue with X",
+      "Continue with Instagram",
+      "Continue with Facebook",
+      "Email OTP",
+      "Mobile OTP"
+    ],
+    "providerRule": "provider-owned native or secure browser handoff; MoolSocial never collects provider credentials",
+    "verifiedExit": "open Universal immediately while preserving Screen02 state",
+    "recoveryRule": "a device-review routing failure is never mislabeled as proof that the customer is offline"
+  },
+  "profileProvenance": {
+    "requiredForProfileDeviceReview": true,
+    "candidateEnvironmentKey": "MOOLSOCIAL_CANDIDATE_ID",
+    "deviceReviewEnvironmentKey": "MOOLSOCIAL_DEVICE_REVIEW",
+    "candidateMarker": "MOOLSOCIAL_CANDIDATE",
+    "startupMarker": "MOOLSOCIAL_STARTUP",
+    "startupOutcomes": [
+      "ready-or-preserved-journey-stage",
+      "boot-failure"
+    ],
+    "enforcedBy": [
+      "apps/mobile/test/platform_configuration_test.dart",
+      "scripts/check-codex-development-regression-memory.ps1",
+      "scripts/check-buy-device-review-runtime.ps1"
+    ],
+    "permanentRegression": "REG-20260806-006-PROFILE-RUNTIME-MARKER-SUPPRESSED"
+  },
+  "prohibited": [
+    "HTML or WebView in Flutter",
+    "copying the read-only screenbook into production",
+    "changing the accepted Screen03 presentation or goldens in C19",
+    "suppressing profile candidate or startup provenance markers",
+    "fake provider success in a production build",
+    "provider credentials inside MoolSocial"
+  ]
+}

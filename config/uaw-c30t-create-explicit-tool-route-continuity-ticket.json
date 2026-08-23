@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CREATE-EXPLICIT-TOOL-ROUTE-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "create_deep_link_journey_blocker",
+  "actor": "creator_receiving_a_new_explicit_Create_tool_route_while_the_Social_screen_remains_mounted",
+  "customerOutcome": "A new Text, Image, Carousel, Image Poll, Quick Poll or Quiz route opens the requested tool without clearing the shared unfinished draft.",
+  "minimumCorrection": [
+    "keep_the_Create_workbench_State_stable_across_in_place_tool_route_changes",
+    "consume_new_explicit_initialIntent_values_in_didUpdateWidget",
+    "preserve_caption_choices_media_and_correct_answer_state",
+    "retain_distinct_state_ownership_across_actual_Social_tab_changes",
+    "prove_an_in_place_Text_to_Quiz_route_update_preserves_caption_copy"
+  ],
+  "explicitExclusions": [
+    "no_global_router_or_Create_visual_redesign",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "16 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/create-explicit-tool-route-continuity-focused-tests.log",
+    "evidenceSha256": "07B7423629EED9068705955A8231C9976D837E1AC7A90D40A1F37D980E5970C2",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

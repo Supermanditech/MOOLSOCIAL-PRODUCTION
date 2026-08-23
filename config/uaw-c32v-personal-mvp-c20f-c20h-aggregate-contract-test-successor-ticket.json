@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C32V-PERSONAL-MVP-C20F-C20H-AGGREGATE-CONTRACT-TEST-SUCCESSOR",
+  "parentOutcome": "UAW-C32R-PERSONAL-MVP-HISTORICAL-NAVIGATION-TEST-APPLICABILITY-RECONCILIATION",
+  "finding": "REG-20260815-2280-C32R-C20F-PRE-C20H-AGGREGATE-STATE-AND-COPY-CONTRACT",
+  "classification": "mvp_supporting",
+  "state": "registered_not_selected_test_only_successor",
+  "customerOutcome": "The aggregate regression follows the accepted C20H lifecycle and current C10E behavior owner without weakening its six-family, seventeen-state or closed-release checks.",
+  "minimumCompleteScope": [
+    "migrate_only_apps_mobile_test_ui_v2_universal_uaw_personal_mvp_subaction_professional_regression_c20f_test_dart",
+    "replace_pre_C20H_state_marker_with_exact_current_machine_state",
+    "replace_obsolete_C10E_title_tokens_with_current_behavior_tokens",
+    "preserve_family_counts_owner_inventory_host_cycles_and_closed_build_install_checks",
+    "run_C20F_C10E_and_analyzer"
+  ],
+  "explicitExclusions": [
+    "no_runtime_navigation_or_business_behavior_change",
+    "no_machine_state_or_acceptance_history_rewrite",
+    "no_backend_build_device_external_or_secret_action"
+  ],
+  "authority": {
+    "runtimeSourceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "backendSourceWriteAuthorized": false,
+    "referenceWriteAuthorized": false,
+    "baselineReplacementAuthorized": false,
+    "buildAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalCommunicationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  }
+}

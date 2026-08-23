@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-C33H-FIREBASE-PHONE-AUTH-LIVE-READINESS-001",
+  "ticketId": "UAW-C30T-R60-45-MOBILE-OTP-GATE-NONFUNCTIONAL",
+  "state": "source_qualified_prebuild_provider_prerequisites_qualified_candidate_device_pending",
+  "projectId": "moolsocial-dev-503018",
+  "packageName": "com.moolsocial.app",
+  "sourceQualification": {
+    "rollbackImplemented": true,
+    "focusedJourneyPassed": true,
+    "focusedJourneyPassedCount": 6,
+    "affectedRegressionsPassed": true,
+    "affectedRegressionsPassedCount": 54,
+    "wholeMobileAnalyzerPassed": true,
+    "dualPowerShellGatePassed": true
+  },
+  "liveReadiness": {
+    "phoneProviderEnabled": true,
+    "fictionalTestPairRegistered": true,
+    "fictionalTestPairValuePersistedInRepository": false,
+    "fictionalTestPairRealSmsSent": false,
+    "smsRegionPolicyQualified": true,
+    "smsRegionPolicyMode": "allow",
+    "smsRegionPolicyRegions": ["IN"],
+    "smsRegionPolicyPreservedExistingMode": true,
+    "smsRegionPolicyRealSmsSent": false,
+    "playSigningSha1Registered": true,
+    "playSigningSha256Registered": true,
+    "playIntegrityOrRecaptchaReturnQualified": false,
+    "realDeviceSendVerifyAuthorized": false,
+    "realDeviceSendVerifyPassed": false,
+    "secretValuesObserved": false,
+    "phoneNumberOrOtpObserved": false
+  },
+  "authority": {
+    "sourceTestAndGateWriteAuthorized": true,
+    "firebaseProviderWriteAuthorized": false,
+    "firebaseProviderWriteAuthorizationConsumed": true,
+    "smsRegionPolicyWriteAuthorized": false,
+    "smsRegionPolicyWriteAuthorizationConsumed": true,
+    "smsSendOrBillingAuthorized": false,
+    "buildPlayOrDeviceMutationAuthorized": false,
+    "credentialAccessAuthorized": false
+  },
+  "qualificationEvidence": [
+    "apps/mobile/test/uaw_c33h_fix1_firebase_phone_auth_independent_journey_test.dart",
+    "scripts/check-uaw-c33h-fix1-firebase-phone-auth-independent-journey.ps1",
+    "docs/quality/UAW-C33H-FIX1-FIREBASE-PHONE-AUTH-INDEPENDENT-JOURNEY-QUALIFICATION-20260815.md",
+    "docs/quality/UAW-C33H-FIX2-FIREBASE-PHONE-INDIA-SMS-REGION-POLICY-QUALIFICATION-20260815.md"
+  ]
+}

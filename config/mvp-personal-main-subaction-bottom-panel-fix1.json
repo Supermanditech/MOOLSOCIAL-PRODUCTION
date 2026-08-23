@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "contractId": "UAW-PERSONAL-MVP-MAIN-SUBACTION-BOTTOM-PANEL-FIX1-CONTRACT-V1",
+  "ticketId": "UAW-PERSONAL-MVP-MAIN-SUBACTION-BOTTOM-PANEL-FIX1",
+  "classification": "mvp_required",
+  "founderAuthority": "docs/quality/UAW-PERSONAL-MVP-MAIN-SUBACTION-BOTTOM-PANEL-FIX1-FOUNDER-AUTHORIZATION-20260806.md",
+  "implementationOwners": {
+    "mainActions": "personalMoolRootActions",
+    "root": "PersonalMoolRootV2",
+    "chooser": "MvpActionChoiceRootV2",
+    "subActionDock": "MoolOutcomeDock",
+    "panelPrimitive": "showModalBottomSheet",
+    "newNamedRoutes": 0,
+    "newScreens": 0,
+    "newStateOwners": 0,
+    "newBackendOwners": 0
+  },
+  "navigation": {
+    "rootMoolOpensMainActionPanel": true,
+    "chooserMoolOpensMainActionPanel": true,
+    "downstreamMoolOpensMainActionPanel": true,
+    "mainActions": ["social", "buy", "eat", "ride", "book", "work"],
+    "moolHomeAvailable": true,
+    "chatRemainsStableDockEdge": true,
+    "dismissRestoresExactCurrentScreen": true,
+    "selectedMainActionSemanticRequired": true,
+    "subActionsRemainVisibleWhenPanelClosed": true,
+    "activeLifecycleMayBeSilentlyReset": false
+  },
+  "motion": {
+    "kind": "finite_native_bottom_sheet",
+    "reducedMotionRequired": true,
+    "perpetualMotionAllowed": false
+  },
+  "carriedDependency": "UAW-PERSONAL-MVP-ACTION-WORDING-WIRING-NAVIGATION-FIX3",
+  "protectedAuditOnly": ["social", "buy"],
+  "deviceGate": {
+    "oppoRequired": true,
+    "inPlaceUpgradeOnly": true,
+    "founderAcceptanceSubjectToCodexSatisfaction": true
+  }
+}

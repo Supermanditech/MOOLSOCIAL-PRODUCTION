@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-POLL-QUIZ-EXPIRY-ENFORCEMENT",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "public_vote_integrity_and_time_truth_blocker",
+  "actor": "signed_in_user_viewing_or_submitting_a_poll_or_quiz_near_or_after_its_authoritative_close_time",
+  "customerOutcome": "Poll and quiz closing copy reflects the provider timestamp, closed choices are disabled, and the backend transaction rejects every late vote even if a client bypasses the UI.",
+  "minimumCorrection": [
+    "derive_minute_hour_day_or_closed_copy_from_the_authoritative_closesAt",
+    "avoid_a_closing_claim_when_closesAt_is_absent",
+    "disable_poll_and_quiz_choices_after_closure",
+    "reject_late_votes_inside_the_Firestore_transaction_before_mutation",
+    "prove_expiry_boundary_copy_disabled_UI_and_backend_rejection"
+  ],
+  "explicitExclusions": [
+    "no_poll_duration_editor_or_backend_schema_expansion",
+    "no_Dev_deployment_real_vote_AAB_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "30 passed, 0 failed (21 Flutter plus 9 backend)",
+    "flutterEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/poll-quiz-expiry-flutter-focused-tests.log",
+    "flutterEvidenceSha256": "BCD56110848C64847E8E4A2DDF327B4FE427258A1F9FEDFBDBF3B66BC1CEAA19",
+    "backendEvidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/poll-quiz-expiry-backend-focused-tests.log",
+    "backendEvidenceSha256": "CA102F6505598459C36D3A997210BB8D1C32A02751E65BBFE5246EDE15B18224",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H",
+  "parentTicket": "UAW-PERSONAL-MVP-APPROVED-HTML-EMBEDDED-NAVIGATION-SHELL-RECOVERY-FIX9-C26",
+  "state": "device_qualified_founder_review_pending",
+  "classification": "mvp_required",
+  "customerOutcome": "One unique qualified successor is installed in place on OPPO, checksum-proven and exercised across every family root, local action and navigation continuity path for founder review.",
+  "reuseInventory": {"complete":true,"duplicateSearchComplete":true,"implementationDisposition":["reuse","configuration"],"sharedImplementationOwners":["existing single-build wrapper","APK regression machine gate","in-place ADB upgrade workflow","OPPO screenshot and UI-hierarchy evidence workflow"],"newScreens":[],"newRoutes":[],"newBackendOwners":[],"newNecessarySharedOwners":[],"necessityProof":"Only versioned candidate and evidence configuration is required after C26G qualification."},
+  "acceptance": ["exactly_one_build_authorization","exactly_one_in_place_install","no_uninstall_clear_or_downgrade","local_live_pulled_checksum_identity","six_family_root_and_action_matrix","embedded_switcher_motion_Back_Mool_Chat_continuity","founder_acceptance_pending"],
+  "preselectionAssessment": "docs/quality/UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H-PRESELECTION-ASSESSMENT-20260810.md",
+  "qualifiedSourceFingerprint": "FFDA4369201743BAE65EC7D743F5A6615AA24C92B8DD36678B20F02AC30C64E9",
+  "hostQualificationEvidence": "docs/quality/UAW-PERSONAL-MVP-APPROVED-NAVIGATION-HOST-QUALIFICATION-FIX9-C26G-COMPLETION-20260810.md",
+  "deviceMatrixContract": "config/mvp-personal-approved-navigation-device-matrix-c26h.json",
+  "deviceMatrixDigest": "0EC85E0A0BFE5DD3A118AC31DA369B6C07B4F7E0F53DD0FDD48E845143659ADA",
+  "deviceQualificationEvidence": "docs/quality/UAW-PERSONAL-MVP-APPROVED-NAVIGATION-OPPO-QUALIFICATION-FIX9-C26H-DEVICE-QUALIFICATION-20260810.md",
+  "installedIdentityRecheck": "artifacts/quality/uaw-personal-mvp-approved-navigation-oppo-qualification-fix9-c26h-r60-25-20260810-01/78-post-matrix-installed-identity.md",
+  "execution": {"referenceWriteAuthorized":true,"runtimeSourceWriteAuthorized":false,"testOrGateWriteAuthorized":false,"buildAuthorized":false,"installAuthorized":false,"backendWriteAuthorized":false,"externalServiceWriteAuthorized":false}
+}

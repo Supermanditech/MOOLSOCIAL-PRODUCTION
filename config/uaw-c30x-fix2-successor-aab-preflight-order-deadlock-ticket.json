@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C30X-FIX2-SUCCESSOR-AAB-PREFLIGHT-ORDER-DEADLOCK",
+  "parentTicket": "UAW-C30X-SUCCESSOR-AAB-PREPARATION-REGRESSION-HARD-GATE",
+  "state": "founder_authorized_gate_order_repair",
+  "classification": "mvp_required",
+  "severity": "blocking_release_regression",
+  "actor": "MoolSocial_release_qualifier",
+  "customerOutcome": "The successor build can enter the single-AAB wrapper only after current source qualification, while fresh generated release configuration and manifest checks still pass before the one build authority is consumed.",
+  "classificationReason": "The audited C30X build path is circular and cannot reach its own preflight. This bounded gate-only correction is required to make the already authorized one-candidate release path executable without weakening any release check.",
+  "minimumCompleteScope": [
+    "separate_source_static_release_control_qualification_from_current_invocation_generated_preflight_evidence",
+    "require_the_fresh_sealed_source_manifest_two_identical_cycles_and_static_release_controls_before_wrapper_entry",
+    "retain_release_config_only_and_merged_manifest_checks_before_single_build_authority_consumption",
+    "add_a_cross_host_static_order_contract_and_negative_gate_coverage"
+  ],
+  "explicitExclusions": [
+    "no_runtime_UI_backend_Hosting_provider_or_service_owner_change",
+    "no_skipping_weakening_or_pre_marking_current_invocation_preflight_evidence",
+    "no_AAB_upload_Play_OPPO_external_write_or_secret_access_under_FIX2",
+    "no_mutation_of_failed_r60_47_history_or_counts"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_directed_every_AAB_audit_finding_to_be_ticketed_and_implemented_before_build",
+    "REG_20260814_2162_registered_before_repair",
+    "C30W_release_runtime_and_C30X_artifact_rebinding_controls_remain_mandatory"
+  ],
+  "robustnessAndReuseAssessment": {
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+    "sharedImplementationOwners": [
+      "scripts/check-successor-aab-regression-hard-gate-c30x.ps1",
+      "scripts/invoke-play-internal-aab-build-c30t.ps1",
+      "scripts/check-play-internal-aab-build-wrapper-c30v.ps1",
+      "tmp/run-c30x-successor-single-aab-founder.ps1",
+      "config/successor-aab-regression-hard-gate-state-c30x.json",
+      "config/successor-aab-regression-hard-gate-aggregate-c30x.json"
+    ],
+    "newScreens": [],
+    "newRoutes": [],
+    "newBackendOwners": [],
+    "newNecessarySharedOwners": [
+      "scripts/check-c30x-fix2-preflight-order-contract.ps1"
+    ],
+    "necessityProof": "The existing wrapper already has the correct safety boundary but the upstream C30X gate and launcher require its downstream result. One state distinction plus one static ordering check is the smallest complete repair and creates no duplicate build owner.",
+    "timelineImpactDays": 0,
+    "within60To75DayLock": true
+  },
+  "testAndEvidencePlan": [
+    "run_the_FIX2_order_contract_on_PowerShell_7_and_Windows_PowerShell",
+    "run_the_generic_wrapper_static_gate_on_both_hosts",
+    "prove_C30X_reconcile_passes_and_build_fails_closed_before_candidate_authority",
+    "include_the_repair_in_two_fresh_identical_source_qualification_cycles"
+  ],
+  "authority": {
+    "referenceWriteAuthorized": false,
+    "testAndGateWriteAuthorized": true,
+    "runtimeSourceWriteAuthorized": false,
+    "backendSourceWriteAuthorized": false,
+    "buildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceMutationAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "evidence": {
+    "founderAuthorization": "docs/quality/UAW-C30X-FIX2-FOUNDER-AUTHORIZATION-20260814.md",
+    "preselectionAssessment": "artifacts/quality/uaw-aab-preparation-regression-hard-gate-20260814-01/c30x-fix2-pre-ticket-selection-assessment.json",
+    "incident": "docs/quality/UAW-AAB-C30X-PREFLIGHT-ORDER-DEADLOCK-20260814.md"
+  }
+}

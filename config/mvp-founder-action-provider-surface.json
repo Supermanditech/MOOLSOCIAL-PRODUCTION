@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-FOUNDER-ACTION-PROVIDER-SURFACE-20260805",
+  "state": "founder_directed_planning_authority_not_executing",
+  "humanAuthority": "docs/delivery/MVP-FOUNDER-ACTION-PROVIDER-SURFACE-DIRECTIVE-20260805.md",
+  "gitFlutterOppoAudit": "docs/quality/MVP-GIT-FLUTTER-OPPO-ACTION-WORKSPACE-RECONCILIATION-20260805.md",
+  "deliveryDiscipline": {
+    "humanAuthority": "docs/delivery/MVP-ROBUST-60-75-DAY-DELIVERY-LOCK-20260805.md",
+    "machineLock": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "preTicketSelectionCheckpoint": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "targetWindowDays": "60-75",
+    "duplicateImplementationBlocked": true,
+    "runtimeChanged": false
+  },
+  "mainActions": [
+    {
+      "id": "social",
+      "mvpDisposition": "mvp_required_dependency_held",
+      "universalSubActions": ["Shorts", "Videos", "Feed", "Create"],
+      "boundary": "shorts_and_videos_finalize_after_youtube_api_compliance_feed_is_native_text_and_image_carousel"
+    },
+    {
+      "id": "buy",
+      "mvpDisposition": "mvp_required",
+      "nativeSubActions": ["Shop", "Wholesale", "Medicine", "Orders"],
+      "boundary": "complete_ready_decision_cart_payment_exact_provider_acceptance_reassignment_packing_delivery_proof_and_recovery"
+    },
+    {
+      "id": "eat",
+      "mvpDisposition": "mvp_required_bounded",
+      "universalSubActions": ["Order Food", "Book Table"],
+      "postponedSubActions": ["Tiffin"]
+    },
+    {
+      "id": "ride",
+      "mvpDisposition": "mvp_required_bounded",
+      "universalSubActions": ["Bike", "Auto", "Cab"],
+      "exactProviderTypes": ["Bike Captain", "Auto Captain", "Cab / Car Captain"]
+    },
+    {
+      "id": "book",
+      "mvpDisposition": "mvp_required_bounded",
+      "universalSubActions": ["Salon", "Doctor"],
+      "postponedSubActions": ["Get It Done"]
+    },
+    {
+      "id": "pay",
+      "mvpDisposition": "postponed_as_standalone_main_action",
+      "universalSubActions": [],
+      "postponedSubActions": ["Recharge", "Bills", "Scan & Pay", "Receipts"],
+      "retainedCapability": "embedded_authoritative_payment_integration_inside_an_approved_transaction_journey"
+    },
+    {
+      "id": "work",
+      "mvpDisposition": "mvp_required_bounded",
+      "universalSubActions": ["Earn Today", "Workspace"],
+      "workspaceOwnedSubActions": ["Delivery", "Onboard", "Verify"]
+    }
+  ],
+  "globalChat": {
+    "mvpDisposition": "mvp_required_shared_capability",
+    "modes": ["individual", "shared_group", "journey_context"],
+    "interactionIntent": "whatsapp_like_immediacy_with_original_moolsocial_ui_and_authoritative_identity_consent_safety_and_audit",
+    "whatsappIsAuthoritativeRecord": false
+  },
+  "unifiedBuySurface": {
+    "humanAuthority": "docs/delivery/MVP-UNIFIED-BUY-SURFACE-AND-VALUE-CHAIN-CATEGORY-DIRECTIVE-20260805.md",
+    "machineAuthority": "config/mvp-unified-buy-surface-value-chain-category-directive.json",
+    "allEligibleBuyersUseNativeBuyMainAction": true,
+    "workspaceSpecificBuyerScreensAllowed": false,
+    "workspaceContextChangesOnly": [
+      "eligible_value_chain_categories",
+      "packs_terms_and_prices",
+      "tax_freight_payment_and_delivery",
+      "buyer_address_and_approval_authority"
+    ],
+    "workspaceRetains": "exact_selling_fulfilment_and_operational_capabilities",
+    "runtimeChanged": false
+  },
+  "buyProviderCoverage": [
+    {
+      "family": "Shop",
+      "customerActors": ["Personal user"],
+      "sellerActors": ["Grocery / Kirana Shop", "General Retail Shop / Dukaan"],
+      "deliveryActors": ["shop_owned_delivery_capability", "Delivery Partner"]
+    },
+    {
+      "family": "Wholesale",
+      "customerActors": ["authorized_verified_business_buyer"],
+      "sellerActors": ["FMCG Supplier / Distributor", "bounded_enabled_FMCG Manufacturer"],
+      "deliveryActors": ["Delivery Partner", "Local Porter / Goods Transporter"]
+    },
+    {
+      "family": "Medicine",
+      "customerActors": ["Personal user"],
+      "sellerActors": ["Medical Store / Pharmacy"],
+      "deliveryActors": ["pharmacy_owned_regulated_delivery_capability", "Delivery Partner"]
+    }
+  ],
+  "profileReclassifications": [
+    {"label": "FMCG Supplier / Distributor", "classification": "mvp_required"},
+    {"label": "Restaurant / Dhaba / Cafe", "classification": "mvp_required"},
+    {"label": "Individual Doctor", "classification": "mvp_required"},
+    {"label": "Salon / Parlour", "classification": "mvp_required"},
+    {"label": "Bike Captain", "classification": "mvp_required"},
+    {"label": "Auto Captain", "classification": "mvp_required"},
+    {"label": "Cab / Car Captain", "classification": "mvp_required"}
+  ],
+  "nextPlanningCandidate": {
+    "id": "MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH",
+    "classification": "mvp_required",
+    "ticketAuthority": "docs/delivery/MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH-TICKET-20260805.md",
+    "machineManifest": "config/mvp-universal-action-workspace-routing-reference-batch.json",
+    "machineManifestSha256": "45D765390EA6B2D94F334CB4F5B2AB67162657A447B220A10650EB7621DB34A8",
+    "childCount": 45,
+    "registeredForFounderReview": true,
+    "authorizationEvidence": "docs/quality/MVP-UNIVERSAL-ACTION-WORKSPACE-ROUTING-REFERENCE-BATCH-AUTHORIZATION-20260805.md",
+    "authorizationMachineState": "config/mvp-universal-action-workspace-routing-reference-batch-authorization.json",
+    "registeredForExecution": false,
+    "preauthorized": true,
+    "executionActive": false
+  },
+  "execution": {
+    "ticketRegistered": false,
+    "runtimeWriteAuthorized": false,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

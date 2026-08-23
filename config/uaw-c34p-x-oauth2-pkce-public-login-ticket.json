@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-C34P-X-OAUTH2-PKCE-PUBLIC-LOGIN",
+  "parentTicketId": "UAW-C34P-ALL-PUBLIC-AUTHENTICATION-SHARED-GATEWAY-EXECUTION",
+  "state": "registered_founder_authorized_beyond_mvp_acceptance_child_pending_parent_scope_activation",
+  "classification": "beyond_mvp",
+  "founderExplicitAuthorizationDate": "2026-08-18",
+  "exactUserType": "personal_user",
+  "customerOutcome": "A Personal user can choose X on the existing public login gateway, complete X authorization privately, return through an exact PKCE-protected callback, establish one MoolSocial session, and recover safely from cancellation, denial, replay or provider failure.",
+  "protocolContract": {
+    "protocol": "OAuth_2_0_authorization_code_with_PKCE_for_native_public_client",
+    "exactRedirectRequired": true,
+    "stateRequired": true,
+    "pkceS256Required": true,
+    "minimumScopes": ["tweet.read", "users.read"],
+    "offlineAccessOnlyIfRefreshIsRequired": true,
+    "revocationRequired": true,
+    "committedClientSecretForbidden": true
+  },
+  "minimumCompleteScope": [
+    "reuse_existing_shared_login_screen_provider enum_session_bootstrap_rollback_and protected return",
+    "replace_dormant_or_direct_Firebase_Twitter_dispatch_with_one_explicit_native_public_client_PKCE contract_or_prove_supported_Firebase_federated_equivalence",
+    "generate_high_entropy_state_verifier_challenge_and_one_time attempt binding",
+    "validate_exact_redirect_state_attempt_provider_and_callback cardinality_before token exchange",
+    "request_minimum_scopes_and_add_offline_access_only_when_refresh lifecycle_is implemented",
+    "cover_cancel_denied_wrong state_wrong redirect_duplicate callback_expired attempt_offline_provider error_account collision_revoke_and sign out",
+    "fail_closed_when_X_app_client_ID_callback_credits_or_provider readiness_is_missing"
+  ],
+  "explicitExclusions": [
+    "no_X_post_read_write_follow_DM_analytics_or_content publishing scope",
+    "no_committed_client_secret_access token_refresh token_account handle_or identifier",
+    "no_X_Developer_console_app_key_or_paid credit action_without_action_time founder confirmation",
+    "no_claim_of_live_OPPO_support_before_a_new_Play_candidate_and_founder_private authorization"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_owned_X_Developer_project_and_app",
+    "exact_Android_callback_URI_registered_in_X_console",
+    "public_client_ID_entered_as_nonsecret_runtime configuration",
+    "any_required_pay_per_use_credits_and_spending_limit_confirmed_by founder",
+    "privacy_policy_terms_and_connected_apps_revocation support"
+  ],
+  "testAndEvidencePlan": [
+    "PKCE_state_redirect_attempt_and_replay_unit tests",
+    "scope_allowlist_and_no_secret_static gates",
+    "provider_cancel_denial_network_error_and sanitized response fixtures",
+    "account_collision_bootstrap_rollback_protected return_relaunch_revoke_and sign out tests",
+    "one_new_Play_installed_OPPO_X_attempt_with_founder_only provider and account handling"
+  ],
+  "authority": {
+    "runtimeAndTestSourceAuthorizedUnderParent": true,
+    "beyondMvpExplicitlyAuthorized": true,
+    "providerConsoleAppCredentialOrFundsAuthorizedWithoutActionTimeConfirmation": false,
+    "secretOrPrivateAccountAccessAuthorized": false,
+    "buildPlayOrDeviceActionAuthorized": false
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "directiveId": "SOCIAL-MVP-YOUTUBE-COMPLIANCE-SEQUENCING-20260805",
+  "recordedAt": "2026-08-07",
+  "humanAuthority": "docs/quality/SOCIAL-MVP-YOUTUBE-COMPLIANCE-SEQUENCING-DIRECTIVE-20260805.md",
+  "state": "founder_deferred_pending_valid_android_application_link",
+  "socialParentTicketId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-END-TO-END-JOURNEY",
+  "socialPortfolioId": "SOCIAL-MVP-CONTENT-TO-DECLARED-ACTION-PORTFOLIO-20260805",
+  "socialAuthorization": {
+    "preauthorized": false,
+    "executionActive": false,
+    "activeChildTicket": null,
+    "runtimeOrBackendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "oppoTestingAuthorized": false
+  },
+  "youtubeComplianceDependency": {
+    "currentStep": "youtube_requested_valid_android_mobile_application_link",
+    "emailDraftState": "none_latest_provider_reply_received_20260806",
+    "emailSendAuthorizedByThisDirective": false,
+    "providerApprovalAssumed": false,
+    "latestProviderReplyReceivedAt": "2026-08-06T18:34:25-07:00",
+    "latestProviderRequest": "provide_a_valid_android_mobile_application_link_within_seven_business_days",
+    "androidApplicationLinkReadiness": "not_ready_no_verified_distribution_or_install_link_recorded",
+    "policyPageIsApplicationLink": false,
+    "replyRecommendation": "wait_until_a_controlled_android_application_link_is_created_and_reviewer_access_is_verified",
+    "socialReturnsToFounderReviewAfter": "current_compliance_step_and_resulting_provider_or_access_status_are_recorded"
+  },
+  "nextPlanningCandidate": {
+    "id": "SUPERADMIN-MVP-EXACT-LAUNCH-PARTICIPANT-PROVISIONING-AND-CONTROL-END-TO-END-JOURNEY",
+    "classification": "mvp_required",
+    "planningOnly": true,
+    "registeredForExecution": false,
+    "preauthorized": false,
+    "authority": [
+      "docs/delivery/45-DAY-GO-LIVE-PLAN.md#days-35-39-business-web-and-superadmin",
+      "docs/delivery/MVP-EXACT-USER-TYPE-TICKET-AND-JOURNEY-RULE-20260805.md",
+      "docs/delivery/FULL-SCALE-PRODUCTION-JOURNEY-MAP.md#superadmin-and-provisioning-decisions-now-locked",
+      "docs/delivery/PRODUCTION-CASCADE-2026-07-20.md#layer-8--superadmin-and-launch",
+      "docs/quality/QA-021-SUPERADMIN-PROVISIONING.md"
+    ]
+  }
+}

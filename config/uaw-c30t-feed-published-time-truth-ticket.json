@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-FEED-PUBLISHED-TIME-TRUTH",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "reviewer_truth_blocker",
+  "surface": ["MoolSocial public Feed author metadata"],
+  "actualResult": "Every Feed post is labelled Just now even when the provider DTO contains an older authoritative publishedAt timestamp.",
+  "expectedResult": "Feed metadata presents bounded truthful recency or an unambiguous calendar date derived from publishedAt.",
+  "minimumCorrection": [
+    "replace_the_static_Just_now_copy_with_a_deterministic_publishedAt_label",
+    "bound_future_and_subminute_clock_skew_to_Just_now",
+    "show_minutes_hours_days_and_then_a_calendar_date",
+    "add_exact_boundary_tests_without_changing_backend_or_data"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "47 passed, 0 failed",
+    "evidenceLog": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/feed-published-time-focused-tests.log",
+    "evidenceSha256": "EAA4C904B3B1BC36E1C464942116981257391BF8F8EDBEF60659402BDBA0B165",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "apkChanged": false,
+    "aabChanged": false
+  }
+}

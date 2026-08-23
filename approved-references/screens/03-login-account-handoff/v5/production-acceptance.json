@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "screen": {
+    "number": 3,
+    "id": "login-account-handoff",
+    "referenceVersion": "v5",
+    "routes": [
+      "/sign-in",
+      "/verify"
+    ]
+  },
+  "status": "Accepted",
+  "acceptanceType": "founder-ui-reference",
+  "approval": {
+    "founderAcceptedAt": "2026-08-15",
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "ticketId": "UAW-C33I-SCREEN03-PASSWORDLESS-EMAIL-LINK-REFERENCE-SUCCESSOR",
+    "sourceSha256": "1E4DB8FA47E42FD065E8A404D78C17DA2A0023D39F724C6A55A1562467F1A6AB",
+    "decisionEvidence": "docs/quality/UAW-C33I-FINAL-FOUNDER-AUTHORIZATION-20260815.md",
+    "scope": "Screen 03 visual v5 and passwordless email-link interaction contract",
+    "decision": "Preserve the approved Screen 03 layout, six social providers and Mobile OTP; replace only numeric Email OTP with Email link and its secure recovery states."
+  },
+  "founderEvidence": {
+    "capturesAreOriginalUnmodifiedBytes": true,
+    "choose": "reference-images/founder-final-choose-434x833.png",
+    "email": "reference-images/founder-final-email-427x827.png",
+    "mobileOtp": "reference-images/founder-final-mobile-otp-481x883.png",
+    "reviewContext": "reference-images/founder-final-review-context-1326x904.png"
+  },
+  "verification": {
+    "sourceParity": "passed",
+    "providerCountAndOrder": "six exact providers: Google, YouTube, Apple, X, Instagram, Facebook",
+    "acceptedV2HashPreserved": "C8B58BED63B6616F83D06C7D95FAA335DB537B3C6DF37593D601D19037ECDFEF",
+    "founderDecision": "FINAL",
+    "nativeFlutterParity": "pending separate successor qualification",
+    "deviceReplay": "pending future qualified native candidate"
+  },
+  "runtimeState": {
+    "currentProductionCheckpoint": "Screen 03 v4",
+    "v5NativeImplementation": "not yet implemented",
+    "productionSuccessClaimed": false
+  },
+  "lockPolicy": {
+    "immutable": true,
+    "enforcedBy": "scripts/check-approved-ui-locks.ps1",
+    "changeRule": "Do not modify an accepted file or hash. A native production reconciliation requires a new approved-reference version."
+  },
+  "lockedFiles": []
+}

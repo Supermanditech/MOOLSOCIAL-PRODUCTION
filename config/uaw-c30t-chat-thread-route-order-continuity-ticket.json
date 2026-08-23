@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "ticketId": "UAW-C30T-CHAT-THREAD-ROUTE-ORDER-CONTINUITY",
+  "parentTicket": "UAW-PERSONAL-MVP-SOCIAL-PLAY-INTERNAL-LIVE-READ-RECOVERY-C30T",
+  "state": "implementation_complete_focused_tests_passed_aab_held",
+  "classification": "mvp_required",
+  "severity": "chat_thread_navigation_blocker",
+  "actor": "signed_in_member_navigating_to_a_new_Chat_thread_while_an_older_thread_load_is_pending",
+  "customerOutcome": "The newest Chat thread route always loads and owns read state; a late older request cannot replace its visible messages or mark the wrong route complete.",
+  "minimumCorrection": [
+    "reload_when_the_reused_Chat_thread_widget_receives_a_new_thread_or_session",
+    "assign_request_ownership_to_each_thread_load",
+    "reject_stale_completion_before_message_read_state",
+    "mark_read_only_after_the_current_thread_load_succeeds",
+    "prove_a_late_old_thread_response_does_not_replace_the_new_thread"
+  ],
+  "explicitExclusions": [
+    "no_chat_backend_or_message_contract_change",
+    "no_provider_build_Play_OPPO_Hosting_or_communication_action"
+  ],
+  "authority": {
+    "sourceImplementationAuthorized": true,
+    "backendOrProviderWriteAuthorized": false,
+    "AabUploadInstallAuthorized": false,
+    "externalCommunicationAuthorized": false
+  },
+  "verification": {
+    "focusedTests": "4 passed, 0 failed",
+    "evidence": "artifacts/quality/uaw-personal-mvp-social-play-internal-live-read-recovery-c30t-continuous-audit-20260813-03/chat-thread-route-order-focused-tests.log",
+    "evidenceSha256": "5FD793862990172731AFBB43314FD24703583A6B87D42D50508E8A0F282CA99A",
+    "releaseRegistrantPlugins": 15,
+    "integrationTestPluginPresent": false,
+    "releaseApkChanged": false,
+    "preservedC30sAabSha256": "2B06AEE022AED4019AE88AF4278A218FEA4F14F3D49F94CDC591DA855458AD55"
+  }
+}

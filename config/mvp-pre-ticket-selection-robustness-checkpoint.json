@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+  "state": "founder_required_fail_closed_for_every_successor_selection",
+  "authorityDate": "2026-08-05",
+  "humanAuthority": "docs/quality/MVP-PRE-TICKET-SELECTION-ROBUSTNESS-AND-REUSE-CHECKPOINT-20260805.md",
+  "deliveryLock": "config/mvp-robust-60-75-day-delivery-lock.json",
+  "appliesBefore": [
+    "selecting_or_registering_any_preauthorized_child_ticket",
+    "selecting_or_registering_any_other_mvp_ticket",
+    "selecting_or_registering_any_separately_authorized_beyond_mvp_ticket",
+    "replacing_the_current_web_ticket_in_mvp_scope_gate_state"
+  ],
+  "requiredInventory": [
+    "current_native_flutter_v2_routes_screens_components_and_state_owners",
+    "existing_tested_non_ui_models_controllers_services_and_adapters",
+    "approved_html_reference_and_every_connected_tap_state",
+    "legacy_routes_for_containment_and_reuse_evidence_only",
+    "active_and_preauthorized_ticket_manifests_dependencies_and_authorities"
+  ],
+  "requiredDecisions": [
+    "map_each_exact_acceptance_ticket_to_one_shared_or_necessary_implementation_owner",
+    "classify_each_unit_as_reuse_configuration_thin_adapter_test_only_or_new_necessary_work",
+    "collapse_duplicate_screen_route_service_and_build_work_without_collapsing_exact_acceptance",
+    "record_necessity_proof_for_each_new_screen_route_or_backend_owner",
+    "retain_failure_recovery_security_privacy_accessibility_and_release_evidence",
+    "record_dependency_order_timeline_impact_and_fit_within_the_60_to_75_day_lock"
+  ],
+  "perSelectedTicketAssessmentFields": [
+    "ticketId",
+    "customerOutcome",
+    "manifestPath",
+    "manifestSha256",
+    "reuseInventoryComplete",
+    "duplicateSearchComplete",
+    "implementationDisposition",
+    "sharedImplementationOwners",
+    "newScreens",
+    "newRoutes",
+    "newBackendOwners",
+    "necessityProof",
+    "robustnessCoverage",
+    "adjustments",
+    "explicitExclusions",
+    "dependenciesAndApprovals",
+    "timelineImpactDays",
+    "within60To75DayLock",
+    "evidencePath"
+  ],
+  "allowedTicketAdjustmentsWithoutManifestMutation": [
+    "reuse_an_existing_shared_screen_route_component_or_backend_owner",
+    "implement_a_ticket_as_configuration_thin_policy_adapter_or_test_only_acceptance",
+    "combine_shared_implementation_waves_while_preserving_exact_actor_outcome_acceptance",
+    "reorder_execution_to_follow_dependencies_and_reduce_rework",
+    "add_missing_failure_recovery_security_privacy_accessibility_or_observability_acceptance"
+  ],
+  "adjustmentsRequiringVersionedFounderAmendment": [
+    "remove_or_weaken_an_approved_customer_outcome",
+    "change_an_exact_actor_capability_or_commercial_authority",
+    "change_a_preauthorized_manifest_or_its_sha256",
+    "add_beyond_mvp_scope",
+    "waive_a_reference_provider_payment_regulatory_security_privacy_accessibility_device_or_release_gate"
+  ],
+  "currentTicketTransition": {
+    "ticketId": "WEB-MVP-PUBLIC-DISCOVERY-AND-YOUTUBE-REVIEW-ACCESS-REMEDIATION",
+    "selectedBeforeCheckpoint": true,
+    "exemptionScope": "selection_only_no_new_scope_or_successor_authority",
+    "exemptionEndsWhenCurrentMachineTicketIsReplaced": true
+  },
+  "rules": {
+    "checkpointRequiredBeforeEverySuccessorSelection": true,
+    "failureOrMissingEvidenceBlocksSelection": true,
+    "adjustmentCannotCreateAuthority": true,
+    "exactAcceptanceTicketsRemainTraceable": true,
+    "robustnessCannotBeReducedForTimeline": true,
+    "duplicateImplementationCannotBeJustifiedByTicketCount": true
+  }
+}

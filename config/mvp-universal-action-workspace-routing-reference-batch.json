@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH",
+  "preparedAt": "2026-08-05",
+  "state": "founder_review_ticket_complete_not_preauthorized_not_executing",
+  "humanAuthority": "docs/delivery/MVP-UNIVERSAL-ACTION-EXPOSURE-AND-WORKSPACE-ROUTING-REFERENCE-BATCH-TICKET-20260805.md",
+  "classification": "mvp_required",
+  "classificationReason": "The protected APK exposes postponed actions and broad combined workspace types; truthful MVP action exposure and exact workspace routing are launch prerequisites.",
+  "childCount": 45,
+  "classificationCounts": {
+    "mvp_required": 43,
+    "mvp_supporting": 2,
+    "beyond_mvp": 0
+  },
+  "protectedCheckpoint": {
+    "branch": "remediation/prototype-conformance-2026-07-20",
+    "head": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+    "candidate": "BUY-R58-CATEGORY-SHEET-IME-RESULT-VISIBILITY-FIX7",
+    "profile": "1.0.0-r58.23 (2026080419)",
+    "sourceSha256": "A05B47F0893778064E255574DF3678BF198DAE72A18DA7C81710693557AE1BEE",
+    "apkSha256": "F0C1061D1D7897130528533F254B41BDC48FE7958E7DD9B50624FEF6EE3B5DC9"
+  },
+  "minimumCompleteScope": [
+    "truthful_personal_user_universal_action_projection",
+    "remove_postponed_universal_promises_without_breaking_transaction_owned_routes",
+    "progressive_workspace_entry_existing_reopen_add_another_family_exact_type_preview_details_request",
+    "exact_user_type_capability_and_non_capability_routing_references",
+    "legacy_route_and_combined_profile_containment",
+    "connected_html_reference_founder_final_native_parity_regression_and_oppo_qualification_after_dependencies"
+  ],
+  "explicitExclusions": [
+    "vertical_backend_implementation",
+    "local_capability_or_approval_grant",
+    "generic_business_provider_professional_captain_creator_or_combined_profile_choice",
+    "tiffin_cloud_kitchen_clinic_hospital_home_beauty_get_it_done_generic_service_fleet_or_owned_long_form_video",
+    "standalone_pay_recharge_bills_scan_and_pay",
+    "creator_activation_before_youtube_social_dependency",
+    "automatic_production_policy_change_or_phone_surveillance",
+    "credential_live_provider_external_message_call_payment_funds_production_data_deploy_promote_commit_or_push"
+  ],
+  "authorizationModel": {
+    "preauthorized": false,
+    "executionActive": false,
+    "oneActiveChildAtATime": true,
+    "screenbookCurrentlyReadOnly": true,
+    "htmlFounderFinalBeforeNativeFlutter": true,
+    "heldDependenciesRemainHeldAfterPortfolioApproval": true,
+    "mvpGateRequiredBeforeFirstRuntimeBackendWriteOrBuild": true,
+    "apkMachineGateRequired": true,
+    "proposedActionsAfterExactFounderPreauthorization": [
+      "bounded_screenbook_reference_correction",
+      "bounded_local_source_writes",
+      "deterministic_tests",
+      "native_flutter_parity_after_exact_html_founder_final",
+      "machine_gated_apk_build",
+      "checksum_matched_oppo_install_and_testing"
+    ],
+    "notAuthorized": [
+      "credential_access",
+      "live_provider_action",
+      "external_message_or_call",
+      "payment_or_funds_movement",
+      "production_data_write",
+      "deploy",
+      "promote",
+      "commit",
+      "push"
+    ]
+  },
+  "personalUniversalSurface": {
+    "mandatoryWorkspaceChoiceAfterLogin": false,
+    "mainActions": ["Social", "Buy", "Eat", "Ride", "Book", "Work"],
+    "globalActions": ["Chat"],
+    "subActions": {
+      "Social": ["Shorts", "Videos", "Feed", "Create"],
+      "Buy": ["Shop", "Wholesale", "Medicine", "Orders"],
+      "Eat": ["Order Food", "Book Table"],
+      "Ride": ["Bike", "Auto", "Cab"],
+      "Book": ["Doctor", "Salon"],
+      "Work": ["Earn Today", "Workspace"]
+    },
+    "absentUniversalActions": [
+      "Pay",
+      "Tiffin",
+      "Get It Done",
+      "Delivery",
+      "Onboard",
+      "Verify",
+      "Recharge",
+      "Bills",
+      "Scan & Pay",
+      "Receipts"
+    ],
+    "embeddedPaymentPreserved": true
+  },
+  "workspaceRouting": {
+    "baselineAccountType": "Personal user",
+    "entry": "Work -> Workspace",
+    "existingWorkspaceFirst": true,
+    "addAnotherWorkspaceSeparate": true,
+    "presentationGroups": [
+      "Earn with MoolSocial",
+      "Run a business or professional workspace"
+    ],
+    "groupsGrantCapability": false,
+    "fixedCustomerTypeEnum": false,
+    "freeTextCustomerTypeCreation": false,
+    "typeSource": "authorized_versioned_admin_published_exact_workspace_registry",
+    "requiredDetailFields": [
+      "purpose_and_benefits",
+      "owning_action",
+      "allowed_capabilities",
+      "explicit_exclusions",
+      "geography_and_category",
+      "eligibility_and_documents",
+      "plan_subscription_and_transaction_charges",
+      "verification_steps",
+      "permissions_and_data_use",
+      "support_suspension_and_appeal",
+      "effective_terms_version"
+    ],
+    "requestResult": "server_owned_idempotent_pending_or_other_authoritative_status_never_local_approval"
+  },
+  "sharedChildRules": {
+    "exactActorRequired": true,
+    "exactCapabilityRequired": true,
+    "authoritativeOutcomeRequired": true,
+    "geographyAndValidityRequired": true,
+    "lifecycleStates": [
+      "draft",
+      "submitted",
+      "pending",
+      "more_information_required",
+      "approved_capability_pending",
+      "active",
+      "rejected",
+      "suspended",
+      "expired",
+      "revoked",
+      "type_paused",
+      "type_retired"
+    ],
+    "recoveryStates": [
+      "loading",
+      "empty",
+      "held",
+      "disabled",
+      "stale",
+      "offline",
+      "denied",
+      "duplicate",
+      "cancelled",
+      "interrupted",
+      "retry",
+      "support"
+    ],
+    "serverOwners": [
+      "launch_capability_projection",
+      "workspace_type_publication",
+      "account_workspace_membership",
+      "workspace_capability_grant",
+      "identity_licence_and_eligibility_decision",
+      "plan_and_terms_version",
+      "workspace_request_command"
+    ],
+    "testAndEvidencePlan": [
+      "unique_evidence_identity",
+      "branch_head_complete_dirty_and_ignored_preservation_inventory",
+      "protected_fix7_checkpoint_verification",
+      "complete_tap_and_state_inventory",
+      "customer_copy_fitment_accessibility_and_route_contract_tests",
+      "two_affected_regressions",
+      "founder_final_immutable_reference_before_native",
+      "source_manifest_and_drift_check",
+      "machine_gated_apk_and_checksum_matched_oppo_qualification"
+    ]
+  },
+  "exactWorkspaceTypes": [
+    {
+      "label": "Grocery / Kirana Shop",
+      "classification": "mvp_required",
+      "exposure": "active_only_where_published",
+      "ownerAction": "Buy/Shop",
+      "allowedLanding": "shop_offer_readiness_order_decision_packing_handover",
+      "notGranted": ["Wholesale", "Pharmacy", "Restaurant", "Ride"]
+    },
+    {
+      "label": "General Retail Shop / Dukaan",
+      "classification": "mvp_required",
+      "exposure": "approved_categories_and_geographies_only",
+      "ownerAction": "Buy/Shop",
+      "allowedLanding": "approved_retail_category_offer_and_fulfilment",
+      "notGranted": ["unapproved_category", "general_marketplace"]
+    },
+    {
+      "label": "FMCG Supplier / Distributor",
+      "classification": "mvp_required",
+      "exposure": "eligible_wholesale_markets",
+      "ownerAction": "Buy/Wholesale",
+      "allowedLanding": "pack_moq_offer_exact_order_decision_dispatch",
+      "notGranted": ["manufacturing_erp", "consumer_shop"]
+    },
+    {
+      "label": "FMCG Manufacturer",
+      "classification": "mvp_supporting",
+      "exposure": "bounded_pilot_dependency_held",
+      "ownerAction": "Buy/Wholesale",
+      "allowedLanding": "approved_product_master_pack_pilot_offer_dispatch",
+      "notGranted": ["manufacturing_erp", "raw_material_sourcing", "broad_b2b"]
+    },
+    {
+      "label": "Restaurant / Dhaba / Cafe",
+      "classification": "mvp_required",
+      "exposure": "active_food_and_table_geography",
+      "ownerAction": "Eat",
+      "allowedLanding": "order_food_and_book_table_workspace",
+      "notGranted": ["Tiffin", "Cloud Kitchen"]
+    },
+    {
+      "label": "Individual Doctor",
+      "classification": "mvp_required",
+      "exposure": "regulated_bounded_booking",
+      "ownerAction": "Book/Doctor",
+      "allowedLanding": "fee_time_mode_booking_service_completion_recovery",
+      "notGranted": ["Clinic", "Hospital", "diagnosis", "clinical_records", "unapproved_telemedicine"]
+    },
+    {
+      "label": "Medical Store / Pharmacy",
+      "classification": "mvp_required",
+      "exposure": "current_licence_and_capability_required",
+      "ownerAction": "Buy/Medicine",
+      "allowedLanding": "exact_medicine_offer_pharmacist_review_acceptance_packing_handover",
+      "notGranted": ["clinical_advice", "automatic_medicine_substitution"]
+    },
+    {
+      "label": "Salon / Parlour",
+      "classification": "mvp_required",
+      "exposure": "bounded_service_and_slot_geography",
+      "ownerAction": "Book/Salon",
+      "allowedLanding": "exact_service_price_professional_slot_served_recovery",
+      "notGranted": ["Get It Done", "Home Beauty"]
+    },
+    {
+      "label": "Freelancer / Field Partner",
+      "classification": "mvp_required",
+      "exposure": "eligible_funded_work",
+      "ownerAction": "Work/Earn Today",
+      "allowedLanding": "funded_opportunity_active_work_proof_review_payout_history",
+      "notGranted": ["jobs_directory", "salary_guarantee", "fee_to_work"]
+    },
+    {
+      "label": "Delivery Partner",
+      "classification": "mvp_required",
+      "exposure": "exact_handling_and_area_grant",
+      "ownerAction": "owning_workspace",
+      "allowedLanding": "assigned_buy_delivery_pickup_proof_recovery",
+      "notGranted": ["seller", "passenger_ride", "vehicle_type"]
+    },
+    {
+      "label": "Bike Captain",
+      "classification": "mvp_required",
+      "exposure": "independently_approved",
+      "ownerAction": "Ride/Bike",
+      "allowedLanding": "bike_availability_assignment_trip_safety_payment_recovery",
+      "notGranted": ["Auto", "Cab", "Delivery"]
+    },
+    {
+      "label": "Auto Captain",
+      "classification": "mvp_required",
+      "exposure": "independently_approved",
+      "ownerAction": "Ride/Auto",
+      "allowedLanding": "auto_availability_assignment_trip_safety_payment_recovery",
+      "notGranted": ["Bike", "Cab", "Delivery"]
+    },
+    {
+      "label": "Cab / Car Captain",
+      "classification": "mvp_required",
+      "exposure": "independently_approved",
+      "ownerAction": "Ride/Cab",
+      "allowedLanding": "cab_availability_assignment_trip_safety_payment_recovery",
+      "notGranted": ["Bike", "Auto", "fleet", "Delivery"]
+    },
+    {
+      "label": "Local Porter / Goods Transporter",
+      "classification": "mvp_supporting",
+      "exposure": "wholesale_pilot_dependency_held",
+      "ownerAction": "Buy/Wholesale logistics",
+      "allowedLanding": "approved_wholesale_load_assignment_and_proof",
+      "notGranted": ["passenger_ride", "general_transport_marketplace", "fleet"]
+    },
+    {
+      "label": "Shorts Creator",
+      "classification": "mvp_required",
+      "exposure": "youtube_social_dependency_held",
+      "ownerAction": "Social/Shorts",
+      "allowedLanding": "rights_safe_bounded_creator_workspace_after_separate_activation",
+      "notGranted": ["current_selectable_promise", "external_channel_grant", "view_based_earning"]
+    },
+    {
+      "label": "Multi-Format Creator",
+      "classification": "mvp_required",
+      "exposure": "social_youtube_dependency_held",
+      "ownerAction": "Social/Feed/Create",
+      "allowedLanding": "native_text_image_and_eligible_link_tools_after_separate_activation",
+      "notGranted": ["owned_long_form_hosting", "generic_external_publishing"]
+    }
+  ],
+  "children": [
+    {"order":1,"id":"UAW-R01-PERSONAL-ACTION-PROJECTION-CONTRACT","exactActor":"Personal user","capability":"read_versioned_main_and_sub_action_projection","outcome":"One authoritative launch projection controls visible actions.","classification":"mvp_required","dependencies":["launch_policy_owner"],"lane":"reference"},
+    {"order":2,"id":"UAW-R02-PERSONAL-LOGIN-TO-UNIVERSAL-CONTINUITY","exactActor":"Personal user","capability":"complete_login_to_normal_universal","outcome":"Login reaches Universal without a mandatory role or workspace choice.","classification":"mvp_required","dependencies":["locked_screens_01_03"],"lane":"reference"},
+    {"order":3,"id":"UAW-R03-PERSONAL-MOOL-MVP-ACTION-ROOT","exactActor":"Personal user","capability":"open_mvp_mool_root","outcome":"Mool shows six MVP actions with global Chat and no standalone Pay.","classification":"mvp_required","dependencies":["tickets_1_2"],"lane":"reference"},
+    {"order":4,"id":"UAW-R04-PERSONAL-SOCIAL-EXPOSURE","exactActor":"Personal user","capability":"open_accepted_social_structure","outcome":"Social exposure remains accepted and truthful about the YouTube hold.","classification":"mvp_required","dependencies":["social_protected_baseline","youtube_dependency"],"lane":"dependency_held"},
+    {"order":5,"id":"UAW-R05-PERSONAL-BUY-EXPOSURE","exactActor":"Personal user","capability":"open_shop_wholesale_medicine_orders","outcome":"Buy opens its exact accepted owner and preserves return context.","classification":"mvp_required","dependencies":["buy_protected_and_reference_gates"],"lane":"reference"},
+    {"order":6,"id":"UAW-R06-PERSONAL-EAT-EXPOSURE","exactActor":"Personal user","capability":"open_order_food_or_book_table","outcome":"Eat contains Order Food and Book Table only.","classification":"mvp_required","dependencies":["restaurant_journey_owner"],"lane":"reference"},
+    {"order":7,"id":"UAW-R07-PERSONAL-RIDE-EXPOSURE","exactActor":"Personal user","capability":"open_bike_auto_or_cab_intent","outcome":"Ride keeps Bike, Auto and Cab as separate passenger intents.","classification":"mvp_required","dependencies":["ride_journey_owner"],"lane":"reference"},
+    {"order":8,"id":"UAW-R08-PERSONAL-BOOK-EXPOSURE","exactActor":"Personal user","capability":"open_doctor_or_salon_intent","outcome":"Book contains Doctor and Salon only.","classification":"mvp_required","dependencies":["book_journey_owner"],"lane":"reference"},
+    {"order":9,"id":"UAW-R09-PERSONAL-STANDALONE-PAY-ABSENCE","exactActor":"Personal user","capability":"use_transaction_owned_payment_only","outcome":"Standalone Pay is absent while transaction-owned payment and receipts remain valid.","classification":"mvp_required","dependencies":["payment_route_inventory"],"lane":"reference"},
+    {"order":10,"id":"UAW-R10-PERSONAL-WORK-EXPOSURE","exactActor":"Personal user","capability":"open_earn_today_or_workspace","outcome":"Universal Work exposes Earn Today and Workspace only.","classification":"mvp_required","dependencies":["work_parent_contracts"],"lane":"reference"},
+    {"order":11,"id":"UAW-R11-PERSONAL-GLOBAL-CHAT-CONTINUITY","exactActor":"Personal user","capability":"open_moolchat_and_restore_origin","outcome":"Chat is global and returns to the exact permitted action context.","classification":"mvp_required","dependencies":["chat_route_owner"],"lane":"reference"},
+    {"order":12,"id":"UAW-R12-PERSONAL-LEGACY-ROUTE-CONTAINMENT","exactActor":"Personal user","capability":"open_removed_route_recovery","outcome":"Removed or moved actions cannot bypass policy through old routes or links.","classification":"mvp_required","dependencies":["complete_route_and_deep_link_inventory"],"lane":"reference"},
+    {"order":13,"id":"UAW-R13-PERSONAL-EXPOSURE-FAILURE-STATES","exactActor":"Personal user","capability":"recover_from_projection_failure","outcome":"Loading, held, disabled, stale, offline and denied states remain truthful.","classification":"mvp_required","dependencies":["ticket_1"],"lane":"reference"},
+    {"order":14,"id":"UAW-R14-PERSONAL-CONTEXT-RESTORE","exactActor":"Personal user","capability":"restore_safe_action_and_sub_action_context","outcome":"Back, Chat return, interruption and relaunch restore a safe permitted context.","classification":"mvp_required","dependencies":["tickets_1_13"],"lane":"reference"},
+    {"order":15,"id":"UAW-R15-PERSONAL-COPY-FITMENT-ACCESSIBILITY","exactActor":"Personal user","capability":"operate_all_exposure_states_accessibly","outcome":"Every exposure state is readable and operable across supported devices and text scales.","classification":"mvp_required","dependencies":["tickets_1_14"],"lane":"reference"},
+    {"order":16,"id":"UAW-R16-PERSONAL-EXISTING-WORKSPACE-REOPEN","exactActor":"Personal user with workspace membership","capability":"reopen_existing_exact_workspace","outcome":"One existing permitted workspace reopens by stable identity.","classification":"mvp_required","dependencies":["workspace_membership_owner"],"lane":"dependency_held"},
+    {"order":17,"id":"UAW-R17-PERSONAL-ADD-ANOTHER-WORKSPACE","exactActor":"Personal user with or without workspace membership","capability":"start_separate_add_workspace_journey","outcome":"Add another workspace neither replaces nor duplicates an existing workspace.","classification":"mvp_required","dependencies":["workspace_membership_and_request_owner"],"lane":"dependency_held"},
+    {"order":18,"id":"UAW-R18-PERSONAL-ADMIN-PUBLISHED-TYPE-SELECTION","exactActor":"Personal user","capability":"select_admin_published_exact_workspace_type","outcome":"Selection is registry-driven with no hard-coded or free-text customer type.","classification":"mvp_required","dependencies":["exact_workspace_registry_family"],"lane":"dependency_held"},
+    {"order":19,"id":"UAW-R19-PERSONAL-GEOGRAPHY-AUDIENCE-AVAILABILITY","exactActor":"Personal user","capability":"view_type_under_published_geography_and_audience","outcome":"Only currently eligible geography/audience types are offered.","classification":"mvp_required","dependencies":["geography_and_audience_policy_owner"],"lane":"dependency_held"},
+    {"order":20,"id":"UAW-R20-PERSONAL-WORKSPACE-BENEFIT-PREVIEW","exactActor":"Personal user","capability":"view_truthful_workspace_benefit_preview","outcome":"A compelling preview remains truthful and versioned.","classification":"mvp_required","dependencies":["published_preview_version","consumer_copy_owner"],"lane":"reference_held"},
+    {"order":21,"id":"UAW-R21-PERSONAL-WORKSPACE-FULL-DETAILS","exactActor":"Personal user","capability":"review_workspace_scope_requirements_charges_exclusions","outcome":"Complete details are available before a workspace request.","classification":"mvp_required","dependencies":["plan_legal_licence_and_terms_owners"],"lane":"dependency_held"},
+    {"order":22,"id":"UAW-R22-PERSONAL-IDEMPOTENT-WORKSPACE-REQUEST","exactActor":"Personal user","capability":"submit_one_exact_workspace_request","outcome":"One request creates at most one authoritative pending workspace record.","classification":"mvp_required","dependencies":["workspace_creation_owner"],"lane":"dependency_held"},
+    {"order":23,"id":"UAW-R23-PERSONAL-MULTIWORKSPACE-SWITCHING","exactActor":"Personal user with multiple workspace memberships","capability":"switch_exact_active_workspace","outcome":"Switching preserves personal history and never leaks rights between workspaces.","classification":"mvp_required","dependencies":["membership_and_capability_owner"],"lane":"dependency_held"},
+    {"order":24,"id":"UAW-R24-PERSONAL-WORKSPACE-LIFECYCLE-RECOVERY","exactActor":"Personal user with workspace request or membership","capability":"recover_from_workspace_lifecycle_state","outcome":"Every incomplete, pending, rejected, suspended, expired, revoked or retired state has an exact next step.","classification":"mvp_required","dependencies":["reviewer_support_and_audit_owners"],"lane":"dependency_held"},
+    {"order":25,"id":"UAW-R25-GROCERY-KIRANA-SHOP-ROUTING-REFERENCE","exactActor":"Grocery / Kirana Shop workspace member","capability":"open_shop_seller_and_fulfilment_work","outcome":"Only active Grocery/Kirana Shop capabilities open.","classification":"mvp_required","dependencies":["buy_sup_exact_capability"],"lane":"reference_held"},
+    {"order":26,"id":"UAW-R26-GENERAL-RETAIL-DUKAAN-ROUTING-REFERENCE","exactActor":"General Retail Shop / Dukaan workspace member","capability":"open_approved_retail_category_work","outcome":"Only approved categories and geographies open.","classification":"mvp_required","dependencies":["category_and_capability_publication"],"lane":"reference_held"},
+    {"order":27,"id":"UAW-R27-FMCG-SUPPLIER-DISTRIBUTOR-ROUTING-REFERENCE","exactActor":"FMCG Supplier / Distributor workspace member","capability":"open_wholesale_offer_order_dispatch_work","outcome":"Exact Wholesale work opens without manufacturing or consumer rights.","classification":"mvp_required","dependencies":["wholesale_capability_owner"],"lane":"reference_held"},
+    {"order":28,"id":"UAW-R28-FMCG-MANUFACTURER-PILOT-ROUTING-REFERENCE","exactActor":"FMCG Manufacturer workspace member","capability":"open_bounded_manufacturer_wholesale_pilot","outcome":"Only a separately approved product/pack/dispatch pilot opens.","classification":"mvp_supporting","dependencies":["manufacturer_pilot_approval"],"lane":"dependency_held"},
+    {"order":29,"id":"UAW-R29-RESTAURANT-DHABA-CAFE-ROUTING-REFERENCE","exactActor":"Restaurant / Dhaba / Cafe workspace member","capability":"open_order_food_and_book_table_work","outcome":"Restaurant work is limited to Order Food and Book Table.","classification":"mvp_required","dependencies":["eat_capability_owner"],"lane":"reference_held"},
+    {"order":30,"id":"UAW-R30-INDIVIDUAL-DOCTOR-ROUTING-REFERENCE","exactActor":"Individual Doctor workspace member","capability":"open_bounded_doctor_booking_and_service_work","outcome":"Doctor work remains separate from Clinic, Hospital and clinical-record scope.","classification":"mvp_required","dependencies":["regulatory_and_book_capability_owner"],"lane":"reference_held"},
+    {"order":31,"id":"UAW-R31-MEDICAL-STORE-PHARMACY-ROUTING-REFERENCE","exactActor":"Medical Store / Pharmacy workspace member","capability":"open_licensed_medicine_fulfilment_work","outcome":"Only licensed exact Medicine fulfilment opens.","classification":"mvp_required","dependencies":["pharmacy_licence_and_buy_capability_owner"],"lane":"reference_held"},
+    {"order":32,"id":"UAW-R32-SALON-PARLOUR-ROUTING-REFERENCE","exactActor":"Salon / Parlour workspace member","capability":"open_bounded_salon_booking_and_service_work","outcome":"Salon work remains separate from Home Beauty and Get It Done.","classification":"mvp_required","dependencies":["book_capability_owner"],"lane":"reference_held"},
+    {"order":33,"id":"UAW-R33-FREELANCER-FIELD-PARTNER-ROUTING-REFERENCE","exactActor":"Freelancer / Field Partner workspace member","capability":"open_governed_funded_work","outcome":"Only funded opportunities, proof, review and payout history open.","classification":"mvp_required","dependencies":["work_eligibility_and_capability_owner"],"lane":"reference_held"},
+    {"order":34,"id":"UAW-R34-DELIVERY-PARTNER-ROUTING-REFERENCE","exactActor":"Delivery Partner workspace member","capability":"open_eligible_buy_delivery_work","outcome":"Only assigned pickup, proof and recovery work opens.","classification":"mvp_required","dependencies":["logistics_capability_owner"],"lane":"reference_held"},
+    {"order":35,"id":"UAW-R35-BIKE-CAPTAIN-ROUTING-REFERENCE","exactActor":"Bike Captain workspace member","capability":"open_bike_ride_work","outcome":"Only independently approved Bike Ride capability opens.","classification":"mvp_required","dependencies":["bike_vehicle_safety_and_capability_owner"],"lane":"reference_held"},
+    {"order":36,"id":"UAW-R36-AUTO-CAPTAIN-ROUTING-REFERENCE","exactActor":"Auto Captain workspace member","capability":"open_auto_ride_work","outcome":"Only independently approved Auto Ride capability opens.","classification":"mvp_required","dependencies":["auto_vehicle_safety_and_capability_owner"],"lane":"reference_held"},
+    {"order":37,"id":"UAW-R37-CAB-CAR-CAPTAIN-ROUTING-REFERENCE","exactActor":"Cab / Car Captain workspace member","capability":"open_cab_ride_work","outcome":"Only independently approved Cab Ride capability opens.","classification":"mvp_required","dependencies":["cab_vehicle_safety_and_capability_owner"],"lane":"reference_held"},
+    {"order":38,"id":"UAW-R38-LOCAL-PORTER-WHOLESALE-PILOT-HOLD","exactActor":"Local Porter / Goods Transporter workspace member","capability":"open_bounded_wholesale_load_work","outcome":"No usable choice appears until the exact Wholesale logistics pilot is approved.","classification":"mvp_supporting","dependencies":["wholesale_logistics_pilot"],"lane":"dependency_held"},
+    {"order":39,"id":"UAW-R39-SHORTS-CREATOR-YOUTUBE-HOLD","exactActor":"Shorts Creator workspace member","capability":"open_rights_safe_shorts_creator_work","outcome":"No selectable or live creator promise appears before YouTube/Social approval.","classification":"mvp_required","dependencies":["youtube_compliance","social_reference"],"lane":"dependency_held"},
+    {"order":40,"id":"UAW-R40-MULTI-FORMAT-CREATOR-SOCIAL-HOLD","exactActor":"Multi-Format Creator workspace member","capability":"open_bounded_native_and_eligible_link_creator_work","outcome":"Creator scope remains bounded and held by Social/YouTube decisions.","classification":"mvp_required","dependencies":["social_and_youtube_decision"],"lane":"dependency_held"},
+    {"order":41,"id":"UAW-R41-CONNECTED-HTML-REFERENCE-BATCH","exactActor":"Personal user and each exact workspace member in tickets 25-40","capability":"review_connected_action_and_workspace_reference","outcome":"Founder reviews one complete connected HTML batch.","classification":"mvp_required","dependencies":["tickets_1_40_contracts"],"lane":"founder_reference_gate"},
+    {"order":42,"id":"UAW-R42-REFERENCE-MACHINE-VERIFICATION","exactActor":"Reference qualification operator","capability":"verify_exact_reference_candidate","outcome":"Path, taps, states, copy, fitment, accessibility and checksums pass.","classification":"mvp_required","dependencies":["ticket_41_candidate"],"lane":"reference_gate"},
+    {"order":43,"id":"UAW-R43-NATIVE-FLUTTER-REFERENCE-PARITY","exactActor":"Personal user and each enabled exact workspace member","capability":"use_native_reference_parity","outcome":"Native Flutter matches founder-final reference without legacy mixing or local grants.","classification":"mvp_required","dependencies":["ticket_42","founder_final","registry_owners"],"lane":"dependency_held"},
+    {"order":44,"id":"UAW-R44-AFFECTED-REGRESSION-AND-OPPO-QUALIFICATION","exactActor":"Personal user and each enabled exact workspace member","capability":"complete_exact_candidate_qualification","outcome":"Action, workspace, legacy-link and lifecycle journeys pass twice and on checksum-matched OPPO.","classification":"mvp_required","dependencies":["ticket_43","mvp_scope_gate","apk_machine_gate"],"lane":"device_held"},
+    {"order":45,"id":"UAW-R45-FOUNDER-CUMULATIVE-ACCEPTANCE-PACK","exactActor":"Founder acceptance authority","capability":"review_exact_cumulative_candidate","outcome":"One evidence pack identifies every pass, exclusion, hold, source, reference and APK.","classification":"mvp_required","dependencies":["tickets_1_44_terminal"],"lane":"founder_final"}
+  ]
+}
