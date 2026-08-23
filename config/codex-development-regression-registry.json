@@ -40379,6 +40379,29 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3646-FIX4-PARSER-HELPER-REPEATED-FOREACH-TOKEN-ADJACENCY",
+      "status": "registered_zero_parser_evidence_no_retry_and_live_checker_parser_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "A compressed two-owner parser helper repeated REG3645 by concatenating the foreach in keyword to its collection variable and failed before reading either gate owner.",
+      "rootCause": "The primary reused compressed PowerShell control-flow syntax despite the registered requirement to retain ordinary token spacing.",
+      "prevention": "Bind this registry generation, do not retry the helper, preserve the exact eight current feature/gate owners, and let the focused FIX8 compatibility checker provide authoritative parser plus behavioral proof after refresh using no compressed helper loop.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1",
+        "scripts/check-uaw-c33m-fix8-fix4-gate-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
