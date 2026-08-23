@@ -40241,6 +40241,29 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3640-REG3638-CHECKER-FIX6-TICKET-RAW-BYTE-HASH-MATERIALIZATION",
+      "status": "registered_no_live_gate_replay_and_exact_checker_hash_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "The first authorized REG3638 compatibility-checker run stopped before live C33J replay because the checker rejected its own historical FIX6 ticket bytes.",
+      "rootCause": "The checker uses a raw SHA-256 over the FIX6 JSON ticket; exact production, feature-worktree and pinned hashes must be compared after registration before one bounded portability correction.",
+      "prevention": "Bind this registry generation, do not retry the checker or gate, compare only the exact FIX6 ticket hashes, preserve the six current feature/gate diffs, and if the difference is line-ending-only use the already authorized canonical text-hash helper for this checker-owned ticket before one replay.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
