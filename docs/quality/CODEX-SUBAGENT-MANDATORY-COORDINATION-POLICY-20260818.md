@@ -78,7 +78,7 @@ The immutable runtime starting point is accepted r60.87 commit
 `f105195ba505dcc9f25a35ab64aab104dadb47c2` and annotated tag
 `moolsocial-google-auth-r60.87-accepted-20260823`. The reusable work starting
 point is the later annotated governance tag
-`moolsocial-parallel-production-discipline-20260824-v35`. No feature lane may start
+`moolsocial-parallel-production-discipline-20260824-v36`. No feature lane may start
 until that governance tag exists and descends from the accepted runtime commit.
 Immediately before creating the tag, the primary runs `governance_preflight`.
 That gate requires the production checkout to descend from accepted r60.87,
