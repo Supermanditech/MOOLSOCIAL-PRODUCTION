@@ -40196,6 +40196,29 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3638-EMAIL-LINK-C33J-HISTORICAL-GATE-GENERIC-SUCCESSOR-BINDING-REJECTION",
+      "status": "registered_no_retry_and_exact_historical_binding_applicability_decision_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After the corrected focused analyzer and five focused email-link suites passed, the first no-build historical C33J native-parity gate exited one at line 110 with only C33J generic successor qualification binding changed.",
+      "rootCause": "The exact historical successor-binding assertion and its applicability to the current email-link ticket must be classified after registration; no retry, later preflight, source edit, build, device, provider, private, email or external action followed.",
+      "prevention": "Bind this registry generation, do not retry the failed gate, inspect only its exact generic-successor binding assertion and current selected-ticket evidence, then either prove the gate is inapplicable to current-ticket closure or require a separately authorized gate-owner correction and governance refresh.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1"
+      ]
     }
   ]
 }
