@@ -40995,7 +40995,7 @@
     },
     {
       "id": "REG-20260824-3674-LOGIN-PLATFORM-CONFIGURATION-LOCK-DIFFERS-FROM-HISTORICAL-EXPECTED",
-      "status": "registered_splash_pair_passed_and_accepted_google_baseline_comparison_required",
+      "status": "registered_accepted_google_r60_87_exact_owner_reuse_proven",
       "appliesTo": [
         "primary",
         "coordination",
@@ -41004,8 +41004,8 @@
         "testing"
       ],
       "mistake": "After the exact splash source/test pending lock passed, the gate stopped on apps/mobile/test/platform_configuration_test.dart because its current production digest differs from the historical login-account-handoff expected digest.",
-      "rootCause": "The test may be an exact owner from the separately accepted Google r60.87 runtime baseline rather than unaccepted UI drift and must be compared to that immutable tag after registration.",
-      "prevention": "Do not alter the test or expected digest. Bind this registry generation, compare current canonical content to moolsocial-google-auth-r60.87-accepted-20260823, admit it only if exact and mark acceptedGoogleBaselineReused=true, otherwise stop for founder direction; then replay the lock once.",
+      "rootCause": "The current canonical platform_configuration_test.dart hash is 725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1 and exactly equals the same owner at accepted Google runtime tag moolsocial-google-auth-r60.87-accepted-20260823, commit f105195ba505dcc9f25a35ab64aab104dadb47c2. The older UI-lock expected digest predates that separately accepted authentication baseline.",
+      "prevention": "Do not alter the test or historical expected digest. Bind this registry generation and admit only the exact accepted-Google-tag canonical digest 725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1 for this exact path, mark acceptedGoogleBaselineReused=true, fail on any other change, and replay the lock once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
