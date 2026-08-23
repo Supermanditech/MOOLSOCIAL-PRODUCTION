@@ -40561,6 +40561,27 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3654-PRESERVED-C33M-LAUNCHER-RESTORE-NOT-LOCALLY-EXCLUDED",
+      "status": "registered_exact_local_exclude_required_no_repository_tracking",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "worktree"
+      ],
+      "mistake": "The exact sanitized historical C33M launcher was restored from the preservation vault to the canonical production tmp path, but that path was not excluded and appeared as one untracked production file.",
+      "rootCause": "The earlier production-untracked preservation did not retain repository-local .git/info/exclude metadata for this exact launcher path.",
+      "prevention": "Bind this registry generation, keep the hash-matched launcher untracked, add only /tmp/run-c33m-r60-51-single-aab-founder.ps1 to the local production exclude file, verify zero production status records, and never copy the launcher into the feature worktree or commit it.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
