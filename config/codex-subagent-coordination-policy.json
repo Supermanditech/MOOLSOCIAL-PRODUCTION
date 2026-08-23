@@ -133,7 +133,9 @@
         "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart",
         "apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart",
         "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
-        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
+        "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
+        "scripts/check-uaw-codex-email-link-c33j-generic-successor-binding.ps1"
       ]
     }
   ],
@@ -163,7 +165,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v13",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v14",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },
