@@ -40085,6 +40085,26 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3636-DELEGATED-INCIDENT-IMPORT-GUESSED-EXACT-ID-NAMES",
+      "status": "registered_no_mutation_exact_ids_proven_and_one_object_read_authorized",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The bounded last-three entry read used three guessed full expected IDs; it safely returned the actual REG3631 through REG3633 IDs but rejected before projecting their objects.",
+      "rootCause": "The primary trusted the delegation's numeric range and invented descriptive suffixes instead of first accepting the registry's exact last-three IDs as authoritative.",
+      "prevention": "Bind this registry generation, use the now-proven literal REG3631 through REG3633 IDs from the failed validation output, read those three objects exactly once, and import them without altering their fields.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
