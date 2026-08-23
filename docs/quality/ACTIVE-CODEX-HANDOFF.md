@@ -3,7 +3,7 @@
 ## 2026-08-23 — parallel Cursor Buy UI and Codex Email Link lanes activated
 
 The founder activated two disjoint production tickets from annotated work-start
-tag `moolsocial-parallel-production-discipline-20260823-v2`:
+tag `moolsocial-parallel-production-discipline-20260823-v3`:
 
 - Cursor UI: `UAW-CURSOR-BUY-SCREEN-SUBACTIONS-UI-20260823`, work ID
   `buy-screen-subactions-ui-20260823`, branch

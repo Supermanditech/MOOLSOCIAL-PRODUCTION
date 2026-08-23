@@ -39669,6 +39669,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3614-PARALLEL-LANE-CURSOR-WORKTREE-CREATION-FAILED-WITH-SUPPRESSED-STDERR",
+      "status": "registered_root_cause_proven_no_path_or_registration_left_and_windows_long_path_support_required",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "worktree"
+      ],
+      "mistake": "The first git worktree add for the Cursor lane returned nonzero before Codex worktree creation, while stderr suppression hid the safe failure classification.",
+      "rootCause": "Git left only a clean local Cursor branch at the exact v2 tag and no path or worktree registration. The checkout projects exactly two tracked paths at 261 characters while repository core.longpaths is unset, proving Windows path handling blocked materialization.",
+      "prevention": "Bind this registry hash, advance the immutable work-start tag without moving v2, enable repository-local core.longpaths, fast-forward the unregistered clean branch to the new tag, and create the worktree from that existing branch without deletion or a second branch creation.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
+      ]
     }
   ]
 }
