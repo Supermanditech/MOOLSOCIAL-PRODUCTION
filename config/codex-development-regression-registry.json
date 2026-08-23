@@ -39859,6 +39859,27 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3623-PARALLEL-LANE-V7-TASK-START-STALE-WORK-START-TAG-V4",
+      "status": "registered_no_feature_mutation_and_immutable_v8_work_start_required",
+      "appliesTo": [
+        "primary",
+        "subagent",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "The first Cursor task_start replay at v7 rejected the post-v4 governance registry owner as outside the Cursor feature claim.",
+      "rootCause": "The coordination policy workStart.annotatedTag still named immutable v4 even though the clean feature branches were fast-forwarded through the v5-v7 governance corrections.",
+      "prevention": "Bind this registry generation, advance workStart.annotatedTag to a new immutable v8 tag without moving prior tags, seal and push that exact baseline, fast-forward both still-clean feature branches, then replay each task_start once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
