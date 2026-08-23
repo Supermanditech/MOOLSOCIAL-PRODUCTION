@@ -40064,6 +40064,27 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3635-SUCCESSOR-WORK-START-PREFLIGHT-BLOCKED-BY-PRESERVED-DIRTY-EMAIL-LINK-WORKTREE",
+      "status": "registered_external_founder_preservation_choice_required_before_successor_tag",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "email_link_auth"
+      ],
+      "mistake": "The primary governance_preflight for the incident-import generation rejected because the managed Codex email-link worktree contains the four intentionally preserved feature diffs plus its local registry/binding changes.",
+      "rootCause": "The work-start contract requires every managed worktree to be clean, while the explicit delegation forbids modifying, resetting, stashing, cleaning or fast-forwarding the dirty feature worktree; both conditions cannot be satisfied simultaneously.",
+      "prevention": "Reconcile the exact incident entries into primary governance, keep the delegated worktree byte-for-byte untouched, and create no successor work-start tag until the founder explicitly selects a preservation method that lawfully produces a clean managed worktree without losing the four feature diffs.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
