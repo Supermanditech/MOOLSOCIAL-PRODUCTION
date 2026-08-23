@@ -40931,7 +40931,7 @@
     },
     {
       "id": "REG-20260824-3671-APP-SPLASH-PRODUCTION-SOURCE-EXPECTED-DIGEST-NOT-RAW-OR-CANONICAL",
-      "status": "registered_root_cause_proven_external_founder_UI_baseline_direction_required",
+      "status": "registered_founder_selected_current_UI_preserved_and_OPPO_visual_acceptance_deferred",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40940,7 +40940,7 @@
       ],
       "mistake": "After text baselines were allowed to match unchanged expected raw or canonical hashes, app_splash_screen_v2.dart still rejected because neither current production raw nor canonical text equals its expected digest.",
       "rootCause": "The expected digest maps exactly to historical commit b2839b82f5d2164e60df3d89e5ca39e1419acf86. Its raw and canonical hashes both equal b0e7b099b70be7240a4e7699596ab7f16b77285fba9c23c4f3708afda7ae218d, while current canonical source is d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be. Git reports 156 additions and 390 deletions, proving semantic source drift rather than line-ending materialization.",
-      "prevention": "Do not weaken the lock or alter UI/reference content under authentication scope. Preserve the portability gate changes and stop for founder direction to either restore the accepted splash implementation or separately review and accept a new UI baseline with exact visual/device evidence and refreshed immutable digests.",
+      "prevention": "Founder selected preserve-current option 2 on 2026-08-24. Do not alter UI/reference content or expected digests. The lock may admit only the exact current splash canonical digest d08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be as pending founder/OPPO visual acceptance on the single later combined authentication candidate; every other text/binary lock remains enforced and any splash byte change fails. Promotion remains blocked until that visual acceptance is recorded.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
