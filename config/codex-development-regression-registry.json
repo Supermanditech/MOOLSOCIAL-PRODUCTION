@@ -40626,6 +40626,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3657-C33M-COMBINED-GATE-MULTIPLE-STALE-PREVENTION-EVIDENCE-SHAS",
+      "status": "registered_second_prevention_rejected_and_one_complete_six_evidence_projection_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "After the C33L FIX4 evidence pin was corrected, the combined source gate stopped on the next C33L FIX5 prevention binding before any later action.",
+      "rootCause": "More than one hardcoded qualified-prevention evidence SHA is stale relative to its current canonical production evidence, so another single-entry correction would repeat the same class.",
+      "prevention": "Bind this registry generation, project all six qualified-prevention evidence paths and canonical hashes once, update every proven stale evidenceSha constant together while preserving all ticket IDs, ticket hashes and implementation states, then replay source phase once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
