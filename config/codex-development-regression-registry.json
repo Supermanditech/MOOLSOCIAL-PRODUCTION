@@ -41015,6 +41015,26 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3675-ACCEPTED-GOOGLE-BASELINE-HASH-HELPER-ALIASED-TO-GET-HISTORY",
+      "status": "registered_no_hash_result_and_non_aliased_helper_retry_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first accepted-Google-baseline comparison named its hash helper H, which PowerShell resolved to the Get-History alias and emitted source text in a parameter-conversion error instead of hashes.",
+      "rootCause": "The helper name collided with a built-in PowerShell alias.",
+      "prevention": "Bind this registry generation, use a descriptive non-aliased Get-CanonicalComparisonHash helper, emit only tag/current canonical hashes and equality, and do not expose source content.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
