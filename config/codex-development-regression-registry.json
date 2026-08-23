@@ -40244,7 +40244,7 @@
     },
     {
       "id": "REG-20260824-3640-REG3638-CHECKER-FIX6-TICKET-RAW-BYTE-HASH-MATERIALIZATION",
-      "status": "registered_no_live_gate_replay_and_exact_checker_hash_classification_required",
+      "status": "registered_root_cause_proven_and_checker_canonical_text_hash_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40253,8 +40253,8 @@
         "tooling"
       ],
       "mistake": "The first authorized REG3638 compatibility-checker run stopped before live C33J replay because the checker rejected its own historical FIX6 ticket bytes.",
-      "rootCause": "The checker uses a raw SHA-256 over the FIX6 JSON ticket; exact production, feature-worktree and pinned hashes must be compared after registration before one bounded portability correction.",
-      "prevention": "Bind this registry generation, do not retry the checker or gate, compare only the exact FIX6 ticket hashes, preserve the six current feature/gate diffs, and if the difference is line-ending-only use the already authorized canonical text-hash helper for this checker-owned ticket before one replay.",
+      "rootCause": "The checker uses a raw SHA-256 over the FIX6 JSON ticket. Production and the pin are 0C395D2A7F73A938D320D637B6ED721328E72269BD22EC94BF51012AA8892431, while the feature CRLF materialization is 87E20835F5D8C4339CCFD7D518D656747F4A209A87FD33D38A8E4F122F77AE58; canonical UTF-8/LF hashing returns the pinned value in both worktrees.",
+      "prevention": "Bind this registry generation, do not retry before refresh, preserve the six current feature/gate diffs, and use the already authorized canonical text-hash helper for the checker-owned FIX6 ticket before one compatibility-checker replay.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
