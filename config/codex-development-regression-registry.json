@@ -40425,6 +40425,29 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3648-FIX5-TWO-OWNER-PATCH-REMEMBERED-STATE-ANCHOR-MISMATCH",
+      "status": "registered_atomic_rejection_zero_gate_change_and_small_owner_patches_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "tooling"
+      ],
+      "mistake": "The first FIX5 two-owner correction patch was rejected atomically because its remembered FIX5 state-string anchor did not match the existing compatibility checker.",
+      "rootCause": "A broad patch coupled the verified gate changes to an unverified long checker-state anchor instead of reading and patching each claimed owner independently.",
+      "prevention": "Count the rejected patch as zero changes, bind this registry generation, read the exact checker fixture anchor, then patch and read back the FIX5 gate and checker independently before one focused replay.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1",
+        "scripts/check-uaw-c33n-fix1-c33m-fix5-gate-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
