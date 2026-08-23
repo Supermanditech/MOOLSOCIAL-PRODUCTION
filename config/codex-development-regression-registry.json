@@ -40866,7 +40866,7 @@
     },
     {
       "id": "REG-20260824-3668-APPROVED-UI-LOCK-TEXT-OWNER-CRLF-MATERIALIZATION-REJECTION",
-      "status": "registered_no_later_action_and_text_only_canonical_hashing_required",
+      "status": "registered_root_cause_proven_and_production_baseline_canonical_text_comparison_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40875,8 +40875,8 @@
         "failure_handling"
       ],
       "mistake": "After v37, check-approved-ui-locks.ps1 was invoked once and rejected unchanged app-splash-first-open HTML because the expected LF digest differs from the feature-worktree CRLF materialization digest.",
-      "rootCause": "The lock gate hashes every owner as raw bytes, so Windows line-ending conversion changes text-owner digests even when semantic content and immutable references are unchanged.",
-      "prevention": "Bind this registry generation, do not alter UI/reference content or rerun qualified authentication gates, claim only check-approved-ui-locks.ps1, hash text lock owners as canonical UTF-8/LF while retaining raw-byte hashes for binary owners, self-test LF/CRLF parity plus semantic-text and binary-change rejection, then replay the lock once.",
+      "rootCause": "The immutable expected HTML raw digest is a mixed-line-ending file with 842 CRLF and 251 LF sequences, while the feature materialization has 1093 CRLF sequences. Both normalize to the identical LF content hash e521d55f89f6659557b7f054f438b45d2b37259841a8264d811455f31a11298e, but the gate compares that normalized hash to the unchanged mixed-byte manifest digest a56a2e18a4c7517c240fb29af1a5fbc30228ca760248f6ac1ff586f18686c649.",
+      "prevention": "Bind this registry generation, do not alter UI/reference content or expected digests, claim only check-approved-ui-locks.ps1, require the canonical production baseline raw hash to equal each expected digest, compare text owners by canonical UTF-8/LF content against that baseline, retain raw-only hashing for binary extensions, self-test LF/CRLF parity plus semantic-text and binary-change rejection, then replay the lock once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
@@ -40885,6 +40885,26 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3669-UI-LOCK-GOVERNANCE-PATCH-ASSUMED-INTERMEDIATE-BINDING",
+      "status": "registered_atomic_rejection_and_exact_current_binding_patch_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first UI-lock governance patch expected a nonexistent intermediate registry binding and was rejected atomically before owner or tag changes.",
+      "rootCause": "Several registry classifications advanced while the coordination policy retained an earlier binding, and the patch used the summarized generation instead of reading the exact current policy value.",
+      "prevention": "Count the rejected patch as zero change, read the exact current binding, update directly to the final registry generation/hash, and apply the owner/tag changes in one exact patch.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
       ]
     }
   ]
