@@ -40405,7 +40405,7 @@
     },
     {
       "id": "REG-20260824-3647-EMAIL-LINK-C33M-FIX5-TICKET-RAW-BYTE-HASH-REJECTION",
-      "status": "registered_no_later_action_and_exact_FIX5_portability_successor_correction_required",
+      "status": "registered_root_cause_proven_and_FIX5_gate_checker_canonical_hash_successor_boundary_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40414,8 +40414,8 @@
         "failure_handling"
       ],
       "mistake": "After v21, the next distinct no-build FIX5 Firebase passwordless email gateway exited one at line 16 because its historical FIX5 ticket bytes changed.",
-      "rootCause": "The exact FIX5 ticket and current selected-manifest hash materialization plus current-successor boundary must be classified after registration; no later action followed.",
-      "prevention": "Bind this registry generation, do not rerun C33J or FIX4, claim only the FIX5 gate and one existing minimal compatibility checker, canonicalize text-manifest hashing, preserve historical bindings and every closed authority, add exact current email-link positive and wrong-ticket/hash/authority negatives, then replay FIX5 once.",
+      "rootCause": "The FIX5 gate, its existing C33N FIX1 compatibility checker and the selected email-link manifest use raw byte hashes. Each feature-worktree CRLF hash differs from its pinned production hash, while canonical UTF-8/LF hashing matches all three pins exactly. The generic mode preserves historical FIX5 evidence but lacks an explicit current email-link authority boundary.",
+      "prevention": "Bind this registry generation, do not rerun C33J or FIX4, claim only the FIX5 gate and existing C33N FIX1 checker, canonicalize their ticket and selected-manifest hashes, preserve historical bindings, add the exact current email-link boundary with backend false plus wrong-ticket/hash/authority negatives, and replay FIX5 once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
