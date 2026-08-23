@@ -41188,6 +41188,112 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md"
       ]
+    },
+    {
+      "id": "REG-20260824-3683-FACEBOOK-GOVERNANCE-FINAL-GATE-OUTPUT-NOT-RETAINED-THROUGH-CONTEXT-COMPACTION",
+      "status": "registered_result_unknown_bounded_gate_replay_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The v46 final regression-memory and coordination-gate call completed at the tool boundary, but its output and exit metadata were not retained through context compaction, so the result cannot be used as release evidence.",
+      "rootCause": "Two verbose final gates were launched together without a bounded scalar result envelope that would survive context compaction.",
+      "prevention": "Bind this registry generation, advance the work-start tag once, then replay each mandatory final gate separately with bounded output and explicit exit metadata before pushing the governance baseline.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260824-3684-FACEBOOK-TRANSITION-PROBE-REUSED-NONCANONICAL-REGISTRY-FILENAME",
+      "status": "registered_read_only_probe_failed_no_repository_state_changed",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first post-compaction Facebook transition probe targeted config/codex-development-regression-memory.json instead of the canonical config/codex-development-regression-registry.json and exited before producing the production-state scalar.",
+      "rootCause": "The probe reconstructed the registry filename from memory instead of reading the canonical path from the existing gate or coordination policy.",
+      "prevention": "Use only config/codex-development-regression-registry.json as resolved from the repository gate and policy, bind this registry generation, and perform one corrected bounded scalar state probe before the mandatory gates.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3685-AUTH-BATCH-POLICY-DOCUMENT-REQUIRED-PHRASE-WRAPPED-AND-CASE-MISMATCHED",
+      "status": "registered_exact_contract_sentence_required_before_retry",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "The first retained v47 coordination preflight rejected because the required authentication-batch sentence was capitalized and split across two Markdown lines, while the checker requires one exact lower-case contiguous phrase.",
+      "rootCause": "The governance edit preserved prose meaning but did not validate the checker's literal document contract before the final preflight.",
+      "prevention": "Bind this registry generation, keep the sentence semantically unchanged on one line with the exact required lower-case phrase, advance the work-start tag once, and replay the coordination gate exactly once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md"
+      ]
+    },
+    {
+      "id": "REG-20260824-3686-FACEBOOK-GOVERNANCE-PREFLIGHT-INVOKED-BEFORE-CLEAN-COMMIT",
+      "status": "registered_no_retry_until_governance_commit_is_clean",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "The v48 coordination governance_preflight was invoked while the seven governance owners were still unstaged and therefore correctly rejected its zero-dirt boundary.",
+      "rootCause": "The primary treated governance_preflight as a pre-commit gate even though the checker defines it as the clean post-commit, pre-tag boundary.",
+      "prevention": "Bind this registry generation, advance the work-start tag once, validate and commit only the exact governance owner set, require a clean production checkout, then invoke governance_preflight exactly once before tagging or pushing.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3687-FACEBOOK-GOVERNANCE-MULTI-OWNER-TAG-PATCH-USED-STALE-DOCUMENT-ANCHOR",
+      "status": "registered_atomic_rejection_no_files_changed",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first v49 multi-owner tag patch was rejected atomically because it expected the coordination-policy document to contain v48 while that owner still contained v47.",
+      "rootCause": "The patch coupled independently versioned owners without first reading the exact tag literal in every owner.",
+      "prevention": "Bind this registry generation, update each tag owner from its exact current literal in independent hunks, then validate the complete owner set before committing.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md"
+      ]
     }
   ]
 }
