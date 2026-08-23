@@ -40046,6 +40046,76 @@
       ]
     },
     {
+      "id": "REG-20260824-3631-EMAIL-LINK-CONTINUATION-COMPOUND-GIT-AND-BROAD-SEARCH-OUTPUT",
+      "status": "registered_read_only_results_rejected_and_independent_bounded_reconstruction_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The resumed email-link lane grouped branch, HEAD, full short status, annotated-tag resolution and a repository-wide content search in one command; it emitted the prohibited four-path status body, PowerShell malformed the annotated-tag peel operand, and the broad search result truncated.",
+      "rootCause": "The continuation acted before applying the repository's independent scalar, non-emitting dirty digest, PowerShell quoting and bounded exact-owner search controls.",
+      "prevention": "Reject the complete compound result. Bind this registry generation; run branch and HEAD independently, suppress every async return in the five-field dirty digest, emit only literal claim-scoped status, peel the work-start tag through a PowerShell-literal argument, and search only exact owners with declared result semantics.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260824-3632-EMAIL-LINK-DIRTY-DIGEST-VOID-TASK-RESULT-LEAK",
+      "status": "registered_digest_output_rejected_and_async_results_must_be_suppressed",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The resumed lane's corrected non-emitting dirty digest printed two System.Threading.Tasks.VoidTaskResult lines before the otherwise bounded five-field JSON.",
+      "rootCause": "The two CopyToAsync GetResult calls were invoked as expressions rather than assigned to null, violating the digest's exact one-line output allowlist.",
+      "prevention": "Bind this registry generation and assign every asynchronous completion result to null before emitting exactly one JSON object containing bytes, records, SHA-256, stderr bytes and exit code. Any extra output rejects the digest.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260824-3633-EMAIL-LINK-FOCUSED-ANALYZER-EXIT-METADATA-OMITTED",
+      "status": "registered_prior_analyzer_result_not_evidence_and_exactly_one_corrected_run_required",
+      "appliesTo": [
+        "primary",
+        "email_link_auth",
+        "flutter",
+        "analyzer",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "The prior focused email-link analyzer result omitted terminal exit metadata, so its visible output cannot qualify the four-file change.",
+      "rootCause": "The analyzer wrapper projected output without retaining an explicit terminal native exit code, making completion and success semantically incomplete.",
+      "prevention": "Bind this registry generation, finish mandatory coordination and MVP preflight, then run the exact focused analyzer once in a fresh native process from apps/mobile. Capture all output as plain strings, preserve the immediate exit code and emit one bounded terminal summary; do not count or repeat the prior ambiguous result.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart",
+        "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart"
+      ]
+    },
+    {
       "id": "REG-20260824-3634-PRIMARY-REGISTRY-IMPORT-FILTER-MISSING-CURRENT-ITEM",
       "status": "registered_no_mutation_and_one_corrected_bounded_read_authorized",
       "appliesTo": [
