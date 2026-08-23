@@ -40841,6 +40841,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3667-C33M-GENERIC-EMAIL-SOURCE-REQUIRED-HISTORICAL-R60-51-SOURCE-SEAL",
+      "status": "registered_no_later_action_and_direct_lifecycle_only_source_seal_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "After all current-ticket, prevention and retained-evidence checks passed, the combined generic email source gate rejected because the historical r60.51 two-cycle registry/source seal is incomplete for the current changed source.",
+      "rootCause": "The combined source phase unconditionally requires the historical r60.51 candidate's two identical cycles and exact registry seal even when running as a generic current-ticket no-build closure that must not claim or enable r60.51 build readiness.",
+      "prevention": "Bind this registry generation, keep the historical sourceQualified computation and every build-phase requirement unchanged, require that seal only for direct C33M lifecycle source/build phases, and for generic email source report historicalSealReused=true with build authority still false; then replay source once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
