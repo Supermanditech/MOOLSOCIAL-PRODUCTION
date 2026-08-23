@@ -40451,7 +40451,7 @@
     },
     {
       "id": "REG-20260824-3649-FIX5-MOBILE-GATEWAY-WIRING-EXACT-FORMATTING-ASSERTION",
-      "status": "registered_no_later_action_and_exact_wiring_semantics_classification_required",
+      "status": "registered_root_cause_proven_and_current_composed_review_wiring_assertion_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40460,8 +40460,8 @@
         "failure_handling"
       ],
       "mistake": "The first corrected FIX5 checker replay reached the live gate and rejected the exact multiline mobile gateway wiring string for deviceReviewMode before any later action.",
-      "rootCause": "The claimed gateway source and exact gate assertion must be compared after registration to distinguish a real missing constructor argument from formatting-only drift.",
-      "prevention": "Bind this registry generation, do not retry FIX5 or earlier gates, inspect only the exact required string and current constructor wiring, then either fix a proven wiring defect or replace a formatting-only assertion with a whitespace-tolerant semantic check in the already claimed FIX5 gate/checker.",
+      "rootCause": "The product wiring is present in main.dart, but the gate still expects deviceReviewMode: _deviceReviewMode. The qualified current baseline intentionally passes globalSocialLoginAuditComposition.useReviewAuthentication so unrelated provider review mode remains fail-closed while the accepted Google-only/runtime composition is preserved.",
+      "prevention": "Bind this registry generation, leave main.dart unchanged, update only the FIX5 gate's required wiring expression to globalSocialLoginAuditComposition.useReviewAuthentication, retain every other selection and authority assertion, then replay the existing FIX5 compatibility checker once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
