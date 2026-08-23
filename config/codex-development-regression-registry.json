@@ -40264,6 +40264,30 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3641-REG3638-SIX-FILE-REAPPLY-GATE-SCRIPT-RAW-HASH-MISMATCH",
+      "status": "registered_four_required_feature_hashes_preserved_and_gate_text_equivalence_check_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The v16 six-file patch reapplied successfully, but an extra raw-byte equality assertion rejected the corrected primary gate script before the bounded REG3640 checker fix or any gate replay.",
+      "rootCause": "Only the four original feature files were required to remain byte-identical; the gate scripts are text owners whose raw bytes may rematerialize with different line endings. Exact canonical text and diff equivalence must be checked after registration.",
+      "prevention": "Bind this registry generation, verify the four required feature hashes exactly, compare the two gate owners as canonical text and intended diff only, preserve the current six-owner patch, and do not impose another raw-byte gate-script equality requirement across Windows worktree refreshes.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33j-screen03-passwordless-email-link-native-parity.ps1",
+        "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
+      ]
     }
   ]
 }
