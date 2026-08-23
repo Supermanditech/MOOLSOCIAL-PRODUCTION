@@ -40175,6 +40175,27 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3637-FINAL-DIRTY-DIGEST-EXIT-CODE-SOURCED-FROM-LATER-GIT-CALL",
+      "status": "registered_prior_digest_not_exit_proven_and_one_captured_process_exit_retry_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The final feature-worktree dirty digest emitted exitCode from PowerShell's later LASTEXITCODE value rather than a variable captured directly from the status process.",
+      "rootCause": "The status Process object was disposed before its ExitCode was saved, and subsequent Git readbacks happened to leave LASTEXITCODE at zero.",
+      "prevention": "Reject only the exit-provenance field from that digest, bind this registry generation, reuse the already verified four-file preservation patch, capture statusExit from Process.ExitCode immediately after WaitForExit and before disposal, then emit the exact five-field digest once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
