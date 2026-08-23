@@ -40498,7 +40498,7 @@
     },
     {
       "id": "REG-20260824-3651-EMAIL-LINK-C33M-R60-51-COMBINED-GATE-TICKET-BYTES-REJECTION",
-      "status": "registered_no_later_action_and_exact_combined_gate_portability_successor_correction_required",
+      "status": "registered_root_cause_proven_and_combined_gate_canonical_source_successor_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40507,8 +40507,8 @@
         "failure_handling"
       ],
       "mistake": "After v25, the combined C33M r60.51 no-regression release-readiness gate was invoked once in source phase and exited one at line 25 because its historical ticket bytes changed.",
-      "rootCause": "The combined gate ticket, selected manifest and source-phase current-successor authority boundary must be classified after registration; the script contains no direct check-uaw invocation and no later action followed.",
-      "prevention": "Bind this registry generation, do not rerun qualified provider gates, claim only the combined r60.51 gate and one existing focused successor checker, canonicalize text-manifest hashes, preserve historical release-state bindings and all build/AAB/Play/install/device/provider/external/secret authorities false, add exact current email-link positive and wrong-ticket/hash/authority negatives, then run source phase once.",
+      "rootCause": "The combined gate hashes its historical C33M ticket as materialized bytes and source phase passes that old ticket to the MVP scope gate. The feature CRLF ticket and selected-manifest hashes differ from their production pins while canonical UTF-8/LF hashes match. The gate has no generic current-ticket lifecycle despite a qualified priorC33M assessment.",
+      "prevention": "Bind this registry generation, do not rerun qualified provider gates, claim only the combined r60.51 gate, canonicalize its ticket and selected-manifest hashes, add an evidence-bound source-only current email-link lifecycle with wrong-ticket/hash/authority self-fixtures, preserve all historical release-state bindings and keep build/AAB/Play/install/device/provider/external/secret authority false, then run source phase once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
