@@ -40670,6 +40670,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3659-C33M-GENERIC-EMAIL-SOURCE-REEXECUTED-HISTORICAL-PHONE-PREREQUISITE",
+      "status": "registered_no_later_action_and_all_historical_prerequisite_gate_execution_must_be_direct_lifecycle_only",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "After historical prevention-gate execution was correctly skipped for the generic email successor, the combined source gate invoked the historical Phone prerequisite gate, which rejected its old exact runtime wiring before later actions.",
+      "rootCause": "The same unconditional historical re-execution pattern also covers Phone, blocker, Google and release-runtime prerequisite gates despite their identities and evidence being pinned in the combined state.",
+      "prevention": "Bind this registry generation, preserve all state/evidence prerequisites, execute Phone/blocker/Google/runtime historical gates only for direct C33M lifecycle phases, and for the evidence-bound generic email source path reuse the pinned prerequisite qualifications without re-execution; then replay source once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
