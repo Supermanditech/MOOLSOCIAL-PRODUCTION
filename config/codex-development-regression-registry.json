@@ -40629,7 +40629,7 @@
     },
     {
       "id": "REG-20260824-3657-C33M-COMBINED-GATE-MULTIPLE-STALE-PREVENTION-EVIDENCE-SHAS",
-      "status": "registered_second_prevention_rejected_and_one_complete_six_evidence_projection_required",
+      "status": "registered_root_cause_proven_two_stale_C33L_evidence_pins_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40637,8 +40637,8 @@
         "release_gate"
       ],
       "mistake": "After the C33L FIX4 evidence pin was corrected, the combined source gate stopped on the next C33L FIX5 prevention binding before any later action.",
-      "rootCause": "More than one hardcoded qualified-prevention evidence SHA is stale relative to its current canonical production evidence, so another single-entry correction would repeat the same class.",
-      "prevention": "Bind this registry generation, project all six qualified-prevention evidence paths and canonical hashes once, update every proven stale evidenceSha constant together while preserving all ticket IDs, ticket hashes and implementation states, then replay source phase once.",
+      "rootCause": "The six-entry projection proved C33L FIX4 and all three C33M evidence pins match after canonical hashing. C33L FIX5 is stale at C600BD1F9D148154AB7032A1413C0893F4B8B52D78FC5AF7C5F837ED94FC40E5 versus current 8AA9C447C9AD7317DF717A30CDA3FF0F4EC8127E965ADBD61D483F3D3435376F, and C33L FIX6 is stale at F1BDEE542DF89349C791A27E38E4B8FD7CFA882AA05F6712171234CA20AE90EC versus current AC341794F06DC5AE6C5C0C48C4BB1320E06EB1D2CF1D179DFA0A6B5B375E4716.",
+      "prevention": "Bind this registry generation, leave all evidence content and the four matching prevention pins unchanged, update only the C33L FIX5 and FIX6 evidenceSha constants to their exact current canonical values, and replay source phase once.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
