@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3585,
-    "sha256": "07113C56B44DA769845C6554748BF5DCD1AE99AFD484672AA88B324B6920C95D"
+    "entryCount": 3586,
+    "sha256": "3904486E1E6B3A20FAF7C48B0FFE5DBA9D89DB6040E660D611716ADFD6C73ABE"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,7 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        ".gitattributes",
         "AGENTS.md",
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
@@ -159,7 +160,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260823-v3",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260823-v4",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

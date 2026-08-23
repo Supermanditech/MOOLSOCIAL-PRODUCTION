@@ -91,10 +91,11 @@ Cursor, Codex and integration never mutate the same checkout.
 - Integration: `C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-<work-id>`
 
 Each worktree and branch begins from the annotated governance tag
-`moolsocial-parallel-production-discipline-20260823-v3`. The original
-governance tag and v2 activation tag remain immutable evidence. V3 is the exact
-task-activation descendant containing the first disjoint Cursor and Codex
-claims plus the registered Windows long-path worktree correction. A worktree is created
+`moolsocial-parallel-production-discipline-20260823-v4`. The original
+governance tag and v2/v3 activation tags remain immutable evidence. V4 is the
+exact task-activation descendant containing the first disjoint Cursor and
+Codex claims plus the registered Windows long-path and machine-hash line-ending
+corrections. A worktree is created
 only after the founder assigns its exact one-ticket work ID and disjoint owner
 claim.
 

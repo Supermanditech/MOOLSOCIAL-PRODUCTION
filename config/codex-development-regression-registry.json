@@ -39691,6 +39691,28 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md"
       ]
+    },
+    {
+      "id": "REG-20260823-3615-PARALLEL-LANE-TASK-START-REGISTRY-HASH-CRLF-MATERIALIZATION",
+      "status": "registered_root_cause_proven_and_exact_lf_attributes_required_for_machine_hash_owners",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "coordination",
+        "worktree"
+      ],
+      "mistake": "Both clean feature worktrees rejected task_start because their checked-out regression registry hash differed from the committed machine binding.",
+      "rootCause": "With core.autocrlf=true and no exact attributes, both worktrees materialized the same CRLF registry hash while the clean production file and recorded binding use repository-normalized LF bytes.",
+      "prevention": "Bind this generation, add exact text eol=lf attributes for the regression registry and coordination policy, commit and tag the immutable correction, fast-forward both clean feature branches, and require both task_start hashes and gates to pass before editing.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        ".gitattributes",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }

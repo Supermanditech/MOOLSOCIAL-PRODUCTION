@@ -7,6 +7,10 @@ apps/mobile/lib/data/generated/** -whitespace
 apps/mobile/lib/** text=auto eol=lf
 apps/mobile/test/** text=auto eol=lf
 
+# Machine-state hashes must be identical in every Windows worktree.
+config/codex-development-regression-registry.json text eol=lf
+config/codex-subagent-coordination-policy.json text eol=lf
+
 # Preserve the upstream font license text exactly as distributed.
 apps/mobile/assets/fonts/OFL.txt -whitespace
 
