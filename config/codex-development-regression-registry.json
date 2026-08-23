@@ -40863,6 +40863,29 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3668-APPROVED-UI-LOCK-TEXT-OWNER-CRLF-MATERIALIZATION-REJECTION",
+      "status": "registered_no_later_action_and_text_only_canonical_hashing_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "ui_lock",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After v37, check-approved-ui-locks.ps1 was invoked once and rejected unchanged app-splash-first-open HTML because the expected LF digest differs from the feature-worktree CRLF materialization digest.",
+      "rootCause": "The lock gate hashes every owner as raw bytes, so Windows line-ending conversion changes text-owner digests even when semantic content and immutable references are unchanged.",
+      "prevention": "Bind this registry generation, do not alter UI/reference content or rerun qualified authentication gates, claim only check-approved-ui-locks.ps1, hash text lock owners as canonical UTF-8/LF while retaining raw-byte hashes for binary owners, self-test LF/CRLF parity plus semantic-text and binary-change rejection, then replay the lock once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }
