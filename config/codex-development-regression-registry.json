@@ -40448,6 +40448,30 @@
         "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1",
         "scripts/check-uaw-c33n-fix1-c33m-fix5-gate-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3649-FIX5-MOBILE-GATEWAY-WIRING-EXACT-FORMATTING-ASSERTION",
+      "status": "registered_no_later_action_and_exact_wiring_semantics_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "The first corrected FIX5 checker replay reached the live gate and rejected the exact multiline mobile gateway wiring string for deviceReviewMode before any later action.",
+      "rootCause": "The claimed gateway source and exact gate assertion must be compared after registration to distinguish a real missing constructor argument from formatting-only drift.",
+      "prevention": "Bind this registry generation, do not retry FIX5 or earlier gates, inspect only the exact required string and current constructor wiring, then either fix a proven wiring defect or replace a formatting-only assertion with a whitespace-tolerant semantic check in the already claimed FIX5 gate/checker.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix5-public-review-firebase-passwordless-email-gateway.ps1",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart"
+      ]
     }
   ]
 }
