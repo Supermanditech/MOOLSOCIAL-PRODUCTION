@@ -40906,6 +40906,28 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3670-APPROVED-UI-TEXT-BASELINE-EXPECTED-CANONICAL-NOT-RAW",
+      "status": "registered_reference_passed_and_text_baseline_raw_or_canonical_expected_match_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "ui_lock",
+        "testing"
+      ],
+      "mistake": "The first corrected UI-lock replay passed the mixed-line-ending reference but rejected app_splash_screen_v2.dart because its expected lock digest differs from the canonical production raw bytes.",
+      "rootCause": "Approved text locks are historically mixed: some expected digests pin production raw bytes, while others pin canonical LF text. Requiring every text baseline expected digest to equal raw bytes is too strict despite unchanged content.",
+      "prevention": "Bind this registry generation, keep every expected digest unchanged, require a text baseline expected digest to match either its exact raw hash or canonical UTF-8/LF hash, compare feature text to canonical baseline content, retain binary raw-only checks and the existing positive/negative fixtures, then replay once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }
