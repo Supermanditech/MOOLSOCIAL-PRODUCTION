@@ -40821,6 +40821,26 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3666-GOOGLE-READINESS-STATE-PATH-GUESSED-IN-AGGREGATE-INVENTORY",
+      "status": "registered_zero_valid_fact_output_and_state_bound_path_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first complete Google evidence inventory guessed config/firebase-google-auth-live-readiness-state-c33f.json, which is absent, then emitted one null placeholder object.",
+      "rootCause": "The inventory did not first read state.sourcePrerequisites.googleLiveReadinessPath from the authoritative C33M detailed state.",
+      "prevention": "Treat the inventory as zero evidence, bind this registry generation, resolve the exact state-bound Google readiness path, then perform one corrected complete facts inventory without a guessed filename.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
