@@ -40732,6 +40732,29 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3662-C33M-COMBINED-GATE-GOOGLE-READINESS-EVIDENCE-MISSING-IN-FEATURE-WORKTREE",
+      "status": "registered_no_later_action_and_artifacts_quality_read_only_production_fallback_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate",
+        "worktree"
+      ],
+      "mistake": "The generic combined source gate progressed to Google readiness evidence and stopped because the retained Play-signer qualification JSON is absent from the feature worktree.",
+      "rootCause": "Historical artifacts/quality evidence is retained only in the canonical production checkout, while the combined resolver fallback currently permits only the one historical launcher.",
+      "prevention": "Bind this registry generation, do not rerun provider gates, allow read-only canonical production fallback only for missing repository-relative artifacts/quality evidence and the exact historical launcher, continue requiring scripts/config/active source in the feature worktree, then replay source once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
