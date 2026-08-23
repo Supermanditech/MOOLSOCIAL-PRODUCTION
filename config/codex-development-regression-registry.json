@@ -40712,6 +40712,26 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3661-COMBINED-GATE-RG-POWERSHELL-VARIABLE-INTERPOLATION",
+      "status": "registered_zero_context_and_literal_single_quoted_rg_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The replacement rg context lookup used a double-quoted PowerShell pattern, expanded phoneGate/runtimeGate variables to empty text and produced a regex parse error.",
+      "rootCause": "The command did not use a literal single-quoted regex for dollar-prefixed PowerShell variable names.",
+      "prevention": "Bind this registry generation, use one literal single-quoted rg pattern, read the exact prerequisite block, and apply one bounded generic-successor lifecycle wrapper without another locator helper.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
