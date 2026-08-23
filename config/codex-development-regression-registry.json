@@ -40604,6 +40604,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3656-C33M-COMBINED-GATE-C33L-FIX4-PREVENTION-BINDING-STILL-REJECTED",
+      "status": "registered_no_later_action_and_exact_five_field_projection_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "release_gate"
+      ],
+      "mistake": "After qualified-prevention ticket/evidence hashing was canonicalized, the combined source gate still rejected the first C33L FIX4 prevention binding before any later action.",
+      "rootCause": "One of the exact ticket ID, assessment hash, canonical ticket hash, implementation state or canonical evidence hash comparisons differs and must be projected after registration.",
+      "prevention": "Bind this registry generation, project only the five exact C33L FIX4 comparison pairs, correct only the proven stale gate-side expectation without weakening the prevention, and replay source phase once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-r60-51-authentication-no-regression-release-readiness.ps1"
+      ]
     }
   ]
 }
