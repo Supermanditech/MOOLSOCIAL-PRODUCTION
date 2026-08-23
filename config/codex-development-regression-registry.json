@@ -40291,7 +40291,7 @@
     },
     {
       "id": "REG-20260824-3642-REG3638-C33J-FOCUSED-MATRIX-HARDCODED-ELEVEN-REJECTION",
-      "status": "registered_no_later_action_and_exact_authored_matrix_count_required",
+      "status": "registered_root_cause_proven_and_exact_twelve_case_gate_update_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40300,8 +40300,8 @@
         "failure_handling"
       ],
       "mistake": "After REG3640 portability was corrected, the one compatibility-checker replay reached the live primary C33J gate and stopped because its focused matrix count was hardcoded to eleven.",
-      "rootCause": "The current exact authored test count and assertion form must be read after registration; no later checker, gate, analyzer, test, build, device, provider, private, email or external action followed.",
-      "prevention": "Bind this registry generation, do not retry before refresh, inspect only the exact count assertion and current claimed C33J matrix, then update the gate and focused checker to the truthful exact authored count without changing feature logic or weakening any behavioral assertion.",
+      "rootCause": "The gate requires exactly eleven test/testWidgets declarations, while the current claimed C33J matrix truthfully contains twelve: six testWidgets and six test declarations after the authorized focused telemetry case was added.",
+      "prevention": "Bind this registry generation, do not retry before refresh, update only the gate's exact matrix count and output from eleven to twelve, retain every required behavioral string assertion, and cover the twelve-case contract in the existing compatibility checker before one replay.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
