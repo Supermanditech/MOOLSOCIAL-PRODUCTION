@@ -40199,7 +40199,7 @@
     },
     {
       "id": "REG-20260824-3638-EMAIL-LINK-C33J-HISTORICAL-GATE-GENERIC-SUCCESSOR-BINDING-REJECTION",
-      "status": "registered_no_retry_and_exact_historical_binding_applicability_decision_required",
+      "status": "registered_root_cause_proven_gate_applicable_and_separate_gate_owner_correction_required",
       "appliesTo": [
         "primary",
         "coordination",
@@ -40208,8 +40208,8 @@
         "failure_handling"
       ],
       "mistake": "After the corrected focused analyzer and five focused email-link suites passed, the first no-build historical C33J native-parity gate exited one at line 110 with only C33J generic successor qualification binding changed.",
-      "rootCause": "The exact historical successor-binding assertion and its applicability to the current email-link ticket must be classified after registration; no retry, later preflight, source edit, build, device, provider, private, email or external action followed.",
-      "prevention": "Bind this registry generation, do not retry the failed gate, inspect only its exact generic-successor binding assertion and current selected-ticket evidence, then either prove the gate is inapplicable to current-ticket closure or require a separately authorized gate-owner correction and governance refresh.",
+      "rootCause": "The gate hashes the selected Markdown manifest as materialized bytes, so the feature worktree CRLF hash differs from the canonical production hash pinned by the assessment. Its next generic-successor boundary also hardcodes the old FIX8 parent ticket and requires backendWriteAuthorized=true, while the current exact email-link ticket intentionally has backend writes false. The gate directly validates the changed C33J session, Firebase gateway and focused test path, and its script is not in the current 12-owner claim.",
+      "prevention": "Do not omit or retry the gate. Require a separately authorized gate-owner correction that canonicalizes text-manifest hashing, admits the exact current email-link ticket through an evidence-bound generic-successor branch without granting backend authority, adds positive and negative successor fixtures, refreshes governance, and only then replays this gate once before no-build closure.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
