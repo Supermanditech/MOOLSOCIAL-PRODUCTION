@@ -40335,6 +40335,29 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c33m-fix6-c33j-gate-trilogy-generic-successor-replay-compatibility.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3644-EMAIL-LINK-C33M-FIX4-TICKET-RAW-BYTE-HASH-REJECTION",
+      "status": "registered_no_later_action_and_exact_FIX4_portability_successor_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "email_link_auth",
+        "testing",
+        "failure_handling"
+      ],
+      "mistake": "After v19, the next distinct no-build FIX4 fresh-process auth-return persistence gate exited one at line 16 because its historical FIX4 ticket bytes changed.",
+      "rootCause": "The exact FIX4 ticket hash materialization and generic-successor execution boundary must be classified after registration; no later gate, analyzer, test, source edit, build, device, private, live-email, provider or external action followed.",
+      "prevention": "Bind this registry generation, do not retry FIX4 or rerun C33J, inspect only the FIX4 ticket hash and successor boundary, then authorize the exact FIX4 gate plus one existing focused compatibility checker for canonical text hashing and evidence-bound current email-link successor fixtures.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c33m-fix4-public-review-fresh-process-auth-return-persistence.ps1"
+      ]
     }
   ]
 }
