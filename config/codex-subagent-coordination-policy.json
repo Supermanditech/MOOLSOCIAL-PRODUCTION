@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3586,
-    "sha256": "3904486E1E6B3A20FAF7C48B0FFE5DBA9D89DB6040E660D611716ADFD6C73ABE"
+    "entryCount": 3592,
+    "sha256": "D8E79E194EAD7C470683ED868E320FCD8D700DD13D251A195859E0A1A5A86E70"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -41,6 +41,7 @@
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
+        "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     },

@@ -39713,6 +39713,132 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260823-3616-CURSOR-MANDATORY-REGRESSION-MEMORY-COMBINED-PAGING-OUTPUT-TRUNCATION",
+      "status": "registered_no_mutation_and_one_page_per_command_retry_required",
+      "appliesTo": [
+        "primary",
+        "subagent",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The Cursor lane combined mandatory regression-memory paging call for lines 1-1000 returned a truncated tool result, so complete-read evidence was invalid.",
+      "rootCause": "The combined page exceeded the tool result budget and omitted or partially rendered required content; no repository or Git mutation occurred.",
+      "prevention": "Bind this registry generation, keep the lane read-only, and resume the mandatory read using exactly one bounded page per command and result with complete scalar page metadata before owner inspection.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"
+      ]
+    },
+    {
+      "id": "REG-20260823-3617-CODEX-EMAIL-LINK-MEMORY-GATE-MISSING-REGISTERED-EVIDENCE-PATH",
+      "status": "registered_no_mutation_and_exact_missing_evidence_dependency_requires_bounded_resolution",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling",
+        "email_link_auth"
+      ],
+      "mistake": "The clean Codex email-link lane mandatory regression-memory gate stopped before implementation because REG-20260806-001-MOOL-ROOT-NONINTERACTIVE references a repository evidence path absent from the clean worktree.",
+      "rootCause": "The gate requires artifacts/quality/uaw-personal-mvp-main-subaction-bottom-panel-fix1-20260806-01/00-current-oppo-audit.md, but that registered evidence dependency is not materialized in the clean governed worktree; no source, test, build, device, external or private action occurred.",
+      "prevention": "Bind this registry generation, verify only the exact registered path and gate applicability, then use the smallest truthful tracked evidence or gate-applicability correction before one authorized gate retry; do not weaken unrelated memory checks.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3618-CLEAN-WORKTREE-REGISTRY-DEPENDENCY-PORTABILITY-PROBE-YIELDED-WITHOUT-SCALARS",
+      "status": "registered_read_only_result_invalid_and_single_tracked_set_probe_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first read-only registry dependency portability probe performed one Git tracked lookup per dependency and exceeded the tool yield window without returning any scalar result.",
+      "rootCause": "Repeated Git process startup inside the dependency loop made the bounded classification too slow, and the wrapper emitted only the empty output field instead of retaining session metadata.",
+      "prevention": "Treat the attempt as no evidence, bind this registry generation, load the tracked path set once, perform only in-memory membership checks, and emit aggregate scalars plus exact missing repository-relative paths in one corrected probe.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3619-CLEAN-WORKTREE-REGISTRY-DEPENDENCY-INVENTORY-OUTPUT-TRUNCATION",
+      "status": "registered_aggregate_proves_portability_gap_and_scalar_only_retry_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling",
+        "worktree"
+      ],
+      "mistake": "The corrected in-memory dependency probe emitted every missing and untracked historical path, producing a truncated 949-line result even though its leading aggregate reported 468 dependencies absent from the clean Codex worktree.",
+      "rootCause": "The regression registry intentionally retains thousands of historical evidence references, many stored only as ignored local artifacts in the canonical production checkout; enumerating them is unnecessary and exceeds the result budget.",
+      "prevention": "Bind this registry generation, emit only aggregate missing-by-kind scalars, preserve local artifacts outside Git, and make the mandatory memory gate use the canonical local production checkout as a read-only evidence fallback while still requiring all executable gate owners in the active worktree.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260823-3620-REGISTRY-BATCH-COORDINATION-REPLAY-WRONG-CLEAN-BOUNDARY-PHASE",
+      "status": "registered_no_source_action_and_implementation_phase_replay_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The primary coordination replay selected governance_preflight while the registered registry and binding changes were intentionally unstaged, so the clean-boundary gate rejected the call.",
+      "rootCause": "The clean-only governance phase was used during an in-progress claimed governance implementation instead of the implementation phase.",
+      "prevention": "Bind this registry generation, replay regression memory, use ProductionPhase implementation for claimed in-progress edits, and reserve governance_preflight for the final zero-dirt boundary after the atomic governance commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260823-3621-BASELINE-LANE-COORDINATION-REPLAY-UNSUPPORTED-IMPLEMENTATION-PHASE",
+      "status": "registered_atomic_governance_seal_required_before_clean_gate_replay",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "After correcting away from governance_preflight, the primary selected implementation with the baseline lane, but the policy correctly permits only baseline or governance_preflight phases for that lane.",
+      "rootCause": "The in-progress registry batch cannot be qualified through a dirty baseline-lane phase; it must be sealed atomically and then verified at the clean governance boundary.",
+      "prevention": "Bind this registry generation, parse and stage only the claimed registry and coordination owners, seal one atomic governance commit, then replay the clean governance_preflight before any checker correction or feature-lane retry.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
