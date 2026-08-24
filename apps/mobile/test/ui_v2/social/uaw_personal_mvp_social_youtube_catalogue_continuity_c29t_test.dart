@@ -13,7 +13,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'C29T reopens Videos and Shorts from snapshots while refresh is pending',
+    'C29T reopens fresh Videos and Shorts without another provider load',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -39,19 +39,27 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
-      final pendingVideos = Completer<List<Screen04YouTubePublicVideo>>();
-      final pendingShorts = Completer<List<Screen04YouTubePublicVideo>>();
+      var videoReloads = 0;
+      var shortReloads = 0;
       await _mount(
         tester,
         owners.consumer(
           subAction: 'videos',
           store: store,
-          videosLoader: () => pendingVideos.future,
-          shortsLoader: () => pendingShorts.future,
+          videosLoader: () async {
+            videoReloads += 1;
+            return const [];
+          },
+          shortsLoader: () async {
+            shortReloads += 1;
+            return const [];
+          },
         ),
       );
       await tester.pump();
 
+      expect(videoReloads, 0);
+      expect(shortReloads, 0);
       expect(find.text('Provider title video-1'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-youtube-videos-state-loading')),
@@ -68,34 +76,67 @@ void main() {
         find.byKey(const Key('screen04-youtube-shorts-state-loading')),
         findsNothing,
       );
-
-      pendingVideos.completeError(StateError('offline'));
-      pendingShorts.completeError(StateError('offline'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(
-        find.byKey(const Key('screen04-youtube-shorts-refresh-error')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('screen04-shorts-page-view')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('screen04-rail-videos')));
-      await tester.pump();
-      expect(find.text('Provider title video-1'), findsOneWidget);
-      expect(
-        find.byKey(const Key('screen04-youtube-videos-refresh-error')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('screen04-youtube-videos-state-error')),
-        findsNothing,
-      );
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Social tab and Create draft survive a main-action remount', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-state', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-state', duration: 'PT30S')]);
+    var providerLoads = 0;
+    Future<List<Screen04YouTubePublicVideo>> loader() async {
+      providerLoads += 1;
+      return const [];
+    }
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('screen04-create-post-text')),
+      'Keep this exact unfinished post',
+    );
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(providerLoads, 0);
+    expect(find.byKey(const Key('social-v2-create-workbench')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
+          .controller
+          ?.text,
+      'Keep this exact unfinished post',
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('C29T expired snapshot uses only the in-surface cold start', (
     tester,
@@ -359,7 +400,7 @@ class _Owners {
   final shared = SharedSession();
 
   SocialUniversalV2 consumer({
-    required String subAction,
+    String? subAction,
     String? initialState,
     String? initialItem,
     required Screen04YouTubeCatalogueSnapshotStore store,

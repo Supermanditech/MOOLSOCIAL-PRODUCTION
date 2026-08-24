@@ -31,6 +31,22 @@ typedef Screen04YouTubePublicVideoLoader =
 typedef Screen04YouTubePublicSearchLoader =
     Future<List<Screen04YouTubePublicVideo>> Function(String query);
 
+final Expando<_SocialV2RetainedState> _socialV2RetainedStates =
+    Expando<_SocialV2RetainedState>();
+
+class _SocialV2RetainedState {
+  _SocialV2RetainedState()
+    : choiceByWorld = <String, String>{
+        for (final world in screen04Worlds) world.id: world.choices.first.id,
+      };
+
+  final Map<String, String> choiceByWorld;
+  final SocialCreateDraftV2 createDraft = SocialCreateDraftV2();
+  String createView = 'home';
+  int activeShortPage = 0;
+  double videoHomeScrollOffset = 0;
+}
+
 class SocialUniversalV2 extends StatefulWidget {
   const SocialUniversalV2({
     required this.session,
@@ -94,19 +110,23 @@ class SocialUniversalV2 extends StatefulWidget {
 class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late SocialV2Tab _tab;
   late String _world;
-  late final Map<String, String> _choiceByWorld;
+  late final _SocialV2RetainedState _retainedState;
+
+  Map<String, String> get _choiceByWorld => _retainedState.choiceByWorld;
 
   late String _feedState;
-  late String _createView;
+  String get _createView => _retainedState.createView;
+  set _createView(String value) => _retainedState.createView = value;
   late bool _contentUnavailable;
-  int _activeShortPage = 0;
+  int get _activeShortPage => _retainedState.activeShortPage;
+  set _activeShortPage(int value) => _retainedState.activeShortPage = value;
   late final PageController _shortController;
   late final ScrollController _videoHomeController;
   late final ScrollController _videoWatchController;
   late final TextEditingController _youtubeSearchController;
   late final FocusNode _youtubeSearchFocusNode;
   late final SocialMediaPicker _mediaPicker;
-  final SocialCreateDraftV2 _createDraft = SocialCreateDraftV2();
+  SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
   late final Screen04YouTubeCatalogueSnapshotStore _youtubeCatalogueSnapshots;
   _VideoData? _activeVideo;
   _VideoData? _youtubeSearchOriginVideo;
@@ -115,7 +135,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   int _visibleVideoCount = 20;
   int _youtubeSearchRequest = 0;
   int _youtubeCatalogueRequest = 0;
-  double _videoHomeScrollOffset = 0;
+  double get _videoHomeScrollOffset => _retainedState.videoHomeScrollOffset;
+  set _videoHomeScrollOffset(double value) =>
+      _retainedState.videoHomeScrollOffset = value;
   bool _youtubeSearchOpen = false;
   bool _youtubeSearchLoading = false;
   bool _returnToYouTubeSearchAfterVideo = false;
@@ -174,7 +196,14 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   @override
   void initState() {
     super.initState();
-    _shortController = PageController();
+    final retained = _socialV2RetainedStates[widget.sharedSession];
+    if (retained == null) {
+      _retainedState = _SocialV2RetainedState();
+      _socialV2RetainedStates[widget.sharedSession] = _retainedState;
+    } else {
+      _retainedState = retained;
+    }
+    _shortController = PageController(initialPage: _activeShortPage);
     _videoHomeController = ScrollController();
     _videoWatchController = ScrollController();
     _youtubeSearchController = TextEditingController();
@@ -189,9 +218,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     _world = screen04Worlds.any((world) => world.id == widget.initialWorld)
         ? widget.initialWorld
         : 'social';
-    _choiceByWorld = {
-      for (final world in screen04Worlds) world.id: world.choices.first.id,
-    };
     if (widget.initialSubAction case final subAction?) {
       final activeWorld = screen04World(_world);
       if (activeWorld.choices.any((choice) => choice.id == subAction)) {
@@ -201,7 +227,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     _tab = _world == 'social'
         ? _tabFor(_choiceByWorld['social'])
         : SocialV2Tab.shorts;
-    _createView = _createViewFor(widget.initialState);
+    if (widget.initialState != null) {
+      _createView = _createViewFor(widget.initialState);
+    } else if (_tab != SocialV2Tab.create) {
+      _createView = 'home';
+    }
     _feedState = _feedStateFor(widget.initialState);
     _feedLinkContextActive =
         _tab == SocialV2Tab.feed &&
@@ -227,16 +257,28 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         _tab == SocialV2Tab.videos && widget.initialState == 'video-watch'
         ? _videoForProviderId(_liveYouTubeVideos, widget.initialItem)
         : null;
-    if (_youtubePublicAccessAvailable) {
+    if (_youtubePublicAccessAvailable &&
+        (!_hasYouTubeVideosSnapshot ||
+            !_hasYouTubeShortsSnapshot ||
+            _liveYouTubeVideos.isEmpty ||
+            _liveYouTubeShorts.isEmpty)) {
       unawaited(_loadLiveYouTubeVideos());
     }
     if (widget.sharedSession.socialContentAvailable) {
-      unawaited(_loadInitialSocialFeed());
+      if (!widget.sharedSession.socialFeedLoaded &&
+          !widget.sharedSession.socialFeedLoading) {
+        unawaited(_loadInitialSocialFeed());
+      } else if (_hasSharedFeedTarget) {
+        unawaited(_resolveSharedFeedItem());
+      }
     }
   }
 
   @override
   void dispose() {
+    if (_videoHomeController.hasClients) {
+      _videoHomeScrollOffset = _videoHomeController.offset;
+    }
     _shortController.dispose();
     _videoHomeController.dispose();
     _videoWatchController.dispose();
@@ -259,17 +301,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           : 'social';
       final activeWorld = screen04World(_world);
       final requestedChoice = widget.initialSubAction;
-      _choiceByWorld[_world] =
-          requestedChoice != null &&
-              activeWorld.choices.any((choice) => choice.id == requestedChoice)
-          ? requestedChoice
-          : activeWorld.choices.first.id;
+      if (requestedChoice != null &&
+          activeWorld.choices.any((choice) => choice.id == requestedChoice)) {
+        _choiceByWorld[_world] = requestedChoice;
+      }
       _tab = _world == 'social'
           ? _tabFor(_choiceByWorld['social'])
           : SocialV2Tab.shorts;
-      _createView = _tab == SocialV2Tab.create
-          ? _createViewFor(widget.initialState)
-          : 'home';
+      if (widget.initialState != null) {
+        _createView = _tab == SocialV2Tab.create
+            ? _createViewFor(widget.initialState)
+            : 'home';
+      } else if (_tab != SocialV2Tab.create) {
+        _createView = 'home';
+      }
       _feedState = _feedStateFor(widget.initialState);
       _feedLinkContextActive =
           _tab == SocialV2Tab.feed &&
