@@ -2500,15 +2500,26 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const ListTile(
+                ListTile(
+                  key: const Key('profile-authenticated-identity'),
                   contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
+                  leading: const CircleAvatar(
                     backgroundColor: MoolColors.navy,
                     foregroundColor: Colors.white,
                     child: Icon(Icons.person_rounded),
                   ),
-                  title: Text('MoolSocial member'),
-                  subtitle: Text('Your purchases, bookings and work stay here'),
+                  title: Text(
+                    session.accountIdentity?.primaryLabel ??
+                        (session.isAuthenticated
+                            ? 'MoolSocial member'
+                            : 'MoolSocial guest'),
+                  ),
+                  subtitle: Text(
+                    session.accountIdentity?.detailLabel ??
+                        (session.isAuthenticated
+                            ? 'Signed in to MoolSocial'
+                            : 'Sign in to keep your activity with you'),
+                  ),
                 ),
                 ListTile(
                   key: const Key('profile-language'),

@@ -273,7 +273,15 @@ void main() {
   testWidgets('universal screen visible controls complete their tap intents', (
     tester,
   ) async {
-    final session = JourneySession();
+    final session = JourneySession(
+      accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+        identity: const AuthenticatedAccountIdentity(
+          displayName: 'Runtime Member',
+          emailAddress: 'member@example.com',
+          signInMethods: ['Google'],
+        ),
+      ),
+    );
     addTearDown(session.dispose);
 
     await authenticate(tester, session);
@@ -290,6 +298,8 @@ void main() {
     );
     await tapVisible(tester, const Key('open-profile'));
     expect(find.text('Your account'), findsOneWidget);
+    expect(find.text('Runtime Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
     await tapVisible(tester, const Key('close-profile'));
 
     await tapVisible(tester, const Key('open-search'));
