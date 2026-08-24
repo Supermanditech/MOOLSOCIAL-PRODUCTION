@@ -41904,6 +41904,55 @@
         "backend/functions/src/youtube/oauth_return_page.ts",
         "backend/functions/src/youtube/oauth_return_page.test.ts"
       ]
+    },
+    {
+      "id": "REG-20260824-3714-YOUTUBE-LOCAL-PREFLIGHT-UI-LOCK-HELPER-REJECTED-WORKTREE-TEXT-MATERIALIZATION",
+      "status": "registered_local_mode_ui_evidence_source_correction_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The exact YouTube feature branch/ticket/hash/23-owner/held-authority boundary passed, then local preflight stopped because its unconditional approved-UI-lock helper hashed the feature worktree's CRLF text materialization and rejected the unchanged splash reference.",
+      "rootCause": "The historical remediation preflight assumes one checkout byte materialization for immutable UI evidence and is not portable to the isolated feature worktree, even though UI owners are forbidden and unchanged for this ticket.",
+      "prevention": "Preserve historical remediation behavior; in exact local feature-prebuild mode verify approved UI locks against the clean sealed production checkout identified by coordination policy, require that checkout/tag/branch boundary, and keep all YouTube source/security/service/secret/budget assertions local before one retry.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-youtube-private-dev-preflight.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3715-YOUTUBE-LOCAL-PREFLIGHT-PRODUCTION-UI-LOCK-REJECTED-FOUNDER-PRESERVED-SPLASH",
+      "status": "registered_ui_lock_inapplicable_to_no_ui_owner_feature_mode",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The production checkout UI-lock helper was tested as a potential immutable evidence source and also rejected the founder-preserved current splash implementation, so it cannot qualify this no-UI-owner YouTube ticket.",
+      "rootCause": "The historical YouTube preflight unconditionally couples an obsolete UI-lock baseline to unrelated provider checks despite the active feature claim containing no UI implementation owner and the founder explicitly preserving the current splash for later combined-APK visual acceptance.",
+      "prevention": "Keep the UI-lock invocation unchanged in historical remediation mode; in exact local feature-prebuild mode require the 23-owner claim to contain no apps/mobile/lib/ui_v2 owner and the accepted r60.87 baseline to remain exact, then continue all YouTube source/security/service/secret/budget assertions without invoking the inapplicable UI gate.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-youtube-private-dev-preflight.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
     }
   ]
 }
