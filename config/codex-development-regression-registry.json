@@ -41564,6 +41564,32 @@
         "apps/mobile/lib/main.dart",
         "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3700-FACEBOOK-C33G-FIX2-PROVIDER-TRUTH-GATE-REJECTED-DYNAMIC-PRODUCTION-ALLOW-LIST",
+      "status": "registered_gate_only_current_facebook_semantic_composition_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "tooling"
+      ],
+      "mistake": "After v58 shared-auth qualification, the first C33G FIX2 provider-truth invocation rejected because it requires a historical const production allow-list containing exactly Google and YouTube.",
+      "rootCause": "Production provider visibility is now computed by _productionSocialIdentityProviders from PublicAuthRuntimeConfiguration readiness, including a fully-qualified facebookAvailable predicate and a Google-only forensic exclusion, but the historical gate still parses a fixed two-provider const set.",
+      "prevention": "Preserve historical provider truth and accepted Google/Email Link paths; admit only the canonical Facebook ticket and 24-owner deferred-runtime claim, validate the dynamic main/runtime-configuration semantics and Google-only exclusion, add wrong-ticket/hash/claim/availability/source-shape negatives, and replay once with all action authorities held false.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c33g-fix2-social-identity-provider-truth.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
+        "apps/mobile/lib/main.dart",
+        "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
+        "scripts/check-uaw-c33g-fix2-social-identity-provider-truth.ps1"
+      ]
     }
   ]
 }
