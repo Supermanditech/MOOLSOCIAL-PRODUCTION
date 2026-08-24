@@ -98,11 +98,16 @@ Instagram intentionally deferred facts and required fix:
   the founder completes its certification. Data handling and reviewer
   instructions remain locked behind that step. Do not upload r60.90 or submit
   the current incomplete review.
-- The deployed Instagram broker currently omits Meta's required/generated
-  `force_reauth=true` authorization parameter. This is a confirmed runtime
-  defect matching the OPPO account-reuse failure. Add it to the backend
-  authorization URL, mobile exact-query validator and focused positive/negative
-  tests before the next APK; deploy only the smallest verified broker change.
+- Commit `3662f155b8972398bae4c301fa00b681d4b93ef7` implements Meta's
+  required/generated `force_reauth=true` authorization parameter in the
+  backend URL, mobile exact-query validator and focused positive/negative
+  tests. Backend tests passed 13/13, mobile tests passed 6/6, TypeScript
+  typecheck and focused Dart analysis passed. Do not reimplement this fix.
+- Production deployment of that commit is intentionally held until the final
+  consolidated APK is ready because installed r60.90 enforces the predecessor
+  exact-query contract and would reject the new parameter. Deploy the backend
+  change in the coordinated final-candidate window, then install and test the
+  successor APK without leaving a mixed client/server contract.
 - After the final consolidated APK is installed and proven on OPPO, record the
   complete Instagram professional-account connect, app return, Firebase session,
   displayed provider handle and sign-out journey. Attach that sanitized recording
