@@ -732,6 +732,49 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'Shop Chat WhatsApp-inspired native review capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-shop-chat-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session, onOpenChat: () {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+      await _captureShopChatReview(tester, reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -787,6 +830,18 @@ Future<void> _captureOffersReview(
     matchesGoldenFile(
       'candidate_captures/buy-v2-offers-progressive-$state-390x844.png',
     ),
+  );
+}
+
+Future<void> _captureShopChatReview(
+  WidgetTester tester,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile('candidate_captures/buy-v2-shop-chat-native-390x844.png'),
   );
 }
 
