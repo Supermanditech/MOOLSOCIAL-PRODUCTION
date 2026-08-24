@@ -1002,7 +1002,7 @@ class _CaptureShopChatSource implements BuyV2ShopChatProvisioningSource {
   const _CaptureShopChatSource();
 
   @override
-  List<BuyV2ShopChatThread> threads(BuyV2Session session) {
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) {
     final defaults = const BuyV2SessionShopChatProvisioningSource()
         .threads(session)
         .where((thread) => thread.id != 'retail-partner');
