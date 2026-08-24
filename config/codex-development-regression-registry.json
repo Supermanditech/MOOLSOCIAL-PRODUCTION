@@ -41492,6 +41492,30 @@
         "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
         "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3697-FACEBOOK-C34P-SHARED-GATE-BLANKET-ERROR-MESSAGE-SUBSTRING-REJECTION",
+      "status": "registered_source_context_classification_required_before_retry",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "tooling"
+      ],
+      "mistake": "After the exact Facebook successor selection branch and its negative fixtures passed, the shared-auth replay advanced and rejected because the historical gate forbids every occurrence of error.message in the shared Firebase gateway.",
+      "rootCause": "The gate uses a context-free substring prohibition and has not yet distinguished unsafe provider-authored public copy from safe internal classification or telemetry use in the current already-tested gateway.",
+      "prevention": "Preserve the current gate diff, bind this registry generation, inspect only the matched gateway lines, and if the use is sanitized/non-public replace only the blanket assertion with an exact unsafe-public-copy boundary plus positive safe-use and negative unsafe-use fixtures; otherwise stop for a separate source defect ticket.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ]
     }
   ]
 }
