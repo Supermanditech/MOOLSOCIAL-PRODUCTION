@@ -39,20 +39,25 @@ void main() {
     expect(
       source,
       contains(
-        'final emailLinkInitialLocation =\n'
-        '      youtubeInitialLocation == null &&\n'
-        '      await session.prepareEmailLinkReturn(platformRouteName);',
+        'emailLinkInitialLocation =\n'
+        '        youtubeInitialLocation == null &&\n'
+        '        !socialAuthInitialLocation &&\n'
+        '        await session\n'
+        '            .prepareEmailLinkReturn(platformRouteName)\n'
+        '            .timeout(_releasePlatformStageTimeout);',
       ),
       reason:
-          'A YouTube provider return remains authoritative before the email '
-          'link handoff is considered.',
+          'YouTube and social-provider returns remain authoritative before '
+          'the email-link handoff is considered.',
     );
     expect(
       source,
       contains(
         'initialLocation:\n'
         '          youtubeInitialLocation ??\n'
-        "          (emailLinkInitialLocation ? '/sign-in' : '/boot'),",
+        '          (socialAuthInitialLocation || emailLinkInitialLocation\n'
+        "              ? '/sign-in'\n"
+        "              : '/boot'),",
       ),
       reason:
           'Safe boot must remain the final fallback after exact provider and '
