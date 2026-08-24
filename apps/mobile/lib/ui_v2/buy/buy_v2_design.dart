@@ -495,7 +495,7 @@ class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
   double _tiltY = 0;
 
   void _setPressed(bool value, [Offset? localPosition]) {
-    if (_pressed == value) return;
+    if (!mounted || _pressed == value) return;
     setState(() {
       _pressed = value;
       if (value && widget.spatial && localPosition != null) {
