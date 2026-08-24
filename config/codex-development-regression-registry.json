@@ -42162,6 +42162,31 @@
         "backend/functions/src/youtube",
         "scripts/check-youtube-private-dev-preflight.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3725-YOUTUBE-PACKAGE-GATE-DOES-NOT-FORWARD-LOCAL-FEATURE-PREFLIGHT-MODE",
+      "status": "registered_confirmed_preinvocation_gate_fix_authorized",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "youtube"
+      ],
+      "mistake": "The claimed package gate accepts only SkipFlutter and unconditionally invokes the corrected preflight without LocalFeaturePrebuild or TicketId, so it must enter historical remediation mode and reject the authorized v2 branch before package verification; it was not invoked.",
+      "rootCause": "The package orchestrator has no evidence-bound feature mode or argument-forwarding contract for the successor preflight.",
+      "prevention": "Add an exact LocalFeaturePrebuild/TicketId pair bound to the v2 branch, canonical ticket hash and 23-owner claim; forward both arguments to preflight; preserve historical default and SkipFlutter behavior; add wrong mode/ticket/branch/claim/forwarding fixtures and never supply Cloud or deployment authority.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-package.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md",
+        "scripts/check-youtube-private-dev-package.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
     }
   ]
 }
