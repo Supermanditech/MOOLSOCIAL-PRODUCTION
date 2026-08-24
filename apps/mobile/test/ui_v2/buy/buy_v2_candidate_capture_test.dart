@@ -660,6 +660,78 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'Offers progressive browsing laptop review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-offers-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers', reviewRootKey);
+
+      await tester.fling(
+        find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+        const Offset(-1200, 0),
+        2200,
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-paged', reviewRootKey);
+
+      session.openProduct('w-oil');
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offer-product', reviewRootKey);
+
+      session.addProduct('w-oil');
+      session.openCart();
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'cart-browse-more', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-cart-browse-more')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-cart-active', reviewRootKey);
+
+      session.openOrders();
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const PageStorageKey('buy-orders')),
+        const Offset(0, -520),
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'orders-browse', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -699,6 +771,21 @@ Future<void> _capturePostOrderReview(
     find.byKey(reviewRootKey),
     matchesGoldenFile(
       'candidate_captures/buy-v2-post-order-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureOffersReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-offers-progressive-$state-390x844.png',
     ),
   );
 }
