@@ -794,8 +794,16 @@ class FirebaseAuthenticatedAccountIdentityGateway
     final providerLabels = user.providerData
         .map((provider) => _publicProviderLabel(provider.providerId))
         .whereType<String>()
-        .toSet()
-        .toList(growable: false);
+        .toSet();
+    try {
+      final tokenResult = await user.getIdTokenResult();
+      final customProvider = publicAuthenticatedProviderLabel(
+        tokenResult.claims?['auth_provider'],
+      );
+      if (customProvider != null) providerLabels.add(customProvider);
+    } on Object {
+      // Firebase profile details remain usable without optional custom claims.
+    }
     return AuthenticatedAccountIdentity(
       displayName: _nonEmpty(user.displayName),
       emailAddress:
@@ -806,7 +814,7 @@ class FirebaseAuthenticatedAccountIdentityGateway
           _firstNonEmpty(
             user.providerData.map((provider) => provider.phoneNumber),
           ),
-      signInMethods: providerLabels,
+      signInMethods: providerLabels.toList(growable: false),
     );
   }
 
@@ -823,16 +831,22 @@ class FirebaseAuthenticatedAccountIdentityGateway
     return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
-  String? _publicProviderLabel(String providerId) => switch (providerId) {
-    'google.com' => 'Google',
-    'facebook.com' => 'Facebook',
-    'twitter.com' => 'X',
-    'apple.com' => 'Apple',
-    'password' => 'Email',
-    'phone' => 'Phone',
-    _ => null,
-  };
+  String? _publicProviderLabel(String providerId) =>
+      publicAuthenticatedProviderLabel(providerId);
 }
+
+@visibleForTesting
+String? publicAuthenticatedProviderLabel(Object? provider) =>
+    switch (provider) {
+      'google.com' || 'google' => 'Google',
+      'facebook.com' || 'facebook' => 'Facebook',
+      'twitter.com' || 'x' => 'X',
+      'instagram' => 'Instagram',
+      'apple.com' || 'apple' => 'Apple',
+      'password' || 'email' || 'email_link' => 'Email',
+      'phone' => 'Phone',
+      _ => null,
+    };
 
 class FirebaseSocialAuthGateway
     implements SocialAuthGateway, SocialAuthCallbackGateway {

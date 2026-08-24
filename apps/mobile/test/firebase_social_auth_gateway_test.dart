@@ -8,6 +8,17 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
 
 void main() {
+  test('account identity exposes only enumerated provider labels', () {
+    expect(publicAuthenticatedProviderLabel('google.com'), 'Google');
+    expect(publicAuthenticatedProviderLabel('facebook.com'), 'Facebook');
+    expect(publicAuthenticatedProviderLabel('x'), 'X');
+    expect(publicAuthenticatedProviderLabel('instagram'), 'Instagram');
+    expect(publicAuthenticatedProviderLabel('email_link'), 'Email');
+    expect(publicAuthenticatedProviderLabel('phone'), 'Phone');
+    expect(publicAuthenticatedProviderLabel('provider-subject-123'), isNull);
+    expect(publicAuthenticatedProviderLabel(null), isNull);
+  });
+
   group('FirebaseSocialAuthGateway', () {
     const knownGoogleFirebaseFailures = <String, String>{
       'canceled': 'auth-cancelled',
