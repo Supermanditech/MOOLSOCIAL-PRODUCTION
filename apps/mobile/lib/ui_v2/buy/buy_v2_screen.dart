@@ -335,27 +335,29 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               ),
             ),
           ),
-          bottomNavigationBar: MoolDestinationNavigationV2(
-            activeId: careNavigation ? 'book' : 'buy',
-            destinationLabel: careNavigation ? 'Care' : 'Shop',
-            selectedLocalIndex: careNavigation
-                ? 1
-                : _offersActive
-                ? 2
-                : switch (session.activeDockDestination) {
-                    BuyV2Destination.orders => 1,
-                    _ => 0,
-                  },
-            localActionCount: 3,
-            localNavigation: careNavigation
-                ? _buildCareLocalNavigation()
-                : _buildBuyLocalNavigation(session),
-            onOpenMool: _openGlobalMool,
-            onOpenAction: _openGlobalAction,
-            onOpenChat: careNavigation ? _openGlobalChat : _openShopChat,
-            onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-            onNextLocalAction: () => _moveBuyLocal(session, 1),
-          ),
+          bottomNavigationBar: _shopChatActive
+              ? null
+              : MoolDestinationNavigationV2(
+                  activeId: careNavigation ? 'book' : 'buy',
+                  destinationLabel: careNavigation ? 'Care' : 'Shop',
+                  selectedLocalIndex: careNavigation
+                      ? 1
+                      : _offersActive
+                      ? 2
+                      : switch (session.activeDockDestination) {
+                          BuyV2Destination.orders => 1,
+                          _ => 0,
+                        },
+                  localActionCount: 3,
+                  localNavigation: careNavigation
+                      ? _buildCareLocalNavigation()
+                      : _buildBuyLocalNavigation(session),
+                  onOpenMool: _openGlobalMool,
+                  onOpenAction: _openGlobalAction,
+                  onOpenChat: careNavigation ? _openGlobalChat : _openShopChat,
+                  onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+                  onNextLocalAction: () => _moveBuyLocal(session, 1),
+                ),
         ),
       ),
     );

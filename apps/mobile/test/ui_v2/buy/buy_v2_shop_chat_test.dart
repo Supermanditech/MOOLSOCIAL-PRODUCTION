@@ -76,6 +76,15 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('moolsocial-single-home-launcher-shell')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('mool-global-chat-tap')), findsNothing);
       expect(productionChatCalls, 0);
 
       await tester.tap(
@@ -109,6 +118,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
       expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('moolsocial-single-home-launcher-shell')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -141,6 +158,8 @@ void main() {
         findsOneWidget,
       );
 
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
@@ -160,6 +179,8 @@ void main() {
         findsOneWidget,
       );
 
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
