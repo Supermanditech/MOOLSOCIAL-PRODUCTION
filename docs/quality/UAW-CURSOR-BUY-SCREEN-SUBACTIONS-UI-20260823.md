@@ -118,3 +118,51 @@ independent commits have been integrated by the authorized production owner.
   `_HeaderContextButton` were removed; no non-header Buy type was removed.
 - APK build, install and OPPO runtime review remain intentionally unperformed
   until the founder requests the device-test step.
+
+## Offers and progressive browsing implementation evidence — 24 August 2026 IST
+
+Mandatory incremental baseline:
+`docs/quality/CURSOR-OPPO-UI-BASELINE-R60-89-20260824.md` / accepted product
+source `c0bbef88d6cd29830e47e11ad4e909b3365b185d`.
+
+- Worktree implementation base:
+  `4ede5790d674f06141fbff3244a891bab562b6ed`.
+- Atomic Buy UI source commit:
+  `9882fd2` (`feat(buy): add offers and progressive product browsing`).
+- Offers is the third equal Buy footer subaction alongside Wholesale and
+  Orders. All three reuse the same local-navigation cell, spacing, selected,
+  pressed, haptic and 44-pixel interaction contracts.
+- `BuyV2PublishedOffersSource` is the presentation-only provisioning seam for
+  ordered catalogue-product placements from manufacturer, wholesale and retail
+  publishers. Existing Buy product facts, cart, checkout and order contracts
+  remain authoritative and unchanged.
+- Shop, Wholesale, Orders and Offers progressively reveal product pages near
+  the end of either horizontal lane. Pagination state is announced to assistive
+  technology and page growth is deferred safely outside layout.
+- Cart exposes a 44-pixel `Browse more products` action. It returns to the
+  originating Offers surface when applicable, preserves cart contents, and
+  supports adding further products before checkout.
+- Focused static analysis across the four Buy UI source owners and two test
+  owners: pass, no issues.
+- `flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart`: pass,
+  `72/72` tests.
+- Navigation-motion plus Orders purchased-item continuity run: pass,
+  `13` tests with `1` pre-existing skipped case.
+- Explicit laptop review-capture run: pass. Six additive `390 × 844` captures
+  are stored under `apps/mobile/test/ui_v2/buy/candidate_captures/`:
+  - Offers:
+    `CAB0095217B04B7937CD2054085C051EF888B6375C8A4DACDA38DDA94B960506`
+  - Offers after progressive paging:
+    `746A5D2AB203618E5FD020358188686C210162BD5618D3E8C243E8B8720279CD`
+  - Offer product with Offers return:
+    `2D851A723474C6620C0F1F8092321EDEE30DADEB3746A9AF2E029181E64A9164`
+  - Cart browse-more continuation:
+    `D0614811B2E5F07DA5F7230BA22AAF96B0ACA647D4CED0F13239CAF6A2183D08`
+  - Offers with retained cart:
+    `66B1FE2DFDB3C81F3FBF1EF80CDB5A0C22B74A3F4E6B533E92FF64E3C89C4227`
+  - Orders product browsing with retained cart:
+    `7E36F1F5EF0961156D45CF90C756CD098D975AF37C5F3545D0E41019BBC20B8E`
+- No Buy session/domain, authentication, provider, backend, admin-policy,
+  platform, Firebase, signing, build, release, registry or tag owner changed.
+- APK build, install and OPPO approval remain intentionally pending the later
+  consolidated-device review requested by the founder.

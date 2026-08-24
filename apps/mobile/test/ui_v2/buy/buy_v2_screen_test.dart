@@ -20,6 +20,13 @@ final _forbiddenBuyCopy = RegExp(
   caseSensitive: false,
 );
 
+final class _FixedOffersSource implements BuyV2PublishedOffersSource {
+  const _FixedOffersSource(this.publishedOffers);
+
+  @override
+  final List<BuyV2PublishedOffer> publishedOffers;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -41,6 +48,8 @@ void main() {
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
     BuyV2InvoiceDownloader? invoiceDownloader,
+    BuyV2PublishedOffersSource offersSource =
+        const BuyV2CataloguePublishedOffersSource(),
   }) {
     return MaterialApp(
       theme: MoolTheme.light(),
@@ -61,6 +70,7 @@ void main() {
         scannerLauncher: scannerLauncher,
         onOpenMool: onOpenMool,
         invoiceDownloader: invoiceDownloader,
+        offersSource: offersSource,
         onOpenMainAction: (action) {
           final uri = Uri.parse(action.route);
           if (uri.path != '/app/buy') return;
@@ -1203,6 +1213,7 @@ void main() {
       (keyName: 'moolsocial-family-root-buy-tap', label: 'Shop'),
       (keyName: 'buy-local-tab-wholesale', label: 'Wholesale'),
       (keyName: 'buy-local-tab-orders', label: 'Orders'),
+      (keyName: 'buy-local-tab-offers', label: 'Offers'),
       (keyName: 'mool-global-chat-tap', label: 'Chat'),
     ]) {
       final cell = find.byKey(ValueKey(entry.keyName));
@@ -1319,6 +1330,7 @@ void main() {
       'moolsocial-family-root-buy-tap',
       'buy-local-tab-wholesale',
       'buy-local-tab-orders',
+      'buy-local-tab-offers',
       'mool-global-chat-tap',
     ]) {
       expect(
@@ -3200,6 +3212,221 @@ void main() {
       await tester.pumpAndSettle();
       _expectCustomerFacingBuyCopy(tester);
     }
+  });
+
+  testWidgets('Buy footer subactions keep one equal interaction geometry', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    final wholesale = find.byKey(const ValueKey('buy-local-tab-wholesale'));
+    final orders = find.byKey(const ValueKey('buy-local-tab-orders'));
+    final offers = find.byKey(const ValueKey('buy-local-tab-offers'));
+    final rectangles = [
+      tester.getRect(wholesale),
+      tester.getRect(orders),
+      tester.getRect(offers),
+    ];
+
+    expect(rectangles.map((rect) => rect.size).toSet(), hasLength(1));
+    expect(rectangles.every((rect) => rect.height >= 44), isTrue);
+    expect(
+      rectangles[1].left - rectangles[0].right,
+      closeTo(rectangles[2].left - rectangles[1].right, .01),
+    );
+
+    await tester.tap(wholesale);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.wholesale);
+    expect(tester.widget<InkWell>(wholesale).onTap, isNull);
+
+    await tester.tap(orders);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(tester.widget<InkWell>(orders).onTap, isNull);
+
+    await tester.tap(offers);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+    expect(tester.widget<InkWell>(offers).onTap, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Offers accepts an ordered published catalogue seam', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    const source = _FixedOffersSource([
+      BuyV2PublishedOffer(
+        productId: 'w-rice',
+        publisherType: BuyV2OfferPublisherType.wholesaler,
+        headline: 'Published trade price',
+      ),
+      BuyV2PublishedOffer(
+        productId: 'missing-product',
+        publisherType: BuyV2OfferPublisherType.retailer,
+        headline: 'Unavailable placement',
+      ),
+    ]);
+    await tester.pumpWidget(app(session, offersSource: source));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('buy-product-w-rice')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-product-missing-product')),
+      findsNothing,
+    );
+    final grid = tester.widget<Semantics>(
+      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+    );
+    expect(grid.properties.label, contains('Showing 1 of 1'));
+    expect(grid.properties.label, contains('All products loaded'));
+  });
+
+  testWidgets('Offers completes product Cart and Checkout navigation', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-product-w-oil')));
+    await tester.pumpAndSettle();
+    expect(session.selectedProduct?.id, 'w-oil');
+    expect(session.view, BuyV2View.product);
+    expect(find.text('Offers'), findsWidgets);
+    expect(find.text('Wholesale'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-product-primary-w-oil')));
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('w-oil'), 2);
+
+    await tester.tap(find.byKey(const ValueKey('buy-compact-cart-indicator')));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.cart);
+    expect(find.byKey(const ValueKey('buy-cart-browse-more')), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-action-bar')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Cart can return to Offers and add another product', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-add-w-oil')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-compact-cart-indicator')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-cart-browse-more')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+    expect(session.quantityFor('w-oil'), 2);
+
+    await tester.drag(
+      find.byKey(const PageStorageKey('buy-offers')),
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-add-s-tomato')));
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('s-tomato'), 1);
+    expect(session.itemCount, 3);
+  });
+
+  testWidgets('Shop Wholesale Orders and Offers page product grids', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    String progressLabel() => tester
+        .widget<Semantics>(
+          find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        )
+        .properties
+        .label!;
+
+    expect(progressLabel(), contains('Showing 8 of 12'));
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+    await tester.pumpAndSettle();
+    expect(progressLabel(), contains('Showing 8 of 12'));
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(
+        const ValueKey('buy-progressive-product-count-buy-orders-products'),
+      ),
+      240,
+      scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
+    );
+    expect(progressLabel(), contains('Showing 8 of 18'));
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+    expect(progressLabel(), contains('Showing 8 of 24'));
+    await tester.fling(
+      find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+      const Offset(-1200, 0),
+      2200,
+    );
+    await tester.pumpAndSettle();
+    expect(progressLabel(), isNot(contains('Showing 8 of 24')));
+    expect(progressLabel(), contains('of 24'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Offers search stays inside the published mixed catalogue', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+    await tester.pumpAndSettle();
+    expect(find.text('Search offers, products and sellers'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-search-field')),
+      'rice',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-product-w-rice')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-product-w-oil')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
   });
 }
 
