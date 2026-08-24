@@ -245,11 +245,29 @@ Future<List<Screen04YouTubePublicVideo>> loadScreen04YouTubePublicSearch(
       throw StateError('Public YouTube search is unavailable.');
     }
 
-    final page = await client.search(query: submittedQuery);
-    return page.items
-        .where(_isEligiblePublicVideo)
-        .take(screen04YouTubeCatalogueTarget)
-        .map(mapScreen04YouTubePublicVideo)
+    final eligible = await collectScreen04YouTubeCatalogue(
+      loadPage: (pageToken) =>
+          client.search(query: submittedQuery, pageToken: pageToken),
+      isEligible: _isEligiblePublicVideo,
+    );
+    final channels = <String, YouTubePublicChannelDetails>{};
+    for (final item in eligible) {
+      if (channels.containsKey(item.channelId)) continue;
+      try {
+        channels[item.channelId] = await client.channelDetails(
+          channelId: item.channelId,
+        );
+      } on Object {
+        // Search remains usable when optional public channel enrichment fails.
+      }
+    }
+    return eligible
+        .map(
+          (item) => mapScreen04YouTubePublicVideo(
+            item,
+            channel: channels[item.channelId],
+          ),
+        )
         .toList(growable: false);
   } finally {
     transport.close(force: true);

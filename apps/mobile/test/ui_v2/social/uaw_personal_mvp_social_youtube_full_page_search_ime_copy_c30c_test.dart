@@ -187,8 +187,11 @@ void main() {
       expect(consumer, contains('class _YouTubeSearchSurface'));
       expect(consumer, contains('widget.youtubeSearchLoader'));
       expect(runtime, contains('loadScreen04YouTubePublicSearch('));
-      expect(runtime, contains('client.search(query: submittedQuery)'));
-      expect(runtime, contains('.where(_isEligiblePublicVideo)'));
+      expect(runtime, contains('collectScreen04YouTubeCatalogue('));
+      expect(runtime, contains('query: submittedQuery'));
+      expect(runtime, contains('pageToken: pageToken'));
+      expect(runtime, contains('client.channelDetails('));
+      expect(runtime, contains('isEligible: _isEligiblePublicVideo'));
 
       final homeHeaderStart = consumer.indexOf('class _YouTubeHomeHeader');
       final watchHeaderStart = consumer.indexOf('class _YouTubeWatchHeader');
