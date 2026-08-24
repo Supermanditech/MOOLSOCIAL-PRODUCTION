@@ -11,6 +11,7 @@ import {
   readCapabilities,
   requireCapability,
   requireConnectPurposeCapability,
+  requireOwnerConnectionStatusCapability,
   requireOAuthAttemptCapability,
 } from "./config.js";
 import { YouTubeProviderError } from "./errors.js";
@@ -77,6 +78,34 @@ test("provider capabilities default to disabled", () => {
     reportingV1: false,
     publicOrUnlistedUpload: false,
   });
+});
+
+test("owner connection status requires one active owner capability", () => {
+  for (const profile of [
+    "ownerConnect",
+    "ownerActions",
+    "creatorAssets",
+    "live",
+    "privateUpload",
+    "ownerAnalytics",
+  ] as const) {
+    assert.doesNotThrow(() =>
+      requireOwnerConnectionStatusCapability(
+        readCapabilities(proofEnvironment(profile), now),
+      ),
+    );
+  }
+  for (const capabilities of [
+    readCapabilities({}, now),
+    readCapabilities(proofEnvironment("publicData"), now),
+  ]) {
+    assert.throws(
+      () => requireOwnerConnectionStatusCapability(capabilities),
+      (error: unknown) =>
+        error instanceof YouTubeProviderError &&
+        error.code === "capability_disabled",
+    );
+  }
 });
 
 test("individual flags cannot activate without the explicit Dev profile", () => {

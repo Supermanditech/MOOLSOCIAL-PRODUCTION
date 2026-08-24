@@ -259,6 +259,27 @@ export function requireConnectPurposeCapability(
   requireCapability(capabilities, connectCapabilityForPurpose(purpose));
 }
 
+export function requireOwnerConnectionStatusCapability(
+  capabilities: YouTubeRuntimeCapabilities,
+): void {
+  const ownerCapabilityAvailable = [
+    capabilities.ownerConnect,
+    capabilities.ownerActions,
+    capabilities.creatorAssets,
+    capabilities.live,
+    capabilities.privateUpload,
+    capabilities.ownerAnalytics,
+  ].some((enabled) => enabled === true);
+  if (!ownerCapabilityAvailable) {
+    throw new YouTubeProviderError(
+      "capability_disabled",
+      "This YouTube capability is not enabled in the private Dev environment.",
+      503,
+      false,
+    );
+  }
+}
+
 function normalizedScopeSet(
   scopes: readonly string[],
 ): readonly string[] {
