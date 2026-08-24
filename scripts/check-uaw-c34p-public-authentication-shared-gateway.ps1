@@ -25,6 +25,96 @@ function Read-Owner([string]$RelativePath) {
   return Get-Content -LiteralPath $path -Raw
 }
 
+function Get-C34PCanonicalTextSha256([string]$Path) {
+  $text = [IO.File]::ReadAllText($Path)
+  $canonical = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $encoding = New-Object Text.UTF8Encoding($false)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString(
+      $sha.ComputeHash($encoding.GetBytes($canonical))
+    )).Replace('-', '')
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Test-C34PCurrentFacebookSuccessor(
+  [string]$TicketId,
+  [string]$TicketHash,
+  [string]$ClaimTask,
+  [int]$ClaimOwnerCount,
+  [bool]$ClaimHasGate,
+  [string]$Lifecycle,
+  [bool]$BuildAuthorized,
+  [bool]$DeviceAuthorized,
+  [bool]$PlayAuthorized,
+  [bool]$ExternalAuthorized,
+  [bool]$SecretAuthorized
+) {
+  return (
+    $TicketId -ceq 'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824' -and
+    $TicketHash -ceq
+      '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' -and
+    $ClaimTask -ceq '/root/codex_auth_facebook_prebuild_20260824' -and
+    $ClaimOwnerCount -eq 24 -and
+    $ClaimHasGate -and
+    $Lifecycle -ceq
+      'facebook_prebuild_selected_runtime_acceptance_deferred' -and
+    -not $BuildAuthorized -and
+    -not $DeviceAuthorized -and
+    -not $PlayAuthorized -and
+    -not $ExternalAuthorized -and
+    -not $SecretAuthorized
+  )
+}
+
+function Test-C34PSafeFirebaseMessageBoundary([string]$GatewaySource) {
+  return (
+    $GatewaySource.Contains('sanitizedFirebaseAuthFailure(') -and
+    $GatewaySource.Contains(
+      '_safeFirebaseAuthCauseCategory(code: error.code, message: error.message)'
+    ) -and
+    $GatewaySource.Contains(
+      'throw JourneyServiceException(failure.publicMessage, code: failure.code);'
+    ) -and
+    -not $GatewaySource.Contains('JourneyServiceException(error.message') -and
+    -not $GatewaySource.Contains('publicMessage: error.message') -and
+    -not $GatewaySource.Contains('_googleStageObserver(error.message')
+  )
+}
+
+function Test-C34PSharedGoogleIdentityDispatch([string]$GatewaySource) {
+  $combinedDispatch = [regex]::IsMatch(
+    $GatewaySource,
+    '(?s)if\s*\(\s*provider\s*==\s*SocialAuthProvider[.]google\s*[|][|]\s*' +
+      'provider\s*==\s*SocialAuthProvider[.]youtube\s*\)\s*\{\s*' +
+      'userId\s*=\s*await\s+_signInWithGoogleIdentity\(\);'
+  )
+  $awaitedIdentityCalls = [regex]::Matches(
+    $GatewaySource,
+    'await\s+_signInWithGoogleIdentity\(\)'
+  ).Count
+  return $combinedDispatch -and $awaitedIdentityCalls -eq 1
+}
+
+function Test-C34PGlobalSocialAuditComposition([string]$MainSource) {
+  return (
+    $MainSource.Contains('MOOLSOCIAL_GLOBAL_SOCIAL_LOGIN_AUDIT') -and
+    $MainSource.Contains('resolveGlobalSocialLoginAuditComposition(') -and
+    $MainSource.Contains(
+      'globalSocialLoginAuditComposition.useReviewAuthentication'
+    ) -and
+    $MainSource.Contains('useProductionProviderAvailability') -and
+    [regex]::IsMatch(
+      $MainSource,
+      'globalSocialLoginAuditEnabled:\s*' +
+        '_globalSocialLoginAuditMode\s*&&\s*!_googleOnlyForensicMode'
+    ) -and
+    $MainSource.Contains('FirebaseAuthenticatedSessionBootstrapGateway(')
+  )
+}
+
 function Test-C34PAuthorizedTicketSelection(
   [string]$CurrentTicketId,
   [string]$CheckpointTicketId,
@@ -64,19 +154,163 @@ Assert-C34P (-not [bool]$parentTicket.authority.secretOrPrivateValueAccessAuthor
 $scopeState = Get-Content -LiteralPath (
   Join-Path $root 'config\mvp-scope-gate-state.json'
 ) -Raw | ConvertFrom-Json
+$coordination = Get-Content -LiteralPath (
+  Join-Path $root 'config\codex-subagent-coordination-policy.json'
+) -Raw | ConvertFrom-Json
+$facebookTicketId = 'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824'
+$facebookTicketRelative = `
+  'docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md'
+$facebookTicketPath = [IO.Path]::GetFullPath((Join-Path `
+  $root $facebookTicketRelative
+))
+Assert-C34P (
+  $facebookTicketPath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -and
+  (Test-Path -LiteralPath $facebookTicketPath -PathType Leaf)
+) 'current Facebook ticket is missing or escaped the repository.'
+$facebookTicketText = Get-Content -LiteralPath $facebookTicketPath -Raw
+$facebookTicketHash = Get-C34PCanonicalTextSha256 $facebookTicketPath
+$gitDiscipline = $coordination.productionGitDiscipline
+$authBatch = $gitDiscipline.agentTicketQueues.authPrebuildBatch
+$facebookClaims = @($coordination.activeClaims | Where-Object {
+  [string]$_.task -ceq '/root/codex_auth_facebook_prebuild_20260824'
+})
+$completedPrebuildProviders = @($authBatch.completedPrebuildProviders)
+$facebookClaimTask = if ($facebookClaims.Count -eq 1) {
+  [string]$facebookClaims[0].task
+} else {
+  'invalid'
+}
+$facebookClaimOwnerCount = if ($facebookClaims.Count -eq 1) {
+  @($facebookClaims[0].owners).Count
+} else {
+  0
+}
+$facebookClaimHasGate = (
+  $facebookClaims.Count -eq 1 -and
+  @($facebookClaims[0].owners) -ccontains
+    'scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1'
+)
+$facebookLifecycleHeld = (
+  [string]$gitDiscipline.acceptedRuntimeBaseline.branch -ceq
+    'remediation/prototype-conformance-2026-07-20' -and
+  [string]$gitDiscipline.acceptedRuntimeBaseline.head -ceq
+    'f105195ba505dcc9f25a35ab64aab104dadb47c2' -and
+  [string]$gitDiscipline.acceptedRuntimeBaseline.tag -ceq
+    'moolsocial-google-auth-r60.87-accepted-20260823' -and
+  [string]$authBatch.state -ceq
+    'founder_authorized_runtime_acceptance_deferred_2026_08_24' -and
+  [string]$authBatch.currentProvider -ceq 'facebook' -and
+  [int]$authBatch.maximumActiveMutationTickets -eq 1 -and
+  [bool]$authBatch.priorProviderImplementationAndQualificationCommitsRequired -and
+  [bool]$authBatch.runtimeAcceptanceDeferredUntilOneCombinedApk -and
+  [bool]$authBatch.finalTicketCloseStillRequired -and
+  $completedPrebuildProviders.Count -eq 1 -and
+  [string]$completedPrebuildProviders[0].provider -ceq 'email_link' -and
+  [string]$completedPrebuildProviders[0].ticketId -ceq
+    'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [string]$completedPrebuildProviders[0].implementationCommit -ceq
+    '883f1d06c315438823c801b184b990b672c77f85' -and
+  [string]$completedPrebuildProviders[0].qualificationCommit -ceq
+    '84ab8e55414d4b87b3442a3b9631fe058efc6efe' -and
+  [bool]$completedPrebuildProviders[0].remoteQualified -and
+  [bool]$completedPrebuildProviders[0].runtimeAcceptancePending -and
+  $facebookClaims.Count -eq 1 -and
+  [string]$facebookClaims[0].role -ceq 'primary' -and
+  @($facebookClaims[0].owners) -ccontains $facebookTicketRelative -and
+  $facebookTicketText.Contains("# $facebookTicketId") -and
+  $facebookTicketText.Contains(
+    'Branch: `work/codex-auth/facebook-auth-prebuild-20260824`'
+  ) -and
+  $facebookTicketText.Contains(
+    'Real Facebook and OPPO acceptance remains deferred to'
+  ) -and
+  [string]$scopeState.ticket.id -ceq
+    'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [string]$scopeState.preTicketSelectionCheckpoint.currentTicketId -ceq
+    'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [bool]$scopeState.execution.runtimeWriteAuthorized -and
+  [bool]$scopeState.execution.testOrGateWriteAuthorized -and
+  -not [bool]$scopeState.execution.backendWriteAuthorized -and
+  -not [bool]$scopeState.execution.otherProviderWriteAuthorized -and
+  -not [bool]$scopeState.execution.liveEmailSendAuthorized
+)
+$facebookLifecycle = if ($facebookLifecycleHeld) {
+  'facebook_prebuild_selected_runtime_acceptance_deferred'
+} else {
+  'invalid'
+}
+
+Assert-C34P (Test-C34PCurrentFacebookSuccessor `
+  -TicketId $facebookTicketId `
+  -TicketHash '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+  -ClaimTask '/root/codex_auth_facebook_prebuild_20260824' `
+  -ClaimOwnerCount 24 -ClaimHasGate $true `
+  -Lifecycle 'facebook_prebuild_selected_runtime_acceptance_deferred' `
+  -BuildAuthorized $false -DeviceAuthorized $false -PlayAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+) 'current Facebook successor positive fixture failed.'
+Assert-C34P (-not (Test-C34PCurrentFacebookSuccessor `
+  -TicketId 'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-WRONG' `
+  -TicketHash '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+  -ClaimTask '/root/codex_auth_facebook_prebuild_20260824' `
+  -ClaimOwnerCount 24 -ClaimHasGate $true `
+  -Lifecycle 'facebook_prebuild_selected_runtime_acceptance_deferred' `
+  -BuildAuthorized $false -DeviceAuthorized $false -PlayAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) 'current Facebook successor wrong-ticket fixture passed unexpectedly.'
+Assert-C34P (-not (Test-C34PCurrentFacebookSuccessor `
+  -TicketId $facebookTicketId `
+  -TicketHash '0919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+  -ClaimTask '/root/codex_auth_facebook_prebuild_20260824' `
+  -ClaimOwnerCount 24 -ClaimHasGate $true `
+  -Lifecycle 'facebook_prebuild_selected_runtime_acceptance_deferred' `
+  -BuildAuthorized $false -DeviceAuthorized $false -PlayAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) 'current Facebook successor wrong-hash fixture passed unexpectedly.'
+Assert-C34P (-not (Test-C34PCurrentFacebookSuccessor `
+  -TicketId $facebookTicketId `
+  -TicketHash '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+  -ClaimTask '/root/codex_auth_facebook_prebuild_wrong' `
+  -ClaimOwnerCount 23 -ClaimHasGate $false `
+  -Lifecycle 'facebook_prebuild_selected_runtime_acceptance_deferred' `
+  -BuildAuthorized $false -DeviceAuthorized $false -PlayAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) 'current Facebook successor wrong-claim fixture passed unexpectedly.'
+Assert-C34P (-not (Test-C34PCurrentFacebookSuccessor `
+  -TicketId $facebookTicketId `
+  -TicketHash '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+  -ClaimTask '/root/codex_auth_facebook_prebuild_20260824' `
+  -ClaimOwnerCount 24 -ClaimHasGate $true `
+  -Lifecycle 'facebook_prebuild_selected_runtime_acceptance_deferred' `
+  -BuildAuthorized $true -DeviceAuthorized $false -PlayAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) 'current Facebook successor wrong-authority fixture passed unexpectedly.'
+
+$currentFacebookSuccessor = (
+  $facebookLifecycleHeld -and
+  (Test-C34PCurrentFacebookSuccessor `
+    -TicketId $facebookTicketId -TicketHash $facebookTicketHash `
+    -ClaimTask $facebookClaimTask -ClaimOwnerCount $facebookClaimOwnerCount `
+    -ClaimHasGate $facebookClaimHasGate -Lifecycle $facebookLifecycle `
+    -BuildAuthorized ([bool]$scopeState.execution.buildAuthorized) `
+    -DeviceAuthorized ([bool]$scopeState.execution.deviceInstallAuthorized) `
+    -PlayAuthorized ([bool]$scopeState.execution.playUploadAuthorized) `
+    -ExternalAuthorized ([bool]$scopeState.execution.externalServiceWriteAuthorized) `
+    -SecretAuthorized ([bool]$scopeState.execution.secretValueAccessAuthorized))
+)
 $authorizedTicketIds = @(
   [string]$parentTicket.ticketId,
   'UAW-C34P-FIX5-ALL-EIGHT-PUBLIC-AUTH-LIVE-PROVIDER-READINESS',
   'UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR'
 )
-Assert-C34P (
-  Test-C34PAuthorizedTicketSelection `
+$historicalC34PSelection = Test-C34PAuthorizedTicketSelection `
     -CurrentTicketId ([string]$scopeState.ticket.id) `
     -CheckpointTicketId (
       [string]$scopeState.preTicketSelectionCheckpoint.currentTicketId
     ) `
     -AuthorizedTicketIds $authorizedTicketIds
-) 'MVP scope state does not select an authorized C34P auth ticket.'
+Assert-C34P ($historicalC34PSelection -or $currentFacebookSuccessor) `
+  'MVP scope state does not select an authorized C34P auth ticket.'
 Assert-C34P (-not (
   Test-C34PAuthorizedTicketSelection `
     -CurrentTicketId 'UNRELATED-TICKET' `
@@ -200,16 +434,23 @@ if ($selectedTicketId -ceq $fix8TicketId) {
 }
 $externalProviderWriteExpected = $selectedTicketId -ceq `
   'UAW-C34P-FIX5-ALL-EIGHT-PUBLIC-AUTH-LIVE-PROVIDER-READINESS'
+$backendWriteExpected = -not $currentFacebookSuccessor
 Assert-C34P (
   [bool]$scopeState.execution.runtimeWriteAuthorized -and
   [bool]$scopeState.execution.testOrGateWriteAuthorized -and
-  [bool]$scopeState.execution.backendWriteAuthorized -and
+  [bool]$scopeState.execution.backendWriteAuthorized -eq
+    $backendWriteExpected -and
   [bool]$scopeState.execution.buildAuthorized -eq
     $fix8ExpectedBuildAuthorized -and
   [bool]$scopeState.execution.deviceInstallAuthorized -eq
     $fix8ExpectedInstallAuthorized -and
   [bool]$scopeState.execution.externalServiceWriteAuthorized -eq
     $externalProviderWriteExpected -and
+  (-not $currentFacebookSuccessor -or (
+    -not [bool]$scopeState.execution.playUploadAuthorized -and
+    -not [bool]$scopeState.execution.otherProviderWriteAuthorized -and
+    -not [bool]$scopeState.execution.liveEmailSendAuthorized
+  )) -and
   -not [bool]$scopeState.execution.secretValueAccessAuthorized
 ) 'MVP execution authority does not match the selected C34P auth ticket.'
 
@@ -235,18 +476,29 @@ foreach ($token in @(
   Assert-C34P ($failureSource.Contains($token)) `
     "sanitized failure taxonomy is missing: $token"
 }
-Assert-C34P (-not $gatewaySource.Contains('error.message')) `
-  'provider-authored Firebase messages can reach public copy.'
+Assert-C34P (Test-C34PSafeFirebaseMessageBoundary $gatewaySource) `
+  'Firebase provider message is not confined to a safe cause classifier.'
+$unsafeFirebaseMessageFixture = (
+  $gatewaySource + "`nthrow JourneyServiceException(error.message);"
+)
+Assert-C34P (-not (
+  Test-C34PSafeFirebaseMessageBoundary $unsafeFirebaseMessageFixture
+)) 'unsafe Firebase public-message negative fixture passed unexpectedly.'
 Assert-C34P (-not $gatewaySource.Contains('TwitterAuthProvider()')) `
   'X regressed to the Firebase OAuth 1 provider.'
 Assert-C34P (-not $gatewaySource.Contains('FacebookAuthProvider()')) `
   'Facebook regressed to unsupported native Firebase provider dispatch.'
-Assert-C34P (
-  $gatewaySource.Contains('SocialAuthProvider.google ||') -and
-  $gatewaySource.Contains(
-    'SocialAuthProvider.youtube => await _signInWithGoogleIdentity()'
-  )
-) 'Google and YouTube no longer share one identity dispatch.'
+Assert-C34P (Test-C34PSharedGoogleIdentityDispatch $gatewaySource) `
+  'Google and YouTube no longer share one identity dispatch.'
+$splitGoogleYoutubeDispatchFixture = (
+  'if (provider == SocialAuthProvider.google) { ' +
+  'userId = await _signInWithGoogleIdentity(); } ' +
+  'if (provider == SocialAuthProvider.youtube) { ' +
+  'userId = await _signInWithGoogleIdentity(); }'
+)
+Assert-C34P (-not (
+  Test-C34PSharedGoogleIdentityDispatch $splitGoogleYoutubeDispatchFixture
+)) 'split Google/YouTube dispatch negative fixture passed unexpectedly.'
 
 foreach ($token in @(
   'googleAndYoutubeAvailable',
@@ -278,12 +530,20 @@ foreach ($token in @(
   'resolveGlobalSocialLoginAuditComposition(',
   'globalSocialLoginAuditComposition.useReviewAuthentication',
   'useProductionProviderAvailability',
-  'globalSocialLoginAuditEnabled: _globalSocialLoginAuditMode',
   'FirebaseAuthenticatedSessionBootstrapGateway('
 )) {
   Assert-C34P ($mainSource.Contains($token)) `
     "FIX8 main composition is missing: $token"
 }
+Assert-C34P (Test-C34PGlobalSocialAuditComposition $mainSource) `
+  'FIX8 global-social audit composition is not fail-closed for Google-only mode.'
+$unsafeGlobalSocialCompositionFixture = $mainSource.Replace(
+  '_globalSocialLoginAuditMode && !_googleOnlyForensicMode',
+  '_globalSocialLoginAuditMode'
+)
+Assert-C34P (-not (
+  Test-C34PGlobalSocialAuditComposition $unsafeGlobalSocialCompositionFixture
+)) 'unsafe global-social composition negative fixture passed unexpectedly.'
 Assert-C34P (
   $gatewaySource.Contains('class FirebaseAuthenticatedSessionBootstrapGateway')
 ) 'FIX8 Firebase session bootstrap owner is missing.'
@@ -332,9 +592,14 @@ foreach ($forbidden in @(
 Assert-C34P ($facebookTest.Contains('public_profile')) `
   'Facebook tests lack the minimum-permission proof.'
 
+$reportedTicketId = if ($currentFacebookSuccessor) {
+  $facebookTicketId
+} else {
+  $selectedTicketId
+}
 Write-Output (
   'C34P public-authentication shared-gateway gate passed: ' +
-  'parent=FIX1A; activeTicket=' + $selectedTicketId + '; ' +
+  'parent=FIX1A; activeTicket=' + $reportedTicketId + '; ' +
   'children=4; runtimeBackendTest=true; ' +
   'googleYoutubeShared=true; appleFirebase=true; xPkce=true; ' +
   'instagramProfessional=true; facebookNative=true; ' +
