@@ -513,6 +513,41 @@ void main() {
     expect(find.byKey(const Key('youtube-creator-connected')), findsNothing);
   });
 
+  testWidgets(
+    'callback completion refreshes a retained screen from backend truth',
+    (tester) async {
+      final gateway = _FakeCreatorGateway(
+        capabilities: _capabilities(),
+        connection: const YouTubeDisconnected(),
+      );
+
+      await _pumpScreen(tester, gateway: gateway);
+      expect(gateway.connectionStatusCalls, 1);
+      expect(
+        find.byKey(const Key('youtube-creator-disconnected')),
+        findsOneWidget,
+      );
+
+      gateway.connectionValue = _connected(scopes: const ['youtube-read']);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialYouTubeCreatorUploadScreen(
+            gateway: gateway,
+            youtubeConnectResult: 'complete',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gateway.connectionStatusCalls, 2);
+      expect(
+        find.byKey(const Key('youtube-creator-connected')),
+        findsOneWidget,
+      );
+      expect(find.text('MoolSocial News'), findsOneWidget);
+    },
+  );
+
   testWidgets('older lifecycle refresh cannot replace newer channel status', (
     tester,
   ) async {

@@ -517,9 +517,10 @@ class _SocialYouTubeCreatorUploadScreenState
   @override
   void didUpdateWidget(covariant SocialYouTubeCreatorUploadScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.youtubeConnectResult != widget.youtubeConnectResult &&
-        widget.youtubeConnectResult == 'failed') {
-      _connectFailurePending = true;
+    final result = widget.youtubeConnectResult;
+    if (oldWidget.youtubeConnectResult != result &&
+        (result == 'complete' || result == 'failed')) {
+      _connectFailurePending = result == 'failed';
       _refreshConnection();
     }
   }
