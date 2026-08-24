@@ -45,6 +45,7 @@ void main() {
     final gateway = File(
       'lib/features/journey01/review_journey_services.dart',
     ).readAsStringSync();
+    final googleBridge = _googleIdentityBridgeBlocks(activity);
 
     for (final token in const <String>[
       'Official google_sign_in owns the Android Credential Manager integration.',
@@ -56,12 +57,21 @@ void main() {
     for (final forbidden in const <String>[
       'com.moolsocial.app/google_identity',
       'GoogleSignInOptions',
-      'startActivityForResult',
       'GoogleSignIn.getSignedInAccountFromIntent',
     ]) {
       expect(activity, isNot(contains(forbidden)), reason: forbidden);
       expect(gateway, isNot(contains(forbidden)), reason: forbidden);
     }
+    expect(
+      googleBridge,
+      isNot(contains('startActivityForResult')),
+      reason: 'legacy Google activity-result bridge',
+    );
+    expect(
+      gateway,
+      isNot(contains('startActivityForResult')),
+      reason: 'legacy Google activity-result bridge',
+    );
     expect(gradle, isNot(contains('play-services-auth')));
     expect(lock, contains('google_sign_in_android:'));
     expect(lock, contains('version: "7.2.16"'));
@@ -533,4 +543,12 @@ void main() {
       Uri.parse('https://moolsocial.com/privacy/'),
     ]);
   });
+}
+
+String _googleIdentityBridgeBlocks(String source) {
+  final matches = RegExp(
+    r'MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_[A-Z_]+_BEGIN([\s\S]*?)'
+    r'MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_[A-Z_]+_END',
+  ).allMatches(source);
+  return matches.map((match) => match.group(1) ?? '').join('\n');
 }
