@@ -1340,8 +1340,14 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/security',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 161),
+        builder: (context, state) => SharedHubScreen(
+          session: sharedSession,
+          screen: 161,
+          onSignOut: () async {
+            await session.signOut();
+            if (context.mounted) context.go('/sign-in');
+          },
+        ),
       ),
       GoRoute(
         path: '/app/account/workspaces',
