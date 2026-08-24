@@ -4,8 +4,10 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_shop_chat.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -734,7 +736,7 @@ void main() {
   );
 
   testWidgets(
-    'Shop Chat WhatsApp-inspired native review capture',
+    'Shop Chat professional tap-journey review captures',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -760,7 +762,13 @@ void main() {
               ),
               child: child!,
             ),
-            home: BuyV2Screen(session: session, onOpenChat: () {}),
+            home: BuyV2Screen(
+              session: session,
+              onOpenChat: () {},
+              shopChatSource: const _CaptureShopChatSource(),
+              onShopChatAction: (_) async =>
+                  const BuyV2ShopChatActionResult.accepted(),
+            ),
           ),
         ),
       );
@@ -769,7 +777,96 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
-      await _captureShopChatReview(tester, reviewRootKey);
+      await _captureShopChatReview(tester, 'shop-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'orders-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'offers-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'partners-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'new-conversation', reviewRootKey);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-new-retail-live')),
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'conversation', reviewRootKey);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Can this arrive tomorrow morning?',
+      );
+      await tester.pump();
+      await _captureShopChatReview(tester, 'composer-draft', reviewRootKey);
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        '',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'emoji-tray', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'attachments', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'thread-menu', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+        'basket',
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(
+        tester,
+        'conversation-search',
+        reviewRootKey,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'business-info', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-info-back')));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(
+        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'message-actions', reviewRootKey);
       expect(tester.takeException(), isNull);
     },
     // Run explicitly with --run-skipped --update-goldens for review evidence.
@@ -835,13 +932,16 @@ Future<void> _captureOffersReview(
 
 Future<void> _captureShopChatReview(
   WidgetTester tester,
+  String state,
   Key reviewRootKey,
 ) async {
-  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pump(const Duration(milliseconds: 500));
   await tester.pumpAndSettle();
   await expectLater(
     find.byKey(reviewRootKey),
-    matchesGoldenFile('candidate_captures/buy-v2-shop-chat-native-390x844.png'),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-shop-chat-enhanced-$state-390x844.png',
+    ),
   );
 }
 
@@ -896,4 +996,77 @@ Future<void> _captureR34SearchSuggestions(
       'buy-v2-r35-1-dense-flat-suggestions-$destination-$viewport.png',
     ),
   );
+}
+
+class _CaptureShopChatSource implements BuyV2ShopChatProvisioningSource {
+  const _CaptureShopChatSource();
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session session) {
+    final defaults = const BuyV2SessionShopChatProvisioningSource()
+        .threads(session)
+        .where((thread) => thread.id != 'retail-partner');
+    return [
+      const BuyV2ShopChatThread(
+        id: 'retail-live',
+        filter: BuyV2ShopChatFilter.sellers,
+        participantKind: BuyV2ShopChatParticipantKind.retailer,
+        title: 'Mahadev Fresh Mart',
+        subtitle: 'Retail partner · Groceries and delivery',
+        detail: 'Your basket is ready to review',
+        icon: Icons.storefront_outlined,
+        accent: BuyV2Colors.orange,
+        commerceTarget: BuyV2ShopChatCommerceTarget.shop,
+        contextTitle: 'Fresh grocery basket',
+        contextDetail: '5 items · Delivery to your saved address',
+        previewTimeLabel: '10:42',
+        unreadCount: 1,
+        quickReplies: ['Is everything in stock?', 'When can it arrive?'],
+        messages: [
+          BuyV2ShopChatMessage(
+            id: 'received-text',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: false,
+            sentAtLabel: '10:36',
+            body: 'Your fresh grocery basket is ready to review.',
+          ),
+          BuyV2ShopChatMessage(
+            id: 'sent-text',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: true,
+            sentAtLabel: '10:38',
+            body: 'Can it arrive tomorrow morning?',
+            deliveryState: BuyV2ShopChatDeliveryState.read,
+          ),
+          BuyV2ShopChatMessage(
+            id: 'received-photo',
+            kind: BuyV2ShopChatMessageKind.image,
+            fromCurrentUser: false,
+            sentAtLabel: '10:40',
+            attachmentName: 'Basket photo',
+            attachmentDetail: 'JPG · 1.8 MB',
+            body: 'These are the available packs.',
+          ),
+          BuyV2ShopChatMessage(
+            id: 'sent-document',
+            kind: BuyV2ShopChatMessageKind.document,
+            fromCurrentUser: true,
+            sentAtLabel: '10:41',
+            attachmentName: 'Monthly staples.pdf',
+            attachmentDetail: 'PDF · 240 KB',
+            deliveryState: BuyV2ShopChatDeliveryState.delivered,
+          ),
+          BuyV2ShopChatMessage(
+            id: 'received-voice',
+            kind: BuyV2ShopChatMessageKind.voice,
+            fromCurrentUser: false,
+            sentAtLabel: '10:42',
+            attachmentName: 'Voice message',
+            attachmentDetail: '0:18',
+          ),
+        ],
+      ),
+      ...defaults,
+    ];
+  }
 }
