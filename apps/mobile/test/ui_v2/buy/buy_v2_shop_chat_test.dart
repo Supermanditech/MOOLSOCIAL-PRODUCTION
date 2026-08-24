@@ -749,7 +749,7 @@ class _RichShopChatSource implements BuyV2ShopChatProvisioningSource {
   const _RichShopChatSource();
 
   @override
-  List<BuyV2ShopChatThread> threads(BuyV2Session session) => const [
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) => const [
     BuyV2ShopChatThread(
       id: 'retail-live',
       filter: BuyV2ShopChatFilter.sellers,
