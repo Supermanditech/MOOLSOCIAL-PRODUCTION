@@ -41516,6 +41516,30 @@
         "apps/mobile/lib/features/journey01/review_journey_services.dart",
         "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3698-FACEBOOK-C34P-SHARED-GATE-GOOGLE-YOUTUBE-DISPATCH-TEXT-SHAPE-REJECTION",
+      "status": "registered_dispatch_context_classification_required_before_retry",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "tooling"
+      ],
+      "mistake": "After the exact safe Firebase-message boundary passed, the shared-auth gate advanced and rejected its historical two-substring Google/YouTube shared identity-dispatch assertion.",
+      "rootCause": "The gate binds one exact source text shape and has not yet established whether the current formatter/refactor preserves the same single shared Google identity call for both providers.",
+      "prevention": "Preserve the current gate diff, bind this registry generation, inspect only the Google/YouTube dispatch switch, and if behavior is unchanged replace only the stale text-shape assertion with an exact semantic source boundary plus a split-dispatch negative fixture; otherwise stop for a source defect ticket.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ]
     }
   ]
 }
