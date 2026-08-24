@@ -41855,6 +41855,31 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
         "apps/mobile/lib/core/navigation/youtube_connect_return_route.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3712-YOUTUBE-OAUTH-RETURN-TEST-BUILD-MISSING-LOCAL-TSC-AFTER-CLEAN",
+      "status": "registered_no_backend_test_executed_noninstalling_toolchain_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "environment"
+      ],
+      "mistake": "The focused backend command invoked npm run build, its existing clean step removed generated lib, and the build then stopped because tsc is not available in backend/functions node_modules or PATH; the focused Node test did not run.",
+      "rootCause": "This clean worktree does not have the backend package's local TypeScript dev dependency installed, and the command assumed an already-provisioned package toolchain.",
+      "prevention": "Preserve the exact two-owner source patch, bind this registry generation, locate an existing non-installing TypeScript runtime/compiler in the workspace or run a safe direct source test path; do not npm install, and execute the focused return-page test before commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "backend/functions/src/youtube/oauth_return_page.test.ts"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/package.json",
+        "backend/functions/src/youtube/oauth_return_page.ts",
+        "backend/functions/src/youtube/oauth_return_page.test.ts"
+      ]
     }
   ]
 }
