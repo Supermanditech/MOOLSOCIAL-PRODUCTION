@@ -42138,6 +42138,30 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-development-regression-memory.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3724-YOUTUBE-LOCAL-PREFLIGHT-GLOBAL-BACKEND-STORAGE-TOKEN-REJECTION",
+      "status": "registered_youtube_subtree_storage_boundary_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "After exact YouTube function option checks passed, local preflight concatenated every non-test backend source and rejected storage tokens owned by unrelated Chat/Social modules.",
+      "rootCause": "The historical media-proxy assertion is global to backend/functions/src instead of scoped to the YouTube provider subtree in the expanded application backend.",
+      "prevention": "Keep the global scan in historical remediation mode; in local feature mode scan only non-test backend/functions/src/youtube sources for MoolSocial storage proxy tokens and add a storage-proxy negative fixture before final replay.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/youtube",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
     }
   ]
 }
