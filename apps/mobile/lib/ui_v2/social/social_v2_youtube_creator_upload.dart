@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/youtube/youtube_private_dev_client.dart';
@@ -26,6 +27,46 @@ final _googlePermissionsUri = Uri.parse(
 );
 
 typedef SocialYouTubeExternalLauncher = Future<void> Function(Uri uri);
+
+@visibleForTesting
+bool isTrustedSocialYouTubeExternalUri(Uri uri) {
+  if (uri.scheme != 'https' ||
+      uri.hasPort ||
+      uri.userInfo.isNotEmpty ||
+      uri.hasFragment) {
+    return false;
+  }
+  if (uri.host == 'moolsocial.com') {
+    return !uri.hasQuery &&
+        const {'/privacy', '/disconnect', '/delete-account'}.contains(uri.path);
+  }
+  if (uri.host == 'myaccount.google.com') {
+    return uri.path == '/permissions' && !uri.hasQuery;
+  }
+  if (uri.host != 'www.youtube.com') return false;
+  final values = uri.queryParametersAll;
+  if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'channel') {
+    return values.isEmpty &&
+        RegExp(r'^UC[A-Za-z0-9_-]{20,64}$').hasMatch(uri.pathSegments.last);
+  }
+  final expectedKey = switch (uri.path) {
+    '/watch' => 'v',
+    '/playlist' => 'list',
+    _ => null,
+  };
+  if (expectedKey == null || values.length != 1) return false;
+  final selected = values[expectedKey];
+  return selected?.length == 1 &&
+      RegExp(r'^[A-Za-z0-9_-]{6,128}$').hasMatch(selected!.single);
+}
+
+Future<void> launchTrustedSocialYouTubeExternalUri(Uri uri) async {
+  if (!isTrustedSocialYouTubeExternalUri(uri)) {
+    throw const FormatException('Unsupported external destination.');
+  }
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened) throw const FormatException('External destination unavailable.');
+}
 
 abstract interface class SocialYouTubeCreatorGateway {
   Future<YouTubePrivateDevCapabilities> capabilities();
@@ -829,8 +870,7 @@ class _SocialYouTubeCreatorUploadScreenState
       if (launcher != null) {
         await launcher(uri);
       } else {
-        await const ExternalYouTubePrivateDevSystemBrowser()
-            .openInSystemBrowser(uri);
+        await launchTrustedSocialYouTubeExternalUri(uri);
       }
     } on Object catch (error) {
       if (!mounted) return;

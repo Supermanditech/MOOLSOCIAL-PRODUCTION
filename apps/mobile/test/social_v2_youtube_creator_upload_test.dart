@@ -15,6 +15,32 @@ const _uploadPermission = 'https://www.googleapis.com/auth/youtube.upload';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('production account and channel destinations are exact', () {
+    for (final value in [
+      'https://moolsocial.com/privacy',
+      'https://moolsocial.com/disconnect',
+      'https://moolsocial.com/delete-account',
+      'https://myaccount.google.com/permissions',
+      'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
+      'https://www.youtube.com/watch?v=video12345',
+      'https://www.youtube.com/playlist?list=playlist12345',
+    ]) {
+      expect(isTrustedSocialYouTubeExternalUri(Uri.parse(value)), isTrue);
+    }
+    for (final value in [
+      'http://moolsocial.com/privacy',
+      'https://moolsocial.com/privacy?return=elsewhere',
+      'https://moolsocial.com/app/auth/x',
+      'https://myaccount.google.com/permissions#private',
+      'https://youtube.com/watch?v=video12345',
+      'https://www.youtube.com/watch?v=video12345&token=private',
+      'https://www.youtube.com/channel/not-a-channel',
+      'https://example.com/delete-account',
+    ]) {
+      expect(isTrustedSocialYouTubeExternalUri(Uri.parse(value)), isFalse);
+    }
+  });
+
   test('production routes keep YouTube upload unreachable', () {
     final router = File(
       'lib/features/journey01/journey_router.dart',
