@@ -60,11 +60,16 @@ test("ships exact Android association and broker return fallbacks", async () => 
   ]);
   assert.match(xReturn, /data-provider="x"/);
   assert.match(xReturn, /href="moolsocial:\/\/auth\/x"/);
+  assert.match(xReturn, /href="\/app\/auth\/return\.css"/);
+  assert.match(xReturn, /src="\/app\/auth\/return\.js"/);
   assert.match(instagramReturn, /data-provider="instagram"/);
   assert.match(
     instagramReturn,
     /href="moolsocial:\/\/auth\/instagram"/,
   );
+  assert.match(instagramReturn, /href="\/app\/auth\/return\.css"/);
+  assert.match(instagramReturn, /src="\/app\/auth\/return\.js"/);
+  assert.doesNotMatch(`${xReturn}\n${instagramReturn}`, /(?:href|src)="\.\.\/return\./);
   assert.match(returnScript, /allowedProviders = new Set\(\['x', 'instagram'\]\)/);
   assert.match(returnScript, /window\.location\.hash !== ''/);
   assert.match(returnScript, /state\.length !== 43/);
