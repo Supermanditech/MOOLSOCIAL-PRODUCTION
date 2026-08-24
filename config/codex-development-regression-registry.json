@@ -41468,6 +41468,30 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3696-FACEBOOK-C34P-SHARED-GATE-REJECTED-EMAIL-LINK-MVP-SELECTION",
+      "status": "registered_gate_only_current_facebook_successor_compatibility_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "coordination",
+        "authentication"
+      ],
+      "mistake": "After the v54 FIX5 gate correction was committed and pushed, the first shared public-authentication gate invocation rejected the clean Facebook branch because MVP scope still selects the prebuild-qualified Email Link ticket rather than one of the three historical C34P ticket IDs.",
+      "rootCause": "The shared-auth gate has no canonical evidence-bound branch for the founder-authorized Facebook prebuild batch successor and therefore cannot distinguish the lawful one-at-a-time provider transition from an unrelated ticket.",
+      "prevention": "Preserve the parent, FIX5 and FIX8 branches and all shared Firebase/source assertions; add only an exact canonical Facebook ticket hash, 24-owner coordination claim and deferred-runtime batch boundary with build, device, Play, external, private and secret authority false, plus wrong-ticket/hash/claim/authority negatives, then replay the shared gate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ]
     }
   ]
 }
