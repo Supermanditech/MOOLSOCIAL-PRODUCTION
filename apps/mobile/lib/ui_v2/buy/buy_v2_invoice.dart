@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../features/buy/buy_v2_models.dart';
 import 'buy_v2_design.dart';
 
-enum BuyV2InvoiceDownloadOutcome { saved, unavailable, failed }
+enum BuyV2InvoiceDownloadOutcome { saved, cancelled, unavailable, failed }
 
 @immutable
 class BuyV2InvoiceDocument {
@@ -66,6 +66,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
     setState(() => _downloading = false);
     final message = switch (outcome) {
       BuyV2InvoiceDownloadOutcome.saved => 'Invoice saved to this device.',
+      BuyV2InvoiceDownloadOutcome.cancelled => 'Invoice save cancelled.',
       BuyV2InvoiceDownloadOutcome.unavailable =>
         'Invoice download is not available for this order yet. You can still view it here.',
       BuyV2InvoiceDownloadOutcome.failed =>

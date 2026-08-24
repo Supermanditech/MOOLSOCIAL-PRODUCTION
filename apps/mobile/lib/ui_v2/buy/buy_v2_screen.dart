@@ -12,6 +12,7 @@ import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_invoice.dart';
+import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_views.dart';
 
@@ -31,7 +32,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMainAction,
     this.onOpenChat,
     this.onDestinationChanged,
-    this.invoiceDownloader,
+    this.invoiceDownloader = saveBuyV2InvoiceToDevice,
   });
 
   final BuyV2Session session;
