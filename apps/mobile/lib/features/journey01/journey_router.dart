@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -1347,8 +1347,20 @@ GoRouter createJourneyRouter(
           session: sharedSession,
           screen: 161,
           onSignOut: () async {
-            await session.signOut();
-            if (context.mounted) context.go('/sign-in');
+            final signedOut = await session.signOut();
+            if (!context.mounted) return;
+            if (signedOut) {
+              context.go('/sign-in');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    session.errorMessage ??
+                        'Sign-out could not be completed. Please try again.',
+                  ),
+                ),
+              );
+            }
           },
         ),
       ),
@@ -1485,8 +1497,20 @@ GoRouter createJourneyRouter(
                 onOpenChat: () =>
                     context.push('/app/chat/inbox?return=/app/mool'),
                 onSignOut: () async {
-                  await session.signOut();
-                  if (context.mounted) context.go('/sign-in');
+                  final signedOut = await session.signOut();
+                  if (!context.mounted) return;
+                  if (signedOut) {
+                    context.go('/sign-in');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          session.errorMessage ??
+                              'Sign-out could not be completed. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
                 },
                 areaLabel: session.currentAreaLabel ?? session.manualArea,
               ),

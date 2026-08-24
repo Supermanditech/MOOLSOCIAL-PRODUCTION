@@ -2636,7 +2636,19 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                               ],
                             ),
                           );
-                          if (confirmed ?? false) await session.signOut();
+                          if (confirmed ?? false) {
+                            final signedOut = await session.signOut();
+                            if (!signedOut && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    session.errorMessage ??
+                                        'Sign-out could not be completed. Please try again.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
                         },
                   child: const Text('Sign out'),
                 ),

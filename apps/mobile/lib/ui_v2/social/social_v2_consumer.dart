@@ -1263,8 +1263,17 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           key: const Key('screen04-account-sign-out'),
           onPressed: () async {
             Navigator.of(context).pop();
-            await widget.session.signOut();
-            if (mounted) context.go('/sign-in');
+            final signedOut = await widget.session.signOut();
+            if (!mounted) return;
+            if (signedOut) {
+              context.go('/sign-in');
+            } else {
+              showSocialV2Message(
+                context,
+                widget.session.errorMessage ??
+                    'Sign-out could not be completed. Please try again.',
+              );
+            }
           },
           child: const Text('Sign out or switch account'),
         ),

@@ -1352,13 +1352,30 @@ class JourneySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signOut() async {
-    if (busy) return;
+  Future<bool> signOut() async {
+    if (busy) return false;
     _setBusy(true);
     try {
-      await _otpGateway.signOut();
-      await _socialAuthGateway.signOut();
-      await _emailLinkGateway.signOut();
+      Object? cleanupFailure;
+      for (final cleanup in <Future<void> Function()>[
+        _otpGateway.signOut,
+        _socialAuthGateway.signOut,
+        _emailLinkGateway.signOut,
+      ]) {
+        try {
+          await cleanup().timeout(socialAuthRollbackTimeout);
+        } on Object catch (error) {
+          cleanupFailure ??= error;
+        }
+      }
+      await _clearPendingEmailLinkAddress();
+      if (cleanupFailure != null) {
+        errorMessage =
+            'Sign-out could not be completed safely. Check the connection and try again.';
+        noticeMessage = null;
+        notifyListeners();
+        return false;
+      }
       _isAuthenticated = false;
       accountIdentity = null;
       stage = allowGuestReady ? JourneyStage.ready : JourneyStage.signIn;
@@ -1368,7 +1385,6 @@ class JourneySession extends ChangeNotifier {
       emailLinkState = EmailLinkState.idle;
       emailLinkReceiptCode = null;
       _pendingEmailLink = null;
-      await _clearPendingEmailLinkAddress();
       _completedEmailLinkReturnRoute = null;
       _completedSocialAuthReturnRoute = null;
       socialAuthProvider = null;
@@ -1379,6 +1395,7 @@ class JourneySession extends ChangeNotifier {
           'You are signed out. Your language and area are retained.';
       await _persist(setupComplete: true);
       notifyListeners();
+      return true;
     } finally {
       _setBusy(false);
     }

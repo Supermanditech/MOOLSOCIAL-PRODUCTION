@@ -48,7 +48,7 @@ void main() {
       await session.start();
       expect(session.stage, JourneyStage.ready);
 
-      await session.signOut();
+      expect(await session.signOut(), isTrue);
 
       expect(otp.signOutCount, 1);
       expect(social.signOutCount, 1);
@@ -74,6 +74,46 @@ void main() {
       expect(restarted.isReady, isFalse);
       expect(restarted.languageCode, 'hi');
       expect(restarted.manualArea, 'Jodhpur');
+    },
+  );
+
+  test(
+    'sign-out attempts every cleanup and retains authenticated state on failure',
+    () async {
+      final pendingAddress = MemoryPendingEmailLinkAddressStore();
+      await pendingAddress.write('member@example.com');
+      final otp = ReviewOtpGateway(signedIn: true);
+      final social = ReviewSocialAuthGateway(
+        signedIn: true,
+        signOutFailure: StateError('private provider cleanup failure'),
+      );
+      final emailLink = ReviewEmailLinkGateway()..signedIn = true;
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+        pendingEmailLinkAddressStore: pendingAddress,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(await session.signOut(), isFalse);
+
+      expect(otp.signOutCount, 1);
+      expect(social.signOutCount, 1);
+      expect(emailLink.signOutCount, 1);
+      expect(await pendingAddress.read(), isNull);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.stage, JourneyStage.ready);
+      expect(session.errorMessage, contains('could not be completed safely'));
+      expect(session.busy, isFalse);
     },
   );
 
