@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3674,
-    "sha256": "AD45D2B3FAAD11C672156A54725FC1B2D92D3C0123854516B32B9347EDE06493"
+    "entryCount": 3675,
+    "sha256": "007FA491D7B349E14F4E4217C0EBDD7DB32C4628D0F2744D3328296110456D8E"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -172,7 +172,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v63",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v64",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

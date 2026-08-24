@@ -41662,6 +41662,30 @@
         "apps/mobile/lib/core/navigation/youtube_connect_return_route.dart",
         "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3704-YOUTUBE-CONNECT-SOURCE-GATE-DART-FORMAT-CHECK-STOPPED-BEFORE-TEST",
+      "status": "registered_no_test_executed_format_then_single_retry_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "The non-writing dart format --set-exit-if-changed check reported the strengthened YouTube Android source-gate test requires formatting and exited one, so the chained focused Flutter test did not execute.",
+      "rootCause": "The added exact host/path assertions were semantically correct but not yet materialized in canonical Dart formatting before the no-write check.",
+      "prevention": "Preserve the exact two-owner patch, bind this registry generation, run dart format on only the claimed test, verify the changed-owner set remains the Kotlin activity plus that test, then execute the focused test exactly once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ]
     }
   ]
 }
