@@ -1,14 +1,20 @@
 param(
   [switch]$Cloud,
+  [switch]$LocalFeaturePrebuild,
   [switch]$RequireBilling,
   [string]$ProjectId = "moolsocial-dev-503018",
-  [string]$BillingAccountId = ""
+  [string]$BillingAccountId = "",
+  [string]$TicketId = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $expectedBranch = "remediation/prototype-conformance-2026-07-20"
+$expectedFeatureBranch = "work/codex-auth/youtube-connect-prebuild-20260824-v2"
+$expectedFeatureTicket = "UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824"
+$expectedFeatureTicketHash =
+  "25EA6040A4ED0D19AF595B7D0701304F6F5E44BEA592FBDEBD6888C9F5418407"
 $expectedProject = "moolsocial-dev-503018"
 $expectedProjectNumber = "760290687711"
 $expectedOrganizationId = "1067591230270"
@@ -86,6 +92,88 @@ function Assert-True {
   if (-not $Condition) {
     throw $Message
   }
+}
+
+function Get-CanonicalTextSha256 {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $text = [IO.File]::ReadAllText($Path)
+  $canonical = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $encoding = New-Object Text.UTF8Encoding($false)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString(
+      $sha.ComputeHash($encoding.GetBytes($canonical))
+    )).Replace("-", "")
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Test-LocalFeaturePrebuildBoundary {
+  param(
+    [string]$Branch,
+    [string]$SelectedTicket,
+    [string]$TicketHash,
+    [int]$ClaimOwnerCount,
+    [bool]$ClaimHasGate,
+    [bool]$CloudRequested,
+    [bool]$BuildAuthorized,
+    [bool]$DeviceAuthorized,
+    [bool]$ExternalAuthorized,
+    [bool]$SecretAuthorized
+  )
+  return (
+    $Branch -ceq $expectedFeatureBranch -and
+    $SelectedTicket -ceq $expectedFeatureTicket -and
+    $TicketHash -ceq $expectedFeatureTicketHash -and
+    $ClaimOwnerCount -eq 23 -and
+    $ClaimHasGate -and
+    -not $CloudRequested -and
+    -not $BuildAuthorized -and
+    -not $DeviceAuthorized -and
+    -not $ExternalAuthorized -and
+    -not $SecretAuthorized
+  )
+}
+
+function Test-LocalYouTubeFirestoreComposition {
+  param([Parameter(Mandatory = $true)][string]$Source)
+  return (
+    $Source.Contains('from "firebase-admin/firestore"') -and
+    $Source.Contains('createFirestoreYouTubeStores') -and
+    [regex]::IsMatch(
+      $Source,
+      '(?s)function\s+stores\(\)\s*:\s*FirestoreYouTubeStores\s*\{' +
+        '.*?providerStores\s*=\s*createFirestoreYouTubeStores\(getFirestore\(\)\)'
+    ) -and
+    -not $Source.Contains("DataConnectYouTube") -and
+    -not $Source.Contains("DataConnectOAuthAttemptStore")
+  )
+}
+
+function Test-LocalYouTubeFunctionOptions {
+  param([Parameter(Mandatory = $true)][string]$Source)
+  foreach ($name in @("youtubeProvider", "youtubeOAuthCallback")) {
+    $match = [regex]::Match(
+      $Source,
+      "(?s)export\s+const\s+$name\s*=\s*onRequest\(\s*" +
+        "\{(?<options>.*?)\},\s*async\s*\("
+    )
+    if (-not $match.Success) { return $false }
+    $options = $match.Groups["options"].Value
+    foreach ($required in @(
+      'region: "asia-south1"',
+      "timeoutSeconds: 120",
+      'memory: "512MiB"',
+      "minInstances: 0",
+      "maxInstances: 1",
+      "concurrency: 1",
+      "serviceAccount: youtubeProviderRuntimeServiceAccount"
+    )) {
+      if (-not $options.Contains($required)) { return $false }
+    }
+  }
+  return $true
 }
 
 function Read-RepositoryFile {
@@ -466,8 +554,140 @@ Assert-ExactStringSet `
   "The reviewed Secret Manager inventory"
 
 $branch = Invoke-GitValue @("branch", "--show-current")
-Assert-True ($branch -eq $expectedBranch) `
-  "Wrong branch: $branch. Expected $expectedBranch."
+Assert-True (Test-LocalFeaturePrebuildBoundary `
+  -Branch $expectedFeatureBranch `
+  -SelectedTicket $expectedFeatureTicket `
+  -TicketHash $expectedFeatureTicketHash `
+  -ClaimOwnerCount 23 -ClaimHasGate $true -CloudRequested $false `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+) "Local feature-prebuild positive fixture failed."
+Assert-True (-not (Test-LocalFeaturePrebuildBoundary `
+  -Branch "work/codex-auth/wrong" `
+  -SelectedTicket $expectedFeatureTicket `
+  -TicketHash $expectedFeatureTicketHash `
+  -ClaimOwnerCount 23 -ClaimHasGate $true -CloudRequested $false `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) "Wrong-branch fixture passed unexpectedly."
+Assert-True (-not (Test-LocalFeaturePrebuildBoundary `
+  -Branch $expectedFeatureBranch `
+  -SelectedTicket "UAW-CODEX-YOUTUBE-CONNECT-WRONG" `
+  -TicketHash $expectedFeatureTicketHash `
+  -ClaimOwnerCount 23 -ClaimHasGate $true -CloudRequested $false `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) "Wrong-ticket fixture passed unexpectedly."
+Assert-True (-not (Test-LocalFeaturePrebuildBoundary `
+  -Branch $expectedFeatureBranch `
+  -SelectedTicket $expectedFeatureTicket `
+  -TicketHash ("0" + $expectedFeatureTicketHash.Substring(1)) `
+  -ClaimOwnerCount 23 -ClaimHasGate $true -CloudRequested $false `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) "Wrong-hash fixture passed unexpectedly."
+Assert-True (-not (Test-LocalFeaturePrebuildBoundary `
+  -Branch $expectedFeatureBranch `
+  -SelectedTicket $expectedFeatureTicket `
+  -TicketHash $expectedFeatureTicketHash `
+  -ClaimOwnerCount 22 -ClaimHasGate $false -CloudRequested $false `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) "Wrong-claim fixture passed unexpectedly."
+Assert-True (-not (Test-LocalFeaturePrebuildBoundary `
+  -Branch $expectedFeatureBranch `
+  -SelectedTicket $expectedFeatureTicket `
+  -TicketHash $expectedFeatureTicketHash `
+  -ClaimOwnerCount 23 -ClaimHasGate $true -CloudRequested $true `
+  -BuildAuthorized $false -DeviceAuthorized $false `
+  -ExternalAuthorized $false -SecretAuthorized $false
+)) "Cloud-without-authority fixture passed unexpectedly."
+
+if ($LocalFeaturePrebuild) {
+  $coordination = Read-RepositoryFile `
+    "config/codex-subagent-coordination-policy.json" | ConvertFrom-Json
+  $scopeState = Read-RepositoryFile `
+    "config/mvp-scope-gate-state.json" | ConvertFrom-Json
+  $ticketRelative =
+    "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md"
+  $ticketPath = Join-Path $repoRoot $ticketRelative
+  $ticketText = Read-RepositoryFile $ticketRelative
+  $ticketHash = Get-CanonicalTextSha256 $ticketPath
+  $gitDiscipline = $coordination.productionGitDiscipline
+  $batch = $gitDiscipline.agentTicketQueues.authPrebuildBatch
+  $claims = @($coordination.activeClaims | Where-Object {
+    [string]$_.task -ceq "/root/codex_auth_youtube_connect_prebuild_20260824_v2"
+  })
+  $claimOwnerCount = if ($claims.Count -eq 1) {
+    @($claims[0].owners).Count
+  } else {
+    0
+  }
+  $claimHasGate = (
+    $claims.Count -eq 1 -and
+    @($claims[0].owners) -ccontains
+      "scripts/check-youtube-private-dev-preflight.ps1" -and
+    @($claims[0].owners) -ccontains
+      "backend/functions/src/youtube/oauth_return_page.ts" -and
+    @($claims[0].owners) -ccontains
+      "backend/functions/src/youtube/oauth_return_page.test.ts"
+  )
+  $completedProviders = @($batch.completedPrebuildProviders)
+  $evidenceHeld = (
+    [string]$gitDiscipline.acceptedRuntimeBaseline.head -ceq
+      "f105195ba505dcc9f25a35ab64aab104dadb47c2" -and
+    [string]$gitDiscipline.acceptedRuntimeBaseline.tag -ceq
+      "moolsocial-google-auth-r60.87-accepted-20260823" -and
+    [string]$batch.state -ceq
+      "founder_authorized_runtime_acceptance_deferred_2026_08_24" -and
+    [string]$batch.currentProvider -ceq "youtube_connect" -and
+    [int]$batch.maximumActiveMutationTickets -eq 1 -and
+    [bool]$batch.runtimeAcceptanceDeferredUntilOneCombinedApk -and
+    [bool]$batch.finalTicketCloseStillRequired -and
+    $completedProviders.Count -eq 2 -and
+    [string]$completedProviders[0].provider -ceq "email_link" -and
+    [string]$completedProviders[0].qualificationCommit -ceq
+      "84ab8e55414d4b87b3442a3b9631fe058efc6efe" -and
+    [string]$completedProviders[1].provider -ceq "facebook" -and
+    [string]$completedProviders[1].qualificationCommit -ceq
+      "2024c25690b81b438c8c08f0081c6b60bd104010" -and
+    $claims.Count -eq 1 -and
+    [string]$claims[0].role -ceq "primary" -and
+    @($claims[0].owners) -ccontains $ticketRelative -and
+    @($claims[0].owners | Where-Object {
+      ([string]$_).StartsWith(
+        "apps/mobile/lib/ui_v2/",
+        [StringComparison]::Ordinal
+      )
+    }).Count -eq 0 -and
+    $ticketText.Contains("# $expectedFeatureTicket") -and
+    $ticketText.Contains("Private YouTube consent and OPPO acceptance remain") -and
+    [string]$scopeState.ticket.id -ceq
+      "UAW-CODEX-EMAIL-LINK-AUTH-20260823" -and
+    -not [bool]$scopeState.execution.buildAuthorized -and
+    -not [bool]$scopeState.execution.deviceInstallAuthorized -and
+    -not [bool]$scopeState.execution.playUploadAuthorized -and
+    -not [bool]$scopeState.execution.externalServiceWriteAuthorized -and
+    -not [bool]$scopeState.execution.otherProviderWriteAuthorized -and
+    -not [bool]$scopeState.execution.secretValueAccessAuthorized
+  )
+  Assert-True ($evidenceHeld -and (Test-LocalFeaturePrebuildBoundary `
+    -Branch $branch -SelectedTicket $TicketId -TicketHash $ticketHash `
+    -ClaimOwnerCount $claimOwnerCount -ClaimHasGate $claimHasGate `
+    -CloudRequested ([bool]$Cloud) `
+    -BuildAuthorized ([bool]$scopeState.execution.buildAuthorized) `
+    -DeviceAuthorized ([bool]$scopeState.execution.deviceInstallAuthorized) `
+    -ExternalAuthorized ([bool]$scopeState.execution.externalServiceWriteAuthorized) `
+    -SecretAuthorized ([bool]$scopeState.execution.secretValueAccessAuthorized)
+  )) "Local YouTube feature-prebuild evidence or authority changed."
+  $executionMode = "local_feature_prebuild"
+} else {
+  Assert-True ($branch -eq $expectedBranch) `
+    "Wrong branch: $branch. Expected $expectedBranch."
+  Assert-True ([string]::IsNullOrEmpty($TicketId)) `
+    "Historical remediation mode does not accept a feature ticket."
+  $executionMode = "historical_remediation"
+}
 
 $main = Invoke-GitValue @("rev-parse", "--short=8", "main")
 Assert-True ($main.StartsWith($expectedBaseline)) `
@@ -481,10 +701,15 @@ $baselineTag = Invoke-GitValue @(
 Assert-True ($baselineTag.StartsWith($expectedBaseline)) `
   "Rollback tag moved: $baselineTag. Expected prefix $expectedBaseline."
 
-$locks = & powershell -NoProfile -ExecutionPolicy Bypass `
-  -File (Join-Path $PSScriptRoot "check-approved-ui-locks.ps1") 2>&1
-Assert-True ($LASTEXITCODE -eq 0) `
-  "Approved UI lock verification failed.`n$($locks | Out-String)"
+if ($LocalFeaturePrebuild) {
+  $uiLockState = "preserved_no_ui_owners"
+} else {
+  $locks = & powershell -NoProfile -ExecutionPolicy Bypass `
+    -File (Join-Path $PSScriptRoot "check-approved-ui-locks.ps1") 2>&1
+  Assert-True ($LASTEXITCODE -eq 0) `
+    "Approved UI lock verification failed.`n$($locks | Out-String)"
+  $uiLockState = "passed"
+}
 
 $environmentTemplate = Read-RepositoryFile "backend/functions/.env.example"
 $deploymentEnvironment = Read-RepositoryFile `
@@ -593,65 +818,99 @@ service cloud.firestore {
   }
 }
 "@.Trim()
+$normalizedExpectedFirestoreRules = (
+  $expectedFirestoreRules -replace "`r`n", "`n"
+).Trim()
 Assert-True (
-  $normalizedFirestoreRules -ceq $expectedFirestoreRules
+  $normalizedFirestoreRules -ceq $normalizedExpectedFirestoreRules
 ) "Firestore Rules must remain the reviewed exact deny-all client policy."
+$permissiveFirestoreFixture = $normalizedFirestoreRules.Replace(
+  "allow read, write: if false;",
+  "allow read, write: if true;"
+)
+Assert-True (
+  $permissiveFirestoreFixture -cne $normalizedExpectedFirestoreRules
+) "Permissive Firestore Rules fixture passed unexpectedly."
 
 $functionSource = Read-RepositoryFile "backend/functions/src/index.ts"
 Assert-True ($functionSource.Contains('from "firebase-admin/firestore"')) `
   "The runtime must use the Firebase Admin Firestore adapter."
 Assert-True ($functionSource.Contains("getFirestore()")) `
   "The runtime must construct the default Firestore database."
-Assert-True (-not $functionSource.Contains("getDataConnect")) `
-  "Data Connect must not be reachable from the private Dev runtime."
-Assert-True (-not $functionSource.Contains("DataConnectYouTube")) `
-  "The private Dev runtime must not construct a Data Connect store."
-Assert-True (-not $functionSource.Contains("DataConnectOAuthAttemptStore")) `
-  "The private Dev runtime must not construct a SQL OAuth-attempt store."
-Assert-True (
-  ([regex]::Matches($functionSource, 'region:\s*"asia-south1"')).Count -eq 2
-) "Both provider Functions must remain in asia-south1."
-Assert-True (
-  ([regex]::Matches($functionSource, "timeoutSeconds:\s*120")).Count -eq 2
-) "Both provider Functions must retain the 120-second timeout."
-Assert-True (
-  ([regex]::Matches($functionSource, 'memory:\s*"512MiB"')).Count -eq 2
-) "Both provider Functions must retain 512MiB memory."
-Assert-True (
-  ([regex]::Matches($functionSource, "minInstances:\s*0")).Count -eq 2
-) "Both provider Functions must explicitly scale to zero."
-Assert-True (
-  ([regex]::Matches($functionSource, "maxInstances:\s*1")).Count -eq 2
-) "Private Dev must cap both provider Functions at one instance."
-Assert-True (
-  ([regex]::Matches($functionSource, "concurrency:\s*1")).Count -eq 2
-) "Private Dev must process at most one request per provider instance."
-Assert-True (
-  $functionSource -match (
-    "const\s+youtubeProviderRuntimeServiceAccount\s*=\s*" +
-    [regex]::Escape('"' + $expectedRuntimeServiceAccount + '"')
+if ($LocalFeaturePrebuild) {
+  Assert-True (Test-LocalYouTubeFirestoreComposition $functionSource) `
+    "The YouTube runtime is not exclusively composed with Firestore stores."
+  $dataConnectYouTubeFixture = $functionSource.Replace(
+    "createFirestoreYouTubeStores(getFirestore())",
+    "new DataConnectYouTube(getDataConnect())"
   )
-) "The dedicated provider runtime identity constant changed."
-Assert-True (
-  (
-    [regex]::Matches(
-      $functionSource,
-      "serviceAccount:\s*youtubeProviderRuntimeServiceAccount"
+  Assert-True (-not (
+    Test-LocalYouTubeFirestoreComposition $dataConnectYouTubeFixture
+  )) "Data Connect YouTube composition fixture passed unexpectedly."
+} else {
+  Assert-True (-not $functionSource.Contains("getDataConnect")) `
+    "Data Connect must not be reachable from the private Dev runtime."
+  Assert-True (-not $functionSource.Contains("DataConnectYouTube")) `
+    "The private Dev runtime must not construct a Data Connect store."
+  Assert-True (-not $functionSource.Contains("DataConnectOAuthAttemptStore")) `
+    "The private Dev runtime must not construct a SQL OAuth-attempt store."
+}
+if ($LocalFeaturePrebuild) {
+  Assert-True (Test-LocalYouTubeFunctionOptions $functionSource) `
+    "The YouTube provider Functions option contract changed."
+  $wrongFunctionOptionFixture = $functionSource.Replace(
+    "maxInstances: 1",
+    "maxInstances: 2"
+  )
+  Assert-True (-not (
+    Test-LocalYouTubeFunctionOptions $wrongFunctionOptionFixture
+  )) "Wrong YouTube function option fixture passed unexpectedly."
+} else {
+  Assert-True (
+    ([regex]::Matches($functionSource, 'region:\s*"asia-south1"')).Count -eq 2
+  ) "Both provider Functions must remain in asia-south1."
+  Assert-True (
+    ([regex]::Matches($functionSource, "timeoutSeconds:\s*120")).Count -eq 2
+  ) "Both provider Functions must retain the 120-second timeout."
+  Assert-True (
+    ([regex]::Matches($functionSource, 'memory:\s*"512MiB"')).Count -eq 2
+  ) "Both provider Functions must retain 512MiB memory."
+  Assert-True (
+    ([regex]::Matches($functionSource, "minInstances:\s*0")).Count -eq 2
+  ) "Both provider Functions must explicitly scale to zero."
+  Assert-True (
+    ([regex]::Matches($functionSource, "maxInstances:\s*1")).Count -eq 2
+  ) "Private Dev must cap both provider Functions at one instance."
+  Assert-True (
+    ([regex]::Matches($functionSource, "concurrency:\s*1")).Count -eq 2
+  ) "Private Dev must process at most one request per provider instance."
+  Assert-True (
+    $functionSource -match (
+      "const\s+youtubeProviderRuntimeServiceAccount\s*=\s*" +
+      [regex]::Escape('"' + $expectedRuntimeServiceAccount + '"')
     )
-  ).Count -eq 2
-) "Both provider Functions must use the dedicated Dev runtime identity."
-$exportMatches = [regex]::Matches(
-  $functionSource,
-  "(?m)^export const ([A-Za-z0-9_]+)\s*="
-)
-$sourceExports = @(
-  $exportMatches |
-    ForEach-Object { $_.Groups[1].Value }
-)
-Assert-ExactStringSet `
-  $sourceExports `
-  $expectedFunctions `
-  "The provider Functions source export inventory"
+  ) "The dedicated provider runtime identity constant changed."
+  Assert-True (
+    (
+      [regex]::Matches(
+        $functionSource,
+        "serviceAccount:\s*youtubeProviderRuntimeServiceAccount"
+      )
+    ).Count -eq 2
+  ) "Both provider Functions must use the dedicated Dev runtime identity."
+  $exportMatches = [regex]::Matches(
+    $functionSource,
+    "(?m)^export const ([A-Za-z0-9_]+)\s*="
+  )
+  $sourceExports = @(
+    $exportMatches |
+      ForEach-Object { $_.Groups[1].Value }
+  )
+  Assert-ExactStringSet `
+    $sourceExports `
+    $expectedFunctions `
+    "The provider Functions source export inventory"
+}
 
 foreach ($secret in $expectedSecrets) {
   $secretPattern = (
@@ -673,8 +932,13 @@ $capabilitySource = Read-RepositoryFile `
 Assert-True ($capabilitySource.Contains("publicOrUnlistedUpload: false")) `
   "Public or unlisted upload must remain hard-disabled."
 
+$backendSourceRoot = if ($LocalFeaturePrebuild) {
+  Join-Path $repoRoot "backend/functions/src/youtube"
+} else {
+  Join-Path $repoRoot "backend/functions/src"
+}
 $backendSource = Get-ChildItem `
-  -LiteralPath (Join-Path $repoRoot "backend/functions/src") `
+  -LiteralPath $backendSourceRoot `
   -Recurse -File -Filter "*.ts" |
   Where-Object { $_.Name -notlike "*.test.ts" } |
   ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName } |
@@ -683,6 +947,13 @@ Assert-True (
   $backendSource -notmatch `
     '@google-cloud/storage|firebase_storage|FirebaseStorage|storageBucket'
 ) "The provider must not proxy YouTube media through MoolSocial storage."
+if ($LocalFeaturePrebuild) {
+  $storageProxyFixture = $backendSource + "`nconst storageBucket = 'unsafe';"
+  Assert-True (
+    $storageProxyFixture -match
+      '@google-cloud/storage|firebase_storage|FirebaseStorage|storageBucket'
+  ) "YouTube storage-proxy negative fixture did not activate."
+}
 
 $mobileAppCheck = Read-RepositoryFile `
   "apps/mobile/lib/core/youtube/youtube_private_dev_app_check.dart"
@@ -1276,7 +1547,8 @@ if ($Cloud) {
 }
 
 Write-Host "YouTube private Dev preflight passed."
+Write-Host "Mode: $executionMode"
 Write-Host "Branch: $branch"
 Write-Host "Project boundary: $ProjectId"
 Write-Host "Provider capabilities: disabled"
-Write-Host "Approved UI locks: passed"
+Write-Host "Approved UI locks: $uiLockState"
