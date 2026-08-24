@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
+import 'package:moolsocial/features/shared/shared_models.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
@@ -135,6 +137,56 @@ void main() {
           ?.text,
       'Keep this exact unfinished post',
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('loaded Feed survives a main-action remount without reloading', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final gateway = _CountingFeedGateway();
+    final owners = _Owners(
+      shared: SharedSession(socialContentGateway: gateway),
+    );
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-feed', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-feed', duration: 'PT30S')]);
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'feed',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.feedCalls, 1);
+    expect(owners.shared.socialFeedLoaded, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-brand')),
+      findsOneWidget,
+    );
+    expect(gateway.feedCalls, 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -394,10 +446,12 @@ Screen04YouTubePublicVideo _publicVideo(
 );
 
 class _Owners {
+  _Owners({SharedSession? shared}) : shared = shared ?? SharedSession();
+
   final journey = JourneySession();
   final creator = CreatorSession();
   final retailer = RetailerSession();
-  final shared = SharedSession();
+  final SharedSession shared;
 
   SocialUniversalV2 consumer({
     String? subAction,
@@ -427,4 +481,25 @@ class _Owners {
     retailer.dispose();
     shared.dispose();
   }
+}
+
+class _CountingFeedGateway implements SocialContentGateway {
+  int feedCalls = 0;
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    feedCalls += 1;
+    return const SocialFeedPage(items: []);
+  }
+
+  @override
+  Future<SocialPublishedItem> interact({
+    required String postId,
+    required String interaction,
+    int? choiceIndex,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
+      Future.error(UnsupportedError('Not used by this test.'));
 }
