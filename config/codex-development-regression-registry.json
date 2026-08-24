@@ -41360,6 +41360,71 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3691-FACEBOOK-PRECOMMIT-ONE-OWNER-PIPELINE-COLLAPSED-TO-SCALAR-STRING",
+      "status": "registered_no_staging_one_owner_array_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "After the qualified FIX5 replay passed, the first pre-commit probe treated the one-owner sorted pipeline result as a scalar string and indexed its first character, so it falsely reported the exact gate owner as unexpected before invoking the pre-commit gate or staging.",
+      "rootCause": "PowerShell pipeline output was assigned without wrapping the entire sorted result in an array expression.",
+      "prevention": "Preserve the passed gate diff, bind this registry generation, and calculate one-owner sets as an explicitly wrapped array before exact ordinal comparison and pre-commit replay.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3692-FACEBOOK-GATE-DIFF-FIRST-TEMP-CAPTURE-USED-TEXT-PIPELINE",
+      "status": "registered_superseded_by_git_binary_output_preservation",
+      "appliesTo": [
+        "primary",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first pre-commit probe piped git diff text through Set-Content for a temporary outside-repository copy even though exact patch-byte preservation must use Git's binary output path.",
+      "rootCause": "The evidence capture used a shell text writer that can normalize encoding or line endings instead of Git's patch writer.",
+      "prevention": "Ignore the first text-pipeline copy, preserve the live diff only with git diff --binary --output, verify its SHA-256 and reverse-apply check, and restore/reapply only that verified Git patch during governance refresh.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3693-FACEBOOK-GATE-PATCH-VERIFICATION-REPEATED-SCALAR-OWNER-INDEXING",
+      "status": "registered_patch_written_reverse_check_passed_final_scope_scalar_unretained",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The Git binary patch was written and reverse-check passed, but the final owner assertion again piped the sorted one-owner result outside the array wrapper and falsely rejected the exact gate path.",
+      "rootCause": "The intended correction wrapped the command union but not the pipeline's final output, repeating REG3691's scalar-collapse defect.",
+      "prevention": "Bind this registry generation and do not repeat that owner probe; verify the existing Git patch and live gate file through direct scalar equality and hashes, then restore only the gate, refresh governance and reapply the verified patch.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
     }
   ]
 }
