@@ -41447,6 +41447,27 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3695-FACEBOOK-GATE-PRECOMMIT-INVOKED-BEFORE-EXACT-STAGING",
+      "status": "registered_no_commit_stage_exact_gate_before_retry",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline"
+      ],
+      "mistake": "At v53 the qualified canonical gate patch, parser and diff checks all passed, but the pre_commit coordination phase was invoked before the exact gate owner was staged and correctly rejected its fully-staged atomic-change requirement.",
+      "rootCause": "The commit-boundary sequence placed the policy pre-commit gate before exact staging instead of after staged-owner verification.",
+      "prevention": "Bind this registry generation, preserve and restore the exact canonical patch, refresh once, reapply and verify it, stage only the one claimed gate owner, verify the cached owner set, then invoke pre_commit before the atomic feature commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
     }
   ]
 }
