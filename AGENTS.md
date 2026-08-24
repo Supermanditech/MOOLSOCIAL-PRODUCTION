@@ -4,6 +4,111 @@ These instructions are mandatory for every Codex task in this repository.
 Repository evidence is the durable source of truth; do not depend on an earlier
 chat being available.
 
+## Founder-confirmed Facebook and Instagram production state (2026-08-25)
+
+This is the durable, sanitized provider-console memory for the active Social
+authentication runtime work. Do not ask the founder to repeat a completed
+console check unless a direct live readback or runtime failure contradicts it.
+Never copy provider IDs, secrets, tokens, account credentials, email addresses,
+key-hash values or install-referrer material from the retained screenshots into
+source, logs, chat or review copy.
+
+Retained local evidence lives outside the repository at:
+
+- `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\facebook-meta-configuration-20260824`
+- `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\instagram-meta-configuration-20260824`
+
+Facebook founder-confirmed complete facts:
+
+- The dedicated `MoolSocial` Meta app is the Facebook Login owner. The separate
+  `MoolSocial Pro Connect` app is not the Facebook Login owner.
+- App domain `moolsocial.com` and Website site URL
+  `https://moolsocial.com/` are saved and survive refresh.
+- The public privacy and terms URLs are saved, and the approved 1024-by-1024
+  MoolSocial app icon is saved. Meta no longer shows the prior eligibility
+  warning for the icon or user-data-deletion requirement.
+- User data deletion uses the signed production callback
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/facebook/data-deletion`.
+  The public manual request page remains `https://moolsocial.com/delete-account`.
+- The exact Firebase OAuth handler redirect and the production Facebook
+  deauthorization callback are saved. Client OAuth, HTTPS enforcement and
+  strict redirect mode are enabled; Web OAuth, embedded-browser OAuth and the
+  JavaScript SDK remain intentionally disabled.
+- Android package `com.moolsocial.app`, launch activity
+  `com.moolsocial.app.MainActivity` and two unique provider key-hash entries are
+  saved. Re-pasting the installed r60.90 release APK key hash produced a
+  temporary duplicate which Meta removed on refresh, proving that signer was
+  already registered. The final APK must still independently verify the same
+  signer before review upload.
+- The app requests only `public_profile`; email, friends, posting, advertising
+  and marketing permissions are intentionally absent. Meta recorded 52
+  `public_profile` test calls. Business verification and use-case customization
+  are complete.
+- Allowed-use certification was founder-confirmed for authentication, Firebase
+  session creation and signed-in identity display only.
+- Data-handling answers were founder-confirmed as: Google LLC/Firebase and
+  Google Cloud are the processor for IT/cloud processing in the United States
+  and India; SuperMandi Tech Pvt Ltd in India is the responsible controller;
+  no national-security disclosure occurred in the preceding twelve months;
+  no unsupported public-authority request policies were claimed.
+- Android reviewer instructions are prepared for the final APK, describe the
+  native Facebook Login journey, identify `public_profile` as the only Meta
+  permission, require account identity plus sign-out verification and contain
+  no reviewer credentials.
+
+Facebook intentionally deferred facts:
+
+- The app remains `Unpublished`. Do not upload r60.90, click final review
+  submission or publish it.
+- Reopen Facebook App Review only after the final consolidated higher-version
+  APK is built, independently signer-verified and OPPO-recorded. Upload that
+  exact APK and its sanitized end-to-end Facebook Login recording, then finish
+  review and publication. Meta testing status may take up to 24 hours to
+  refresh.
+
+Instagram founder-confirmed complete facts:
+
+- The dedicated `MoolSocial Pro Connect` Meta app owns Instagram Business
+  Login. Its use-case customization and test-use-case steps are complete, but
+  it remains `Unpublished`.
+- The generated production Business Login URL uses the exact redirect
+  `https://moolsocial.com/app/auth/instagram` and explicitly includes
+  `force_reauth=true`.
+- The saved deauthorization and data-deletion callbacks are exactly
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/instagram/deauthorize`
+  and
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/instagram/data-deletion`.
+- The approved MoolSocial app icon, `https://moolsocial.com/privacy/` and the
+  `Shopping` category are saved for App Review.
+- The review request contains only `instagram_business_basic`. The founder
+  removed Meta's preselected recommendations for messaging, comment management,
+  content publishing, insights and Human Agent. Do not re-add those permissions,
+  configure webhooks, generate provider tokens or become a Tech Provider without
+  a separate exact feature requirement and authorization.
+- The `instagram_business_basic` review description is prepared and states the
+  real minimum flow: eligible Business/Creator identity, one-time code exchange,
+  validation of provider ID/account type/public username, Firebase custom-token
+  session creation, public handle display and revocation of transient Instagram
+  access material. It claims no media, insights, comments, messages, publishing,
+  advertising or account action authority.
+
+Instagram intentionally deferred facts and required fix:
+
+- Allowed usage cannot be saved until the final APK screencast is attached and
+  the founder completes its certification. Data handling and reviewer
+  instructions remain locked behind that step. Do not upload r60.90 or submit
+  the current incomplete review.
+- The deployed Instagram broker currently omits Meta's required/generated
+  `force_reauth=true` authorization parameter. This is a confirmed runtime
+  defect matching the OPPO account-reuse failure. Add it to the backend
+  authorization URL, mobile exact-query validator and focused positive/negative
+  tests before the next APK; deploy only the smallest verified broker change.
+- After the final consolidated APK is installed and proven on OPPO, record the
+  complete Instagram professional-account connect, app return, Firebase session,
+  displayed provider handle and sign-out journey. Attach that sanitized recording
+  to `instagram_business_basic`, complete the remaining review sections, submit
+  and publish only after every production runtime check passes.
+
 ## Git and preservation gate
 
 Before any implementation:
