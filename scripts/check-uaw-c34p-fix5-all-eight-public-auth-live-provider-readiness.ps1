@@ -37,6 +37,42 @@ function Read-C34PFix5Text([string]$RelativePath, [string]$Label) {
   ) -Raw
 }
 
+function Get-C34PFix5CanonicalTextSha256([string]$Path) {
+  $text = [IO.File]::ReadAllText($Path)
+  $canonical = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $encoding = New-Object Text.UTF8Encoding($false)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString(
+      $sha.ComputeHash($encoding.GetBytes($canonical))
+    )).Replace('-', '')
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Test-C34PFix5FacebookSuccessorBoundary(
+  [string]$TicketId,
+  [string]$TicketHash,
+  [string]$Lifecycle,
+  [bool]$BuildAuthorized,
+  [bool]$DeviceAuthorized,
+  [bool]$ExternalAuthorized,
+  [bool]$SecretAuthorized
+) {
+  return (
+    $TicketId -ceq 'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824' -and
+    $TicketHash -ceq
+      '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' -and
+    $Lifecycle -ceq
+      'facebook_prebuild_selected_runtime_acceptance_deferred' -and
+    -not $BuildAuthorized -and
+    -not $DeviceAuthorized -and
+    -not $ExternalAuthorized -and
+    -not $SecretAuthorized
+  )
+}
+
 function Assert-C34PFix5Contains(
   [string]$Body,
   [string]$Expected,
@@ -64,6 +100,17 @@ $state = Read-C34PFix5Json `
 $apkState = Read-C34PFix5Json `
   'config/apk-regression-gate-state.json' `
   'APK regression state'
+$coordination = Read-C34PFix5Json `
+  'config/codex-subagent-coordination-policy.json' `
+  'coordination policy'
+$facebookTicketId = 'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824'
+$facebookTicketRelative = `
+  'docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md'
+$facebookTicketPath = Resolve-C34PFix5File `
+  $facebookTicketRelative 'current Facebook ticket'
+$facebookTicketText = Read-C34PFix5Text `
+  $facebookTicketRelative 'current Facebook ticket'
+$facebookTicketHash = Get-C34PFix5CanonicalTextSha256 $facebookTicketPath
 $ticketRelease = $fix8Ticket.releaseAuthorization
 $auditRelease = $state.comprehensiveSuccessorAudit.releaseAuthorization
 $fix8R6084ManifestPath = [IO.Path]::GetFullPath((Join-Path `
@@ -414,6 +461,34 @@ $fix8R6084Lifecycle = (
   $fix8R6084PostbuildLifecycle -or
   $fix8R6084PostinstallLifecycle
 )
+$fix8R6084RejectedLifecycle = (
+  [string]$fix8Ticket.status -ceq
+    'fix10_r60_84_built_installed_and_rejected_all_five_founder_provider_tests_consumed_fix11_google_only_successor_active' -and
+  [string]$ticketRelease.state -ceq
+    'r60_84_one_build_and_one_install_consumed_founder_rejected_all_five_provider_sign_in_paths_non_reusable_FIX11_google_only_successor_required' -and
+  [int]$ticketRelease.maximumBuildCount -eq 1 -and
+  [int]$ticketRelease.maximumInstallCount -eq 1 -and
+  [int]$ticketRelease.buildCount -eq 1 -and
+  [int]$ticketRelease.installCount -eq 1 -and
+  -not [bool]$fix8Ticket.authority.buildAuthorized -and
+  -not [bool]$fix8Ticket.authority.installOrOppoMutationAuthorized -and
+  -not [bool]$fix8Ticket.authority.sqlConnectProvisioningOrMigrationAuthorized -and
+  -not [bool]$fix8Ticket.authority.privateProviderLoginAuthorized -and
+  -not [bool]$fix8Ticket.authority.realEmailOrSmsAuthorized -and
+  -not [bool]$fix8Ticket.authority.playOrProductionAuthorized -and
+  [string]$state.machineState -ceq
+    'fix8_r60_81_rejected_five_provider_acceptance_failures_source_repairs_unqualified_successor_blocked' -and
+  -not [bool]$state.authority.buildAuthorized -and
+  -not [bool]$state.authority.oppoAuthorized -and
+  [int]$state.actionCounts.build -eq 2 -and
+  [int]$state.actionCounts.oppoUpdate -eq 1 -and
+  -not [bool]$mvp.execution.buildAuthorized -and
+  -not [bool]$mvp.execution.deviceInstallAuthorized -and
+  -not [bool]$mvp.execution.externalServiceWriteAuthorized -and
+  -not [bool]$mvp.execution.otherProviderWriteAuthorized -and
+  -not [bool]$mvp.execution.liveEmailSendAuthorized -and
+  -not [bool]$mvp.execution.secretValueAccessAuthorized
+)
 $fix8ReleaseLifecycle = (
   $fix8PrebuildLifecycle -or
   $fix8FailedBuildLifecycle -or
@@ -424,7 +499,115 @@ $fix8ReleaseLifecycle = (
   $fix8PostinstallLifecycle -or
   $fix8RepairRetryPostinstallLifecycle -or
   $fix8R6083RejectedLifecycle -or
-  $fix8R6084Lifecycle
+  $fix8R6084Lifecycle -or
+  $fix8R6084RejectedLifecycle
+)
+$authBatch = $coordination.productionGitDiscipline.agentTicketQueues.authPrebuildBatch
+$facebookClaims = @($coordination.activeClaims | Where-Object {
+  [string]$_.task -ceq '/root/codex_auth_facebook_prebuild_20260824'
+})
+$completedPrebuildProviders = @($authBatch.completedPrebuildProviders)
+$facebookAcceptance = $state.founderDevProviderAcceptance
+$facebookLifecycleHeld = (
+  [string]$authBatch.state -ceq
+    'founder_authorized_runtime_acceptance_deferred_2026_08_24' -and
+  (@($authBatch.orderedProviders) -join '|') -ceq
+    'email_link|facebook|youtube_connect|x|instagram' -and
+  [int]$authBatch.maximumActiveMutationTickets -eq 1 -and
+  [bool]$authBatch.priorProviderImplementationAndQualificationCommitsRequired -and
+  [bool]$authBatch.runtimeAcceptanceDeferredUntilOneCombinedApk -and
+  [bool]$authBatch.finalTicketCloseStillRequired -and
+  [string]$authBatch.currentProvider -ceq 'facebook' -and
+  $completedPrebuildProviders.Count -eq 1 -and
+  [string]$completedPrebuildProviders[0].provider -ceq 'email_link' -and
+  [string]$completedPrebuildProviders[0].ticketId -ceq
+    'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [string]$completedPrebuildProviders[0].implementationCommit -ceq
+    '883f1d06c315438823c801b184b990b672c77f85' -and
+  [string]$completedPrebuildProviders[0].qualificationCommit -ceq
+    '84ab8e55414d4b87b3442a3b9631fe058efc6efe' -and
+  [bool]$completedPrebuildProviders[0].remoteQualified -and
+  [bool]$completedPrebuildProviders[0].runtimeAcceptancePending -and
+  $facebookClaims.Count -eq 1 -and
+  [string]$facebookClaims[0].role -ceq 'primary' -and
+  @($facebookClaims[0].owners).Count -eq 24 -and
+  @($facebookClaims[0].owners) -ccontains
+    'scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1' -and
+  @($facebookClaims[0].owners) -ccontains $facebookTicketRelative -and
+  $facebookTicketText.Contains("# $facebookTicketId") -and
+  $facebookTicketText.Contains(
+    'Branch: `work/codex-auth/facebook-auth-prebuild-20260824`'
+  ) -and
+  $facebookTicketText.Contains(
+    'Real Facebook and OPPO acceptance remains deferred to'
+  )
+)
+$facebookLifecycle = if ($facebookLifecycleHeld) {
+  'facebook_prebuild_selected_runtime_acceptance_deferred'
+} else {
+  'invalid'
+}
+
+Assert-C34PFix5 (
+  Test-C34PFix5FacebookSuccessorBoundary `
+    $facebookTicketId `
+    '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+    'facebook_prebuild_selected_runtime_acceptance_deferred' `
+    $false $false $false $false
+) 'current Facebook successor positive fixture failed.'
+Assert-C34PFix5 (-not (
+  Test-C34PFix5FacebookSuccessorBoundary `
+    'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-WRONG' `
+    '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+    'facebook_prebuild_selected_runtime_acceptance_deferred' `
+    $false $false $false $false
+)) 'current Facebook successor wrong-ticket fixture passed unexpectedly.'
+Assert-C34PFix5 (-not (
+  Test-C34PFix5FacebookSuccessorBoundary `
+    $facebookTicketId `
+    '0919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+    'facebook_prebuild_selected_runtime_acceptance_deferred' `
+    $false $false $false $false
+)) 'current Facebook successor wrong-hash fixture passed unexpectedly.'
+Assert-C34PFix5 (-not (
+  Test-C34PFix5FacebookSuccessorBoundary `
+    $facebookTicketId `
+    '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+    'facebook_runtime_accepted' `
+    $false $false $false $false
+)) 'current Facebook successor wrong-lifecycle fixture passed unexpectedly.'
+Assert-C34PFix5 (-not (
+  Test-C34PFix5FacebookSuccessorBoundary `
+    $facebookTicketId `
+    '6919BA2D3346E328AA518C443FEFC64655BA54F57F5B466CD29E47E3EF3025E0' `
+    'facebook_prebuild_selected_runtime_acceptance_deferred' `
+    $true $false $false $false
+)) 'current Facebook successor wrong-authority fixture passed unexpectedly.'
+
+$currentFacebookPrebuildBoundary = (
+  $facebookLifecycleHeld -and
+  (Test-C34PFix5FacebookSuccessorBoundary `
+    $facebookTicketId $facebookTicketHash $facebookLifecycle `
+    ([bool]$mvp.execution.buildAuthorized) `
+    ([bool]$mvp.execution.deviceInstallAuthorized) `
+    ([bool]$mvp.execution.externalServiceWriteAuthorized) `
+    ([bool]$mvp.execution.secretValueAccessAuthorized)) -and
+  -not [bool]$mvp.execution.backendWriteAuthorized -and
+  -not [bool]$mvp.execution.otherProviderWriteAuthorized -and
+  -not [bool]$mvp.execution.playUploadAuthorized -and
+  -not [bool]$mvp.execution.liveEmailSendAuthorized -and
+  [string]$facebookAcceptance.ticketId -ceq
+    'UAW-C34P-FIX9-CROSS-PROVIDER-RETURN-TRUTH-HARD-GATE' -and
+  [string]$facebookAcceptance.scope -ceq
+    'founder_private_dev_sideload_not_public_release' -and
+  [bool]$facebookAcceptance.facebookRoleAcceptanceQualified -and
+  [bool]$facebookAcceptance.facebookBuildInputsPresenceQualified -and
+  [bool]$facebookAcceptance.facebookSideloadKeyHashQualifiedByFounder -and
+  -not [bool]$facebookAcceptance.publicReleaseOrAppReviewQualified -and
+  -not [bool]$facebookAcceptance.secretValuesObserved -and
+  [int]$facebookAcceptance.agentPrivateLoginCount -eq 0 -and
+  [int]$facebookAcceptance.buildCountSinceAcceptance -eq 0 -and
+  [int]$facebookAcceptance.installCountSinceAcceptance -eq 0
 )
 $main = Read-C34PFix5Text 'apps/mobile/lib/main.dart' 'mobile main'
 $releaseRuntime = Read-C34PFix5Text `
@@ -517,9 +700,21 @@ $fix8Selection = (
   [string]$selectedAssessment.manifestPath -ceq $fix8TicketRelative -and
   [string]$selectedAssessment.manifestSha256 -ceq $fix8TicketHash
 )
+$facebookPrebuildSelection = (
+  $currentFacebookPrebuildBoundary -and
+  $selectedTicketId -ceq 'UAW-CODEX-EMAIL-LINK-AUTH-20260823' -and
+  [string]$mvp.authorization.state -ceq 'founder_acknowledged_mvp_scope' -and
+  -not [bool]$mvp.authorization.beyondMvpExplicitlyAuthorized -and
+  [bool]$mvp.execution.runtimeWriteAuthorized -and
+  [bool]$mvp.execution.testOrGateWriteAuthorized -and
+  -not [bool]$mvp.execution.backendWriteAuthorized -and
+  -not [bool]$mvp.execution.externalServiceWriteAuthorized -and
+  -not [bool]$mvp.execution.otherProviderWriteAuthorized
+)
 
 Assert-C34PFix5 (
-  $commonSelectionHeld -and ($fix5Selection -or $fix8Selection)
+  $commonSelectionHeld -and
+  ($fix5Selection -or $fix8Selection -or $facebookPrebuildSelection)
 ) 'MVP selection or held release boundary changed.'
 
 Assert-C34PFix5 (
@@ -638,9 +833,11 @@ Assert-C34PFix5 (
   [string]$audit.selectedRepairTicketId -ceq
     'UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR' -and
   (
-    (($fix8R6083RejectedLifecycle -or $fix8R6084Lifecycle) -and
+    (($fix8R6083RejectedLifecycle -or $fix8R6084Lifecycle -or
+      $fix8R6084RejectedLifecycle) -and
       $fix8R6083FindingSetExact) -or
-    (-not ($fix8R6083RejectedLifecycle -or $fix8R6084Lifecycle) -and
+    (-not ($fix8R6083RejectedLifecycle -or $fix8R6084Lifecycle -or
+      $fix8R6084RejectedLifecycle) -and
       @($audit.registeredFindingIds).Count -eq 4)
   ) -and
   @($audit.founderSequence).Count -eq 9 -and
@@ -660,6 +857,28 @@ Assert-C34PFix5 (
   [bool]$audit.oppoConnectedReadOnlyAvailabilityReported -and
   -not [bool]$audit.sqlConnectProvisioningOrMigrationAuthorized
 ) 'comprehensive successor audit sequence or held boundaries changed.'
+
+if ($RequireQualified -and $currentFacebookPrebuildBoundary) {
+  Assert-C34PFix5 (
+    [int]$facebookAcceptance.agentPrivateLoginCount -eq 0 -and
+    [int]$facebookAcceptance.buildCountSinceAcceptance -eq 0 -and
+    [int]$facebookAcceptance.installCountSinceAcceptance -eq 0 -and
+    -not [bool]$facebookAcceptance.secretValuesObserved -and
+    -not [bool]$mvp.execution.buildAuthorized -and
+    -not [bool]$mvp.execution.deviceInstallAuthorized -and
+    -not [bool]$mvp.execution.playUploadAuthorized -and
+    -not [bool]$mvp.execution.externalServiceWriteAuthorized -and
+    -not [bool]$mvp.execution.otherProviderWriteAuthorized -and
+    -not [bool]$mvp.execution.liveEmailSendAuthorized -and
+    -not [bool]$mvp.execution.secretValueAccessAuthorized
+  ) 'current Facebook successor action counts or held authority changed.'
+  Write-Output (
+    'C34P FIX5 current Facebook prebuild readiness passed qualified: ' +
+    'provider=facebook; source=true; buildInstallSinceAcceptance=0; ' +
+    'PlayExternalPrivate=false; runtimeAcceptance=pending; privateValues=false.'
+  )
+  return
+}
 
 if (-not $RequireQualified) {
   Assert-C34PFix5 (
