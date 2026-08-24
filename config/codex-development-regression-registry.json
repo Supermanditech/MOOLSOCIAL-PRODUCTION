@@ -41540,6 +41540,30 @@
         "apps/mobile/lib/features/journey01/review_journey_services.dart",
         "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3699-FACEBOOK-C34P-SHARED-GATE-GLOBAL-SOCIAL-COMPOSITION-TOKEN-SHAPE-REJECTION",
+      "status": "registered_remaining_claimed_source_assertion_review_required_before_retry",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "tooling"
+      ],
+      "mistake": "After the shared Google/YouTube dispatch semantic check passed, the shared-auth gate advanced and rejected the historical globalSocialLoginAuditEnabled: _globalSocialLoginAuditMode literal in main composition.",
+      "rootCause": "The gate binds a prior exact constructor/property text shape instead of the current production composition semantics, and the remaining claimed source assertions have not yet been checked for the same formatting drift.",
+      "prevention": "Preserve the current gate diff, bind this registry generation, inspect only the remaining source tokens already asserted by this gate, replace only proven stale shapes with exact semantic boundaries and negative fixtures, and then perform one final replay without application-source changes.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/lib/main.dart",
+        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1"
+      ]
     }
   ]
 }
