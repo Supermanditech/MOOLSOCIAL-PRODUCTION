@@ -557,6 +557,32 @@ void main() {
 
       expect(events, ['firebase-sign-out', 'google-sign-out']);
     });
+
+    test('sign-out also clears the configured Facebook SDK session', () async {
+      final events = <String>[];
+      final gateway = FirebaseSocialAuthGateway.forTesting(
+        authClient: _FakeFirebaseSocialAuthClient(
+          userIdAfterSignIn: 'user-1',
+          events: events,
+        ),
+        googleIdentityGateway: _FakeGoogleIdentityGateway(
+          idToken: 'synthetic-google-id-token',
+          events: events,
+        ),
+        facebookAdapter: _FakeFacebookNativeSdkAdapter(
+          signInOutcome: FacebookLoginOutcome.success,
+          events: events,
+        ),
+      );
+
+      await gateway.signOut();
+
+      expect(events, [
+        'firebase-sign-out',
+        'google-sign-out',
+        'facebook-sign-out',
+      ]);
+    });
   });
 
   group('NativeGoogleIdentityGateway', () {
@@ -882,10 +908,12 @@ final class _FakeFacebookNativeSdkAdapter implements FacebookNativeSdkAdapter {
   _FakeFacebookNativeSdkAdapter({
     required this.signInOutcome,
     this.signInOrigin = FacebookLoginOrigin.completed,
+    this.events,
   });
 
   final FacebookLoginOutcome signInOutcome;
   final FacebookLoginOrigin signInOrigin;
+  final List<String>? events;
   int signInCount = 0;
   int logOutCount = 0;
 
@@ -901,6 +929,7 @@ final class _FakeFacebookNativeSdkAdapter implements FacebookNativeSdkAdapter {
   @override
   Future<FacebookLoginOutcome> logOut() async {
     logOutCount += 1;
+    events?.add('facebook-sign-out');
     return FacebookLoginOutcome.success;
   }
 

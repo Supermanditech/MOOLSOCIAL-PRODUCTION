@@ -24,6 +24,59 @@ void main() {
     expect(session.manualArea, 'Jodhpur');
   });
 
+  test(
+    'sign-out clears every auth gateway and a restart stays signed out',
+    () async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'hi',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      );
+      final otp = ReviewOtpGateway(signedIn: true);
+      final social = ReviewSocialAuthGateway(signedIn: true);
+      final emailLink = ReviewEmailLinkGateway()..signedIn = true;
+      final session = JourneySession(
+        store: store,
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+      expect(session.stage, JourneyStage.ready);
+
+      await session.signOut();
+
+      expect(otp.signOutCount, 1);
+      expect(social.signOutCount, 1);
+      expect(emailLink.signOutCount, 1);
+      expect(otp.signedIn, isFalse);
+      expect(social.signedIn, isFalse);
+      expect(emailLink.signedIn, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.noticeMessage, contains('signed out'));
+      expect(session.languageCode, 'hi');
+      expect(session.manualArea, 'Jodhpur');
+
+      final restarted = JourneySession(
+        store: store,
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+      );
+      addTearDown(restarted.dispose);
+      await restarted.start();
+
+      expect(restarted.stage, JourneyStage.signIn);
+      expect(restarted.isReady, isFalse);
+      expect(restarted.languageCode, 'hi');
+      expect(restarted.manualArea, 'Jodhpur');
+    },
+  );
+
   test('boot failure changes nothing and exact retry restores state', () async {
     final store = MemoryJourneyStore(readFailure: StateError('disk'));
     final session = JourneySession(store: store);
