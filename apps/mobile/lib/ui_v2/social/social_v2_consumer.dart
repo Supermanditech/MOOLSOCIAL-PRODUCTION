@@ -43,8 +43,17 @@ class _SocialV2RetainedState {
   final Map<String, String> choiceByWorld;
   final SocialCreateDraftV2 createDraft = SocialCreateDraftV2();
   String createView = 'home';
+  String feedState = 'empty';
   int activeShortPage = 0;
   double videoHomeScrollOffset = 0;
+  _VideoData? activeVideo;
+  _VideoData? youtubeSearchOriginVideo;
+  String videoQuery = '';
+  String youtubeSubmittedQuery = '';
+  bool youtubeSearchOpen = false;
+  bool returnToYouTubeSearchAfterVideo = false;
+  String? youtubeSearchError;
+  List<_VideoData> youtubeSearchResults = const [];
 }
 
 class SocialUniversalV2 extends StatefulWidget {
@@ -114,7 +123,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
 
   Map<String, String> get _choiceByWorld => _retainedState.choiceByWorld;
 
-  late String _feedState;
+  String get _feedState => _retainedState.feedState;
+  set _feedState(String value) => _retainedState.feedState = value;
   String get _createView => _retainedState.createView;
   set _createView(String value) => _retainedState.createView = value;
   late bool _contentUnavailable;
@@ -128,21 +138,38 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late final SocialMediaPicker _mediaPicker;
   SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
   late final Screen04YouTubeCatalogueSnapshotStore _youtubeCatalogueSnapshots;
-  _VideoData? _activeVideo;
-  _VideoData? _youtubeSearchOriginVideo;
-  String _videoQuery = '';
-  String _youtubeSubmittedQuery = '';
+  _VideoData? get _activeVideo => _retainedState.activeVideo;
+  set _activeVideo(_VideoData? value) => _retainedState.activeVideo = value;
+  _VideoData? get _youtubeSearchOriginVideo =>
+      _retainedState.youtubeSearchOriginVideo;
+  set _youtubeSearchOriginVideo(_VideoData? value) =>
+      _retainedState.youtubeSearchOriginVideo = value;
+  String get _videoQuery => _retainedState.videoQuery;
+  set _videoQuery(String value) => _retainedState.videoQuery = value;
+  String get _youtubeSubmittedQuery => _retainedState.youtubeSubmittedQuery;
+  set _youtubeSubmittedQuery(String value) =>
+      _retainedState.youtubeSubmittedQuery = value;
   int _visibleVideoCount = 20;
   int _youtubeSearchRequest = 0;
   int _youtubeCatalogueRequest = 0;
   double get _videoHomeScrollOffset => _retainedState.videoHomeScrollOffset;
   set _videoHomeScrollOffset(double value) =>
       _retainedState.videoHomeScrollOffset = value;
-  bool _youtubeSearchOpen = false;
+  bool get _youtubeSearchOpen => _retainedState.youtubeSearchOpen;
+  set _youtubeSearchOpen(bool value) =>
+      _retainedState.youtubeSearchOpen = value;
   bool _youtubeSearchLoading = false;
-  bool _returnToYouTubeSearchAfterVideo = false;
-  String? _youtubeSearchError;
-  List<_VideoData> _youtubeSearchResults = const [];
+  bool get _returnToYouTubeSearchAfterVideo =>
+      _retainedState.returnToYouTubeSearchAfterVideo;
+  set _returnToYouTubeSearchAfterVideo(bool value) =>
+      _retainedState.returnToYouTubeSearchAfterVideo = value;
+  String? get _youtubeSearchError => _retainedState.youtubeSearchError;
+  set _youtubeSearchError(String? value) =>
+      _retainedState.youtubeSearchError = value;
+  List<_VideoData> get _youtubeSearchResults =>
+      _retainedState.youtubeSearchResults;
+  set _youtubeSearchResults(List<_VideoData> value) =>
+      _retainedState.youtubeSearchResults = value;
   List<_VideoData> _liveYouTubeVideos = const [];
   List<_ShortData> _liveYouTubeShorts = const [];
   bool _liveYouTubeLoading = false;
@@ -206,7 +233,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     _shortController = PageController(initialPage: _activeShortPage);
     _videoHomeController = ScrollController();
     _videoWatchController = ScrollController();
-    _youtubeSearchController = TextEditingController();
+    _youtubeSearchController = TextEditingController(
+      text: _youtubeSubmittedQuery,
+    );
     _youtubeSearchFocusNode = FocusNode();
     _mediaPicker = widget.mediaPicker ?? NativeSocialMediaPicker();
     _youtubeCatalogueSnapshots =
@@ -232,14 +261,24 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     } else if (_tab != SocialV2Tab.create) {
       _createView = 'home';
     }
-    _feedState = _feedStateFor(widget.initialState);
+    if (widget.initialState != null) {
+      _feedState = _feedStateFor(widget.initialState);
+    }
     _feedLinkContextActive =
         _tab == SocialV2Tab.feed &&
         (widget.initialItem?.trim().isNotEmpty ?? false);
     _contentUnavailable = widget.initialState == 'unavailable';
+    var videosAreFresh = false;
+    var shortsAreFresh = false;
     if (_youtubePublicAccessAvailable) {
-      final cachedVideos = _youtubeCatalogueSnapshots.readFreshVideos();
-      final cachedShorts = _youtubeCatalogueSnapshots.readFreshShorts();
+      final freshVideos = _youtubeCatalogueSnapshots.readFreshVideos();
+      final freshShorts = _youtubeCatalogueSnapshots.readFreshShorts();
+      final cachedVideos =
+          freshVideos ?? _youtubeCatalogueSnapshots.readVideos();
+      final cachedShorts =
+          freshShorts ?? _youtubeCatalogueSnapshots.readShorts();
+      videosAreFresh = freshVideos != null;
+      shortsAreFresh = freshShorts != null;
       _hasYouTubeVideosSnapshot = cachedVideos != null;
       _hasYouTubeShortsSnapshot = cachedShorts != null;
       _liveYouTubeVideos =
@@ -253,13 +292,15 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         _youtubePublicAccessAvailable && !_hasYouTubeVideosSnapshot;
     _liveYouTubeShortsLoading =
         _youtubePublicAccessAvailable && !_hasYouTubeShortsSnapshot;
-    _activeVideo =
-        _tab == SocialV2Tab.videos && widget.initialState == 'video-watch'
-        ? _videoForProviderId(_liveYouTubeVideos, widget.initialItem)
-        : null;
+    if (_tab == SocialV2Tab.videos && widget.initialState == 'video-watch') {
+      _activeVideo = _videoForProviderId(
+        _liveYouTubeVideos,
+        widget.initialItem,
+      );
+    }
     if (_youtubePublicAccessAvailable &&
-        (!_hasYouTubeVideosSnapshot ||
-            !_hasYouTubeShortsSnapshot ||
+        (!videosAreFresh ||
+            !shortsAreFresh ||
             _liveYouTubeVideos.isEmpty ||
             _liveYouTubeShorts.isEmpty)) {
       unawaited(_loadLiveYouTubeVideos());

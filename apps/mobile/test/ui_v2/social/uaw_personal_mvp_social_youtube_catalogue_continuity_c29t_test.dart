@@ -140,6 +140,124 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('active YouTube video survives a main-action remount', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-watch', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-watch', duration: 'PT30S')]);
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'videos',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Provider title video-watch'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(find.text('Provider title video-watch'), findsWidgets);
+  });
+
+  testWidgets(
+    'YouTube search query and results survive a main-action remount',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+      final store = Screen04YouTubeCatalogueSnapshotStore()
+        ..replaceVideos([_publicVideo('video-search', duration: 'PT4M')])
+        ..replaceShorts([_publicVideo('short-search', duration: 'PT30S')]);
+      Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+      var searchCalls = 0;
+      Future<List<Screen04YouTubePublicVideo>> searchLoader(
+        String query,
+      ) async {
+        searchCalls += 1;
+        return [_publicVideo('search-result', duration: 'PT3M')];
+      }
+
+      await _mount(
+        tester,
+        owners.consumer(
+          subAction: 'videos',
+          store: store,
+          videosLoader: loader,
+          shortsLoader: loader,
+          searchLoader: searchLoader,
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('screen04-youtube-search-input')),
+        'India news',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(searchCalls, 1);
+      expect(find.text('Provider title search-result'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await _mount(
+        tester,
+        owners.consumer(
+          subAction: null,
+          store: store,
+          videosLoader: loader,
+          shortsLoader: loader,
+          searchLoader: searchLoader,
+        ),
+      );
+      await tester.pump();
+
+      expect(searchCalls, 1);
+      expect(
+        find.byKey(const Key('screen04-youtube-search-surface')),
+        findsOneWidget,
+      );
+      expect(find.text('Provider title search-result'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('screen04-youtube-search-input')),
+            )
+            .controller
+            ?.text,
+        'India news',
+      );
+    },
+  );
+
   testWidgets('loaded Feed survives a main-action remount without reloading', (
     tester,
   ) async {
@@ -222,7 +340,7 @@ void main() {
 
     expect(
       find.byKey(const Key('screen04-youtube-videos-state-loading')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('screen04-youtube-home-header')),
@@ -236,7 +354,7 @@ void main() {
       find.byKey(const Key('screen04-youtube-home-account')),
       findsOneWidget,
     );
-    expect(find.text('Provider title expired'), findsNothing);
+    expect(find.text('Provider title expired'), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
 
@@ -460,6 +578,7 @@ class _Owners {
     required Screen04YouTubeCatalogueSnapshotStore store,
     required Screen04YouTubePublicVideoLoader videosLoader,
     required Screen04YouTubePublicVideoLoader shortsLoader,
+    Screen04YouTubePublicSearchLoader? searchLoader,
   }) => SocialUniversalV2(
     session: journey,
     creatorSession: creator,
@@ -472,6 +591,7 @@ class _Owners {
     youtubeCreatorAccessOverride: false,
     youtubeVideosLoader: videosLoader,
     youtubeShortsLoader: shortsLoader,
+    youtubeSearchLoader: searchLoader,
     youtubeCatalogueSnapshotStore: store,
   );
 

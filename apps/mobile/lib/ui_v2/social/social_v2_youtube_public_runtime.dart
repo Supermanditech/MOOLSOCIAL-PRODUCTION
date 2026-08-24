@@ -109,6 +109,14 @@ class Screen04YouTubeCatalogueSnapshotStore {
 
   List<Screen04YouTubePublicVideo>? readFreshShorts() => _readFresh(_shorts);
 
+  List<Screen04YouTubePublicVideo>? readVideos() => _videos?.items;
+
+  List<Screen04YouTubePublicVideo>? readShorts() => _shorts?.items;
+
+  bool get videosAreFresh => _readFresh(_videos) != null;
+
+  bool get shortsAreFresh => _readFresh(_shorts) != null;
+
   void replaceVideos(List<Screen04YouTubePublicVideo> videos) {
     _videos = _capture(videos);
   }
