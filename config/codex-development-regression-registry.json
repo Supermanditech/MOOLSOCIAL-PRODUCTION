@@ -42240,6 +42240,31 @@
         "backend/functions/src/youtube/provider_service.ts",
         "backend/functions/src/youtube/shared_catalogue_client.test.ts"
       ]
+    },
+    {
+      "id": "REG-20260824-3728-YOUTUBE-FULL-VERIFY-SHARED-CATALOGUE-DURABILITY-ASSERTION-FAILED",
+      "status": "registered_direct_corresponding_test_owner_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "The focused repair typecheck and 26 focused tests passed; full npm verify then ran 585 tests with 584 passed and one shared_catalogue.test durability assertion reporting accepted, rejected and localReservations as undefined instead of one.",
+      "rootCause": "The test expects a youtubeProviderQuotaMeasurements operation-counter feature that does not exist in FirestoreYouTubeQuotaStore; the actual durable contract is one youtubeProviderQuotaUsage document per search/upload/general bucket with used and hardCap fields.",
+      "prevention": "Add only shared_catalogue.test.ts as the directly required tenth owner, assert the actual durable search/upload/general quota-usage documents and corrupt-used fail-closed behavior, then rerun focused catalogue tests and full verify/export without adding a measurement feature.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "backend/functions/src/youtube/shared_catalogue.test.ts"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/youtube/shared_catalogue.ts",
+        "backend/functions/src/youtube/shared_catalogue.test.ts"
+      ]
     }
   ]
 }
