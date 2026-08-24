@@ -40,6 +40,11 @@ provisioned.
 
 ## Implemented scope
 
+- Full-depth visual revision: the active Shop context now persists through the
+  inbox banner, new-conversation header and category badges, thread breadcrumb,
+  commerce card, inline sharing, search, information and message-action states.
+  MoolSocial navy remains the action language while restrained participant and
+  context accents improve scanability without creating a separate visual brand.
 - Added a compact Shop-native Chat header, contextual search, All/Orders/
   Partners/Offers filters, secure-conversation guidance, dense truthful rows
   and a 44-pixel new-chat action.
@@ -127,26 +132,26 @@ built or installed for this screenshot-review stage.
 - Targeted Flutter analysis across the five Shop Chat source/test owners:
   pass, no issues.
 - `buy_v2_shop_chat_test.dart`: pass, `14/14` tests.
-- Combined Buy screen, navigation-motion and Shop Chat run: pass, `94/94`
-  tests.
+- Combined Buy screen, navigation-motion, Shop Chat and contextual Chat run:
+  pass, `99/99` executed tests; one capture generator skipped by default.
 - Explicit candidate-capture run: pass, `1/1` test.
 - All enhanced candidate screenshots are `390 x 844`:
 
 | State | SHA-256 |
 | --- | --- |
-| `shop-inbox` | `62FF070A078B507606A71017AB00B7CFAED2EE84F803563E16AF248EA6FFC82C` |
-| `orders-inbox` | `B184104B7A6FF13BDBFCEE0CD72F52C0BD80A0D93C54E0C4BD5BC093571FE624` |
-| `offers-inbox` | `21D286C8AAC0C264C0B24093569054BA89A82B312FA09346CD8358E1E6ADA907` |
-| `partners-inbox` | `8134797865D840D32FB431C666C20C7CF38833D726C51D2104232D85A6EE9D13` |
-| `new-conversation` | `CCD7BE87EC324AC3633D4912856A2BC2FA710C11CDDC734979233DCEF86D32C4` |
-| `conversation` | `A31AEFD9C3E7859D0381A7DBCA5991DAEC7DE8ADD9295C9220B1129B90C61792` |
-| `composer-draft` | `E2033C6F5D4F21128C18910ABB3E5C63FE2C50D95680956B3C5A916E889C58C4` |
-| `emoji-tray` | `259122D08A62CCD62D825D63F57686815AA207BBF1B3B9A2629D6B6EDB1B7BE3` |
-| `attachments` | `61C8E144E543217E5679D7C59BB65AB74C956D66A68C2CD620B8B61144560CDD` |
-| `thread-menu` | `0E62372A7758C58399854186DB6686237026FBA530DC2E4709DF1FA277DF0A68` |
-| `conversation-search` | `E384F2793F523F2EB1105E1714498FEB5213B50F1DC51B47EA03EAF440EB7CE1` |
-| `business-info` | `D0E6699A5CB65EBF716B18D43618821F913883054646F04730CEEAF92F8B4A2C` |
-| `message-actions` | `42A6CD7DA22F423AAE1BF47F18A42077866674FD46D33C9740F1B98B61203492` |
+| `shop-inbox` | `3318FA95CE4FC6794DB313B56DD8419647A43C12E7A7C284BD0534144905349E` |
+| `orders-inbox` | `6845FE53CB24D48D8D356CBF56B3040AA96F54195C0130D7C7199B6CC365BD2E` |
+| `offers-inbox` | `5B1C78F05F17846846647AA460404B6C4BE19383ED759DE4AC70CEE7F76732C2` |
+| `partners-inbox` | `51F584F484FD1F7DD5AB02F4BBEBFCD487897C90C695B6BDA9E378B1CCF94B2F` |
+| `new-conversation` | `4FC6466409292F17D1F771E3731F7F688A3CF3E680E73751FE067BC5BEEA862C` |
+| `conversation` | `50A34ACA310B0398828F7B9AA8F2B2429BAEACFE6A3CD519BA266FA54452E1DD` |
+| `composer-draft` | `7C78FCFD62622E36546A602676CFA812EF9558E55B2D2FD1164F664058F98031` |
+| `emoji-tray` | `A4A33D87E98333AC5467BDA799CE574C2EA994A2A2E15CE82E117192FF612175` |
+| `attachments` | `F5FF0C5EE87C4512C210A747461679FEB28B2509DF7D1217421A2A540BFF2210` |
+| `thread-menu` | `E2ADFADFA82A79E396006B52C657C65B0B77A9D62CD173791288DE4012216356` |
+| `conversation-search` | `D862926DA251A86E7D0F0CC317C88BA3B5262E9254C08DE89CB84E98DE5EAA92` |
+| `business-info` | `A647C3C85F50852F9F9987FA50369B0445D8F4923C0C01B986A7170D0922F470` |
+| `message-actions` | `3CA4BD3A2E14CA2CDF77CC04C30FD55597EDC9A38D3E1701CF173E6F6F36D296` |
 
 ## Approval state
 

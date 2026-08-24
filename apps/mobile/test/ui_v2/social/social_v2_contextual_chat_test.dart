@@ -144,6 +144,14 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attach-shareProduct')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attach-shareOrder')),
+        findsOneWidget,
+      );
       await tester.tap(
         find.byKey(const ValueKey('buy-shop-chat-attach-selectDocument')),
       );
@@ -209,8 +217,131 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+    await tester.pumpAndSettle();
+    expect(find.text('New Travel conversation'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-back')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-travel-bus-desk')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-composer')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+    await tester.pumpAndSettle();
+    expect(find.text('Share in this Travel chat'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-attach-shareProduct')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+    await tester.pumpAndSettle();
+    expect(find.text('Travel Chat info'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'every family keeps contextual identity through Chat utility depths',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      for (final capture in _captureFamilies) {
+        final owners = _Owners();
+        await tester.pumpWidget(
+          _app(owners, world: capture.world, subAction: capture.subAction),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+        await tester.pumpAndSettle();
+
+        final presentation = MoolContextualChatCatalog.presentationFor(
+          capture.world,
+        );
+        await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('New ${presentation.familyLabel} conversation'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('MoolSocial Chat · choose a trusted context'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-back')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(ValueKey('buy-shop-chat-entry-${capture.threadId}')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('${presentation.familyLabel} ·'),
+          findsWidgets,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-chat-thread-more')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('${presentation.familyLabel} info'), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-chat-menu-search')),
+        );
+        await tester.pumpAndSettle();
+        final search = tester.widget<TextField>(
+          find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+        );
+        expect(search.decoration?.hintText, contains(capture.threadTitle));
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Share in this ${presentation.familyLabel} chat'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-shop-chat-attach-shareProduct')),
+          capture.world == 'eat' ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-shop-chat-attach-shareOrder')),
+          capture.world == 'eat' ? findsOneWidget : findsNothing,
+        );
+        await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-chat-thread-info')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('${presentation.familyLabel} Chat info'),
+          findsOneWidget,
+        );
+        expect(find.text(capture.contextTitle), findsWidgets);
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        owners.dispose();
+      }
+    },
+  );
 
   test('default provisioning covers every published contextual filter', () {
     const source = MoolDefaultContextualChatProvisioningSource();
@@ -225,6 +356,29 @@ void main() {
       );
       expect(threads.every((thread) => thread.messages.isEmpty), isTrue);
     }
+
+    final food = source.threadsFor('eat');
+    expect(food.first.capabilities.productSharing, isTrue);
+    expect(food.last.capabilities.productSharing, isFalse);
+
+    final travel = source.threadsFor('ride');
+    expect(
+      travel.every(
+        (thread) =>
+            !thread.capabilities.productSharing &&
+            !thread.capabilities.orderSharing,
+      ),
+      isTrue,
+    );
+
+    final care = source.threadsFor('book');
+    expect(care[0].capabilities.productSharing, isFalse);
+    expect(care[1].capabilities.productSharing, isTrue);
+    expect(care[2].capabilities.productSharing, isFalse);
+
+    final work = source.threadsFor('work');
+    expect(work.every((thread) => !thread.capabilities.productSharing), isTrue);
+    expect(work.last.capabilities.locationSharing, isFalse);
   });
 
   testWidgets('contextual Chat family review captures', (tester) async {
@@ -251,6 +405,16 @@ void main() {
       await tester.pumpAndSettle();
       await _captureContextChat(tester, '${capture.name}-inbox', reviewRootKey);
 
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pumpAndSettle();
+      await _captureContextChat(
+        tester,
+        '${capture.name}-new-conversation',
+        reviewRootKey,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-back')));
+      await tester.pumpAndSettle();
+
       await tester.tap(
         find.byKey(ValueKey('buy-shop-chat-entry-${capture.threadId}')),
       );
@@ -258,6 +422,24 @@ void main() {
       await _captureContextChat(
         tester,
         '${capture.name}-conversation',
+        reviewRootKey,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      await _captureContextChat(
+        tester,
+        '${capture.name}-attachments',
+        reviewRootKey,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+      await tester.pumpAndSettle();
+      await _captureContextChat(
+        tester,
+        '${capture.name}-conversation-info',
         reviewRootKey,
       );
 
@@ -349,30 +531,47 @@ const _families = <({String id, List<({String id, String label})> subActions})>[
 ];
 
 const _captureFamilies =
-    <({String name, String world, String subAction, String threadId})>[
+    <
+      ({
+        String name,
+        String world,
+        String subAction,
+        String threadId,
+        String threadTitle,
+        String contextTitle,
+      })
+    >[
       (
         name: 'food-order-food',
         world: 'eat',
         subAction: 'order-food',
         threadId: 'food-order-support',
+        threadTitle: 'Food order support',
+        contextTitle: 'Order Food',
       ),
       (
         name: 'travel-cab',
         world: 'ride',
         subAction: 'cab',
         threadId: 'travel-cab-support',
+        threadTitle: 'Cab trip support',
+        contextTitle: 'Cab trip',
       ),
       (
         name: 'care-doctor',
         world: 'book',
         subAction: 'doctor',
         threadId: 'care-doctor-desk',
+        threadTitle: 'Doctor booking',
+        contextTitle: 'Doctor appointment',
       ),
       (
         name: 'work-earn-today',
         world: 'work',
         subAction: 'earn-today',
         threadId: 'work-opportunity-support',
+        threadTitle: 'Work opportunity',
+        contextTitle: 'Earn Today',
       ),
     ];
 
