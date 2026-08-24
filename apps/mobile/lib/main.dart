@@ -579,6 +579,7 @@ Future<void> main() async {
     EmailLinkGatewaySelection.unavailable =>
       const UnavailableEmailLinkGateway(),
   };
+  final pendingEmailLinkAddressStore = SecurePendingEmailLinkAddressStore();
   final session = _youtubePublicReviewMode
       ? JourneySession(
           store: SeededJourneyStore(
@@ -598,6 +599,7 @@ Future<void> main() async {
             apiBaseUrl: _authApiBaseUrl,
           ),
           emailLinkGateway: emailLinkGateway,
+          pendingEmailLinkAddressStore: pendingEmailLinkAddressStore,
           socialAuthGateway: FirebaseSocialAuthGateway(
             FirebaseAuth.instance,
             googleServerClientId: _googleServerClientId,
@@ -642,6 +644,7 @@ Future<void> main() async {
                   apiBaseUrl: _authApiBaseUrl,
                 ),
           emailLinkGateway: emailLinkGateway,
+          pendingEmailLinkAddressStore: pendingEmailLinkAddressStore,
           socialAuthGateway:
               globalSocialLoginAuditComposition.useReviewAuthentication
               ? ReviewSocialAuthGateway(

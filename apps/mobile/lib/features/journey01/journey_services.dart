@@ -242,6 +242,32 @@ abstract interface class EmailLinkGateway {
   Future<void> signOut();
 }
 
+abstract interface class PendingEmailLinkAddressStore {
+  Future<String?> read();
+
+  Future<void> write(String emailAddress);
+
+  Future<void> clear();
+}
+
+class MemoryPendingEmailLinkAddressStore
+    implements PendingEmailLinkAddressStore {
+  String? value;
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String emailAddress) async {
+    value = emailAddress;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
+}
+
 class UnavailableEmailLinkGateway implements EmailLinkGateway {
   const UnavailableEmailLinkGateway();
 

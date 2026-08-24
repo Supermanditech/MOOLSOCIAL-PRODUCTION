@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'journey_services.dart';
@@ -31,6 +33,7 @@ class JourneySession extends ChangeNotifier {
     OtpGateway? otpGateway,
     EmailOtpGateway? emailOtpGateway,
     EmailLinkGateway? emailLinkGateway,
+    PendingEmailLinkAddressStore? pendingEmailLinkAddressStore,
     SocialAuthGateway? socialAuthGateway,
     Set<SocialAuthProvider>? availableSocialAuthProviders,
     this.emailOtpAvailable = true,
@@ -50,6 +53,8 @@ class JourneySession extends ChangeNotifier {
        _emailOtpGateway = emailOtpGateway ?? ReviewEmailOtpGateway(),
        _emailLinkGateway =
            emailLinkGateway ?? const UnavailableEmailLinkGateway(),
+       _pendingEmailLinkAddressStore =
+           pendingEmailLinkAddressStore ?? MemoryPendingEmailLinkAddressStore(),
        _socialAuthGateway = socialAuthGateway ?? ReviewSocialAuthGateway(),
        availableSocialAuthProviders = Set.unmodifiable(
          availableSocialAuthProviders ?? SocialAuthProvider.values.toSet(),
@@ -64,6 +69,7 @@ class JourneySession extends ChangeNotifier {
   final OtpGateway _otpGateway;
   final EmailOtpGateway _emailOtpGateway;
   final EmailLinkGateway _emailLinkGateway;
+  final PendingEmailLinkAddressStore _pendingEmailLinkAddressStore;
   final SocialAuthGateway _socialAuthGateway;
   final Set<SocialAuthProvider> availableSocialAuthProviders;
   final bool emailOtpAvailable;
@@ -756,6 +762,7 @@ class JourneySession extends ChangeNotifier {
     if (busy) return;
     emailAddress = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     emailLinkState = EmailLinkState.entering;
     emailLinkReceiptCode = null;
     resendAvailableAt = null;
@@ -768,6 +775,7 @@ class JourneySession extends ChangeNotifier {
     if (busy) return;
     emailAddress = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     resendAvailableAt = null;
@@ -788,12 +796,25 @@ class JourneySession extends ChangeNotifier {
     await start();
     if (_isAuthenticated) {
       _pendingEmailLink = null;
+      await _clearPendingEmailLinkAddress();
       return false;
     }
 
     stage = JourneyStage.signIn;
     errorMessage = null;
     noticeMessage = null;
+    try {
+      final retainedAddress = (await _pendingEmailLinkAddressStore.read())
+          ?.trim()
+          .toLowerCase();
+      if (retainedAddress != null && _isValidEmail(retainedAddress)) {
+        emailAddress = retainedAddress;
+      } else if (retainedAddress != null) {
+        await _clearPendingEmailLinkAddress();
+      }
+    } on Object {
+      // Cross-device and unavailable local recovery use matching-address entry.
+    }
     if (emailAddress == null) {
       emailLinkState = EmailLinkState.awaitingEmail;
       _recordEmailLinkReceipt('email-link-awaiting-address');
@@ -844,7 +865,10 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     errorMessage = null;
     noticeMessage = null;
+    var recoveryAddressPersisted = false;
     try {
+      await _pendingEmailLinkAddressStore.write(email);
+      recoveryAddressPersisted = true;
       await _emailLinkGateway.sendSignInLink(email);
       resendAvailableAt = _now().add(resendCooldown);
       emailLinkState = EmailLinkState.sent;
@@ -853,14 +877,21 @@ class JourneySession extends ChangeNotifier {
       notifyListeners();
       return true;
     } on JourneyServiceException catch (error) {
+      await _clearPendingEmailLinkAddress();
       _applyEmailLinkFailure(error);
       return false;
     } on Object {
+      await _clearPendingEmailLinkAddress();
       _applyEmailLinkFailure(
-        const JourneyServiceException(
-          'The email service is unavailable. Check the connection and retry.',
-          code: 'email-link-bridge-failure',
-        ),
+        recoveryAddressPersisted
+            ? const JourneyServiceException(
+                'The email service is unavailable. Check the connection and retry.',
+                code: 'email-link-bridge-failure',
+              )
+            : const JourneyServiceException(
+                'This device could not save the secure sign-in request. Please try again.',
+                code: 'email-link-local-recovery-unavailable',
+              ),
       );
       return false;
     } finally {
@@ -925,6 +956,7 @@ class JourneySession extends ChangeNotifier {
         rethrow;
       }
       _pendingEmailLink = null;
+      await _clearPendingEmailLinkAddress();
       emailLinkState = EmailLinkState.idle;
       _recordEmailLinkReceipt('email-link-session-ready');
       return true;
@@ -958,6 +990,14 @@ class JourneySession extends ChangeNotifier {
     errorMessage = error.userMessage;
     noticeMessage = null;
     notifyListeners();
+  }
+
+  Future<void> _clearPendingEmailLinkAddress() async {
+    try {
+      await _pendingEmailLinkAddressStore.clear();
+    } on Object {
+      // The provider failure remains the customer-visible recovery path.
+    }
   }
 
   void _recordEmailLinkReceipt(String code) {
@@ -1236,6 +1276,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     errorMessage = null;
@@ -1262,6 +1303,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     socialAuthProvider = null;
@@ -1288,6 +1330,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     socialAuthProvider = null;
@@ -1312,6 +1355,7 @@ class JourneySession extends ChangeNotifier {
       emailLinkState = EmailLinkState.idle;
       emailLinkReceiptCode = null;
       _pendingEmailLink = null;
+      await _clearPendingEmailLinkAddress();
       _completedEmailLinkReturnRoute = null;
       _completedSocialAuthReturnRoute = null;
       socialAuthProvider = null;

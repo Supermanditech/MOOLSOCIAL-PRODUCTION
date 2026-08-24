@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kDebugMode, visibleForTesting;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -101,6 +102,30 @@ class SharedPreferencesJourneyStore implements JourneyStore {
       await _preferences.setString(key, value);
     }
   }
+}
+
+class SecurePendingEmailLinkAddressStore
+    implements PendingEmailLinkAddressStore {
+  SecurePendingEmailLinkAddressStore({FlutterSecureStorage? storage})
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(storageNamespace: 'moolsocial_email_link'),
+          );
+
+  static const _addressKey = 'pending_address';
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read() => _storage.read(key: _addressKey);
+
+  @override
+  Future<void> write(String emailAddress) =>
+      _storage.write(key: _addressKey, value: emailAddress);
+
+  @override
+  Future<void> clear() => _storage.delete(key: _addressKey);
 }
 
 class FirebaseOtpGateway implements OtpGateway {
