@@ -109,7 +109,14 @@ void main() {
       await tester.tap(find.byKey(origin.chatKey));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(
+        find.byKey(
+          origin.id == 'buy'
+              ? const Key('buy-shop-chat')
+              : const Key('chat-inbox-screen'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('WhatsApp'), findsNothing);
       expect(find.byKey(const Key('chat-back')), findsNothing);
       await tester.binding.handlePopRoute();
