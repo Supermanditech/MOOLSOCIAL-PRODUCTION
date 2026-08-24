@@ -135,6 +135,17 @@ X founder-confirmed production state (2026-08-25):
   post-authorization authenticated-user identity lookup. OAuth consent alone
   is not acceptance. Do not add billing or purchase credits without a separate
   explicit founder authorization for that paid-service action.
+- Founder decision on 2026-08-25: do not buy X API credit now. After the final
+  consolidated APK is installed, attempt exactly one real X runtime journey on
+  the existing configuration. If it fails with a sanitized credit, billing or
+  paid-access classification, stop without repeated provider attempts or a
+  purchase and queue X paid activation beside the separate Apple Sign-In
+  backlog.
+- Apple Sign-In remains a separate disabled provider ticket, not an automatic
+  replacement for X and not evidence that X passed. Do not expose or implement
+  Apple as a fallback inside the X journey. Apple requires its own platform,
+  provider, redirect, revocation, session, UI and founder/runtime acceptance
+  before it can be counted as supported.
 - After usable credit is explicitly authorized and provisioned, the final OPPO
   journey must prove: fresh X authorization, hosted/app-link return, broker
   completion, authenticated-user identity, Firebase credential acceptance,
