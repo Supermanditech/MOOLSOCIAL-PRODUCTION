@@ -42212,6 +42212,34 @@
         "scripts/check-youtube-private-dev-package.ps1",
         "scripts/test-youtube-private-dev-deployment-controls.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3727-YOUTUBE-PACKAGE-FULL-BACKEND-VERIFY-REJECTED-UNCLAIMED-TYPE-CONTRACT-DRIFT",
+      "status": "registered_scope_blocker_no_tests_exports_or_gate_commit",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "The local package feature boundary, deployment-control static suite, forwarded local preflight and runtime package verification passed; full npm verify then stopped during tsc --noEmit on five existing YouTube shared-catalogue/config/service contract errors, so npm tests and export verification did not run.",
+      "rootCause": "The current backend index/tests reference requireOwnerConnectionStatusCapability, sharedCatalogueSearch, sharedShortsCatalogue and publicShortsCatalogue members absent from their current unclaimed interfaces/implementations; this is separate backend contract drift outside the package-gate-only authorization.",
+      "prevention": "Do not weaken or skip full backend verify/export checks and do not edit backend source under this gate ticket. Preserve the package/fixture patch outside the repository, restore the worktree clean, and require explicit owner/scope authorization for a focused backend contract repair before retrying local package verification.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-package.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/youtube/config.ts",
+        "backend/functions/src/youtube/client.ts",
+        "backend/functions/src/youtube/provider_service.ts",
+        "backend/functions/src/youtube/shared_catalogue_client.test.ts"
+      ]
     }
   ]
 }
