@@ -41977,6 +41977,74 @@
         "backend/functions/src/youtube/oauth_return_page.ts",
         "backend/functions/src/youtube/oauth_return_page.test.ts"
       ]
+    },
+    {
+      "id": "REG-20260824-3717-YOUTUBE-LOCAL-PREFLIGHT-FIRESTORE-RULES-EXACT-TEXT-REJECTION",
+      "status": "registered_security_assertion_context_classification_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "security",
+        "tooling"
+      ],
+      "mistake": "After the exact v2 branch/ticket/hash/23-owner/no-UI/held-authority boundary passed, local YouTube preflight advanced and rejected its historical exact-text Firestore deny-all assertion.",
+      "rootCause": "The gate binds one historical Firestore Rules text shape and has not yet classified the current preserved rules as semantically equivalent, stronger or weaker.",
+      "prevention": "Preserve the current preflight diff, bind this registry generation, inspect only the gate assertion and firestore.rules, and if client access remains deny-all replace only the brittle text equality with a semantic deny-all boundary plus permissive-rule negative fixture; otherwise stop for a security source ticket.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/firestore/youtube-private-dev.rules",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3718-YOUTUBE-FIRESTORE-CLASSIFICATION-READBACK-USED-NONEXISTENT-ROOT-PATH",
+      "status": "registered_read_only_path_miss_no_repository_change",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "tooling"
+      ],
+      "mistake": "The first Firestore classification readback targeted nonexistent root firestore.rules even though the preflight assertion names backend/firestore/youtube-private-dev.rules; the parallel assertion-source read succeeded and no file changed.",
+      "rootCause": "The diagnostic path was inferred from the rejection label instead of copied from the gate's resolved Read-RepositoryFile owner.",
+      "prevention": "Bind this registry generation and read only backend/firestore/youtube-private-dev.rules exactly as named by the gate before classifying the deny-all semantics; do not repeat the root path.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/firestore/youtube-private-dev.rules",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3719-REG3717-EVIDENCE-OWNER-USED-NONEXISTENT-FIRESTORE-ROOT-PATH",
+      "status": "registered_registry_evidence_path_corrected_before_commit",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first v77 governance memory replay rejected before staging because REG3717 recorded nonexistent firestore.rules as evidence instead of backend/firestore/youtube-private-dev.rules.",
+      "rootCause": "The incident entry inherited the same inferred root path later identified in REG3718 rather than the exact path read by the preflight gate.",
+      "prevention": "Correct REG3717's evidence owner to backend/firestore/youtube-private-dev.rules, bind this registry generation, and run regression memory before staging the governance owners.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/firestore/youtube-private-dev.rules"
+      ]
     }
   ]
 }
