@@ -478,10 +478,12 @@ class _SocialYouTubeCreatorUploadScreenState
   List<YouTubeVideoSummary> _channelVideos = const [];
   List<YouTubePublicPlaylistDetails> _channelPlaylists = const [];
   String? _channelVideosNextPageToken;
+  String? _channelPlaylistsNextPageToken;
   String? _channelBrowseError;
   bool _channelBrowseOpen = false;
   bool _channelBrowseLoading = false;
   bool _channelBrowseLoadingMore = false;
+  bool _channelPlaylistsLoadingMore = false;
   int _channelBrowseRequest = 0;
   SocialPickedMedia? _media;
   SocialYouTubeShortMediaInfo? _mediaInfo;
@@ -634,10 +636,12 @@ class _SocialYouTubeCreatorUploadScreenState
     _channelBrowseOpen = false;
     _channelBrowseLoading = false;
     _channelBrowseLoadingMore = false;
+    _channelPlaylistsLoadingMore = false;
     _channelDetails = null;
     _channelVideos = const [];
     _channelPlaylists = const [];
     _channelVideosNextPageToken = null;
+    _channelPlaylistsNextPageToken = null;
     _channelBrowseError = null;
   }
 
@@ -712,6 +716,7 @@ class _SocialYouTubeCreatorUploadScreenState
           _channelPlaylists = List<YouTubePublicPlaylistDetails>.unmodifiable(
             playlistsPage.items,
           );
+          _channelPlaylistsNextPageToken = playlistsPage.nextPageToken;
         }
         _channelVideosNextPageToken = videosPage.nextPageToken;
         _channelBrowseLoading = false;
@@ -722,6 +727,44 @@ class _SocialYouTubeCreatorUploadScreenState
       setState(() {
         _channelBrowseLoading = false;
         _channelBrowseLoadingMore = false;
+        _channelBrowseError = _customerMessage(error);
+      });
+    }
+  }
+
+  Future<void> _loadMoreChannelPlaylists() async {
+    final connection = _connected;
+    final browser = _channelBrowser;
+    final pageToken = _channelPlaylistsNextPageToken;
+    if (connection == null || browser == null || pageToken == null) return;
+    final request = ++_channelBrowseRequest;
+    setState(() {
+      _channelPlaylistsLoadingMore = true;
+      _channelBrowseError = null;
+    });
+    try {
+      final page = await browser.channelPlaylists(
+        channelId: connection.channelId,
+        pageToken: pageToken,
+        maxResults: 10,
+      );
+      if (!mounted || request != _channelBrowseRequest) return;
+      final existingIds = _channelPlaylists
+          .map((playlist) => playlist.playlistId)
+          .toSet();
+      setState(() {
+        _channelPlaylists = List<YouTubePublicPlaylistDetails>.unmodifiable([
+          ..._channelPlaylists,
+          for (final playlist in page.items)
+            if (existingIds.add(playlist.playlistId)) playlist,
+        ]);
+        _channelPlaylistsNextPageToken = page.nextPageToken;
+        _channelPlaylistsLoadingMore = false;
+      });
+    } on Object catch (error) {
+      if (!mounted || request != _channelBrowseRequest) return;
+      setState(() {
+        _channelPlaylistsLoadingMore = false;
         _channelBrowseError = _customerMessage(error);
       });
     }
@@ -1292,6 +1335,26 @@ class _SocialYouTubeCreatorUploadScreenState
           else
             for (final playlist in _channelPlaylists)
               _channelPlaylistTile(playlist),
+          if (_channelPlaylistsNextPageToken != null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('youtube-channel-load-more-playlists'),
+              onPressed: _channelPlaylistsLoadingMore
+                  ? null
+                  : _loadMoreChannelPlaylists,
+              icon: _channelPlaylistsLoadingMore
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.expand_more_rounded),
+              label: Text(
+                _channelPlaylistsLoadingMore
+                    ? 'Loading…'
+                    : 'Load more playlists',
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -267,6 +267,15 @@ void main() {
       expect(gateway.playlistVideosCalls, 2);
       expect(gateway.channelPlaylistsCalls, 1);
 
+      await _reveal(tester, const Key('youtube-channel-load-more-playlists'));
+      await tester.tap(
+        find.byKey(const Key('youtube-channel-load-more-playlists')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('National reports'), findsOneWidget);
+      expect(gateway.channelPlaylistsCalls, 2);
+
       await tester.tap(find.byKey(const Key('youtube-creator-back')));
       await tester.pumpAndSettle();
 
@@ -711,6 +720,21 @@ class _FakeCreatorGateway
     int? maxResults,
   }) async {
     channelPlaylistsCalls += 1;
+    if (pageToken == 'playlist-page-2') {
+      return YouTubePublicPlaylistPage(
+        items: [
+          YouTubePublicPlaylistDetails(
+            playlistId: 'playlist-2',
+            title: 'National reports',
+            description: 'National reporting playlist.',
+            publishedAt: DateTime.utc(2026, 8, 2),
+            channelId: channelId,
+            channelTitle: 'MoolSocial News channel',
+            itemCount: 8,
+          ),
+        ],
+      );
+    }
     return YouTubePublicPlaylistPage(
       items: [
         YouTubePublicPlaylistDetails(
@@ -723,6 +747,7 @@ class _FakeCreatorGateway
           itemCount: 12,
         ),
       ],
+      nextPageToken: 'playlist-page-2',
     );
   }
 
