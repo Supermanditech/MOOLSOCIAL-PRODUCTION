@@ -333,8 +333,13 @@ Assert-SideloadControl (
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW'") -and
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF'") -and
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PROVIDER_URL'") -and
+  $wrapper.Contains("'MOOLSOCIAL_CHAT_URL'") -and
+  $wrapper.Contains(
+    'Public-auth sideload Chat endpoint differs from the live environment.'
+  ) -and
   $apkGate.Contains('$fullSocialCohortNames') -and
   $apkGate.Contains('$fullSocialRequiredFacts') -and
+  $apkGate.Contains('MOOLSOCIAL_CHAT_URL') -and
   $apkGate.Contains('full-social runtime cohort is partial') -and
   $apkMachineState.Contains(
     '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'

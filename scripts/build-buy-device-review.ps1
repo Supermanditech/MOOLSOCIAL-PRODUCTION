@@ -284,6 +284,7 @@ function Get-PublicAuthSideloadRuntimeValues {
     'MOOLSOCIAL_YOUTUBE_PROVIDER_URL',
     'MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED',
     'MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED',
+    'MOOLSOCIAL_CHAT_URL',
     'MOOLSOCIAL_FIREBASE_API_KEY',
     'MOOLSOCIAL_FIREBASE_APP_ID',
     'MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID',
@@ -353,6 +354,12 @@ function Get-PublicAuthSideloadRuntimeValues {
       $value = ''
     }
     $values[$name] = $value
+  }
+  $expectedChatUrl =
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/' +
+    'moolSocialChat'
+  if ([string]$values.MOOLSOCIAL_CHAT_URL -cne $expectedChatUrl) {
+    throw 'Public-auth sideload Chat endpoint differs from the live environment.'
   }
   if ($CandidateId -ceq
     'UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR') {
