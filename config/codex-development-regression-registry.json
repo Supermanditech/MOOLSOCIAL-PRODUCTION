@@ -41590,6 +41590,28 @@
         "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
         "scripts/check-uaw-c33g-fix2-social-identity-provider-truth.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3701-FACEBOOK-PREBUILD-EVIDENCE-APPEND-USED-STALE-WRAPPED-TAIL-ANCHOR",
+      "status": "registered_atomic_rejection_no_ticket_change",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first Facebook prebuild-evidence append was rejected atomically because its remembered final paragraph wrapping did not match the exact current ticket tail.",
+      "rootCause": "The patch used a reconstructed multiline anchor instead of reading the exact final ticket lines immediately before the append.",
+      "prevention": "Bind this registry generation, read only the exact ticket tail, append the evidence section from that literal anchor, and verify that the Facebook branch changes only its claimed ticket owner before the evidence commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md"
+      ]
     }
   ]
 }
