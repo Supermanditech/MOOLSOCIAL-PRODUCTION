@@ -51,6 +51,7 @@
       "task": "/root/cursor_buy_screen_subactions_ui_20260823",
       "role": "subagent",
       "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
