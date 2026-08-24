@@ -310,8 +310,28 @@ test("expired refresh reports only its safe failing phase", async () => {
     (error: unknown) =>
       error instanceof YouTubeProviderError &&
       error.code === "provider_unavailable" &&
-      error.providerReason === "sharedShortsCatalogue.load_page" &&
+      error.providerReason === "sharedShortsCatalogue.load_page.error" &&
       !error.message.includes("private transport detail"),
+  );
+});
+
+test("commit refresh reports a whitelisted persistence code", async () => {
+  const store = new MemoryCatalogueStore();
+  store.commitRefresh = async () => {
+    throw Object.assign(new Error("private persistence detail"), { code: 3 });
+  };
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => ({ items: [short("commit-failure")] }),
+  });
+
+  await assert.rejects(
+    coordinator.load("request-commit-failure"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.providerReason === "sharedShortsCatalogue.commit_refresh.code_3" &&
+      !error.message.includes("private persistence detail"),
   );
 });
 

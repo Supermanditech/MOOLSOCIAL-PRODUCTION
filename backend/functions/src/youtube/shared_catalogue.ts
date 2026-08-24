@@ -360,6 +360,26 @@ function usableStaleSnapshot(
   return expiresAt !== null && nowEpoch <= expiresAt + STALE_FALLBACK_MS;
 }
 
+function safeRefreshFailureClass(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = String((error as { readonly code?: unknown }).code ?? "");
+    if (/^[A-Za-z0-9_-]{1,32}$/u.test(code)) return `code_${code}`;
+  }
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("refresh lease was lost")) return "lease_lost";
+    if (message.includes("undefined")) return "undefined_value";
+    if (message.includes("maximum") && message.includes("size")) {
+      return "document_size";
+    }
+    if (message.includes("transaction")) return "transaction";
+    if (/^[A-Za-z][A-Za-z0-9]{0,31}$/u.test(error.name)) {
+      return error.name.toLowerCase();
+    }
+  }
+  return "unknown";
+}
+
 export class SharedShortsCatalogueCoordinator {
   private readonly now: () => Date;
 
@@ -494,7 +514,7 @@ export class SharedShortsCatalogueCoordinator {
         "The shared YouTube catalogue is temporarily unavailable.",
         503,
         true,
-        `sharedShortsCatalogue.${refreshPhase}`,
+        `sharedShortsCatalogue.${refreshPhase}.${safeRefreshFailureClass(error)}`,
       );
     }
   }
