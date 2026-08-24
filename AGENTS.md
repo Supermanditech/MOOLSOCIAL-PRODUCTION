@@ -109,6 +109,38 @@ Instagram intentionally deferred facts and required fix:
   to `instagram_business_basic`, complete the remaining review sections, submit
   and publish only after every production runtime check passes.
 
+X founder-confirmed production state (2026-08-25):
+
+- Retained sanitized X console evidence lives outside the repository at
+  `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\x-developer-configuration-20260825`.
+- The existing X app is active and connected to the existing pay-per-use
+  project. Do not create another X app/project, disconnect it, regenerate keys
+  or tokens, buy unrelated access, or expose any console identifier.
+- OAuth 2.0 is configured as a Native App/public PKCE client with Read-only
+  permission. Read-and-write, Direct Messages and email access remain disabled.
+- The exact callback is `https://moolsocial.com/app/auth/x`. Website,
+  organization URL, terms and privacy URLs use the live `moolsocial.com`
+  destinations and survive console save/readback.
+- Founder corrected the provider-facing app identity from the prior internal
+  account-style label and generic metadata to the `MoolSocial` name, approved
+  MoolSocial icon and the exact read-only authentication description. Do not
+  ask to repeat those branding changes.
+- The deployed broker already uses OAuth 2.0 Authorization Code with S256 PKCE,
+  an exact state-bound callback, the authenticated-user identity endpoint,
+  Firebase custom-token exchange and transient provider-token revocation. The
+  live begin operation succeeded before this console audit; final callback and
+  durable MoolSocial-session acceptance remain pending.
+- The connected project currently has zero usable X API credit and no payment
+  method. This is a confirmed external production blocker for the
+  post-authorization authenticated-user identity lookup. OAuth consent alone
+  is not acceptance. Do not add billing or purchase credits without a separate
+  explicit founder authorization for that paid-service action.
+- After usable credit is explicitly authorized and provisioned, the final OPPO
+  journey must prove: fresh X authorization, hosted/app-link return, broker
+  completion, authenticated-user identity, Firebase credential acceptance,
+  displayed X handle, durable MoolSocial session, sign-out and a second-account
+  recovery path. Retain only sanitized status/operation evidence.
+
 ## Git and preservation gate
 
 Before any implementation:
