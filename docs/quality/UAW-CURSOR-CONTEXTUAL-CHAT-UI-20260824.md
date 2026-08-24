@@ -33,6 +33,13 @@ returning to the originating family surface.
 
 ## Runtime implementation
 
+- Completed a full-depth professional revision. Family identity and the active
+  subaction now remain visible through the inbox context banner, new-chat
+  chooser, participant thread header, context card, welcome state, thread menu,
+  conversation search, inline sharing and conversation information.
+- MoolSocial navy remains the common interaction color. Food orange, Travel
+  slate, Care teal and Work green are limited to identity, context and status
+  accents so every family remains recognizably MoolSocial.
 - Generalized the production Shop Chat presentation layer so one tested native
   runtime owns inbox, search, filters, new conversation, conversation, message
   composition, inline attachments, emoji, calls, thread utilities, business
@@ -43,6 +50,10 @@ returning to the originating family surface.
 - The selected family and subaction determine the title, origin label, search
   copy, active filter, security guidance, participant role, context card and
   quick replies.
+- Sharing actions are context-aware. Product and order references remain
+  available for food/medicine purchase contexts, while irrelevant commerce
+  actions are removed from travel, doctor, salon and work trays. Workspace also
+  omits location sharing. The production action handler remains authoritative.
 - The entire shared main-action and subaction rail is absent from the widget
   tree while contextual Chat is active. The Chat composer exclusively owns the
   bottom safe area.
@@ -97,22 +108,36 @@ screenshot-review stage.
 - Targeted Flutter analysis across all six modified/new source and test owners:
   pass, no issues.
 - Combined Buy screen, Buy navigation motion, Shop Chat and contextual Chat:
-  pass, `98/98` executed tests; one screenshot generator skipped by default.
+  pass, `99/99` executed tests; one screenshot generator skipped by default.
 - Existing Social action/accessibility, creator ergonomics, footer compaction
   and subaction conformance: pass, `10/10` tests.
 - Explicit contextual candidate-capture run: pass, `1/1` test.
-- All candidate screenshots passed manual visual inspection at `390 x 844`.
+- All `20` contextual candidate screenshots passed manual visual inspection at
+  `390 x 844`. The complete set covers Inbox, New conversation, Conversation,
+  Inline sharing and Conversation information for every service family.
 
 | State | SHA-256 |
 | --- | --- |
-| `food-order-food-inbox` | `89C882A2D2F8596748BE2F9CBD0053E28BC2CB88A2AA26B568F8107A6AAED860` |
-| `food-order-food-conversation` | `77BEDBDF214AE5A2310ACBDF67235D629EE695F644E808355A6C7DFD4055AEAE` |
-| `travel-cab-inbox` | `2ECCDE7BFF866A903677C11DAC6CFD97E9914765D72DE34FD9F6AA3507F94282` |
-| `travel-cab-conversation` | `B1FB455A6CAFEF1FA84AC89496AE6BF3F09C424AB2338A7E7D2C940DA14F6875` |
-| `care-doctor-inbox` | `7EC931B109CB7CB1A0E366427F52FA2381CEED4C6CE2E16A233590108143DF16` |
-| `care-doctor-conversation` | `082000D22BEF683338EA1ABBC96F051DDB85A4B261EFDA0BC3FCCA145D207DC6` |
-| `work-earn-today-inbox` | `986CBFA4E2BCEB10ABD0679747DEAA5711335805B81874D7A719D0D026DF22F1` |
-| `work-earn-today-conversation` | `D54EB9C49950478A5078595B79B92F8EA82F854CAD21EEC299F8E9E334B9CEFE` |
+| `food-order-food-inbox` | `13D9B41286068C1F63067F3B71BAB51586DBEBDB9273601E78AAFCCE6F07431A` |
+| `food-order-food-new-conversation` | `6BD4088BE6BF939EC689B485471D49EA9968B67B77366994BF240BA7C1B79786` |
+| `food-order-food-conversation` | `32B7FA03632F377784BA46E27077C333563A9BA15535D8FF8184DB8F41E52599` |
+| `food-order-food-attachments` | `F91744D8B59F3F6349857ACEF861E584D0B6EB1302E21E762BEBB0D586CA893F` |
+| `food-order-food-conversation-info` | `299E8434523B5E9BC98C67666E8BDBB52FF980EAB8A7D3845F565C1E506B503D` |
+| `travel-cab-inbox` | `BA02A25D54E2E16BF22F80056BEAD09ED872E3DD3E3D248AE26294EC84C391F9` |
+| `travel-cab-new-conversation` | `8D101D0A19178FF30E998D3656CD6E1990ED62FB9F57B4E26B650531E056AA6F` |
+| `travel-cab-conversation` | `0410308549DED4B9C6AD9DAF9A6FA89AB5A884C7BAE7737EC5E0914A5242C991` |
+| `travel-cab-attachments` | `7C4B23AD9E59761862A4A09D4171F7D0507A24D2C77065D65F85475C2A8AB8A8` |
+| `travel-cab-conversation-info` | `0D15CB0D680C3EC625CF1153FC06C036A8FDADD37767DE004836FD08EEB3E88C` |
+| `care-doctor-inbox` | `121D8C22134AF87AF0CB20FFA5755C54191BEF6CD0D6AF9F14ED43C50CA045EF` |
+| `care-doctor-new-conversation` | `7CD62FBAAF79E0AB7152FE683669977399A0FDBF453B9DFE698126B7FD4F7767` |
+| `care-doctor-conversation` | `A68EBCC07121BA7C0242A61E7B86FEF5825904E12D5455E722B53A53AE7AE63E` |
+| `care-doctor-attachments` | `3AB34BE567964F2C5F7D116EECCA8C3F0DD9CB544901B490334D58E777BF2F30` |
+| `care-doctor-conversation-info` | `B3B0087E6C84EF81A9C969C692E0C82CA6C48C4BBA760D2669E60BCA912B8EC0` |
+| `work-earn-today-inbox` | `D9CF98A5306FFBDBA621200C4A1E3B90F81E169CEF6EE1C9B826C6CC8F37B6BC` |
+| `work-earn-today-new-conversation` | `CC1AEBB691ADABA67073528912A7C16F86872002A7D1F033662DD5A62320E39F` |
+| `work-earn-today-conversation` | `9751D50DCE586BD4390D9406BB193EE1A7DED892662206A7099AEFDD5B5E99A3` |
+| `work-earn-today-attachments` | `401A86012973EFB527CCE4442DD7F11C57C7CCDCCAB9A18F14671DA264E5A112` |
+| `work-earn-today-conversation-info` | `FF2A1EBFB656164364B7093817B6B0FAE580B10FF3F5DD3A28AC10E231235F9A` |
 
 ## Approval state
 
