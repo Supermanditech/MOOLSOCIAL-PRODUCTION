@@ -239,6 +239,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               onScan: _scanProduct,
                               onLocation: () =>
                                   showBuyV2AddressSheet(context, session),
+                              onAccount: () {
+                                HapticFeedback.selectionClick();
+                                setState(() => _searchOpen = false);
+                                session.openAccount();
+                              },
                               scannerBusy: _scannerBusy,
                             ),
                           Expanded(
@@ -602,6 +607,7 @@ class _BuySearchBand extends StatelessWidget {
     required this.onOpenChanged,
     required this.onScan,
     required this.onLocation,
+    required this.onAccount,
     required this.scannerBusy,
   });
 
@@ -611,6 +617,7 @@ class _BuySearchBand extends StatelessWidget {
   final ValueChanged<bool> onOpenChanged;
   final VoidCallback onScan;
   final VoidCallback onLocation;
+  final VoidCallback onAccount;
   final bool scannerBusy;
 
   @override
@@ -826,8 +833,79 @@ class _BuySearchBand extends StatelessWidget {
                 padding: EdgeInsets.zero,
               ),
             ),
+            const SizedBox(width: 4),
+            _BuyAccountButton(onPressed: onAccount),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _BuyAccountButton extends StatelessWidget {
+  const _BuyAccountButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Open profile and account',
+      button: true,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: BuyV2Colors.line),
+        ),
+        child: InkWell(
+          key: const ValueKey('buy-open-account'),
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    key: const ValueKey('buy-profile-avatar'),
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: BuyV2Colors.navy,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Text(
+                      'DC',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -1,
+                    bottom: 1,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
