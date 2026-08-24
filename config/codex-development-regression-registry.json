@@ -41635,6 +41635,33 @@
         "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3703-YOUTUBE-CONNECT-ANDROID-RETURN-ACTIVITY-HOST-PATH-TUPLE-MISMATCH",
+      "status": "registered_proven_runtime_source_fix_authorized",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "android",
+        "youtube"
+      ],
+      "mistake": "The Android manifest and Dart return parser accept moolsocial://app/creator/youtube-connect, but YouTubeConnectReturnActivity requires an empty host and /app/creator/youtube-connect, so the real consent return reaches the activity and is rejected before Flutter restart; the existing source-gate test did not assert the exact activity tuple.",
+      "rootCause": "The Kotlin activity validates an internal Flutter route shape instead of the external Android deep-link tuple, while its source test checks only generic activity tokens and the manifest tuple independently.",
+      "prevention": "Claim only YouTubeConnectReturnActivity.kt, require external host app plus path /creator/youtube-connect, admit exactly one youtubeConnect=complete or failed value with no fragment or extra query, restart Flutter on the internal /app/creator/youtube-connect route, and add exact positive and negative host/path source assertions to the existing test.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/android/app/src/main/AndroidManifest.xml",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
+        "apps/mobile/lib/core/navigation/youtube_connect_return_route.dart",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ]
     }
   ]
 }
