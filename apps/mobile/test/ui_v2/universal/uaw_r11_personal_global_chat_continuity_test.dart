@@ -62,7 +62,7 @@ void main() {
       id: 'buy',
       entryRoute: '/app/buy?sub=shop',
       returnOwnerKey: Key('buy-v2-screen'),
-      chatKey: Key('buy-global-chat'),
+      chatKey: Key('mool-global-chat-tap'),
     ),
     (
       id: 'eat',

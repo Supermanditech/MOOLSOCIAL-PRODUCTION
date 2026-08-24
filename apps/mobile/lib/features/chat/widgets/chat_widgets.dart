@@ -33,6 +33,8 @@ class ChatPageScaffold extends StatelessWidget {
     required this.returnRoute,
     required this.body,
     this.showContentBack = false,
+    this.backKey = const Key('chat-back'),
+    this.backTooltip = 'Back to conversations',
     this.messageThreadId,
     this.trailing,
     this.bottom,
@@ -45,6 +47,8 @@ class ChatPageScaffold extends StatelessWidget {
   final String returnRoute;
   final Widget body;
   final bool showContentBack;
+  final Key backKey;
+  final String backTooltip;
   final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
@@ -76,8 +80,8 @@ class ChatPageScaffold extends StatelessWidget {
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
                   child: IconButton.outlined(
-                    key: const Key('chat-back'),
-                    tooltip: 'Back to conversations',
+                    key: backKey,
+                    tooltip: backTooltip,
                     onPressed: () => chatGoBack(context, returnRoute),
                     icon: const Icon(
                       Icons.arrow_back_ios_new_rounded,

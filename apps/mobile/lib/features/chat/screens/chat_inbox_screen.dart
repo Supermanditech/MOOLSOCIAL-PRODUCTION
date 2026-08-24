@@ -145,6 +145,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           title: 'Chat',
           subtitle: 'People, businesses, orders and support',
           returnRoute: widget.returnRoute,
+          showContentBack: true,
+          backKey: const Key('chat-inbox-back'),
+          backTooltip: 'Back to previous screen',
           trailing: IconButton.filled(
             key: const Key('chat-new'),
             tooltip: 'Start a new chat',

@@ -60,6 +60,8 @@ void main() {
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
     expect(find.byKey(const Key('chat-global-chat-edge')), findsOneWidget);
     expect(find.byKey(const Key('chat-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+    expect(find.byTooltip('Back to previous screen'), findsOneWidget);
     expect(find.byKey(const Key('chat-open-mool')), findsNothing);
     expect(find.byKey(const Key('chat-thread-mool')), findsNothing);
 
@@ -88,7 +90,7 @@ void main() {
       'Home Basket',
     );
 
-    await tester.binding.handlePopRoute();
+    await tester.tap(find.byKey(const Key('chat-inbox-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     semantics.dispose();
@@ -133,6 +135,7 @@ void main() {
       'Home Basket',
     );
     expect(find.byKey(const Key('chat-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
   });
 
   testWidgets('thread draft focus and IME survive a global Buy round trip', (
