@@ -904,6 +904,7 @@ void main() {
       find.byKey(const Key('screen04-account-youtube-connection')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('screen04-account-sign-out')), findsOneWidget);
     expect(find.text('Creator workspace'), findsNothing);
     expect(find.textContaining('Minimum read-only access'), findsOneWidget);
     await tester.tap(find.byTooltip('Close'));

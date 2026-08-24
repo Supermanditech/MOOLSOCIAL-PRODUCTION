@@ -1475,6 +1475,10 @@ GoRouter createJourneyRouter(
                 },
                 onOpenChat: () =>
                     context.push('/app/chat/inbox?return=/app/mool'),
+                onSignOut: () async {
+                  await session.signOut();
+                  if (context.mounted) context.go('/sign-in');
+                },
                 areaLabel: session.currentAreaLabel ?? session.manualArea,
               ),
             );

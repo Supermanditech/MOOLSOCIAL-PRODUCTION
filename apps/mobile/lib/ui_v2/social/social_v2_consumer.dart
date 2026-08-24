@@ -1159,9 +1159,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           },
         ),
         OutlinedButton(
-          onPressed: () {
+          key: const Key('screen04-account-sign-out'),
+          onPressed: () async {
             Navigator.of(context).pop();
-            context.go('/sign-in?intent=sign-out');
+            await widget.session.signOut();
+            if (mounted) context.go('/sign-in');
           },
           child: const Text('Sign out'),
         ),
