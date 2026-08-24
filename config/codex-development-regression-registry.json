@@ -41880,6 +41880,30 @@
         "backend/functions/src/youtube/oauth_return_page.ts",
         "backend/functions/src/youtube/oauth_return_page.test.ts"
       ]
+    },
+    {
+      "id": "REG-20260824-3713-YOUTUBE-OAUTH-RETURN-NEGATIVE-TEST-CONFLATED-APP-HOST-WITH-INTERNAL-APP-PATH",
+      "status": "registered_source_correct_test_oracle_fix_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "youtube"
+      ],
+      "mistake": "The isolated return-page source compiled, but both tests failed because the new /app/creator negative regex matched across the valid authority and path in moolsocial://app/creator/youtube-connect.",
+      "rootCause": "The negative fixture treated the textual host segment app plus /creator as if it were the forbidden internal pathname /app/creator.",
+      "prevention": "Preserve the canonical source URI, parse appReturnUrl with URL, assert host app and pathname /creator/youtube-connect, explicitly reject pathname /app/creator/youtube-connect, then rerun the same isolated compiled tests and mobile return tests.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "backend/functions/src/youtube/oauth_return_page.test.ts"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/youtube/oauth_return_page.ts",
+        "backend/functions/src/youtube/oauth_return_page.test.ts"
+      ]
     }
   ]
 }
