@@ -48,7 +48,7 @@ void main() {
     return (journey: journey, chat: chat);
   }
 
-  testWidgets('Chat inbox keeps the Mool launcher and selected Chat edge', (
+  testWidgets('Chat inbox is a standalone page with exact origin Back', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -56,39 +56,14 @@ void main() {
     await mount(tester, route: '/app/chat/inbox?return=/app/buy');
 
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    expect(find.byKey(const Key('chat-global-edge-navigation')), findsOne);
-    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('chat-global-chat-edge')), findsOneWidget);
+    expect(find.byKey(const Key('chat-global-edge-navigation')), findsNothing);
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(find.byKey(const Key('chat-back')), findsNothing);
     expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
     expect(find.byTooltip('Back to previous screen'), findsOneWidget);
     expect(find.byKey(const Key('chat-open-mool')), findsNothing);
     expect(find.byKey(const Key('chat-thread-mool')), findsNothing);
-
-    await tester.enterText(
-      find.byKey(const Key('chat-search-field')),
-      'Home Basket',
-    );
-    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('mool-connected-action-navigator')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('mool-navigator-family-social')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
-
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const Key('chat-search-field')))
-          .controller
-          ?.text,
-      'Home Basket',
-    );
 
     await tester.tap(find.byKey(const Key('chat-inbox-back')));
     await tester.pumpAndSettle();
@@ -116,7 +91,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
     expect(find.byKey(const Key('chat-back')), findsOneWidget);
-    expect(find.byKey(const Key('chat-global-chat-edge')), findsOneWidget);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
 
     await tester.tap(find.byKey(const Key('chat-back')));
     await tester.pumpAndSettle();
@@ -138,7 +113,7 @@ void main() {
     expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
   });
 
-  testWidgets('thread draft focus and IME survive a global Buy round trip', (
+  testWidgets('thread keeps native composer focus without a global dock', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -160,16 +135,9 @@ void main() {
       isTrue,
     );
 
-    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
-    await tester.pumpAndSettle();
-    final buy = find.byKey(const Key('mool-navigator-family-buy'));
-    expect(buy.hitTestable(), findsOneWidget);
-    await tester.tap(buy);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
+    await tester.pump();
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
     expect(
       tester.widget<TextField>(field).controller?.text,

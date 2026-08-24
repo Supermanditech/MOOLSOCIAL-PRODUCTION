@@ -1,10 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
-import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../chat_session.dart';
 
 void chatGoBack(BuildContext context, String returnRoute) {
@@ -56,14 +54,6 @@ class ChatPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final view = View.of(context);
-    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-      viewPadding: EdgeInsets.fromViewPadding(
-        view.viewPadding,
-        view.devicePixelRatio,
-      ),
-      platform: defaultTargetPlatform,
-    );
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -147,61 +137,7 @@ class ChatPageScaffold extends StatelessWidget {
             ),
           ),
         ),
-        bottomNavigationBar: Column(
-          key: const Key('chat-bottom-navigation-stack'),
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ?bottom,
-            RepaintBoundary(
-              key: const Key('chat-global-edge-navigation'),
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: MoolLocalNavigationTokens.destinationCanvas,
-                  border: Border(
-                    top: BorderSide(
-                      color: MoolLocalNavigationTokens.destinationDivider,
-                    ),
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      bottom: exportedSemanticsClearance,
-                    ),
-                    child: SafeArea(
-                      top: false,
-                      maintainBottomViewPadding: true,
-                      minimum: const EdgeInsets.only(bottom: 2),
-                      child: SizedBox(
-                        key: const Key('chat-compact-global-edge-rail'),
-                        height: MoolLocalNavigationTokens.destinationRailHeight,
-                        child: Row(
-                          children: [
-                            MoolGlobalNavigationV2(
-                              activeId: 'chat',
-                              onOpenMool: () =>
-                                  context.push('/app/mool?from=chat'),
-                              onOpenAction: (action) =>
-                                  context.push(action.route),
-                              onOpenChat: null,
-                              compact: true,
-                            ),
-                            const Spacer(),
-                            const MoolGlobalChatNavigationV2(
-                              controlKey: Key('chat-global-chat-edge'),
-                              onOpenChat: null,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        bottomNavigationBar: bottom,
       ),
     );
   }

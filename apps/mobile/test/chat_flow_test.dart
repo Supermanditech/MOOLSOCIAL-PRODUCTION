@@ -165,7 +165,7 @@ void main() {
   );
 
   testWidgets(
-    'Chat keeps a high-contrast new-chat action and compact global edges',
+    'Chat keeps a high-contrast new-chat action on a standalone page',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       tester.platformDispatcher.textScaleFactorTestValue = 1.4;
@@ -199,22 +199,18 @@ void main() {
 
       expect(
         find.byKey(const Key('chat-global-edge-navigation')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('chat-compact-global-edge-rail')),
-        findsOneWidget,
+        findsNothing,
       );
-      final mool = find.byKey(const Key('mool-compact-launcher'));
-      final chatEdge = find.byKey(const Key('chat-global-chat-edge'));
-      expect(mool, findsOneWidget);
-      expect(chatEdge, findsOneWidget);
-      expect(tester.getSize(mool).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(mool).height, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).height, greaterThanOrEqualTo(44));
-      expect(tester.getCenter(mool).dx, lessThan(72));
-      expect(tester.getCenter(chatEdge).dx, greaterThan(288));
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
+      final back = find.byKey(const Key('chat-inbox-back'));
+      expect(back, findsOneWidget);
+      expect(tester.getSize(back).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(back).height, greaterThanOrEqualTo(44));
       expect(tester.takeException(), isNull);
     },
   );
@@ -323,18 +319,9 @@ void main() {
 
       await tapVisible(tester, const Key('chat-send'));
       expect(find.text('Write a message.'), findsOneWidget);
-      await tapVisible(tester, const Key('mool-compact-launcher'));
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsOneWidget,
-      );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsNothing,
-      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -444,16 +431,13 @@ void main() {
       size: const Size(360, 800),
     );
 
-    for (final key in const [
-      Key('chat-back'),
-      Key('mool-compact-launcher'),
-      Key('chat-global-chat-edge'),
-      Key('chat-send'),
-    ]) {
+    for (final key in const [Key('chat-back'), Key('chat-send')]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
