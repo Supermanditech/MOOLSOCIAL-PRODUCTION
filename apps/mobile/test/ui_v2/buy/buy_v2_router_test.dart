@@ -86,6 +86,19 @@ void main() {
     expect(find.text('Orders'), findsWidgets);
   });
 
+  testWidgets('Offers deep link restores the exact Offers catalogue', (
+    tester,
+  ) async {
+    await mountRoute(tester, '/app/buy?sub=offers');
+
+    expect(find.byKey(const PageStorageKey('buy-offers')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+    expect(find.text('Search offers, products and sellers'), findsOneWidget);
+  });
+
   testWidgets('Screen 04 Mool Buy action opens only the native Buy V2', (
     tester,
   ) async {

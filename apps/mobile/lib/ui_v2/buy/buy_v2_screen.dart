@@ -21,6 +21,7 @@ class BuyV2Screen extends StatefulWidget {
     super.key,
     required this.session,
     this.initialDestination = BuyV2Destination.shop,
+    this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
     this.initialCartScope = BuyV2CartScope.all,
     this.productId,
@@ -38,6 +39,7 @@ class BuyV2Screen extends StatefulWidget {
 
   final BuyV2Session session;
   final BuyV2Destination initialDestination;
+  final bool initialOffersActive;
   final BuyV2View initialView;
   final BuyV2CartScope initialCartScope;
   final String? productId;
@@ -85,6 +87,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       unawaited(widget.session.restoreSavedProducts());
     }
     if (oldWidget.initialDestination != widget.initialDestination ||
+        oldWidget.initialOffersActive != widget.initialOffersActive ||
         oldWidget.initialView != widget.initialView ||
         oldWidget.initialCartScope != widget.initialCartScope ||
         oldWidget.productId != widget.productId ||
@@ -95,7 +98,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _applyInitialState() {
-    _offersActive = false;
+    _offersActive = widget.initialOffersActive;
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;

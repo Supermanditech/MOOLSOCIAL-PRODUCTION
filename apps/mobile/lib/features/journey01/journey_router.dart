@@ -274,6 +274,7 @@ GoRouter createJourneyRouter(
             child: BuyV2Screen(
               session: buyV2Session,
               initialDestination: destination,
+              initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
               initialView: view,
               initialCartScope: cartScope,
               productId: state.uri.queryParameters['product'],
