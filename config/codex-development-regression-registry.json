@@ -41825,6 +41825,36 @@
         "config/codex-subagent-coordination-policy.json",
         "apps/mobile/.dart_tool/package_config.json"
       ]
+    },
+    {
+      "id": "REG-20260824-3711-YOUTUBE-OAUTH-RETURN-PAGE-EMITS-NONCANONICAL-TRIPLE-SLASH-APP-URI",
+      "status": "registered_proven_upstream_runtime_source_fix_authorized",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "authentication",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "After the Android return activity tuple was fixed, the backend OAuth callback return page was proven to emit and test moolsocial:///app/creator/youtube-connect, which has no app host and cannot resolve the manifest activity requiring host app and path /creator/youtube-connect.",
+      "rootCause": "The provider callback HTML/meta-refresh/link owns an internal Flutter route encoded as an external custom-scheme URI instead of the canonical Android deep-link tuple.",
+      "prevention": "Claim only oauth_return_page.ts and its test, emit moolsocial://app/creator/youtube-connect with exactly youtubeConnect=complete or failed, preserve token-free CSP-safe HTML, add canonical positive and triple-slash/unsafe-result negatives, and replay backend plus Android/Dart return tests without touching OAuth exchange or provider configuration.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "backend/functions/src/youtube/oauth_return_page.test.ts",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart",
+        "apps/mobile/test/youtube_connect_return_route_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/youtube/oauth_return_page.ts",
+        "backend/functions/src/youtube/oauth_return_page.test.ts",
+        "apps/mobile/android/app/src/main/AndroidManifest.xml",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
+        "apps/mobile/lib/core/navigation/youtube_connect_return_route.dart"
+      ]
     }
   ]
 }
