@@ -42068,6 +42068,30 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-youtube-private-dev-preflight.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3721-YOUTUBE-LOCAL-PREFLIGHT-GLOBAL-GETDATACONNECT-SUBSTRING-REJECTION",
+      "status": "registered_youtube_runtime_reachability_classification_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "After the v2 local boundary, no-UI mode and canonical deny-all rules passed, preflight rejected because backend/functions/src/index.ts contains getDataConnect somewhere in the global runtime source.",
+      "rootCause": "The historical assertion bans a global symbol without proving whether Data Connect is constructed or reachable in the YouTube provider/OAuth path versus an unrelated backend subsystem.",
+      "prevention": "Preserve the global historical assertion in remediation mode; inspect only current index.ts YouTube composition, and if YouTube remains bound to getFirestore with no DataConnectYouTube/DataConnectOAuthAttemptStore construction, use exact semantic YouTube reachability checks plus a Data Connect YouTube negative fixture in local feature mode.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/index.ts",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
     }
   ]
 }

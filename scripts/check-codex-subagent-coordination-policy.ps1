@@ -332,7 +332,7 @@ Assert-ExactNames $gitDiscipline.workStart @(
 ) 'production work start'
 Assert-Coordination (
   [string]$gitDiscipline.workStart.annotatedTag -ceq
-    'moolsocial-parallel-production-discipline-20260824-v79' -and
+    'moolsocial-parallel-production-discipline-20260824-v80' -and
   [bool]$gitDiscipline.workStart.mustDescendFromAcceptedRuntimeBaseline -and
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
@@ -656,7 +656,7 @@ foreach ($token in @(
   'never enumerate all historical assessment properties',
   'digest output allowlist is',
   'Mandatory Codex/Cursor isolated production Git discipline',
-  'moolsocial-parallel-production-discipline-20260824-v79',
+  'moolsocial-parallel-production-discipline-20260824-v80',
   'Parallel mutation in one checkout is forbidden',
   'codex-cursor-baseline-reconciliation',
   '`governance_preflight`',
