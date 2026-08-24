@@ -41710,6 +41710,121 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
         "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3706-YOUTUBE-CONNECT-FLUTTER-TEST-MODIFIED-TRACKED-GENERATED-SUPPORT-OWNERS",
+      "status": "registered_tests_passed_generated_changes_must_be_restored",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "Both focused YouTube return suites passed, but Flutter dependency resolution modified tracked .dart_tool package_config.json, package_graph.json and GeneratedPluginRegistrant.java outside the two-owner repair claim.",
+      "rootCause": "The focused Flutter test bootstrap refreshed tracked generated dependency/plugin support files in the clean successor worktree.",
+      "prevention": "Preserve only the Kotlin activity and Dart source-gate diff, restore exactly the three generated support owners to HEAD, require zero other dirt, then replay the implementation/pre-commit boundary without rerunning the already-passed tests.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart",
+        "apps/mobile/test/youtube_connect_return_route_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/.dart_tool/package_config.json",
+        "apps/mobile/.dart_tool/package_graph.json",
+        "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
+      ]
+    },
+    {
+      "id": "REG-20260824-3707-YOUTUBE-CONNECT-IMPLEMENTATION-GATE-REJECTED-GENERATED-OWNER-CONTAMINATION",
+      "status": "registered_expected_fail_closed_result_no_commit",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The implementation coordination gate was launched in parallel with the owner check after the focused tests and rejected because package_graph.json was a changed owner outside the YouTube claim.",
+      "rootCause": "The gate correctly observed the same generated-file contamination recorded by REG3706 before the primary had restored those files.",
+      "prevention": "Bind this registry generation, do not add generated owners to the claim, restore the exact generated changes, verify only the two intended owners remain, then invoke the implementation gate once before staging.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/.dart_tool/package_graph.json"
+      ]
+    },
+    {
+      "id": "REG-20260824-3708-YOUTUBE-CONNECT-GENERATED-CLEANUP-EXPECTED-WRONG-SUPPORT-FILE-SET",
+      "status": "registered_no_restore_actual_three_owner_set_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first generated cleanup expected package_config.json to remain changed and omitted .flutter-plugins-dependencies; the exact owner assertion rejected before patch capture or restore.",
+      "rootCause": "The cleanup target set was inferred from warning output rather than the final repository-root git diff owner list after both tests completed.",
+      "prevention": "Bind this registry generation, preserve only the two intended owners, restore exactly package_graph.json, .flutter-plugins-dependencies and GeneratedPluginRegistrant.java, and require the remaining diff to equal only the Kotlin activity and Dart test.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/.dart_tool/package_graph.json",
+        "apps/mobile/.flutter-plugins-dependencies",
+        "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
+      ]
+    },
+    {
+      "id": "REG-20260824-3709-YOUTUBE-GOVERNANCE-BINDING-PATCH-USED-PRE-REG3706-ANCHOR",
+      "status": "registered_atomic_rejection_actual_pending_binding_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The post-REG3708 coordination-binding patch expected the pre-REG3706 generation 3676 even though the pending governance policy had already been bound to generation 3678; the patch was rejected atomically.",
+      "rootCause": "The binding update reused a stale remembered intermediate value instead of reading the actual current two-field binding before replacement.",
+      "prevention": "Bind this final registry generation from the exact current policy value, advance one successor tag, parse both JSON owners and complete the already-authorized generated-file cleanup without another inferred intermediate binding.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
+    },
+    {
+      "id": "REG-20260824-3710-YOUTUBE-GENERATED-RESTORE-LEFT-RESIDUAL-TRACKED-SUPPORT-DIRT",
+      "status": "registered_intended_patch_preserved_exact_residual_owner_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The intended two-owner repair patch was captured and the expected five owners were restored, but the final zero-dirt assertion still failed after Git emitted a package_config.json line-ending warning.",
+      "rootCause": "Restoring the generated dependency owners rematerialized an additional tracked support file that was not present in the pre-restore diff owner list.",
+      "prevention": "Bind this registry generation, read only the residual status owner names, restore exactly those generated support owners, require a clean worktree, then reapply only the preserved two-owner repair patch after governance refresh.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/.dart_tool/package_config.json"
+      ]
     }
   ]
 }
