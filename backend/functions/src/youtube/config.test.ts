@@ -39,6 +39,7 @@ function proofEnvironment(
   profile:
     | "publicData"
     | "ownerConnect"
+    | "socialAuthRuntime"
     | "ownerActions"
     | "creatorAssets"
     | "live"
@@ -49,6 +50,7 @@ function proofEnvironment(
   const flag = {
     publicData: "YOUTUBE_PUBLIC_DATA_ENABLED",
     ownerConnect: "YOUTUBE_OWNER_CONNECT_ENABLED",
+    socialAuthRuntime: "YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED",
     ownerActions: "YOUTUBE_OWNER_ACTIONS_ENABLED",
     creatorAssets: "YOUTUBE_CREATOR_ASSETS_ENABLED",
     live: "YOUTUBE_LIVE_ENABLED",
@@ -163,6 +165,48 @@ test("one supervised profile activates only inside its server proof window", () 
     );
     assert.equal(result.publicOrUnlistedUpload, false);
   }
+});
+
+test("social auth runtime exposes only public data and channel connection", () => {
+  const result = readCapabilities(
+    proofEnvironment("socialAuthRuntime"),
+    now,
+  );
+  assert.deepEqual(result, {
+    environment: "dev",
+    publicData: true,
+    ownerConnect: true,
+    ownerActions: false,
+    creatorAssets: false,
+    live: false,
+    privateUpload: false,
+    ownerAnalytics: false,
+    analyticsV2: false,
+    reportingV1: false,
+    publicOrUnlistedUpload: false,
+  });
+  assert.deepEqual(
+    readCapabilities(
+      {
+        ...proofEnvironment("socialAuthRuntime"),
+        YOUTUBE_OWNER_CONNECT_ENABLED: "true",
+      },
+      now,
+    ),
+    {
+      environment: "dev",
+      publicData: false,
+      ownerConnect: false,
+      ownerActions: false,
+      creatorAssets: false,
+      live: false,
+      privateUpload: false,
+      ownerAnalytics: false,
+      analyticsV2: false,
+      reportingV1: false,
+      publicOrUnlistedUpload: false,
+    },
+  );
 });
 
 test("accepted public review keeps only public data live in exact Dev", () => {

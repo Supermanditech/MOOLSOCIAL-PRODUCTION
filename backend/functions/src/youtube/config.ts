@@ -15,6 +15,7 @@ export const ACCEPTED_PUBLIC_REVIEW_MODE = "accepted";
 const proofProfileFlag = {
   publicData: "YOUTUBE_PUBLIC_DATA_ENABLED",
   ownerConnect: "YOUTUBE_OWNER_CONNECT_ENABLED",
+  socialAuthRuntime: "YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED",
   ownerActions: "YOUTUBE_OWNER_ACTIONS_ENABLED",
   creatorAssets: "YOUTUBE_CREATOR_ASSETS_ENABLED",
   live: "YOUTUBE_LIVE_ENABLED",
@@ -79,6 +80,7 @@ function activeProofProfile(
   if (
     profile !== "publicData" &&
     profile !== "ownerConnect" &&
+    profile !== "socialAuthRuntime" &&
     profile !== "ownerActions" &&
     profile !== "creatorAssets" &&
     profile !== "live" &&
@@ -157,8 +159,11 @@ export function readCapabilities(
   return {
     environment: environment(env.MOOLSOCIAL_PROVIDER_ENV),
     publicData:
-      acceptedPublicReview || proofProfile === "publicData",
-    ownerConnect: proofProfile === "ownerConnect",
+      acceptedPublicReview ||
+      proofProfile === "publicData" ||
+      proofProfile === "socialAuthRuntime",
+    ownerConnect:
+      proofProfile === "ownerConnect" || proofProfile === "socialAuthRuntime",
     ownerActions: proofProfile === "ownerActions",
     creatorAssets: proofProfile === "creatorAssets",
     live: proofProfile === "live",
