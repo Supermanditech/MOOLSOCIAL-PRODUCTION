@@ -41316,6 +41316,50 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3689-FACEBOOK-C34P-FIX5-REQUIRE-QUALIFIED-REJECTED-HISTORICAL-FIX8-LIFECYCLE",
+      "status": "registered_gate_only_current_facebook_successor_compatibility_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "coordination",
+        "authentication"
+      ],
+      "mistake": "After 160 focused tests, 14 analyzer items and the non-private full-social readiness gate passed, the first qualified C34P FIX5 invocation rejected the clean Facebook v50 worktree because the gate admitted only historical FIX8 release lifecycles.",
+      "rootCause": "The historical all-eight readiness gate has no evidence-bound compatibility branch for the founder-authorized UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824 batch successor with build, device, external, private and secret authority held false.",
+      "prevention": "Preserve all historical FIX8 lifecycle predicates and provider facts, add only an exact canonical-ticket-hash and coordination-claim-bound Facebook prebuild branch with positive and wrong-ticket/hash/lifecycle/authority negative self-fixtures, and replay the qualified gate once without build or provider action.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3690-FACEBOOK-GATE-STATUS-PROBE-POWERSHELL-PARENTHESIS-PARSER-DEFECT",
+      "status": "registered_read_only_probe_failed_no_repository_state_changed",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "tooling"
+      ],
+      "mistake": "The first combined Facebook status probe embedded a semicolon and LASTEXITCODE expression inside a parenthesized property expression and PowerShell rejected it with a missing-closing-parenthesis parser error.",
+      "rootCause": "The scalar probe attempted command execution and exit-code evaluation inline inside a PSCustomObject property.",
+      "prevention": "Bind this registry generation and compute Git tracking/status scalars in separate statements before constructing the bounded result object; do not retry the malformed expression.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }
