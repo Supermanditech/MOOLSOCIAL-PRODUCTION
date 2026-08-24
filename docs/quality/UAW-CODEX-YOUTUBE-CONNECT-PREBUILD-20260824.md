@@ -2,8 +2,8 @@
 
 Founder date: 24 August 2026 IST
 Lane: `codex_auth`
-Work ID: `youtube-connect-prebuild-20260824`
-Branch: `work/codex-auth/youtube-connect-prebuild-20260824`
+Work ID: `youtube-connect-prebuild-20260824-v2`
+Branch: `work/codex-auth/youtube-connect-prebuild-20260824-v2`
 
 ## Objective
 

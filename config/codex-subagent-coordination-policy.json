@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3686,
-    "sha256": "12A5C102F897BAE3C578BD48713E5C22BBAAB3898BFC92F83FBBBD1D7846DAEB"
+    "entryCount": 3687,
+    "sha256": "353486182700D33012450DE2906748B79ACA2A738ADD019E56CA52B30DC158BB"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -119,7 +119,7 @@
       ]
     },
     {
-      "task": "/root/codex_auth_youtube_connect_prebuild_20260824",
+      "task": "/root/codex_auth_youtube_connect_prebuild_20260824_v2",
       "role": "primary",
       "owners": [
         "apps/mobile/lib/main.dart",
@@ -174,7 +174,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v74",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v75",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

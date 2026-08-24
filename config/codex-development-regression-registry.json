@@ -41953,6 +41953,30 @@
         "scripts/check-youtube-private-dev-preflight.ps1",
         "scripts/check-approved-ui-locks.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3716-YOUTUBE-FEATURE-BRANCH-DIVERGED-AFTER-BACKEND-COMMIT-AND-GOVERNANCE-ADVANCE",
+      "status": "registered_no_merge_rebase_or_rewrite_v2_successor_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "authentication"
+      ],
+      "mistake": "The v74 fast-forward of the original YouTube branch was attempted after that branch gained qualified backend commit a9f9f8a while v73/v74 governance advanced independently from its prior base, so Git correctly refused the divergent histories before any patch reapply.",
+      "rootCause": "The backend feature commit was not carried into the remediation governance line before later registry refreshes, leaving an immutable qualified feature commit and immutable governance commits on separate descendants.",
+      "prevention": "Do not merge, rebase, reset, cherry-pick or force-push either history. Select an exact v2 YouTube work ID/branch from the next governance tag, reapply the checksum-bound qualified backend patch as its own atomic commit, then apply and qualify the local preflight gate correction on that clean successor.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md",
+        "backend/functions/src/youtube/oauth_return_page.ts",
+        "backend/functions/src/youtube/oauth_return_page.test.ts"
+      ]
     }
   ]
 }
