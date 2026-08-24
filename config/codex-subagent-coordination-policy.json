@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3672,
-    "sha256": "5D6A09A3CF2FA318FDFF8EE9D06D041D4A2C8AF4B2B847F78B51747F11D6833E"
+    "entryCount": 3673,
+    "sha256": "218C2A9E7D6FE670E3A4F5A6AD461FCB33F1E3992E2A9054726EAC57BBA14631"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -119,32 +119,28 @@
       ]
     },
     {
-      "task": "/root/codex_auth_facebook_prebuild_20260824",
+      "task": "/root/codex_auth_youtube_connect_prebuild_20260824",
       "role": "primary",
       "owners": [
         "apps/mobile/lib/main.dart",
-        "apps/mobile/lib/core/auth/facebook_login_contract.dart",
-        "apps/mobile/lib/core/auth/facebook_native_sdk_adapter.dart",
-        "apps/mobile/lib/core/auth/public_auth_runtime_configuration.dart",
-        "apps/mobile/lib/features/journey01/journey_services.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
         "apps/mobile/lib/features/journey01/journey_session.dart",
-        "apps/mobile/lib/features/journey01/review_journey_services.dart",
-        "apps/mobile/lib/features/journey01/screens/sign_in_screen.dart",
         "apps/mobile/android/app/src/main/AndroidManifest.xml",
-        "apps/mobile/android/app/build.gradle.kts",
-        "apps/mobile/pubspec.yaml",
-        "apps/mobile/pubspec.lock",
-        "apps/mobile/test/firebase_social_auth_gateway_test.dart",
-        "apps/mobile/test/uaw_c34p_facebook_login_contract_test.dart",
-        "apps/mobile/test/uaw_c34p_facebook_native_sdk_adapter_test.dart",
-        "apps/mobile/test/uaw_c34p_public_auth_failure_and_availability_test.dart",
-        "apps/mobile/test/uaw_c34p_fix8_global_social_login_runtime_composition_test.dart",
-        "apps/mobile/test/uaw_c33g_fix2_social_identity_provider_truth_test.dart",
-        "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md",
-        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1",
-        "scripts/check-uaw-c34p-public-authentication-shared-gateway.ps1",
+        "apps/mobile/test/youtube_connect_return_route_test.dart",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart",
+        "apps/mobile/test/social_v2_youtube_connect_return_test.dart",
+        "apps/mobile/test/screen03_session_test.dart",
+        "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_account_state_journey_c30j_test.dart",
+        "apps/mobile/test/youtube_private_dev_proof_harness_test.dart",
+        "apps/mobile/test/youtube_private_dev_client_test.dart",
+        "apps/mobile/test/social_v2_youtube_creator_upload_test.dart",
+        "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md",
+        "scripts/check-personal-social-youtube-creator-connection-private-short-upload-c29l.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1",
+        "scripts/check-youtube-private-dev-package.ps1",
+        "scripts/check-youtube-private-dev-exports.mjs",
         "scripts/check-full-social-founder-dev-readiness.ps1",
-        "scripts/check-uaw-c33g-fix2-social-identity-provider-truth.ps1",
+        "scripts/check-youtube-private-dev-security-prerequisites.ps1",
         "scripts/check-android-plugin-manifest-namespace-readiness.ps1"
       ]
     }
@@ -175,7 +171,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v60",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v62",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },
@@ -245,7 +241,7 @@
         "priorProviderImplementationAndQualificationCommitsRequired": true,
         "runtimeAcceptanceDeferredUntilOneCombinedApk": true,
         "finalTicketCloseStillRequired": true,
-        "currentProvider": "facebook",
+        "currentProvider": "youtube_connect",
         "completedPrebuildProviders": [
           {
             "provider": "email_link",
@@ -253,6 +249,15 @@
             "branch": "work/codex-auth/email-link-auth-20260823",
             "implementationCommit": "883f1d06c315438823c801b184b990b672c77f85",
             "qualificationCommit": "84ab8e55414d4b87b3442a3b9631fe058efc6efe",
+            "remoteQualified": true,
+            "runtimeAcceptancePending": true
+          },
+          {
+            "provider": "facebook",
+            "ticketId": "UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824",
+            "branch": "work/codex-auth/facebook-auth-prebuild-20260824",
+            "implementationCommit": "567168bb4814e0cfe2b7b7a3daac772e3f4bb64c",
+            "qualificationCommit": "2024c25690b81b438c8c08f0081c6b60bd104010",
             "remoteQualified": true,
             "runtimeAcceptancePending": true
           }

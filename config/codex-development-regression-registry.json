@@ -41612,6 +41612,29 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824.md"
       ]
+    },
+    {
+      "id": "REG-20260824-3702-YOUTUBE-TRANSITION-CHECKER-PATCH-COUPLED-BATCH-AND-STALE-WORKSTART-ANCHOR",
+      "status": "registered_atomic_checker_rejection_policy_and_ticket_preserved",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first YouTube transition checker patch coupled the completed-provider batch assertions with two work-start literal replacements, and one stale literal anchor rejected the whole checker patch atomically.",
+      "rootCause": "Semantically independent checker sections were patched together without first reading the exact current work-start literals after the policy moved to the tentative successor.",
+      "prevention": "Preserve the applied YouTube policy and ticket, bind this registry generation, advance one successor tag, patch the batch assertions first, then replace each exact work-start literal separately and parse before governance commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-YOUTUBE-CONNECT-PREBUILD-20260824.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
     }
   ]
 }

@@ -332,7 +332,7 @@ Assert-ExactNames $gitDiscipline.workStart @(
 ) 'production work start'
 Assert-Coordination (
   [string]$gitDiscipline.workStart.annotatedTag -ceq
-    'moolsocial-parallel-production-discipline-20260824-v60' -and
+    'moolsocial-parallel-production-discipline-20260824-v62' -and
   [bool]$gitDiscipline.workStart.mustDescendFromAcceptedRuntimeBaseline -and
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
@@ -438,8 +438,8 @@ Assert-Coordination (
   [bool]$authPrebuildBatch.priorProviderImplementationAndQualificationCommitsRequired -and
   [bool]$authPrebuildBatch.runtimeAcceptanceDeferredUntilOneCombinedApk -and
   [bool]$authPrebuildBatch.finalTicketCloseStillRequired -and
-  [string]$authPrebuildBatch.currentProvider -ceq 'facebook' -and
-  $completedPrebuildProviders.Count -eq 1
+  [string]$authPrebuildBatch.currentProvider -ceq 'youtube_connect' -and
+  $completedPrebuildProviders.Count -eq 2
 ) 'authentication prebuild batch weakened or changed.'
 $emailLinkPrebuild = $completedPrebuildProviders[0]
 Assert-ExactNames $emailLinkPrebuild @(
@@ -459,6 +459,24 @@ Assert-Coordination (
   [bool]$emailLinkPrebuild.remoteQualified -and
   [bool]$emailLinkPrebuild.runtimeAcceptancePending
 ) 'email-link prebuild qualification changed.'
+$facebookPrebuild = $completedPrebuildProviders[1]
+Assert-ExactNames $facebookPrebuild @(
+  'provider','ticketId','branch','implementationCommit','qualificationCommit',
+  'remoteQualified','runtimeAcceptancePending'
+) 'Facebook prebuild qualification'
+Assert-Coordination (
+  [string]$facebookPrebuild.provider -ceq 'facebook' -and
+  [string]$facebookPrebuild.ticketId -ceq
+    'UAW-CODEX-FACEBOOK-AUTH-PREBUILD-20260824' -and
+  [string]$facebookPrebuild.branch -ceq
+    'work/codex-auth/facebook-auth-prebuild-20260824' -and
+  [string]$facebookPrebuild.implementationCommit -ceq
+    '567168bb4814e0cfe2b7b7a3daac772e3f4bb64c' -and
+  [string]$facebookPrebuild.qualificationCommit -ceq
+    '2024c25690b81b438c8c08f0081c6b60bd104010' -and
+  [bool]$facebookPrebuild.remoteQualified -and
+  [bool]$facebookPrebuild.runtimeAcceptancePending
+) 'Facebook prebuild qualification changed.'
 
 $productionLanes = @($gitDiscipline.lanes)
 $expectedLaneIds = @('cursor_ui','codex_auth','codex_backend','integration')
@@ -638,7 +656,7 @@ foreach ($token in @(
   'never enumerate all historical assessment properties',
   'digest output allowlist is',
   'Mandatory Codex/Cursor isolated production Git discipline',
-  'moolsocial-parallel-production-discipline-20260824-v60',
+  'moolsocial-parallel-production-discipline-20260824-v62',
   'Parallel mutation in one checkout is forbidden',
   'codex-cursor-baseline-reconciliation',
   '`governance_preflight`',
