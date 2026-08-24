@@ -22,10 +22,14 @@ import 'core/config/email_link_runtime_configuration.dart';
 import 'core/navigation/youtube_connect_return_route.dart';
 import 'core/platform/mool_system_ui_viewport.dart';
 import 'core/youtube/youtube_private_dev_app_check.dart';
+import 'core/youtube/youtube_embedded_player_contract.dart';
+import 'core/youtube/youtube_private_dev_client.dart';
+import 'features/chat/chat_services.dart';
 import 'features/chat/chat_session.dart';
 import 'features/journey01/journey_services.dart';
 import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
+import 'features/shared/social_content_gateway.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
   apiKey: 'demo-moolsocial-local-key',
@@ -726,14 +730,24 @@ Future<void> main() async {
 
 bool _runtimeModeIsValid() {
   return isQualifiedDeviceReviewRuntimeMode(
-    deviceReview: _deviceReviewMode,
-    useEmulators: _useEmulators,
-    youtubePublicReview: _youtubePublicReviewMode,
-    youtubePrivateDevProof: youtubePrivateDevProofEnabled,
-    sideloadPreflightEnabled: _sideloadPreflightEnabled,
-    googleSideloadSigningQualified: _googleSideloadSigningQualified,
-    globalSocialLoginAudit: _globalSocialLoginAuditMode,
-  );
+        deviceReview: _deviceReviewMode,
+        useEmulators: _useEmulators,
+        youtubePublicReview: _youtubePublicReviewMode,
+        youtubePrivateDevProof: youtubePrivateDevProofEnabled,
+        sideloadPreflightEnabled: _sideloadPreflightEnabled,
+        googleSideloadSigningQualified: _googleSideloadSigningQualified,
+        globalSocialLoginAudit: _globalSocialLoginAuditMode,
+      ) &&
+      isQualifiedSocialRuntimeDependencySet(
+        globalSocialLoginAudit: _globalSocialLoginAuditMode,
+        useEmulators: _useEmulators,
+        firebaseProjectId: _firebaseProjectId,
+        youtubePrivateDevProof: youtubePrivateDevProofEnabled,
+        youtubeEmbeddedPlayerEnabled: youtubeEmbeddedPlayerEnabled,
+        youtubeProviderUrl: youtubePrivateDevProviderUrl,
+        socialContentUrl: moolSocialContentUrl,
+        chatUrl: moolSocialChatUrl,
+      );
 }
 
 FirebaseOptions _firebaseOptions() {
