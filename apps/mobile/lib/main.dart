@@ -580,6 +580,9 @@ Future<void> main() async {
       const UnavailableEmailLinkGateway(),
   };
   final pendingEmailLinkAddressStore = SecurePendingEmailLinkAddressStore();
+  final accountIdentityGateway = FirebaseAuthenticatedAccountIdentityGateway(
+    FirebaseAuth.instance,
+  );
   final session = _youtubePublicReviewMode
       ? JourneySession(
           store: SeededJourneyStore(
@@ -613,6 +616,7 @@ Future<void> main() async {
               publicAuthRuntimeConfiguration.passwordlessEmailAvailable,
           mobileOtpAvailable: publicAuthRuntimeConfiguration.mobileOtpAvailable,
           accountBootstrapGateway: DataConnectAccountBootstrapGateway(),
+          accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
           allowGuestReady: true,
@@ -682,6 +686,7 @@ Future<void> main() async {
               : DataConnectAccountBootstrapGateway(
                   emulatorHost: _useEmulators ? emulatorHost : null,
                 ),
+          accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
         );

@@ -928,6 +928,37 @@ void main() {
     expect(tester.takeException(), isNull);
     _expectCustomerCopy(tester, 'header actions');
   });
+
+  testWidgets('authenticated account shows identity and switching action', (
+    tester,
+  ) async {
+    final owners = _AuthenticatedOwners();
+    addTearDown(owners.dispose);
+    await owners.journey.start();
+    await _pump(
+      tester,
+      const Size(390, 844),
+      1,
+      SocialUniversalV2(
+        session: owners.journey,
+        creatorSession: owners.creator,
+        retailerSession: owners.retailer,
+        sharedSession: owners.shared,
+        initialWorld: 'buy',
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('screen04-profile')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-account-authenticated-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Test Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsOneWidget);
+  });
 }
 
 Future<void> _openConnectedAction(
@@ -1057,6 +1088,13 @@ class _AuthenticatedOwners {
       ),
     ),
     otpGateway: ReviewOtpGateway(signedIn: true),
+    accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+      identity: const AuthenticatedAccountIdentity(
+        displayName: 'Test Member',
+        emailAddress: 'member@example.com',
+        signInMethods: ['Google'],
+      ),
+    ),
   );
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();

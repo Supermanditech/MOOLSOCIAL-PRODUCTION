@@ -780,6 +780,60 @@ class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
   Future<void> signOut() => _auth.signOut();
 }
 
+class FirebaseAuthenticatedAccountIdentityGateway
+    implements AuthenticatedAccountIdentityGateway {
+  FirebaseAuthenticatedAccountIdentityGateway(this._auth);
+
+  final FirebaseAuth _auth;
+
+  @override
+  Future<AuthenticatedAccountIdentity?> currentIdentity() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final providerLabels = user.providerData
+        .map((provider) => _publicProviderLabel(provider.providerId))
+        .whereType<String>()
+        .toSet()
+        .toList(growable: false);
+    return AuthenticatedAccountIdentity(
+      displayName: _nonEmpty(user.displayName),
+      emailAddress:
+          _nonEmpty(user.email) ??
+          _firstNonEmpty(user.providerData.map((provider) => provider.email)),
+      phoneNumber:
+          _nonEmpty(user.phoneNumber) ??
+          _firstNonEmpty(
+            user.providerData.map((provider) => provider.phoneNumber),
+          ),
+      signInMethods: providerLabels,
+    );
+  }
+
+  String? _firstNonEmpty(Iterable<String?> values) {
+    for (final value in values) {
+      final normalized = _nonEmpty(value);
+      if (normalized != null) return normalized;
+    }
+    return null;
+  }
+
+  String? _nonEmpty(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  String? _publicProviderLabel(String providerId) => switch (providerId) {
+    'google.com' => 'Google',
+    'facebook.com' => 'Facebook',
+    'twitter.com' => 'X',
+    'apple.com' => 'Apple',
+    'password' => 'Email',
+    'phone' => 'Phone',
+    _ => null,
+  };
+}
+
 class FirebaseSocialAuthGateway
     implements SocialAuthGateway, SocialAuthCallbackGateway {
   FirebaseSocialAuthGateway(

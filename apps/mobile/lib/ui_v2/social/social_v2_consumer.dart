@@ -1154,6 +1154,21 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       title: 'Your MoolSocial account',
       subtitle: 'Profile, language and account safety',
       children: [
+        if (widget.session.isAuthenticated)
+          SocialV2ListTile(
+            key: const Key('screen04-account-authenticated-identity'),
+            icon: Icons.account_circle_outlined,
+            title:
+                widget.session.accountIdentity?.primaryLabel ??
+                'MoolSocial member',
+            detail:
+                widget.session.accountIdentity?.detailLabel ??
+                'Signed in to MoolSocial',
+            onTap: () {
+              Navigator.of(context).pop();
+              context.push('/app/account/security');
+            },
+          ),
         SocialV2ListTile(
           icon: Icons.location_on_outlined,
           title: 'Serviceable area',
@@ -1210,7 +1225,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
             await widget.session.signOut();
             if (mounted) context.go('/sign-in');
           },
-          child: const Text('Sign out'),
+          child: const Text('Sign out or switch account'),
         ),
       ],
     );

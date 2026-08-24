@@ -480,6 +480,59 @@ abstract interface class AccountBootstrapGateway {
   Future<void> prepareAuthenticatedAccount({String? expectedUserId});
 }
 
+class AuthenticatedAccountIdentity {
+  const AuthenticatedAccountIdentity({
+    this.displayName,
+    this.emailAddress,
+    this.phoneNumber,
+    this.signInMethods = const <String>[],
+  });
+
+  final String? displayName;
+  final String? emailAddress;
+  final String? phoneNumber;
+  final List<String> signInMethods;
+
+  String get primaryLabel {
+    final name = displayName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final email = emailAddress?.trim();
+    if (email != null && email.isNotEmpty) return email;
+    final phone = phoneNumber?.trim();
+    if (phone != null && phone.isNotEmpty) return phone;
+    return 'MoolSocial member';
+  }
+
+  String get detailLabel {
+    final details = <String>[
+      if (emailAddress?.trim() case final email? when email.isNotEmpty) email,
+      if (phoneNumber?.trim() case final phone? when phone.isNotEmpty) phone,
+      if (signInMethods.isNotEmpty) signInMethods.join(' · '),
+    ];
+    return details.isEmpty ? 'Signed in to MoolSocial' : details.join(' · ');
+  }
+}
+
+abstract interface class AuthenticatedAccountIdentityGateway {
+  Future<AuthenticatedAccountIdentity?> currentIdentity();
+}
+
+class ReviewAuthenticatedAccountIdentityGateway
+    implements AuthenticatedAccountIdentityGateway {
+  ReviewAuthenticatedAccountIdentityGateway({this.identity, this.failure});
+
+  AuthenticatedAccountIdentity? identity;
+  Object? failure;
+  int readCount = 0;
+
+  @override
+  Future<AuthenticatedAccountIdentity?> currentIdentity() async {
+    readCount += 1;
+    if (failure case final value?) throw value;
+    return identity;
+  }
+}
+
 class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
   ReviewAccountBootstrapGateway({this.failure});
 

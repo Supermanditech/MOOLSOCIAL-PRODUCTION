@@ -40,6 +40,7 @@ class JourneySession extends ChangeNotifier {
     this.emailLinkAvailable = false,
     this.mobileOtpAvailable = true,
     AccountBootstrapGateway? accountBootstrapGateway,
+    AuthenticatedAccountIdentityGateway? accountIdentityGateway,
     LocationPermissionGateway? locationGateway,
     CurrentAreaGateway? currentAreaGateway,
     DateTime Function()? now,
@@ -61,6 +62,9 @@ class JourneySession extends ChangeNotifier {
        ),
        _accountBootstrapGateway =
            accountBootstrapGateway ?? ReviewAccountBootstrapGateway(),
+       _accountIdentityGateway =
+           accountIdentityGateway ??
+           ReviewAuthenticatedAccountIdentityGateway(),
        _locationGateway = locationGateway ?? ReviewLocationPermissionGateway(),
        _currentAreaGateway = currentAreaGateway ?? ReviewCurrentAreaGateway(),
        _now = now ?? DateTime.now;
@@ -76,6 +80,7 @@ class JourneySession extends ChangeNotifier {
   final bool emailLinkAvailable;
   final bool mobileOtpAvailable;
   final AccountBootstrapGateway _accountBootstrapGateway;
+  final AuthenticatedAccountIdentityGateway _accountIdentityGateway;
   final LocationPermissionGateway _locationGateway;
   final CurrentAreaGateway _currentAreaGateway;
   final DateTime Function() _now;
@@ -106,6 +111,7 @@ class JourneySession extends ChangeNotifier {
   String? emailLinkReceiptCode;
   String? errorMessage;
   String? noticeMessage;
+  AuthenticatedAccountIdentity? accountIdentity;
   String? reviewCode;
   String? returnTo;
   String? _authenticationCancelTo;
@@ -243,6 +249,7 @@ class JourneySession extends ChangeNotifier {
         stage = JourneyStage.setup;
       } else if (signedIn) {
         await _prepareAuthenticatedAccount();
+        await _refreshAuthenticatedAccountIdentity();
         stage = JourneyStage.ready;
       } else if (snapshot.setupComplete) {
         stage = resumesPersistedAuthentication
@@ -510,6 +517,7 @@ class JourneySession extends ChangeNotifier {
       await _persist(setupComplete: true);
       if (_authenticatedAtBoot) {
         await _prepareAuthenticatedAccount();
+        await _refreshAuthenticatedAccountIdentity();
         stage = JourneyStage.ready;
       } else if (allowGuestReady) {
         stage = JourneyStage.ready;
@@ -1199,6 +1207,7 @@ class JourneySession extends ChangeNotifier {
     _authenticationCompletionInProgress = true;
     try {
       await _prepareAuthenticatedAccount(expectedUserId: expectedUserId);
+      await _refreshAuthenticatedAccountIdentity();
       await _persist(setupComplete: true);
       _isAuthenticated = true;
       stage = JourneyStage.ready;
@@ -1217,6 +1226,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> _rollbackIncompleteSocialAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     _socialAuthCleanupRequired = true;
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
@@ -1251,6 +1261,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<void> _rollbackIncompleteOtpAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     try {
       await _otpGateway.signOut();
     } on Object {
@@ -1260,6 +1271,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<void> _rollbackIncompleteEmailLinkAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     try {
       await _emailLinkGateway.signOut();
     } on Object {
@@ -1348,6 +1360,7 @@ class JourneySession extends ChangeNotifier {
       await _socialAuthGateway.signOut();
       await _emailLinkGateway.signOut();
       _isAuthenticated = false;
+      accountIdentity = null;
       stage = allowGuestReady ? JourneyStage.ready : JourneyStage.signIn;
       phoneNumber = null;
       emailAddress = null;
@@ -1541,6 +1554,27 @@ class JourneySession extends ChangeNotifier {
             code: 'auth-session-timeout',
           ),
         );
+  }
+
+  Future<void> _refreshAuthenticatedAccountIdentity() async {
+    try {
+      accountIdentity = await _accountIdentityGateway.currentIdentity();
+    } on Object {
+      accountIdentity = null;
+    }
+    accountIdentity ??= switch ((emailAddress, phoneNumber)) {
+      (final email?, _) when email.trim().isNotEmpty =>
+        AuthenticatedAccountIdentity(
+          emailAddress: email.trim(),
+          signInMethods: const ['Email'],
+        ),
+      (_, final phone?) when phone.trim().isNotEmpty =>
+        AuthenticatedAccountIdentity(
+          phoneNumber: phone.trim(),
+          signInMethods: const ['Phone'],
+        ),
+      _ => null,
+    };
   }
 }
 
