@@ -148,6 +148,9 @@ source `c0bbef88d6cd29830e47e11ad4e909b3365b185d`.
   `72/72` tests.
 - Navigation-motion plus Orders purchased-item continuity run: pass,
   `13` tests with `1` pre-existing skipped case.
+- The two claimed pre-r60.89 chooser suites were reconciled to the mandatory
+  compact launcher and local-rail baseline; both focused files pass, `4/4`
+  tests.
 - Explicit laptop review-capture run: pass. Six additive `390 × 844` captures
   are stored under `apps/mobile/test/ui_v2/buy/candidate_captures/`:
   - Offers:
