@@ -88,6 +88,13 @@ function requiredText(
   return value;
 }
 
+function boundedText(value: unknown, field: string, maximum: number): string {
+  if (typeof value !== "string" || value.length > maximum) {
+    throw new Error(`Shared YouTube catalogue has an invalid ${field}.`);
+  }
+  return value;
+}
+
 function snapshotItem(value: unknown): YouTubeVideoSummary {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Shared YouTube catalogue contains an invalid item.");
@@ -106,7 +113,7 @@ function snapshotItem(value: unknown): YouTubeVideoSummary {
   requiredText(item.channelId, "channelId", 64);
   requiredText(item.channelTitle, "channelTitle");
   requiredText(item.publishedAt, "publishedAt", 64);
-  requiredText(item.description, "description", 25000);
+  boundedText(item.description, "description", 25000);
   requiredText(
     (thumbnail as Record<string, unknown>).url,
     "thumbnail URL",
