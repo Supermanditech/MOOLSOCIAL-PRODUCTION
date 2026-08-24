@@ -33,9 +33,11 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMool,
     this.onOpenMainAction,
     this.onOpenChat,
+    this.onShopChatAction,
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.offersSource = const BuyV2CataloguePublishedOffersSource(),
+    this.shopChatSource = const BuyV2SessionShopChatProvisioningSource(),
   });
 
   final BuyV2Session session;
@@ -51,15 +53,18 @@ class BuyV2Screen extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
+  final BuyV2ShopChatActionHandler? onShopChatAction;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PublishedOffersSource offersSource;
+  final BuyV2ShopChatProvisioningSource shopChatSource;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
 }
 
 class _BuyV2ScreenState extends State<BuyV2Screen> {
+  final GlobalKey<BuyV2ShopChatViewState> _shopChatViewKey = GlobalKey();
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
   bool _scannerBusy = false;
@@ -219,7 +224,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           if (!didPop) {
             HapticFeedback.selectionClick();
             if (_shopChatActive) {
-              _closeShopChat();
+              _handleShopChatBack();
             } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
               setState(() => _searchOpen = false);
@@ -576,14 +581,36 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     });
   }
 
+  void _handleShopChatBack() {
+    if (_shopChatViewKey.currentState?.handleBack() ?? false) return;
+    _closeShopChat();
+  }
+
+  void _openShopChatCommerce(BuyV2ShopChatCommerceTarget target) {
+    switch (target) {
+      case BuyV2ShopChatCommerceTarget.shop:
+        _openBuyDestination(BuyV2Destination.shop);
+      case BuyV2ShopChatCommerceTarget.wholesale:
+        _openBuyDestination(BuyV2Destination.wholesale);
+      case BuyV2ShopChatCommerceTarget.orders:
+        _openBuyDestination(BuyV2Destination.orders);
+      case BuyV2ShopChatCommerceTarget.offers:
+        _openOffers();
+    }
+  }
+
   Widget _currentView(BuyV2Session session) {
     if (_shopChatActive) {
       return BuyV2ShopChatView(
+        key: _shopChatViewKey,
         session: session,
         originLabel: _shopChatOriginLabel,
         initialFilter: _shopChatInitialFilter,
         onBack: _closeShopChat,
         onOpenProductionChat: _openGlobalChat,
+        provisioningSource: widget.shopChatSource,
+        onAction: widget.onShopChatAction,
+        onOpenCommerce: _openShopChatCommerce,
       );
     }
     if (_offersActive && session.view == BuyV2View.catalogue) {

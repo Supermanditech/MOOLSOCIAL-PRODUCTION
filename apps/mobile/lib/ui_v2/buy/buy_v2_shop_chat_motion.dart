@@ -57,3 +57,39 @@ class BuyV2ShopChatFilterMotion extends StatelessWidget {
     );
   }
 }
+
+/// Finite directional motion for inbox, conversation and business-info
+/// surfaces. Only the incoming surface owns semantics and hit testing.
+class BuyV2ShopChatSurfaceMotion extends StatelessWidget {
+  const BuyV2ShopChatSurfaceMotion({
+    super.key,
+    required this.stateKey,
+    required this.forward,
+    required this.child,
+  });
+
+  final Object stateKey;
+  final bool forward;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<Object>(stateKey),
+      tween: Tween<double>(begin: reduced ? 1 : .68, end: 1),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.routeChange),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          key: const ValueKey('buy-shop-chat-surface-translation'),
+          offset: Offset((1 - value) * (forward ? 26 : -18), 0),
+          transformHitTests: false,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
