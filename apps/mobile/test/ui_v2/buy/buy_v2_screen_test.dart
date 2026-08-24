@@ -384,8 +384,9 @@ void main() {
       );
       expect(
         restingSearch.width / viewport.size.width,
-        inInclusiveRange(.72, .86),
-        reason: '${viewport.label} resting search width',
+        inInclusiveRange(.65, .76),
+        reason:
+            '${viewport.label} resting search width with location and account',
       );
       expect(
         restingSearch.height,
@@ -882,12 +883,80 @@ void main() {
           safePadding.top,
           reason: '${destination.name} begins at the safe-area top',
         );
+        final accountAction = find.byKey(const ValueKey('buy-open-account'));
+        expect(accountAction, findsOneWidget, reason: destination.name);
+        expect(
+          tester.getSize(accountAction),
+          const Size(44, 44),
+          reason: '${destination.name} account target remains accessible',
+        );
+        final searchBandRect = tester.getRect(searchBand);
+        final accountRect = tester.getRect(accountAction);
+        expect(
+          accountRect.right,
+          searchBandRect.right - 8,
+          reason: '${destination.name} keeps account access at top right',
+        );
+        expect(
+          accountRect.top,
+          closeTo(searchBandRect.top + 5, 1),
+          reason: '${destination.name} keeps account access in the top row',
+        );
+
+        await tester.tap(accountAction);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.account, reason: destination.name);
+        expect(
+          find.byKey(const ValueKey('buy-account-hub')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-search-band')),
+          findsNothing,
+          reason: '${destination.name} Account is a full-page content surface',
+        );
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.destination, destination);
+        expect(session.view, BuyV2View.catalogue);
       }
 
       expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('top-right avatar opens full-page Account and returns to Shop', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final session = BuyV2Session(core: BuySession());
+
+    await tester.pumpWidget(app(session, disableAnimations: true));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Open profile and account'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-profile-avatar')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.account);
+    expect(find.byKey(const ValueKey('buy-account-hub')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(session.destination, BuyV2Destination.shop);
+    expect(session.view, BuyV2View.catalogue);
+    expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets('inactive sponsored placement consumes no catalogue height', (
     tester,

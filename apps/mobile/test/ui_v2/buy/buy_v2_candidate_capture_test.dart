@@ -505,6 +505,88 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for additive evidence.
     skip: true,
   );
+
+  testWidgets(
+    'OPPO installed baseline header removal review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.orders,
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final reviewRootKey = ValueKey(
+          'buy-header-removal-review-root-${destination.name}',
+        );
+
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: reviewRootKey,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                  disableAnimations: true,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(session: session),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (destination == BuyV2Destination.orders) {
+          session.openOrders();
+          await tester.pumpAndSettle();
+        } else if (destination != BuyV2Destination.shop) {
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+        }
+
+        await _captureHeaderRemovalReview(
+          tester,
+          destination.name,
+          reviewRootKey,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-header-visual-creative-reel')),
+          findsNothing,
+          reason: destination.name,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-open-account')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+
+        if (destination == BuyV2Destination.shop) {
+          await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-account-hub')), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+          await _captureHeaderRemovalReview(tester, 'account', reviewRootKey);
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -513,6 +595,22 @@ Future<void> _capture(WidgetTester tester, String state) async {
     find.byKey(const ValueKey('buy-v2-screen')),
     matchesGoldenFile(
       'candidate_captures/buy-v2-r33-search-media-chat-local-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureHeaderRemovalReview(
+  WidgetTester tester,
+  String destination,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/'
+      'buy-v2-oppo-baseline-header-removed-$destination-360x800.png',
     ),
   );
 }
