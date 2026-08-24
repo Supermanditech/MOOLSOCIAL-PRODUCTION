@@ -412,6 +412,47 @@ class SharedSession extends ChangeNotifier {
     noticeMessage = null;
   }
 
+  void resetForAuthenticationBoundary() {
+    busy = false;
+    authorized = false;
+    subscriptionActive = false;
+    errorMessage = null;
+    noticeMessage = null;
+    input = '';
+    inputResult = null;
+    filters.clear();
+    searches.clear();
+    _controlValues.clear();
+    _completedActions.clear();
+    _socialPublishedItems.clear();
+    _socialInteractionsInFlight.clear();
+    _socialInteractionErrors.clear();
+    _socialPublishSequence = 0;
+    _pendingSocialPublishFingerprint = null;
+    _pendingSocialPublishKey = null;
+    _socialFeedCursor = null;
+    socialFeedLoading = false;
+    socialFeedLoaded = false;
+    socialFeedHasMore = false;
+    socialFeedError = null;
+    _socialFeedFailureWasRefresh = true;
+    _socialComments.clear();
+    _socialCommentCursors.clear();
+    _socialCommentsLoaded.clear();
+    _socialCommentsLoading.clear();
+    _socialRepliesInFlight.clear();
+    _socialCommentErrors.clear();
+    _socialReplyDrafts.clear();
+    _pendingSocialReplyFingerprints.clear();
+    _pendingSocialReplyKeys.clear();
+    _socialReplySequence = 0;
+    _socialAuthorProfiles.clear();
+    _socialAuthorsLoading.clear();
+    _socialFollowsInFlight.clear();
+    _socialAuthorErrors.clear();
+    notifyListeners();
+  }
+
   void dismissMessages() {
     clearMessages();
     notifyListeners();

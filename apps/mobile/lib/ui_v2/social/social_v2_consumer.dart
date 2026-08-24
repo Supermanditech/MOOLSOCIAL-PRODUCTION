@@ -36,6 +36,12 @@ typedef Screen04YouTubePublicSearchLoader =
 final Expando<_SocialV2RetainedState> _socialV2RetainedStates =
     Expando<_SocialV2RetainedState>();
 
+void resetSocialV2RetainedStateForAuthenticationBoundary(
+  SharedSession session,
+) {
+  _socialV2RetainedStates[session] = _SocialV2RetainedState();
+}
+
 class _SocialV2RetainedState {
   _SocialV2RetainedState()
     : choiceByWorld = <String, String>{

@@ -20,6 +20,7 @@ import '../features/work/work_session.dart';
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
+import '../ui_v2/social/social_v2_consumer.dart';
 
 class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
@@ -125,6 +126,8 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final LaunchInterruptionGuard _launchInterruptionGuard =
       widget.launchInterruptionGuard ?? LaunchInterruptionGuard();
   late final MoolSocialBrandCadence _brandCadence = MoolSocialBrandCadence();
+  late bool _lastAuthenticated = _session.isAuthenticated;
+  bool _signedOutBoundaryActive = false;
   late final _router = createJourneyRouter(
     _session,
     _bookSession,
@@ -150,9 +153,28 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _session.addListener(_handleAuthenticationBoundary);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _launchInterruptionGuard.start();
     });
+  }
+
+  void _handleAuthenticationBoundary() {
+    final authenticated = _session.isAuthenticated;
+    if (authenticated == _lastAuthenticated) return;
+    final signedOut = _lastAuthenticated && !authenticated;
+    _lastAuthenticated = authenticated;
+    if (signedOut) {
+      _signedOutBoundaryActive = true;
+      _chatSession.resetForAuthenticationBoundary();
+      _sharedSession.resetForAuthenticationBoundary();
+      resetSocialV2RetainedStateForAuthenticationBoundary(_sharedSession);
+      return;
+    }
+    if (authenticated && _signedOutBoundaryActive) {
+      _signedOutBoundaryActive = false;
+      _sharedSession.setAuthorized(true);
+    }
   }
 
   @override
@@ -197,6 +219,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _session.removeListener(_handleAuthenticationBoundary);
     _router.dispose();
     _launchPresentationGate.dispose();
     _brandCadence.dispose();

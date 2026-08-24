@@ -140,6 +140,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('account boundary removes the prior user Create draft', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore();
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('screen04-create-post-text')),
+      'Private draft from the prior account',
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    resetSocialV2RetainedStateForAuthenticationBoundary(owners.shared);
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('active YouTube video survives a main-action remount', (
     tester,
   ) async {

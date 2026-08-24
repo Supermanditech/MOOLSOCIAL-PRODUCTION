@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
 
 void main() {
   Future<void> tapVisible(WidgetTester tester, Key key) async {
@@ -347,4 +349,59 @@ void main() {
     expect(session.areaChoice, AreaChoice.current);
     expect(auth.signedIn, isFalse);
   });
+
+  testWidgets(
+    'successful sign-out clears prior-account Chat and Social state',
+    (tester) async {
+      final auth = ReviewOtpGateway(signedIn: true);
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: auth,
+        allowGuestReady: true,
+      );
+      final chat = ChatSession();
+      final shared = SharedSession()
+        ..saveSocialReplyDraft('prior-post', 'Private');
+      addTearDown(session.dispose);
+      addTearDown(chat.dispose);
+      addTearDown(shared.dispose);
+      await session.start();
+
+      expect(chat.visibleThreads(), isNotEmpty);
+      expect(shared.socialReplyDraft('prior-post'), 'Private');
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: session,
+          chatSession: chat,
+          sharedSession: shared,
+          initialLocation: '/app/mool',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tapVisible(tester, const Key('mool-home-sign-out'));
+      await tapVisible(tester, const Key('mool-confirm-sign-out'));
+
+      expect(session.isAuthenticated, isFalse);
+      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+      expect(chat.visibleThreads(), isEmpty);
+      expect(shared.socialReplyDraft('prior-post'), isEmpty);
+      expect(shared.authorized, isFalse);
+
+      expect(await session.requestOtp('9876543210'), isTrue);
+      expect(await session.verifyOtp('123456'), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(session.isAuthenticated, isTrue);
+      expect(shared.authorized, isTrue);
+      expect(chat.visibleThreads(), isEmpty);
+      expect(shared.socialReplyDraft('prior-post'), isEmpty);
+    },
+  );
 }
