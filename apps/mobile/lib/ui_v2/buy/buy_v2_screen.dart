@@ -14,6 +14,7 @@ import 'buy_v2_design.dart';
 import 'buy_v2_invoice.dart';
 import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
+import 'buy_v2_shop_chat.dart';
 import 'buy_v2_views.dart';
 
 class BuyV2Screen extends StatefulWidget {
@@ -64,6 +65,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
+  bool _shopChatActive = false;
+  BuyV2ShopChatFilter _shopChatInitialFilter = BuyV2ShopChatFilter.all;
+  String _shopChatOriginLabel = 'Shop';
+  int _shopChatMotionSequence = 0;
+  BuyV2NavigationMotionDirection _surfaceMotionDirection =
+      BuyV2NavigationMotionDirection.replace;
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -99,6 +106,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _applyInitialState() {
     _offersActive = widget.initialOffersActive;
+    _shopChatActive = false;
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
@@ -122,10 +130,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _sessionChanged() {
     if (!mounted) return;
+    _surfaceMotionDirection = widget.session.navigationMotionDirection;
     if (_offersActive &&
         widget.session.view == BuyV2View.catalogue &&
         widget.session.destination != BuyV2Destination.shop) {
       _offersActive = false;
+    }
+    if (_shopChatActive &&
+        widget.session.activeDockDestination == BuyV2Destination.medicine) {
+      _shopChatActive = false;
     }
     final destinationChanged =
         _lastSearchDestination != widget.session.destination;
@@ -195,10 +208,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final session = widget.session;
     final careNavigation =
         session.activeDockDestination == BuyV2Destination.medicine;
-    final surfaceTheme = BuyV2ThemeSpec.resolve(
-      session.destination,
-      session.view,
-    );
+    final surfaceTheme = _shopChatActive
+        ? BuyV2ThemeSpec.resolve(BuyV2Destination.shop, BuyV2View.catalogue)
+        : BuyV2ThemeSpec.resolve(session.destination, session.view);
     return BuyV2ThemeScope(
       spec: surfaceTheme,
       child: PopScope<Object?>(
@@ -206,7 +218,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
             HapticFeedback.selectionClick();
-            if (_searchOpen) {
+            if (_shopChatActive) {
+              _closeShopChat();
+            } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
               setState(() => _searchOpen = false);
             } else if (session.canHandleBack) {
@@ -245,7 +259,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                       color: Colors.white.withValues(alpha: .94),
                       child: Column(
                         children: [
-                          if (session.view == BuyV2View.catalogue)
+                          if (session.view == BuyV2View.catalogue &&
+                              !_shopChatActive)
                             _BuySearchBand(
                               session: session,
                               offersActive: _offersActive,
@@ -269,14 +284,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                 Positioned.fill(
                                   child: _BuyNavigationSurfaceOwner(
                                     key: ObjectKey(session),
-                                    stateKey: session.navigationMotionSequence,
-                                    direction:
-                                        session.navigationMotionDirection,
+                                    stateKey: Object.hash(
+                                      session.navigationMotionSequence,
+                                      _shopChatMotionSequence,
+                                    ),
+                                    direction: _surfaceMotionDirection,
                                     child: _BuyExpandCollapseOwner(
                                       key: ValueKey(
-                                        _searchOpen &&
-                                                session.destination !=
-                                                    BuyV2Destination.orders
+                                        _shopChatActive
+                                            ? 'buy-shop-chat-owner-motion'
+                                            : _searchOpen &&
+                                                  session.destination !=
+                                                      BuyV2Destination.orders
                                             ? 'buy-search-owner-motion-search'
                                             : 'buy-search-owner-motion-primary',
                                       ),
@@ -301,7 +320,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               ],
                             ),
                           ),
-                          if (_showsMiniCart(session))
+                          if (!_shopChatActive && _showsMiniCart(session))
                             _BuyMiniCartBar(session: session),
                         ],
                       ),
@@ -328,7 +347,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                 : _buildBuyLocalNavigation(session),
             onOpenMool: _openGlobalMool,
             onOpenAction: _openGlobalAction,
-            onOpenChat: _openGlobalChat,
+            onOpenChat: careNavigation ? _openGlobalChat : _openShopChat,
             onPreviousLocalAction: () => _moveBuyLocal(session, -1),
             onNextLocalAction: () => _moveBuyLocal(session, 1),
           ),
@@ -379,6 +398,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = false;
+      _shopChatActive = false;
       _searchOpen = false;
     });
     if (destination == BuyV2Destination.orders) {
@@ -392,6 +412,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = true;
+      _shopChatActive = false;
       _searchOpen = false;
     });
     widget.session.openDestination(BuyV2Destination.shop);
@@ -484,8 +505,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openGlobalAction(PersonalMoolActionSpec action) {
-    if (action.id == 'buy' && _offersActive) {
-      setState(() => _offersActive = false);
+    if (action.id == 'buy' && (_offersActive || _shopChatActive)) {
+      setState(() {
+        _offersActive = false;
+        _shopChatActive = false;
+      });
     }
     final onOpenMainAction = widget.onOpenMainAction;
     if (onOpenMainAction != null) {
@@ -518,7 +542,50 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  void _openShopChat() {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _shopChatOriginLabel = _offersActive
+          ? 'Offers'
+          : switch (widget.session.activeDockDestination) {
+              BuyV2Destination.orders => 'Orders',
+              BuyV2Destination.wholesale => 'Wholesale',
+              _ => 'Shop',
+            };
+      _shopChatInitialFilter = _offersActive
+          ? BuyV2ShopChatFilter.offers
+          : switch (widget.session.activeDockDestination) {
+              BuyV2Destination.orders => BuyV2ShopChatFilter.orders,
+              BuyV2Destination.wholesale => BuyV2ShopChatFilter.sellers,
+              _ => BuyV2ShopChatFilter.all,
+            };
+      _shopChatActive = true;
+      _searchOpen = false;
+      _shopChatMotionSequence += 1;
+      _surfaceMotionDirection = BuyV2NavigationMotionDirection.forward;
+    });
+  }
+
+  void _closeShopChat() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _shopChatActive = false;
+      _shopChatMotionSequence += 1;
+      _surfaceMotionDirection = BuyV2NavigationMotionDirection.back;
+    });
+  }
+
   Widget _currentView(BuyV2Session session) {
+    if (_shopChatActive) {
+      return BuyV2ShopChatView(
+        session: session,
+        originLabel: _shopChatOriginLabel,
+        initialFilter: _shopChatInitialFilter,
+        onBack: _closeShopChat,
+        onOpenProductionChat: _openGlobalChat,
+      );
+    }
     if (_offersActive && session.view == BuyV2View.catalogue) {
       return BuyV2OffersView(session: session, source: widget.offersSource);
     }
