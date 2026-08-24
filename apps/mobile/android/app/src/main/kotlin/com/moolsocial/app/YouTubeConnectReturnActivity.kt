@@ -34,21 +34,23 @@ class YouTubeConnectReturnActivity : Activity() {
         val result = data.getQueryParameter("youtubeConnect")
         val isExactYouTubeReturn =
             data.scheme == "moolsocial" &&
-                data.host.isNullOrEmpty() &&
-                data.path == YOUTUBE_CONNECT_PATH &&
+                data.host == YOUTUBE_CONNECT_HOST &&
+                data.path == YOUTUBE_CONNECT_EXTERNAL_PATH &&
                 data.fragment == null &&
                 data.queryParameterNames == setOf(YOUTUBE_CONNECT_RESULT) &&
                 data.getQueryParameters(YOUTUBE_CONNECT_RESULT).size == 1 &&
                 (result == "complete" || result == "failed")
         return if (isExactYouTubeReturn) {
-            "$YOUTUBE_CONNECT_PATH?$YOUTUBE_CONNECT_RESULT=$result"
+            "$YOUTUBE_CONNECT_INTERNAL_ROUTE?$YOUTUBE_CONNECT_RESULT=$result"
         } else {
             null
         }
     }
 
     private companion object {
-        const val YOUTUBE_CONNECT_PATH = "/app/creator/youtube-connect"
+        const val YOUTUBE_CONNECT_HOST = "app"
+        const val YOUTUBE_CONNECT_EXTERNAL_PATH = "/creator/youtube-connect"
+        const val YOUTUBE_CONNECT_INTERNAL_ROUTE = "/app/creator/youtube-connect"
         const val YOUTUBE_CONNECT_RESULT = "youtubeConnect"
         const val FLUTTER_INITIAL_ROUTE = "route"
     }

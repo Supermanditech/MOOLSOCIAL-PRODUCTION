@@ -28,6 +28,37 @@ void main() {
     expect(returnActivity, contains('putExtra(FLUTTER_INITIAL_ROUTE, route)'));
     expect(returnActivity, contains('data.queryParameterNames == setOf('));
     expect(returnActivity, contains('data.fragment == null'));
+    expect(returnActivity, contains('data.host == YOUTUBE_CONNECT_HOST'));
+    expect(
+      returnActivity,
+      contains('data.path == YOUTUBE_CONNECT_EXTERNAL_PATH'),
+    );
+    expect(returnActivity, contains('const val YOUTUBE_CONNECT_HOST = "app"'));
+    expect(
+      returnActivity,
+      contains(
+        'const val YOUTUBE_CONNECT_EXTERNAL_PATH = '
+        '"/creator/youtube-connect"',
+      ),
+    );
+    expect(
+      returnActivity,
+      contains(
+        'const val YOUTUBE_CONNECT_INTERNAL_ROUTE = '
+        '"/app/creator/youtube-connect"',
+      ),
+    );
+    expect(
+      returnActivity,
+      contains(
+        '"\$YOUTUBE_CONNECT_INTERNAL_ROUTE?\$YOUTUBE_CONNECT_RESULT=\$result"',
+      ),
+    );
+    expect(returnActivity, isNot(contains('data.host.isNullOrEmpty()')));
+    expect(
+      returnActivity,
+      isNot(contains('data.path == YOUTUBE_CONNECT_INTERNAL_ROUTE')),
+    );
     expect(returnActivity, contains('result == "complete"'));
     expect(returnActivity, contains('result == "failed"'));
     expect(returnActivity, isNot(contains('code')));
