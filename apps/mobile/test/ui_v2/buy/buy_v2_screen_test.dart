@@ -6,6 +6,7 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
@@ -48,6 +49,8 @@ void main() {
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
     BuyV2InvoiceDownloader? invoiceDownloader,
+    AuthenticatedAccountIdentity? accountIdentity,
+    bool accountAuthenticated = false,
     BuyV2PublishedOffersSource offersSource =
         const BuyV2CataloguePublishedOffersSource(),
   }) {
@@ -67,6 +70,8 @@ void main() {
       },
       home: BuyV2Screen(
         session: session,
+        accountIdentity: accountIdentity,
+        accountAuthenticated: accountAuthenticated,
         scannerLauncher: scannerLauncher,
         onOpenMool: onOpenMool,
         invoiceDownloader: invoiceDownloader,
@@ -969,6 +974,36 @@ void main() {
     expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
     expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
     semantics.dispose();
+  });
+
+  testWidgets('Shop Account projects the global authenticated identity', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    const identity = AuthenticatedAccountIdentity(
+      displayName: 'Runtime Member',
+      emailAddress: 'member@example.com',
+      signInMethods: ['Google'],
+    );
+
+    await tester.pumpWidget(
+      app(
+        session,
+        disableAnimations: true,
+        accountIdentity: identity,
+        accountAuthenticated: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('RM'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Runtime Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('Dharmendra Choudhary'), findsNothing);
   });
 
   testWidgets('inactive sponsored placement consumes no catalogue height', (

@@ -8,6 +8,7 @@ import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/journey01/journey_services.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
@@ -21,6 +22,8 @@ class BuyV2Screen extends StatefulWidget {
   const BuyV2Screen({
     super.key,
     required this.session,
+    this.accountIdentity,
+    this.accountAuthenticated = false,
     this.initialDestination = BuyV2Destination.shop,
     this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
@@ -41,6 +44,8 @@ class BuyV2Screen extends StatefulWidget {
   });
 
   final BuyV2Session session;
+  final AuthenticatedAccountIdentity? accountIdentity;
+  final bool accountAuthenticated;
   final BuyV2Destination initialDestination;
   final bool initialOffersActive;
   final BuyV2View initialView;
@@ -281,6 +286,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                 setState(() => _searchOpen = false);
                                 session.openAccount();
                               },
+                              accountLabel:
+                                  widget.accountIdentity?.primaryLabel ??
+                                  (widget.accountAuthenticated
+                                      ? 'MoolSocial member'
+                                      : 'MoolSocial guest'),
                               scannerBusy: _scannerBusy,
                             ),
                           Expanded(
@@ -706,7 +716,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2AssistView(session: session),
-      BuyV2View.account => BuyV2AccountView(session: session),
+      BuyV2View.account => BuyV2AccountView(
+        session: session,
+        accountIdentity: widget.accountIdentity,
+        accountAuthenticated: widget.accountAuthenticated,
+      ),
       BuyV2View.recovery => BuyV2RecoveryView(session: session),
     };
   }
@@ -829,6 +843,7 @@ class _BuySearchBand extends StatelessWidget {
     required this.onScan,
     required this.onLocation,
     required this.onAccount,
+    required this.accountLabel,
     required this.scannerBusy,
   });
 
@@ -840,6 +855,7 @@ class _BuySearchBand extends StatelessWidget {
   final VoidCallback onScan;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
+  final String accountLabel;
   final bool scannerBusy;
 
   @override
@@ -1058,7 +1074,7 @@ class _BuySearchBand extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            _BuyAccountButton(onPressed: onAccount),
+            _BuyAccountButton(onPressed: onAccount, accountLabel: accountLabel),
           ],
         ],
       ),
@@ -1067,9 +1083,13 @@ class _BuySearchBand extends StatelessWidget {
 }
 
 class _BuyAccountButton extends StatelessWidget {
-  const _BuyAccountButton({required this.onPressed});
+  const _BuyAccountButton({
+    required this.onPressed,
+    required this.accountLabel,
+  });
 
   final VoidCallback onPressed;
+  final String accountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1103,9 +1123,9 @@ class _BuyAccountButton extends StatelessWidget {
                       color: BuyV2Colors.navy,
                       shape: BoxShape.circle,
                     ),
-                    child: const Text(
-                      'DC',
-                      style: TextStyle(
+                    child: Text(
+                      _buyAccountInitials(accountLabel),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
@@ -1133,6 +1153,23 @@ class _BuyAccountButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String _buyAccountInitials(String label) {
+  final words = label
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+  if (words.isEmpty) return 'MS';
+  if (words.length > 1) {
+    return words
+        .take(2)
+        .map((word) => String.fromCharCode(word.runes.first))
+        .join()
+        .toUpperCase();
+  }
+  return String.fromCharCodes(words.single.runes.take(2)).toUpperCase();
 }
 
 class _BuyMiniCartBar extends StatelessWidget {

@@ -6,6 +6,7 @@ import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_design.dart';
@@ -4174,9 +4175,16 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
 }
 
 class BuyV2AccountView extends StatelessWidget {
-  const BuyV2AccountView({super.key, required this.session});
+  const BuyV2AccountView({
+    super.key,
+    required this.session,
+    this.accountIdentity,
+    this.accountAuthenticated = false,
+  });
 
   final BuyV2Session session;
+  final AuthenticatedAccountIdentity? accountIdentity;
+  final bool accountAuthenticated;
 
   @override
   Widget build(BuildContext context) {
@@ -4207,9 +4215,14 @@ class BuyV2AccountView extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: BuyV2Colors.orange, width: 2),
                 ),
-                child: const Text(
-                  'DC',
-                  style: TextStyle(
+                child: Text(
+                  _buyAccountViewInitials(
+                    accountIdentity?.primaryLabel ??
+                        (accountAuthenticated
+                            ? 'MoolSocial member'
+                            : 'MoolSocial guest'),
+                  ),
+                  style: const TextStyle(
                     color: BuyV2Colors.navy,
                     fontWeight: FontWeight.w900,
                   ),
@@ -4220,8 +4233,11 @@ class BuyV2AccountView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Dharmendra Choudhary',
+                    Text(
+                      accountIdentity?.primaryLabel ??
+                          (accountAuthenticated
+                              ? 'MoolSocial member'
+                              : 'MoolSocial guest'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -4232,9 +4248,10 @@ class BuyV2AccountView extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      address == null
-                          ? 'Choose a delivery contact'
-                          : '${address.phone} · Account contact',
+                      accountIdentity?.detailLabel ??
+                          (accountAuthenticated
+                              ? 'Signed in to MoolSocial'
+                              : 'Sign in to keep your activity with you'),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 9,
@@ -4304,13 +4321,34 @@ class BuyV2AccountView extends StatelessWidget {
         _AccountActionRow(
           key: const ValueKey('buy-account-security'),
           icon: Icons.security_outlined,
-          title: 'Security',
-          detail: 'Sign-in and account protection',
+          title: accountAuthenticated
+              ? 'Sign out or switch account'
+              : 'Sign in to MoolSocial',
+          detail: accountAuthenticated
+              ? 'Account security and provider access'
+              : 'Use one identity across MoolSocial',
           onTap: () => context.push('/app/account/security'),
         ),
       ],
     );
   }
+}
+
+String _buyAccountViewInitials(String label) {
+  final words = label
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+  if (words.isEmpty) return 'MS';
+  if (words.length > 1) {
+    return words
+        .take(2)
+        .map((word) => String.fromCharCode(word.runes.first))
+        .join()
+        .toUpperCase();
+  }
+  return String.fromCharCodes(words.single.runes.take(2)).toUpperCase();
 }
 
 class _AccountActionRow extends StatelessWidget {

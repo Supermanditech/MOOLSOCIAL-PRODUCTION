@@ -404,4 +404,39 @@ void main() {
       expect(shared.socialReplyDraft('prior-post'), isEmpty);
     },
   );
+
+  testWidgets('authenticated identity is global in the Shop account route', (
+    tester,
+  ) async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+        identity: const AuthenticatedAccountIdentity(
+          displayName: 'Runtime Member',
+          emailAddress: 'member@example.com',
+          signInMethods: ['Google'],
+        ),
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, initialLocation: '/app/buy?sub=shop'),
+    );
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const ValueKey('buy-open-account'));
+
+    expect(find.text('Runtime Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('Dharmendra Choudhary'), findsNothing);
+  });
 }

@@ -273,6 +273,8 @@ GoRouter createJourneyRouter(
             state: state,
             child: BuyV2Screen(
               session: buyV2Session,
+              accountIdentity: session.accountIdentity,
+              accountAuthenticated: session.isAuthenticated,
               initialDestination: destination,
               initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
               initialView: view,
@@ -295,6 +297,8 @@ GoRouter createJourneyRouter(
             ? BuyCatalogScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -307,6 +311,8 @@ GoRouter createJourneyRouter(
             ? BuyMedicineScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.medicine,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -322,6 +328,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.product,
                 productId: state.pathParameters['productId'],
@@ -336,6 +344,8 @@ GoRouter createJourneyRouter(
             ? BuyBasketScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: _buyV2Destination(
                   state.uri.queryParameters['scope'],
                 ),
@@ -354,6 +364,8 @@ GoRouter createJourneyRouter(
             ? BuyReviewScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.checkout,
                 onExit: buyExit(context, state),
@@ -370,6 +382,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -387,6 +401,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -404,6 +420,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -419,6 +437,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -434,6 +454,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.assist,
                 orderId: state.pathParameters['orderId'],
