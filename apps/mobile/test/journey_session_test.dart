@@ -78,6 +78,34 @@ void main() {
   );
 
   test(
+    'explicit sign-out opens account choice even when guest browsing is allowed',
+    () async {
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        allowGuestReady: true,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(session.isAuthenticated, isTrue);
+      expect(session.stage, JourneyStage.ready);
+
+      expect(await session.signOut(), isTrue);
+
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.noticeMessage, contains('signed out'));
+    },
+  );
+
+  test(
     'sign-out attempts every cleanup and retains authenticated state on failure',
     () async {
       final pendingAddress = MemoryPendingEmailLinkAddressStore();

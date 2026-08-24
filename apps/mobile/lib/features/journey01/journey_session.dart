@@ -1378,7 +1378,7 @@ class JourneySession extends ChangeNotifier {
       }
       _isAuthenticated = false;
       accountIdentity = null;
-      stage = allowGuestReady ? JourneyStage.ready : JourneyStage.signIn;
+      stage = JourneyStage.signIn;
       phoneNumber = null;
       emailAddress = null;
       otpChannel = null;
