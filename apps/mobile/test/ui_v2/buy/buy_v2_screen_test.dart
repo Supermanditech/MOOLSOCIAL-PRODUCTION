@@ -8,6 +8,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
@@ -39,6 +40,7 @@ void main() {
     bool disableAnimations = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
+    BuyV2InvoiceDownloader? invoiceDownloader,
   }) {
     return MaterialApp(
       theme: MoolTheme.light(),
@@ -58,6 +60,7 @@ void main() {
         session: session,
         scannerLauncher: scannerLauncher,
         onOpenMool: onOpenMool,
+        invoiceDownloader: invoiceDownloader,
         onOpenMainAction: (action) {
           final uri = Uri.parse(action.route);
           if (uri.path != '/app/buy') return;
@@ -1758,6 +1761,25 @@ void main() {
     session.openTracking(order.id);
     await tester.pumpAndSettle();
 
+    final invoiceAction = find.byKey(
+      ValueKey('buy-tracking-invoice-${order.id}'),
+    );
+    await tester.scrollUntilVisible(
+      invoiceAction,
+      220,
+      scrollable: scrollableWithin(PageStorageKey('buy-tracking-${order.id}')),
+    );
+    await tester.tap(invoiceAction);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('buy-invoice-page-${order.id}')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, order.id);
+
     final itemsAction = find.text('Items');
     await tester.scrollUntilVisible(
       itemsAction,
@@ -2742,6 +2764,7 @@ void main() {
       for (final product in products) {
         session.addProduct(product.id);
       }
+      session.increase(products.first.id);
       session.openCart();
       session.openCheckout();
       await tester.pumpAndSettle();
@@ -2759,14 +2782,156 @@ void main() {
         find.textContaining(session.confirmedOrders.first.partner),
         findsWidgets,
       );
+      final shopOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.shop,
+      );
+      final wholesaleOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.wholesale,
+      );
+      expect(shopOrder.lines.single.product.id, products.first.id);
+      expect(shopOrder.lines.single.quantity, 2);
+      expect(wholesaleOrder.lines.single.product.id, products.last.id);
+      expect(wholesaleOrder.lines.single.quantity, products.last.minimumOrder);
 
-      await tester.tap(find.byKey(const ValueKey('buy-confirmation-orders')));
+      final invoiceAction = find.byKey(
+        ValueKey('buy-confirmation-invoice-${shopOrder.id}'),
+      );
+      await tester.ensureVisible(invoiceAction);
+      await tester.tap(invoiceAction);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(ValueKey('buy-invoice-page-${shopOrder.id}')),
+        findsOneWidget,
+      );
+      expect(find.text(products.first.title), findsOneWidget);
+      expect(find.text('2×'), findsOneWidget);
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
+
+      final ordersAction = find.byKey(
+        const ValueKey('buy-confirmation-orders'),
+      );
+      await tester.ensureVisible(ordersAction);
+      await tester.tap(ordersAction);
       await tester.pumpAndSettle();
       expect(find.text('PURCHASES'), findsOneWidget);
       expect(
         find.textContaining(session.confirmedOrders.first.id),
         findsWidgets,
       );
+    },
+  );
+
+  testWidgets('invoice download uses the placed-order document contract', (
+    tester,
+  ) async {
+    BuyV2InvoiceDocument? requestedInvoice;
+    final session = BuyV2Session(core: BuySession());
+    final product = BuyV2Catalogue.products.firstWhere(
+      (item) => item.destination == BuyV2Destination.shop,
+    );
+    await tester.pumpWidget(
+      app(
+        session,
+        disableAnimations: true,
+        invoiceDownloader: (invoice) async {
+          requestedInvoice = invoice;
+          return BuyV2InvoiceDownloadOutcome.saved;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    session.addProduct(product.id);
+    session.increase(product.id);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.confirmOrder(), isTrue);
+    await tester.pumpAndSettle();
+    final order = session.confirmedOrders.single;
+
+    final invoiceAction = find.byKey(
+      ValueKey('buy-confirmation-invoice-${order.id}'),
+    );
+    await tester.ensureVisible(invoiceAction);
+    await tester.tap(invoiceAction);
+    await tester.pumpAndSettle();
+
+    final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
+    expect(download, findsOneWidget);
+    expect(tester.getSize(download).height, 48);
+    await tester.tap(download);
+    await tester.pumpAndSettle();
+
+    expect(requestedInvoice, isNotNull);
+    expect(requestedInvoice!.order.id, order.id);
+    expect(requestedInvoice!.order.lines.single.quantity, 2);
+    expect(
+      requestedInvoice!.suggestedFileName,
+      'MoolSocial-invoice-${order.id}.pdf',
+    );
+    expect(find.text('Invoice saved to this device.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Orders opens an honest full-page invoice at compact accessible size',
+    (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      final session = BuyV2Session(core: BuySession());
+      await tester.pumpWidget(
+        app(session, textScale: 1.4, disableAnimations: true),
+      );
+      await tester.pumpAndSettle();
+      session.openOrders();
+      await tester.pumpAndSettle();
+      final order = session.visibleOrders.first;
+
+      final invoiceAction = find.byKey(
+        ValueKey('buy-order-invoice-${order.id}'),
+      );
+      await tester.ensureVisible(invoiceAction);
+      await tester.tap(invoiceAction);
+      await tester.pumpAndSettle();
+
+      final invoicePage = find.byKey(ValueKey('buy-invoice-page-${order.id}'));
+      expect(invoicePage, findsOneWidget);
+      expect(find.text('Order invoice'), findsOneWidget);
+      expect(find.text(order.itemSummary), findsOneWidget);
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      final invoiceCopy = tester
+          .widgetList<Text>(
+            find.descendant(of: invoicePage, matching: find.byType(Text)),
+          )
+          .map((text) => text.data ?? text.textSpan?.toPlainText() ?? '')
+          .join(' ');
+      expect(_forbiddenBuyCopy.hasMatch(invoiceCopy), isFalse);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(
+        find.byKey(ValueKey('buy-download-invoice-${order.id}')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Invoice download is not available for this order yet. You can still view it here.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.catalogue);
+      expect(find.byKey(const PageStorageKey('buy-orders')), findsOneWidget);
     },
   );
 

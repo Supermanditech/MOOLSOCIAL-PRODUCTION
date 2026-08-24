@@ -220,6 +220,10 @@ class BuyV2Order {
     required this.progress,
     required this.status,
     this.productIds = const [],
+    this.lines = const [],
+    this.paymentMethod,
+    this.recipient,
+    this.addressLine,
     this.deliveryInstruction,
     this.tip = 0,
   });
@@ -236,6 +240,10 @@ class BuyV2Order {
   final double progress;
   final BuyV2OrderStatus status;
   final List<String> productIds;
+  final List<BuyV2CartLine> lines;
+  final String? paymentMethod;
+  final String? recipient;
+  final String? addressLine;
   final String? deliveryInstruction;
   final int tip;
 }
