@@ -292,6 +292,29 @@ test("expired fallback fails truthfully when refresh cannot start", async () => 
   );
 });
 
+test("expired refresh reports only its safe failing phase", async () => {
+  const store = new MemoryCatalogueStore(
+    snapshot([short("expired")], "2026-08-11T03:59:59.000Z"),
+    true,
+  );
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => {
+      throw new Error("private transport detail");
+    },
+  });
+
+  await assert.rejects(
+    coordinator.load("request-expired-refresh"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.code === "provider_unavailable" &&
+      error.providerReason === "sharedShortsCatalogue.load_page" &&
+      !error.message.includes("private transport detail"),
+  );
+});
+
 test("Firestore store enforces a cross-instance lease and durable outcomes", async () => {
   const database = new MemoryDocumentDatabase();
   const store = new FirestoreSharedShortsCatalogueStore(database);

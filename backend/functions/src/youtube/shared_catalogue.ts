@@ -421,6 +421,7 @@ export class SharedShortsCatalogueCoordinator {
       );
     }
 
+    let refreshPhase = "load_page";
     try {
       const items: YouTubeVideoSummary[] = [];
       const videoIds = new Set<string>();
@@ -464,6 +465,7 @@ export class SharedShortsCatalogueCoordinator {
           refreshedAt.getTime() + SNAPSHOT_TTL_MS,
         ).toISOString(),
       };
+      refreshPhase = "commit_refresh";
       await this.options.store.commitRefresh(lease.leaseId, next);
       await safeRecordOutcome(
         this.options.store,
@@ -492,6 +494,7 @@ export class SharedShortsCatalogueCoordinator {
         "The shared YouTube catalogue is temporarily unavailable.",
         503,
         true,
+        `sharedShortsCatalogue.${refreshPhase}`,
       );
     }
   }
