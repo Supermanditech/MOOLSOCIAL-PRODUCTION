@@ -131,6 +131,44 @@ void main() {
   );
 
   testWidgets(
+    'production fallback keeps unsupported calls inside contextual Chat',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      var productionChatCalls = 0;
+
+      await tester.pumpWidget(
+        app(session, onOpenChat: () => productionChatCalls += 1),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-partner')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-voice-call')));
+      await tester.pump();
+
+      expect(productionChatCalls, 0);
+      expect(
+        find.text('Calls are not available in MoolSocial Chat yet.'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'Shop subactions seed the matching Chat filter and return cleanly',
     (tester) async {
       tester.view.devicePixelRatio = 1;

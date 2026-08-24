@@ -533,7 +533,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  void _openGlobalChat() {
+  void _openGlobalChat({String? draft}) {
     final onOpenChat = widget.onOpenChat;
     if (onOpenChat != null) {
       onOpenChat();
@@ -544,9 +544,50 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     context.push(
       Uri(
         path: '/app/chat/inbox',
-        queryParameters: {'return': returnRoute ?? '/app/buy'},
+        queryParameters: {
+          'return': returnRoute ?? '/app/buy',
+          if (draft?.trim() case final value? when value.isNotEmpty)
+            'draft': value,
+        },
       ).toString(),
     );
+  }
+
+  Future<BuyV2ShopChatActionResult> _handleShopChatAction(
+    BuyV2ShopChatAction action,
+  ) async {
+    final external = widget.onShopChatAction;
+    if (external != null) return external(action);
+    switch (action.kind) {
+      case BuyV2ShopChatActionKind.sendText:
+        _openGlobalChat(draft: action.text);
+        return const BuyV2ShopChatActionResult.handedOff();
+      case BuyV2ShopChatActionKind.captureImage:
+      case BuyV2ShopChatActionKind.selectMedia:
+      case BuyV2ShopChatActionKind.selectDocument:
+      case BuyV2ShopChatActionKind.recordVoice:
+        _openGlobalChat();
+        return const BuyV2ShopChatActionResult.handedOff();
+      case BuyV2ShopChatActionKind.startVoiceCall:
+      case BuyV2ShopChatActionKind.startVideoCall:
+        return const BuyV2ShopChatActionResult.unavailable(
+          'Calls are not available in MoolSocial Chat yet.',
+        );
+      case BuyV2ShopChatActionKind.shareProduct:
+      case BuyV2ShopChatActionKind.shareOrder:
+      case BuyV2ShopChatActionKind.shareLocation:
+      case BuyV2ShopChatActionKind.shareContact:
+      case BuyV2ShopChatActionKind.openAttachment:
+      case BuyV2ShopChatActionKind.reply:
+      case BuyV2ShopChatActionKind.copyMessage:
+      case BuyV2ShopChatActionKind.forwardMessage:
+      case BuyV2ShopChatActionKind.reactToMessage:
+      case BuyV2ShopChatActionKind.manageNotifications:
+      case BuyV2ShopChatActionKind.openSafety:
+        return const BuyV2ShopChatActionResult.unavailable(
+          'Open all Chat to continue this action.',
+        );
+    }
   }
 
   void _openShopChat() {
@@ -611,7 +652,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onBack: _closeShopChat,
         onOpenProductionChat: _openGlobalChat,
         provisioningSource: widget.shopChatSource,
-        onAction: widget.onShopChatAction,
+        onAction: _handleShopChatAction,
         onOpenCommerce: _openShopChatCommerce,
       );
     }

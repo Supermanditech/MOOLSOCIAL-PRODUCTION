@@ -631,7 +631,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                           familyId: _world,
                           source: widget.contextualChatSource,
                         ),
-                        onAction: widget.onContextualChatAction,
+                        onAction:
+                            widget.onContextualChatAction ??
+                            _handleContextualChatAction,
                         onBack: _closeContextualChat,
                         onOpenProductionChat: _openProductionChat,
                         onOpenThreadContext: (_) => _closeContextualChat(),
@@ -1211,7 +1213,42 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     setState(() => _contextualChatActive = false);
   }
 
-  void _openProductionChat() {
+  Future<BuyV2ShopChatActionResult> _handleContextualChatAction(
+    BuyV2ShopChatAction action,
+  ) async {
+    switch (action.kind) {
+      case BuyV2ShopChatActionKind.sendText:
+        _openProductionChat(draft: action.text);
+        return const BuyV2ShopChatActionResult.handedOff();
+      case BuyV2ShopChatActionKind.captureImage:
+      case BuyV2ShopChatActionKind.selectMedia:
+      case BuyV2ShopChatActionKind.selectDocument:
+      case BuyV2ShopChatActionKind.recordVoice:
+        _openProductionChat();
+        return const BuyV2ShopChatActionResult.handedOff();
+      case BuyV2ShopChatActionKind.startVoiceCall:
+      case BuyV2ShopChatActionKind.startVideoCall:
+        return const BuyV2ShopChatActionResult.unavailable(
+          'Calls are not available in MoolSocial Chat yet.',
+        );
+      case BuyV2ShopChatActionKind.shareProduct:
+      case BuyV2ShopChatActionKind.shareOrder:
+      case BuyV2ShopChatActionKind.shareLocation:
+      case BuyV2ShopChatActionKind.shareContact:
+      case BuyV2ShopChatActionKind.openAttachment:
+      case BuyV2ShopChatActionKind.reply:
+      case BuyV2ShopChatActionKind.copyMessage:
+      case BuyV2ShopChatActionKind.forwardMessage:
+      case BuyV2ShopChatActionKind.reactToMessage:
+      case BuyV2ShopChatActionKind.manageNotifications:
+      case BuyV2ShopChatActionKind.openSafety:
+        return const BuyV2ShopChatActionResult.unavailable(
+          'Open all Chat to continue this action.',
+        );
+    }
+  }
+
+  void _openProductionChat({String? draft}) {
     final world = screen04World(_world);
     final choice = _choiceByWorld[_world] ?? world.choices.first.id;
     final returnQuery = <String, String>{
@@ -1229,7 +1266,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     context.push(
       Uri(
         path: '/app/chat',
-        queryParameters: {'return': returnRoute},
+        queryParameters: {
+          'return': returnRoute,
+          if (draft?.trim() case final value? when value.isNotEmpty)
+            'draft': value,
+        },
       ).toString(),
     );
   }
