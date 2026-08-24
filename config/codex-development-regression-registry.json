@@ -41425,6 +41425,28 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3694-FACEBOOK-GATE-PATCH-REAPPLY-RAW-WORKTREE-HASH-LINE-ENDING-MISMATCH",
+      "status": "registered_semantic_git_diff_verification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The preserved Git patch reapplied at v52, but verification compared the raw materialized gate file hash to the pre-restore working-tree hash and rejected after Git line-ending materialization changed those raw bytes.",
+      "rootCause": "A raw checkout-file hash was used as the portability contract for a text owner even though Git canonicalizes line endings in the repository diff.",
+      "prevention": "Bind this registry generation, compare the exact canonical Git binary diff and parsed script semantics instead of raw worktree bytes, preserve the expected patch hash, then restore, refresh and reapply once before the atomic gate commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-uaw-c34p-fix5-all-eight-public-auth-live-provider-readiness.ps1"
+      ]
     }
   ]
 }
