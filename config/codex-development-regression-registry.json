@@ -41686,6 +41686,30 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
         "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
       ]
+    },
+    {
+      "id": "REG-20260824-3705-YOUTUBE-CONNECT-POST-FORMAT-OWNER-PROBE-USED-WRONG-GIT-ROOT",
+      "status": "registered_format_succeeded_no_test_executed_root_probe_correction_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "Dart formatting succeeded on the claimed YouTube source-gate test, but the post-format owner probe invoked git -C .. from apps/mobile while passing repository-root paths, produced an empty owner set and stopped before the focused test.",
+      "rootCause": "The probe mixed the apps directory as Git root with paths rooted at apps/mobile instead of invoking Git from the repository root.",
+      "prevention": "Preserve the now-formatted two-owner patch, bind this registry generation, run all owner checks from the repository root, require exactly the Kotlin activity and Dart test, verify format stability, then execute the focused test once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/YouTubeConnectReturnActivity.kt",
+        "apps/mobile/test/youtube_connect_return_android_source_gate_test.dart"
+      ]
     }
   ]
 }
