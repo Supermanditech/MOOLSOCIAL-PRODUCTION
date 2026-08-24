@@ -42092,6 +42092,52 @@
         "backend/functions/src/index.ts",
         "scripts/check-youtube-private-dev-preflight.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3722-YOUTUBE-LOCAL-PREFLIGHT-GLOBAL-FUNCTION-OPTION-COUNTS-REJECTED-EXPANDED-INDEX",
+      "status": "registered_youtube_export_scoped_option_checks_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "After local Firestore-only composition passed, preflight rejected because it globally counts exactly two asia-south1 option occurrences in index.ts, which now contains additional unrelated provider functions.",
+      "rootCause": "Historical assertions count region, timeout, memory, scaling, concurrency, service-account and export tokens across the entire expanded backend index rather than scoping them to youtubeProvider and youtubeOAuthCallback.",
+      "prevention": "Keep global exact counts in historical mode; in local feature mode extract only the two YouTube onRequest option blocks, require each exact region/timeout/memory/min/max/concurrency/serviceAccount contract and both exports, and add a wrong-option negative fixture before final replay.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/index.ts",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260824-3723-YOUTUBE-GOVERNANCE-WRAPPER-CHECKED-LASTEXITCODE-AFTER-POWERSHELL-SCRIPT",
+      "status": "registered_memory_passed_no_staging_powershell_status_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "Regression memory printed its passed result, but the governance wrapper then threw Memory failed because it inspected stale LASTEXITCODE after invoking a PowerShell script; git add was not reached.",
+      "rootCause": "LASTEXITCODE is a native-process status and is not a reliable success signal for an invoked PowerShell script in this wrapper.",
+      "prevention": "Bind this registry generation, use PowerShell $? immediately after the memory script, then stage the exact governance owner set and commit only after the passed result.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1"
+      ]
     }
   ]
 }
