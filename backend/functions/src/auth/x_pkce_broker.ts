@@ -68,6 +68,11 @@ export interface XTokenGrant {
   readonly refreshTokenPresent: boolean;
 }
 
+export interface XProviderIdentity {
+  readonly subject: string;
+  readonly username: string;
+}
+
 export interface XProviderTransport {
   exchangeCode(input: {
     readonly clientId: string;
@@ -75,7 +80,7 @@ export interface XProviderTransport {
     readonly code: string;
     readonly codeVerifier: string;
   }): Promise<XTokenGrant>;
-  readSubject(accessToken: string): Promise<string>;
+  readIdentity(accessToken: string): Promise<XProviderIdentity>;
   revokeAccessToken(input: {
     readonly clientId: string;
     readonly accessToken: string;
@@ -87,7 +92,7 @@ export interface XSubjectProjector {
 }
 
 export interface XFirebaseTokenIssuer {
-  issue(firebaseUid: string): Promise<string>;
+  issue(firebaseUid: string, accountHandle: string): Promise<string>;
 }
 
 export interface XRandomSource {
@@ -561,8 +566,14 @@ interface FirebaseCustomTokenCreator {
 export class FirebaseAdminXTokenIssuer implements XFirebaseTokenIssuer {
   constructor(private readonly auth: FirebaseCustomTokenCreator) {}
 
-  issue(firebaseUid: string): Promise<string> {
-    return this.auth.createCustomToken(firebaseUid, { auth_provider: "x" });
+  issue(firebaseUid: string, accountHandle: string): Promise<string> {
+    if (!/^@[A-Za-z0-9_]{1,15}$/u.test(accountHandle)) {
+      throw new Error("X account handle is invalid.");
+    }
+    return this.auth.createCustomToken(firebaseUid, {
+      auth_provider: "x",
+      auth_provider_account: accountHandle,
+    });
   }
 }
 
@@ -716,9 +727,9 @@ export class XPublicAuthBroker {
     let customToken: string | undefined;
     try {
       validateExactGrant(grant);
-      let subject: string;
+      let identity: XProviderIdentity;
       try {
-        subject = await this.transport.readSubject(accessToken);
+        identity = await this.transport.readIdentity(accessToken);
       } catch {
         throw new XPublicAuthError(
           "identity_unavailable",
@@ -727,9 +738,12 @@ export class XPublicAuthBroker {
           true,
         );
       }
-      const firebaseUid = this.subjectProjector.project(subject);
+      const firebaseUid = this.subjectProjector.project(identity.subject);
       try {
-        customToken = await this.tokenIssuer.issue(firebaseUid);
+        customToken = await this.tokenIssuer.issue(
+          firebaseUid,
+          `@${identity.username}`,
+        );
       } catch {
         throw new XPublicAuthError(
           "token_issue_failed",
@@ -874,7 +888,7 @@ export class FetchXProviderTransport implements XProviderTransport {
     };
   }
 
-  async readSubject(accessToken: string): Promise<string> {
+  async readIdentity(accessToken: string): Promise<XProviderIdentity> {
     let response: Response;
     try {
       response = await this.fetchImplementation(X_SUBJECT_ENDPOINT, {
@@ -893,7 +907,13 @@ export class FetchXProviderTransport implements XProviderTransport {
     const body = await readProviderJson(response);
     const data = providerObject(body?.data);
     const subject = boundedText(data?.id, 32);
-    if (!subject || !/^[0-9]{1,32}$/u.test(subject)) {
+    const username = boundedText(data?.username, 15);
+    if (
+      !subject ||
+      !/^[0-9]{1,32}$/u.test(subject) ||
+      !username ||
+      !/^[A-Za-z0-9_]{1,15}$/u.test(username)
+    ) {
       throw new XPublicAuthError(
         "identity_unavailable",
         "The X account identity could not be verified.",
@@ -901,7 +921,7 @@ export class FetchXProviderTransport implements XProviderTransport {
         true,
       );
     }
-    return subject;
+    return { subject, username };
   }
 
   async revokeAccessToken(input: {

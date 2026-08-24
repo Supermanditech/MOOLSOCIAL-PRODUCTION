@@ -17,6 +17,23 @@ void main() {
     expect(publicAuthenticatedProviderLabel('phone'), 'Phone');
     expect(publicAuthenticatedProviderLabel('provider-subject-123'), isNull);
     expect(publicAuthenticatedProviderLabel(null), isNull);
+    expect(
+      publicAuthenticatedProviderAccountLabel('@vetonewsline'),
+      '@vetonewsline',
+    );
+    expect(
+      publicAuthenticatedProviderAccountLabel('@vetonews.live'),
+      '@vetonews.live',
+    );
+    expect(publicAuthenticatedProviderAccountLabel('missing-at'), isNull);
+    expect(publicAuthenticatedProviderAccountLabel('@private token'), isNull);
+    expect(publicAuthenticatedProviderAccountLabel(null), isNull);
+    const brokeredIdentity = AuthenticatedAccountIdentity(
+      providerAccountLabel: '@vetonewsline',
+      signInMethods: ['X'],
+    );
+    expect(brokeredIdentity.primaryLabel, '@vetonewsline');
+    expect(brokeredIdentity.detailLabel, '@vetonewsline · X');
   });
 
   group('FirebaseSocialAuthGateway', () {

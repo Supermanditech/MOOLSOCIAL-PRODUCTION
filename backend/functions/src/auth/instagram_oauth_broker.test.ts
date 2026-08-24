@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  FirebaseAdminInstagramTokenIssuer,
   FetchInstagramProviderTransport,
   HmacInstagramSubjectProjector,
   InstagramPublicAuthBroker,
@@ -22,6 +23,34 @@ import {
 const NOW_MS = Date.UTC(2026, 7, 18, 1, 0, 0);
 const REDIRECT_URI = "moolsocial://auth/instagram/callback";
 const CLIENT_ID = "syntheticInstagramClient";
+
+test(
+  "Firebase token claim contains only provider and public Instagram handle",
+  async () => {
+    let captured: { uid: string; claims: object | undefined } | undefined;
+    const issuer = new FirebaseAdminInstagramTokenIssuer({
+      createCustomToken: async (uid, claims) => {
+        captured = { uid, claims };
+        return "synthetic-custom-token";
+      },
+    });
+    assert.equal(
+      await issuer.issue("instagram_projected_identity", "@vetonews.live"),
+      "synthetic-custom-token",
+    );
+    assert.deepEqual(captured, {
+      uid: "instagram_projected_identity",
+      claims: {
+        auth_provider: "instagram",
+        auth_provider_account: "@vetonews.live",
+      },
+    });
+    assert.throws(
+      () => issuer.issue("instagram_projected_identity", "private token"),
+      /handle is invalid/u,
+    );
+  },
+);
 
 class MemoryInstagramAttemptStore implements InstagramAttemptStore {
   attempt: InstagramPendingAttempt | undefined;
@@ -58,6 +87,7 @@ class RecordingInstagramTransport implements InstagramProviderTransport {
   identity: InstagramProviderIdentity = {
     subject: "9988776655443322",
     accountType: "BUSINESS",
+    username: "vetonewslive",
   };
   exchangeError = false;
   identityError = false;
@@ -104,10 +134,12 @@ class RecordingInstagramProjector implements InstagramSubjectProjector {
 
 class RecordingInstagramIssuer implements InstagramFirebaseTokenIssuer {
   uid: string | undefined;
+  accountHandle: string | undefined;
   shouldFail = false;
 
-  async issue(firebaseUid: string): Promise<string> {
+  async issue(firebaseUid: string, accountHandle: string): Promise<string> {
     this.uid = firebaseUid;
+    this.accountHandle = accountHandle;
     if (this.shouldFail) throw new Error("firebase-private-detail");
     return "synthetic-instagram-firebase-material";
   }
@@ -207,6 +239,7 @@ test("eligible professional identity mints Firebase material then revokes access
   });
   assert.equal(rig.projector.subject, rig.transport.identity.subject);
   assert.equal(rig.issuer.uid, "instagram_projected_identity");
+  assert.equal(rig.issuer.accountHandle, "@vetonewslive");
   assert.equal(rig.transport.revocationCount, 1);
 });
 
@@ -301,6 +334,7 @@ test("personal or unknown account class is truthful and revoked", async () => {
   rig.transport.identity = {
     subject: "9988776655443322",
     accountType: "PERSONAL",
+    username: "vetonewslive",
   };
   const state = await beginState(rig);
   await assert.rejects(
@@ -426,6 +460,7 @@ test("fetch transport confines the server secret and provider access material", 
       return Response.json({
         id: "9988776655443322",
         account_type: "MEDIA_CREATOR",
+        username: "vetonewslive",
       });
     }
     return Response.json({ success: true });
@@ -443,6 +478,7 @@ test("fetch transport confines the server secret and provider access material", 
   const identity = await transport.readIdentity(grant.accessToken);
   await transport.revokeAccessToken(grant.accessToken);
   assert.equal(identity.accountType, "MEDIA_CREATOR");
+  assert.equal(identity.username, "vetonewslive");
   assert.equal(calls.length, 3);
 
   const exchange = calls[0];
@@ -461,7 +497,10 @@ test("fetch transport confines the server secret and provider access material", 
   const identityCall = calls[1];
   assert.ok(identityCall?.init);
   const identityUrl = new URL(identityCall.input.toString());
-  assert.equal(identityUrl.searchParams.get("fields"), "id,account_type");
+  assert.equal(
+    identityUrl.searchParams.get("fields"),
+    "id,account_type,username",
+  );
   assert.equal(identityUrl.searchParams.has("access_token"), false);
   assert.equal(
     new Headers(identityCall.init.headers).get("authorization"),

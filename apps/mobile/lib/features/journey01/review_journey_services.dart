@@ -795,12 +795,16 @@ class FirebaseAuthenticatedAccountIdentityGateway
         .map((provider) => _publicProviderLabel(provider.providerId))
         .whereType<String>()
         .toSet();
+    String? providerAccountLabel;
     try {
       final tokenResult = await user.getIdTokenResult();
       final customProvider = publicAuthenticatedProviderLabel(
         tokenResult.claims?['auth_provider'],
       );
       if (customProvider != null) providerLabels.add(customProvider);
+      providerAccountLabel = publicAuthenticatedProviderAccountLabel(
+        tokenResult.claims?['auth_provider_account'],
+      );
     } on Object {
       // Firebase profile details remain usable without optional custom claims.
     }
@@ -814,6 +818,7 @@ class FirebaseAuthenticatedAccountIdentityGateway
           _firstNonEmpty(
             user.providerData.map((provider) => provider.phoneNumber),
           ),
+      providerAccountLabel: providerAccountLabel,
       signInMethods: providerLabels.toList(growable: false),
     );
   }
@@ -847,6 +852,16 @@ String? publicAuthenticatedProviderLabel(Object? provider) =>
       'phone' => 'Phone',
       _ => null,
     };
+
+@visibleForTesting
+String? publicAuthenticatedProviderAccountLabel(Object? account) {
+  if (account is! String ||
+      account.length > 31 ||
+      !RegExp(r'^@[A-Za-z0-9._]{1,30}$').hasMatch(account)) {
+    return null;
+  }
+  return account;
+}
 
 class FirebaseSocialAuthGateway
     implements SocialAuthGateway, SocialAuthCallbackGateway {

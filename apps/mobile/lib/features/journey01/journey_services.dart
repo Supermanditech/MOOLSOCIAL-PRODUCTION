@@ -485,12 +485,14 @@ class AuthenticatedAccountIdentity {
     this.displayName,
     this.emailAddress,
     this.phoneNumber,
+    this.providerAccountLabel,
     this.signInMethods = const <String>[],
   });
 
   final String? displayName;
   final String? emailAddress;
   final String? phoneNumber;
+  final String? providerAccountLabel;
   final List<String> signInMethods;
 
   String get primaryLabel {
@@ -500,6 +502,10 @@ class AuthenticatedAccountIdentity {
     if (email != null && email.isNotEmpty) return email;
     final phone = phoneNumber?.trim();
     if (phone != null && phone.isNotEmpty) return phone;
+    final providerAccount = providerAccountLabel?.trim();
+    if (providerAccount != null && providerAccount.isNotEmpty) {
+      return providerAccount;
+    }
     return 'MoolSocial member';
   }
 
@@ -507,6 +513,9 @@ class AuthenticatedAccountIdentity {
     final details = <String>[
       if (emailAddress?.trim() case final email? when email.isNotEmpty) email,
       if (phoneNumber?.trim() case final phone? when phone.isNotEmpty) phone,
+      if (providerAccountLabel?.trim() case final account?
+          when account.isNotEmpty)
+        account,
       if (signInMethods.isNotEmpty) signInMethods.join(' · '),
     ];
     return details.isEmpty ? 'Signed in to MoolSocial' : details.join(' · ');
