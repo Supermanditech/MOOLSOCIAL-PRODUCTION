@@ -61,6 +61,8 @@ abstract final class MoolContextualChatCatalog {
     familyLabel: 'Food',
     title: 'Food Chat',
     subtitle: 'orders and reservations',
+    icon: Icons.restaurant_outlined,
+    accent: Color(0xFFF27A1A),
     securityMessage: 'Food conversations continue securely in MoolSocial Chat.',
     newConversationPrompt:
         'Choose who can help with your order or reservation.',
@@ -88,6 +90,8 @@ abstract final class MoolContextualChatCatalog {
     familyLabel: 'Travel',
     title: 'Travel Chat',
     subtitle: 'rides and bookings',
+    icon: Icons.route_outlined,
+    accent: Color(0xFF34345E),
     securityMessage:
         'Travel conversations continue securely in MoolSocial Chat.',
     newConversationPrompt: 'Choose the trip you need help with.',
@@ -125,6 +129,8 @@ abstract final class MoolContextualChatCatalog {
     familyLabel: 'Care',
     title: 'Care Chat',
     subtitle: 'appointments and services',
+    icon: Icons.health_and_safety_outlined,
+    accent: Color(0xFF00757B),
     securityMessage:
         'Care Chat supports booking and coordination, not emergency or medical advice.',
     newConversationPrompt: 'Choose the Care service you need help with.',
@@ -157,6 +163,8 @@ abstract final class MoolContextualChatCatalog {
     familyLabel: 'Work',
     title: 'Work Chat',
     subtitle: 'jobs and workspace',
+    icon: Icons.work_outline_rounded,
+    accent: Color(0xFF2F7A28),
     securityMessage: 'Work conversations continue securely in MoolSocial Chat.',
     newConversationPrompt: 'Choose the Work conversation you need.',
     filters: [
@@ -207,6 +215,10 @@ const _foodThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Book Table',
     contextDetail: 'Restaurant, date, time and party-size context',
     quickReplies: ['Check this time', 'Ask about seating'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
 ];
 
@@ -224,6 +236,10 @@ const _travelThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Bike trip',
     contextDetail: 'Pickup, destination, estimate and trip context',
     quickReplies: ['Ask about pickup', 'Check the fare'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
   BuyV2ShopChatThread(
     id: 'travel-auto-support',
@@ -238,6 +254,10 @@ const _travelThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Auto trip',
     contextDetail: 'Pickup, destination, estimate and trip context',
     quickReplies: ['Ask about arrival', 'Check the fare'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
   BuyV2ShopChatThread(
     id: 'travel-cab-support',
@@ -252,6 +272,10 @@ const _travelThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Cab trip',
     contextDetail: 'Vehicle, pickup, destination and trip context',
     quickReplies: ['Ask about the vehicle', 'Check arrival time'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
   BuyV2ShopChatThread(
     id: 'travel-bus-desk',
@@ -266,6 +290,10 @@ const _travelThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Bus booking',
     contextDetail: 'Route, travel date, seat and fare context',
     quickReplies: ['Ask about this route', 'Check seat options'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
 ];
 
@@ -283,6 +311,10 @@ const _careThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Doctor appointment',
     contextDetail: 'Provider, consultation type, fee and time context',
     quickReplies: ['Check availability', 'Ask about consultation type'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
   BuyV2ShopChatThread(
     id: 'care-medicine-desk',
@@ -311,6 +343,10 @@ const _careThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Salon appointment',
     contextDetail: 'Service, professional, price and time context',
     quickReplies: ['Check this service', 'Ask about the time'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
 ];
 
@@ -328,6 +364,10 @@ const _workThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Earn Today',
     contextDetail: 'Opportunity, requirements, timing and earnings context',
     quickReplies: ['Ask about requirements', 'Check the timing'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
   ),
   BuyV2ShopChatThread(
     id: 'work-workspace-support',
@@ -342,5 +382,10 @@ const _workThreads = <BuyV2ShopChatThread>[
     contextTitle: 'Workspace',
     contextDetail: 'Active work, next steps and document context',
     quickReplies: ['Ask about next steps', 'Help with documents'],
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+      locationSharing: false,
+    ),
   ),
 ];

@@ -30,6 +30,8 @@ class BuyV2ShopChatPresentation {
     required this.familyLabel,
     required this.title,
     required this.subtitle,
+    required this.icon,
+    required this.accent,
     required this.securityMessage,
     required this.newConversationPrompt,
     required this.filters,
@@ -40,6 +42,8 @@ class BuyV2ShopChatPresentation {
     familyLabel: 'Shop',
     title: 'Shop Chat',
     subtitle: 'partners, orders and offers',
+    icon: Icons.storefront_outlined,
+    accent: BuyV2Colors.navy,
     securityMessage: 'Shop conversations continue securely in MoolSocial Chat.',
     newConversationPrompt: 'Choose who can help with this purchase.',
     filters: [
@@ -72,6 +76,8 @@ class BuyV2ShopChatPresentation {
   final String familyLabel;
   final String title;
   final String subtitle;
+  final IconData icon;
+  final Color accent;
   final String securityMessage;
   final String newConversationPrompt;
   final List<BuyV2ShopChatFilterSpec> filters;
@@ -482,7 +488,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         onOpenInfo: _showInfo,
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
-        familyLabel: widget.presentation.familyLabel,
+        presentation: widget.presentation,
       ),
       _BuyV2ShopChatSurface.info => _ShopChatInfoView(
         key: ValueKey('buy-shop-chat-info-${_selectedThread!.id}'),
@@ -490,6 +496,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         onBack: () => _showThread(forward: false),
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
+        presentation: widget.presentation,
       ),
     };
     return BuyV2ShopChatSurfaceMotion(
@@ -555,9 +562,12 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                               itemCount: entries.length + 2,
                               itemBuilder: (context, index) {
                                 if (index == 0) {
-                                  return _ShopChatTrustNote(
-                                    message:
-                                        widget.presentation.securityMessage,
+                                  return _ShopChatContextBanner(
+                                    presentation: widget.presentation,
+                                    filter: widget.presentation.filter(
+                                      _filterId,
+                                    ),
+                                    conversationCount: entries.length,
                                   );
                                 }
                                 if (index == 1) {
@@ -755,72 +765,110 @@ class _ShopChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 66),
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
-      decoration: const BoxDecoration(
+    return DecoratedBox(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.topRight,
+          colors: [
+            presentation.accent.withValues(alpha: .08),
+            Colors.white,
+            BuyV2Colors.softBlue.withValues(alpha: .36),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          IconButton(
-            key: const ValueKey('buy-shop-chat-back'),
-            tooltip: 'Back to $originLabel',
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: BuyV2Colors.ink,
-          ),
-          const SizedBox(width: 2),
-          Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [BuyV2Colors.navy, BuyV2Colors.royal],
-              ),
-              borderRadius: BorderRadius.circular(14),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 68),
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
+        child: Row(
+          children: [
+            IconButton(
+              key: const ValueKey('buy-shop-chat-back'),
+              tooltip: 'Back to $originLabel',
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+              color: BuyV2Colors.ink,
             ),
-            child: const Icon(
-              Icons.chat_bubble_outline_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 2),
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Text(
-                  presentation.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.buyTitle.copyWith(fontSize: 20),
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: presentation.accent.withValues(alpha: .11),
+                    border: Border.all(
+                      color: presentation.accent.withValues(alpha: .22),
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    presentation.icon,
+                    color: presentation.accent,
+                    size: 22,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$originLabel · ${presentation.subtitle}',
-                  key: const ValueKey('buy-shop-chat-origin'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.buyMeta.copyWith(fontSize: 10),
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [BuyV2Colors.navy, BuyV2Colors.royal],
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: Colors.white,
+                      size: 8,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            key: const ValueKey('buy-shop-chat-open-all'),
-            tooltip: 'All MoolSocial chats',
-            onPressed: onOpenAll,
-            icon: const Icon(Icons.forum_outlined),
-            color: BuyV2Colors.navy,
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    presentation.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyTitle.copyWith(fontSize: 20),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$originLabel · ${presentation.subtitle}',
+                    key: const ValueKey('buy-shop-chat-origin'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              key: const ValueKey('buy-shop-chat-open-all'),
+              tooltip: 'All MoolSocial chats',
+              onPressed: onOpenAll,
+              icon: const Icon(Icons.forum_outlined),
+              color: BuyV2Colors.navy,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -938,44 +986,105 @@ class _ShopChatFilters extends StatelessWidget {
   }
 }
 
-class _ShopChatTrustNote extends StatelessWidget {
-  const _ShopChatTrustNote({required this.message});
+class _ShopChatContextBanner extends StatelessWidget {
+  const _ShopChatContextBanner({
+    required this.presentation,
+    required this.filter,
+    required this.conversationCount,
+  });
 
-  final String message;
+  final BuyV2ShopChatPresentation presentation;
+  final BuyV2ShopChatFilterSpec filter;
+  final int conversationCount;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: message,
+      label:
+          '${filter.label} ${presentation.familyLabel} Chat context. ${presentation.securityMessage}',
       child: Container(
-        constraints: const BoxConstraints(minHeight: 46),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
         decoration: buyV2CardDecoration(
-          color: BuyV2Colors.softGreen.withValues(alpha: .72),
-          border: BuyV2Colors.green.withValues(alpha: .22),
-          radius: 14,
+          color: Colors.white,
+          border: presentation.accent.withValues(alpha: .22),
+          radius: 16,
         ),
         child: Row(
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 38,
+              height: 38,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                color: presentation.accent.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(13),
               ),
-              child: const Icon(
-                Icons.lock_outline_rounded,
-                color: BuyV2Colors.green,
-                size: 17,
+              child: Icon(
+                presentation.icon,
+                color: presentation.accent,
+                size: 20,
               ),
             ),
-            const SizedBox(width: 9),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: context.buyBody.copyWith(fontSize: 10.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          filter.id == 'all'
+                              ? 'All ${presentation.familyLabel} conversations'
+                              : '${filter.label} conversations',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyBody.copyWith(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.softGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              color: BuyV2Colors.green,
+                              size: 11,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'MoolSocial',
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.green,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$conversationCount ${conversationCount == 1 ? 'conversation' : 'conversations'} available · ${presentation.securityMessage}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(fontSize: 9),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1197,8 +1306,17 @@ class _ShopChatNewConversationView extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            constraints: const BoxConstraints(minHeight: 64),
-            color: Colors.white,
+            constraints: const BoxConstraints(minHeight: 72),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+              gradient: LinearGradient(
+                colors: [
+                  presentation.accent.withValues(alpha: .08),
+                  Colors.white,
+                ],
+              ),
+            ),
             child: Row(
               children: [
                 IconButton(
@@ -1207,23 +1325,74 @@ class _ShopChatNewConversationView extends StatelessWidget {
                   onPressed: onBack,
                   icon: const Icon(Icons.arrow_back_rounded),
                 ),
-                Expanded(
-                  child: Text(
-                    'New ${presentation.familyLabel} conversation',
-                    style: context.buyTitle,
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: presentation.accent.withValues(alpha: .11),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(
+                    presentation.icon,
+                    color: presentation.accent,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 48),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'New ${presentation.familyLabel} conversation',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyTitle.copyWith(fontSize: 18),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'MoolSocial Chat · choose a trusted context',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(fontSize: 9.5),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                presentation.newConversationPrompt,
-                style: context.buyMeta,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+              decoration: buyV2CardDecoration(
+                color: presentation.accent.withValues(alpha: .06),
+                border: presentation.accent.withValues(alpha: .18),
+                radius: 14,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: presentation.accent,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      presentation.newConversationPrompt,
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.ink,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1253,7 +1422,31 @@ class _ShopChatNewConversationView extends StatelessWidget {
                     ),
                     title: Text(entry.title, style: context.buyBody),
                     subtitle: Text(entry.subtitle, style: context.buyMeta),
-                    trailing: const Icon(Icons.chevron_right_rounded),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: entry.accent.withValues(alpha: .09),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            presentation.filter(entry.resolvedFilterId).label,
+                            style: context.buyMeta.copyWith(
+                              color: entry.accent,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
                     onTap: () => onSelected(entry),
                   ),
                 );
@@ -1274,7 +1467,7 @@ class _ShopChatConversationView extends StatefulWidget {
     required this.onOpenInfo,
     required this.onDispatch,
     required this.onOpenContext,
-    required this.familyLabel,
+    required this.presentation,
   });
 
   final BuyV2ShopChatThread thread;
@@ -1282,7 +1475,7 @@ class _ShopChatConversationView extends StatefulWidget {
   final VoidCallback onOpenInfo;
   final _ShopChatDispatch onDispatch;
   final VoidCallback? onOpenContext;
-  final String familyLabel;
+  final BuyV2ShopChatPresentation presentation;
 
   @override
   State<_ShopChatConversationView> createState() =>
@@ -1321,6 +1514,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
           children: [
             if (_selectedMessage case final selected?)
               _ShopChatSelectionHeader(
+                familyLabel: widget.presentation.familyLabel,
                 onClose: () => setState(() => _selectedMessage = null),
                 onReply: () {
                   setState(() {
@@ -1342,7 +1536,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
             else
               _ShopChatThreadHeader(
                 thread: widget.thread,
-                familyLabel: widget.familyLabel,
+                presentation: widget.presentation,
                 onBack: widget.onBack,
                 onOpenInfo: widget.onOpenInfo,
                 onVoiceCall: widget.thread.capabilities.voiceCall
@@ -1362,6 +1556,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
               ),
             if (_threadMenuOpen)
               _ShopChatInlineThreadMenu(
+                presentation: widget.presentation,
                 onInfo: () {
                   setState(() => _threadMenuOpen = false);
                   widget.onOpenInfo();
@@ -1378,6 +1573,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
               ),
             if (_searchOpen)
               _ShopChatMessageSearch(
+                threadTitle: widget.thread.title,
                 controller: _messageSearchController,
                 onChanged: (_) => setState(() {}),
                 onClose: () {
@@ -1388,7 +1584,11 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
             Expanded(
               child: Stack(
                 children: [
-                  const Positioned.fill(child: _ShopChatConversationCanvas()),
+                  Positioned.fill(
+                    child: _ShopChatConversationCanvas(
+                      accent: widget.presentation.accent,
+                    ),
+                  ),
                   Positioned.fill(
                     child: BuyV2ShopChatFilterMotion(
                       stateKey:
@@ -1400,10 +1600,14 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                           _ShopChatCommerceContext(
                             thread: widget.thread,
                             onTap: widget.onOpenContext,
+                            familyLabel: widget.presentation.familyLabel,
                           ),
                           const SizedBox(height: 12),
                           if (messages.isEmpty)
-                            _ShopChatWelcomePanel(thread: widget.thread)
+                            _ShopChatWelcomePanel(
+                              thread: widget.thread,
+                              presentation: widget.presentation,
+                            )
                           else ...[
                             const Center(child: _ShopChatDayChip()),
                             const SizedBox(height: 10),
@@ -1449,6 +1653,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
             if (_attachmentOpen)
               _ShopChatInlineAttachmentTray(
                 capabilities: widget.thread.capabilities,
+                presentation: widget.presentation,
                 onSelected: (kind) {
                   setState(() => _attachmentOpen = false);
                   _dispatchDirect(kind);
@@ -1576,7 +1781,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
 class _ShopChatThreadHeader extends StatelessWidget {
   const _ShopChatThreadHeader({
     required this.thread,
-    required this.familyLabel,
+    required this.presentation,
     required this.onBack,
     required this.onOpenInfo,
     required this.onVoiceCall,
@@ -1585,7 +1790,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
   });
 
   final BuyV2ShopChatThread thread;
-  final String familyLabel;
+  final BuyV2ShopChatPresentation presentation;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
   final VoidCallback? onVoiceCall;
@@ -1597,15 +1802,22 @@ class _ShopChatThreadHeader extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minHeight: 66),
       padding: const EdgeInsets.fromLTRB(2, 5, 2, 5),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        gradient: LinearGradient(
+          colors: [
+            presentation.accent.withValues(alpha: .06),
+            Colors.white,
+            BuyV2Colors.softBlue.withValues(alpha: .24),
+          ],
+        ),
       ),
       child: Row(
         children: [
           IconButton(
             key: const ValueKey('buy-shop-chat-thread-back'),
-            tooltip: 'Back to $familyLabel chats',
+            tooltip: 'Back to ${presentation.familyLabel} chats',
             onPressed: onBack,
             icon: const Icon(Icons.arrow_back_rounded),
           ),
@@ -1635,7 +1847,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          thread.participantKind.customerLabel,
+                          '${presentation.familyLabel} · ${thread.participantKind.customerLabel}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.buyMeta.copyWith(fontSize: 9),
@@ -1678,6 +1890,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
 
 class _ShopChatSelectionHeader extends StatelessWidget {
   const _ShopChatSelectionHeader({
+    required this.familyLabel,
     required this.onClose,
     required this.onReply,
     required this.onReact,
@@ -1685,6 +1898,7 @@ class _ShopChatSelectionHeader extends StatelessWidget {
     required this.onForward,
   });
 
+  final String familyLabel;
   final VoidCallback onClose;
   final VoidCallback onReply;
   final VoidCallback onReact;
@@ -1709,7 +1923,7 @@ class _ShopChatSelectionHeader extends StatelessWidget {
             ),
             Expanded(
               child: Text(
-                '1 selected',
+                '1 selected · $familyLabel',
                 maxLines: 1,
                 style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
               ),
@@ -1751,12 +1965,14 @@ class _ShopChatSelectionHeader extends StatelessWidget {
 
 class _ShopChatInlineThreadMenu extends StatelessWidget {
   const _ShopChatInlineThreadMenu({
+    required this.presentation,
     required this.onInfo,
     required this.onSearch,
     required this.onNotifications,
     required this.onSafety,
   });
 
+  final BuyV2ShopChatPresentation presentation;
   final VoidCallback onInfo;
   final VoidCallback onSearch;
   final VoidCallback onNotifications;
@@ -1776,8 +1992,8 @@ class _ShopChatInlineThreadMenu extends StatelessWidget {
           children: [
             _ShopChatInlineMenuAction(
               keyName: 'info',
-              icon: Icons.storefront_outlined,
-              label: 'Info',
+              icon: presentation.icon,
+              label: '${presentation.familyLabel} info',
               onTap: onInfo,
             ),
             _ShopChatInlineMenuAction(
@@ -1849,11 +2065,13 @@ class _ShopChatInlineMenuAction extends StatelessWidget {
 
 class _ShopChatMessageSearch extends StatelessWidget {
   const _ShopChatMessageSearch({
+    required this.threadTitle,
     required this.controller,
     required this.onChanged,
     required this.onClose,
   });
 
+  final String threadTitle;
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClose;
@@ -1873,7 +2091,7 @@ class _ShopChatMessageSearch extends StatelessWidget {
           onChanged: onChanged,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Search this conversation',
+            hintText: 'Search $threadTitle',
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: IconButton(
               key: const ValueKey('buy-shop-chat-message-search-close'),
@@ -1896,7 +2114,9 @@ class _ShopChatMessageSearch extends StatelessWidget {
 }
 
 class _ShopChatConversationCanvas extends StatelessWidget {
-  const _ShopChatConversationCanvas();
+  const _ShopChatConversationCanvas({required this.accent});
+
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -1906,6 +2126,7 @@ class _ShopChatConversationCanvas extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
+            accent.withValues(alpha: .045),
             BuyV2Colors.softBlue.withValues(alpha: .48),
             const Color(0xFFF7F7FB),
           ],
@@ -1916,10 +2137,15 @@ class _ShopChatConversationCanvas extends StatelessWidget {
 }
 
 class _ShopChatCommerceContext extends StatelessWidget {
-  const _ShopChatCommerceContext({required this.thread, required this.onTap});
+  const _ShopChatCommerceContext({
+    required this.thread,
+    required this.onTap,
+    required this.familyLabel,
+  });
 
   final BuyV2ShopChatThread thread;
   final VoidCallback? onTap;
+  final String familyLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1946,7 +2172,34 @@ class _ShopChatCommerceContext extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(thread.contextTitle, style: context.buyBody),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              thread.contextTitle,
+                              style: context.buyBody,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: thread.accent.withValues(alpha: .09),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$familyLabel context',
+                              style: context.buyMeta.copyWith(
+                                color: thread.accent,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         thread.contextDetail,
@@ -1973,9 +2226,13 @@ class _ShopChatCommerceContext extends StatelessWidget {
 }
 
 class _ShopChatWelcomePanel extends StatelessWidget {
-  const _ShopChatWelcomePanel({required this.thread});
+  const _ShopChatWelcomePanel({
+    required this.thread,
+    required this.presentation,
+  });
 
   final BuyV2ShopChatThread thread;
+  final BuyV2ShopChatPresentation presentation;
 
   @override
   Widget build(BuildContext context) {
@@ -1985,12 +2242,29 @@ class _ShopChatWelcomePanel extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: buyV2CardDecoration(
           color: Colors.white.withValues(alpha: .94),
+          border: presentation.accent.withValues(alpha: .16),
           radius: 20,
           shadow: true,
         ),
         child: Column(
           children: [
             _ShopChatAvatar(thread: thread, size: 58),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: presentation.accent.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Text(
+                '${presentation.familyLabel} · ${thread.contextTitle}',
+                style: context.buyMeta.copyWith(
+                  color: presentation.accent,
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
             const SizedBox(height: 10),
             Text(
               'Start with ${thread.title}',
@@ -2560,10 +2834,12 @@ class _ShopChatMessageContent extends StatelessWidget {
 class _ShopChatInlineAttachmentTray extends StatelessWidget {
   const _ShopChatInlineAttachmentTray({
     required this.capabilities,
+    required this.presentation,
     required this.onSelected,
   });
 
   final BuyV2ShopChatCapabilities capabilities;
+  final BuyV2ShopChatPresentation presentation;
   final ValueChanged<BuyV2ShopChatActionKind> onSelected;
 
   @override
@@ -2631,12 +2907,40 @@ class _ShopChatInlineAttachmentTray extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  'Share in this conversation',
-                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: presentation.accent.withValues(alpha: .09),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    presentation.icon,
+                    color: presentation.accent,
+                    size: 17,
+                  ),
                 ),
-                const Spacer(),
-                Text('Choose one', style: context.buyMeta),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Share in this ${presentation.familyLabel} chat',
+                        style: context.buyBody.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Choose what is relevant to this conversation',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 9),
@@ -2702,12 +3006,14 @@ class _ShopChatInfoView extends StatelessWidget {
   const _ShopChatInfoView({
     super.key,
     required this.thread,
+    required this.presentation,
     required this.onBack,
     required this.onDispatch,
     required this.onOpenContext,
   });
 
   final BuyV2ShopChatThread thread;
+  final BuyV2ShopChatPresentation presentation;
   final VoidCallback onBack;
   final _ShopChatDispatch onDispatch;
   final VoidCallback? onOpenContext;
@@ -2726,7 +3032,19 @@ class _ShopChatInfoView extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              color: Colors.white,
+              constraints: const BoxConstraints(minHeight: 66),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: const Border(
+                  bottom: BorderSide(color: BuyV2Colors.line),
+                ),
+                gradient: LinearGradient(
+                  colors: [
+                    presentation.accent.withValues(alpha: .07),
+                    Colors.white,
+                  ],
+                ),
+              ),
               child: Row(
                 children: [
                   IconButton(
@@ -2735,10 +3053,42 @@ class _ShopChatInfoView extends StatelessWidget {
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back_rounded),
                   ),
-                  Expanded(
-                    child: Text('Conversation info', style: context.buyTitle),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: presentation.accent.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      presentation.icon,
+                      color: presentation.accent,
+                      size: 19,
+                    ),
                   ),
-                  const SizedBox(width: 48),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${presentation.familyLabel} Chat info',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyTitle.copyWith(fontSize: 18),
+                        ),
+                        Text(
+                          thread.contextTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 9.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                 ],
               ),
             ),
@@ -2755,7 +3105,7 @@ class _ShopChatInfoView extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    thread.participantKind.customerLabel,
+                    '${presentation.familyLabel} · ${thread.participantKind.customerLabel}',
                     textAlign: TextAlign.center,
                     style: context.buyMeta,
                   ),
