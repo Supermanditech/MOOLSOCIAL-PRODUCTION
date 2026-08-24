@@ -32,9 +32,10 @@ String _destinationSummary(Set<BuyV2Destination> destinations) {
 }
 
 class BuyV2ProductView extends StatelessWidget {
-  const BuyV2ProductView({super.key, required this.session});
+  const BuyV2ProductView({super.key, required this.session, this.returnLabel});
 
   final BuyV2Session session;
+  final String? returnLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +94,7 @@ class BuyV2ProductView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
             children: [
               _ReturnAffordance(
-                label: product.destination.label,
+                label: returnLabel ?? product.destination.label,
                 onTap: session.closeProduct,
               ),
               const SizedBox(height: 7),
@@ -1987,9 +1988,14 @@ class _MissingOrderSelection extends StatelessWidget {
 }
 
 class BuyV2CartView extends StatefulWidget {
-  const BuyV2CartView({super.key, required this.session});
+  const BuyV2CartView({
+    super.key,
+    required this.session,
+    required this.onBrowseMore,
+  });
 
   final BuyV2Session session;
+  final VoidCallback onBrowseMore;
 
   @override
   State<BuyV2CartView> createState() => _BuyV2CartViewState();
@@ -2126,6 +2132,17 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   key: PageStorageKey('buy-cart-${session.cartScope.name}'),
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('buy-cart-browse-more'),
+                        onPressed: widget.onBrowseMore,
+                        icon: const Icon(Icons.add_shopping_cart_outlined),
+                        label: const Text('Browse more products'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     for (final line in lines)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 7),
@@ -2722,10 +2739,12 @@ class BuyV2OrdersView extends StatelessWidget {
     super.key,
     required this.session,
     this.invoiceDownloader,
+    this.browseProducts,
   });
 
   final BuyV2Session session;
   final BuyV2InvoiceDownloader? invoiceDownloader;
+  final Widget? browseProducts;
 
   @override
   Widget build(BuildContext context) {
@@ -2843,6 +2862,23 @@ class BuyV2OrdersView extends StatelessWidget {
             BuyV2SponsoredPlacement.ordersAfterHistory,
           ),
         ),
+        if (browseProducts case final productGrid?) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            header: true,
+            child: Text(
+              'Browse more products',
+              style: context.buyTitle.copyWith(fontSize: 15),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Add products now without leaving your purchase history behind.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 4),
+          productGrid,
+        ],
         const SizedBox(height: 2),
         _OrdersContinuationRail(session: session),
       ],

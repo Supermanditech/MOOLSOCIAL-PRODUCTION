@@ -33,6 +33,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenChat,
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
+    this.offersSource = const BuyV2CataloguePublishedOffersSource(),
   });
 
   final BuyV2Session session;
@@ -49,6 +50,7 @@ class BuyV2Screen extends StatefulWidget {
   final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2PublishedOffersSource offersSource;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
@@ -59,6 +61,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Timer? _cartAcknowledgementTimer;
   bool _scannerBusy = false;
   bool _searchOpen = false;
+  bool _offersActive = false;
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -92,6 +95,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _applyInitialState() {
+    _offersActive = false;
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
@@ -115,6 +119,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (_offersActive &&
+        widget.session.view == BuyV2View.catalogue &&
+        widget.session.destination != BuyV2Destination.shop) {
+      _offersActive = false;
+    }
     final destinationChanged =
         _lastSearchDestination != widget.session.destination;
     if (destinationChanged) {
@@ -236,6 +245,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                           if (session.view == BuyV2View.catalogue)
                             _BuySearchBand(
                               session: session,
+                              offersActive: _offersActive,
                               controller: _searchController,
                               open: _searchOpen,
                               onOpenChanged: (value) =>
@@ -269,6 +279,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                       ),
                                       child:
                                           _searchOpen &&
+                                              !_offersActive &&
                                               session.destination !=
                                                   BuyV2Destination.orders
                                           ? BuyV2SearchResultsView(
@@ -302,11 +313,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
             destinationLabel: careNavigation ? 'Care' : 'Shop',
             selectedLocalIndex: careNavigation
                 ? 1
+                : _offersActive
+                ? 2
                 : switch (session.activeDockDestination) {
                     BuyV2Destination.orders => 1,
                     _ => 0,
                   },
-            localActionCount: careNavigation ? 3 : 2,
+            localActionCount: 3,
             localNavigation: careNavigation
                 ? _buildCareLocalNavigation()
                 : _buildBuyLocalNavigation(session),
@@ -327,35 +340,58 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       key: const ValueKey('buy-local-destination-tabs'),
       familyId: 'buy',
       surfaceTone: MoolLocalNavigationSurfaceTone.light,
-      semanticLabel: 'Shop choices: Wholesale and Orders.',
-      activeId: active.name,
+      semanticLabel: 'Shop choices: Wholesale, Orders and Offers.',
+      activeId: _offersActive ? 'offers' : active.name,
       actions: [
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-wholesale',
           id: BuyV2Destination.wholesale.name,
           label: 'Wholesale',
           icon: Icons.inventory_2_outlined,
-          onPressed: active == BuyV2Destination.wholesale
+          onPressed: !_offersActive && active == BuyV2Destination.wholesale
               ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  session.openDestination(BuyV2Destination.wholesale);
-                },
+              : () => _openBuyDestination(BuyV2Destination.wholesale),
         ),
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-orders',
           id: BuyV2Destination.orders.name,
           label: 'Orders',
           icon: Icons.receipt_long_outlined,
-          onPressed: active == BuyV2Destination.orders
+          onPressed: !_offersActive && active == BuyV2Destination.orders
               ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  session.openOrders();
-                },
+              : () => _openBuyDestination(BuyV2Destination.orders),
+        ),
+        MoolLocalNavigationAction(
+          keyName: 'buy-local-tab-offers',
+          id: 'offers',
+          label: 'Offers',
+          icon: Icons.local_offer_outlined,
+          onPressed: _offersActive ? null : _openOffers,
         ),
       ],
     );
+  }
+
+  void _openBuyDestination(BuyV2Destination destination) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _offersActive = false;
+      _searchOpen = false;
+    });
+    if (destination == BuyV2Destination.orders) {
+      widget.session.openOrders();
+    } else {
+      widget.session.openDestination(destination);
+    }
+  }
+
+  void _openOffers() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _offersActive = true;
+      _searchOpen = false;
+    });
+    widget.session.openDestination(BuyV2Destination.shop);
   }
 
   Widget _buildCareLocalNavigation() {
@@ -418,15 +454,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2Destination.wholesale,
       BuyV2Destination.orders,
     ];
-    final current = destinations.indexOf(session.activeDockDestination);
-    final next =
-        destinations[(current + delta + destinations.length) %
-            destinations.length];
-    HapticFeedback.selectionClick();
-    if (next == BuyV2Destination.orders) {
-      session.openOrders();
+    final current = _offersActive
+        ? destinations.length
+        : destinations.indexOf(session.activeDockDestination);
+    final nextIndex =
+        (current + delta + destinations.length + 1) % (destinations.length + 1);
+    if (nextIndex == destinations.length) {
+      _openOffers();
     } else {
-      session.openDestination(next);
+      _openBuyDestination(destinations[nextIndex]);
     }
   }
 
@@ -445,6 +481,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openGlobalAction(PersonalMoolActionSpec action) {
+    if (action.id == 'buy' && _offersActive) {
+      setState(() => _offersActive = false);
+    }
     final onOpenMainAction = widget.onOpenMainAction;
     if (onOpenMainAction != null) {
       onOpenMainAction(action);
@@ -477,17 +516,45 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   Widget _currentView(BuyV2Session session) {
+    if (_offersActive && session.view == BuyV2View.catalogue) {
+      return BuyV2OffersView(session: session, source: widget.offersSource);
+    }
     if (session.destination == BuyV2Destination.orders &&
         session.view == BuyV2View.catalogue) {
       return BuyV2OrdersView(
         session: session,
         invoiceDownloader: widget.invoiceDownloader,
+        browseProducts: session.visibleProducts.isEmpty
+            ? null
+            : BuyV2ProgressiveProductGrid(
+                session: session,
+                products: session.visibleProducts,
+                storageKey: 'buy-orders-products',
+                semanticLabel: 'Products to buy from Orders',
+              ),
       );
     }
     return switch (session.view) {
       BuyV2View.catalogue => BuyV2CatalogueView(session: session),
-      BuyV2View.product => BuyV2ProductView(session: session),
-      BuyV2View.cart => BuyV2CartView(session: session),
+      BuyV2View.product => BuyV2ProductView(
+        session: session,
+        returnLabel: _offersActive ? 'Offers' : null,
+      ),
+      BuyV2View.cart => BuyV2CartView(
+        session: session,
+        onBrowseMore: () {
+          if (_offersActive) {
+            _openOffers();
+            return;
+          }
+          final destination = switch (session.cartScope) {
+            BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
+            BuyV2CartScope.medicine => BuyV2Destination.medicine,
+            BuyV2CartScope.all || BuyV2CartScope.shop => BuyV2Destination.shop,
+          };
+          _openBuyDestination(destination);
+        },
+      ),
       BuyV2View.checkout => BuyV2CheckoutView(session: session),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
@@ -615,6 +682,7 @@ class _BuyNavigationSurfaceOwnerState
 class _BuySearchBand extends StatelessWidget {
   const _BuySearchBand({
     required this.session,
+    required this.offersActive,
     required this.controller,
     required this.open,
     required this.onOpenChanged,
@@ -625,6 +693,7 @@ class _BuySearchBand extends StatelessWidget {
   });
 
   final BuyV2Session session;
+  final bool offersActive;
   final TextEditingController controller;
   final bool open;
   final ValueChanged<bool> onOpenChanged;
@@ -635,12 +704,14 @@ class _BuySearchBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hint = switch (session.destination) {
-      BuyV2Destination.wholesale => 'Search bulk products and suppliers',
-      BuyV2Destination.medicine => 'Search medicines and wellness',
-      BuyV2Destination.orders => 'Search orders, sellers or ID',
-      _ => 'Search products, brands and codes',
-    };
+    final hint = offersActive
+        ? 'Search offers, products and sellers'
+        : switch (session.destination) {
+            BuyV2Destination.wholesale => 'Search bulk products and suppliers',
+            BuyV2Destination.medicine => 'Search medicines and wellness',
+            BuyV2Destination.orders => 'Search orders, sellers or ID',
+            _ => 'Search products, brands and codes',
+          };
     final showScanner = session.destination != BuyV2Destination.orders;
     final longQuery = open && controller.text.trim().length > 38;
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
