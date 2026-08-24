@@ -42045,6 +42045,29 @@
         "config/codex-subagent-coordination-policy.json",
         "backend/firestore/youtube-private-dev.rules"
       ]
+    },
+    {
+      "id": "REG-20260824-3720-YOUTUBE-V2-TASK-START-INVOKED-AFTER-PREFLIGHT-PATCH-APPLY",
+      "status": "registered_no_preflight_executed_clean_task_start_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "At v78 the final checksum-bound preflight patch was applied before task_start, so coordination correctly rejected the dirty worktree and no local preflight execution occurred.",
+      "rootCause": "The final command ordered patch apply ahead of the clean-base task-start boundary.",
+      "prevention": "Preserve and restore the exact preflight patch, bind this registry generation, invoke task_start while clean at the governance tag, then apply the patch, run implementation and execute local preflight without Cloud.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-youtube-private-dev-preflight.ps1"
+      ]
     }
   ]
 }
