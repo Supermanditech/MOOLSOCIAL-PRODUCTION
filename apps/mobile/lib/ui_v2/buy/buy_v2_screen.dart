@@ -11,6 +11,7 @@ import '../../features/buy/buy_v2_session.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
+import 'buy_v2_invoice.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_views.dart';
 
@@ -30,6 +31,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMainAction,
     this.onOpenChat,
     this.onDestinationChanged,
+    this.invoiceDownloader,
   });
 
   final BuyV2Session session;
@@ -45,6 +47,7 @@ class BuyV2Screen extends StatefulWidget {
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
@@ -475,15 +478,24 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Widget _currentView(BuyV2Session session) {
     if (session.destination == BuyV2Destination.orders &&
         session.view == BuyV2View.catalogue) {
-      return BuyV2OrdersView(session: session);
+      return BuyV2OrdersView(
+        session: session,
+        invoiceDownloader: widget.invoiceDownloader,
+      );
     }
     return switch (session.view) {
       BuyV2View.catalogue => BuyV2CatalogueView(session: session),
       BuyV2View.product => BuyV2ProductView(session: session),
       BuyV2View.cart => BuyV2CartView(session: session),
       BuyV2View.checkout => BuyV2CheckoutView(session: session),
-      BuyV2View.confirmation => BuyV2ConfirmationView(session: session),
-      BuyV2View.tracking => BuyV2TrackingView(session: session),
+      BuyV2View.confirmation => BuyV2ConfirmationView(
+        session: session,
+        invoiceDownloader: widget.invoiceDownloader,
+      ),
+      BuyV2View.tracking => BuyV2TrackingView(
+        session: session,
+        invoiceDownloader: widget.invoiceDownloader,
+      ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2AssistView(session: session),
       BuyV2View.account => BuyV2AccountView(session: session),

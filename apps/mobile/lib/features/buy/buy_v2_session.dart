@@ -1947,6 +1947,10 @@ class BuyV2Session extends ChangeNotifier {
       progress: status == BuyV2OrderStatus.confirmed ? .34 : .2,
       status: status,
       productIds: group.productIds,
+      lines: List.unmodifiable(group.lines),
+      paymentMethod: selectedPayment,
+      recipient: address.recipient,
+      addressLine: '${address.line}, ${address.area} ${address.pinCode}',
       deliveryInstruction: selectedDeliveryInstructionFor(
         group.destination,
       )?.label,

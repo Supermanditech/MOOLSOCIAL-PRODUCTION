@@ -587,6 +587,79 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'post-order confirmation and invoice review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-post-order-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final shop = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.shop,
+      );
+      final wholesale = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.wholesale,
+      );
+      session.addProduct(shop.id);
+      session.increase(shop.id);
+      session.addProduct(wholesale.id);
+      session.openCart();
+      session.openCheckout();
+      session.confirmOrder();
+      await tester.pumpAndSettle();
+
+      await _capturePostOrderReview(
+        tester,
+        'confirmation-shop-wholesale',
+        reviewRootKey,
+      );
+      final shopOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.shop,
+      );
+      final invoiceAction = find.byKey(
+        ValueKey('buy-confirmation-invoice-${shopOrder.id}'),
+      );
+      await tester.ensureVisible(invoiceAction);
+      await tester.tap(invoiceAction);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('buy-invoice-page-${shopOrder.id}')),
+        findsOneWidget,
+      );
+
+      await _capturePostOrderReview(tester, 'invoice-shop', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -611,6 +684,21 @@ Future<void> _captureHeaderRemovalReview(
     matchesGoldenFile(
       'candidate_captures/'
       'buy-v2-oppo-baseline-header-removed-$destination-360x800.png',
+    ),
+  );
+}
+
+Future<void> _capturePostOrderReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-post-order-$state-360x800.png',
     ),
   );
 }
