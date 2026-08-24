@@ -7,7 +7,7 @@ export interface YouTubeOAuthReturnPage {
 }
 
 const APP_RETURN_BASE =
-  "moolsocial:///app/creator/youtube-connect?youtubeConnect=";
+  "moolsocial://app/creator/youtube-connect?youtubeConnect=";
 
 export function youtubeOAuthReturnPage(
   outcome: YouTubeOAuthReturnOutcome,
