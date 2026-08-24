@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3696,
-    "sha256": "4BDB4B5250F1E2D76516557E021AA17B94EEB8F21CB2BC7A0B6094E6CF8E3BC4"
+    "entryCount": 3697,
+    "sha256": "EE5D9F2ED2D336FB243B4A3A0FC0A3F1CAC9A2353199014CA9AC8E3DD7E0F930"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -144,6 +144,7 @@
         "scripts/check-youtube-private-dev-exports.mjs",
         "scripts/check-full-social-founder-dev-readiness.ps1",
         "scripts/check-youtube-private-dev-security-prerequisites.ps1",
+        "scripts/test-youtube-private-dev-deployment-controls.ps1",
         "scripts/check-android-plugin-manifest-namespace-readiness.ps1"
       ]
     }
@@ -174,7 +175,7 @@
       "mainHead": "ed2a44d59efd51d7d4ff09fab5feb940d5798d5c"
     },
     "workStart": {
-      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v84",
+      "annotatedTag": "moolsocial-parallel-production-discipline-20260824-v85",
       "mustDescendFromAcceptedRuntimeBaseline": true,
       "featureBranchesMustStartAtTag": true
     },

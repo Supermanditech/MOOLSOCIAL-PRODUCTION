@@ -42187,6 +42187,31 @@
         "scripts/check-youtube-private-dev-package.ps1",
         "scripts/check-youtube-private-dev-preflight.ps1"
       ]
+    },
+    {
+      "id": "REG-20260824-3726-YOUTUBE-PACKAGE-LOCAL-MODE-DEPLOYMENT-CONTROL-FIXTURE-REJECTED-CURRENT-DEV-BASELINE",
+      "status": "registered_minimal_fixture_owner_feature_mode_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "youtube"
+      ],
+      "mistake": "The package gate's local feature arguments were accepted and forwarded, then its historical deployment-control test rejected YOUTUBE_PUBLIC_DATA_ENABLED even though the exact environment line remains false; no later runtime prep, npm, Flutter, content or deployment action ran.",
+      "rootCause": "The deployment-control fixture applies multiline end-anchored regexes to raw CRLF environment text, so the carriage return prevents the reviewed false lines from matching in the isolated Windows worktree.",
+      "prevention": "Add only test-youtube-private-dev-deployment-controls.ps1 as the minimal fixture owner, preserve its historical default, add an exact LocalFeaturePrebuild/TicketId non-deploying mode that canonicalizes baseline line endings and has negative mode/ticket/deploy-authority fixtures, forward arguments from package gate, then rerun with SkipFlutter and no Cloud/deployment.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-youtube-private-dev-package.ps1",
+        "scripts/test-youtube-private-dev-deployment-controls.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-youtube-private-dev-package.ps1",
+        "scripts/test-youtube-private-dev-deployment-controls.ps1"
+      ]
     }
   ]
 }
