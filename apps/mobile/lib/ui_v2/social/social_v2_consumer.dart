@@ -18,6 +18,8 @@ import '../../features/retailer/retailer_session.dart';
 import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
+import '../buy/buy_v2_shop_chat.dart';
+import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'social_v2_create_workbench.dart';
 import 'social_v2_design.dart';
@@ -61,6 +63,9 @@ class SocialUniversalV2 extends StatefulWidget {
     this.initialWorld = 'social',
     this.onOpenMool,
     this.onOpenMainAction,
+    this.onContextualChatAction,
+    this.contextualChatSource =
+        const MoolDefaultContextualChatProvisioningSource(),
     this.mediaPicker,
     @visibleForTesting this.youtubePublicAccessOverride,
     @visibleForTesting this.youtubeCreatorAccessOverride,
@@ -83,6 +88,8 @@ class SocialUniversalV2 extends StatefulWidget {
   final String initialWorld;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
+  final BuyV2ShopChatActionHandler? onContextualChatAction;
+  final MoolContextualChatProvisioningSource contextualChatSource;
   final SocialMediaPicker? mediaPicker;
 
   @visibleForTesting
@@ -108,8 +115,10 @@ class SocialUniversalV2 extends StatefulWidget {
 }
 
 class _SocialUniversalV2State extends State<SocialUniversalV2> {
+  final GlobalKey<BuyV2ShopChatViewState> _contextualChatKey = GlobalKey();
   late SocialV2Tab _tab;
   late String _world;
+  bool _contextualChatActive = false;
   late final _SocialV2RetainedState _retainedState;
 
   Map<String, String> get _choiceByWorld => _retainedState.choiceByWorld;
@@ -299,6 +308,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _world = screen04Worlds.any((world) => world.id == widget.initialWorld)
           ? widget.initialWorld
           : 'social';
+      _contextualChatActive = false;
       final activeWorld = screen04World(_world);
       final requestedChoice = widget.initialSubAction;
       if (requestedChoice != null &&
@@ -507,12 +517,15 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         (_tab == SocialV2Tab.videos || _tab == SocialV2Tab.shorts);
     final shortsOwned = _world == 'social' && _tab == SocialV2Tab.shorts;
     final composerOpen = _world == 'social' && _tab == SocialV2Tab.create;
+    final contextualChatOpen =
+        _contextualChatActive && MoolContextualChatCatalog.supports(_world);
     final area =
         widget.session.currentAreaPrimary ??
         widget.session.manualArea?.split(',').first.trim() ??
         'Khema-Ka-Kuwa';
 
-    final hasInlineBack = _activeVideo != null || _youtubeSearchOpen;
+    final hasInlineBack =
+        _activeVideo != null || _youtubeSearchOpen || contextualChatOpen;
 
     return MediaQuery(
       data: media,
@@ -552,59 +565,87 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
             ),
             child: Scaffold(
               key: const Key('screen04-universal-v2'),
-              extendBody: !youtubeOwned && !composerOpen,
+              extendBody: !youtubeOwned && !composerOpen && !contextualChatOpen,
               backgroundColor: youtubeOwned
                   ? const Color(0xFF0F0F0F)
                   : SocialV2Colors.canvas,
               body: SafeArea(
                 top: !shortsOwned,
                 bottom: true,
-                child: Column(
-                  children: [
-                    if (_world != 'social')
-                      Screen04Header(
-                        area: area,
-                        prompt: world.prompt,
-                        immersive: false,
-                        showChat: _world != 'social',
-                        onHome: () => _selectWorld('social'),
-                        onArea: _openServiceableArea,
-                        onChat: _openChat,
-                        onNotifications: _openUniversalNotifications,
-                        onProfile: _openAccount,
-                        onSearch: _openSearch,
-                        onScan: _openUniversalScan,
-                        onVoice: _openUniversalVoice,
-                      ),
-                    Expanded(
-                      child: _world == 'social'
-                          ? KeyedSubtree(
-                              key: ValueKey(
-                                '${_tab.name}-${_tab == SocialV2Tab.create ? 'workbench' : _createView}-${_youtubeSearchOpen ? 'search' : _activeVideo?.id ?? 'home'}',
-                              ),
-                              child: switch (_tab) {
-                                SocialV2Tab.shorts => _buildShorts(),
-                                SocialV2Tab.videos => _buildVideos(),
-                                SocialV2Tab.feed => _buildFeed(),
-                                SocialV2Tab.create => _buildCreate(),
-                                _ => const SizedBox.shrink(),
-                              },
-                            )
-                          : Screen04WorldBody(
-                              world: world,
-                              choice: choice,
-                              area: area,
-                              onPrimary: () => _openWorldDestination(choice),
-                              onPlacement: (title) =>
-                                  _openWorldDestination(choice, detail: title),
-                              onContextAction: (action) =>
-                                  _runContextAction(action, choice),
+                child: contextualChatOpen
+                    ? BuyV2ShopChatView(
+                        key: _contextualChatKey,
+                        originLabel: world.choices
+                            .firstWhere((item) => item.id == choice)
+                            .label,
+                        presentation: MoolContextualChatCatalog.presentationFor(
+                          _world,
+                        ),
+                        initialFilterId:
+                            MoolContextualChatCatalog.initialFilterFor(
+                              _world,
+                              choice,
                             ),
-                    ),
-                  ],
-                ),
+                        provisioningSource: MoolContextualChatSourceAdapter(
+                          familyId: _world,
+                          source: widget.contextualChatSource,
+                        ),
+                        onAction: widget.onContextualChatAction,
+                        onBack: _closeContextualChat,
+                        onOpenProductionChat: _openProductionChat,
+                        onOpenThreadContext: (_) => _closeContextualChat(),
+                      )
+                    : Column(
+                        children: [
+                          if (_world != 'social')
+                            Screen04Header(
+                              area: area,
+                              prompt: world.prompt,
+                              immersive: false,
+                              showChat: _world != 'social',
+                              onHome: () => _selectWorld('social'),
+                              onArea: _openServiceableArea,
+                              onChat: _openChat,
+                              onNotifications: _openUniversalNotifications,
+                              onProfile: _openAccount,
+                              onSearch: _openSearch,
+                              onScan: _openUniversalScan,
+                              onVoice: _openUniversalVoice,
+                            ),
+                          Expanded(
+                            child: _world == 'social'
+                                ? KeyedSubtree(
+                                    key: ValueKey(
+                                      '${_tab.name}-${_tab == SocialV2Tab.create ? 'workbench' : _createView}-${_youtubeSearchOpen ? 'search' : _activeVideo?.id ?? 'home'}',
+                                    ),
+                                    child: switch (_tab) {
+                                      SocialV2Tab.shorts => _buildShorts(),
+                                      SocialV2Tab.videos => _buildVideos(),
+                                      SocialV2Tab.feed => _buildFeed(),
+                                      SocialV2Tab.create => _buildCreate(),
+                                      _ => const SizedBox.shrink(),
+                                    },
+                                  )
+                                : Screen04WorldBody(
+                                    world: world,
+                                    choice: choice,
+                                    area: area,
+                                    onPrimary: () =>
+                                        _openWorldDestination(choice),
+                                    onPlacement: (title) =>
+                                        _openWorldDestination(
+                                          choice,
+                                          detail: title,
+                                        ),
+                                    onContextAction: (action) =>
+                                        _runContextAction(action, choice),
+                                  ),
+                          ),
+                        ],
+                      ),
               ),
-              bottomNavigationBar: composerOpen || _youtubeSearchOpen
+              bottomNavigationBar:
+                  composerOpen || _youtubeSearchOpen || contextualChatOpen
                   ? null
                   : _world == 'social'
                   ? _SocialOwnershipDock(
@@ -683,6 +724,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _handleScreen04Back() {
+    if (_contextualChatActive) {
+      if (_contextualChatKey.currentState?.handleBack() ?? false) return;
+      _closeContextualChat();
+      return;
+    }
     if (_youtubeSearchOpen) {
       _closeYouTubeSearch();
       return;
@@ -731,6 +777,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       return;
     }
     setState(() {
+      _contextualChatActive = false;
       _world = worldId;
       _activeVideo = null;
       _resetYouTubeSearch();
@@ -753,6 +800,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       return;
     }
     setState(() {
+      _contextualChatActive = false;
       _choiceByWorld[_world] = choiceId;
       _activeVideo = null;
       _resetYouTubeSearch();
@@ -1106,6 +1154,23 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _openChat() {
+    if (_world != 'social' && MoolContextualChatCatalog.supports(_world)) {
+      FocusScope.of(context).unfocus();
+      HapticFeedback.selectionClick();
+      setState(() => _contextualChatActive = true);
+      return;
+    }
+    _openProductionChat();
+  }
+
+  void _closeContextualChat() {
+    if (!_contextualChatActive) return;
+    FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
+    setState(() => _contextualChatActive = false);
+  }
+
+  void _openProductionChat() {
     final world = screen04World(_world);
     final choice = _choiceByWorld[_world] ?? world.choices.first.id;
     final returnQuery = <String, String>{

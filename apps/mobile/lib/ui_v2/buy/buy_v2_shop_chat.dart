@@ -8,12 +8,94 @@ import 'buy_v2_shop_chat_motion.dart';
 
 enum BuyV2ShopChatFilter { all, orders, sellers, offers }
 
+@immutable
+class BuyV2ShopChatFilterSpec {
+  const BuyV2ShopChatFilterSpec({
+    required this.id,
+    required this.label,
+    required this.sectionLabel,
+    this.allLimit,
+  });
+
+  final String id;
+  final String label;
+  final String sectionLabel;
+  final int? allLimit;
+}
+
+@immutable
+class BuyV2ShopChatPresentation {
+  const BuyV2ShopChatPresentation({
+    required this.familyId,
+    required this.familyLabel,
+    required this.title,
+    required this.subtitle,
+    required this.securityMessage,
+    required this.newConversationPrompt,
+    required this.filters,
+  });
+
+  static const shop = BuyV2ShopChatPresentation(
+    familyId: 'shop',
+    familyLabel: 'Shop',
+    title: 'Shop Chat',
+    subtitle: 'partners, orders and offers',
+    securityMessage: 'Shop conversations continue securely in MoolSocial Chat.',
+    newConversationPrompt: 'Choose who can help with this purchase.',
+    filters: [
+      BuyV2ShopChatFilterSpec(
+        id: 'all',
+        label: 'All',
+        sectionLabel: 'Start with Shop',
+      ),
+      BuyV2ShopChatFilterSpec(
+        id: 'orders',
+        label: 'Orders',
+        sectionLabel: 'Order conversations',
+        allLimit: 2,
+      ),
+      BuyV2ShopChatFilterSpec(
+        id: 'sellers',
+        label: 'Partners',
+        sectionLabel: 'Partner conversations',
+      ),
+      BuyV2ShopChatFilterSpec(
+        id: 'offers',
+        label: 'Offers',
+        sectionLabel: 'Offer conversations',
+        allLimit: 1,
+      ),
+    ],
+  );
+
+  final String familyId;
+  final String familyLabel;
+  final String title;
+  final String subtitle;
+  final String securityMessage;
+  final String newConversationPrompt;
+  final List<BuyV2ShopChatFilterSpec> filters;
+
+  BuyV2ShopChatFilterSpec filter(String id) => filters.firstWhere(
+    (candidate) => candidate.id == id,
+    orElse: () => filters.first,
+  );
+}
+
 enum BuyV2ShopChatParticipantKind {
   retailer,
   wholesaler,
   manufacturer,
   orderSupport,
   offerSupport,
+  restaurant,
+  tableDesk,
+  travelPartner,
+  doctorDesk,
+  medicineDesk,
+  salonDesk,
+  workOpportunity,
+  workspaceSupport,
 }
 
 enum BuyV2ShopChatMessageKind {
@@ -120,12 +202,13 @@ class BuyV2ShopChatThread {
     required this.detail,
     required this.icon,
     required this.accent,
-    required this.commerceTarget,
+    this.commerceTarget,
     required this.contextTitle,
     required this.contextDetail,
     this.messages = const [],
     this.quickReplies = const [],
     this.capabilities = const BuyV2ShopChatCapabilities(),
+    this.filterId,
     this.previewTimeLabel,
     this.unreadCount = 0,
   });
@@ -138,14 +221,17 @@ class BuyV2ShopChatThread {
   final String detail;
   final IconData icon;
   final Color accent;
-  final BuyV2ShopChatCommerceTarget commerceTarget;
+  final BuyV2ShopChatCommerceTarget? commerceTarget;
   final String contextTitle;
   final String contextDetail;
   final List<BuyV2ShopChatMessage> messages;
   final List<String> quickReplies;
   final BuyV2ShopChatCapabilities capabilities;
+  final String? filterId;
   final String? previewTimeLabel;
   final int unreadCount;
+
+  String get resolvedFilterId => filterId ?? filter.name;
 }
 
 @immutable
@@ -186,7 +272,7 @@ typedef BuyV2ShopChatActionHandler =
     Future<BuyV2ShopChatActionResult> Function(BuyV2ShopChatAction action);
 
 abstract interface class BuyV2ShopChatProvisioningSource {
-  List<BuyV2ShopChatThread> threads(BuyV2Session session);
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session);
 }
 
 /// Presentation-only default. A later runtime owner can provide authoritative
@@ -197,7 +283,8 @@ class BuyV2SessionShopChatProvisioningSource
   const BuyV2SessionShopChatProvisioningSource();
 
   @override
-  List<BuyV2ShopChatThread> threads(BuyV2Session session) {
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) {
+    if (session == null) return const [];
     final orderThreads = session.orders
         .where(
           (order) =>
@@ -309,31 +396,37 @@ enum _BuyV2ShopChatSurface { inbox, newConversation, thread, info }
 class BuyV2ShopChatView extends StatefulWidget {
   const BuyV2ShopChatView({
     super.key,
-    required this.session,
+    this.session,
     required this.originLabel,
     required this.onBack,
     required this.onOpenProductionChat,
     this.initialFilter = BuyV2ShopChatFilter.all,
+    this.initialFilterId,
+    this.presentation = BuyV2ShopChatPresentation.shop,
     this.provisioningSource = const BuyV2SessionShopChatProvisioningSource(),
     this.onAction,
     this.onOpenCommerce,
+    this.onOpenThreadContext,
   });
 
-  final BuyV2Session session;
+  final BuyV2Session? session;
   final String originLabel;
   final VoidCallback onBack;
   final VoidCallback onOpenProductionChat;
   final BuyV2ShopChatFilter initialFilter;
+  final String? initialFilterId;
+  final BuyV2ShopChatPresentation presentation;
   final BuyV2ShopChatProvisioningSource provisioningSource;
   final BuyV2ShopChatActionHandler? onAction;
   final ValueChanged<BuyV2ShopChatCommerceTarget>? onOpenCommerce;
+  final ValueChanged<BuyV2ShopChatThread>? onOpenThreadContext;
 
   @override
   State<BuyV2ShopChatView> createState() => BuyV2ShopChatViewState();
 }
 
 class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
-  late BuyV2ShopChatFilter _filter = widget.initialFilter;
+  late String _filterId = widget.initialFilterId ?? widget.initialFilter.name;
   final TextEditingController _searchController = TextEditingController();
   _BuyV2ShopChatSurface _surface = _BuyV2ShopChatSurface.inbox;
   BuyV2ShopChatThread? _selectedThread;
@@ -359,8 +452,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   @override
   void didUpdateWidget(covariant BuyV2ShopChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialFilter != widget.initialFilter) {
-      _filter = widget.initialFilter;
+    if (oldWidget.initialFilter != widget.initialFilter ||
+        oldWidget.initialFilterId != widget.initialFilterId ||
+        oldWidget.presentation != widget.presentation) {
+      _filterId = widget.initialFilterId ?? widget.initialFilter.name;
     }
   }
 
@@ -376,6 +471,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
       _BuyV2ShopChatSurface.inbox => _buildInbox(context),
       _BuyV2ShopChatSurface.newConversation => _ShopChatNewConversationView(
         entries: widget.provisioningSource.threads(widget.session),
+        presentation: widget.presentation,
         onBack: _showInbox,
         onSelected: _openThread,
       ),
@@ -385,14 +481,15 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         onBack: () => _showInbox(),
         onOpenInfo: _showInfo,
         onDispatch: _dispatch,
-        onOpenCommerce: widget.onOpenCommerce,
+        onOpenContext: _openContextFor(_selectedThread!),
+        familyLabel: widget.presentation.familyLabel,
       ),
       _BuyV2ShopChatSurface.info => _ShopChatInfoView(
         key: ValueKey('buy-shop-chat-info-${_selectedThread!.id}'),
         thread: _selectedThread!,
         onBack: () => _showThread(forward: false),
         onDispatch: _dispatch,
-        onOpenCommerce: widget.onOpenCommerce,
+        onOpenContext: _openContextFor(_selectedThread!),
       ),
     };
     return BuyV2ShopChatSurfaceMotion(
@@ -407,13 +504,14 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     return Semantics(
       key: const ValueKey('buy-shop-chat'),
       container: true,
-      label: 'Shop Chat. Partners, orders and offers.',
+      label: '${widget.presentation.title}. ${widget.presentation.subtitle}.',
       child: ColoredBox(
         color: const Color(0xFFF8F8FC),
         child: Column(
           children: [
             _ShopChatHeader(
               originLabel: widget.originLabel,
+              presentation: widget.presentation,
               onBack: widget.onBack,
               onOpenAll: widget.onOpenProductionChat,
             ),
@@ -427,10 +525,11 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
               },
             ),
             _ShopChatFilters(
-              selected: _filter,
+              presentation: widget.presentation,
+              selectedId: _filterId,
               onSelected: (value) {
                 HapticFeedback.selectionClick();
-                setState(() => _filter = value);
+                setState(() => _filterId = value);
               },
             ),
             const SizedBox(height: 4),
@@ -440,14 +539,13 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                 children: [
                   Positioned.fill(
                     child: BuyV2ShopChatFilterMotion(
-                      stateKey:
-                          '${_filter.name}|${_searchController.text.trim()}',
+                      stateKey: '$_filterId|${_searchController.text.trim()}',
                       child: entries.isEmpty
-                          ? const _ShopChatEmptyState()
+                          ? _ShopChatEmptyState(
+                              familyLabel: widget.presentation.familyLabel,
+                            )
                           : ListView.builder(
-                              key: ValueKey(
-                                'buy-shop-chat-results-${_filter.name}',
-                              ),
+                              key: ValueKey('buy-shop-chat-results-$_filterId'),
                               padding: const EdgeInsets.fromLTRB(
                                 12,
                                 12,
@@ -457,7 +555,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                               itemCount: entries.length + 2,
                               itemBuilder: (context, index) {
                                 if (index == 0) {
-                                  return const _ShopChatTrustNote();
+                                  return _ShopChatTrustNote(
+                                    message:
+                                        widget.presentation.securityMessage,
+                                  );
                                 }
                                 if (index == 1) {
                                   return Padding(
@@ -468,9 +569,9 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                                       6,
                                     ),
                                     child: Text(
-                                      _filter == BuyV2ShopChatFilter.all
-                                          ? 'Start with Shop'
-                                          : _filter.sectionLabel,
+                                      widget.presentation
+                                          .filter(_filterId)
+                                          .sectionLabel,
                                       style: context.buyEyebrow.copyWith(
                                         color: BuyV2Colors.ink,
                                         fontSize: 11,
@@ -483,6 +584,9 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                                   index: index - 2,
                                   child: _ShopChatEntryTile(
                                     entry: entry,
+                                    categoryLabel: widget.presentation
+                                        .filter(entry.resolvedFilterId)
+                                        .label,
                                     onTap: () => _openThread(entry),
                                   ),
                                 );
@@ -494,10 +598,11 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                     right: 16,
                     bottom: 16,
                     child: Semantics(
-                      label: 'Start a new Shop chat',
+                      label:
+                          'Start a new ${widget.presentation.familyLabel} chat',
                       button: true,
                       child: Tooltip(
-                        message: 'New Shop chat',
+                        message: 'New ${widget.presentation.familyLabel} chat',
                         child: FloatingActionButton(
                           key: const ValueKey('buy-shop-chat-new'),
                           heroTag: 'buy-shop-chat-new',
@@ -534,6 +639,17 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         'Chat could not continue. Please try again.',
       );
     }
+  }
+
+  VoidCallback? _openContextFor(BuyV2ShopChatThread thread) {
+    final onOpenThreadContext = widget.onOpenThreadContext;
+    if (onOpenThreadContext != null) {
+      return () => onOpenThreadContext(thread);
+    }
+    final target = thread.commerceTarget;
+    final onOpenCommerce = widget.onOpenCommerce;
+    if (target == null || onOpenCommerce == null) return null;
+    return () => onOpenCommerce(target);
   }
 
   void _openThread(BuyV2ShopChatThread thread) {
@@ -584,7 +700,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   }
 
   List<BuyV2ShopChatThread> _visibleEntries() {
-    final allEntries = _entriesFor(_filter);
+    final allEntries = _entriesFor(_filterId);
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return allEntries;
     final tokens = query
@@ -596,45 +712,44 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
             entry.title,
             entry.subtitle,
             entry.detail,
-            entry.filter.label,
+            widget.presentation.filter(entry.resolvedFilterId).label,
           ].join(' ').toLowerCase();
           return tokens.every(searchable.contains);
         })
         .toList(growable: false);
   }
 
-  List<BuyV2ShopChatThread> _entriesFor(BuyV2ShopChatFilter filter) {
+  List<BuyV2ShopChatThread> _entriesFor(String filterId) {
     final allEntries = widget.provisioningSource.threads(widget.session);
-    final orderEntries = allEntries
-        .where((entry) => entry.filter == BuyV2ShopChatFilter.orders)
-        .toList(growable: false);
-    final sellerEntries = allEntries
-        .where((entry) => entry.filter == BuyV2ShopChatFilter.sellers)
-        .toList(growable: false);
-    final offerEntries = allEntries
-        .where((entry) => entry.filter == BuyV2ShopChatFilter.offers)
-        .toList(growable: false);
-    return switch (filter) {
-      BuyV2ShopChatFilter.orders => orderEntries,
-      BuyV2ShopChatFilter.sellers => sellerEntries,
-      BuyV2ShopChatFilter.offers => offerEntries,
-      BuyV2ShopChatFilter.all => [
-        ...orderEntries.take(2),
-        ...sellerEntries,
-        ...offerEntries.take(1),
-      ],
-    };
+    if (filterId != 'all') {
+      return allEntries
+          .where((entry) => entry.resolvedFilterId == filterId)
+          .toList(growable: false);
+    }
+    final visible = <BuyV2ShopChatThread>[];
+    for (final filter in widget.presentation.filters) {
+      if (filter.id == 'all') continue;
+      final matching = allEntries.where(
+        (entry) => entry.resolvedFilterId == filter.id,
+      );
+      visible.addAll(
+        filter.allLimit == null ? matching : matching.take(filter.allLimit!),
+      );
+    }
+    return visible;
   }
 }
 
 class _ShopChatHeader extends StatelessWidget {
   const _ShopChatHeader({
     required this.originLabel,
+    required this.presentation,
     required this.onBack,
     required this.onOpenAll,
   });
 
   final String originLabel;
+  final BuyV2ShopChatPresentation presentation;
   final VoidCallback onBack;
   final VoidCallback onOpenAll;
 
@@ -682,14 +797,14 @@ class _ShopChatHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Shop Chat',
+                  presentation.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: context.buyTitle.copyWith(fontSize: 20),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$originLabel · partners, orders and offers',
+                  '$originLabel · ${presentation.subtitle}',
                   key: const ValueKey('buy-shop-chat-origin'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -767,10 +882,15 @@ class _ShopChatSearch extends StatelessWidget {
 }
 
 class _ShopChatFilters extends StatelessWidget {
-  const _ShopChatFilters({required this.selected, required this.onSelected});
+  const _ShopChatFilters({
+    required this.presentation,
+    required this.selectedId,
+    required this.onSelected,
+  });
 
-  final BuyV2ShopChatFilter selected;
-  final ValueChanged<BuyV2ShopChatFilter> onSelected;
+  final BuyV2ShopChatPresentation presentation;
+  final String selectedId;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -780,21 +900,21 @@ class _ShopChatFilters extends StatelessWidget {
         key: const ValueKey('buy-shop-chat-filters'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         scrollDirection: Axis.horizontal,
-        itemCount: BuyV2ShopChatFilter.values.length,
+        itemCount: presentation.filters.length,
         separatorBuilder: (_, _) => const SizedBox(width: 7),
         itemBuilder: (context, index) {
-          final filter = BuyV2ShopChatFilter.values[index];
-          final active = filter == selected;
+          final filter = presentation.filters[index];
+          final active = filter.id == selectedId;
           return Semantics(
             selected: active,
             button: true,
-            label: '${filter.label} Shop Chat filter',
+            label: '${filter.label} ${presentation.title} filter',
             child: ChoiceChip(
-              key: ValueKey('buy-shop-chat-filter-${filter.name}'),
+              key: ValueKey('buy-shop-chat-filter-${filter.id}'),
               label: Text(filter.label),
               selected: active,
               showCheckmark: false,
-              onSelected: active ? null : (_) => onSelected(filter),
+              onSelected: active ? null : (_) => onSelected(filter.id),
               labelStyle: TextStyle(
                 color: active ? Colors.white : BuyV2Colors.ink,
                 fontSize: 11,
@@ -819,12 +939,14 @@ class _ShopChatFilters extends StatelessWidget {
 }
 
 class _ShopChatTrustNote extends StatelessWidget {
-  const _ShopChatTrustNote();
+  const _ShopChatTrustNote({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Shop conversations continue securely in MoolSocial Chat.',
+      label: message,
       child: Container(
         constraints: const BoxConstraints(minHeight: 46),
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
@@ -852,7 +974,7 @@ class _ShopChatTrustNote extends StatelessWidget {
             const SizedBox(width: 9),
             Expanded(
               child: Text(
-                'Shop conversations continue securely in MoolSocial Chat.',
+                message,
                 style: context.buyBody.copyWith(fontSize: 10.5),
               ),
             ),
@@ -864,9 +986,14 @@ class _ShopChatTrustNote extends StatelessWidget {
 }
 
 class _ShopChatEntryTile extends StatelessWidget {
-  const _ShopChatEntryTile({required this.entry, required this.onTap});
+  const _ShopChatEntryTile({
+    required this.entry,
+    required this.categoryLabel,
+    required this.onTap,
+  });
 
   final BuyV2ShopChatThread entry;
+  final String categoryLabel;
   final VoidCallback onTap;
 
   @override
@@ -932,7 +1059,7 @@ class _ShopChatEntryTile extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  entry.previewTimeLabel ?? entry.filter.label,
+                                  entry.previewTimeLabel ?? categoryLabel,
                                   style: context.buyMeta.copyWith(
                                     color: entry.unreadCount > 0
                                         ? BuyV2Colors.green
@@ -1008,7 +1135,9 @@ class _ShopChatEntryTile extends StatelessWidget {
 }
 
 class _ShopChatEmptyState extends StatelessWidget {
-  const _ShopChatEmptyState();
+  const _ShopChatEmptyState({required this.familyLabel});
+
+  final String familyLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1024,10 +1153,10 @@ class _ShopChatEmptyState extends StatelessWidget {
               size: 34,
             ),
             const SizedBox(height: 10),
-            Text('No Shop chats found', style: context.buyBody),
+            Text('No $familyLabel chats found', style: context.buyBody),
             const SizedBox(height: 4),
             Text(
-              'Try another seller, order or offer.',
+              'Try another conversation or clear your search.',
               textAlign: TextAlign.center,
               style: context.buyMeta,
             ),
@@ -1044,26 +1173,23 @@ typedef _ShopChatDispatch =
 class _ShopChatNewConversationView extends StatelessWidget {
   const _ShopChatNewConversationView({
     required this.entries,
+    required this.presentation,
     required this.onBack,
     required this.onSelected,
   });
 
   final List<BuyV2ShopChatThread> entries;
+  final BuyV2ShopChatPresentation presentation;
   final VoidCallback onBack;
   final ValueChanged<BuyV2ShopChatThread> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final starters = <BuyV2ShopChatThread>[];
-    for (final kind in const [
-      BuyV2ShopChatParticipantKind.retailer,
-      BuyV2ShopChatParticipantKind.wholesaler,
-      BuyV2ShopChatParticipantKind.manufacturer,
-      BuyV2ShopChatParticipantKind.orderSupport,
-      BuyV2ShopChatParticipantKind.offerSupport,
-    ]) {
-      final matching = entries.where((entry) => entry.participantKind == kind);
-      if (matching.isNotEmpty) starters.add(matching.first);
+    final includedGroups = <String>{};
+    for (final entry in entries) {
+      final groupId = entry.filterId ?? entry.participantKind.name;
+      if (includedGroups.add(groupId)) starters.add(entry);
     }
     return ColoredBox(
       key: const ValueKey('buy-shop-chat-new-surface'),
@@ -1077,12 +1203,15 @@ class _ShopChatNewConversationView extends StatelessWidget {
               children: [
                 IconButton(
                   key: const ValueKey('buy-shop-chat-new-back'),
-                  tooltip: 'Back to Shop chats',
+                  tooltip: 'Back to ${presentation.familyLabel} chats',
                   onPressed: onBack,
                   icon: const Icon(Icons.arrow_back_rounded),
                 ),
                 Expanded(
-                  child: Text('New Shop conversation', style: context.buyTitle),
+                  child: Text(
+                    'New ${presentation.familyLabel} conversation',
+                    style: context.buyTitle,
+                  ),
                 ),
                 const SizedBox(width: 48),
               ],
@@ -1093,7 +1222,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Choose who can help with this purchase.',
+                presentation.newConversationPrompt,
                 style: context.buyMeta,
               ),
             ),
@@ -1144,14 +1273,16 @@ class _ShopChatConversationView extends StatefulWidget {
     required this.onBack,
     required this.onOpenInfo,
     required this.onDispatch,
-    required this.onOpenCommerce,
+    required this.onOpenContext,
+    required this.familyLabel,
   });
 
   final BuyV2ShopChatThread thread;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
   final _ShopChatDispatch onDispatch;
-  final ValueChanged<BuyV2ShopChatCommerceTarget>? onOpenCommerce;
+  final VoidCallback? onOpenContext;
+  final String familyLabel;
 
   @override
   State<_ShopChatConversationView> createState() =>
@@ -1211,6 +1342,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
             else
               _ShopChatThreadHeader(
                 thread: widget.thread,
+                familyLabel: widget.familyLabel,
                 onBack: widget.onBack,
                 onOpenInfo: widget.onOpenInfo,
                 onVoiceCall: widget.thread.capabilities.voiceCall
@@ -1267,11 +1399,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                         children: [
                           _ShopChatCommerceContext(
                             thread: widget.thread,
-                            onTap: widget.onOpenCommerce == null
-                                ? null
-                                : () => widget.onOpenCommerce!(
-                                    widget.thread.commerceTarget,
-                                  ),
+                            onTap: widget.onOpenContext,
                           ),
                           const SizedBox(height: 12),
                           if (messages.isEmpty)
@@ -1448,6 +1576,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
 class _ShopChatThreadHeader extends StatelessWidget {
   const _ShopChatThreadHeader({
     required this.thread,
+    required this.familyLabel,
     required this.onBack,
     required this.onOpenInfo,
     required this.onVoiceCall,
@@ -1456,6 +1585,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
   });
 
   final BuyV2ShopChatThread thread;
+  final String familyLabel;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
   final VoidCallback? onVoiceCall;
@@ -1475,7 +1605,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
         children: [
           IconButton(
             key: const ValueKey('buy-shop-chat-thread-back'),
-            tooltip: 'Back to Shop chats',
+            tooltip: 'Back to $familyLabel chats',
             onPressed: onBack,
             icon: const Icon(Icons.arrow_back_rounded),
           ),
@@ -2574,13 +2704,13 @@ class _ShopChatInfoView extends StatelessWidget {
     required this.thread,
     required this.onBack,
     required this.onDispatch,
-    required this.onOpenCommerce,
+    required this.onOpenContext,
   });
 
   final BuyV2ShopChatThread thread;
   final VoidCallback onBack;
   final _ShopChatDispatch onDispatch;
-  final ValueChanged<BuyV2ShopChatCommerceTarget>? onOpenCommerce;
+  final VoidCallback? onOpenContext;
 
   @override
   Widget build(BuildContext context) {
@@ -2662,10 +2792,8 @@ class _ShopChatInfoView extends StatelessWidget {
                     title: thread.contextTitle,
                     subtitle: thread.contextDetail,
                     icon: thread.icon,
-                    trailing: onOpenCommerce == null ? null : 'Open',
-                    onTap: onOpenCommerce == null
-                        ? null
-                        : () => onOpenCommerce!(thread.commerceTarget),
+                    trailing: onOpenContext == null ? null : 'Open',
+                    onTap: onOpenContext,
                   ),
                   const SizedBox(height: 10),
                   _ShopChatInfoCard(
@@ -2824,6 +2952,14 @@ extension on BuyV2ShopChatParticipantKind {
     BuyV2ShopChatParticipantKind.manufacturer => 'Manufacturer',
     BuyV2ShopChatParticipantKind.orderSupport => 'Order conversation',
     BuyV2ShopChatParticipantKind.offerSupport => 'Offer conversation',
+    BuyV2ShopChatParticipantKind.restaurant => 'Restaurant partner',
+    BuyV2ShopChatParticipantKind.tableDesk => 'Reservation desk',
+    BuyV2ShopChatParticipantKind.travelPartner => 'Travel partner',
+    BuyV2ShopChatParticipantKind.doctorDesk => 'Care provider',
+    BuyV2ShopChatParticipantKind.medicineDesk => 'Medicine support',
+    BuyV2ShopChatParticipantKind.salonDesk => 'Salon partner',
+    BuyV2ShopChatParticipantKind.workOpportunity => 'Work opportunity',
+    BuyV2ShopChatParticipantKind.workspaceSupport => 'Workspace support',
   };
 }
 
@@ -2896,22 +3032,6 @@ extension on BuyV2ShopChatDeliveryState {
     BuyV2ShopChatDeliveryState.delivered => Icons.done_all_rounded,
     BuyV2ShopChatDeliveryState.read => Icons.done_all_rounded,
     BuyV2ShopChatDeliveryState.failed => Icons.error_outline_rounded,
-  };
-}
-
-extension on BuyV2ShopChatFilter {
-  String get label => switch (this) {
-    BuyV2ShopChatFilter.all => 'All',
-    BuyV2ShopChatFilter.orders => 'Orders',
-    BuyV2ShopChatFilter.sellers => 'Partners',
-    BuyV2ShopChatFilter.offers => 'Offers',
-  };
-
-  String get sectionLabel => switch (this) {
-    BuyV2ShopChatFilter.all => 'Start with Shop',
-    BuyV2ShopChatFilter.orders => 'Order conversations',
-    BuyV2ShopChatFilter.sellers => 'Partner conversations',
-    BuyV2ShopChatFilter.offers => 'Offer conversations',
   };
 }
 
