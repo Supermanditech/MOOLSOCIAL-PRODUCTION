@@ -508,6 +508,7 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
@@ -525,6 +526,7 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],

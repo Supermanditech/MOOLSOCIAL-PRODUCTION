@@ -5,14 +5,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../shared/shared_session.dart';
 import '../chat_models.dart';
 import '../chat_session.dart';
 import '../widgets/chat_widgets.dart';
+import 'chat_people_directory.dart';
 
 class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({
     required this.session,
     required this.returnRoute,
+    this.socialSession,
     this.initialFilter,
     this.initialTargetUserId,
     this.initialMessageDraft,
@@ -21,6 +24,7 @@ class ChatInboxScreen extends StatefulWidget {
 
   final ChatSession session;
   final String returnRoute;
+  final SharedSession? socialSession;
   final ChatThreadType? initialFilter;
   final String? initialTargetUserId;
   final String? initialMessageDraft;
@@ -31,8 +35,18 @@ class ChatInboxScreen extends StatefulWidget {
 
 class _ChatInboxScreenState extends State<ChatInboxScreen> {
   final _searchController = TextEditingController();
+  final _peopleSearchController = TextEditingController();
   int _routeRequest = 0;
+  int _peopleRequest = 0;
   bool _applyingRoute = false;
+  bool _loadingPeopleDirectory = false;
+  String? _peopleDirectoryError;
+  ChatHomeSection _section = ChatHomeSection.chats;
+
+  bool get _socialContext => widget.returnRoute.startsWith('/app/social');
+
+  ChatThreadType? get _effectiveInitialFilter =>
+      widget.initialFilter ?? (_socialContext ? ChatThreadType.people : null);
 
   @override
   void initState() {
@@ -46,6 +60,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   void didUpdateWidget(covariant ChatInboxScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.session, widget.session) ||
+        !identical(oldWidget.socialSession, widget.socialSession) ||
         oldWidget.initialFilter != widget.initialFilter ||
         oldWidget.initialTargetUserId != widget.initialTargetUserId ||
         oldWidget.initialMessageDraft != widget.initialMessageDraft ||
@@ -66,7 +81,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
       while (mounted) {
         final request = _routeRequest;
         final session = widget.session;
-        final filter = widget.initialFilter;
+        final filter = _effectiveInitialFilter;
         final targetUserId = widget.initialTargetUserId?.trim();
         final messageDraft = widget.initialMessageDraft;
         final returnRoute = widget.returnRoute;
@@ -120,7 +135,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     return mounted &&
         request == _routeRequest &&
         identical(session, widget.session) &&
-        filter == widget.initialFilter &&
+        filter == _effectiveInitialFilter &&
         targetUserId == widget.initialTargetUserId?.trim() &&
         messageDraft == widget.initialMessageDraft &&
         returnRoute == widget.returnRoute;
@@ -129,149 +144,369 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   void dispose() {
     _routeRequest += 1;
+    _peopleRequest += 1;
     _searchController.dispose();
+    _peopleSearchController.dispose();
     super.dispose();
+  }
+
+  void _selectSection(ChatHomeSection section) {
+    if (_section == section) return;
+    setState(() => _section = section);
+    if (section != ChatHomeSection.chats) {
+      unawaited(_ensurePeopleDirectory());
+    }
+  }
+
+  Future<void> _ensurePeopleDirectory({bool refresh = false}) async {
+    final social = widget.socialSession;
+    if (social == null || !social.socialContentAvailable) {
+      if (mounted) {
+        setState(() {
+          _loadingPeopleDirectory = false;
+          _peopleDirectoryError =
+              'People discovery is unavailable right now. Try again later.';
+        });
+      }
+      return;
+    }
+    final request = ++_peopleRequest;
+    setState(() {
+      _loadingPeopleDirectory = true;
+      _peopleDirectoryError = null;
+    });
+    try {
+      if (refresh || !social.socialFeedLoaded) {
+        final loaded = await social.loadSocialFeed(refresh: refresh);
+        if (!loaded && social.socialPublishedItems.isEmpty) {
+          throw StateError(
+            social.socialFeedError ?? 'Public people could not load.',
+          );
+        }
+      }
+      if (!mounted || request != _peopleRequest) return;
+      final authorIds = social.socialPublishedItems
+          .map((item) => item.authorId?.trim())
+          .whereType<String>()
+          .where((authorId) => authorId.isNotEmpty)
+          .toSet()
+          .take(12)
+          .toList(growable: false);
+      await Future.wait(
+        authorIds.map(
+          (authorId) => social.loadSocialAuthor(authorId, authenticated: true),
+        ),
+      );
+      if (!mounted || request != _peopleRequest) return;
+      setState(() => _loadingPeopleDirectory = false);
+    } on Object catch (error) {
+      if (!mounted || request != _peopleRequest) return;
+      setState(() {
+        _loadingPeopleDirectory = false;
+        _peopleDirectoryError = error is StateError
+            ? error.message.toString()
+            : 'People could not load. Check your connection and try again.';
+      });
+    }
+  }
+
+  List<ChatPersonEntry> _visiblePeople() {
+    final social = widget.socialSession;
+    if (social == null) return const [];
+    final peopleById = <String, ChatPersonEntry>{};
+    for (final item in social.socialPublishedItems) {
+      final authorId = item.authorId?.trim();
+      if (authorId == null || authorId.isEmpty) continue;
+      final profile = social.socialAuthorProfile(authorId);
+      if (profile?.isSelf == true) continue;
+      peopleById.putIfAbsent(
+        authorId,
+        () => ChatPersonEntry(
+          authorId: authorId,
+          name: profile?.authorName ?? item.authorName,
+          handle: profile?.authorHandle ?? item.authorHandle,
+          profile: profile,
+          loading: social.socialAuthorLoading(authorId),
+          connecting: social.socialFollowBusy(authorId),
+          error: social.socialAuthorError(authorId),
+        ),
+      );
+    }
+    var people = peopleById.values
+        .where((person) {
+          if (_section == ChatHomeSection.people && !person.connected) {
+            return false;
+          }
+          final query = _peopleSearchController.text.trim().toLowerCase();
+          if (query.isEmpty) return true;
+          return person.name.toLowerCase().contains(query) ||
+              person.handle.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
+    people.sort((left, right) {
+      if (left.connected != right.connected) return left.connected ? -1 : 1;
+      return left.name.toLowerCase().compareTo(right.name.toLowerCase());
+    });
+    return people;
+  }
+
+  Future<void> _toggleConnection(ChatPersonEntry person) async {
+    final social = widget.socialSession;
+    if (social == null) return;
+    var profile = social.socialAuthorProfile(person.authorId);
+    if (profile == null) {
+      await social.loadSocialAuthor(person.authorId, authenticated: true);
+      profile = social.socialAuthorProfile(person.authorId);
+    }
+    if (profile == null || profile.isSelf) return;
+    await social.setSocialFollow(person.authorId, !profile.followed);
+  }
+
+  Future<void> _startPersonChat(ChatPersonEntry person) async {
+    final thread = await widget.session.createDirectThread(person.authorId);
+    if (!mounted || thread == null) return;
+    _openThread(context, thread.id, widget.returnRoute);
+  }
+
+  int get _sectionIndex => ChatHomeSection.values.indexOf(_section);
+
+  Future<void> _handleMoreAction(String action) async {
+    switch (action) {
+      case 'refresh':
+        if (_section == ChatHomeSection.chats) {
+          await widget.session.loadThreads(refresh: true);
+        } else {
+          await _ensurePeopleDirectory(refresh: true);
+        }
+        return;
+      case 'feed':
+        if (mounted) context.go('/app/social?sub=feed');
+        return;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final listeners = <Listenable>[
+      widget.session,
+      if (widget.socialSession != null) widget.socialSession!,
+    ];
     return AnimatedBuilder(
-      animation: widget.session,
+      animation: Listenable.merge(listeners),
       builder: (context, _) {
         final threads = widget.session.visibleThreads(_searchController.text);
+        final people = _visiblePeople();
+        final sectionMotion = MoolMotion.accessible(
+          context,
+          MoolMotion.standard,
+        );
+        final reverseSectionMotion = MoolMotion.accessible(
+          context,
+          MoolMotion.quick,
+        );
         return ChatPageScaffold(
           key: const Key('chat-inbox-screen'),
           session: widget.session,
-          title: 'Chat',
-          subtitle: 'People, businesses, orders and support',
+          title: 'MoolSocial Chat',
+          subtitle: '',
           returnRoute: widget.returnRoute,
-          showContentBack: true,
-          backKey: const Key('chat-inbox-back'),
-          backTooltip: 'Back to previous screen',
-          trailing: IconButton.filled(
-            key: const Key('chat-new'),
-            tooltip: 'Start a new chat',
-            style: IconButton.styleFrom(
-              backgroundColor: MoolColors.navy,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.square(MoolMetrics.compactTapTarget),
-              disabledBackgroundColor: MoolColors.navy.withValues(alpha: .38),
-              disabledForegroundColor: Colors.white.withValues(alpha: .72),
-            ),
-            onPressed: () => _showNewChat(context, widget.session),
-            icon: const Icon(Icons.edit_square),
+          prominentTitle: true,
+          showMessageBanner: false,
+          trailing: PopupMenuButton<String>(
+            key: const Key('chat-more'),
+            tooltip: 'More Chat options',
+            onSelected: (value) => unawaited(_handleMoreAction(value)),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'refresh',
+                child: ListTile(
+                  leading: Icon(Icons.refresh_rounded),
+                  title: Text('Refresh'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'feed',
+                child: ListTile(
+                  leading: Icon(Icons.dynamic_feed_outlined),
+                  title: Text('Open public Feed'),
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.more_vert_rounded),
           ),
-          body: widget.session.loadingThreads && !widget.session.threadsLoaded
-              ? const _ChatLoadingState()
-              : widget.session.errorMessage != null && threads.isEmpty
-              ? _ChatErrorState(
-                  message: widget.session.errorMessage!,
-                  onRetry: () => widget.session.loadThreads(refresh: true),
-                )
-              : CustomScrollView(
-                  key: const PageStorageKey('chat-inbox-scroll'),
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolSpacing.md,
-                        MoolSpacing.xs,
-                        MoolSpacing.md,
-                        0,
-                      ),
-                      sliver: SliverList.list(
-                        children: [
-                          TextField(
-                            key: const Key('chat-search-field'),
-                            controller: _searchController,
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              hintText: 'Search conversations',
-                              prefixIcon: const Icon(Icons.search_rounded),
-                              suffixIcon: IconButton(
-                                key: const Key('chat-voice-search'),
-                                tooltip: 'Voice search',
-                                onPressed: () async {
-                                  final query = await _showVoiceSearch(context);
-                                  if (query == null || !context.mounted) return;
-                                  _searchController.text = query;
-                                  setState(() {});
-                                },
-                                icon: const Icon(Icons.mic_none_rounded),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: MoolSpacing.sm),
-                          _FilterStrip(session: widget.session),
-                          const SizedBox(height: MoolSpacing.sm),
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Conversations',
-                                  style: TextStyle(
-                                    color: MoolColors.ink,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${threads.length}',
-                                style: const TextStyle(
-                                  color: MoolColors.muted,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: MoolSpacing.xs),
-                        ],
+          floatingActionButton: FloatingActionButton(
+            key: const Key('chat-new'),
+            tooltip: 'Add MoolSocial people',
+            onPressed: () => _showNewChat(
+              context,
+              onDiscover: () => _selectSection(ChatHomeSection.discover),
+            ),
+            backgroundColor: MoolColors.navy,
+            foregroundColor: Colors.white,
+            child: const Icon(Icons.person_add_alt_1_rounded),
+          ),
+          bottom: NavigationBar(
+            key: const Key('chat-native-navigation'),
+            selectedIndex: _sectionIndex,
+            onDestinationSelected: (index) =>
+                _selectSection(ChatHomeSection.values[index]),
+            destinations: [
+              for (final section in ChatHomeSection.values)
+                NavigationDestination(
+                  key: Key('chat-section-${section.name}'),
+                  icon: Icon(section.icon),
+                  selectedIcon: Icon(section.selectedIcon),
+                  label: section.label,
+                ),
+            ],
+          ),
+          body: AnimatedSwitcher(
+            duration: sectionMotion,
+            reverseDuration: reverseSectionMotion,
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position:
+                    Tween<Offset>(
+                      begin: const Offset(.045, 0),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
                       ),
                     ),
-                    if (threads.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyInbox(
-                          hasQuery:
-                              _searchController.text.trim().isNotEmpty ||
-                              widget.session.selectedFilter != null ||
-                              widget.session.unreadOnly,
-                          onReset: () {
-                            _searchController.clear();
-                            widget.session.chooseAll();
-                            setState(() {});
-                          },
-                          onOpenFeed: () => context.go('/app/social?sub=feed'),
-                        ),
-                      )
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(
-                          MoolSpacing.md,
-                          0,
-                          MoolSpacing.md,
-                          MoolSpacing.xxl,
-                        ),
-                        sliver: SliverList.separated(
-                          itemCount: threads.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: MoolSpacing.xs),
-                          itemBuilder: (context, index) => _ThreadCard(
-                            thread: threads[index],
-                            unread: widget.session.unreadFor(threads[index]),
-                            onTap: () => _openThread(
-                              context,
-                              threads[index].id,
-                              widget.returnRoute,
-                              draft: widget.initialMessageDraft,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                child: child,
+              ),
+            ),
+            child: switch (_section) {
+              ChatHomeSection.chats => KeyedSubtree(
+                key: const ValueKey('chat-section-body-chats'),
+                child: _buildChats(threads),
+              ),
+              ChatHomeSection.people ||
+              ChatHomeSection.discover => ChatPeopleDirectory(
+                key: ValueKey('chat-section-body-${_section.name}'),
+                section: _section,
+                searchController: _peopleSearchController,
+                people: people,
+                loading: _loadingPeopleDirectory,
+                error:
+                    _peopleDirectoryError ??
+                    widget.socialSession?.socialFeedError,
+                onSearchChanged: (_) => setState(() {}),
+                onRefresh: () => _ensurePeopleDirectory(refresh: true),
+                onConnect: (person) => unawaited(_toggleConnection(person)),
+                onChat: (person) => unawaited(_startPersonChat(person)),
+                onDiscover: () => _selectSection(ChatHomeSection.discover),
+                onOpenFeed: () => context.go('/app/social?sub=feed'),
+              ),
+            },
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildChats(List<ChatThread> threads) {
+    if (widget.session.loadingThreads && !widget.session.threadsLoaded) {
+      return const _ChatLoadingState();
+    }
+    if (widget.session.errorMessage != null && threads.isEmpty) {
+      return _ChatErrorState(
+        message: widget.session.errorMessage!,
+        onRetry: () => widget.session.loadThreads(refresh: true),
+      );
+    }
+    return CustomScrollView(
+      key: const PageStorageKey('chat-inbox-scroll'),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            MoolSpacing.md,
+            MoolSpacing.xs,
+            MoolSpacing.md,
+            0,
+          ),
+          sliver: SliverList.list(
+            children: [
+              TextField(
+                key: const Key('chat-search-field'),
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search conversations',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    key: const Key('chat-voice-search'),
+                    tooltip: 'Voice search',
+                    onPressed: () async {
+                      final query = await _showVoiceSearch(context);
+                      if (query == null || !mounted) return;
+                      _searchController.text = query;
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.mic_none_rounded),
+                  ),
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              if (!_socialContext) ...[
+                _FilterStrip(session: widget.session),
+                const SizedBox(height: MoolSpacing.sm),
+              ],
+            ],
+          ),
+        ),
+        if (threads.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _EmptyInbox(
+              hasQuery:
+                  _searchController.text.trim().isNotEmpty ||
+                  (!_socialContext && widget.session.selectedFilter != null) ||
+                  widget.session.unreadOnly,
+              socialOnly: _socialContext,
+              onReset: () {
+                _searchController.clear();
+                if (_socialContext) {
+                  widget.session.chooseFilter(ChatThreadType.people);
+                } else {
+                  widget.session.chooseAll();
+                }
+                setState(() {});
+              },
+              onDiscover: () => _selectSection(ChatHomeSection.discover),
+              onOpenFeed: () => context.go('/app/social?sub=feed'),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              MoolSpacing.md,
+              0,
+              MoolSpacing.md,
+              MoolSpacing.xxl,
+            ),
+            sliver: SliverList.separated(
+              itemCount: threads.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, indent: 68, color: MoolColors.line),
+              itemBuilder: (context, index) => _ThreadCard(
+                thread: threads[index],
+                unread: widget.session.unreadFor(threads[index]),
+                onTap: () => _openThread(
+                  context,
+                  threads[index].id,
+                  widget.returnRoute,
+                  draft: widget.initialMessageDraft,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -327,64 +562,87 @@ class _ThreadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChatSurfaceCard(
-      padding: EdgeInsets.zero,
-      child: ListTile(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         key: Key('chat-open-thread-${thread.id}'),
         onTap: onTap,
-        minTileHeight: 78,
-        leading: CircleAvatar(
-          radius: 25,
-          backgroundColor: _threadColor(thread.type),
-          child: Icon(_threadIcon(thread.type), color: MoolColors.navy),
-        ),
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                thread.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontWeight: FontWeight.w900,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: _threadColor(thread.type),
+                child: Icon(_threadIcon(thread.type), color: MoolColors.navy),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            thread.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: MoolColors.ink,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (thread.verified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 16,
+                            color: MoolColors.success,
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        Text(
+                          thread.timeLabel,
+                          style: const TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            thread.preview,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        if (unread > 0) ...[
+                          const SizedBox(width: 8),
+                          Badge(
+                            label: Text('$unread'),
+                            backgroundColor: MoolColors.success,
+                            textColor: Colors.white,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            if (thread.verified) ...[
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.verified_rounded,
-                size: 16,
-                color: MoolColors.success,
-              ),
             ],
-          ],
-        ),
-        subtitle: Text(
-          thread.preview,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              thread.timeLabel,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 5),
-            if (unread > 0)
-              Badge(
-                label: Text('$unread'),
-                backgroundColor: MoolColors.orange,
-                textColor: MoolColors.ink,
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -394,12 +652,16 @@ class _ThreadCard extends StatelessWidget {
 class _EmptyInbox extends StatelessWidget {
   const _EmptyInbox({
     required this.hasQuery,
+    required this.socialOnly,
     required this.onReset,
+    required this.onDiscover,
     required this.onOpenFeed,
   });
 
   final bool hasQuery;
+  final bool socialOnly;
   final VoidCallback onReset;
+  final VoidCallback onDiscover;
   final VoidCallback onOpenFeed;
 
   @override
@@ -417,7 +679,11 @@ class _EmptyInbox extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.sm),
             Text(
-              hasQuery ? 'No matching conversations' : 'No conversations yet',
+              hasQuery
+                  ? 'No matching conversations'
+                  : socialOnly
+                  ? 'No people conversations yet'
+                  : 'No conversations yet',
               style: TextStyle(
                 color: MoolColors.ink,
                 fontSize: 20,
@@ -428,14 +694,32 @@ class _EmptyInbox extends StatelessWidget {
             Text(
               hasQuery
                   ? 'Clear the search or show every conversation.'
+                  : socialOnly
+                  ? 'Discover a public MoolSocial profile, connect, then start a private Chat.'
                   : 'Open a public Feed profile to start a private conversation.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: MoolSpacing.md),
             OutlinedButton(
-              key: Key(hasQuery ? 'chat-reset-search' : 'chat-open-feed'),
-              onPressed: hasQuery ? onReset : onOpenFeed,
-              child: Text(hasQuery ? 'Show all conversations' : 'Open Feed'),
+              key: Key(
+                hasQuery
+                    ? 'chat-reset-search'
+                    : socialOnly
+                    ? 'chat-open-discover'
+                    : 'chat-open-feed',
+              ),
+              onPressed: hasQuery
+                  ? onReset
+                  : socialOnly
+                  ? onDiscover
+                  : onOpenFeed,
+              child: Text(
+                hasQuery
+                    ? 'Clear search'
+                    : socialOnly
+                    ? 'Discover people'
+                    : 'Open Feed',
+              ),
             ),
           ],
         ),
@@ -459,7 +743,10 @@ void _openThread(
   );
 }
 
-Future<void> _showNewChat(BuildContext context, ChatSession session) {
+Future<void> _showNewChat(
+  BuildContext context, {
+  required VoidCallback onDiscover,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     builder: (sheetContext) => Padding(
@@ -484,18 +771,28 @@ Future<void> _showNewChat(BuildContext context, ChatSession session) {
             ),
             const SizedBox(height: MoolSpacing.xs),
             const Text(
-              'Open a public MoolSocial post, choose its author, then start Chat. '
-              'This prevents unsolicited contact and keeps the recipient clear.',
+              'Discover a public MoolSocial profile, connect, then continue '
+              'privately in Chat. Phone contacts are never uploaded.',
             ),
             const SizedBox(height: MoolSpacing.md),
             FilledButton.icon(
+              key: const Key('chat-new-discover-people'),
+              onPressed: () {
+                Navigator.of(sheetContext).pop();
+                onDiscover();
+              },
+              icon: const Icon(Icons.person_search_outlined),
+              label: const Text('Discover MoolSocial people'),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+            OutlinedButton.icon(
               key: const Key('chat-new-open-feed'),
               onPressed: () {
                 Navigator.of(sheetContext).pop();
                 context.go('/app/social?sub=feed');
               },
               icon: const Icon(Icons.dynamic_feed_outlined),
-              label: const Text('Open Feed'),
+              label: const Text('Open public Feed'),
             ),
             TextButton(
               key: const Key('chat-new-cancel'),

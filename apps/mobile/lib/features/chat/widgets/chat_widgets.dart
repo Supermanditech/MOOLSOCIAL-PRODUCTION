@@ -33,9 +33,12 @@ class ChatPageScaffold extends StatelessWidget {
     this.showContentBack = false,
     this.backKey = const Key('chat-back'),
     this.backTooltip = 'Back to conversations',
+    this.showMessageBanner = true,
+    this.prominentTitle = false,
     this.messageThreadId,
     this.trailing,
     this.bottom,
+    this.floatingActionButton,
     super.key,
   });
 
@@ -47,9 +50,12 @@ class ChatPageScaffold extends StatelessWidget {
   final bool showContentBack;
   final Key backKey;
   final String backTooltip;
+  final bool showMessageBanner;
+  final bool prominentTitle;
   final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
+  final Widget? floatingActionButton;
 
   @override
   Widget build(BuildContext context) {
@@ -59,85 +65,89 @@ class ChatPageScaffold extends StatelessWidget {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) chatGoBack(context, returnRoute);
       },
-      child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          toolbarHeight: 72,
-          backgroundColor: MoolColors.canvas,
-          surfaceTintColor: Colors.transparent,
-          leadingWidth: showContentBack ? 64 : 0,
-          leading: showContentBack
-              ? Padding(
-                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
+      child: RepaintBoundary(
+        key: const Key('chat-page-surface'),
+        child: Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            toolbarHeight: prominentTitle ? 80 : 64,
+            backgroundColor: MoolColors.canvas,
+            surfaceTintColor: Colors.transparent,
+            leadingWidth: showContentBack ? 52 : 0,
+            leading: showContentBack
+                ? IconButton(
                     key: backKey,
                     tooltip: backTooltip,
                     onPressed: () => chatGoBack(context, returnRoute),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  )
+                : null,
+            titleSpacing: showContentBack ? 0 : MoolSpacing.md,
+            title: Semantics(
+              header: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: prominentTitle ? 28 : 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: prominentTitle ? -.7 : -.35,
                     ),
                   ),
-                )
-              : null,
-          titleSpacing: showContentBack ? 4 : MoolSpacing.md,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            if (trailing != null)
-              Padding(
-                padding: const EdgeInsets.only(right: MoolSpacing.sm),
-                child: trailing!,
-              ),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: MoolMetrics.maximumContentWidth,
-              ),
-              child: Column(
-                children: [
-                  ChatMessageBanner(
-                    session: session,
-                    threadId: messageThreadId,
-                  ),
-                  Expanded(child: body),
+                  if (subtitle.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
+            actions: [
+              if (trailing != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                  child: trailing!,
+                ),
+            ],
           ),
+          body: SafeArea(
+            top: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: MoolMetrics.maximumContentWidth,
+                ),
+                child: Column(
+                  children: [
+                    if (showMessageBanner)
+                      ChatMessageBanner(
+                        session: session,
+                        threadId: messageThreadId,
+                      ),
+                    Expanded(child: body),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          bottomNavigationBar: bottom,
+          floatingActionButton: floatingActionButton,
         ),
-        bottomNavigationBar: bottom,
       ),
     );
   }

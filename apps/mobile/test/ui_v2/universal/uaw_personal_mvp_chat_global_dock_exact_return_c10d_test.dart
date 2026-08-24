@@ -48,7 +48,7 @@ void main() {
     return (journey: journey, chat: chat);
   }
 
-  testWidgets('Chat inbox is a standalone page with exact origin Back', (
+  testWidgets('Chat inbox is standalone and system Back restores its origin', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -60,12 +60,12 @@ void main() {
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(find.byKey(const Key('chat-back')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
-    expect(find.byTooltip('Back to previous screen'), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
     expect(find.byKey(const Key('chat-open-mool')), findsNothing);
     expect(find.byKey(const Key('chat-thread-mool')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('chat-inbox-back')));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     semantics.dispose();
@@ -85,8 +85,7 @@ void main() {
       find.byKey(const Key('chat-search-field')),
       'Home Basket',
     );
-    await tester.tap(find.byKey(const Key('chat-filter-people')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-filter-people')), findsNothing);
     await tester.tap(find.byKey(const Key('chat-open-thread-home-basket')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
@@ -96,12 +95,7 @@ void main() {
     await tester.tap(find.byKey(const Key('chat-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    expect(
-      tester
-          .widget<ChoiceChip>(find.byKey(const Key('chat-filter-people')))
-          .selected,
-      isTrue,
-    );
+    expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('chat-search-field')))
@@ -110,7 +104,7 @@ void main() {
       'Home Basket',
     );
     expect(find.byKey(const Key('chat-back')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
   });
 
   testWidgets('thread keeps native composer focus without a global dock', (
