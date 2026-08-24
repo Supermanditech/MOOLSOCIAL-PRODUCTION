@@ -203,6 +203,7 @@ test("begin emits the direct professional-login minimum scope and stores a diges
   assert.equal(authorization.pathname, "/oauth/authorize");
   assert.deepEqual([...authorization.searchParams.keys()].sort(), [
     "client_id",
+    "force_reauth",
     "redirect_uri",
     "response_type",
     "scope",
@@ -213,6 +214,7 @@ test("begin emits the direct professional-login minimum scope and stores a diges
     "instagram_business_basic",
   );
   assert.equal(authorization.searchParams.get("client_id"), CLIENT_ID);
+  assert.equal(authorization.searchParams.get("force_reauth"), "true");
   assert.equal(authorization.searchParams.get("redirect_uri"), REDIRECT_URI);
   const state = authorization.searchParams.get("state") ?? "";
   assert.match(state, /^[A-Za-z0-9_-]{43}$/u);

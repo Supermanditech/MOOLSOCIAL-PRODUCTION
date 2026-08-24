@@ -570,6 +570,7 @@ export class InstagramPublicAuthBroker {
     }
     const authorizationUrl = new URL(INSTAGRAM_AUTHORIZATION_ENDPOINT);
     authorizationUrl.searchParams.set("response_type", "code");
+    authorizationUrl.searchParams.set("force_reauth", "true");
     authorizationUrl.searchParams.set("client_id", this.clientId);
     authorizationUrl.searchParams.set("redirect_uri", this.redirectUri);
     authorizationUrl.searchParams.set("scope", INSTAGRAM_SCOPE);
