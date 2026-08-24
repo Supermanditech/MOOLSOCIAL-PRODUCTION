@@ -594,12 +594,9 @@ class JourneySession extends ChangeNotifier {
       }
       try {
         await _completeAuthentication(expectedUserId: expectedUserId);
-      } on Object {
+      } on Object catch (error) {
         if (!await _rollbackIncompleteSocialAuthentication()) {
-          throw const JourneyServiceException(
-            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
-            code: 'auth-rollback-failed',
-          );
+          throw _socialAuthRollbackFailure(error);
         }
         rethrow;
       }
@@ -692,12 +689,9 @@ class JourneySession extends ChangeNotifier {
       }
       try {
         await _completeAuthentication(expectedUserId: expectedUserId);
-      } on Object {
+      } on Object catch (error) {
         if (!await _rollbackIncompleteSocialAuthentication()) {
-          throw const JourneyServiceException(
-            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
-            code: 'auth-rollback-failed',
-          );
+          throw _socialAuthRollbackFailure(error);
         }
         rethrow;
       }
@@ -1235,6 +1229,17 @@ class JourneySession extends ChangeNotifier {
     } on Object {
       return false;
     }
+  }
+
+  JourneyServiceException _socialAuthRollbackFailure(Object originalError) {
+    final originalMessage = originalError is JourneyServiceException
+        ? '${originalError.userMessage} '
+        : '';
+    return JourneyServiceException(
+      '${originalMessage}The incomplete sign-in could not be cleared safely. '
+      'Please close and reopen the app before trying again.',
+      code: 'auth-rollback-failed',
+    );
   }
 
   Future<bool> _retrySocialAuthCleanup(SocialAuthProvider provider) async {
