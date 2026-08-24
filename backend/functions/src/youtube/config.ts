@@ -11,6 +11,7 @@ import type {
 export const PRIVATE_DEV_YOUTUBE_PROJECT_ID = "moolsocial-dev-503018";
 export const PRIVATE_DEV_YOUTUBE_MAX_PROOF_MILLISECONDS = 30 * 60 * 1000;
 export const ACCEPTED_PUBLIC_REVIEW_MODE = "accepted";
+export const ACCEPTED_SOCIAL_RUNTIME_MODE = "accepted";
 
 const proofProfileFlag = {
   publicData: "YOUTUBE_PUBLIC_DATA_ENABLED",
@@ -144,6 +145,30 @@ function acceptedPublicReviewActive(env: NodeJS.ProcessEnv): boolean {
   return enabledProfiles.length === 1 && enabledProfiles[0] === "publicData";
 }
 
+function acceptedSocialRuntimeActive(env: NodeJS.ProcessEnv): boolean {
+  if (
+    env.YOUTUBE_SOCIAL_RUNTIME_MODE?.trim() !==
+    ACCEPTED_SOCIAL_RUNTIME_MODE
+  ) {
+    return false;
+  }
+  if (
+    env.YOUTUBE_PUBLIC_DATA_REVIEW_MODE?.trim() ||
+    env.YOUTUBE_PROOF_PROFILE?.trim() ||
+    env.YOUTUBE_PROOF_EXPIRES_AT?.trim()
+  ) {
+    return false;
+  }
+
+  const enabledProfiles = Object.entries(proofProfileFlag)
+    .filter(([, flag]) => enabled(env[flag]))
+    .map(([name]) => name);
+  return (
+    enabledProfiles.length === 1 &&
+    enabledProfiles[0] === "socialAuthRuntime"
+  );
+}
+
 export function readCapabilities(
   env: NodeJS.ProcessEnv = process.env,
   now: Date = new Date(),
@@ -153,17 +178,25 @@ export function readCapabilities(
     env.YOUTUBE_PUBLIC_DATA_REVIEW_MODE !== undefined;
   const acceptedPublicReview =
     privateDevRuntime && acceptedPublicReviewActive(env);
-  const proofProfile = privateDevRuntime && !reviewModePresent
+  const socialRuntimeModePresent =
+    env.YOUTUBE_SOCIAL_RUNTIME_MODE !== undefined;
+  const acceptedSocialRuntime =
+    privateDevRuntime && acceptedSocialRuntimeActive(env);
+  const proofProfile =
+    privateDevRuntime && !reviewModePresent && !socialRuntimeModePresent
     ? activeProofProfile(env, now)
     : undefined;
   return {
     environment: environment(env.MOOLSOCIAL_PROVIDER_ENV),
     publicData:
       acceptedPublicReview ||
+      acceptedSocialRuntime ||
       proofProfile === "publicData" ||
       proofProfile === "socialAuthRuntime",
     ownerConnect:
-      proofProfile === "ownerConnect" || proofProfile === "socialAuthRuntime",
+      acceptedSocialRuntime ||
+      proofProfile === "ownerConnect" ||
+      proofProfile === "socialAuthRuntime",
     ownerActions: proofProfile === "ownerActions",
     creatorAssets: proofProfile === "creatorAssets",
     live: proofProfile === "live",

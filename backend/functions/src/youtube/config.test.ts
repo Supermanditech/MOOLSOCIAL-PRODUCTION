@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACCEPTED_PUBLIC_REVIEW_MODE,
+  ACCEPTED_SOCIAL_RUNTIME_MODE,
   PRIVATE_DEV_YOUTUBE_MAX_PROOF_MILLISECONDS,
   PRIVATE_DEV_YOUTUBE_PROJECT_ID,
   connectCapabilityForPurpose,
@@ -63,6 +64,18 @@ function proofEnvironment(
     YOUTUBE_PROOF_PROFILE: profile,
     YOUTUBE_PROOF_EXPIRES_AT: `utc:${expiry}`,
     [flag]: "true",
+  };
+}
+
+function acceptedSocialRuntimeEnvironment(
+  overrides: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  return {
+    MOOLSOCIAL_PROVIDER_ENV: "dev",
+    GCLOUD_PROJECT: PRIVATE_DEV_YOUTUBE_PROJECT_ID,
+    YOUTUBE_SOCIAL_RUNTIME_MODE: ACCEPTED_SOCIAL_RUNTIME_MODE,
+    YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED: "true",
+    ...overrides,
   };
 }
 
@@ -207,6 +220,52 @@ test("social auth runtime exposes only public data and channel connection", () =
       publicOrUnlistedUpload: false,
     },
   );
+});
+
+test("accepted social runtime stays live without a temporary proof expiry", () => {
+  const expected = {
+    environment: "dev",
+    publicData: true,
+    ownerConnect: true,
+    ownerActions: false,
+    creatorAssets: false,
+    live: false,
+    privateUpload: false,
+    ownerAnalytics: false,
+    analyticsV2: false,
+    reportingV1: false,
+    publicOrUnlistedUpload: false,
+  };
+  assert.deepEqual(
+    readCapabilities(acceptedSocialRuntimeEnvironment(), now),
+    expected,
+  );
+  assert.deepEqual(
+    readCapabilities(
+      acceptedSocialRuntimeEnvironment(),
+      new Date("2027-07-25T00:00:00Z"),
+    ),
+    expected,
+  );
+});
+
+test("accepted social runtime rejects every ambiguous or wrong boundary", () => {
+  for (const overrides of [
+    { GCLOUD_PROJECT: "moolsocial-staging-503018" },
+    { YOUTUBE_SOCIAL_RUNTIME_MODE: "pending" },
+    { YOUTUBE_PROOF_PROFILE: "socialAuthRuntime" },
+    { YOUTUBE_PROOF_EXPIRES_AT: "utc:2026-07-25T00:30:00Z" },
+    { YOUTUBE_PUBLIC_DATA_REVIEW_MODE: ACCEPTED_PUBLIC_REVIEW_MODE },
+    { YOUTUBE_PUBLIC_DATA_ENABLED: "true" },
+    { YOUTUBE_OWNER_ACTIONS_ENABLED: "true" },
+  ]) {
+    const result = readCapabilities(
+      acceptedSocialRuntimeEnvironment(overrides),
+      now,
+    );
+    assert.equal(result.publicData, false);
+    assert.equal(result.ownerConnect, false);
+  }
 });
 
 test("accepted public review keeps only public data live in exact Dev", () => {
