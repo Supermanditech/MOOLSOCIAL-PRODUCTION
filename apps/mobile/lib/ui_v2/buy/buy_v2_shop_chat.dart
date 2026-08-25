@@ -3158,6 +3158,7 @@ class _ShopChatComposer extends StatelessWidget {
                   Semantics(
                     button: true,
                     enabled: primaryEnabled,
+                    liveRegion: busy,
                     label: primaryLabel,
                     child: SizedBox(
                       width: 46,

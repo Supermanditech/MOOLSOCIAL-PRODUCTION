@@ -1184,7 +1184,16 @@ void main() {
       await tester.pump();
 
       expect(actions.single.kind, BuyV2ShopChatActionKind.startVoiceCall);
-      expect(find.bySemanticsLabel('Starting voice call'), findsOneWidget);
+      final progress = find.bySemanticsLabel('Starting voice call');
+      expect(progress, findsOneWidget);
+      expect(
+        tester
+            .getSemantics(progress)
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
       expect(tester.widget<IconButton>(voice).onPressed, isNull);
       expect(tester.widget<IconButton>(video).onPressed, isNull);
       for (final key in const [
