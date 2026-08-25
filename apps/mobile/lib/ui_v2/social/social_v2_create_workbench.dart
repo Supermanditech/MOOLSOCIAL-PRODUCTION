@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../features/shared/shared_models.dart';
+import '../../features/shared/social_create_draft_repository.dart';
 import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
 import 'social_v2_design.dart';
@@ -28,10 +29,84 @@ class SocialCreateDraftV2 {
   ];
   int _correctChoice = 0;
   SocialQuotedPost? _quotedPost;
+  int _revision = 1;
+  VoidCallback? _onChanged;
 
   SocialQuotedPost? get quotedPost => _quotedPost;
 
   String? get quotedPostId => _quotedPost?.id;
+
+  List<SocialPickedMedia> get media => List.unmodifiable(_media);
+  List<SocialPickedMedia?> get imagePollMedia =>
+      List.unmodifiable(_imagePollMedia);
+  int get revision => _revision;
+  String get body => _body;
+  List<String> get choices => List.unmodifiable(_choices);
+  String get formatName => _format.name;
+  String get toolName => _postTool.name;
+  int get correctChoice => _correctChoice;
+
+  void setChangeListener(VoidCallback? listener) => _onChanged = listener;
+
+  SocialCreateDraftSnapshot toPersistenceSnapshot({
+    required SocialCreateDraftStateCache cache,
+    required List<SocialCreateDraftMediaReference> media,
+    required List<SocialCreateDraftMediaReference?> imagePollMedia,
+  }) => cache.createSnapshot(
+    initialized: _initialized,
+    format: SocialCreateDraftFormat.values.byName(_format.name),
+    tool: SocialCreateDraftTool.values.byName(_postTool.name),
+    body: _body,
+    choices: _choices,
+    media: media,
+    imagePollMedia: imagePollMedia,
+    correctChoice: _correctChoice,
+    quote: _quotedPost == null
+        ? null
+        : SocialCreateDraftQuote(
+            id: _quotedPost!.id,
+            authorName: _quotedPost!.authorName,
+            authorHandle: _quotedPost!.authorHandle,
+            body: _quotedPost!.body,
+            mediaUrl: _httpsUriOrNull(_quotedPost!.mediaPath),
+          ),
+    revision: _revision,
+  );
+
+  void applyPersistenceSnapshot(
+    SocialCreateDraftSnapshot snapshot, {
+    required List<SocialPickedMedia> media,
+    required List<SocialPickedMedia?> imagePollMedia,
+  }) {
+    _initialized = snapshot.initialized;
+    _format = SocialCreateFormatV2.values.byName(snapshot.format.name);
+    _postTool = _SocialPostTool.values.byName(snapshot.tool.name);
+    _body = snapshot.body;
+    _choices.setAll(0, snapshot.choices);
+    _media
+      ..clear()
+      ..addAll(media);
+    _imagePollMedia
+      ..clear()
+      ..addAll(imagePollMedia);
+    _correctChoice = snapshot.correctChoice;
+    final quote = snapshot.quote;
+    _quotedPost = quote == null
+        ? null
+        : SocialQuotedPost(
+            id: quote.id,
+            authorName: quote.authorName,
+            authorHandle: quote.authorHandle,
+            body: quote.body,
+            mediaPath: quote.mediaUrl?.toString(),
+          );
+    _revision = snapshot.revision;
+  }
+
+  void _markChanged() {
+    _revision += 1;
+    _onChanged?.call();
+  }
 
   void prepareQuotedPost(SocialPublishedItem item) {
     _initialized = true;
@@ -44,6 +119,7 @@ class SocialCreateDraftV2 {
       body: item.body,
       mediaPath: item.mediaPaths.firstOrNull,
     );
+    _markChanged();
   }
 
   void _clear() {
@@ -56,6 +132,17 @@ class SocialCreateDraftV2 {
     _imagePollMedia.fillRange(0, _imagePollMedia.length, null);
     _correctChoice = 0;
     _quotedPost = null;
+    _markChanged();
+  }
+
+  static Uri? _httpsUriOrNull(String? raw) {
+    final uri = raw == null ? null : Uri.tryParse(raw);
+    return uri != null &&
+            uri.scheme == 'https' &&
+            uri.host.isNotEmpty &&
+            uri.userInfo.isEmpty
+        ? uri
+        : null;
   }
 }
 
@@ -72,6 +159,10 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
     this.allowReel = true,
     this.onCreateYouTubeShort,
     this.onClose,
+    this.onBeforeClose,
+    this.onBeforeDraftClear,
+    this.recoverInterruptedMedia = true,
+    this.disableLocalMediaPreviewForTesting = false,
     super.key,
   });
 
@@ -86,6 +177,11 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
   final bool allowReel;
   final VoidCallback? onCreateYouTubeShort;
   final VoidCallback? onClose;
+  final Future<bool> Function()? onBeforeClose;
+  final Future<void> Function()? onBeforeDraftClear;
+  final bool recoverInterruptedMedia;
+  @visibleForTesting
+  final bool disableLocalMediaPreviewForTesting;
 
   @override
   State<SocialCreateWorkbenchV2> createState() =>
@@ -104,6 +200,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   late final List<SocialPickedMedia?> _imagePollMedia;
   int _correctChoice = 0;
   bool _selectingMedia = false;
+  bool _draftOperationLocked = false;
   int _mediaSelectionRequest = 0;
 
   @override
@@ -140,7 +237,9 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     }
     _body.addListener(_persistTextDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _recoverInterruptedSelection();
+      if (widget.recoverInterruptedMedia) {
+        await _recoverInterruptedSelection();
+      }
       if (!mounted || widget.initialIntent != intent) return;
       if (freshDraft && intent == SocialCreateIntentV2.image) {
         await _choosePostImage();
@@ -198,6 +297,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     for (var index = 0; index < _choiceControllers.length; index++) {
       _draft._choices[index] = _choiceControllers[index].text;
     }
+    _draft._markChanged();
   }
 
   void _persistDraftState() {
@@ -540,6 +640,21 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       return;
     }
     if (_draftFingerprint() == submittedDraftFingerprint) {
+      _invalidateMediaSelection();
+      setState(() => _draftOperationLocked = true);
+      try {
+        await widget.onBeforeDraftClear?.call();
+      } on Object {
+        if (!mounted) return;
+        setState(() => _draftOperationLocked = false);
+        showSocialV2Message(
+          context,
+          'Published, but local draft cleanup needs another try.',
+        );
+        widget.onPublished(published);
+        return;
+      }
+      if (!mounted) return;
       _clearComposer();
     } else {
       _persistDraftState();
@@ -570,6 +685,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       controller.clear();
     }
     setState(() {
+      _draftOperationLocked = false;
       _format = SocialCreateFormatV2.post;
       _media.clear();
       _imagePollMedia
@@ -581,105 +697,186 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     });
   }
 
+  bool get _hasDraftContent =>
+      _body.text.trim().isNotEmpty ||
+      _choiceControllers.any(
+        (controller) => controller.text.trim().isNotEmpty,
+      ) ||
+      _media.isNotEmpty ||
+      _imagePollMedia.any((item) => item != null) ||
+      _draft.quotedPost != null ||
+      _format != SocialCreateFormatV2.post ||
+      _postTool != _SocialPostTool.none;
+
+  Future<void> _confirmDiscard() async {
+    if (!_hasDraftContent) return;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('screen04-create-discard-confirmation'),
+        title: const Text('Discard this draft?'),
+        content: const Text(
+          'Your unpublished changes and staged media will be removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            key: const Key('screen04-create-discard-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || discard != true) return;
+    _invalidateMediaSelection();
+    setState(() => _draftOperationLocked = true);
+    try {
+      await widget.onBeforeDraftClear?.call();
+    } on Object {
+      if (mounted) {
+        setState(() => _draftOperationLocked = false);
+        showSocialV2Message(context, 'Draft cleanup failed. Please try again.');
+      }
+      return;
+    }
+    _clearComposer();
+    widget.onClose?.call();
+  }
+
+  Future<void> _requestClose() async {
+    if (_draftOperationLocked) return;
+    setState(() => _draftOperationLocked = true);
+    var confirmed = true;
+    try {
+      confirmed = await widget.onBeforeClose?.call() ?? true;
+    } on Object {
+      confirmed = false;
+    }
+    if (!mounted) return;
+    if (!confirmed) {
+      setState(() => _draftOperationLocked = false);
+      showSocialV2Message(context, 'Draft save failed. Please try again.');
+      return;
+    }
+    widget.onClose?.call();
+    if (mounted) setState(() => _draftOperationLocked = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       key: const ValueKey('social-v2-create-workbench'),
       decoration: const BoxDecoration(color: SocialV2Colors.canvas),
-      child: Column(
-        children: [
-          Material(
-            key: const Key('screen04-create-composer-header'),
-            color: Colors.white,
-            elevation: 1,
-            shadowColor: const Color(0x22000050),
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
-                height: 58,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      if (widget.onClose != null)
+      child: IgnorePointer(
+        ignoring: _draftOperationLocked,
+        child: Column(
+          children: [
+            Material(
+              key: const Key('screen04-create-composer-header'),
+              color: Colors.white,
+              elevation: 1,
+              shadowColor: const Color(0x22000050),
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: 58,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        if (widget.onClose != null)
+                          IconButton(
+                            key: const Key('screen04-create-close'),
+                            tooltip: 'Close composer',
+                            onPressed: _requestClose,
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        Expanded(
+                          child: Text(
+                            _composerTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SocialV2Colors.navy,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
                         IconButton(
-                          key: const Key('screen04-create-close'),
-                          tooltip: 'Close composer',
-                          onPressed: widget.onClose,
-                          icon: const Icon(Icons.close_rounded),
+                          key: const Key('screen04-create-discard'),
+                          tooltip: 'Discard draft',
+                          onPressed: _confirmDiscard,
+                          icon: const Icon(Icons.delete_outline_rounded),
                         ),
-                      Expanded(
-                        child: Text(
-                          _composerTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: SocialV2Colors.navy,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 96,
-                        height: 44,
-                        child: FilledButton.icon(
-                          key: const Key('screen04-create-publish-post'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(96, 44),
-                            maximumSize: const Size(96, 44),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                          onPressed: widget.session.busy || _selectingMedia
-                              ? null
-                              : _publish,
-                          icon: const Icon(
-                            Icons.arrow_upward_rounded,
-                            size: 18,
-                          ),
-                          label: Text(
-                            widget.session.busy ? 'Posting…' : 'Post',
+                        SizedBox(
+                          width: 96,
+                          height: 44,
+                          child: FilledButton.icon(
+                            key: const Key('screen04-create-publish-post'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(96, 44),
+                              maximumSize: const Size(96, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                            ),
+                            onPressed: widget.session.busy || _selectingMedia
+                                ? null
+                                : _publish,
+                            icon: const Icon(
+                              Icons.arrow_upward_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              widget.session.busy ? 'Posting…' : 'Post',
+                            ),
                           ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                key: const Key('screen04-create-scrollable-composer'),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                child: _buildWorkbenchCard(),
+              ),
+            ),
+            Material(
+              key: const Key('screen04-create-thumb-workbench'),
+              color: Colors.white,
+              elevation: 12,
+              shadowColor: const Color(0x26000050),
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 20),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_format == SocialCreateFormatV2.post) ...[
+                        _buildPostToolActions(),
+                        const SizedBox(height: 5),
+                      ],
+                      _buildFormatActions(),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              key: const Key('screen04-create-scrollable-composer'),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-              child: _buildWorkbenchCard(),
-            ),
-          ),
-          Material(
-            key: const Key('screen04-create-thumb-workbench'),
-            color: Colors.white,
-            elevation: 12,
-            shadowColor: const Color(0x26000050),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.only(bottom: 20),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_format == SocialCreateFormatV2.post) ...[
-                      _buildPostToolActions(),
-                      const SizedBox(height: 5),
-                    ],
-                    _buildFormatActions(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -850,11 +1047,18 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             aspectRatio: 16 / 9,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: SocialMediaPreviewV2(
-                path: _media.first.path,
-                isAsset: _media.first.isAsset,
-                fit: BoxFit.cover,
-              ),
+              child:
+                  widget.disableLocalMediaPreviewForTesting &&
+                      !_media.first.isAsset
+                  ? const ColoredBox(
+                      key: Key('screen04-create-local-media-test-preview'),
+                      color: SocialV2Colors.canvas,
+                    )
+                  : SocialMediaPreviewV2(
+                      path: _media.first.path,
+                      isAsset: _media.first.isAsset,
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
         ],

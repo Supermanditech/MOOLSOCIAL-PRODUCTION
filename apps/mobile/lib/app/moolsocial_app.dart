@@ -132,6 +132,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final MoolSocialBrandCadence _brandCadence = MoolSocialBrandCadence();
   late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
+  Future<void> _authenticationBoundaryTail = Future<void>.value();
   late final _router = createJourneyRouter(
     _session,
     _bookSession,
@@ -173,7 +174,16 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       _signedOutBoundaryActive = true;
       _chatSession.resetForAuthenticationBoundary();
       _sharedSession.resetForAuthenticationBoundary();
-      resetSocialV2RetainedStateForAuthenticationBoundary(_sharedSession);
+      _queueAuthenticationBoundary(() async {
+        final passed =
+            await resetSocialV2RetainedStateForAuthenticationBoundary(
+              _sharedSession,
+            );
+        debugPrint(
+          'MOOLSOCIAL_AUTH_BOUNDARY social_create_draft_cleanup='
+          '${passed ? 'passed' : 'degraded'}',
+        );
+      });
       return;
     }
     if (authenticated) {
@@ -183,11 +193,20 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       }
       final onAuthenticatedBoundary = widget.onAuthenticatedBoundary;
       if (onAuthenticatedBoundary != null) {
-        unawaited(
-          Future<void>.sync(onAuthenticatedBoundary).catchError((Object _) {}),
-        );
+        _queueAuthenticationBoundary(onAuthenticatedBoundary);
       }
     }
+  }
+
+  void _queueAuthenticationBoundary(Future<void> Function() operation) {
+    final queued = _authenticationBoundaryTail.then<void>(
+      (_) => operation(),
+      onError: (Object _, StackTrace _) => operation(),
+    );
+    _authenticationBoundaryTail = queued.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
   }
 
   @override

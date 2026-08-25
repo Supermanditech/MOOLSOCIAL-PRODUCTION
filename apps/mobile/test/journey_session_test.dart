@@ -8,6 +8,7 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 
 void main() {
   test('returning authenticated session restores directly to ready', () async {
@@ -30,6 +31,11 @@ void main() {
     expect(session.areaChoice, AreaChoice.manual);
     expect(session.manualArea, 'Jodhpur');
   });
+
+  testWidgets(
+    'rapid reauthentication waits for prior draft cleanup',
+    _proveRapidReauthenticationWaitsForDraftCleanup,
+  );
 
   test(
     'sign-out clears every auth gateway and a restart stays signed out',
@@ -1636,6 +1642,93 @@ void main() {
     expect(session.socialAuthReceiptCode, 'auth-authorization-denied');
     expect(callbackGateway.callbackCompletionCount, 1);
   });
+}
+
+Future<void> _proveRapidReauthenticationWaitsForDraftCleanup(
+  WidgetTester tester,
+) async {
+  final binding = await const ReviewPrincipalBindingProtector().protect(
+    'private-user-a',
+  );
+  final session = JourneySession(
+    store: MemoryJourneyStore(
+      snapshot: const JourneySnapshot(
+        languageCode: 'en',
+        areaMode: 'skipped',
+        setupComplete: true,
+      ),
+    ),
+    otpGateway: ReviewOtpGateway(signedIn: true),
+    socialAuthGateway: ReviewSocialAuthGateway(
+      results: const {
+        SocialAuthProvider.google: SocialAuthResult.authenticated(
+          'private-user-a',
+        ),
+      },
+    ),
+    accountBootstrapGateway: ReviewAccountBootstrapGateway(
+      result: AuthenticatedAccountBootstrapResult.verified(binding),
+      currentBinding: binding,
+    ),
+    verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+    ),
+    availableSocialAuthProviders: const {SocialAuthProvider.google},
+  );
+  addTearDown(session.dispose);
+  await session.start();
+  var rebindCount = 0;
+  await tester.pumpWidget(
+    MoolSocialApp(
+      session: session,
+      legacyPresentationForTestsOnly: true,
+      onAuthenticatedBoundary: () async {
+        rebindCount += 1;
+      },
+    ),
+  );
+  await tester.pump();
+  final draftRepository = _DelayedClearDraftRepository();
+  final draftBinding = socialCreateDraftState.beginPrincipalBindingAttempt();
+  await socialCreateDraftState.configureDurability(
+    draftRepository,
+    bindingAttempt: draftBinding,
+  );
+  addTearDown(() {
+    socialCreateDraftState.beginPrincipalBindingAttempt();
+  });
+
+  expect(await session.signOut(), isTrue);
+  await draftRepository.clearStarted.future;
+  expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+  await tester.pump();
+  expect(rebindCount, 0);
+
+  draftRepository.clearGate.complete();
+  await tester.pump();
+  await tester.pump();
+  expect(rebindCount, 1);
+  await tester.pumpWidget(const SizedBox.shrink());
+}
+
+final class _DelayedClearDraftRepository
+    implements SocialCreateDraftRepository {
+  final Completer<void> clearStarted = Completer<void>();
+  final Completer<void> clearGate = Completer<void>();
+
+  @override
+  Future<SocialCreateDraftRead> read() async => const SocialCreateDraftRead(
+    freshness: SocialCreateDraftFreshness.missing,
+  );
+
+  @override
+  Future<void> write(SocialCreateDraftSnapshot snapshot) async {}
+
+  @override
+  Future<void> clear() async {
+    if (!clearStarted.isCompleted) clearStarted.complete();
+    await clearGate.future;
+  }
 }
 
 class _NeverCompletesAccountBootstrap implements AccountBootstrapGateway {

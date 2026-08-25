@@ -18,6 +18,8 @@ import '../../features/retailer/retailer_session.dart';
 import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
+import '../../features/shared/social_create_draft_media_store.dart';
+import '../../features/shared/social_create_draft_repository.dart';
 import '../../features/shared/youtube_public_catalogue_repository.dart';
 import '../../features/shared/youtube_public_search_state_repository.dart';
 import '../../features/shared/youtube_public_short_state_repository.dart';
@@ -40,13 +42,21 @@ typedef Screen04YouTubePublicSearchLoader =
 final Expando<_SocialV2RetainedState> _socialV2RetainedStates =
     Expando<_SocialV2RetainedState>();
 
-void resetSocialV2RetainedStateForAuthenticationBoundary(
+Future<bool> resetSocialV2RetainedStateForAuthenticationBoundary(
   SharedSession session,
-) {
+) async {
   _socialV2RetainedStates[session] = _SocialV2RetainedState();
   unawaited(youtubePublicSearchState.clear(detachRepository: true));
   unawaited(youtubePublicWatchState.clear(detachRepository: true));
   unawaited(youtubePublicShortState.clear(detachRepository: true));
+  final envelopeClear = socialCreateDraftState.clearConfirmed(
+    detachRepository: true,
+  );
+  final mediaStore = socialCreateDraftMediaStore;
+  final mediaPurge = mediaStore?.disableStagingAndPurgeAll();
+  final envelopeCleared = await envelopeClear;
+  final mediaCleared = mediaPurge == null || await mediaPurge;
+  return envelopeCleared && mediaCleared;
 }
 
 class _SocialV2RetainedState {
@@ -100,6 +110,9 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeSearchStateCache,
     @visibleForTesting this.youtubeWatchStateCache,
     @visibleForTesting this.youtubeShortStateCache,
+    @visibleForTesting this.createDraftStateCache,
+    @visibleForTesting this.createDraftMediaStore,
+    @visibleForTesting this.disableLocalDraftMediaPreviewForTesting = false,
     super.key,
   });
 
@@ -146,11 +159,21 @@ class SocialUniversalV2 extends StatefulWidget {
   @visibleForTesting
   final YouTubePublicShortStateCache? youtubeShortStateCache;
 
+  @visibleForTesting
+  final SocialCreateDraftStateCache? createDraftStateCache;
+
+  @visibleForTesting
+  final SocialCreateDraftMediaStore? createDraftMediaStore;
+
+  @visibleForTesting
+  final bool disableLocalDraftMediaPreviewForTesting;
+
   @override
   State<SocialUniversalV2> createState() => _SocialUniversalV2State();
 }
 
-class _SocialUniversalV2State extends State<SocialUniversalV2> {
+class _SocialUniversalV2State extends State<SocialUniversalV2>
+    with WidgetsBindingObserver {
   final GlobalKey<BuyV2ShopChatViewState> _contextualChatKey = GlobalKey();
   late SocialV2Tab _tab;
   late String _world;
@@ -178,6 +201,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late final YouTubePublicSearchStateCache _youtubeSearchStateCache;
   late final YouTubePublicWatchStateCache _youtubeWatchStateCache;
   late final YouTubePublicShortStateCache _youtubeShortStateCache;
+  late final SocialCreateDraftStateCache _createDraftStateCache;
+  late final SocialCreateDraftMediaStore? _createDraftMediaStore;
+  bool _createDraftHydrating = false;
+  bool _createDraftMediaLoss = false;
+  bool _restoredCreateDraft = false;
+  int _createDraftPersistenceRequest = 0;
+  int _createDraftHydrationGeneration = 0;
+  final Map<String, SocialCreateDraftMediaReference> _draftMediaRefs = {};
+  final Set<Future<SocialCreateDraftMediaReference?>> _draftStagingOperations =
+      {};
   bool _restoredYouTubeSearch = false;
   bool _preserveDurableSearchForNestedWatch = false;
   _VideoData? get _activeVideo => _retainedState.activeVideo;
@@ -272,6 +305,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final retained = _socialV2RetainedStates[widget.sharedSession];
     final hasRetainedState = retained != null;
     if (retained == null) {
@@ -286,6 +320,24 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                 widget.youtubeShortsLoader == null
             ? screen04YouTubeCatalogueSnapshots
             : Screen04YouTubeCatalogueSnapshotStore());
+    _createDraftStateCache =
+        widget.createDraftStateCache ??
+        (widget.mediaPicker == null
+            ? socialCreateDraftState
+            : SocialCreateDraftStateCache());
+    _createDraftMediaStore =
+        widget.createDraftMediaStore ?? socialCreateDraftMediaStore;
+    final restoredCreateDraft = !hasRetainedState
+        ? _createDraftStateCache.snapshot
+        : null;
+    if (restoredCreateDraft == null) {
+      _createDraft.setChangeListener(_scheduleCreateDraftPersistence);
+    } else {
+      _createDraftHydrating = true;
+      _restoredCreateDraft = true;
+      final hydration = ++_createDraftHydrationGeneration;
+      unawaited(_hydrateCreateDraft(restoredCreateDraft, hydration));
+    }
     _youtubeSearchStateCache =
         widget.youtubeSearchStateCache ??
         (widget.youtubeSearchLoader == null
@@ -486,6 +538,18 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _createDraftHydrationGeneration += 1;
+    final draftRequest = ++_createDraftPersistenceRequest;
+    unawaited(
+      _persistCreateDraft(draftRequest)
+          .then((persisted) {
+            if (!persisted) return Future<void>.value();
+            return _createDraftStateCache.settleDurableWrites();
+          })
+          .catchError((Object _) {}),
+    );
+    _createDraft.setChangeListener(null);
     if (_videoHomeController.hasClients) {
       _videoHomeScrollOffset = _videoHomeController.offset;
     }
@@ -1145,6 +1209,199 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     if (!_videoWatchController.hasClients) return;
     _videoWatchScrollOffset = _videoWatchController.offset;
     _youtubeWatchStateCache.updateWatchScrollOffset(_videoWatchScrollOffset);
+  }
+
+  Future<void> _hydrateCreateDraft(
+    SocialCreateDraftSnapshot snapshot,
+    int hydration,
+  ) async {
+    final store = _createDraftMediaStore;
+    final media = <SocialPickedMedia>[];
+    final poll = <SocialPickedMedia?>[];
+    var mediaLoss = false;
+    if (store == null) {
+      mediaLoss =
+          snapshot.media.isNotEmpty ||
+          snapshot.imagePollMedia.any((item) => item != null);
+      poll.addAll(List<SocialPickedMedia?>.filled(4, null));
+    } else {
+      for (final reference in snapshot.media) {
+        final resolved = await store.resolve(reference);
+        if (resolved == null) {
+          mediaLoss = true;
+        } else {
+          media.add(resolved);
+          _draftMediaRefs[resolved.path] = reference;
+        }
+      }
+      for (final reference in snapshot.imagePollMedia) {
+        if (reference == null) {
+          poll.add(null);
+          continue;
+        }
+        final resolved = await store.resolve(reference);
+        if (resolved == null) {
+          mediaLoss = true;
+          poll.add(null);
+        } else {
+          poll.add(resolved);
+          _draftMediaRefs[resolved.path] = reference;
+        }
+      }
+    }
+    while (poll.length < 4) {
+      poll.add(null);
+    }
+    if (!mounted || hydration != _createDraftHydrationGeneration) return;
+    _createDraft.applyPersistenceSnapshot(
+      snapshot,
+      media: media,
+      imagePollMedia: poll,
+    );
+    _createDraft.setChangeListener(_scheduleCreateDraftPersistence);
+    setState(() {
+      _createDraftHydrating = false;
+      _createDraftMediaLoss = mediaLoss;
+    });
+    if (mediaLoss) _scheduleCreateDraftPersistence();
+  }
+
+  void _scheduleCreateDraftPersistence() {
+    final request = ++_createDraftPersistenceRequest;
+    unawaited(_persistCreateDraft(request));
+  }
+
+  Future<bool> _flushCreateDraft() async {
+    final request = ++_createDraftPersistenceRequest;
+    if (!await _persistCreateDraft(request)) return false;
+    return _createDraftStateCache.settleDurableWritesConfirmed();
+  }
+
+  void _closeCreate() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _createView = 'home';
+      _choiceByWorld['social'] = 'feed';
+      _tab = SocialV2Tab.feed;
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(_flushCreateDraft());
+    }
+  }
+
+  Future<SocialCreateDraftMediaReference?> _stageDraftMedia(
+    SocialPickedMedia media,
+  ) async {
+    final existing = _draftMediaRefs[media.path];
+    if (existing != null) return existing;
+    if (media.isAsset) {
+      try {
+        final reference = SocialCreateDraftMediaStore.referenceForBundledAsset(
+          media,
+        );
+        _draftMediaRefs[media.path] = reference;
+        return reference;
+      } on Object {
+        return null;
+      }
+    }
+    final store = _createDraftMediaStore;
+    if (store == null) return null;
+    late final Future<SocialCreateDraftMediaReference?> operation;
+    operation = (() async {
+      try {
+        return await store.stage(media);
+      } on Object {
+        return null;
+      }
+    })();
+    _draftStagingOperations.add(operation);
+    try {
+      final staged = await operation;
+      if (staged == null) return null;
+      _draftMediaRefs[media.path] = staged;
+      return staged;
+    } finally {
+      _draftStagingOperations.remove(operation);
+    }
+  }
+
+  Future<bool> _persistCreateDraft(int request) async {
+    final media = <SocialCreateDraftMediaReference>[];
+    for (final item in _createDraft.media) {
+      final staged = await _stageDraftMedia(item);
+      if (staged == null) return false;
+      media.add(staged);
+    }
+    final poll = <SocialCreateDraftMediaReference?>[];
+    for (final item in _createDraft.imagePollMedia) {
+      if (item == null) {
+        poll.add(null);
+      } else {
+        final staged = await _stageDraftMedia(item);
+        if (staged == null) return false;
+        poll.add(staged);
+      }
+    }
+    if (request != _createDraftPersistenceRequest) return false;
+    final prior = _createDraftStateCache.snapshot;
+    final snapshot = _createDraft.toPersistenceSnapshot(
+      cache: _createDraftStateCache,
+      media: media,
+      imagePollMedia: poll,
+    );
+    _createDraftStateCache.replace(snapshot);
+    final store = _createDraftMediaStore;
+    if (store != null && prior != null) {
+      final retainedIds = <String>{
+        ...media.map((item) => item.id),
+        ...poll.whereType<SocialCreateDraftMediaReference>().map(
+          (item) => item.id,
+        ),
+      };
+      final removed = <SocialCreateDraftMediaReference>[
+        ...prior.media,
+        ...prior.imagePollMedia.whereType<SocialCreateDraftMediaReference>(),
+      ].where((item) => !retainedIds.contains(item.id));
+      await store.clear(removed);
+    }
+    return true;
+  }
+
+  Future<void> _clearCreateDraftMedia() async {
+    _createDraftPersistenceRequest += 1;
+    await Future.wait<SocialCreateDraftMediaReference?>(
+      _draftStagingOperations.toList(growable: false),
+    );
+    final snapshot = _createDraftStateCache.snapshot;
+    final store = _createDraftMediaStore;
+    final references = <SocialCreateDraftMediaReference>{
+      ..._draftMediaRefs.values,
+      if (snapshot != null) ...snapshot.media,
+      if (snapshot != null)
+        ...snapshot.imagePollMedia.whereType<SocialCreateDraftMediaReference>(),
+    };
+    final cleared = await _createDraftStateCache.clearConfirmed();
+    if (!cleared) throw StateError('Draft cleanup failed.');
+    if (store != null) {
+      try {
+        await store.clear(references);
+      } on Object {
+        if (snapshot != null) {
+          _createDraftStateCache.replace(snapshot, debounce: false);
+          await _createDraftStateCache.settleDurableWritesConfirmed();
+        }
+        rethrow;
+      }
+    }
+    _draftMediaRefs.clear();
   }
 
   YouTubePublicCatalogueItem? _publicItemForVideo(_VideoData video) {
@@ -2602,7 +2859,13 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   Widget _buildCreate() {
-    return SocialCreateWorkbenchV2(
+    if (_createDraftHydrating) {
+      return const Center(
+        key: Key('screen04-create-draft-restoring'),
+        child: CircularProgressIndicator(),
+      );
+    }
+    final workbench = SocialCreateWorkbenchV2(
       key: const ValueKey('social-creator-gateway'),
       session: widget.sharedSession,
       mediaPicker: _mediaPicker,
@@ -2610,14 +2873,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       authorName: _publicAuthorName,
       authorHandle: _publicAuthorHandle,
       allowReel: false,
-      onClose: () {
-        FocusManager.instance.primaryFocus?.unfocus();
-        setState(() {
-          _createView = 'home';
-          _choiceByWorld['social'] = 'feed';
-          _tab = SocialV2Tab.feed;
-        });
-      },
+      onBeforeDraftClear: _clearCreateDraftMedia,
+      onBeforeClose: _flushCreateDraft,
+      recoverInterruptedMedia: !_restoredCreateDraft,
+      disableLocalMediaPreviewForTesting:
+          widget.disableLocalDraftMediaPreviewForTesting,
+      onClose: _closeCreate,
       initialIntent: switch (_createView) {
         'image' => SocialCreateIntentV2.image,
         'carousel' => SocialCreateIntentV2.carousel,
@@ -2649,6 +2910,22 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           WidgetsBinding.instance.addPostFrameCallback((_) => _resetShorts());
         }
       },
+    );
+    if (!_createDraftMediaLoss) return workbench;
+    return Column(
+      children: [
+        const Material(
+          key: Key('screen04-create-draft-media-loss'),
+          color: Color(0xFFFFF3CD),
+          child: Padding(
+            padding: EdgeInsets.all(10),
+            child: Text(
+              'Some draft media was unavailable and was removed. Your text was kept.',
+            ),
+          ),
+        ),
+        Expanded(child: workbench),
+      ],
     );
   }
 

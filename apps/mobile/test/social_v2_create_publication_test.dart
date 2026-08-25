@@ -11,6 +11,7 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/shared_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/social_media_picker.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_create_workbench.dart';
@@ -1472,6 +1473,7 @@ class _Owners {
       gateway: _ImmediateSharedGateway(),
       socialContentGateway: socialGateway,
     );
+    unawaited(draftCache.configureDurability(_PublicationDraftRepository()));
   }
 
   final JourneySession journey;
@@ -1480,6 +1482,7 @@ class _Owners {
   final socialGateway = ReviewSocialContentGateway();
   late final SharedSession shared;
   final picker = _FakeSocialMediaPicker();
+  final draftCache = SocialCreateDraftStateCache();
 
   SocialUniversalV2 consumer({String? sub, String? state, String? item}) =>
       SocialUniversalV2(
@@ -1488,6 +1491,7 @@ class _Owners {
         retailerSession: retailer,
         sharedSession: shared,
         mediaPicker: picker,
+        createDraftStateCache: draftCache,
         initialSubAction: sub,
         initialState: state,
         initialItem: item,
@@ -1498,6 +1502,28 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+final class _PublicationDraftRepository implements SocialCreateDraftRepository {
+  SocialCreateDraftSnapshot? snapshot;
+
+  @override
+  Future<SocialCreateDraftRead> read() async => SocialCreateDraftRead(
+    freshness: snapshot == null
+        ? SocialCreateDraftFreshness.missing
+        : SocialCreateDraftFreshness.fresh,
+    snapshot: snapshot,
+  );
+
+  @override
+  Future<void> write(SocialCreateDraftSnapshot value) async {
+    snapshot = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    snapshot = null;
   }
 }
 

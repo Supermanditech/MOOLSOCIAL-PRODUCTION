@@ -422,7 +422,11 @@ void main() {
         ),
       );
       expect(appSource, contains('this.onAuthenticatedBoundary'));
-      expect(appSource, contains('Future<void>.sync(onAuthenticatedBoundary)'));
+      expect(
+        appSource,
+        contains('_queueAuthenticationBoundary(onAuthenticatedBoundary)'),
+      );
+      expect(appSource, contains('_authenticationBoundaryTail.then<void>'));
 
       final homeHeaderStart = consumer.indexOf('class _YouTubeHomeHeader');
       final watchHeaderStart = consumer.indexOf('class _YouTubeWatchHeader');
