@@ -693,7 +693,9 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                               onOpenAll: widget.onOpenProductionChat,
                             )
                           : ListView.builder(
-                              key: ValueKey('buy-shop-chat-results-$_filterId'),
+                              key: PageStorageKey<String>(
+                                'buy-shop-chat-results-${widget.presentation.familyId}-$_filterId',
+                              ),
                               padding: const EdgeInsets.fromLTRB(
                                 12,
                                 12,

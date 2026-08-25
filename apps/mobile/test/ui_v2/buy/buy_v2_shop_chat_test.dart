@@ -975,6 +975,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'conversation inbox retains its filtered scroll on thread return',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+
+      final inboxKey = const PageStorageKey<String>(
+        'buy-shop-chat-results-shop-all',
+      );
+      final inbox = find.byKey(inboxKey);
+      final offer = find.byKey(
+        const ValueKey('buy-shop-chat-entry-offer-details'),
+      );
+      await tester.scrollUntilVisible(
+        offer,
+        120,
+        scrollable: find.descendant(
+          of: inbox,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      final beforeThread = tester
+          .state<ScrollableState>(
+            find.descendant(of: inbox, matching: find.byType(Scrollable)),
+          )
+          .position
+          .pixels;
+      expect(beforeThread, greaterThan(0));
+
+      await tester.tap(offer);
+      await tester.pumpAndSettle();
+      expect(find.text('Offer details'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-back')));
+      await tester.pumpAndSettle();
+
+      final restoredInbox = find.byKey(inboxKey);
+      final afterReturn = tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: restoredInbox,
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position
+          .pixels;
+      expect(afterReturn, closeTo(beforeThread, 0.1));
+      expect(offer, findsOneWidget);
+      expect(find.text('Forward to Offer details'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('rejected send keeps the draft and gives a truthful recovery', (
     tester,
   ) async {
