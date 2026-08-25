@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -728,6 +729,59 @@ void main() {
     expect(bootstrap.prepareCount, 1);
     expect(session.authenticatedRevalidationPending, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('RT-06 same-process resume preserves exact Work route', (
+    tester,
+  ) async {
+    final bootstrap = ReviewAccountBootstrapGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+          lastReadyRoute: '/app/work',
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/work',
+        legacyPresentationForTestsOnly: true,
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('mvp-action-root-work')), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.byKey(const Key('mvp-action-root-work')), findsOneWidget);
+    expect(find.byKey(const Key('mvp-action-root-social')), findsNothing);
+    expect(bootstrap.prepareCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test('RT-06 native launcher delegates ordinary re-entry to Flutter', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final activity = File(
+      'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+    ).readAsStringSync();
+
+    expect(manifest, contains('android:launchMode="singleTop"'));
+    expect(activity, contains('class MainActivity : FlutterActivity()'));
+    expect(activity, isNot(contains('onNewIntent(')));
+    expect(activity, isNot(contains("'/app/social'")));
   });
 
   test(
