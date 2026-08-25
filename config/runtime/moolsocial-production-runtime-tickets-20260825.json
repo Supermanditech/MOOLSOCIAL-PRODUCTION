@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": true,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 210,
+  "ticketCount": 212,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 62,
-    "implementedAtomicTicketCount": 61,
-    "pendingConfirmedImplementationCount": 1,
+    "totalCodexAtomicEngineeringTicketCount": 64,
+    "implementedAtomicTicketCount": 64,
+    "pendingConfirmedImplementationCount": 0,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 1,
+    "remainingCodexEngineeringQueueCount": 0,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -84,9 +84,11 @@
       ,{"id":"RT-08","state":"closed_current_round_reopen_on_apk_defect","implementation":"Plain Create now owns a focused landing and dock; nested untouched editors intercept Android Back for one confirmed unwind before the landing returns to Mool.","runtime":"Real MoolSocialApp nested-to-landing-to-Mool route proof, exact intent regressions, 26 publication tests, 70 broad Social tests plus one intentional skip, clean analysis and independent audit GO; integrated APK/OPPO may reopen."}
       ,{"id":"RT-08-CHILD-01","state":"CLOSED","implementation":"Fresh Post and Carousel landing entries reinitialize only an untouched retained intent and never overwrite actual user content.","runtime":"Text-to-Carousel and Carousel-to-Post behavioral cases pass; re-audit GO."}
       ,{"id":"RT-08-CHILD-01B","state":"CLOSED","implementation":"Continue draft bypasses fresh-entry reset and resumes every exact specialized intent.","runtime":"Quick Poll and Image Poll Back-to-Continue behavioral cases pass; final audit GO."}
+      ,{"id":"RT-08-02","state":"closed_current_round_reopen_on_apk_defect","implementation":"Dirty Create Android Back now focus-locks editor/picker mutations, confirms the latest durable revision, lands one level and preserves exact content through Mool/Continue until explicit Discard.","runtime":"4 dirty-Back behavioral tests, 26 publication tests, 74 broad Social tests plus one intentional skip, clean analysis and independent audit GO; integrated APK/OPPO may reopen."}
+      ,{"id":"RT-08-02-CHILD-01","state":"CLOSED","implementation":"Confirmed Android Back externally locks focus, editor and picker mutations while the exact dirty revision settles.","runtime":"Delayed-write late-interaction and rapid double-Back proof passes; audit GO."}
+      ,{"id":"RT-08-02-CHILD-02","state":"CLOSED","implementation":"Meaningful dirty route updates preserve their current resume format/tool instead of retargeting hidden content.","runtime":"Dirty Quick Poll question and choice survive an attempted Image route reinterpretation; final audit GO."}
     ],
     "pendingConfirmedImplementation": [
-      {"id":"RT-08-02","order":11.1,"state":"PENDING","ownerBoundary":"codex_navigation_and_draft_contract_after_Cursor_owner_release_or_reviewed_integration","blocker":"dirty Create Back must preserve a valid local draft while unwinding one logical level; required Social presentation owner remains actively Cursor-owned"},
     ],
     "pendingClassification": [],
     "cursorUiExcludedTicketCount": 11,
@@ -116,9 +118,9 @@
     "activeTicket": null,
     "activeTicketPhase": "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT",
     "activeTicketChildGaps": [],
-    "lastClosedTicket": "RT-08",
-    "lastPreApkClosedTicket": "RT-08",
-    "nextTicket": "RT-08-02"
+    "lastClosedTicket": "RT-08-02",
+    "lastPreApkClosedTicket": "RT-08-02",
+    "nextTicket": null
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -300,7 +302,9 @@
     {"id":"RT-08","area":"navigation","microScope":"untouched_create_editor_android_back_continuity","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Android Back from an untouched nested Create editor unwinds one logical level to the focused Create ribbon; the next Back returns to Mool root.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"Real MoolSocialApp proves nested untouched Back to focused Create, second Back to Mool, normalized return, header parity and exact entry intents; focused/affected regressions and analysis pass; independent audit GO.","blocker":"none in source round; integrated APK/OPPO may reopen","dependencies":["SAFE-OPPO-04","META-CURSOR-03","REL-SUCCESSOR-01"]},
     {"id":"RT-08-CHILD-01","area":"navigation","microScope":"create_landing_entry_intent_reset","layers":["ui","wiring","navigation"],"outcome":"Untouched Post and Carousel landing entries must open the selected fresh intent rather than the prior initialized empty intent.","owner":"codex_runtime","state":"CLOSED","evidence":"Both cross-intent behavioral cases pass; audit GO.","blocker":"none","dependencies":["RT-08"]},
     {"id":"RT-08-CHILD-01B","area":"navigation","microScope":"continue_empty_specialized_intent","layers":["ui","wiring","navigation"],"outcome":"Continue draft must reopen an untouched Image, Image Poll, Quick Poll or Quiz intent without resetting it to Text.","owner":"codex_runtime","state":"CLOSED","evidence":"Quick Poll and Image Poll Continue cases pass; final audit GO.","blocker":"none","dependencies":["RT-08","RT-08-CHILD-01"]},
-    {"id":"RT-08-02","area":"navigation","microScope":"dirty_create_editor_android_back_draft_continuity","layers":["ui","wiring","navigation","mobile","cache","oppo"],"outcome":"After the IME consumes its own dismissal, Android Back from a dirty nested Create editor unwinds one logical level while retaining a valid unpublished local draft; only an explicit discard clears it.","owner":"codex_runtime","state":"open_defect","evidence":"Contract audit isolated dirty-draft Back from untouched-editor Back. In-process draft retention and explicit discard already pass, while system-Back coverage is missing; durable process-death storage remains exclusively RT-04C-01.","blocker":"required Social presentation owner is actively Cursor-owned; final runtime proof also waits for the integrated successor","dependencies":["RT-08","RT-04C-01","META-CURSOR-03","REL-SUCCESSOR-01"]},
+    {"id":"RT-08-02","area":"navigation","microScope":"dirty_create_editor_android_back_draft_continuity","layers":["ui","wiring","navigation","mobile","cache","oppo"],"outcome":"After the IME consumes its own dismissal, Android Back from a dirty nested Create editor unwinds one logical level while retaining a valid unpublished local draft; only an explicit discard clears it.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"Exact dirty text, delayed-write/double-Back, failed-write and dirty specialized-route behavioral proofs pass with publication/broad regressions, clean analysis and independent audit GO.","blocker":"none in source round; integrated APK/OPPO may reopen","dependencies":["RT-08","RT-04C-01","META-CURSOR-03","REL-SUCCESSOR-01"]},
+    {"id":"RT-08-02-CHILD-01","area":"navigation","microScope":"confirmed_back_edit_lock","layers":["ui","mobile","cache"],"outcome":"While Android Back confirms a dirty revision, editor and picker mutations must be locked so landing never precedes the latest durable state.","owner":"codex_runtime","state":"CLOSED","evidence":"External lock and delayed-write interaction proof pass; audit GO.","blocker":"none","dependencies":["RT-08-02"]},
+    {"id":"RT-08-02-CHILD-02","area":"navigation","microScope":"dirty_route_intent_preservation","layers":["ui","wiring","navigation","cache"],"outcome":"A nested Create route update must not reinterpret meaningful content under a different format/tool without explicit replacement.","owner":"codex_runtime","state":"CLOSED","evidence":"Dirty Quick Poll route-conflict proof passes; final audit GO.","blocker":"none","dependencies":["RT-08-02","RT-08-CHILD-01"]},
     {"id":"OPPO-CHAT-BACK-01","area":"chat","microScope":"inbox_android_back_return","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Android Back from standalone Chat inbox restores the immediately prior Social/YouTube Home.","owner":"codex_runtime","state":"verified_pass","evidence":"Installed r60.91 opened Chat inbox from Social/YouTube Home and one Android Back restored the prior Social/YouTube frame while MoolSocial remained focused.","blocker":"none","dependencies":["OPPO-CHAT-INBOX-01","SAFE-OPPO-04"]},
     {"id":"PUB-IMAGE-POLL-01","area":"social_publication","microScope":"image_poll_post","layers":["ui","wiring","mobile","backend","session","oppo"],"outcome":"Publish one sanitized Image Poll and verify image-option order, vote rendering and recovery.","owner":"founder_with_codex","state":"pending_private_founder_action","evidence":"Installed r60.91 Create editor visibly exposes Image Poll; no option, media or publication action occurred.","blocker":"media selection and external publication require founder action","dependencies":["OPPO-CREATE-TEXT-01"]},
     {"id":"PUB-QUICK-POLL-01","area":"social_publication","microScope":"quick_poll_post","layers":["ui","wiring","mobile","backend","session","oppo"],"outcome":"Publish one sanitized Quick Poll and verify choices, vote state and recovery.","owner":"founder_with_codex","state":"pending_private_founder_action","evidence":"Installed r60.91 Create editor visibly exposes Quick Poll; no option or publication action occurred.","blocker":"external publication requires founder action","dependencies":["OPPO-CREATE-TEXT-01"]},

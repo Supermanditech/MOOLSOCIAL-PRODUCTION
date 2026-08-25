@@ -198,6 +198,7 @@
         "apps/mobile/test/ui_v2/social/rt04c01_social_create_draft_process_death_test.dart",
         "apps/mobile/test/ui_v2/social/rt07_feed_android_back_contract_test.dart",
         "apps/mobile/test/ui_v2/social/rt08_create_android_back_contract_test.dart",
+        "apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_action_truth_accessibility_c29o_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_creator_ergonomics_global_edge_consistency_c29n_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_native_home_dock_c29e_test.dart",

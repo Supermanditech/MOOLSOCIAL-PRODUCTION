@@ -1037,7 +1037,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Create applies a newer explicit tool route in place', (
+  testWidgets('dirty Create rejects a conflicting explicit tool route', (
     tester,
   ) async {
     final owners = _Owners();
@@ -1053,8 +1053,9 @@ void main() {
 
     expect(
       find.byKey(const Key('screen04-create-quiz-choice-0')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.text('New text post'), findsOneWidget);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))

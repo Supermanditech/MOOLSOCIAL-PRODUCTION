@@ -609,11 +609,18 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           ? _tabFor(_choiceByWorld['social'])
           : SocialV2Tab.shorts;
       if (widget.initialState != null) {
-        _createView = _tab == SocialV2Tab.create
+        final requestedCreateView = _tab == SocialV2Tab.create
             ? _createViewFor(widget.initialState ?? 'post')
             : 'home';
-        if (_tab == SocialV2Tab.create && _createView != 'home') {
-          _createDraft.retargetIntent(_createIntentForView(_createView));
+        if (_tab == SocialV2Tab.create &&
+            requestedCreateView != 'home' &&
+            _createDraft.hasUserContent) {
+          _createView = _createDraftResumeView();
+        } else {
+          _createView = requestedCreateView;
+          if (_tab == SocialV2Tab.create && _createView != 'home') {
+            _createDraft.retargetIntent(_createIntentForView(_createView));
+          }
         }
       } else if (_tab != SocialV2Tab.create) {
         _createView = 'home';
@@ -1322,16 +1329,18 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
 
   Future<void> _backFromCreateEditor() async {
     if (_createBackBusy) return;
-    _createBackBusy = true;
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (mounted) setState(() => _createBackBusy = true);
     final persisted = await _flushCreateDraft().catchError((Object _) => false);
     if (mounted) {
       if (persisted) {
+        _createBackBusy = false;
         _closeCreate();
       } else {
+        setState(() => _createBackBusy = false);
         showSocialV2Message(context, 'Draft save failed. Please try again.');
       }
     }
-    _createBackBusy = false;
   }
 
   @override
@@ -2927,6 +2936,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       recoverInterruptedMedia: !_restoredCreateDraft,
       disableLocalMediaPreviewForTesting:
           widget.disableLocalDraftMediaPreviewForTesting,
+      externalOperationLocked: _createBackBusy,
       onClose: _closeCreate,
       initialIntent: switch (_createView) {
         'image' => SocialCreateIntentV2.image,

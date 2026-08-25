@@ -206,6 +206,7 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
     this.onBeforeDraftClear,
     this.recoverInterruptedMedia = true,
     this.disableLocalMediaPreviewForTesting = false,
+    this.externalOperationLocked = false,
     super.key,
   });
 
@@ -225,6 +226,7 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
   final bool recoverInterruptedMedia;
   @visibleForTesting
   final bool disableLocalMediaPreviewForTesting;
+  final bool externalOperationLocked;
 
   @override
   State<SocialCreateWorkbenchV2> createState() =>
@@ -295,6 +297,10 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   @override
   void didUpdateWidget(covariant SocialCreateWorkbenchV2 oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!oldWidget.externalOperationLocked && widget.externalOperationLocked) {
+      _invalidateMediaSelection();
+      _bodyFocus.unfocus();
+    }
     final intent = widget.initialIntent;
     if (intent == null || oldWidget.initialIntent == intent) return;
     final selectionWasPending = _selectingMedia;
@@ -815,7 +821,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       key: const ValueKey('social-v2-create-workbench'),
       decoration: const BoxDecoration(color: SocialV2Colors.canvas),
       child: IgnorePointer(
-        ignoring: _draftOperationLocked,
+        ignoring: _draftOperationLocked || widget.externalOperationLocked,
         child: Column(
           children: [
             Material(
