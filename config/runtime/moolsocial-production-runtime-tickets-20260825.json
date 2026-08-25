@@ -8,26 +8,29 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": true,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 165,
+  "ticketCount": 166,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 19,
-    "implementedAtomicTicketCount": 8,
+    "totalCodexAtomicEngineeringTicketCount": 20,
+    "implementedAtomicTicketCount": 9,
     "pendingConfirmedImplementationCount": 7,
     "pendingClassificationCount": 4,
     "remainingCodexEngineeringQueueCount": 11,
+    "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "GAP_FOUND"],
+    "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
     "implemented": [
       {"id":"RT-01","state":"fixed_deployed","implementation":"Permanent accepted YouTube capability tuple restored in youtubeprovider-00055-suf.","runtime":"Videos, Shorts, Short playback, Search and Social-Shop-Social retention passed."},
       {"id":"RT-02-01","state":"fixed_source_pending_runtime","implementation":"Chat composer system-navigation inset fixed at source commit 5f80789314461c62749e8caf0dd7655e7a8ca3c8.","runtime":"Installed r60.91 still fails because it predates the fix."},
       {"id":"RT-02-02","state":"fixed_source_pending_runtime","implementation":"Root Scaffold is the single bottom-inset owner at 5f80789314461c62749e8caf0dd7655e7a8ca3c8.","runtime":"45 of 45 focused Chat tests passed; successor OPPO retest pending."},
       {"id":"RT-02-05","state":"fixed_source_pending_runtime","implementation":"The RT-02 source correction is expected to restore composer visibility above the IME.","runtime":"r60.91 reproduced complete composer loss with IME; final successor proof pending."},
-      {"id":"REL-CONFIG-01","state":"fixed_source_pending_runtime","implementation":"Provider-only deploy now restores and verifies the permanent environment, OAuth callback, enabled flag and accepted runtime mode.","runtime":"Validate mode passed locally with no cloud action; live revision proof remains pending."},
+      {"id":"REL-CONFIG-01","state":"CLOSED","implementation":"Provider-only deploy restores and verifies the permanent environment, OAuth callback, enabled flag and accepted runtime mode.","runtime":"Live youtubeprovider-00049-kxt serves 100% traffic with all four values exact, no proof expiry, unchanged callback/content and successful OPPO catalogue load."},
       {"id":"REL-CONFIG-01-GAP-01","state":"verified_pass","implementation":"Provider-only package/content containment now owns the C30M scripts and safely accepts an existing reviewed local runtime.","runtime":"Complete provider package validation passed."},
       {"id":"REL-CONFIG-01-GAP-02","state":"verified_pass","implementation":"Export gate now requires exactly the current five legitimate backend exports.","runtime":"Export gate and 594 of 594 backend tests passed."},
       {"id":"REL-CONFIG-01-GAP-03","state":"verified_pass","implementation":"Secret scanner allows only two exact path/count/SHA-bound fake Bearer fixtures while retaining all other secret patterns.","runtime":"Content scan passed across 181 UTF-8 package files."}
+      ,{"id":"REL-CONFIG-01-GAP-04","state":"CLOSED","implementation":"Runtime harness now establishes a fresh visible route through explicit app launch before coordinate-free result inspection.","runtime":"Retest opened MoolSocial directly and proved the live YouTube catalogue; the earlier local Ride selection caused no external action."}
     ],
     "pendingConfirmedImplementation": [
       {"id":"REL-BUILD-CLEAN-01","order":2,"state":"pending","ownerBoundary":"codex_release_controls_only","blocker":"starts only after REL-CONFIG-01 closes"},
@@ -68,9 +71,11 @@
       "select_the_next_atomic_ticket"
     ],
     "nextTicketBlockedUntilActiveClosed": true,
-    "activeTicket": "REL-CONFIG-01",
-    "activeTicketPhase": "implementation_and_local_audit_complete_pending_live_runtime",
-    "activeTicketChildGaps": []
+    "activeTicket": null,
+    "activeTicketPhase": "CLOSED",
+    "activeTicketChildGaps": [],
+    "lastClosedTicket": "REL-CONFIG-01",
+    "nextTicket": "REL-BUILD-CLEAN-01"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -137,10 +142,11 @@
     {"id":"RT-04C-01","area":"create","microScope":"draft_process_death_cache","layers":["mobile","cache"],"outcome":"Restore an unpublished Create draft after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Create drafts are in-memory only; navigation-only retention passes, while the sanitized r60.91 force-stop/relaunch probe lost the draft.","blocker":"durable draft storage absent","dependencies":["OPPO-CREATE-DRAFT-01","OPPO-CREATE-DRAFT-DEATH-01"]},
     {"id":"RT-05-01","area":"shop","microScope":"direct_account_action_route","layers":["ui","wiring","navigation"],"outcome":"Reach account sign-out/switch without a long Security-page scroll.","owner":"cursor_ui","state":"pending_cursor","evidence":"Current route requires about six swipes.","blocker":"reviewed Cursor UX solution pending","dependencies":["META-CURSOR-02"]},
     {"id":"RT-05-02","area":"shop","microScope":"signout_discoverability","layers":["ui","navigation"],"outcome":"Make actual sign-out discoverable near the Shop account action.","owner":"cursor_ui","state":"pending_cursor","evidence":"Confirmation exists but is deeply placed.","blocker":"reviewed Cursor UX solution pending","dependencies":["RT-05-01"]},
-    {"id":"REL-CONFIG-01","area":"deployment","microScope":"accepted_flag_preservation","layers":["backend","provider","deployment"],"outcome":"Prevent function deploys from omitting accepted non-secret runtime flags.","owner":"codex_backend","state":"fixed_source_pending_runtime","evidence":"Provider-only deploy now restores and readbacks the permanent environment, exact callback, enabled flag and accepted mode. Focused controls passed in both PowerShell hosts; full Validate passed with 594 backend tests and 181-file content verification. No cloud action occurred.","blocker":"live provider revision/runtime proof waits for the next separately authorized isolated deployment","dependencies":["RT-01","SAFE-OPPO-EXHAUSTED-01"]},
+    {"id":"REL-CONFIG-01","area":"deployment","microScope":"accepted_flag_preservation","layers":["backend","provider","deployment"],"outcome":"Prevent function deploys from omitting accepted non-secret runtime flags.","owner":"codex_backend","state":"verified_pass","evidence":"Provider-only deploy created the later serving revision youtubeprovider-00049-kxt after Firebase revision 00056-ses. Independent readback proved ready=created, 100% traffic, permanent environment/callback/enabled/accepted values exact, no proof expiry, unchanged youtubeoauthcallback-00037-5rz and moolsocialcontent-00005-lep, and real OPPO YouTube catalogue load. Focused controls, 594 backend tests and 181-file content verification passed.","blocker":"none","dependencies":["RT-01","SAFE-OPPO-EXHAUSTED-01"]},
     {"id":"REL-CONFIG-01-GAP-01","area":"deployment","microScope":"c30m_package_containment_recovery","layers":["backend","deployment"],"outcome":"The provider-only package/content gates recognize the C30M deploy wrapper and focused control test and safely validate an already reviewed local runtime without exposing or rewriting it.","owner":"codex_backend","state":"verified_pass","evidence":"Provider-only package/content containment passed without rewriting or printing the reviewed local runtime.","blocker":"none","dependencies":["REL-CONFIG-01"]},
     {"id":"REL-CONFIG-01-GAP-02","area":"deployment","microScope":"current_backend_export_inventory","layers":["backend","deployment"],"outcome":"The provider package export gate accepts exactly the current five legitimate function exports and rejects any missing or additional export.","owner":"codex_backend","state":"verified_pass","evidence":"Exact five-function export gate passed after 594 of 594 backend tests.","blocker":"none","dependencies":["REL-CONFIG-01","REL-CONFIG-01-GAP-01"]},
     {"id":"REL-CONFIG-01-GAP-03","area":"deployment","microScope":"hashed_fake_bearer_fixture_allowance","layers":["backend","deployment"],"outcome":"The package scanner allows only the exact hashed fake Bearer expectation used twice by the Instagram transport test while continuing to reject every other Bearer/JWT/key/secret literal.","owner":"codex_backend","state":"verified_pass","evidence":"Exact path/count/SHA-bound fixture allowance passed while the complete 181-file secret/content scan remained active.","blocker":"none","dependencies":["REL-CONFIG-01","REL-CONFIG-01-GAP-02"]},
+    {"id":"REL-CONFIG-01-GAP-04","area":"runtime_harness","microScope":"fresh_route_precondition_before_coordinate_action","layers":["mobile","oppo"],"outcome":"Every coordinate-driven runtime proof captures and verifies the current route immediately before each tap so stale coordinates cannot mutate an unrelated local surface.","owner":"primary_device_coordinator","state":"verified_pass","evidence":"The failed attempt changed only local Ride Cash selection and caused no external action. Retest used explicit MainActivity launch as the fresh precondition and then proved the real YouTube catalogue on the deployed provider.","blocker":"none","dependencies":["REL-CONFIG-01"]},
     {"id":"REL-BUILD-CLEAN-01","area":"build","microScope":"tracked_flutter_support_dirt","layers":["mobile","deployment","apk"],"outcome":"Prevent builds from generating tracked Flutter support-file dirt.","owner":"release_coordinator","state":"open_defect","evidence":"Build-generated tracked dirt recorded in handoff.","blocker":"exact generated owners/root cause require selected prevention ticket","dependencies":[]},
     {"id":"REL-SUCCESSOR-01","area":"apk","microScope":"source_apk_parity","layers":["deployment","apk","oppo"],"outcome":"Ensure the final successor APK contains the final integrated source HEAD.","owner":"release_coordinator","state":"pending_release","evidence":"Installed r60.91 is from 6d4d743 while source already advanced.","blocker":"selected Codex work and reviewed Cursor integration incomplete","dependencies":["META-CURSOR-03","FINAL-REGRESSION-01"]},
     {"id":"REL-SUCCESSOR-02","area":"apk","microScope":"no_premature_successor","layers":["deployment","apk"],"outcome":"Build no successor APK before selected tickets and Cursor integration complete.","owner":"release_coordinator","state":"constraint","evidence":"Founder explicitly reaffirmed integration before next APK.","blocker":"none","dependencies":["META-CURSOR-03","REL-SUCCESSOR-01"]},
