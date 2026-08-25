@@ -218,16 +218,173 @@ function Assert-IntegrationRepairMerge(
       $automaticTree $ActualTree)
   Assert-Coordination ($LASTEXITCODE -eq 0) `
     'integration repair automatic-tree comparison failed.'
+  Assert-Coordination (
+    (@($manualDeltaOwners | Sort-Object) -join '|') -ceq
+      (@($expectedRepairConflictOwners | Sort-Object) -join '|')
+  ) 'integration repair resolved delta does not equal every exact conflict owner.'
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
+  $repairOwnerClaim = @($claims | Where-Object {
+    [string]$_.task -ceq '/root/repair_social_runtime_chat_20260825'
+  })
+  Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
+    'integration repair exact owner claim is missing or ambiguous.'
+  $repairOwnerClaimKeys = @($repairOwnerClaim[0].owners | ForEach-Object {
+    ([string]$_).ToLowerInvariant()
+  })
   foreach ($manualDeltaOwner in $manualDeltaOwners) {
     $canonicalManualOwner = Get-CanonicalOwner ([string]$manualDeltaOwner)
     Assert-Coordination (
       $expectedRepairConflictKeys.Contains(
         $canonicalManualOwner.ToLowerInvariant()
-      )
+      ) -and
+      $repairOwnerClaimKeys.Contains($canonicalManualOwner.ToLowerInvariant())
     ) "integration repair manually changed a non-conflict owner: $canonicalManualOwner"
+    $resolvedBlobSpec = '{0}:{1}' -f $ActualTree,$canonicalManualOwner
+    $resolvedBlobLines = @(& git -C $root show $resolvedBlobSpec)
+    Assert-Coordination ($LASTEXITCODE -eq 0) `
+      "integration repair resolved blob is unreadable: $canonicalManualOwner"
+    $resolvedMarkerLines = @($resolvedBlobLines | Where-Object {
+      [string]$_ -cmatch '^(?:<<<<<<<|=======|>>>>>>>)'
+    })
+    Assert-Coordination ($resolvedMarkerLines.Count -eq 0) `
+      "integration repair resolved blob retains conflict markers: $canonicalManualOwner"
   }
+}
+
+function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
+  $repairType = @(& git -C $root cat-file -t $RepairCommit 2>$null)
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $repairType.Count -eq 1 -and
+    [string]$repairType[0] -ceq 'commit'
+  ) 'qualified integration repair tip is unavailable.'
+  $repairBinding = @($continuationBindings | Where-Object {
+    [string]$_.lane -ceq 'integration_repair'
+  })
+  Assert-Coordination ($repairBinding.Count -eq 1) `
+    'qualified integration repair continuation is missing or ambiguous.'
+  $repairBaseline = [string]$repairBinding[0].baselineHead
+  Assert-Coordination (
+    $repairBaseline -ceq [string]$integrationRepair.requiredCodexCommit
+  ) 'qualified integration repair baseline changed.'
+  & git -C $root merge-base --is-ancestor $repairBaseline $RepairCommit
+  Assert-Coordination ($LASTEXITCODE -eq 0) `
+    'qualified integration repair does not descend from the sealed Codex tip.'
+
+  $repairHistory = @(& git -C $root rev-list --reverse `
+      "$repairBaseline..$RepairCommit")
+  Assert-Coordination ($LASTEXITCODE -eq 0 -and $repairHistory.Count -ge 4) `
+    'qualified integration repair history is incomplete.'
+  $repairBootstrap = [string]$repairHistory[0]
+  $bootstrapParents = @(& git -C $root show -s --format='%P' $repairBootstrap)
+  $bootstrapSubject = @(& git -C $root show -s --format='%s' $repairBootstrap)
+  $bootstrapOwners = @(& git -C $root diff --name-only `
+      "$repairBaseline..$repairBootstrap")
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $bootstrapParents.Count -eq 1 -and
+    [string]$bootstrapParents[0] -ceq $repairBaseline -and
+    $bootstrapSubject.Count -eq 1 -and
+    [string]$bootstrapSubject[0] -ceq
+      [string]$repairBinding[0].bootstrapCommitSubject -and
+    (@($bootstrapOwners | Sort-Object) -join '|') -ceq
+      (@($repairBinding[0].bootstrapOwners | Sort-Object) -join '|')
+  ) 'qualified integration repair bootstrap changed.'
+
+  $repairMergeCommits = @(& git -C $root rev-list --merges `
+      "$repairBootstrap..$RepairCommit")
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $repairMergeCommits.Count -eq
+      [int]$integrationRepair.maximumMergeCommits
+  ) 'qualified integration repair merge count changed.'
+  $repairMergeCommit = [string]$repairMergeCommits[0]
+  $repairMergeParentsOutput = @(& git -C $root show -s --format='%P' `
+      $repairMergeCommit)
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $repairMergeParentsOutput.Count -eq 1
+  ) 'qualified integration repair merge parent read failed.'
+  $repairMergeParents = @([string]$repairMergeParentsOutput[0] -split ' ')
+  Assert-Coordination (
+    $repairMergeParents.Count -eq 2 -and
+    $repairMergeParents[1] -ceq [string]$integrationRepair.requiredCursorCommit
+  ) 'qualified integration repair merge second parent changed.'
+
+  $preMergeCommits = @(& git -C $root rev-list --reverse --no-merges `
+      "$repairBootstrap..$($repairMergeParents[0])")
+  $preMergeOwners = @(& git -C $root diff --name-only `
+      "$repairBootstrap..$($repairMergeParents[0])")
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $preMergeCommits.Count -eq
+      [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+    $preMergeCommits[-1] -ceq $repairMergeParents[0] -and
+    (@($preMergeOwners | Sort-Object) -join '|') -ceq
+      (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
+  ) 'qualified integration repair pre-merge correction changed.'
+  $preMergeAllowedKeys = @($integrationRepair.preMergeCoordinationOwners |
+    ForEach-Object { ([string]$_).ToLowerInvariant() })
+  foreach ($preMergeCommit in $preMergeCommits) {
+    $preMergeSubject = @(& git -C $root show -s --format='%s' $preMergeCommit)
+    $preMergeCommitOwners = @(& git -C $root diff-tree --no-commit-id `
+        --name-only -r $preMergeCommit)
+    Assert-Coordination (
+      $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
+      [string]$preMergeSubject[0] -cmatch
+        '^repair\(social-runtime-chat-conflict-correction-20260825\): .+' -and
+      @($preMergeCommitOwners | Where-Object {
+        -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
+      }).Count -eq 0
+    ) 'qualified integration repair contains a forbidden pre-merge commit.'
+  }
+
+  $repairMergeSubject = @(& git -C $root show -s --format='%s' `
+      $repairMergeCommit)
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
+    [string]$repairMergeSubject[0] -cmatch
+      '^repair\(social-runtime-chat-conflict-correction-20260825\): .+'
+  ) 'qualified integration repair merge subject changed.'
+  $repairMergeTree = (& git -C $root show -s --format='%T' `
+      $repairMergeCommit).Trim()
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $repairMergeTree -cmatch '^[0-9a-f]{40}$'
+  ) 'qualified integration repair merge tree read failed.'
+  Assert-IntegrationRepairMerge -FirstParent $repairMergeParents[0] `
+    -SecondParent $repairMergeParents[1] -ActualTree $repairMergeTree
+
+  $postMergeCommits = @(& git -C $root rev-list --reverse `
+      "$repairMergeCommit..$RepairCommit")
+  $postMergeMerges = @(& git -C $root rev-list --merges `
+      "$repairMergeCommit..$RepairCommit")
+  Assert-Coordination (
+    $LASTEXITCODE -eq 0 -and $postMergeMerges.Count -eq 0 -and
+    $postMergeCommits.Count -le
+      [int]$integrationRepair.maximumPostMergeClosureCommits
+  ) 'qualified integration repair post-merge history changed.'
+  if ($postMergeCommits.Count -eq 0) {
+    Assert-Coordination ($RepairCommit -ceq $repairMergeCommit) `
+      'qualified integration repair tip moved beyond its merge unexpectedly.'
+  } else {
+    $postMergeOwners = @(& git -C $root diff --name-only `
+        "$repairMergeCommit..$RepairCommit")
+    $postMergeSubject = @(& git -C $root show -s --format='%s' $RepairCommit)
+    Assert-Coordination (
+      $LASTEXITCODE -eq 0 -and $postMergeCommits.Count -eq 1 -and
+      $postMergeCommits[0] -ceq $RepairCommit -and
+      (@($postMergeOwners | Sort-Object) -join '|') -ceq
+        (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|') -and
+      $postMergeSubject.Count -eq 1 -and
+      [string]$postMergeSubject[0] -cmatch
+        '^repair\(social-runtime-chat-conflict-correction-20260825\): .+'
+    ) 'qualified integration repair closure commit changed.'
+  }
+
+  $codexRemoteHead = Get-ProductionRemoteBranchHead `
+    ([string]$integrationRepair.requiredCodexBranch)
+  $cursorRemoteHead = Get-ProductionRemoteBranchHead `
+    ([string]$integrationRepair.requiredCursorBranch)
+  Assert-Coordination (
+    $codexRemoteHead -ceq [string]$integrationRepair.requiredCodexCommit -and
+    $cursorRemoteHead -ceq [string]$integrationRepair.requiredCursorCommit
+  ) 'qualified integration repair sealed source remote changed.'
 }
 
 function Assert-ProductionManagedWorktreesClean {
@@ -727,7 +884,7 @@ Assert-Coordination (
   [string]$integrationRepair.requiredCursorBranch -ceq
     'work/cursor-ui/shop-chat-ui-20260824' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
-  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
+  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 2 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
@@ -1393,8 +1550,19 @@ if ($ProductionLane -ceq 'baseline') {
         Assert-IntegrationRepairMerge -FirstParent $head `
           -SecondParent $repairMergeHead -ActualTree $repairIndexTree
       } elseif ($existingRepairMerges.Count -eq 0) {
+        $existingCoordinationCommits = @(& git -C $root rev-list --no-merges `
+            "$baseCommit..$head")
+        $existingCoordinationOwners = @(& git -C $root diff --name-only `
+            "$baseCommit..$head")
         Assert-Coordination (
-          $head -ceq $baseCommit -and
+          $LASTEXITCODE -eq 0 -and
+          $existingCoordinationCommits.Count -lt
+            [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+          (
+            $existingCoordinationCommits.Count -eq 0 -or
+            (@($existingCoordinationOwners | Sort-Object) -join '|') -ceq
+              (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
+          ) -and
           (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
             (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
         ) 'integration repair coordination correction owner set changed.'
@@ -1512,6 +1680,7 @@ if ($ProductionLane -ceq 'baseline') {
         $codexRemoteHead -ceq [string]$integrationRepair.requiredCodexCommit -and
         $cursorRemoteHead -ceq [string]$integrationRepair.requiredCursorCommit
       ) 'integration repair sealed source remote changed.'
+      Assert-QualifiedIntegrationRepairTip -RepairCommit $head
     }
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head
   }
@@ -1526,6 +1695,7 @@ if ($ProductionLane -ceq 'baseline') {
       $IntegrationTargetTicketId -ceq
         [string]$integrationRepair.freshIntegrationTicketId
     ) 'fresh integration admission identity or repair cleanliness changed.'
+    Assert-QualifiedIntegrationRepairTip -RepairCommit $head
     $repairRemoteHead = Get-ProductionRemoteBranchHead $branch
     Assert-Coordination ($repairRemoteHead -ceq $head) `
       'fresh integration admission requires exact repair remote readback.'
@@ -1790,6 +1960,8 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$approvedBranches[0] -ceq
           'work/integration-repair/social-runtime-chat-conflict-correction-20260825') {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
+      Assert-QualifiedIntegrationRepairTip `
+        -RepairCommit $qualifiedRepairCommit
       & git -C $root merge-base --is-ancestor `
         ([string]$integrationRepair.requiredCodexCommit) $qualifiedRepairCommit
       $repairHasCodex = $LASTEXITCODE -eq 0

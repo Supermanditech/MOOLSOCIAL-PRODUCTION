@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": false,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 214,
+  "ticketCount": 216,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 66,
+    "totalCodexAtomicEngineeringTicketCount": 68,
     "implementedAtomicTicketCount": 64,
-    "pendingConfirmedImplementationCount": 2,
+    "pendingConfirmedImplementationCount": 4,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 2,
+    "remainingCodexEngineeringQueueCount": 4,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -97,9 +97,21 @@
       },
       {
         "id": "RT-INTEGRATION-CHAT-01-CHILD-01",
-        "state": "IMPLEMENTED",
+        "state": "TESTED",
         "implementation": "Machine-lock non-conflict files to Git's automatic merge tree regardless of stale claim ownership and permit one exact pre-merge coordination correction commit with no direct product edits.",
-        "runtime": "Regression memory and the corrected coordination fixture must pass before the exact merge is replayed."
+        "runtime": "Corrected repair pre-commit passed; 37 Buy Chat, 15 contextual Chat plus one intentional capture skip, 75 Buy/account/navigation and 31 Codex RT tests passed, and full Flutter analysis was clean before the approved lock stopped the cycle."
+      },
+      {
+        "id": "RT-INTEGRATION-CHAT-01-CHILD-02",
+        "state": "IMPLEMENTED",
+        "implementation": "Classify the inherited MainActivity accepted projection across the sealed tips without changing an accepted hash or weakening the lock.",
+        "runtime": "A second exact non-product coordination boundary is implemented; regression memory and fixture replay must pass before bounded hash/diff classification."
+      },
+      {
+        "id": "RT-INTEGRATION-CHAT-01-CHILD-03",
+        "state": "IMPLEMENTED",
+        "implementation": "Factor one fail-closed repair-tip verifier and invoke it independently at handoff, fresh-integration admission and final integration verification.",
+        "runtime": "Focused positive real-graph proof and negative marker, subject, ancestry, owner and automatic-tree assertions must pass before admission."
       }
     ],
     "pendingClassification": [],
@@ -347,7 +359,9 @@
     {"id":"OPPO-CARE-ROUTE-01","area":"care","microScope":"doctor_entry_and_shop_return","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Open Care Doctor from Shop through Mool and return to the exact Shop origin with Android Back.","owner":"cursor_ui","state":"verified_pass","evidence":"Installed r60.91 opened Doctor with Clinic selected; one Android Back restored the prior Shop frame and no search, booking, provider or Chat action occurred.","blocker":"none for this entry/return; broader Care contextual UX remains Cursor-owned","dependencies":["SAFE-OPPO-04","OPPO-SHOP-ROUTE-01"]},
     {"id":"OPPO-WORK-ROUTE-BACK-01","area":"work","microScope":"earn_today_entry_and_shop_return","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Open Work Earn Today from Shop through Mool and return to the exact Shop origin with Android Back.","owner":"cursor_ui","state":"verified_pass","evidence":"Installed r60.91 opened Earn Today read-only; one Android Back restored the prior Shop frame.","blocker":"none for this entry/return; broader Work contextual UX remains Cursor-owned","dependencies":["SAFE-OPPO-04","OPPO-SHOP-ROUTE-01"]},
     {"id":"SAFE-OPPO-EXHAUSTED-01","area":"oppo","microScope":"safe_investigation_boundary_complete","layers":["ui","wiring","navigation","mobile","provider","session","cache","apk","oppo"],"outcome":"Exhaust every currently safe non-publishing, non-messaging, non-account-changing OPPO differential before Codex implementation selection.","owner":"primary_device_coordinator","state":"verified_pass","evidence":"Safe checks covered candidate identity, background/re-entry, Feed/Create/Chat navigation, Chat composer with and without IME, guarded offline/process-death recovery, sanitized text-draft process death, sanitized Quick Poll local retention/discard, visible Feed/Create affordances and Shop/Travel/Care/Work entry/return. Search/Short persistence and all private/external mutations were explicitly deferred at their privacy/provider boundaries.","blocker":"none for safe investigation sequencing; RT-02, RT-04A, RT-04C, RT-06, RT-07, RT-08, RT-09 and RT-10 remain open or source-pending","dependencies":["SAFE-OPPO-01","SAFE-OPPO-02","SAFE-OPPO-03","SAFE-OPPO-04","SAFE-OPPO-05","SAFE-OPPO-08","SAFE-OPPO-09","SAFE-OPPO-10"]},
-    {"id":"RT-INTEGRATION-CHAT-01","area":"social_runtime_contextual_chat_integration","microScope":"sealed_codex_cursor_conflict_correction_and_zero_regression_union","layers":["ui","wiring","navigation","mobile","session","cache","testing","deployment_preflight","apk","oppo"],"outcome":"Preserve all Codex durable Social/Create/Back/account behavior and all Cursor contextual Chat handoff, retention, provisioning, capability, truthful-copy and Android navigation behavior in one auditable combined source tree.","owner":"primary_integration_repair","state":"GAP_FOUND","evidence":"Sealed inputs are Codex 922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9 and Cursor 00ce93552091ee51739266c0a8fbe6d207d9f695; the first repair pre-commit reproduced the exact conflict set and stopped before commit on stale ownership for an automatically merged lock checker.","blocker":"child RT-INTEGRATION-CHAT-01-CHILD-01 must pass corrected gate replay before the exact repair merge continues","dependencies":["RT-04A-01","RT-04B-01","RT-04B-02","RT-04B-03","RT-04C-01","RT-07","RT-08","RT-08-02","RT-10"]},
-    {"id":"RT-INTEGRATION-CHAT-01-CHILD-01","area":"integration_gate","microScope":"automatic_nonconflict_owner_and_premerge_coordination_correction","layers":["wiring","testing","deployment_preflight"],"outcome":"Accept every unclaimed non-conflict owner only when its resolved bytes equal Git's automatic merge tree, while permitting one exact non-product coordination correction commit before merge replay.","owner":"primary_integration_repair","state":"IMPLEMENTED","evidence":"The rejected cycle created no merge commit and was aborted cleanly; REG-20260826-3735 binds the exact gate correction.","blocker":"corrected regression memory, fixture and coordination implementation gates pending","dependencies":["RT-INTEGRATION-CHAT-01"]}
+    {"id":"RT-INTEGRATION-CHAT-01","area":"social_runtime_contextual_chat_integration","microScope":"sealed_codex_cursor_conflict_correction_and_zero_regression_union","layers":["ui","wiring","navigation","mobile","session","cache","testing","deployment_preflight","apk","oppo"],"outcome":"Preserve all Codex durable Social/Create/Back/account behavior and all Cursor contextual Chat handoff, retention, provisioning, capability, truthful-copy and Android navigation behavior in one auditable combined source tree.","owner":"primary_integration_repair","state":"GAP_FOUND","evidence":"The automatic-owner child passed corrected pre-commit, 158 focused tests and full analysis; the approved UI lock then stopped on an inherited MainActivity projection, and independent audit found the later admission boundary did not yet re-prove the repair tip.","blocker":"children RT-INTEGRATION-CHAT-01-CHILD-02 and RT-INTEGRATION-CHAT-01-CHILD-03 must pass before merge replay and admission","dependencies":["RT-04A-01","RT-04B-01","RT-04B-02","RT-04B-03","RT-04C-01","RT-07","RT-08","RT-08-02","RT-10"]},
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-01","area":"integration_gate","microScope":"automatic_nonconflict_owner_and_premerge_coordination_correction","layers":["wiring","testing","deployment_preflight"],"outcome":"Accept every unclaimed non-conflict owner only when its resolved bytes equal Git's automatic merge tree, while permitting one exact non-product coordination correction commit before merge replay.","owner":"primary_integration_repair","state":"TESTED","evidence":"Corrected repair pre-commit passed; 158 affected tests and full analysis passed before the later independent lock gate stopped the cycle.","blocker":"parent remains open on separate child RT-INTEGRATION-CHAT-01-CHILD-02","dependencies":["RT-INTEGRATION-CHAT-01"]},
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-02","area":"approved_ui_lock","microScope":"inherited_mainactivity_projection_classification","layers":["mobile","testing","deployment_preflight"],"outcome":"Classify the sealed Codex MainActivity projection against accepted Screen 02 ownership without replacing an accepted hash or weakening the approved lock.","owner":"primary_integration_repair","state":"IMPLEMENTED","evidence":"REG-20260826-3736 records the fail-closed gate result and a second exact non-product coordination boundary.","blocker":"bounded hash/diff classification and corrected gate replay pending","dependencies":["RT-INTEGRATION-CHAT-01","RT-INTEGRATION-CHAT-01-CHILD-01"]},
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-03","area":"integration_gate","microScope":"qualified_repair_tip_reproof_at_every_trust_boundary","layers":["wiring","testing","deployment_preflight"],"outcome":"Re-prove the exact repair topology, conflict resolution and sealed remotes at handoff, fresh-integration admission and final integration verification.","owner":"primary_integration_repair","state":"IMPLEMENTED","evidence":"REG-20260826-3737 binds the supervised fail-open finding before the second coordination commit.","blocker":"corrected fixture and real-graph gate replay pending","dependencies":["RT-INTEGRATION-CHAT-01","RT-INTEGRATION-CHAT-01-CHILD-01"]}
   ]
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3706,
-    "sha256": "DF2FB3F0579FFBAB987981090CE89C380AE991AEBE08C34E5E6A6D4E5AA5FD06"
+    "entryCount": 3708,
+    "sha256": "43EF8D412A5E8AC49C76C669036D7EE26C8ED8CF7AAB507B26D7C7F6BA20112C"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -598,7 +598,7 @@
         "requiredCursorCommit": "00ce93552091ee51739266c0a8fbe6d207d9f695",
         "requiredCursorBranch": "work/cursor-ui/shop-chat-ui-20260824",
         "maximumMergeCommits": 1,
-        "maximumPreMergeCoordinationCommits": 1,
+        "maximumPreMergeCoordinationCommits": 2,
         "preMergeCoordinationOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",

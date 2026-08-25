@@ -40,7 +40,7 @@ Assert-RepairContract (
   [string]$repair.requiredCursorCommit -ceq
     '00ce93552091ee51739266c0a8fbe6d207d9f695' -and
   [int]$repair.maximumMergeCommits -eq 1 -and
-  [int]$repair.maximumPreMergeCoordinationCommits -eq 1 -and
+  [int]$repair.maximumPreMergeCoordinationCommits -eq 2 -and
   @($repair.preMergeCoordinationOwners).Count -eq 5 -and
   [int]$repair.maximumPostMergeClosureCommits -eq 1 -and
   @($repair.postMergeClosureOwners).Count -eq 2 -and
@@ -55,6 +55,12 @@ $requiredCheckerTokens = @(
   'requiredCodexCommit',
   'requiredCursorCommit',
   'exactConflictOwners',
+  'function Assert-QualifiedIntegrationRepairTip',
+  'integration repair resolved delta does not equal every exact conflict owner',
+  'integration repair resolved blob retains conflict markers',
+  'qualified integration repair merge subject changed',
+  'Assert-QualifiedIntegrationRepairTip -RepairCommit $head',
+  '-RepairCommit $qualifiedRepairCommit',
   'integration repair contains a forbidden direct commit',
   'integration repair merge second parent changed',
   'fresh integration target is not clean at the governance tag'
@@ -66,12 +72,23 @@ foreach ($token in $requiredCheckerTokens) {
 if ($RequireQualifiedGraph) {
   $head = (& git -C $root rev-parse HEAD).Trim()
   Assert-RepairContract ($LASTEXITCODE -eq 0) 'repair HEAD read failed.'
-  $parents = @((& git -C $root show -s --format='%P' $head) -split ' ')
+  $qualifiedMerges = @(& git -C $root rev-list --merges `
+      "$($repair.requiredCodexCommit)..$head")
+  Assert-RepairContract (
+    $LASTEXITCODE -eq 0 -and $qualifiedMerges.Count -eq 1
+  ) 'qualified repair does not contain one exact merge.'
+  $qualifiedMerge = [string]$qualifiedMerges[0]
+  $parents = @((& git -C $root show -s --format='%P' $qualifiedMerge) -split ' ')
   Assert-RepairContract ($LASTEXITCODE -eq 0 -and $parents.Count -eq 2) `
-    'qualified repair HEAD is not a two-parent merge.'
+    'qualified repair merge is not a two-parent merge.'
   Assert-RepairContract (
     $parents[1] -ceq [string]$repair.requiredCursorCommit
   ) 'qualified repair second parent is not the sealed Cursor tip.'
+  $subject = (& git -C $root show -s --format='%s' $qualifiedMerge).Trim()
+  Assert-RepairContract (
+    $LASTEXITCODE -eq 0 -and
+    $subject -cmatch '^repair\(social-runtime-chat-conflict-correction-20260825\): .+'
+  ) 'qualified repair subject is not exact.'
   & git -C $root merge-base --is-ancestor `
     ([string]$repair.requiredCodexCommit) $head
   Assert-RepairContract ($LASTEXITCODE -eq 0) `

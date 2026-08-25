@@ -42418,6 +42418,58 @@
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260826-3736-SOCIAL-INTEGRATION-APPROVED-LOCK-REJECTED-INHERITED-MAINACTIVITY-PROJECTION",
+      "status": "registered_fail_closed_projection_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "mobile"
+      ],
+      "mistake": "After 158 focused tests and full Flutter analysis passed on the staged semantic union, the approved UI lock rejected the inherited MainActivity projection for first-setup language/location; the merge was aborted without commit and no lock or product owner was changed.",
+      "rootCause": "The sealed Codex runtime tip and Cursor lock checker had not yet been jointly classified for this Android projection, so the repair cycle could not prove whether the difference is an approved non-UI runtime delta or prohibited accepted-surface drift.",
+      "prevention": "Permit one additional exact non-product pre-merge coordination child, compare only canonical hashes and bounded diffs for the governance tag, sealed Codex tip, sealed Cursor tip and current production owner, identify the owning accepted region, and either preserve a semantically approved runtime-only delta through an exact negative-fixture lock rule or stop for a separate product correction; never replace an accepted hash or weaken the lock.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3737-SOCIAL-INTEGRATION-ADMISSION-DID-NOT-REPROVE-REPAIR-TIP",
+      "status": "registered_reusable_repair_tip_verifier_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing"
+      ],
+      "mistake": "Independent audit found that integration_admission_authorize and downstream integration_verify could trust a clean remotely pushed repair tip containing both sealed ancestors without independently replaying its bootstrap, correction, exact repair merge, conflict inventory and automatic non-conflict tree proof.",
+      "rootCause": "The first repair gate implementation kept the strongest topology/tree assertions inside repair pre-commit and handoff instead of factoring one fail-closed verifier used by every later trust boundary.",
+      "prevention": "Create one reusable qualified-repair-tip verifier and invoke it at repair handoff, fresh-integration admission and fresh-integration verification; require exact bootstrap and bounded correction history, one exact repair merge/subject/parents, all nine conflicts resolved without marker lines, automatic-tree deltas exactly equal the nine conflict owners, exact repair ownership and sealed source remote readback.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ]
     }
   ]
 }
