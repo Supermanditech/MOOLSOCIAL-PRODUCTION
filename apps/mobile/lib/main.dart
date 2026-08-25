@@ -583,6 +583,17 @@ Future<void> main() async {
   final accountIdentityGateway = FirebaseAuthenticatedAccountIdentityGateway(
     FirebaseAuth.instance,
   );
+  final secureVerifiedPrincipalBindingStore =
+      SecureVerifiedPrincipalBindingStore();
+  final VerifiedPrincipalBindingStore verifiedPrincipalBindingStore =
+      globalSocialLoginAuditComposition.useReviewAuthentication &&
+          !_youtubePublicReviewMode
+      ? MemoryVerifiedPrincipalBindingStore()
+      : secureVerifiedPrincipalBindingStore;
+  final firebaseSessionBootstrap = FirebaseAuthenticatedSessionBootstrapGateway(
+    FirebaseAuth.instance,
+    bindingProtector: secureVerifiedPrincipalBindingStore,
+  );
   final session = _youtubePublicReviewMode
       ? JourneySession(
           store: SeededJourneyStore(
@@ -615,7 +626,10 @@ Future<void> main() async {
           emailLinkAvailable:
               publicAuthRuntimeConfiguration.passwordlessEmailAvailable,
           mobileOtpAvailable: publicAuthRuntimeConfiguration.mobileOtpAvailable,
-          accountBootstrapGateway: DataConnectAccountBootstrapGateway(),
+          accountBootstrapGateway: DataConnectAccountBootstrapGateway(
+            principalGateway: firebaseSessionBootstrap,
+          ),
+          verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
           accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
@@ -680,12 +694,12 @@ Future<void> main() async {
               globalSocialLoginAuditComposition.useReviewAuthentication
               ? ReviewAccountBootstrapGateway()
               : globalSocialLoginAuditComposition.useFirebaseSessionBootstrap
-              ? FirebaseAuthenticatedSessionBootstrapGateway(
-                  FirebaseAuth.instance,
-                )
+              ? firebaseSessionBootstrap
               : DataConnectAccountBootstrapGateway(
+                  principalGateway: firebaseSessionBootstrap,
                   emulatorHost: _useEmulators ? emulatorHost : null,
                 ),
+          verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
           accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),

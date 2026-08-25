@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kDebugMode, visibleForTesting;
@@ -126,6 +128,181 @@ class SecurePendingEmailLinkAddressStore
 
   @override
   Future<void> clear() => _storage.delete(key: _addressKey);
+}
+
+class SecureVerifiedPrincipalBindingStore
+    implements VerifiedPrincipalBindingStore, PrincipalBindingProtector {
+  factory SecureVerifiedPrincipalBindingStore({FlutterSecureStorage? storage}) {
+    final secureStorage =
+        storage ??
+        const FlutterSecureStorage(
+          aOptions: AndroidOptions(
+            storageNamespace: 'moolsocial_principal_binding',
+          ),
+        );
+    return SecureVerifiedPrincipalBindingStore._(
+      readValue: secureStorage.read,
+      writeValue: ({required key, required value}) =>
+          secureStorage.write(key: key, value: value),
+      deleteValue: ({required key}) => secureStorage.delete(key: key),
+      createSecret: _createSecurePrincipalBindingSecret,
+    );
+  }
+
+  @visibleForTesting
+  SecureVerifiedPrincipalBindingStore.forTesting({
+    required Future<String?> Function({required String key}) readValue,
+    required Future<void> Function({
+      required String key,
+      required String? value,
+    })
+    writeValue,
+    required Future<void> Function({required String key}) deleteValue,
+    required List<int> Function() createSecret,
+  }) : this._(
+         readValue: readValue,
+         writeValue: writeValue,
+         deleteValue: deleteValue,
+         createSecret: createSecret,
+       );
+
+  SecureVerifiedPrincipalBindingStore._({
+    required this._readValue,
+    required this._writeValue,
+    required this._deleteValue,
+    required this._createSecret,
+  });
+
+  static const _bindingKey = 'verified_principal_binding';
+  static const _secretKey = 'principal_binding_install_secret';
+  static const _bindingContext = 'moolsocial.verified-principal.v1\u0000';
+
+  final Future<String?> Function({required String key}) _readValue;
+  final Future<void> Function({required String key, required String? value})
+  _writeValue;
+  final Future<void> Function({required String key}) _deleteValue;
+  final List<int> Function() _createSecret;
+
+  Future<List<int>>? _secretInFlight;
+  List<int>? _secretBytes;
+
+  @override
+  Future<VerifiedPrincipalBinding?> read() async {
+    try {
+      final value = await _readValue(key: _bindingKey);
+      if (value == null) return null;
+      return VerifiedPrincipalBinding.fromStorage(value);
+    } on Object {
+      throw const JourneyServiceException(
+        'Your saved account verification could not be read safely. Please sign in online.',
+        code: 'auth-binding-read-failed',
+      );
+    }
+  }
+
+  @override
+  Future<void> write(VerifiedPrincipalBinding binding) async {
+    try {
+      await _writeValue(key: _bindingKey, value: binding.storageValue);
+    } on Object {
+      throw const JourneyServiceException(
+        'Your account is signed in, but offline verification could not be enabled.',
+        code: 'auth-binding-write-failed',
+      );
+    }
+  }
+
+  @override
+  Future<void> clear() async {
+    try {
+      await _deleteValue(key: _bindingKey);
+    } on Object {
+      throw const JourneyServiceException(
+        'Saved account verification could not be cleared safely.',
+        code: 'auth-binding-clear-failed',
+      );
+    }
+  }
+
+  @override
+  Future<VerifiedPrincipalBinding> protect(String principalId) async {
+    final normalized = principalId.trim();
+    if (normalized.isEmpty) {
+      throw const JourneyServiceException(
+        'Your signed-in account could not be verified. Please sign in again.',
+        code: 'auth-session-missing',
+      );
+    }
+    final secret = await _installSecret();
+    final digest = Hmac(
+      sha256,
+      secret,
+    ).convert(utf8.encode('$_bindingContext$normalized'));
+    return VerifiedPrincipalBinding.fromStorage('v1:$digest');
+  }
+
+  Future<List<int>> _installSecret() async {
+    if (_secretBytes case final bytes?) return bytes;
+    if (_secretInFlight case final pending?) return pending;
+    final pending = _loadOrCreateSecret();
+    _secretInFlight = pending;
+    try {
+      final bytes = await pending;
+      _secretBytes = List<int>.unmodifiable(bytes);
+      return _secretBytes!;
+    } finally {
+      if (identical(_secretInFlight, pending)) _secretInFlight = null;
+    }
+  }
+
+  Future<List<int>> _loadOrCreateSecret() async {
+    try {
+      final encoded = await _readValue(key: _secretKey);
+      if (encoded != null) return _decodeInstallSecret(encoded);
+
+      final existingBinding = await _readValue(key: _bindingKey);
+      if (existingBinding != null) {
+        throw const JourneyServiceException(
+          'Saved account verification is unavailable. Please sign in online.',
+          code: 'auth-binding-secret-missing',
+        );
+      }
+      final created = _createSecret();
+      if (created.length != 32) {
+        throw const JourneyServiceException(
+          'Secure account verification could not be initialized.',
+          code: 'auth-binding-secret-invalid',
+        );
+      }
+      await _writeValue(key: _secretKey, value: base64Url.encode(created));
+      return created;
+    } on JourneyServiceException {
+      rethrow;
+    } on Object {
+      throw const JourneyServiceException(
+        'Secure account verification is unavailable. Please sign in online.',
+        code: 'auth-binding-secret-unavailable',
+      );
+    }
+  }
+
+  List<int> _decodeInstallSecret(String value) {
+    try {
+      final bytes = base64Url.decode(value);
+      if (bytes.length != 32) throw const FormatException();
+      return bytes;
+    } on Object {
+      throw const JourneyServiceException(
+        'Secure account verification is unavailable. Please sign in online.',
+        code: 'auth-binding-secret-invalid',
+      );
+    }
+  }
+}
+
+List<int> _createSecurePrincipalBindingSecret() {
+  final random = Random.secure();
+  return List<int>.generate(32, (_) => random.nextInt(256), growable: false);
 }
 
 class FirebaseOtpGateway implements OtpGateway {
@@ -1601,77 +1778,202 @@ class DeviceCurrentAreaGateway implements CurrentAreaGateway {
 
 class FirebaseAuthenticatedSessionBootstrapGateway
     implements AccountBootstrapGateway {
-  FirebaseAuthenticatedSessionBootstrapGateway(FirebaseAuth auth)
-    : this._(
-        interactiveVerifiedUserId: () async {
-          final user = auth.currentUser;
-          if (user == null) return null;
-          final token = await user.getIdToken();
-          if (token == null || token.trim().isEmpty) return null;
-          return user.uid;
-        },
-        revalidatedUserId: () async {
-          final user = auth.currentUser;
-          if (user == null) return null;
-          await user.reload();
-          final refreshed = auth.currentUser;
-          if (refreshed == null) return null;
-          final token = await refreshed.getIdToken();
-          if (token == null || token.trim().isEmpty) return null;
-          return refreshed.uid;
-        },
-      );
+  FirebaseAuthenticatedSessionBootstrapGateway(
+    FirebaseAuth auth, {
+    required PrincipalBindingProtector bindingProtector,
+  }) : this._(
+         bindingProtector: bindingProtector,
+         currentUserId: () async => auth.currentUser?.uid,
+         interactiveVerifiedUserId: () async {
+           final user = auth.currentUser;
+           if (user == null) return null;
+           final token = await user.getIdToken(true);
+           if (token == null || token.trim().isEmpty) return null;
+           return user.uid;
+         },
+         revalidatedUserId: () async {
+           final user = auth.currentUser;
+           if (user == null) return null;
+           await user.reload();
+           final refreshed = auth.currentUser;
+           if (refreshed == null) return null;
+           final token = await refreshed.getIdToken(true);
+           if (token == null || token.trim().isEmpty) return null;
+           return refreshed.uid;
+         },
+         invalidateLocalSession: auth.signOut,
+       );
 
   @visibleForTesting
   FirebaseAuthenticatedSessionBootstrapGateway.forTesting({
     required Future<String?> Function() verifiedUserId,
     Future<String?> Function()? interactiveVerifiedUserId,
+    Future<String?> Function()? currentUserId,
+    Future<void> Function()? invalidateLocalSession,
+    PrincipalBindingProtector bindingProtector =
+        const ReviewPrincipalBindingProtector(),
   }) : this._(
+         bindingProtector: bindingProtector,
+         currentUserId: currentUserId,
          interactiveVerifiedUserId: interactiveVerifiedUserId ?? verifiedUserId,
          revalidatedUserId: verifiedUserId,
+         invalidateLocalSession: invalidateLocalSession ?? _noOpInvalidation,
        );
 
   FirebaseAuthenticatedSessionBootstrapGateway._({
+    required this._bindingProtector,
+    required this._currentUserId,
     required this._interactiveVerifiedUserId,
     required this._revalidatedUserId,
+    required this._invalidateLocalSession,
   });
 
+  final PrincipalBindingProtector _bindingProtector;
+  final Future<String?> Function()? _currentUserId;
   final Future<String?> Function() _interactiveVerifiedUserId;
   final Future<String?> Function() _revalidatedUserId;
+  final Future<void> Function() _invalidateLocalSession;
 
   @override
-  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) async {
+    final expected = expectedUserId?.trim();
+    if (expected != null && expected.isNotEmpty) {
+      return _prepareInteractive(expected);
+    }
+
+    VerifiedPrincipalBinding? localBinding;
     try {
-      final expected = expectedUserId?.trim();
-      final userId = expected == null || expected.isEmpty
-          ? await _revalidatedUserId()
-          : await _interactiveVerifiedUserId();
-      if (userId == null || userId.trim().isEmpty) {
-        throw const JourneyServiceException(
-          'Your signed-in account could not be verified. Please sign in again.',
+      final currentUserIdReader = _currentUserId;
+      final currentUserId = currentUserIdReader == null
+          ? null
+          : await currentUserIdReader();
+      if (_currentUserId != null) {
+        if (currentUserId == null || currentUserId.trim().isEmpty) {
+          return const AuthenticatedAccountBootstrapResult.invalidSession(
+            code: 'auth-session-missing',
+          );
+        }
+        localBinding = await _bindingProtector.protect(currentUserId);
+      }
+
+      final refreshedUserId = await _revalidatedUserId();
+      if (refreshedUserId == null || refreshedUserId.trim().isEmpty) {
+        return const AuthenticatedAccountBootstrapResult.invalidSession(
           code: 'auth-session-missing',
         );
       }
-      if (expected != null && expected.isNotEmpty && userId != expected) {
-        throw const JourneyServiceException(
-          'Your signed-in account changed before it could be verified. Please sign in again.',
+      final refreshedBinding = await _bindingProtector.protect(refreshedUserId);
+      localBinding ??= refreshedBinding;
+      if (!localBinding.matches(refreshedBinding)) {
+        return const AuthenticatedAccountBootstrapResult.invalidSession(
           code: 'auth-session-user-mismatch',
         );
       }
-    } on JourneyServiceException {
-      rethrow;
+      return AuthenticatedAccountBootstrapResult.verified(refreshedBinding);
+    } on FirebaseAuthException catch (error) {
+      return _firebaseFailure(error.code, localBinding);
     } on Object {
-      throw const JourneyServiceException(
-        'Your account session could not be verified. '
-        'Check the connection and try again.',
-        code: 'auth-session-verification',
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-verification-fatal',
       );
     }
   }
+
+  Future<AuthenticatedAccountBootstrapResult> _prepareInteractive(
+    String expectedUserId,
+  ) async {
+    try {
+      final userId = await _interactiveVerifiedUserId();
+      if (userId == null || userId.trim().isEmpty) {
+        return const AuthenticatedAccountBootstrapResult.invalidSession(
+          code: 'auth-session-missing',
+        );
+      }
+      if (userId != expectedUserId) {
+        return const AuthenticatedAccountBootstrapResult.invalidSession(
+          code: 'auth-session-user-mismatch',
+        );
+      }
+      return AuthenticatedAccountBootstrapResult.verified(
+        await _bindingProtector.protect(userId),
+      );
+    } on FirebaseAuthException catch (error) {
+      final localBinding = await _protectExpectedForRetry(expectedUserId);
+      return _firebaseFailure(error.code, localBinding);
+    } on Object {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-verification-fatal',
+      );
+    }
+  }
+
+  Future<VerifiedPrincipalBinding?> _protectExpectedForRetry(
+    String expectedUserId,
+  ) async {
+    try {
+      return await _bindingProtector.protect(expectedUserId);
+    } on Object {
+      return null;
+    }
+  }
+
+  AuthenticatedAccountBootstrapResult _firebaseFailure(
+    String code,
+    VerifiedPrincipalBinding? localBinding,
+  ) {
+    final normalized = code.trim().toLowerCase();
+    if (const {
+      'network-request-failed',
+      'web-network-request-failed',
+      'too-many-requests',
+    }.contains(normalized)) {
+      if (localBinding != null) {
+        return AuthenticatedAccountBootstrapResult.retryableUnavailable(
+          localBinding,
+          code: 'auth-session-network-unavailable',
+        );
+      }
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-missing',
+      );
+    }
+    if (const {
+      'user-disabled',
+      'user-token-expired',
+      'invalid-user-token',
+      'user-not-found',
+    }.contains(normalized)) {
+      return AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-$normalized',
+      );
+    }
+    return const AuthenticatedAccountBootstrapResult.fatal(
+      code: 'auth-session-verification-fatal',
+    );
+  }
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async {
+    final currentUserIdReader = _currentUserId;
+    final currentUserId = currentUserIdReader == null
+        ? null
+        : await currentUserIdReader();
+    if (currentUserId == null || currentUserId.trim().isEmpty) return null;
+    return _bindingProtector.protect(currentUserId);
+  }
+
+  @override
+  Future<void> invalidateLocalSession() => _invalidateLocalSession();
 }
 
 class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
-  DataConnectAccountBootstrapGateway({String? emulatorHost, this.port = 9399}) {
+  DataConnectAccountBootstrapGateway({
+    required this._principalGateway,
+    String? emulatorHost,
+    this.port = 9399,
+  }) : _upsertAccount = _executeDataConnectAccountUpsert {
     if (emulatorHost != null) {
       MobileConnector.instance.dataConnect.useDataConnectEmulator(
         emulatorHost,
@@ -1680,10 +1982,47 @@ class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
     }
   }
 
+  @visibleForTesting
+  DataConnectAccountBootstrapGateway.forTesting(
+    this._principalGateway,
+    this._upsertAccount,
+  ) : port = 9399;
+
   final int port;
+  final AccountBootstrapGateway _principalGateway;
+  final Future<void> Function() _upsertAccount;
 
   @override
-  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
-    await MobileConnector.instance.upsertMyAccount().execute();
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) async {
+    final principal = await _principalGateway.prepareAuthenticatedAccount(
+      expectedUserId: expectedUserId,
+    );
+    if (principal.state != AuthenticatedAccountBootstrapState.verified) {
+      return principal;
+    }
+    try {
+      await _upsertAccount();
+      return principal;
+    } on Object {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-account-bootstrap-fatal',
+      );
+    }
   }
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() =>
+      _principalGateway.currentPrincipalBinding();
+
+  @override
+  Future<void> invalidateLocalSession() =>
+      _principalGateway.invalidateLocalSession();
+}
+
+Future<void> _noOpInvalidation() async {}
+
+Future<void> _executeDataConnectAccountUpsert() async {
+  await MobileConnector.instance.upsertMyAccount().execute();
 }

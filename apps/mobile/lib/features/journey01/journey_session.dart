@@ -40,6 +40,7 @@ class JourneySession extends ChangeNotifier {
     this.emailLinkAvailable = false,
     this.mobileOtpAvailable = true,
     AccountBootstrapGateway? accountBootstrapGateway,
+    VerifiedPrincipalBindingStore? verifiedPrincipalBindingStore,
     AuthenticatedAccountIdentityGateway? accountIdentityGateway,
     LocationPermissionGateway? locationGateway,
     CurrentAreaGateway? currentAreaGateway,
@@ -62,6 +63,9 @@ class JourneySession extends ChangeNotifier {
        ),
        _accountBootstrapGateway =
            accountBootstrapGateway ?? ReviewAccountBootstrapGateway(),
+       _verifiedPrincipalBindingStore =
+           verifiedPrincipalBindingStore ??
+           MemoryVerifiedPrincipalBindingStore(),
        _accountIdentityGateway =
            accountIdentityGateway ??
            ReviewAuthenticatedAccountIdentityGateway(),
@@ -80,6 +84,7 @@ class JourneySession extends ChangeNotifier {
   final bool emailLinkAvailable;
   final bool mobileOtpAvailable;
   final AccountBootstrapGateway _accountBootstrapGateway;
+  final VerifiedPrincipalBindingStore _verifiedPrincipalBindingStore;
   final AuthenticatedAccountIdentityGateway _accountIdentityGateway;
   final LocationPermissionGateway _locationGateway;
   final CurrentAreaGateway _currentAreaGateway;
@@ -112,6 +117,7 @@ class JourneySession extends ChangeNotifier {
   String? errorMessage;
   String? noticeMessage;
   AuthenticatedAccountIdentity? accountIdentity;
+  AuthenticatedAccountBootstrapState? authenticatedBootstrapState;
   String? reviewCode;
   String? returnTo;
   String? _authenticationCancelTo;
@@ -248,9 +254,11 @@ class JourneySession extends ChangeNotifier {
         _authenticatedAtBoot = signedIn;
         stage = JourneyStage.setup;
       } else if (signedIn) {
-        await _prepareAuthenticatedAccount();
-        await _refreshAuthenticatedAccountIdentity();
-        stage = JourneyStage.ready;
+        final bootstrap = await _prepareAuthenticatedAccount();
+        if (await _acceptAuthenticatedRelaunch(bootstrap)) {
+          await _refreshAuthenticatedAccountIdentity();
+          stage = JourneyStage.ready;
+        }
       } else if (snapshot.setupComplete) {
         stage = resumesPersistedAuthentication
             ? JourneyStage.signIn
@@ -273,7 +281,7 @@ class JourneySession extends ChangeNotifier {
           'setupComplete=${snapshot?.setupComplete ?? false} '
           'completedSetupVersion=$_completedSetupExperienceVersion '
           'requiredSetupVersion=$approvedSetupExperienceVersion '
-          'authenticated=$signedIn',
+          'authenticated=$_isAuthenticated',
         );
       }
       noticeMessage = null;
@@ -516,9 +524,13 @@ class JourneySession extends ChangeNotifier {
     try {
       await _persist(setupComplete: true);
       if (_authenticatedAtBoot) {
-        await _prepareAuthenticatedAccount();
-        await _refreshAuthenticatedAccountIdentity();
-        stage = JourneyStage.ready;
+        final bootstrap = await _prepareAuthenticatedAccount();
+        if (await _acceptAuthenticatedRelaunch(bootstrap)) {
+          await _refreshAuthenticatedAccountIdentity();
+          stage = JourneyStage.ready;
+        } else {
+          stage = JourneyStage.signIn;
+        }
       } else if (allowGuestReady) {
         stage = JourneyStage.ready;
       } else {
@@ -1200,9 +1212,13 @@ class JourneySession extends ChangeNotifier {
     }
     _authenticationCompletionInProgress = true;
     try {
-      await _prepareAuthenticatedAccount(expectedUserId: expectedUserId);
+      final bootstrap = await _prepareAuthenticatedAccount(
+        expectedUserId: expectedUserId,
+      );
+      _requireVerifiedInteractiveBootstrap(bootstrap);
       await _refreshAuthenticatedAccountIdentity();
       await _persist(setupComplete: true);
+      await _retainVerifiedPrincipalForOnlineSession(bootstrap.currentBinding!);
       _isAuthenticated = true;
       stage = JourneyStage.ready;
       errorMessage = null;
@@ -1224,6 +1240,7 @@ class JourneySession extends ChangeNotifier {
     _socialAuthCleanupRequired = true;
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      await _verifiedPrincipalBindingStore.clear();
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
@@ -1250,6 +1267,7 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      await _verifiedPrincipalBindingStore.clear();
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
@@ -1269,6 +1287,7 @@ class JourneySession extends ChangeNotifier {
     accountIdentity = null;
     try {
       await _otpGateway.signOut();
+      await _verifiedPrincipalBindingStore.clear();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
@@ -1279,6 +1298,7 @@ class JourneySession extends ChangeNotifier {
     accountIdentity = null;
     try {
       await _emailLinkGateway.signOut();
+      await _verifiedPrincipalBindingStore.clear();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
@@ -1366,6 +1386,8 @@ class JourneySession extends ChangeNotifier {
         _otpGateway.signOut,
         _socialAuthGateway.signOut,
         _emailLinkGateway.signOut,
+        _accountBootstrapGateway.invalidateLocalSession,
+        _verifiedPrincipalBindingStore.clear,
       ]) {
         try {
           await cleanup().timeout(socialAuthRollbackTimeout);
@@ -1566,16 +1588,137 @@ class JourneySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _prepareAuthenticatedAccount({String? expectedUserId}) {
+  Future<AuthenticatedAccountBootstrapResult> _prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) async {
+    VerifiedPrincipalBinding? localBinding;
+    try {
+      localBinding = await _accountBootstrapGateway
+          .currentPrincipalBinding()
+          .timeout(accountBootstrapTimeout);
+    } on TimeoutException {
+      localBinding = null;
+    }
     return _accountBootstrapGateway
         .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
         .timeout(
           accountBootstrapTimeout,
-          onTimeout: () => throw const JourneyServiceException(
-            'Your account service did not respond. Check the connection and try again.',
-            code: 'auth-session-timeout',
-          ),
+          onTimeout: () => localBinding == null
+              ? const AuthenticatedAccountBootstrapResult.fatal(
+                  code: 'auth-session-timeout',
+                )
+              : AuthenticatedAccountBootstrapResult.retryableUnavailable(
+                  localBinding,
+                  code: 'auth-session-timeout',
+                ),
         );
+  }
+
+  Future<bool> _acceptAuthenticatedRelaunch(
+    AuthenticatedAccountBootstrapResult bootstrap,
+  ) async {
+    authenticatedBootstrapState = bootstrap.state;
+    switch (bootstrap.state) {
+      case AuthenticatedAccountBootstrapState.verified:
+        final current = bootstrap.currentBinding!;
+        final stored = await _verifiedPrincipalBindingStore.read();
+        if (stored != null && !stored.matches(current)) {
+          await _invalidateMismatchedPrincipal();
+          return false;
+        }
+        await _retainVerifiedPrincipalForOnlineSession(
+          current,
+          existing: stored,
+        );
+        return true;
+      case AuthenticatedAccountBootstrapState.retryableUnavailable:
+        throw JourneyServiceException(
+          'Your account could not be verified while offline. Check the connection and retry.',
+          code: bootstrap.code,
+        );
+      case AuthenticatedAccountBootstrapState.invalidSession:
+        await _invalidateMismatchedPrincipal();
+        return false;
+      case AuthenticatedAccountBootstrapState.fatal:
+        throw JourneyServiceException(
+          'Your account session could not be verified safely. Please retry online.',
+          code: bootstrap.code,
+        );
+    }
+  }
+
+  void _requireVerifiedInteractiveBootstrap(
+    AuthenticatedAccountBootstrapResult bootstrap,
+  ) {
+    authenticatedBootstrapState = bootstrap.state;
+    if (bootstrap.state == AuthenticatedAccountBootstrapState.verified &&
+        bootstrap.currentBinding != null) {
+      return;
+    }
+    if (bootstrap.code == 'auth-session-timeout') {
+      throw const JourneyServiceException(
+        'Your account service did not respond. Check the connection and try again.',
+        code: 'auth-session-timeout',
+      );
+    }
+    final message = switch (bootstrap.state) {
+      AuthenticatedAccountBootstrapState.retryableUnavailable =>
+        'Your account service did not respond. Check the connection and try again.',
+      AuthenticatedAccountBootstrapState.invalidSession =>
+        'Your signed-in account could not be verified. Please sign in again.',
+      AuthenticatedAccountBootstrapState.fatal =>
+        'Your account session could not be verified safely. Please try again.',
+      AuthenticatedAccountBootstrapState.verified =>
+        'Your signed-in account could not be verified. Please sign in again.',
+    };
+    throw JourneyServiceException(message, code: bootstrap.code);
+  }
+
+  Future<void> _retainVerifiedPrincipalForOnlineSession(
+    VerifiedPrincipalBinding binding, {
+    VerifiedPrincipalBinding? existing,
+  }) async {
+    final prior = existing ?? await _verifiedPrincipalBindingStore.read();
+    if (prior != null && prior.matches(binding)) return;
+    try {
+      await _verifiedPrincipalBindingStore.write(binding);
+    } on Object {
+      try {
+        await _verifiedPrincipalBindingStore.clear();
+      } on Object {
+        throw const JourneyServiceException(
+          'Your account verification could not be stored or cleared safely.',
+          code: 'auth-binding-unsafe-state',
+        );
+      }
+      // The online session remains valid, but no offline receipt is retained.
+    }
+  }
+
+  Future<void> _invalidateMismatchedPrincipal() async {
+    Object? cleanupFailure;
+    for (final cleanup in <Future<void> Function()>[
+      _verifiedPrincipalBindingStore.clear,
+      _accountBootstrapGateway.invalidateLocalSession,
+      _otpGateway.signOut,
+      _socialAuthGateway.signOut,
+      _emailLinkGateway.signOut,
+    ]) {
+      try {
+        await cleanup().timeout(socialAuthRollbackTimeout);
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
+    }
+    _isAuthenticated = false;
+    accountIdentity = null;
+    if (cleanupFailure != null) {
+      throw const JourneyServiceException(
+        'The invalid account session could not be cleared safely.',
+        code: 'auth-session-invalidation-failed',
+      );
+    }
+    stage = JourneyStage.signIn;
   }
 
   Future<void> _refreshAuthenticatedAccountIdentity() async {

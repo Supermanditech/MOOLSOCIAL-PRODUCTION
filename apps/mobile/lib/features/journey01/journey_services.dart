@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 const approvedSetupExperienceVersion = 5;
 
 enum LocationPermissionResult { granted, denied, permanentlyDenied }
@@ -476,8 +480,178 @@ class ReviewCurrentAreaGateway implements CurrentAreaGateway {
   }
 }
 
+enum AuthenticatedAccountBootstrapState {
+  verified,
+  retryableUnavailable,
+  invalidSession,
+  fatal,
+}
+
+final class VerifiedPrincipalBinding {
+  VerifiedPrincipalBinding._(this._storageValue);
+
+  static final RegExp _storagePattern = RegExp(r'^v1:[0-9a-f]{64}$');
+
+  final String _storageValue;
+
+  static VerifiedPrincipalBinding fromStorage(String value) {
+    if (!_storagePattern.hasMatch(value)) {
+      throw const FormatException('Invalid verified-principal binding.');
+    }
+    return VerifiedPrincipalBinding._(value);
+  }
+
+  String get storageValue => _storageValue;
+
+  bool matches(VerifiedPrincipalBinding other) {
+    final left = _storageValue.codeUnits;
+    final right = other._storageValue.codeUnits;
+    if (left.length != right.length) return false;
+    var difference = 0;
+    for (var index = 0; index < left.length; index += 1) {
+      difference |= left[index] ^ right[index];
+    }
+    return difference == 0;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is VerifiedPrincipalBinding && matches(other);
+
+  @override
+  int get hashCode => Object.hash(runtimeType, _storageValue);
+
+  @override
+  String toString() => 'VerifiedPrincipalBinding(redacted)';
+}
+
+final class AuthenticatedAccountBootstrapResult {
+  const AuthenticatedAccountBootstrapResult._({
+    required this.state,
+    required this.code,
+    this.currentBinding,
+  });
+
+  factory AuthenticatedAccountBootstrapResult.verified(
+    VerifiedPrincipalBinding binding,
+  ) => AuthenticatedAccountBootstrapResult._(
+    state: AuthenticatedAccountBootstrapState.verified,
+    code: 'auth-session-verified',
+    currentBinding: binding,
+  );
+
+  factory AuthenticatedAccountBootstrapResult.retryableUnavailable(
+    VerifiedPrincipalBinding binding, {
+    String code = 'auth-session-network-unavailable',
+  }) => AuthenticatedAccountBootstrapResult._(
+    state: AuthenticatedAccountBootstrapState.retryableUnavailable,
+    code: code,
+    currentBinding: binding,
+  );
+
+  const AuthenticatedAccountBootstrapResult.invalidSession({
+    String code = 'auth-session-invalid',
+  }) : this._(
+         state: AuthenticatedAccountBootstrapState.invalidSession,
+         code: code,
+       );
+
+  const AuthenticatedAccountBootstrapResult.fatal({
+    String code = 'auth-session-verification-fatal',
+  }) : this._(state: AuthenticatedAccountBootstrapState.fatal, code: code);
+
+  final AuthenticatedAccountBootstrapState state;
+  final VerifiedPrincipalBinding? currentBinding;
+  final String code;
+
+  @override
+  String toString() =>
+      'AuthenticatedAccountBootstrapResult(state: ${state.name}, code: redacted, binding: redacted)';
+}
+
+abstract interface class PrincipalBindingProtector {
+  Future<VerifiedPrincipalBinding> protect(String principalId);
+}
+
+class ReviewPrincipalBindingProtector implements PrincipalBindingProtector {
+  const ReviewPrincipalBindingProtector();
+
+  static final Hmac _reviewHmac = Hmac(
+    sha256,
+    utf8.encode('moolsocial-review-principal-binding-v1'),
+  );
+
+  @override
+  Future<VerifiedPrincipalBinding> protect(String principalId) async {
+    final normalized = principalId.trim();
+    if (normalized.isEmpty) {
+      throw const JourneyServiceException(
+        'Your signed-in account could not be verified. Please sign in again.',
+        code: 'auth-session-missing',
+      );
+    }
+    final digest = _reviewHmac.convert(
+      utf8.encode('moolsocial.verified-principal.v1\u0000$normalized'),
+    );
+    return VerifiedPrincipalBinding.fromStorage('v1:$digest');
+  }
+}
+
+abstract interface class VerifiedPrincipalBindingStore {
+  Future<VerifiedPrincipalBinding?> read();
+
+  Future<void> write(VerifiedPrincipalBinding binding);
+
+  Future<void> clear();
+}
+
+class MemoryVerifiedPrincipalBindingStore
+    implements VerifiedPrincipalBindingStore {
+  MemoryVerifiedPrincipalBindingStore({
+    this.binding,
+    this.readFailure,
+    this.writeFailure,
+    this.clearFailure,
+  });
+
+  VerifiedPrincipalBinding? binding;
+  Object? readFailure;
+  Object? writeFailure;
+  Object? clearFailure;
+  int readCount = 0;
+  int writeCount = 0;
+  int clearCount = 0;
+
+  @override
+  Future<VerifiedPrincipalBinding?> read() async {
+    readCount += 1;
+    if (readFailure case final value?) throw value;
+    return binding;
+  }
+
+  @override
+  Future<void> write(VerifiedPrincipalBinding value) async {
+    writeCount += 1;
+    if (writeFailure case final failure?) throw failure;
+    binding = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    clearCount += 1;
+    if (clearFailure case final failure?) throw failure;
+    binding = null;
+  }
+}
+
 abstract interface class AccountBootstrapGateway {
-  Future<void> prepareAuthenticatedAccount({String? expectedUserId});
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  });
+
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding();
+
+  Future<void> invalidateLocalSession();
 }
 
 class AuthenticatedAccountIdentity {
@@ -543,17 +717,48 @@ class ReviewAuthenticatedAccountIdentityGateway
 }
 
 class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
-  ReviewAccountBootstrapGateway({this.failure});
+  ReviewAccountBootstrapGateway({
+    this.failure,
+    AuthenticatedAccountBootstrapResult? result,
+    VerifiedPrincipalBinding? currentBinding,
+  }) : result =
+           result ??
+           AuthenticatedAccountBootstrapResult.verified(_defaultBinding),
+       currentBinding = currentBinding ?? _defaultBinding;
+
+  static final VerifiedPrincipalBinding _defaultBinding =
+      VerifiedPrincipalBinding.fromStorage(
+        'v1:0000000000000000000000000000000000000000000000000000000000000000',
+      );
 
   Object? failure;
+  AuthenticatedAccountBootstrapResult result;
+  VerifiedPrincipalBinding? currentBinding;
   int prepareCount = 0;
+  int currentBindingCount = 0;
+  int invalidationCount = 0;
   String? lastExpectedUserId;
 
   @override
-  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) async {
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) async {
     prepareCount += 1;
     lastExpectedUserId = expectedUserId;
     if (failure case final value?) throw value;
+    return result;
+  }
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async {
+    currentBindingCount += 1;
+    return currentBinding;
+  }
+
+  @override
+  Future<void> invalidateLocalSession() async {
+    invalidationCount += 1;
+    currentBinding = null;
   }
 }
 

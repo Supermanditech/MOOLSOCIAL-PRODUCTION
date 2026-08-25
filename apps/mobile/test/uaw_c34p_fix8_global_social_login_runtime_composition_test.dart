@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -94,7 +95,11 @@ void main() {
       verifiedUserId: () async => 'firebase-user',
     );
 
-    await gateway.prepareAuthenticatedAccount();
+    final result = await gateway.prepareAuthenticatedAccount();
+
+    expect(result.state, AuthenticatedAccountBootstrapState.verified);
+    expect(result.currentBinding, isNotNull);
+    expect(result.toString(), isNot(contains('firebase-user')));
   });
 
   test(
@@ -113,9 +118,10 @@ void main() {
         },
       );
 
-      await gateway.prepareAuthenticatedAccount(
+      final result = await gateway.prepareAuthenticatedAccount(
         expectedUserId: 'firebase-user',
       );
+      expect(result.state, AuthenticatedAccountBootstrapState.verified);
       expect(interactiveCount, 1);
       expect(revalidatedCount, 0);
     },
@@ -129,16 +135,12 @@ void main() {
         interactiveVerifiedUserId: () async => 'different-user',
       );
 
-      await expectLater(
-        gateway.prepareAuthenticatedAccount(expectedUserId: 'firebase-user'),
-        throwsA(
-          isA<JourneyServiceException>().having(
-            (error) => error.code,
-            'code',
-            'auth-session-user-mismatch',
-          ),
-        ),
+      final result = await gateway.prepareAuthenticatedAccount(
+        expectedUserId: 'firebase-user',
       );
+      expect(result.state, AuthenticatedAccountBootstrapState.invalidSession);
+      expect(result.code, 'auth-session-user-mismatch');
+      expect(result.currentBinding, isNull);
     },
   );
 
@@ -147,18 +149,11 @@ void main() {
       verifiedUserId: () async => null,
     );
 
-    await expectLater(
-      gateway.prepareAuthenticatedAccount(),
-      throwsA(
-        isA<JourneyServiceException>()
-            .having((error) => error.code, 'code', 'auth-session-missing')
-            .having(
-              (error) => error.userMessage,
-              'message',
-              contains('sign in again'),
-            ),
-      ),
-    );
+    final result = await gateway.prepareAuthenticatedAccount();
+
+    expect(result.state, AuthenticatedAccountBootstrapState.invalidSession);
+    expect(result.code, 'auth-session-missing');
+    expect(result.currentBinding, isNull);
   });
 
   test('Firebase session bootstrap sanitizes verification failure', () async {
@@ -166,18 +161,269 @@ void main() {
       verifiedUserId: () async => throw StateError('private failure'),
     );
 
-    await expectLater(
-      gateway.prepareAuthenticatedAccount(),
-      throwsA(
-        isA<JourneyServiceException>()
-            .having((error) => error.code, 'code', 'auth-session-verification')
-            .having(
-              (error) => error.userMessage,
-              'message',
-              isNot(contains('private failure')),
-            ),
-      ),
+    final result = await gateway.prepareAuthenticatedAccount();
+
+    expect(result.state, AuthenticatedAccountBootstrapState.fatal);
+    expect(result.code, 'auth-session-verification-fatal');
+    expect(result.toString(), isNot(contains('private failure')));
+  });
+
+  group('verified principal binding security', () {
+    test(
+      'secure HMAC binding is opaque, deterministic and install-scoped',
+      () async {
+        final values = <String, String?>{};
+        var secretCreationCount = 0;
+        final store = SecureVerifiedPrincipalBindingStore.forTesting(
+          readValue: ({required key}) async => values[key],
+          writeValue: ({required key, required value}) async {
+            values[key] = value;
+          },
+          deleteValue: ({required key}) async {
+            values.remove(key);
+          },
+          createSecret: () {
+            secretCreationCount += 1;
+            return List<int>.generate(32, (index) => index);
+          },
+        );
+
+        final first = await store.protect('private-user-a');
+        final repeated = await store.protect('private-user-a');
+        final different = await store.protect('private-user-b');
+        await store.write(first);
+
+        expect(first.matches(repeated), isTrue);
+        expect(first.matches(different), isFalse);
+        expect(first.storageValue, matches(RegExp(r'^v1:[0-9a-f]{64}$')));
+        expect(first.toString(), 'VerifiedPrincipalBinding(redacted)');
+        expect(values.values.join('|'), isNot(contains('private-user-a')));
+        expect(secretCreationCount, 1);
+        expect((await store.read())!.matches(first), isTrue);
+      },
     );
+
+    test('concurrent first use creates one install secret', () async {
+      final values = <String, String?>{};
+      var secretCreationCount = 0;
+      var secretWriteCount = 0;
+      final store = SecureVerifiedPrincipalBindingStore.forTesting(
+        readValue: ({required key}) async {
+          await Future<void>.delayed(Duration.zero);
+          return values[key];
+        },
+        writeValue: ({required key, required value}) async {
+          values[key] = value;
+          if (key.contains('secret')) secretWriteCount += 1;
+        },
+        deleteValue: ({required key}) async {
+          values.remove(key);
+        },
+        createSecret: () {
+          secretCreationCount += 1;
+          return List<int>.filled(32, 7);
+        },
+      );
+
+      await Future.wait([
+        store.protect('principal-a'),
+        store.protect('principal-b'),
+        store.protect('principal-c'),
+      ]);
+
+      expect(secretCreationCount, 1);
+      expect(secretWriteCount, 1);
+    });
+
+    test('missing install secret never accepts an existing receipt', () async {
+      final receipt = 'v1:${List.filled(64, 'a').join()}';
+      final store = SecureVerifiedPrincipalBindingStore.forTesting(
+        readValue: ({required key}) async =>
+            key.contains('secret') ? null : receipt,
+        writeValue: ({required key, required value}) async {},
+        deleteValue: ({required key}) async {},
+        createSecret: () => List<int>.filled(32, 1),
+      );
+
+      await expectLater(
+        store.protect('private-user'),
+        throwsA(
+          isA<JourneyServiceException>().having(
+            (error) => error.code,
+            'code',
+            'auth-binding-secret-missing',
+          ),
+        ),
+      );
+    });
+
+    test('corrupt or unknown receipt version fails closed', () async {
+      final store = SecureVerifiedPrincipalBindingStore.forTesting(
+        readValue: ({required key}) async => 'v2:not-a-valid-receipt',
+        writeValue: ({required key, required value}) async {},
+        deleteValue: ({required key}) async {},
+        createSecret: () => List<int>.filled(32, 1),
+      );
+
+      await expectLater(
+        store.read(),
+        throwsA(
+          isA<JourneyServiceException>().having(
+            (error) => error.code,
+            'code',
+            'auth-binding-read-failed',
+          ),
+        ),
+      );
+    });
+  });
+
+  group('typed Firebase principal revalidation', () {
+    test('explicit network failure is retryable with local binding', () async {
+      final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+        currentUserId: () async => 'private-user',
+        verifiedUserId: () async => throw FirebaseAuthException(
+          code: 'network-request-failed',
+          message: 'private network detail',
+        ),
+      );
+
+      final result = await gateway.prepareAuthenticatedAccount();
+
+      expect(
+        result.state,
+        AuthenticatedAccountBootstrapState.retryableUnavailable,
+      );
+      expect(result.code, 'auth-session-network-unavailable');
+      expect(result.currentBinding, isNotNull);
+      expect(result.toString(), isNot(contains('private-user')));
+      expect(result.toString(), isNot(contains('private network detail')));
+    });
+
+    for (final code in const [
+      'user-disabled',
+      'user-token-expired',
+      'invalid-user-token',
+      'user-not-found',
+    ]) {
+      test('$code is invalid-session and never retryable', () async {
+        final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+          currentUserId: () async => 'private-user',
+          verifiedUserId: () async =>
+              throw FirebaseAuthException(code: code, message: 'private'),
+        );
+
+        final result = await gateway.prepareAuthenticatedAccount();
+
+        expect(result.state, AuthenticatedAccountBootstrapState.invalidSession);
+        expect(result.currentBinding, isNull);
+      });
+    }
+
+    test('principal change across reload is invalid-session', () async {
+      final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+        currentUserId: () async => 'private-user-a',
+        verifiedUserId: () async => 'private-user-b',
+      );
+
+      final result = await gateway.prepareAuthenticatedAccount();
+
+      expect(result.state, AuthenticatedAccountBootstrapState.invalidSession);
+      expect(result.code, 'auth-session-user-mismatch');
+      expect(result.currentBinding, isNull);
+    });
+
+    test('unknown and TLS-like failures default fatal', () async {
+      for (final failure in <Object>[
+        StateError('private parse detail'),
+        const HandshakeException('private TLS detail'),
+      ]) {
+        final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+          currentUserId: () async => 'private-user',
+          verifiedUserId: () async => throw failure,
+        );
+
+        final result = await gateway.prepareAuthenticatedAccount();
+
+        expect(result.state, AuthenticatedAccountBootstrapState.fatal);
+        expect(result.code, 'auth-session-verification-fatal');
+        expect(result.currentBinding, isNull);
+        expect(result.toString(), isNot(contains('private')));
+      }
+    });
+  });
+
+  group('Data Connect account bootstrap boundary', () {
+    test('retryable principal result prevents account upsert', () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user',
+      );
+      var upsertCount = 0;
+      final gateway = DataConnectAccountBootstrapGateway.forTesting(
+        ReviewAccountBootstrapGateway(
+          result: AuthenticatedAccountBootstrapResult.retryableUnavailable(
+            binding,
+          ),
+          currentBinding: binding,
+        ),
+        () async {
+          upsertCount += 1;
+        },
+      );
+
+      final result = await gateway.prepareAuthenticatedAccount();
+
+      expect(
+        result.state,
+        AuthenticatedAccountBootstrapState.retryableUnavailable,
+      );
+      expect(upsertCount, 0);
+    });
+
+    test(
+      'verified principal and account upsert retain exact binding',
+      () async {
+        final binding = await const ReviewPrincipalBindingProtector().protect(
+          'private-user',
+        );
+        var upsertCount = 0;
+        final gateway = DataConnectAccountBootstrapGateway.forTesting(
+          ReviewAccountBootstrapGateway(
+            result: AuthenticatedAccountBootstrapResult.verified(binding),
+            currentBinding: binding,
+          ),
+          () async {
+            upsertCount += 1;
+          },
+        );
+
+        final result = await gateway.prepareAuthenticatedAccount();
+
+        expect(result.state, AuthenticatedAccountBootstrapState.verified);
+        expect(result.currentBinding!.matches(binding), isTrue);
+        expect(upsertCount, 1);
+      },
+    );
+
+    test('unknown account upsert failure is fatal and sanitized', () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user',
+      );
+      final gateway = DataConnectAccountBootstrapGateway.forTesting(
+        ReviewAccountBootstrapGateway(
+          result: AuthenticatedAccountBootstrapResult.verified(binding),
+          currentBinding: binding,
+        ),
+        () async => throw StateError('private account failure'),
+      );
+
+      final result = await gateway.prepareAuthenticatedAccount();
+
+      expect(result.state, AuthenticatedAccountBootstrapState.fatal);
+      expect(result.code, 'auth-account-bootstrap-fatal');
+      expect(result.currentBinding, isNull);
+      expect(result.toString(), isNot(contains('private account failure')));
+    });
   });
 
   test(
