@@ -350,6 +350,52 @@ void main() {
     },
   );
 
+  testWidgets('context Chat Android Back exposes one-tap Forward history', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(
+      _app(owners, world: 'work', subAction: 'workspace', textScale: 1.4),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-work-workspace-support')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+    expect(find.text('Forward to Workspace support'), findsOneWidget);
+    final forward = find.byKey(const ValueKey('buy-shop-chat-history-forward'));
+    expect(tester.getSize(forward).height, greaterThanOrEqualTo(44));
+    expect(
+      find.bySemanticsLabel('Navigate forward to Workspace support'),
+      findsOneWidget,
+    );
+    await tester.tap(forward);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat-thread')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('screen04-rail-workspace')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('context Chat stays usable at 320 width and 140 percent text', (
     tester,
   ) async {

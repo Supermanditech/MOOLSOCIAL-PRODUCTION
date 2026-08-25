@@ -560,6 +560,18 @@ void main() {
       );
       expect(find.byType(BottomSheet), findsNothing);
 
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to Shop conversation choices'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-new-surface')),
+        findsOneWidget,
+      );
+
       await tester.tap(
         find.byKey(const ValueKey('buy-shop-chat-new-manufacturer-partner')),
       );
@@ -651,11 +663,41 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('buy-shop-chat-info')), findsNothing);
+      expect(find.text('Forward to Mahadev Fresh Mart info'), findsOneWidget);
+      final forwardSize = tester.getSize(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      expect(forwardSize.height, greaterThanOrEqualTo(44));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat-info')), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
       expect(find.byKey(const ValueKey('buy-shop-chat-thread')), findsNothing);
+      expect(find.text('Forward to Mahadev Fresh Mart'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
+      expect(find.text('Forward to Mahadev Fresh Mart info'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -725,6 +767,90 @@ void main() {
         find.byKey(const ValueKey('buy-shop-chat-message-search')),
         findsOneWidget,
       );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-search')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread-menu')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread-menu')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsNothing,
+      );
+
+      await tester.longPress(
+        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-actions')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-actions')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

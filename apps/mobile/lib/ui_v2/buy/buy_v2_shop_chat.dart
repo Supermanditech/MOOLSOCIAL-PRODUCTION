@@ -400,6 +400,14 @@ abstract final class BuyV2ShopChatThreadFactory {
 
 enum _BuyV2ShopChatSurface { inbox, newConversation, thread, info }
 
+@immutable
+class _BuyV2ShopChatHistoryEntry {
+  const _BuyV2ShopChatHistoryEntry({required this.surface, this.thread});
+
+  final _BuyV2ShopChatSurface surface;
+  final BuyV2ShopChatThread? thread;
+}
+
 class BuyV2ShopChatView extends StatefulWidget {
   const BuyV2ShopChatView({
     super.key,
@@ -437,23 +445,33 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   final TextEditingController _searchController = TextEditingController();
   _BuyV2ShopChatSurface _surface = _BuyV2ShopChatSurface.inbox;
   BuyV2ShopChatThread? _selectedThread;
+  final GlobalKey<_ShopChatConversationViewState> _threadViewKey = GlobalKey();
+  final List<_BuyV2ShopChatHistoryEntry> _forwardHistory = [];
   bool _surfaceForward = true;
   int _surfaceSequence = 0;
 
   bool handleBack() {
-    if (_surface == _BuyV2ShopChatSurface.info) {
-      _showThread(forward: false);
+    if (_surface == _BuyV2ShopChatSurface.thread &&
+        (_threadViewKey.currentState?.handleBack() ?? false)) {
       return true;
     }
-    if (_surface == _BuyV2ShopChatSurface.thread) {
-      _showInbox();
-      return true;
-    }
-    if (_surface == _BuyV2ShopChatSurface.newConversation) {
-      _showInbox();
-      return true;
-    }
-    return false;
+    final target = switch (_surface) {
+      _BuyV2ShopChatSurface.info => _BuyV2ShopChatSurface.thread,
+      _BuyV2ShopChatSurface.thread ||
+      _BuyV2ShopChatSurface.newConversation => _BuyV2ShopChatSurface.inbox,
+      _BuyV2ShopChatSurface.inbox => null,
+    };
+    if (target == null) return false;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _forwardHistory.add(
+        _BuyV2ShopChatHistoryEntry(surface: _surface, thread: _selectedThread),
+      );
+      _surface = target;
+      _surfaceForward = false;
+      _surfaceSequence += 1;
+    });
+    return true;
   }
 
   @override
@@ -474,18 +492,29 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
 
   @override
   Widget build(BuildContext context) {
+    final navigationForward = _forwardHistory.isEmpty
+        ? null
+        : _ShopChatNavigationForwardBar(
+            destination: _forwardDestination(_forwardHistory.last),
+            onPressed: _showForwardHistory,
+          );
     final surface = switch (_surface) {
-      _BuyV2ShopChatSurface.inbox => _buildInbox(context),
+      _BuyV2ShopChatSurface.inbox => _buildInbox(
+        context,
+        navigationForward: navigationForward,
+      ),
       _BuyV2ShopChatSurface.newConversation => _ShopChatNewConversationView(
         entries: widget.provisioningSource.threads(widget.session),
         presentation: widget.presentation,
-        onBack: _showInbox,
+        navigationForward: navigationForward,
+        onBack: () => handleBack(),
         onSelected: _openThread,
       ),
       _BuyV2ShopChatSurface.thread => _ShopChatConversationView(
-        key: ValueKey('buy-shop-chat-thread-${_selectedThread!.id}'),
+        key: _threadViewKey,
         thread: _selectedThread!,
-        onBack: () => _showInbox(),
+        navigationForward: navigationForward,
+        onBack: () => handleBack(),
         onOpenInfo: _showInfo,
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
@@ -494,7 +523,8 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
       _BuyV2ShopChatSurface.info => _ShopChatInfoView(
         key: ValueKey('buy-shop-chat-info-${_selectedThread!.id}'),
         thread: _selectedThread!,
-        onBack: () => _showThread(forward: false),
+        navigationForward: navigationForward,
+        onBack: () => handleBack(),
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
         presentation: widget.presentation,
@@ -507,7 +537,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     );
   }
 
-  Widget _buildInbox(BuildContext context) {
+  Widget _buildInbox(
+    BuildContext context, {
+    required Widget? navigationForward,
+  }) {
     final entries = _visibleEntries();
     return Semantics(
       key: const ValueKey('buy-shop-chat'),
@@ -523,6 +556,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
               onBack: widget.onBack,
               onOpenAll: widget.onOpenProductionChat,
             ),
+            ?navigationForward,
             _ShopChatSearch(
               originLabel: widget.originLabel,
               controller: _searchController,
@@ -668,6 +702,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
     setState(() {
+      _forwardHistory.clear();
       _selectedThread = thread;
       _surface = _BuyV2ShopChatSurface.thread;
       _surfaceForward = true;
@@ -675,27 +710,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     });
   }
 
-  void _showInbox() {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _surface = _BuyV2ShopChatSurface.inbox;
-      _surfaceForward = false;
-      _surfaceSequence += 1;
-    });
-  }
-
-  void _showThread({bool forward = true}) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _surface = _BuyV2ShopChatSurface.thread;
-      _surfaceForward = forward;
-      _surfaceSequence += 1;
-    });
-  }
-
   void _showInfo() {
     HapticFeedback.selectionClick();
     setState(() {
+      _forwardHistory.clear();
       _surface = _BuyV2ShopChatSurface.info;
       _surfaceForward = true;
       _surfaceSequence += 1;
@@ -705,11 +723,36 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   void _showNewConversationPicker() {
     HapticFeedback.selectionClick();
     setState(() {
+      _forwardHistory.clear();
       _surface = _BuyV2ShopChatSurface.newConversation;
       _surfaceForward = true;
       _surfaceSequence += 1;
     });
   }
+
+  void _showForwardHistory() {
+    if (_forwardHistory.isEmpty) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      final target = _forwardHistory.removeLast();
+      _surface = target.surface;
+      _selectedThread = target.thread ?? _selectedThread;
+      _surfaceForward = true;
+      _surfaceSequence += 1;
+    });
+  }
+
+  String _forwardDestination(_BuyV2ShopChatHistoryEntry entry) =>
+      switch (entry.surface) {
+        _BuyV2ShopChatSurface.inbox =>
+          '${widget.presentation.familyLabel} conversations',
+        _BuyV2ShopChatSurface.newConversation =>
+          '${widget.presentation.familyLabel} conversation choices',
+        _BuyV2ShopChatSurface.thread =>
+          entry.thread?.title ?? '${widget.presentation.familyLabel} thread',
+        _BuyV2ShopChatSurface.info =>
+          '${entry.thread?.title ?? widget.presentation.familyLabel} info',
+      };
 
   List<BuyV2ShopChatThread> _visibleEntries() {
     final allEntries = _entriesFor(_filterId);
@@ -870,6 +913,62 @@ class _ShopChatHeader extends StatelessWidget {
               color: BuyV2Colors.navy,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopChatNavigationForwardBar extends StatelessWidget {
+  const _ShopChatNavigationForwardBar({
+    required this.destination,
+    required this.onPressed,
+  });
+
+  final String destination;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = 'Navigate forward to $destination';
+    return Semantics(
+      key: const ValueKey('buy-shop-chat-history-forward'),
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: const Color(0xFFEFF3FF),
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Forward to $destination',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: BuyV2Colors.navy,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1285,12 +1384,14 @@ class _ShopChatNewConversationView extends StatelessWidget {
   const _ShopChatNewConversationView({
     required this.entries,
     required this.presentation,
+    required this.navigationForward,
     required this.onBack,
     required this.onSelected,
   });
 
   final List<BuyV2ShopChatThread> entries;
   final BuyV2ShopChatPresentation presentation;
+  final Widget? navigationForward;
   final VoidCallback onBack;
   final ValueChanged<BuyV2ShopChatThread> onSelected;
 
@@ -1367,6 +1468,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
               ],
             ),
           ),
+          ?navigationForward,
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Container(
@@ -1465,6 +1567,7 @@ class _ShopChatConversationView extends StatefulWidget {
   const _ShopChatConversationView({
     super.key,
     required this.thread,
+    required this.navigationForward,
     required this.onBack,
     required this.onOpenInfo,
     required this.onDispatch,
@@ -1473,6 +1576,7 @@ class _ShopChatConversationView extends StatefulWidget {
   });
 
   final BuyV2ShopChatThread thread;
+  final Widget? navigationForward;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
   final _ShopChatDispatch onDispatch;
@@ -1495,6 +1599,35 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   bool _attachmentOpen = false;
   bool _threadMenuOpen = false;
   bool _dispatching = false;
+
+  bool handleBack() {
+    if (_selectedMessage != null) {
+      setState(() => _selectedMessage = null);
+      return true;
+    }
+    if (_threadMenuOpen) {
+      setState(() => _threadMenuOpen = false);
+      return true;
+    }
+    if (_searchOpen) {
+      _messageSearchController.clear();
+      setState(() => _searchOpen = false);
+      return true;
+    }
+    if (_attachmentOpen) {
+      setState(() => _attachmentOpen = false);
+      return true;
+    }
+    if (_emojiOpen) {
+      setState(() => _emojiOpen = false);
+      return true;
+    }
+    if (_replyTarget != null) {
+      setState(() => _replyTarget = null);
+      return true;
+    }
+    return false;
+  }
 
   @override
   void dispose() {
@@ -1556,6 +1689,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                   _attachmentOpen = false;
                 }),
               ),
+            ?widget.navigationForward,
             if (_threadMenuOpen)
               _ShopChatInlineThreadMenu(
                 presentation: widget.presentation,
@@ -3062,6 +3196,7 @@ class _ShopChatInfoView extends StatelessWidget {
     super.key,
     required this.thread,
     required this.presentation,
+    required this.navigationForward,
     required this.onBack,
     required this.onDispatch,
     required this.onOpenContext,
@@ -3069,6 +3204,7 @@ class _ShopChatInfoView extends StatelessWidget {
 
   final BuyV2ShopChatThread thread;
   final BuyV2ShopChatPresentation presentation;
+  final Widget? navigationForward;
   final VoidCallback onBack;
   final _ShopChatDispatch onDispatch;
   final VoidCallback? onOpenContext;
@@ -3147,6 +3283,7 @@ class _ShopChatInfoView extends StatelessWidget {
                 ],
               ),
             ),
+            ?navigationForward,
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(14, 16, 14, 24),
