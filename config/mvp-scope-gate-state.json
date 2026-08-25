@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-CODEX-REL-BUILD-CLEAN-01-20260825",
+    "currentTicketId": "UAW-CODEX-SOCIAL-SHARE-RUNTIME-20260826",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,54 +1672,55 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-CODEX-REL-BUILD-CLEAN-01-20260825",
-      "customerOutcome": "Supported Flutter commands cannot leave tracked dependency or plugin support dirt; exact pre-command bytes are restored on success, failure and exception.",
-      "manifestPath": "docs/quality/UAW-CODEX-REL-BUILD-CLEAN-01-20260825.md",
-      "manifestSha256": "465724295E2A1ABC9A18D46C00A85105D6C14989C9510C6F4BF1C905CE749A59",
+      "ticketId": "UAW-CODEX-SOCIAL-SHARE-RUNTIME-20260826",
+      "customerOutcome": "A person can use the phone's real share sheet for an exact public MoolSocial post or selected public YouTube video without a false delivery claim.",
+      "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+      "manifestSha256": "DFED4BEFE68554B1E4AE65BCCC8AFC6BC981D2ED20E0069EA6D3E46A4BED6DC5",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
-      "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
+      "implementationDisposition": ["reuse", "thin_adapter", "test_only_acceptance", "new_necessary_work"],
       "sharedImplementationOwners": [
-        "scripts/build-buy-device-review.ps1",
-        "scripts/invoke-flutter-with-clean-support.ps1",
-        "scripts/test-flutter-clean-support.ps1",
-        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-        "docs/quality/UAW-CODEX-REL-BUILD-CLEAN-01-20260825.md"
+        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+        "apps/mobile/pubspec.yaml",
+        "apps/mobile/pubspec.lock",
+        "apps/mobile/test/social_v2_create_publication_test.dart",
+        "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The four tracked Flutter support owners remain required by existing release gates. One byte-preserving guarded invocation reused by the supported build wrapper is the smallest prevention and changes no dependency or generated source.",
+      "necessityProof": "Fresh integrated-v4 audit found that Feed and YouTube controls labelled as external Share only write to Clipboard, while no native share adapter exists. One maintained cross-platform adapter reused by both surfaces is the smallest complete correction.",
       "robustnessCoverage": [
-        "exact_four_tracked_support_owner_allowlist",
-        "raw_pre_command_byte_snapshot_and_restore",
-        "success_nonzero_exception_and_deleted_file_recovery",
-        "preexisting_bytes_preserved_instead_of_HEAD",
-        "outside_root_reparse_untracked_duplicate_and_concurrent_rejection",
-        "scalar_child_exit_and_human_output_separation",
-        "real_focused_Flutter_test_leaves_zero_support_dirt"
+        "exact_public_uri_and_safe_title",
+        "valid_iPad_and_macOS_share_origin",
+        "single_flight_duplicate_tap_containment",
+        "selected_dismissed_and_unavailable_outcome_truth",
+        "guest_Feed_share_access",
+        "Watch_Search_and_discovery_return_retention",
+        "copy_link_remains_independent"
       ],
       "adjustments": [
-        "add_one_named_mutex_byte_restore_guard",
-        "integrate_guard_into_supported_device_review_build_wrapper",
-        "add_fixture_and_real_command_runtime tests"
+        "add_one_typed_Social_share_adapter",
+        "wire_Feed_external_share_without_removing_Copy_link",
+        "wire_YouTube_Video_Share_to_the_exact_provider_watch_URL"
       ],
       "explicitExclusions": [
-        "no_APK_AAB_build_install_Play_or_dependency_change",
-        "no_generated_support_owner_commit",
-        "no_Cursor_UI_backend_provider_cloud_account_or_private_data_change"
+        "no_APK_AAB_build_install_Play_or_device_action",
+        "no_Buy_Travel_Work_Care_or_other_contextual_share_implementation",
+        "no_backend_provider_cloud_auth_Chat_or_remote_mutation",
+        "no_claim_that_recipient_delivery_completed"
       ],
       "dependenciesAndApprovals": [
-        "founder_full_one_at_a_time_Codex_ticket_authorization_2026_08_25",
-        "REL_CONFIG_01_closed",
-        "REG_3706_3707_3708_exact_generated_owner_history",
-        "supervised_read_only_build_guard_review",
-        "no_successor_APK_before_Cursor_integration"
+        "founder_requested_fresh_integrated_baseline_Social_and_global_share_audit_fix_2026_08_26",
+        "integrated_v4_remote_closed_at_0a40f68dc7697ae226aef469604761fa8b3d1301",
+        "Cursor_UI_and_Buy_remain_excluded",
+        "no_successor_APK_in_this_round"
       ],
       "timelineImpactDays": 1,
       "within60To75DayLock": true,
-      "implementationState": "REL_BUILD_CLEAN_01_selected_guard_fixture_and_supported_wrapper_authorized_no_APK_build_install_Cursor_or_external_action",
-      "evidencePath": "docs/quality/UAW-CODEX-REL-BUILD-CLEAN-01-20260825.md"
+      "implementationState": "RT_11_01_selected_native_share_adapter_Feed_and_YouTube_children_authorized_no_APK_device_external_or_excluded_surface_action",
+      "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5039,37 +5040,38 @@
     ]
   },
   "ticket": {
-    "id": "UAW-CODEX-REL-BUILD-CLEAN-01-20260825",
+    "id": "UAW-CODEX-SOCIAL-SHARE-RUNTIME-20260826",
     "parentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-    "customerOutcome": "Supported Flutter commands cannot leave tracked dependency or plugin support dirt; exact pre-command bytes are restored on success, failure and exception.",
+    "customerOutcome": "A person can use the phone's real share sheet for an exact public MoolSocial post or selected public YouTube video without a false delivery claim.",
     "classification": "mvp_required",
-    "classificationReason": "Tracked generated support dirt contaminates atomic tickets, source seals and successor reproducibility, so prevention is launch-required.",
+    "classificationReason": "The integrated app exposes Share controls that never open a share destination. Truthful completion of visible core Social actions is launch-required.",
     "minimumCompleteScope": [
-      "guard_the_exact_four_tracked_Flutter_support_owners",
-      "snapshot_restore_and_verify_raw_pre_command_bytes",
-      "preserve_scalar_child_exit_and_serialize_per_worktree",
-      "integrate_the_guard_into_the_supported_review_build_wrapper",
-      "prove_fixture_and_real_Flutter_test_without_building_an_APK"
+      "one_typed_cross_platform_share_adapter",
+      "one_single_flight_guard_for_duplicate_taps",
+      "Feed_native_share_for_the_exact_stable_public_post_URL",
+      "YouTube_Video_native_share_for_the_exact_selected_watch_URL",
+      "truthful_selected_dismissed_unavailable_and_failure_handling",
+      "focused_runtime_safe_widget_dependency_and_analysis_proof_without_APK"
     ],
     "explicitExclusions": [
-      "no_APK_AAB_build_install_Play_or_dependency_change",
-      "no_generated_support_owner_commit",
-      "no_Cursor_UI_backend_provider_cloud_account_or_private_data_change"
+      "no_APK_AAB_build_install_Play_or_device_action",
+      "no_Buy_Travel_Work_Care_or_other_contextual_share_implementation",
+      "no_backend_provider_cloud_auth_Chat_or_remote_mutation",
+      "no_claim_that_recipient_delivery_completed"
     ],
     "dependenciesAndApprovals": [
-      "founder_full_one_at_a_time_Codex_ticket_authorization_2026_08_25",
-      "REL_CONFIG_01_closed",
-      "REG_3706_3707_3708_exact_generated_owner_history",
-      "supervised_read_only_build_guard_review",
-      "no_successor_APK_before_Cursor_integration"
+      "founder_requested_fresh_integrated_baseline_Social_and_global_share_audit_fix_2026_08_26",
+      "integrated_v4_remote_closed_at_0a40f68dc7697ae226aef469604761fa8b3d1301",
+      "Cursor_UI_and_Buy_remain_excluded",
+      "no_successor_APK_in_this_round"
     ],
     "testAndEvidencePlan": [
-      "PowerShell_AST_parse",
-      "guard_and_wrapper_PowerShell_AST_parse",
-      "success_nonzero_delete_outside_and_concurrency_fixture_matrix",
-      "real_guarded_Flutter_test_with_scalar_exit",
-      "four_support_file_hash_equality_and_zero_Git_dirt",
-      "supported_build_wrapper_static_integration_and_no_APK_action"
+      "typed_adapter_unit_and_widget_seam_tests",
+      "Feed_exact_URL_guest_dismissal_failure_and_duplicate_tap_tests",
+      "YouTube_exact_URL_title_return_state_dismissal_failure_and_duplicate_tap_tests",
+      "share_dependency_integrity_and_guarded_flutter_test",
+      "full_Flutter_analysis_and_affected_Social_regressions",
+      "ticket_scoped_adversarial_reaudit_with_no_APK_claim"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5329,13 +5331,13 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md"
+    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
   },
   "authorization": {
     "state": "founder_acknowledged_mvp_scope",
-    "evidence": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
+    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "exact_5f80789_runtime_continuation_binding_sanitized_manifest_safe_OPPO_investigation_and_one_at_a_time_later_child_execution_authorized_Cursor_independent_and_integration_required_before_next_APK_2026_08_25"
+    "founderAcceptance": "fresh_integrated_v4_Social_and_global_sharing_audit_then_implement_and_fix_findings_Buy_and_other_remaining_work_excluded_no_APK_2026_08_26"
   },
   "execution": {
     "referenceWriteAuthorized": false,
@@ -5344,8 +5346,8 @@
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "successor_APK_not_authorized_until_selected_Codex_children_reviewed_Cursor_integration_and_final_integrated_regression_complete",
-    "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_or_data_clear_in_runtime_continuation_investigation",
+    "buildAuthorizationScope": "no_APK_AAB_or_other_release_build_authorized_for_the_Social_share_runtime_round",
+    "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_data_clear_or_other_device_mutation_authorized_for_the_Social_share_runtime_round",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,
     "playUploadAuthorized": false,
