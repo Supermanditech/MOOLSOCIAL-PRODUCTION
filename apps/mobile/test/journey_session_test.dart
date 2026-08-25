@@ -476,6 +476,43 @@ void main() {
     },
   );
 
+  test('late verified reconnect cannot cross explicit sign-out', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    final staleRetry = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    expect(bootstrap.prepareCount, 2);
+    expect(await session.signOut(), isTrue);
+    expect(receiptStore.binding, isNull);
+
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+
+    expect(await staleRetry, isFalse);
+    expect(receiptStore.binding, isNull);
+    expect(session.accountIdentity, isNull);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.authenticatedRevalidationPending, isFalse);
+  });
+
   test(
     'verified principal mismatch clears receipt and invalidates session',
     () async {

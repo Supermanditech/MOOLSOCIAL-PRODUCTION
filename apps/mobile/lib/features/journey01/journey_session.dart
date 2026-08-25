@@ -145,6 +145,9 @@ class JourneySession extends ChangeNotifier {
   String? _completedSocialAuthReturnRoute;
   int _completedSetupExperienceVersion = 0;
   Future<void> _persistenceTail = Future<void>.value();
+  Future<void> _principalBindingMutationTail = Future<void>.value();
+  int _authenticationGeneration = 0;
+  bool _disposed = false;
 
   bool get isReady => stage == JourneyStage.ready;
   bool get isAuthenticated => _isAuthenticated;
@@ -202,6 +205,7 @@ class JourneySession extends ChangeNotifier {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    _authenticationGeneration += 1;
     _completedSetupExperienceVersion = 0;
     _setBusy(true);
     errorMessage = null;
@@ -1243,6 +1247,7 @@ class JourneySession extends ChangeNotifier {
     if (stage == JourneyStage.ready || _authenticationCompletionInProgress) {
       return;
     }
+    _authenticationGeneration += 1;
     _authenticationCompletionInProgress = true;
     try {
       final bootstrap = await _prepareAuthenticatedAccount(
@@ -1418,12 +1423,13 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> signOut() async {
     if (busy) return false;
+    _authenticationGeneration += 1;
     _setBusy(true);
     try {
       Object? cleanupFailure;
       var localSessionInvalidated = false;
       try {
-        await _verifiedPrincipalBindingStore.clear().timeout(
+        await _clearVerifiedPrincipalBinding().timeout(
           socialAuthRollbackTimeout,
         );
         _principalBindingCleanupRequired = false;
@@ -1495,41 +1501,59 @@ class JourneySession extends ChangeNotifier {
     if (!_isAuthenticated || !authenticatedRevalidationPending) {
       return Future<bool>.value(false);
     }
-    final attempt = _runAuthenticatedAccountRevalidation();
+    final generation = _authenticationGeneration;
+    final attempt = _runAuthenticatedAccountRevalidation(generation);
     _authenticatedRevalidationFuture = attempt;
     return attempt;
   }
 
-  Future<bool> _runAuthenticatedAccountRevalidation() async {
+  Future<bool> _runAuthenticatedAccountRevalidation(int generation) async {
     try {
       final bootstrap = await _prepareAuthenticatedAccount();
+      if (!_isActiveRevalidationGeneration(generation)) return false;
       if (bootstrap.state == AuthenticatedAccountBootstrapState.fatal) {
         await _invalidateMismatchedPrincipal();
         errorMessage =
             'Your account session could not be verified safely. Please sign in again.';
-        notifyListeners();
+        _notifyRevalidationListeners();
         return false;
       }
-      final accepted = await _acceptAuthenticatedRelaunch(bootstrap);
+      final accepted = await _acceptAuthenticatedRelaunch(
+        bootstrap,
+        revalidationGeneration: generation,
+      );
+      if (!_isCurrentAuthenticationGeneration(generation)) return false;
       if (!accepted) {
-        notifyListeners();
+        _notifyRevalidationListeners();
         return false;
       }
       if (authenticatedRevalidationPending) {
-        notifyListeners();
+        _notifyRevalidationListeners();
         return false;
       }
-      await _refreshAuthenticatedAccountIdentity();
+      await _refreshAuthenticatedAccountIdentity(generation: generation);
+      if (!_isCurrentAuthenticationGeneration(generation)) return false;
       errorMessage = null;
       noticeMessage = null;
-      notifyListeners();
+      _notifyRevalidationListeners();
       return true;
     } on Object {
-      notifyListeners();
+      _notifyRevalidationListeners();
       return false;
     } finally {
       _authenticatedRevalidationFuture = null;
     }
+  }
+
+  bool _isActiveRevalidationGeneration(int generation) =>
+      _isCurrentAuthenticationGeneration(generation) &&
+      authenticatedRevalidationPending;
+
+  bool _isCurrentAuthenticationGeneration(int generation) =>
+      !_disposed && generation == _authenticationGeneration && _isAuthenticated;
+
+  void _notifyRevalidationListeners() {
+    if (!_disposed) notifyListeners();
   }
 
   void captureReturnTo(String location) {
@@ -1776,12 +1800,16 @@ class JourneySession extends ChangeNotifier {
   }
 
   Future<bool> _acceptAuthenticatedRelaunch(
-    AuthenticatedAccountBootstrapResult bootstrap,
-  ) async {
+    AuthenticatedAccountBootstrapResult bootstrap, {
+    int? revalidationGeneration,
+  }) async {
     authenticatedBootstrapState = bootstrap.state;
+    if (revalidationGeneration != null &&
+        !_isActiveRevalidationGeneration(revalidationGeneration)) {
+      return false;
+    }
     switch (bootstrap.state) {
       case AuthenticatedAccountBootstrapState.verified:
-        authenticatedRevalidationPending = false;
         final current = bootstrap.currentBinding!;
         final VerifiedPrincipalBinding? stored;
         try {
@@ -1790,14 +1818,26 @@ class JourneySession extends ChangeNotifier {
           await _resetUnsafePrincipalBinding();
           return false;
         }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
+          return false;
+        }
         if (stored != null && !stored.matches(current)) {
           await _invalidateMismatchedPrincipal();
           return false;
         }
-        await _retainVerifiedPrincipalForOnlineSession(
+        if (!await _retainVerifiedPrincipalForOnlineSession(
           current,
           existing: stored,
-        );
+          revalidationGeneration: revalidationGeneration,
+        )) {
+          return false;
+        }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
+          return false;
+        }
+        authenticatedRevalidationPending = false;
         return true;
       case AuthenticatedAccountBootstrapState.retryableUnavailable:
         final current = bootstrap.currentBinding!;
@@ -1806,6 +1846,10 @@ class JourneySession extends ChangeNotifier {
           stored = await _verifiedPrincipalBindingStore.read();
         } on Object {
           await _resetUnsafePrincipalBinding();
+          return false;
+        }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
           return false;
         }
         if (stored == null) {
@@ -1862,9 +1906,10 @@ class JourneySession extends ChangeNotifier {
     throw JourneyServiceException(message, code: bootstrap.code);
   }
 
-  Future<void> _retainVerifiedPrincipalForOnlineSession(
+  Future<bool> _retainVerifiedPrincipalForOnlineSession(
     VerifiedPrincipalBinding binding, {
     VerifiedPrincipalBinding? existing,
+    int? revalidationGeneration,
   }) async {
     final VerifiedPrincipalBinding? prior;
     try {
@@ -1876,12 +1921,20 @@ class JourneySession extends ChangeNotifier {
         code: 'auth-binding-reset-required',
       );
     }
-    if (prior != null && prior.matches(binding)) return;
+    if (revalidationGeneration != null &&
+        !_isActiveRevalidationGeneration(revalidationGeneration)) {
+      return false;
+    }
+    if (prior != null && prior.matches(binding)) return true;
     try {
-      await _verifiedPrincipalBindingStore.write(binding);
+      await _writeVerifiedPrincipalBinding(binding);
+      if (revalidationGeneration != null &&
+          !_isActiveRevalidationGeneration(revalidationGeneration)) {
+        return false;
+      }
     } on Object {
       try {
-        await _verifiedPrincipalBindingStore.clear();
+        await _clearVerifiedPrincipalBinding();
       } on Object {
         throw const JourneyServiceException(
           'Your account verification could not be stored or cleared safely.',
@@ -1890,12 +1943,42 @@ class JourneySession extends ChangeNotifier {
       }
       // The online session remains valid, but no offline receipt is retained.
     }
+    return true;
   }
 
+  Future<T> _runPrincipalBindingMutation<T>(Future<T> Function() operation) {
+    final completer = Completer<T>();
+    _principalBindingMutationTail = _principalBindingMutationTail.then((
+      _,
+    ) async {
+      try {
+        completer.complete(await operation());
+      } on Object catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _writeVerifiedPrincipalBinding(
+    VerifiedPrincipalBinding binding,
+  ) => _runPrincipalBindingMutation(
+    () => _verifiedPrincipalBindingStore.write(binding),
+  );
+
+  Future<void> _clearVerifiedPrincipalBinding() =>
+      _runPrincipalBindingMutation(_verifiedPrincipalBindingStore.clear);
+
+  Future<void> _resetUnsafeVerifiedPrincipalBinding() =>
+      _runPrincipalBindingMutation(
+        _verifiedPrincipalBindingStore.resetUnsafeState,
+      );
+
   Future<void> _invalidateMismatchedPrincipal() async {
+    _authenticationGeneration += 1;
     Object? cleanupFailure;
     for (final cleanup in <Future<void> Function()>[
-      _verifiedPrincipalBindingStore.clear,
+      _clearVerifiedPrincipalBinding,
       _accountBootstrapGateway.invalidateLocalSession,
       _otpGateway.signOut,
       _socialAuthGateway.signOut,
@@ -1920,9 +2003,10 @@ class JourneySession extends ChangeNotifier {
   }
 
   Future<void> _resetUnsafePrincipalBinding() async {
+    _authenticationGeneration += 1;
     Object? cleanupFailure;
     for (final cleanup in <Future<void> Function()>[
-      _verifiedPrincipalBindingStore.resetUnsafeState,
+      _resetUnsafeVerifiedPrincipalBinding,
       _accountBootstrapGateway.invalidateLocalSession,
       _otpGateway.signOut,
       _socialAuthGateway.signOut,
@@ -1955,7 +2039,7 @@ class JourneySession extends ChangeNotifier {
       return;
     }
     try {
-      await _verifiedPrincipalBindingStore.clear();
+      await _clearVerifiedPrincipalBinding();
       _principalBindingCleanupRequired = false;
     } on Object {
       _principalBindingCleanupRequired = true;
@@ -1968,7 +2052,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> _clearVerifiedPrincipalAfterAuthFailure() async {
     try {
-      await _verifiedPrincipalBindingStore.clear();
+      await _clearVerifiedPrincipalBinding();
       _principalBindingCleanupRequired = false;
       return true;
     } on Object {
@@ -1986,12 +2070,17 @@ class JourneySession extends ChangeNotifier {
     return false;
   }
 
-  Future<void> _refreshAuthenticatedAccountIdentity() async {
+  Future<void> _refreshAuthenticatedAccountIdentity({int? generation}) async {
+    AuthenticatedAccountIdentity? refreshed;
     try {
-      accountIdentity = await _accountIdentityGateway.currentIdentity();
+      refreshed = await _accountIdentityGateway.currentIdentity();
     } on Object {
-      accountIdentity = null;
+      refreshed = null;
     }
+    if (generation != null && !_isCurrentAuthenticationGeneration(generation)) {
+      return;
+    }
+    accountIdentity = refreshed;
     accountIdentity ??= switch ((emailAddress, phoneNumber)) {
       (final email?, _) when email.trim().isNotEmpty =>
         AuthenticatedAccountIdentity(
@@ -2005,6 +2094,15 @@ class JourneySession extends ChangeNotifier {
         ),
       _ => null,
     };
+  }
+
+  @override
+  void dispose() {
+    if (!_disposed) {
+      _disposed = true;
+      _authenticationGeneration += 1;
+    }
+    super.dispose();
   }
 }
 
