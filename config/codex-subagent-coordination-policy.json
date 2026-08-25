@@ -27,6 +27,7 @@
     "docs/quality/ACTIVE-CODEX-HANDOFF.md",
     "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
     "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-approved-ui-locks.ps1",
     "scripts/check-uaw-c34l-r60-76-consolidated-release-transaction-evidence-readiness.ps1"
   ],
   "activeClaims": [
@@ -44,7 +45,8 @@
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1"
       ]
     },
     {
@@ -203,11 +205,11 @@
         "ticketId": "UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824",
         "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-screen-subactions-ui-20260823",
         "branch": "work/cursor-ui/shop-chat-ui-20260824",
-        "baselineHead": "817ed215b4eb3181a5cd32544cdcb727b94cf7d5",
-        "bootstrapCommitSubject": "coordination(shop-chat-ui-20260824): bind authorized continuation",
+        "baselineHead": "44a843859b417b498de0ddb5bf2aa0735fd1b53f",
+        "bootstrapCommitSubject": "coordination(shop-chat-ui-20260824): unblock locked reference gate",
         "bootstrapOwners": [
           "config/codex-subagent-coordination-policy.json",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "scripts/check-approved-ui-locks.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
