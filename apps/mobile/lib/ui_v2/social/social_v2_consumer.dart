@@ -1217,15 +1217,21 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         queryParameters: {
           'type': thread.productionChatType,
           if (draft != null && draft.isNotEmpty) 'draft': draft,
-          'return': _productionChatReturnRoute(),
+          'return': _productionChatReturnRoute(
+            threadChoice: thread.resolvedFilterId,
+          ),
         },
       ).toString(),
     );
   }
 
-  String _productionChatReturnRoute() {
+  String _productionChatReturnRoute({String? threadChoice}) {
     final world = screen04World(_world);
-    final choice = _choiceByWorld[_world] ?? world.choices.first.id;
+    final choice =
+        threadChoice != null &&
+            world.choices.any((candidate) => candidate.id == threadChoice)
+        ? threadChoice
+        : _choiceByWorld[_world] ?? world.choices.first.id;
     final returnPath = switch (world.id) {
       'eat' => '/app/eat',
       'ride' => '/app/ride',

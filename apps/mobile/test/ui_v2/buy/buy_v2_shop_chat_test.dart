@@ -192,8 +192,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('buy-shop-chat-entry-retail-partner')),
+        find.byKey(const ValueKey('buy-shop-chat-new-wholesale-partner')),
       );
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -211,7 +213,7 @@ void main() {
         handoffUri?.queryParameters['draft'],
         'Please check local delivery',
       );
-      expect(handoffUri?.queryParameters['return'], '/app/buy');
+      expect(handoffUri?.queryParameters['return'], '/app/buy?sub=wholesale');
       expect(handoffUri?.queryParameters.containsKey('start'), isFalse);
       expect(tester.takeException(), isNull);
     },

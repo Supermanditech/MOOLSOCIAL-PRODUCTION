@@ -576,7 +576,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       return;
     }
     final router = GoRouter.maybeOf(context);
-    final returnRoute = router?.routeInformationProvider.value.uri.toString();
+    final currentRoute =
+        router?.routeInformationProvider.value.uri.toString() ?? '/app/buy';
+    final returnRoute = _shopChatReturnRouteFor(thread, currentRoute);
     final draft = action.kind == BuyV2ShopChatActionKind.sendText
         ? action.text?.trim()
         : null;
@@ -586,10 +588,46 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         queryParameters: {
           'type': thread.productionChatType,
           if (draft != null && draft.isNotEmpty) 'draft': draft,
-          'return': returnRoute ?? '/app/buy',
+          'return': returnRoute,
         },
       ).toString(),
     );
+  }
+
+  String _shopChatReturnRouteFor(
+    BuyV2ShopChatThread thread,
+    String currentRoute,
+  ) {
+    if (_shopChatPresentation.familyId == 'book') {
+      final subAction = thread.resolvedFilterId;
+      if (subAction == 'medicine' && _shopChatInitialFilterId == 'medicine') {
+        return currentRoute;
+      }
+      return Uri(
+        path: '/app/book',
+        queryParameters: {'sub': subAction},
+      ).toString();
+    }
+    final target = thread.commerceTarget;
+    final matchesOrigin = switch (target) {
+      BuyV2ShopChatCommerceTarget.shop =>
+        _shopChatInitialFilter == BuyV2ShopChatFilter.all,
+      BuyV2ShopChatCommerceTarget.wholesale =>
+        _shopChatInitialFilter == BuyV2ShopChatFilter.sellers,
+      BuyV2ShopChatCommerceTarget.orders =>
+        _shopChatInitialFilter == BuyV2ShopChatFilter.orders,
+      BuyV2ShopChatCommerceTarget.offers =>
+        _shopChatInitialFilter == BuyV2ShopChatFilter.offers,
+      null => true,
+    };
+    if (matchesOrigin) return currentRoute;
+    return switch (target) {
+      BuyV2ShopChatCommerceTarget.shop => '/app/buy',
+      BuyV2ShopChatCommerceTarget.wholesale => '/app/buy?sub=wholesale',
+      BuyV2ShopChatCommerceTarget.orders => '/app/buy?sub=orders',
+      BuyV2ShopChatCommerceTarget.offers => '/app/buy?sub=offers',
+      null => currentRoute,
+    };
   }
 
   void _openShopChat() {

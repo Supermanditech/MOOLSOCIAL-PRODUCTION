@@ -272,7 +272,7 @@ void main() {
       Uri? handoffUri;
       late final GoRouter router;
       router = GoRouter(
-        initialLocation: '/app/ride?sub=cab',
+        initialLocation: '/app/ride?sub=bike',
         routes: [
           GoRoute(
             path: '/app/chat/inbox',
@@ -300,10 +300,12 @@ void main() {
 
       await tester.pumpWidget(_routedApp(router));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.tap(find.byKey(const ValueKey('social-global-chat')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('buy-shop-chat-entry-travel-cab-support')),
+        find.byKey(const ValueKey('buy-shop-chat-new-travel-cab-support')),
       );
       await tester.pumpAndSettle();
       await tester.enterText(
