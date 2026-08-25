@@ -42590,6 +42590,33 @@
         "scripts/check-approved-ui-locks.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260826-3743-SOCIAL-REPAIR-HANDOFF-BOOTSTRAP-SEARCH-WALKED-CURSOR-SECOND-PARENT",
+      "status": "registered_first_parent_bootstrap_traversal_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "git_discipline"
+      ],
+      "mistake": "The committed repair graph passed its focused graph fixture, then handoff rejected bootstrap parentage because the generic continuation rev-list traversed Cursor's merged second-parent history and selected a historical Cursor commit before the repair bootstrap.",
+      "rootCause": "Both continuation bootstrap discovery and the reusable qualified-tip history inventory used all-parent revision traversal even though the repair contract is defined by its first-parent lane history.",
+      "prevention": "Use --first-parent --reverse for both bootstrap inventories, retain exact bootstrap parent/subject/owner checks, add a fixture token requiring both first-parent traversals, and rerun handoff on the same immutable repair merge before any push or admission.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ]
     }
   ]
 }

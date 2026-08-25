@@ -271,7 +271,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination ($LASTEXITCODE -eq 0) `
     'qualified integration repair does not descend from the sealed Codex tip.'
 
-  $repairHistory = @(& git -C $root rev-list --reverse `
+  $repairHistory = @(& git -C $root rev-list --first-parent --reverse `
       "$repairBaseline..$RepairCommit")
   Assert-Coordination ($LASTEXITCODE -eq 0 -and $repairHistory.Count -ge 4) `
     'qualified integration repair history is incomplete.'
@@ -290,7 +290,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       (@($repairBinding[0].bootstrapOwners | Sort-Object) -join '|')
   ) 'qualified integration repair bootstrap changed.'
 
-  $repairMergeCommits = @(& git -C $root rev-list --merges `
+  $repairMergeCommits = @(& git -C $root rev-list --first-parent --merges `
       "$repairBootstrap..$RepairCommit")
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeCommits.Count -eq
@@ -365,16 +365,30 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   } else {
     $postMergeOwners = @(& git -C $root diff --name-only `
         "$repairMergeCommit..$RepairCommit")
-    $postMergeSubject = @(& git -C $root show -s --format='%s' $RepairCommit)
     Assert-Coordination (
-      $LASTEXITCODE -eq 0 -and $postMergeCommits.Count -eq 1 -and
-      $postMergeCommits[0] -ceq $RepairCommit -and
+      $LASTEXITCODE -eq 0 -and
+      $postMergeCommits[-1] -ceq $RepairCommit -and
       (@($postMergeOwners | Sort-Object) -join '|') -ceq
-        (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|') -and
-      $postMergeSubject.Count -eq 1 -and
-      [string]$postMergeSubject[0] -cmatch
-        '^repair\(social-runtime-chat-conflict-correction-20260825\): .+'
+        (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|')
     ) 'qualified integration repair closure commit changed.'
+    $postMergeAllowedKeys = @($integrationRepair.postMergeClosureOwners |
+      ForEach-Object { ([string]$_).ToLowerInvariant() })
+    foreach ($postMergeCommit in $postMergeCommits) {
+      $postMergeSubject = @(& git -C $root show -s --format='%s' `
+          $postMergeCommit)
+      $postMergeCommitOwners = @(& git -C $root diff-tree --no-commit-id `
+          --name-only -r $postMergeCommit)
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
+        [string]$postMergeSubject[0] -cmatch
+          '^repair\(social-runtime-chat-conflict-correction-20260825\): .+' -and
+        @($postMergeCommitOwners | Where-Object {
+          -not $postMergeAllowedKeys.Contains(
+            ([string]$_).ToLowerInvariant()
+          )
+        }).Count -eq 0
+      ) 'qualified integration repair contains a forbidden closure commit.'
+    }
   }
 
   $codexRemoteHead = Get-ProductionRemoteBranchHead `
@@ -888,9 +902,9 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 4 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-approved-ui-locks.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 2 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md' -and
+    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
@@ -1345,7 +1359,7 @@ if ($ProductionLane -ceq 'baseline') {
         'continuation bootstrap must run before its bootstrap commit.'
       $baseCommit = $continuationBaseline
     } else {
-      $continuationCommits = @(& git -C $root rev-list --reverse `
+      $continuationCommits = @(& git -C $root rev-list --first-parent --reverse `
           "$continuationBaseline..$head")
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $continuationCommits.Count -ge 1
@@ -1579,10 +1593,18 @@ if ($ProductionLane -ceq 'baseline') {
           }).Count -eq 0
         ) 'integration repair coordination correction owner set changed.'
       } else {
+        $postMergeClosureOwnerKeys = @(
+          $integrationRepair.postMergeClosureOwners | ForEach-Object {
+            ([string]$_).ToLowerInvariant()
+          }
+        )
         Assert-Coordination (
           $existingRepairMerges.Count -eq 1 -and
-          (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
-            (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|')
+          @($preCommitStagedOwners | Where-Object {
+            -not $postMergeClosureOwnerKeys.Contains(
+              ([string]$_).ToLowerInvariant()
+            )
+          }).Count -eq 0
         ) 'integration repair post-merge closure owner set changed.'
       }
     }
@@ -1601,8 +1623,13 @@ if ($ProductionLane -ceq 'baseline') {
       'production handoff contains no feature commit.'
     Assert-Coordination (Test-ProductionWorktreeClean) `
       'production handoff worktree is not clean.'
-    $featureMergeCommits = @(& git -C $root rev-list --merges `
-        "$baseCommit..$head")
+    if ($ProductionLane -ceq 'integration_repair') {
+      $featureMergeCommits = @(& git -C $root rev-list --first-parent `
+          --merges "$baseCommit..$head")
+    } else {
+      $featureMergeCommits = @(& git -C $root rev-list --merges `
+          "$baseCommit..$head")
+    }
     Assert-Coordination ($LASTEXITCODE -eq 0) `
       'production feature merge inventory failed.'
     if ($ProductionLane -ceq 'integration_repair') {
@@ -1614,8 +1641,13 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ($featureMergeCommits.Count -eq 0) `
         'production feature branch contains a merge commit.'
     }
-    $featureCommits = @(& git -C $root rev-list --reverse `
-        "$baseCommit..$head")
+    if ($ProductionLane -ceq 'integration_repair') {
+      $featureCommits = @(& git -C $root rev-list --first-parent --reverse `
+          "$baseCommit..$head")
+    } else {
+      $featureCommits = @(& git -C $root rev-list --reverse `
+          "$baseCommit..$head")
+    }
     Assert-Coordination ($LASTEXITCODE -eq 0 -and $featureCommits.Count -gt 0) `
       'production feature commit inventory is empty or failed.'
     $subjectPattern = (

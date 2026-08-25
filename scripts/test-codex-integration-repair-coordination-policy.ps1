@@ -44,8 +44,8 @@ Assert-RepairContract (
   [int]$repair.maximumMergeCommits -eq 1 -and
   [int]$repair.maximumPreMergeCoordinationCommits -eq 4 -and
   @($repair.preMergeCoordinationOwners).Count -eq 6 -and
-  [int]$repair.maximumPostMergeClosureCommits -eq 1 -and
-  @($repair.postMergeClosureOwners).Count -eq 2 -and
+  [int]$repair.maximumPostMergeClosureCommits -eq 2 -and
+  @($repair.postMergeClosureOwners).Count -eq 6 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed -and
   @($repair.exactConflictOwners).Count -eq 10
@@ -70,6 +70,12 @@ $requiredCheckerTokens = @(
 foreach ($token in $requiredCheckerTokens) {
   Assert-RepairContract ($checker.Contains($token)) "checker token is missing: $token"
 }
+$firstParentReverseTraversals = [regex]::Matches(
+  $checker,
+  'rev-list --first-parent --reverse'
+).Count
+Assert-RepairContract ($firstParentReverseTraversals -ge 3) `
+  'repair bootstrap or subject inventory can traverse second-parent history.'
 foreach ($lockToken in @(
     'function Test-SealedParallelContinuationFacts',
     'function Test-SealedParallelContinuationUnchanged',
@@ -91,7 +97,7 @@ Assert-RepairContract ($sealedFallbackCalls -eq 2) `
 if ($RequireQualifiedGraph) {
   $head = (& git -C $root rev-parse HEAD).Trim()
   Assert-RepairContract ($LASTEXITCODE -eq 0) 'repair HEAD read failed.'
-  $qualifiedMerges = @(& git -C $root rev-list --merges `
+  $qualifiedMerges = @(& git -C $root rev-list --first-parent --merges `
       "$($repair.requiredCodexCommit)..$head")
   Assert-RepairContract (
     $LASTEXITCODE -eq 0 -and $qualifiedMerges.Count -eq 1

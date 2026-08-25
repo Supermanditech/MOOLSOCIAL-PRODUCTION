@@ -14,7 +14,7 @@ The first local integration attempt is retained unchanged and unpushed at
 
 The correction may create exactly one two-parent merge. Its first-parent
 history must descend from the sealed Codex tip and its second parent must be the
-sealed Cursor tip. Manual resolution is limited to the nine conflict owners
+sealed Cursor tip. Manual resolution is limited to the ten conflict owners
 recorded in machine policy. No ordinary direct product commit, rebase, squash,
 cherry-pick, force push, APK, install, deployment or promotion is authorized.
 
@@ -32,3 +32,13 @@ Closure requires both source tips and their remote branches to remain exact,
 all conflict and automatically merged owners to pass focused and broad
 regressions, approved UI locks to pass, a clean worktree, secret-safe evidence,
 an independent audit, and exact remote readback of the repair tip.
+
+The committed repair merge is
+`d8a288cb897b5ca930425eb4a81be1a329ffa4c4`. Its fourth replay resolved the
+original six product/test overlaps plus four exact coordination/evidence owners,
+including the hardened approved-lock checker. It passed 158 affected tests with
+one intentional capture skip, full Flutter analysis, approved UI locks and the
+automatic-tree/marker/ownership pre-commit gate. Handoff remained fail-closed
+before push when all-parent history selected Cursor's second-parent commits;
+REG-20260826-3743 requires first-parent bootstrap and subject inventories before
+this candidate can be remotely qualified.
