@@ -1197,7 +1197,7 @@ void main() {
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = const Size(320, 568);
     addTearDown(tester.view.reset);
     final core = BuySession();
     final session = BuyV2Session(core: core);
@@ -1210,6 +1210,7 @@ void main() {
       app(
         session,
         shopChatSource: const _RichShopChatSource(),
+        textScale: 1.4,
         onShopChatAction: (action) {
           actions.add(action);
           if (actions.length == 1) return firstCall.future;
@@ -1229,12 +1230,22 @@ void main() {
 
     final voice = find.byKey(const ValueKey('buy-shop-chat-info-voice-call'));
     final video = find.byKey(const ValueKey('buy-shop-chat-info-video-call'));
+    expect(find.bySemanticsLabel('Start voice call'), findsOneWidget);
+    expect(find.bySemanticsLabel('Start video call'), findsOneWidget);
     await tester.tap(voice);
     await tester.pump();
     expect(actions.single.kind, BuyV2ShopChatActionKind.startVoiceCall);
     expect(find.bySemanticsLabel('Starting voice call'), findsOneWidget);
     expect(tester.widget<OutlinedButton>(voice).onPressed, isNull);
     expect(tester.widget<OutlinedButton>(video).onPressed, isNull);
+    for (final label in const ['Start voice call', 'Start video call']) {
+      final flags = tester
+          .getSemantics(find.bySemanticsLabel(label))
+          .getSemanticsData()
+          .flagsCollection;
+      expect(flags.isButton, isTrue, reason: label);
+      expect(flags.isEnabled, Tristate.isFalse, reason: label);
+    }
     expect(
       tester
           .widget<ListTile>(
@@ -1261,6 +1272,17 @@ void main() {
     );
     expect(tester.widget<OutlinedButton>(voice).onPressed, isNotNull);
     expect(tester.widget<OutlinedButton>(video).onPressed, isNotNull);
+    for (final label in const ['Start voice call', 'Start video call']) {
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(label))
+            .getSemanticsData()
+            .flagsCollection
+            .isEnabled,
+        Tristate.isTrue,
+        reason: label,
+      );
+    }
 
     await tester.tap(voice);
     await tester.pumpAndSettle();

@@ -3973,6 +3973,7 @@ class _ShopChatInfoViewState extends State<_ShopChatInfoView> {
                           keyName: 'voice-call',
                           icon: Icons.call_outlined,
                           label: 'Voice',
+                          semanticLabel: 'Start voice call',
                           onTap: _dispatching
                               ? null
                               : () => _dispatchInfoAction(
@@ -3986,6 +3987,7 @@ class _ShopChatInfoViewState extends State<_ShopChatInfoView> {
                           keyName: 'video-call',
                           icon: Icons.videocam_outlined,
                           label: 'Video',
+                          semanticLabel: 'Start video call',
                           onTap: _dispatching
                               ? null
                               : () => _dispatchInfoAction(
@@ -4084,46 +4086,54 @@ class _ShopChatInfoAction extends StatelessWidget {
     required this.keyName,
     required this.icon,
     required this.label,
+    required this.semanticLabel,
     required this.onTap,
   });
 
   final String keyName;
   final IconData icon;
   final String label;
+  final String semanticLabel;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return SizedBox(
-      width: 76,
-      height: 68,
-      child: OutlinedButton(
-        key: ValueKey('buy-shop-chat-info-$keyName'),
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          side: const BorderSide(color: BuyV2Colors.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 76,
+        height: 68,
+        child: OutlinedButton(
+          key: ValueKey('buy-shop-chat-info-$keyName'),
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            side: const BorderSide(color: BuyV2Colors.line),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: context.buyMeta.copyWith(
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
                 color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
               ),
-            ),
-          ],
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: context.buyMeta.copyWith(
+                  color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
