@@ -1679,6 +1679,9 @@ class _ShopChatNewConversationView extends StatelessWidget {
                     onOpenAll: onOpenAll,
                   )
                 : ListView.separated(
+                    key: PageStorageKey<String>(
+                      'buy-shop-chat-new-list-${presentation.familyId}',
+                    ),
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                     itemCount: entries.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 7),

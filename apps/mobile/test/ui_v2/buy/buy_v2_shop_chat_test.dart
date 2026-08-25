@@ -911,6 +911,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('conversation picker retains scroll through Back and Forward', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+    await tester.pumpAndSettle();
+
+    final pickerKey = const PageStorageKey<String>(
+      'buy-shop-chat-new-list-shop',
+    );
+    final picker = find.byKey(pickerKey);
+    final checkout = find.byKey(
+      const ValueKey('buy-shop-chat-new-offer-checkout'),
+    );
+    await tester.scrollUntilVisible(
+      checkout,
+      120,
+      scrollable: find.descendant(
+        of: picker,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final beforeBack = tester
+        .state<ScrollableState>(
+          find.descendant(of: picker, matching: find.byType(Scrollable)),
+        )
+        .position
+        .pixels;
+    expect(beforeBack, greaterThan(0));
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+    );
+    await tester.pumpAndSettle();
+
+    final restoredPicker = find.byKey(pickerKey);
+    final afterForward = tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: restoredPicker,
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position
+        .pixels;
+    expect(afterForward, closeTo(beforeBack, 0.1));
+    expect(checkout, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('rejected send keeps the draft and gives a truthful recovery', (
     tester,
   ) async {
