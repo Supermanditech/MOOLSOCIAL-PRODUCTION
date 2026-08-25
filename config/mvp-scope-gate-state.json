@@ -1675,7 +1675,7 @@
       "ticketId": "UAW-CODEX-SOCIAL-SHARE-RUNTIME-20260826",
       "customerOutcome": "A person can use the phone's real share sheet for an exact public MoolSocial post or selected public YouTube video without a false delivery claim.",
       "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-      "manifestSha256": "52871E4D7C69ECC846EF4597F10355000E734AED6C15A267AC001C360DA26B88",
+      "manifestSha256": "5B4FAC2E4E6B45B26DF9B16F216664CE99699C70B4AAAF9A415182F9DD874491",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
@@ -1719,7 +1719,7 @@
       ],
       "timelineImpactDays": 1,
       "within60To75DayLock": true,
-      "implementationState": "RT_11_02_selected_Feed_exact_stable_URL_native_share_Copy_link_retained_no_APK_device_external_or_excluded_surface_action",
+      "implementationState": "RT_11_03_selected_YouTube_exact_watch_URL_native_share_and_return_retention_no_APK_device_external_or_excluded_surface_action",
       "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
     },
     "priorC34ISelectedTicketAssessment": {

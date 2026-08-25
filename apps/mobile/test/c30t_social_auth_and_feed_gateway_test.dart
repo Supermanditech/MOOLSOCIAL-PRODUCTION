@@ -694,6 +694,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('social-share-send-chat')), findsOneWidget);
+      expect(find.byKey(const Key('social-share-other-apps')), findsOneWidget);
+      expect(find.byKey(const Key('social-copy-post-link')), findsOneWidget);
       expect(socialGateway.interactions, isEmpty);
       await tester.tap(find.byKey(const Key('social-share-add-thoughts')));
       await tester.pump();

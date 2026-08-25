@@ -202,6 +202,7 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeShortStateCache,
     @visibleForTesting this.createDraftStateCache,
     @visibleForTesting this.createDraftMediaStore,
+    @visibleForTesting this.shareGateway,
     @visibleForTesting this.disableLocalDraftMediaPreviewForTesting = false,
     super.key,
   });
@@ -257,6 +258,9 @@ class SocialUniversalV2 extends StatefulWidget {
   final SocialCreateDraftMediaStore? createDraftMediaStore;
 
   @visibleForTesting
+  final SocialV2ShareGateway? shareGateway;
+
+  @visibleForTesting
   final bool disableLocalDraftMediaPreviewForTesting;
 
   @override
@@ -295,6 +299,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   late final YouTubePublicShortStateCache _youtubeShortStateCache;
   late final SocialCreateDraftStateCache _createDraftStateCache;
   late final SocialCreateDraftMediaStore? _createDraftMediaStore;
+  late final SocialV2ShareGateway _shareGateway;
   bool _createDraftHydrating = false;
   bool _createDraftMediaLoss = false;
   bool _restoredCreateDraft = false;
@@ -409,6 +414,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     }
     _chatAuthenticated = widget.session.isAuthenticated;
     widget.session.addListener(_handleChatIdentityBoundary);
+    _shareGateway = widget.shareGateway ?? SocialV2PlatformShareGateway();
     _youtubeCatalogueSnapshots =
         widget.youtubeCatalogueSnapshotStore ??
         (widget.youtubeVideosLoader == null &&
@@ -3248,7 +3254,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openShare(SocialPublishedItem item) {
-    final postLink = _publicPostLink(item);
+    final postUri = _publicPostUri(item);
+    final postLink = postUri.toString();
     showSocialV2Sheet(
       context,
       title: 'Share',
@@ -3278,10 +3285,17 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           onTap: () => _sendPostLinkInChat(item, postLink),
         ),
         SocialV2ListTile(
+          key: const Key('social-share-other-apps'),
+          icon: Icons.share_outlined,
+          title: 'Share to another app',
+          detail: "Open your phone's share options",
+          onTap: () => _sharePostExternally(postUri),
+        ),
+        SocialV2ListTile(
           key: const Key('social-copy-post-link'),
           icon: Icons.link_rounded,
           title: 'Copy post link',
-          detail: 'Share through another app',
+          detail: 'Copy the public link',
           onTap: () async {
             try {
               await Clipboard.setData(ClipboardData(text: postLink));
@@ -3303,11 +3317,45 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  String _publicPostLink(SocialPublishedItem item) => Uri.https(
+  Uri _publicPostUri(SocialPublishedItem item) => Uri.https(
     'moolsocial.com',
     '/app/social',
     {'sub': 'feed', 'item': item.id},
-  ).toString();
+  );
+
+  Rect _sharePositionOrigin() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      final origin =
+          renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      if (origin.isFinite && origin.width > 0 && origin.height > 0) {
+        return origin;
+      }
+    }
+    final size = MediaQuery.sizeOf(context);
+    return Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: 1,
+      height: 1,
+    );
+  }
+
+  Future<void> _sharePostExternally(Uri postUri) async {
+    Navigator.of(context).pop();
+    final outcome = await _shareGateway.share(
+      SocialV2ShareRequest(
+        uri: postUri,
+        title: 'Share MoolSocial post',
+        subject: 'MoolSocial post',
+        sharePositionOrigin: _sharePositionOrigin(),
+      ),
+    );
+    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) return;
+    showSocialV2Message(
+      context,
+      'Sharing is unavailable right now. You can copy the link instead.',
+    );
+  }
 
   Future<void> _toggleRepostFromShare(SocialPublishedItem item) async {
     Navigator.of(context).pop();
