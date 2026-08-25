@@ -128,7 +128,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final LaunchInterruptionGuard _launchInterruptionGuard =
       widget.launchInterruptionGuard ?? LaunchInterruptionGuard();
   late final MoolSocialBrandCadence _brandCadence = MoolSocialBrandCadence();
-  late bool _lastAuthenticated = _session.isAuthenticated;
+  late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
   late final _router = createJourneyRouter(
     _session,
@@ -154,6 +154,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   @override
   void initState() {
     super.initState();
+    _lastAuthenticated = _session.isAuthenticated;
     WidgetsBinding.instance.addObserver(this);
     _session.addListener(_handleAuthenticationBoundary);
     WidgetsBinding.instance.addPostFrameCallback((_) {

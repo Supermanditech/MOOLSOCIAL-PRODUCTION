@@ -1865,7 +1865,9 @@ class JourneySession extends ChangeNotifier {
           );
         }
         if (!stored.matches(current)) {
-          await _invalidateMismatchedPrincipal();
+          await _invalidateMismatchedPrincipal(
+            notifyBoundary: revalidationGeneration != null,
+          );
           return false;
         }
         authenticatedRevalidationPending = true;
@@ -1875,7 +1877,9 @@ class JourneySession extends ChangeNotifier {
         return true;
       case AuthenticatedAccountBootstrapState.invalidSession:
         if (bootstrap.code == 'auth-binding-reset-required') return false;
-        await _invalidateMismatchedPrincipal();
+        await _invalidateMismatchedPrincipal(
+          notifyBoundary: revalidationGeneration != null,
+        );
         return false;
       case AuthenticatedAccountBootstrapState.fatal:
         throw JourneyServiceException(
@@ -1980,7 +1984,9 @@ class JourneySession extends ChangeNotifier {
         _verifiedPrincipalBindingStore.resetUnsafeState,
       );
 
-  Future<void> _invalidateMismatchedPrincipal() async {
+  Future<void> _invalidateMismatchedPrincipal({
+    bool notifyBoundary = false,
+  }) async {
     _authenticationGeneration += 1;
     Object? cleanupFailure;
     for (final cleanup in <Future<void> Function()>[
@@ -2006,6 +2012,7 @@ class JourneySession extends ChangeNotifier {
         code: 'auth-session-invalidation-failed',
       );
     }
+    if (notifyBoundary) _notifyRevalidationListeners();
   }
 
   Future<void> _resetUnsafePrincipalBinding() async {

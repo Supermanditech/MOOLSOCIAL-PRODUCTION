@@ -6,6 +6,7 @@ import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
 
 void main() {
   test('returning authenticated session restores directly to ready', () async {
@@ -535,6 +536,10 @@ void main() {
     );
     addTearDown(session.dispose);
     await session.start();
+    var boundaryNotifications = 0;
+    void onBoundary() => boundaryNotifications += 1;
+    session.addListener(onBoundary);
+    addTearDown(() => session.removeListener(onBoundary));
 
     final retry = session.retryAuthenticatedAccountRevalidation();
     bootstrap.complete(
@@ -549,6 +554,7 @@ void main() {
     expect(session.authenticatedRevalidationPending, isFalse);
     expect(receiptStore.binding, isNull);
     expect(bootstrap.invalidationCount, 1);
+    expect(boundaryNotifications, 1);
   });
 
   test(
@@ -592,6 +598,55 @@ void main() {
       expect(session.errorMessage, contains('could not be cleared safely'));
     },
   );
+
+  testWidgets('invalid reconnect notifies real app boundary once', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final shared = SharedSession()..setAuthorized(true);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    addTearDown(shared.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        sharedSession: shared,
+        legacyPresentationForTestsOnly: true,
+      ),
+    );
+    await tester.pump();
+
+    final retry = session.retryAuthenticatedAccountRevalidation();
+    bootstrap.complete(
+      const AuthenticatedAccountBootstrapResult.invalidSession(),
+    );
+    expect(await retry, isFalse);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 3100));
+    await tester.pump();
+
+    expect(shared.authorized, isFalse);
+    expect(find.byKey(const Key('screen03-login-v2')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('app resume starts exactly one pending revalidation', (
     tester,
