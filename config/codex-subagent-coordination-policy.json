@@ -175,7 +175,9 @@
         "apps/mobile/lib/features/journey01/journey_session.dart",
         "apps/mobile/lib/features/journey01/review_journey_services.dart",
         "apps/mobile/lib/features/shared/youtube_public_catalogue_repository.dart",
+        "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
         "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
         "apps/mobile/test/youtube_public_catalogue_repository_test.dart",
         "apps/mobile/test/uaw_c34p_fix8_global_social_login_runtime_composition_test.dart",
         "scripts/build-buy-device-review.ps1",
@@ -395,6 +397,7 @@
           "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
           "apps/mobile/lib/features/journey01/",
           "apps/mobile/lib/features/shared/youtube_public_catalogue_repository.dart",
+          "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
           "apps/mobile/test/",
           "apps/mobile/android/",
           "apps/mobile/pubspec.yaml",
@@ -407,9 +410,7 @@
           "docs/quality/",
           "scripts/"
         ],
-        "forbiddenOwnerRoots": [
-          "apps/mobile/lib/ui_v2/"
-        ]
+        "forbiddenOwnerRoots": []
       },
       {
         "id": "codex_backend",

@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": true,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 183,
+  "ticketCount": 184,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 35,
-    "implementedAtomicTicketCount": 26,
-    "pendingConfirmedImplementationCount": 9,
+    "totalCodexAtomicEngineeringTicketCount": 36,
+    "implementedAtomicTicketCount": 28,
+    "pendingConfirmedImplementationCount": 8,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 9,
+    "remainingCodexEngineeringQueueCount": 8,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -49,9 +49,10 @@
       ,{"id":"RT-09-CHILD-03-GAP-01","state":"audited_pending_final_runtime","implementation":"MoolSocialApp captures the initial authenticated state eagerly in initState so the first authentication-boundary transition cannot be suppressed by a lazy late initializer.","runtime":"Real app-boundary test reproduced the lazy-capture miss, then passed after eager initialization together with the 88-test focused suite."}
       ,{"id":"RT-06","state":"closed_current_round_reopen_on_apk_defect","implementation":"No product correction selected: same-process lifecycle preserves the exact live route, while process-death/cold launch intentionally retains the accepted Social default.","runtime":"68 lifecycle/navigation tests pass, including real Work pause/resume, singleTop/no-native-rewrite assertions and accepted cold-launch/Buy/context contracts; final same-PID OPPO evidence may reopen."}
       ,{"id":"RT-04A-01-CHILD-01","state":"CLOSED","implementation":"A non-UI SharedPreferencesAsync repository now persists separate versioned Videos and Shorts metadata with exact field validation, five-minute fresh truth, bounded stale/expiry handling, corruption isolation, immutable copies, exact-key clearing and isolate-wide linear ordering.","runtime":"Closed after 30 focused repository tests plus 10 affected YouTube runtime tests, full Flutter analysis, restored generated-support bytes, passing coordination gate and independent adversarial re-audit. Customer-visible process-death restoration remains owned by parent RT-04A-01."}
+      ,{"id":"RT-04A-01-CHILD-02","state":"CLOSED","implementation":"The existing global YouTube runtime store now hydrates both durable lanes before app render and writes live replacements through without changing Cursor's consumer; generation fencing, exact mapping, per-lane degraded truth and joined mutation settlement close every audit gap.","runtime":"20 runtime integration tests, 30 repository tests and 10 customer continuity tests pass; new repository/runtime A-B instances restore both lanes at the exact TTL boundary, full analysis is clean and independent audit is GO."}
+      ,{"id":"RT-04A-01","state":"closed_current_round_reopen_on_apk_defect","implementation":"Production bootstrap binds the no-cache asynchronous durable repository to the existing Social YouTube runtime store before runApp, restoring eligible fresh or stale Videos and Shorts after process death while live success atomically replaces durable truth.","runtime":"Closed for this source round after 60 focused, integration and customer-continuity tests, clean full analysis, guarded support-byte restoration, passing ownership gate and independent audit; final integrated APK/OPPO force-stop and offline acceptance may reopen."}
     ],
     "pendingConfirmedImplementation": [
-      {"id":"RT-04A-01","order":3,"state":"GAP_FOUND","ownerBoundary":"codex_runtime_foundation_then_reviewed_Cursor_consumer_integration","blocker":"RT-04A-01-CHILD-01 must close before reviewed consumer wiring; active Cursor Social presentation owner remains untouched"},
       {"id":"RT-04A-02","order":4,"state":"pending","ownerBoundary":"codex_cache_logic_after_RT-04A-01","blocker":"offline acceptance follows durable catalogue implementation"},
       {"id":"RT-04B-01","order":5,"state":"pending","ownerBoundary":"codex_persistence_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
       {"id":"RT-04B-02","order":6,"state":"pending","ownerBoundary":"codex_persistence_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
@@ -86,12 +87,12 @@
       "select_the_next_atomic_ticket"
     ],
     "nextTicketBlockedUntilActiveClosed": true,
-    "activeTicket": "RT-04A-01",
-    "activeTicketPhase": "GAP_FOUND",
+    "activeTicket": null,
+    "activeTicketPhase": "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT",
     "activeTicketChildGaps": [],
-    "lastClosedTicket": "RT-06",
-    "lastPreApkClosedTicket": "RT-09",
-    "nextTicket": "RT-04A-01"
+    "lastClosedTicket": "RT-04A-01",
+    "lastPreApkClosedTicket": "RT-04A-01",
+    "nextTicket": "RT-04A-02"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -150,8 +151,9 @@
     {"id":"RT-02-04","area":"chat","microScope":"successor_oppo_retest","layers":["ui","mobile","apk","oppo"],"outcome":"Retest composer geometry on the final successor APK.","owner":"release_coordinator","state":"pending_release","evidence":"No installed candidate contains the fix.","blocker":"successor APK held until Cursor integration and final regression","dependencies":["RT-02-01","META-CURSOR-03","FINAL-REGRESSION-01"]},
     {"id":"RT-03-01","area":"social_youtube","microScope":"home_person_icon_global_account","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Route the Social/YouTube Home person icon to global MoolSocial Account.","owner":"integration","state":"pending_integration","evidence":"Installed behavior opens YouTube channel connection. Read-only classification proved the exact Social consumer owner is actively claimed by independent Cursor work; no Codex product-source edit or test occurred.","blocker":"defer until Cursor releases the owner or reviewed integration provides an exact handoff","dependencies":["RT-03-02","SAFE-OPPO-EXHAUSTED-01","META-CURSOR-03"]},
     {"id":"RT-03-02","area":"youtube","microScope":"dedicated_channel_connection_entry","layers":["ui","wiring","navigation","provider"],"outcome":"Keep YouTube channel connection reachable from an explicit provider-specific entry.","owner":"integration","state":"pending_integration","evidence":"Global Account and provider connection require distinct entry ownership inside the active Cursor Social presentation owner.","blocker":"defer until Cursor owner release or reviewed integration; Codex does not own the UI file","dependencies":["RT-03-01","YT-CONNECT-CONSENT-01","META-CURSOR-03"]},
-    {"id":"RT-04A-01","area":"youtube","microScope":"catalogue_process_death_cache","layers":["mobile","cache","provider"],"outcome":"Restore YouTube catalogue after process death.","owner":"codex_runtime","state":"GAP_FOUND","evidence":"Durable repository child RT-04A-01-CHILD-01 is closed; the active consumer still uses only the process-local snapshot store.","blocker":"Reviewed integration must wire the proven repository into the Social consumer before this parent can close.","dependencies":["OPPO-YT-VIDEO-01","OPPO-YT-SHORTS-01","RT-04A-01-CHILD-01","META-CURSOR-03"]},
+    {"id":"RT-04A-01","area":"youtube","microScope":"catalogue_process_death_cache","layers":["mobile","cache","provider"],"outcome":"Restore YouTube catalogue after process death.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"The no-cache durable repository is hydrated into the existing global runtime store before runApp and successful live replacements write through; 60 focused/integration/continuity tests, process-instance A-B simulation, clean full analysis and independent audit pass without changing Cursor's consumer.","blocker":"final integrated APK/OPPO force-stop and offline acceptance may reopen","dependencies":["OPPO-YT-VIDEO-01","OPPO-YT-SHORTS-01","RT-04A-01-CHILD-01","RT-04A-01-CHILD-02","META-CURSOR-03"]},
     {"id":"RT-04A-01-CHILD-01","area":"youtube","microScope":"durable_catalogue_repository_foundation","layers":["mobile","cache","provider"],"outcome":"Provide a versioned, bounded, corruption-safe and atomic durable repository for separate Videos and Shorts catalogue metadata with TTL/stale truth, clear/invalidation and latest-write-wins ordering, without playback bytes, account data or secrets.","owner":"codex_runtime","state":"CLOSED","evidence":"SharedPreferencesAsync repository passes 30 focused persistence, corruption, bounds, expiry, failure, isolation and concurrency tests; 10 affected YouTube runtime tests and full analysis pass; independent adversarial audit is GO.","blocker":"none for this foundation child; parent consumer wiring remains separate","dependencies":["RT-04A-01"]},
+    {"id":"RT-04A-01-CHILD-02","area":"youtube","microScope":"durable_catalogue_runtime_hydration_write_through","layers":["mobile","cache","provider","wiring"],"outcome":"Hydrate the existing production YouTube runtime snapshot store from durable Videos and Shorts metadata before the app renders, and write every successful live catalogue replacement through to the proven repository without changing Cursor-owned consumer code.","owner":"codex_runtime","state":"CLOSED","evidence":"Exact 21-field mapping, per-lane failure isolation, truthful degraded bootstrap status, generation fencing, write-tail joining, invalid-cache clearing and process-instance restoration pass 60 tests, full analysis and independent audit.","blocker":"none for current source round; final integrated APK/OPPO may reopen","dependencies":["RT-04A-01","RT-04A-01-CHILD-01"]},
     {"id":"RT-04A-02","area":"youtube","microScope":"catalogue_offline_cache","layers":["mobile","cache","provider"],"outcome":"Restore cached YouTube catalogue while offline.","owner":"codex_runtime","state":"open_defect","evidence":"No durable offline restoration exists.","blocker":"durable cache and offline acceptance absent","dependencies":["RT-04A-01"]},
     {"id":"RT-04B-01","area":"youtube","microScope":"search_process_death_state","layers":["mobile","cache","provider"],"outcome":"Restore Search query, result and scroll state after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Search state is in-memory only.","blocker":"durable state implementation absent","dependencies":["OPPO-YT-SEARCH-01"]},
     {"id":"RT-04B-02","area":"youtube","microScope":"watch_process_death_state","layers":["mobile","cache","provider"],"outcome":"Restore selected watch state after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Watch state is in-memory only.","blocker":"durable state implementation absent","dependencies":[]},

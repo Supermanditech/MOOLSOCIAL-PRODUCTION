@@ -30,6 +30,8 @@ import 'features/journey01/journey_services.dart';
 import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
 import 'features/shared/social_content_gateway.dart';
+import 'features/shared/youtube_public_catalogue_repository.dart';
+import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
   apiKey: 'demo-moolsocial-local-key',
@@ -39,6 +41,7 @@ const _localFirebaseOptions = FirebaseOptions(
 );
 const _releaseFirstFrameTimeout = Duration(seconds: 5);
 const _releasePlatformStageTimeout = Duration(seconds: 15);
+const _youtubeCatalogueCacheHydrationTimeout = Duration(seconds: 2);
 
 const _useEmulators = bool.fromEnvironment(
   'MOOLSOCIAL_USE_EMULATORS',
@@ -441,6 +444,25 @@ Future<void> main() async {
     return;
   }
   _recordReleaseBootstrapStage('shared_preferences', 'passed');
+  _recordReleaseBootstrapStage('youtube_catalogue_cache', 'begin');
+  try {
+    final hydration = await screen04YouTubeCatalogueSnapshots
+        .configureDurability(
+          DurableYouTubePublicCatalogueRepository(
+            persistence: SharedPreferencesAsyncYouTubePublicCatalogueStore(
+              SharedPreferencesAsync(),
+            ),
+            regionCode: screen04YouTubeRegionCode,
+          ),
+        )
+        .timeout(_youtubeCatalogueCacheHydrationTimeout);
+    _recordReleaseBootstrapStage(
+      'youtube_catalogue_cache',
+      hydration.degraded ? 'degraded' : 'passed',
+    );
+  } on Object {
+    _recordReleaseBootstrapStage('youtube_catalogue_cache', 'degraded');
+  }
   final platformRouteName =
       WidgetsBinding.instance.platformDispatcher.defaultRouteName;
   final youtubeInitialLocation = youtubeConnectReturnLocation(
