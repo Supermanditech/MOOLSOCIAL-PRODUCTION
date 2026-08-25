@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3698,
-    "sha256": "F50DF07F6892784E84C77FB6EBC4DD3352BAF90CF1AE49E708B19F48E844A906"
+    "entryCount": 3705,
+    "sha256": "46745ADBCC8CC9CA3286AACC88AD3A9C9B1247C2502339E0FFC9B1AB14997C0A"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -42,7 +42,7 @@
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },
     {
@@ -62,7 +62,6 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_feedback_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_saved_clear_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_supplier_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
@@ -114,10 +113,7 @@
         "apps/mobile/test/ui_v2/buy/uaw_personal_mvp_buy_local_tabs_global_dock_c10c_test.dart",
         "apps/mobile/test/ui_v2/buy/uaw_personal_mvp_buy_subaction_professional_conformance_c16c_test.dart",
         "docs/quality/UAW-CURSOR-BUY-SCREEN-SUBACTIONS-UI-20260823.md",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat_motion.dart",
-        "apps/mobile/lib/ui_v2/universal/mool_contextual_chat_v2.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/buy-v2-shop-chat-native-390x844.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/shop-chat-reference-current-moolsocial-oppo.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/buy-v2-shop-chat-enhanced-attachments-390x844.png",
@@ -153,8 +149,7 @@
         "apps/mobile/test/ui_v2/social/candidate_captures/moolsocial-context-chat-work-earn-today-conversation-info-390x844.png",
         "apps/mobile/test/ui_v2/social/candidate_captures/moolsocial-context-chat-work-earn-today-inbox-390x844.png",
         "apps/mobile/test/ui_v2/social/candidate_captures/moolsocial-context-chat-work-earn-today-new-conversation-390x844.png",
-        "apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart",
-        "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
+        
         "docs/quality/UAW-CURSOR-SHOP-CHAT-UI-20260824.md"
       ]
     },
@@ -162,7 +157,6 @@
       "task": "/root/codex_auth_social_runtime_core_20260824",
       "role": "primary",
       "owners": [
-        "config/codex-subagent-coordination-policy.json",
         "config/mvp-scope-gate-state.json",
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
@@ -182,7 +176,6 @@
         "apps/mobile/lib/features/shared/youtube_public_search_state_repository.dart",
         "apps/mobile/lib/features/shared/youtube_public_short_state_repository.dart",
         "apps/mobile/lib/features/shared/youtube_public_watch_state_repository.dart",
-        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
         "apps/mobile/lib/ui_v2/social/social_v2_create_workbench.dart",
         "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
         "apps/mobile/test/journey_session_test.dart",
@@ -219,6 +212,29 @@
         "scripts/invoke-flutter-with-clean-support.ps1",
         "scripts/test-flutter-clean-support.ps1",
         "scripts/test-youtube-provider-c30m-deployment-controls.ps1"
+      ]
+    },
+    {
+      "task": "/root/repair_social_runtime_chat_20260825",
+      "role": "primary",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+        "apps/mobile/lib/ui_v2/universal/mool_contextual_chat_v2.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+        "apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
+        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "task": "/root/integration_social_runtime_chat_v2_20260825",
+      "role": "primary",
+      "owners": [
+        "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825.md"
       ]
     }
   ],
@@ -293,6 +309,32 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "social_runtime_chat_conflict_correction_20260825",
+        "state": "founder_authorized_2026_08_25",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_social_runtime_chat_20260825",
+        "workId": "social-runtime-chat-conflict-correction-20260825",
+        "ticketId": "UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-social-runtime-chat-conflict-correction-20260825",
+        "branch": "work/integration-repair/social-runtime-chat-conflict-correction-20260825",
+        "baselineHead": "922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9",
+        "bootstrapCommitSubject": "coordination(social-runtime-chat-conflict-correction-20260825): bind conflict correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+          "docs/quality/ACTIVE-CODEX-HANDOFF.md",
+          "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
+          "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
+          "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
       }
     ],
     "workspaceIsolation": {
@@ -338,6 +380,7 @@
       "cursorUiMaximumOpenTickets": 1,
       "codexAuthMaximumOpenTickets": 1,
       "codexBackendMaximumOpenTickets": 1,
+      "integrationRepairMaximumOpenTickets": 1,
       "priorTicketClosureRequired": true,
       "founderSelectsExactNextTicket": true,
       "crossLaneImplementationAllowed": false,
@@ -487,6 +530,32 @@
           "docs/quality/"
         ],
         "forbiddenOwnerRoots": []
+      },
+      {
+        "id": "integration_repair",
+        "agentRole": "primary",
+        "taskPrefix": "/root/repair_",
+        "branchPrefix": "work/integration-repair/",
+        "worktreePrefix": "MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-",
+        "commitPrefix": "repair",
+        "baseRule": "approved_codex_tip",
+        "allowedOwnerRoots": [
+          "apps/mobile/lib/ui_v2/buy/",
+          "apps/mobile/lib/ui_v2/social/",
+          "apps/mobile/lib/ui_v2/universal/",
+          "apps/mobile/test/ui_v2/buy/",
+          "apps/mobile/test/ui_v2/social/",
+          "config/",
+          "docs/quality/",
+          "scripts/"
+        ],
+        "forbiddenOwnerRoots": [
+          "apps/mobile/lib/core/auth/",
+          "apps/mobile/lib/features/journey01/",
+          "apps/mobile/android/",
+          "apps/mobile/ios/",
+          "backend/"
+        ]
       }
     ],
     "founderAcceptance": {
@@ -521,7 +590,34 @@
       "cleanIntegratedWorktreeRemovalAllowed": true,
       "combinedRegressionRequired": true,
       "candidateBuildRequiresSeparateAuthorization": true,
-      "integrationOwnerGitClosureResponsible": true
+      "integrationOwnerGitClosureResponsible": true,
+      "repair": {
+        "lane": "integration_repair",
+        "requiredCodexCommit": "922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9",
+        "requiredCodexBranch": "work/codex-auth/social-runtime-core-20260824",
+        "requiredCursorCommit": "00ce93552091ee51739266c0a8fbe6d207d9f695",
+        "requiredCursorBranch": "work/cursor-ui/shop-chat-ui-20260824",
+        "maximumMergeCommits": 1,
+        "directSourceCommitsAllowed": false,
+        "conflictResolutionAllowed": true,
+        "exactConflictOwners": [
+          "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+          "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+          "apps/mobile/lib/ui_v2/universal/mool_contextual_chat_v2.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+          "apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
+        "freshIntegrationWorkId": "social-runtime-chat-v2-20260825",
+        "freshIntegrationTicketId": "UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825",
+        "freshIntegrationBranch": "integration/moolsocial/social-runtime-chat-v2-20260825",
+        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v2-20260825",
+        "freshIntegrationMergeSubject": "merge(social-runtime-chat-v2-20260825): integrate conflict-qualified runtime and Chat"
+      }
     },
     "promotion": {
       "directFeatureToRemediationAllowed": false,

@@ -13,12 +13,12 @@ param(
   [Parameter(Mandatory)]
   [ValidatePattern('^[0-9A-F]{64}$')]
   [string]$ExpectedRegistrySha256,
-  [ValidateSet('baseline','cursor_ui','codex_auth','codex_backend','integration')]
+  [ValidateSet('baseline','cursor_ui','codex_auth','codex_backend','integration_repair','integration')]
   [string]$ProductionLane = 'baseline',
   [ValidateSet(
     'baseline','governance_preflight','coordination_bootstrap','task_start','implementation','pre_commit','handoff',
     'founder_acceptance','ticket_acceptance','ticket_close',
-    'integration_start','integration_verify','integration_close',
+    'integration_start','integration_verify','integration_close','integration_admission_authorize',
     'candidate_preflight'
   )]
   [string]$ProductionPhase = 'baseline',
@@ -36,6 +36,9 @@ param(
   [string]$OppoAcceptanceEvidenceSha256,
   [string[]]$ApprovedFeatureCommits = @(),
   [string[]]$ApprovedFeatureBranches = @(),
+  [string]$IntegrationTargetRoot,
+  [string]$IntegrationTargetWorkId,
+  [string]$IntegrationTargetTicketId,
   [string]$RepositoryRoot
 )
 
@@ -160,7 +163,7 @@ function Test-ProductionWorktreeClean {
 
 function Get-ProductionRemoteBranchHead([string]$BranchName) {
   Assert-Coordination (
-    $BranchName -cmatch '^(?:work/(?:cursor-ui|codex-auth|codex-backend)/|integration/moolsocial/)[a-z0-9][a-z0-9-]{2,48}$'
+    $BranchName -cmatch '^(?:work/(?:cursor-ui|codex-auth|codex-backend|integration-repair)/|integration/moolsocial/)[a-z0-9][a-z0-9-]{2,48}$'
   ) 'production remote branch name is invalid.'
   $remoteRef = 'refs/heads/' + $BranchName
   $remoteOutput = @(& git -C $root ls-remote --exit-code --heads origin `
@@ -175,6 +178,56 @@ function Get-ProductionRemoteBranchHead([string]$BranchName) {
     $remoteParts[1] -ceq $remoteRef
   ) "production remote branch readback is invalid: $BranchName"
   return [string]$remoteParts[0]
+}
+
+function Assert-IntegrationRepairMerge(
+  [string]$FirstParent,
+  [string]$SecondParent,
+  [string]$ActualTree
+) {
+  Assert-Coordination (
+    $SecondParent -ceq [string]$integrationRepair.requiredCursorCommit
+  ) 'integration repair merge second parent changed.'
+  Assert-Coordination (
+    $FirstParent -cmatch '^[0-9a-f]{40}$' -and
+    $ActualTree -cmatch '^[0-9a-f]{40}$'
+  ) 'integration repair parent or tree identity is invalid.'
+
+  $mergeTreeOutput = @(& git -C $root merge-tree --write-tree `
+      $FirstParent $SecondParent 2>&1)
+  $mergeTreeExit = $LASTEXITCODE
+  Assert-Coordination (
+    $mergeTreeExit -eq 1 -and $mergeTreeOutput.Count -ge 1 -and
+    [string]$mergeTreeOutput[0] -cmatch '^[0-9a-f]{40}$'
+  ) 'integration repair no longer reproduces one bounded conflict merge.'
+  $automaticTree = [string]$mergeTreeOutput[0]
+  $actualConflictOwners = @()
+  foreach ($mergeTreeLine in $mergeTreeOutput) {
+    $mergeTreeText = [string]$mergeTreeLine
+    if ($mergeTreeText -cmatch '^CONFLICT \(.+\): Merge conflict in (.+)$') {
+      $actualConflictOwners += Get-CanonicalOwner $Matches[1]
+    }
+  }
+  $actualConflictOwners = @($actualConflictOwners | Sort-Object -Unique)
+  Assert-Coordination (
+    (@($actualConflictOwners | Sort-Object) -join '|') -ceq
+      (@($expectedRepairConflictOwners | Sort-Object) -join '|')
+  ) 'integration repair conflict inventory changed.'
+
+  $manualDeltaOwners = @(& git -C $root diff --name-only `
+      $automaticTree $ActualTree)
+  Assert-Coordination ($LASTEXITCODE -eq 0) `
+    'integration repair automatic-tree comparison failed.'
+  $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
+    ForEach-Object { $_.ToLowerInvariant() })
+  foreach ($manualDeltaOwner in $manualDeltaOwners) {
+    $canonicalManualOwner = Get-CanonicalOwner ([string]$manualDeltaOwner)
+    Assert-Coordination (
+      $expectedRepairConflictKeys.Contains(
+        $canonicalManualOwner.ToLowerInvariant()
+      )
+    ) "integration repair manually changed a non-conflict owner: $canonicalManualOwner"
+  }
 }
 
 function Assert-ProductionManagedWorktreesClean {
@@ -337,7 +390,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 2) `
+Assert-Coordination ($continuationBindings.Count -eq 3) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -346,17 +399,16 @@ foreach ($continuationBinding in $continuationBindings) {
     'branch','baselineHead','bootstrapCommitSubject','bootstrapOwners',
     'cursorIndependent','integrationRequiredBeforeSuccessorApk'
   ) 'founder-authorized continuation binding'
-  $continuationBranchPrefix = if (
-    [string]$continuationBinding.lane -ceq 'cursor_ui'
-  ) {
-    'work/cursor-ui/'
-  } else {
-    'work/codex-auth/'
+  $continuationBranchPrefix = switch ([string]$continuationBinding.lane) {
+    'cursor_ui' { 'work/cursor-ui/' }
+    'codex_auth' { 'work/codex-auth/' }
+    'integration_repair' { 'work/integration-repair/' }
+    default { '' }
   }
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
     [string]$continuationBinding.state -ceq 'founder_authorized_2026_08_25' -and
-    [string]$continuationBinding.lane -cin @('cursor_ui','codex_auth') -and
+    [string]$continuationBinding.lane -cin @('cursor_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
     [string]$continuationBinding.task -cmatch '^/root/[a-z0-9_]+$' -and
     [string]$continuationBinding.workId -cmatch '^[a-z0-9][a-z0-9-]{2,48}$' -and
@@ -367,7 +419,10 @@ foreach ($continuationBinding in $continuationBindings) {
     [string]$continuationBinding.bootstrapCommitSubject -cmatch
       '^coordination\([a-z0-9][a-z0-9-]{2,48}\): .+' -and
     @($continuationBinding.bootstrapOwners).Count -ge 2 -and
-    [bool]$continuationBinding.cursorIndependent -and
+    (
+      [bool]$continuationBinding.cursorIndependent -or
+      [string]$continuationBinding.lane -ceq 'integration_repair'
+    ) -and
     [bool]$continuationBinding.integrationRequiredBeforeSuccessorApk
   ) 'founder-authorized continuation binding is invalid or weakened.'
   $continuationBindingIds += [string]$continuationBinding.id
@@ -443,7 +498,8 @@ Assert-Coordination (
 ) 'ticket closure discipline weakened.'
 Assert-ExactNames $gitDiscipline.agentTicketQueues @(
   'cursorUiMaximumOpenTickets','codexAuthMaximumOpenTickets',
-  'codexBackendMaximumOpenTickets','priorTicketClosureRequired',
+  'codexBackendMaximumOpenTickets','integrationRepairMaximumOpenTickets',
+  'priorTicketClosureRequired',
   'founderSelectsExactNextTicket','crossLaneImplementationAllowed',
   'plannedCodexAuthenticationProviders','authPrebuildBatch'
 ) 'agent ticket queue discipline'
@@ -455,6 +511,7 @@ Assert-Coordination (
   [int]$gitDiscipline.agentTicketQueues.cursorUiMaximumOpenTickets -eq 1 -and
   [int]$gitDiscipline.agentTicketQueues.codexAuthMaximumOpenTickets -eq 1 -and
   [int]$gitDiscipline.agentTicketQueues.codexBackendMaximumOpenTickets -eq 1 -and
+  [int]$gitDiscipline.agentTicketQueues.integrationRepairMaximumOpenTickets -eq 1 -and
   [bool]$gitDiscipline.agentTicketQueues.priorTicketClosureRequired -and
   [bool]$gitDiscipline.agentTicketQueues.founderSelectsExactNextTicket -and
   -not [bool]$gitDiscipline.agentTicketQueues.crossLaneImplementationAllowed -and
@@ -519,7 +576,7 @@ Assert-Coordination (
 ) 'Facebook prebuild qualification changed.'
 
 $productionLanes = @($gitDiscipline.lanes)
-$expectedLaneIds = @('cursor_ui','codex_auth','codex_backend','integration')
+$expectedLaneIds = @('cursor_ui','codex_auth','codex_backend','integration_repair','integration')
 Assert-Coordination (
   $productionLanes.Count -eq $expectedLaneIds.Count -and
   (@($productionLanes.id | Sort-Object) -join '|') -ceq
@@ -540,6 +597,11 @@ $expectedLaneContracts = @{
     role = 'primary'; task = '/root/codex_backend_'; branch = 'work/codex-backend/'
     worktree = 'MOOLSOCIAL-WORKTREE-CODEX-'; commit = 'backend'
     base = 'founder_accepted_ui_commit'
+  }
+  integration_repair = @{
+    role = 'primary'; task = '/root/repair_'; branch = 'work/integration-repair/'
+    worktree = 'MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-'; commit = 'repair'
+    base = 'approved_codex_tip'
   }
   integration = @{
     role = 'primary'; task = '/root/integration_'; branch = 'integration/moolsocial/'
@@ -614,7 +676,8 @@ Assert-ExactNames $gitDiscipline.integration @(
   'firstParentDirectCommitsAllowed','conflictSourceEditsAllowed',
   'allManagedWorktreesCleanRequired','remoteIntegrationBranchMustEqualHeadAtClose',
   'cleanIntegratedWorktreeRemovalAllowed','combinedRegressionRequired',
-  'candidateBuildRequiresSeparateAuthorization','integrationOwnerGitClosureResponsible'
+  'candidateBuildRequiresSeparateAuthorization','integrationOwnerGitClosureResponsible',
+  'repair'
 ) 'integration discipline'
 Assert-Coordination (
   [string]$gitDiscipline.integration.strategy -ceq 'no_ff_merge_commit' -and
@@ -630,6 +693,53 @@ Assert-Coordination (
   [bool]$gitDiscipline.integration.candidateBuildRequiresSeparateAuthorization -and
   [bool]$gitDiscipline.integration.integrationOwnerGitClosureResponsible
 ) 'integration discipline weakened.'
+$integrationRepair = $gitDiscipline.integration.repair
+Assert-ExactNames $integrationRepair @(
+  'lane','requiredCodexCommit','requiredCodexBranch','requiredCursorCommit',
+  'requiredCursorBranch','maximumMergeCommits','directSourceCommitsAllowed',
+  'conflictResolutionAllowed','exactConflictOwners',
+  'remoteRepairBranchMustEqualHeadBeforeAdmission','freshIntegrationWorkId',
+  'freshIntegrationTicketId','freshIntegrationBranch',
+  'freshIntegrationWorktreePath','freshIntegrationMergeSubject'
+) 'integration repair discipline'
+$expectedRepairConflictOwners = @(
+  'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
+  'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart',
+  'apps/mobile/lib/ui_v2/universal/mool_contextual_chat_v2.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+  'apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart',
+  'config/codex-subagent-coordination-policy.json',
+  'docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md',
+  'scripts/check-codex-subagent-coordination-policy.ps1'
+)
+Assert-Coordination (
+  [string]$integrationRepair.lane -ceq 'integration_repair' -and
+  [string]$integrationRepair.requiredCodexCommit -ceq
+    '922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9' -and
+  [string]$integrationRepair.requiredCodexBranch -ceq
+    'work/codex-auth/social-runtime-core-20260824' -and
+  [string]$integrationRepair.requiredCursorCommit -ceq
+    '00ce93552091ee51739266c0a8fbe6d207d9f695' -and
+  [string]$integrationRepair.requiredCursorBranch -ceq
+    'work/cursor-ui/shop-chat-ui-20260824' -and
+  [int]$integrationRepair.maximumMergeCommits -eq 1 -and
+  -not [bool]$integrationRepair.directSourceCommitsAllowed -and
+  [bool]$integrationRepair.conflictResolutionAllowed -and
+  (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
+    (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
+  [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
+  [string]$integrationRepair.freshIntegrationWorkId -ceq
+    'social-runtime-chat-v2-20260825' -and
+  [string]$integrationRepair.freshIntegrationTicketId -ceq
+    'UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825' -and
+  [string]$integrationRepair.freshIntegrationBranch -ceq
+    'integration/moolsocial/social-runtime-chat-v2-20260825' -and
+  [string]$integrationRepair.freshIntegrationWorktreePath -ceq
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v2-20260825' -and
+  [string]$integrationRepair.freshIntegrationMergeSubject -ceq
+    'merge(social-runtime-chat-v2-20260825): integrate conflict-qualified runtime and Chat'
+) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
   'newAnnotatedAcceptanceTagRequired','productionCheckoutCleanRequired',
@@ -803,13 +913,18 @@ $codexAuthOpenTasks = @($taskNames | Where-Object {
 $codexBackendOpenTasks = @($taskNames | Where-Object {
   $_.StartsWith('/root/codex_backend_', [StringComparison]::Ordinal)
 })
+$integrationRepairOpenTasks = @($taskNames | Where-Object {
+  $_.StartsWith('/root/repair_', [StringComparison]::Ordinal)
+})
 Assert-Coordination (
   $cursorUiOpenTasks.Count -le
     [int]$gitDiscipline.agentTicketQueues.cursorUiMaximumOpenTickets -and
   $codexAuthOpenTasks.Count -le
     [int]$gitDiscipline.agentTicketQueues.codexAuthMaximumOpenTickets -and
   $codexBackendOpenTasks.Count -le
-    [int]$gitDiscipline.agentTicketQueues.codexBackendMaximumOpenTickets
+    [int]$gitDiscipline.agentTicketQueues.codexBackendMaximumOpenTickets -and
+  $integrationRepairOpenTasks.Count -le
+    [int]$gitDiscipline.agentTicketQueues.integrationRepairMaximumOpenTickets
 ) 'an agent lane has more than one open production ticket.'
 $ownerToTask = @{}
 foreach ($claim in $claims) {
@@ -1162,6 +1277,12 @@ if ($ProductionLane -ceq 'baseline') {
     'codex_backend' {
       @('task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
     }
+    'integration_repair' {
+      @(
+        'coordination_bootstrap','task_start','implementation','pre_commit',
+        'handoff','integration_admission_authorize'
+      )
+    }
     'integration' {
       @('integration_start','integration_verify','integration_close','candidate_preflight')
     }
@@ -1191,8 +1312,17 @@ if ($ProductionLane -ceq 'baseline') {
         $_.ToLowerInvariant()
       })
       foreach ($changedOwner in $changedOwners) {
+        $changedOwnerKey = $changedOwner.ToLowerInvariant()
+        $repairAutomaticOwner = (
+          $ProductionLane -ceq 'integration_repair' -and
+          -not @($expectedRepairConflictOwners | ForEach-Object {
+            $_.ToLowerInvariant()
+          }).Contains($changedOwnerKey) -and
+          $ownerToTask.ContainsKey($changedOwnerKey)
+        )
         Assert-Coordination (
-          $effectiveOwnerKeys.Contains($changedOwner.ToLowerInvariant())
+          $effectiveOwnerKeys.Contains($changedOwnerKey) -or
+          $repairAutomaticOwner
         ) "production feature changed an owner outside its claim: $changedOwner"
       }
     }
@@ -1218,6 +1348,26 @@ if ($ProductionLane -ceq 'baseline') {
     ) 'production pre-commit requires one fully staged atomic change set.'
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head `
       -IndexOnly
+    if ($ProductionLane -ceq 'integration_repair') {
+      Assert-Coordination ($head -ceq $baseCommit) `
+        'integration repair pre-commit must retain the bootstrap HEAD.'
+      $repairMergeHeadPath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and
+        (Test-Path -LiteralPath $repairMergeHeadPath -PathType Leaf)
+      ) 'integration repair pre-commit requires an active merge.'
+      $repairMergeHead = (Get-Content -Raw -LiteralPath $repairMergeHeadPath).Trim()
+      $repairUnmergedOwners = @(& git -C $root diff --name-only --diff-filter=U)
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $repairUnmergedOwners.Count -eq 0
+      ) 'integration repair pre-commit contains unresolved index entries.'
+      $repairIndexTree = (& git -C $root write-tree).Trim()
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $repairIndexTree -cmatch '^[0-9a-f]{40}$'
+      ) 'integration repair staged tree could not be written.'
+      Assert-IntegrationRepairMerge -FirstParent $head `
+        -SecondParent $repairMergeHead -ActualTree $repairIndexTree
+    }
   }
 
   if ($ProductionPhase -ceq 'task_start') {
@@ -1237,8 +1387,15 @@ if ($ProductionLane -ceq 'baseline') {
         "$baseCommit..$head")
     Assert-Coordination ($LASTEXITCODE -eq 0) `
       'production feature merge inventory failed.'
-    Assert-Coordination ($featureMergeCommits.Count -eq 0) `
-      'production feature branch contains a merge commit.'
+    if ($ProductionLane -ceq 'integration_repair') {
+      Assert-Coordination (
+        $featureMergeCommits.Count -eq
+          [int]$integrationRepair.maximumMergeCommits
+      ) 'integration repair merge count changed.'
+    } else {
+      Assert-Coordination ($featureMergeCommits.Count -eq 0) `
+        'production feature branch contains a merge commit.'
+    }
     $featureCommits = @(& git -C $root rev-list --reverse `
         "$baseCommit..$head")
     Assert-Coordination ($LASTEXITCODE -eq 0 -and $featureCommits.Count -gt 0) `
@@ -1254,7 +1411,76 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$subjectOutput[0] -cmatch $subjectPattern
       ) "production feature commit subject is not atomic: $featureCommit"
     }
+    if ($ProductionLane -ceq 'integration_repair') {
+      $repairDirectCommits = @(& git -C $root rev-list --no-merges `
+          "$baseCommit..$head")
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $repairDirectCommits.Count -eq 0
+      ) 'integration repair contains a forbidden direct commit.'
+      Assert-Coordination ($featureCommits.Count -eq 1 -and $head -ceq $featureCommits[0]) `
+        'integration repair must end at its single merge commit.'
+      $repairParentOutput = @(& git -C $root show -s --format='%P' $head)
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $repairParentOutput.Count -eq 1
+      ) 'integration repair merge parent read failed.'
+      $repairParents = @([string]$repairParentOutput[0] -split ' ')
+      Assert-Coordination (
+        $repairParents.Count -eq 2 -and $repairParents[0] -ceq $baseCommit
+      ) 'integration repair merge first parent changed.'
+      $repairActualTree = (& git -C $root show -s --format='%T' $head).Trim()
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $repairActualTree -cmatch '^[0-9a-f]{40}$'
+      ) 'integration repair merge tree read failed.'
+      Assert-IntegrationRepairMerge -FirstParent $repairParents[0] `
+        -SecondParent $repairParents[1] -ActualTree $repairActualTree
+      $codexRemoteHead = Get-ProductionRemoteBranchHead `
+        ([string]$integrationRepair.requiredCodexBranch)
+      $cursorRemoteHead = Get-ProductionRemoteBranchHead `
+        ([string]$integrationRepair.requiredCursorBranch)
+      Assert-Coordination (
+        $codexRemoteHead -ceq [string]$integrationRepair.requiredCodexCommit -and
+        $cursorRemoteHead -ceq [string]$integrationRepair.requiredCursorCommit
+      ) 'integration repair sealed source remote changed.'
+    }
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head
+  }
+
+  if ($ProductionPhase -ceq 'integration_admission_authorize') {
+    Assert-Coordination ($ProductionLane -ceq 'integration_repair') `
+      'fresh integration admission is valid only from the repair lane.'
+    Assert-Coordination (
+      (Test-ProductionWorktreeClean) -and
+      $IntegrationTargetWorkId -ceq
+        [string]$integrationRepair.freshIntegrationWorkId -and
+      $IntegrationTargetTicketId -ceq
+        [string]$integrationRepair.freshIntegrationTicketId
+    ) 'fresh integration admission identity or repair cleanliness changed.'
+    $repairRemoteHead = Get-ProductionRemoteBranchHead $branch
+    Assert-Coordination ($repairRemoteHead -ceq $head) `
+      'fresh integration admission requires exact repair remote readback.'
+    $targetRootForward = ConvertTo-ProductionForwardPath $IntegrationTargetRoot
+    Assert-Coordination (
+      $targetRootForward -ceq
+        [string]$integrationRepair.freshIntegrationWorktreePath -and
+      (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
+    ) 'fresh integration target worktree path changed or is missing.'
+    $targetBranch = (& git -C $IntegrationTargetRoot branch --show-current).Trim()
+    $targetHead = (& git -C $IntegrationTargetRoot rev-parse HEAD).Trim()
+    $targetStatus = @(& git -C $IntegrationTargetRoot status --porcelain=v1 `
+        --untracked-files=normal)
+    Assert-Coordination (
+      $LASTEXITCODE -eq 0 -and
+      $targetBranch -ceq [string]$integrationRepair.freshIntegrationBranch -and
+      $targetHead -ceq $workStartCommit -and $targetStatus.Count -eq 0
+    ) 'fresh integration target is not clean at the governance tag.'
+    Assert-ProductionManagedWorktreesClean
+    $targetRemoteRef = 'refs/heads/' + [string]$integrationRepair.freshIntegrationBranch
+    $existingTargetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads `
+        origin $targetRemoteRef 2>$null)
+    Assert-Coordination (
+      $LASTEXITCODE -eq 0 -and $existingTargetRemote.Count -eq 0
+    ) 'fresh integration target remote branch already exists.'
+    Write-Output ([string]$integrationRepair.freshIntegrationMergeSubject)
   }
 
   if ($ProductionPhase -ceq 'founder_acceptance') {
@@ -1488,6 +1714,38 @@ if ($ProductionLane -ceq 'baseline') {
       $approvedRemoteHead = Get-ProductionRemoteBranchHead $approvedBranch
       Assert-Coordination ($approvedRemoteHead -ceq $approvedCommit) `
         "approved feature remote branch differs from its accepted commit: $approvedBranch"
+    }
+    if ($approvedBranches.Count -eq 1 -and
+        [string]$approvedBranches[0] -ceq
+          'work/integration-repair/social-runtime-chat-conflict-correction-20260825') {
+      $qualifiedRepairCommit = [string]$approvedCommits[0]
+      & git -C $root merge-base --is-ancestor `
+        ([string]$integrationRepair.requiredCodexCommit) $qualifiedRepairCommit
+      $repairHasCodex = $LASTEXITCODE -eq 0
+      & git -C $root merge-base --is-ancestor `
+        ([string]$integrationRepair.requiredCursorCommit) $qualifiedRepairCommit
+      $repairHasCursor = $LASTEXITCODE -eq 0
+      $codexRemoteHead = Get-ProductionRemoteBranchHead `
+        ([string]$integrationRepair.requiredCodexBranch)
+      $cursorRemoteHead = Get-ProductionRemoteBranchHead `
+        ([string]$integrationRepair.requiredCursorBranch)
+      $repairRemoteHead = Get-ProductionRemoteBranchHead `
+        ([string]$approvedBranches[0])
+      Assert-Coordination (
+        $repairHasCodex -and $repairHasCursor -and
+        $codexRemoteHead -ceq [string]$integrationRepair.requiredCodexCommit -and
+        $cursorRemoteHead -ceq [string]$integrationRepair.requiredCursorCommit -and
+        $repairRemoteHead -ceq $qualifiedRepairCommit
+      ) 'qualified repair ancestry or sealed remote readback changed.'
+      Assert-Coordination ($integrationMerges.Count -eq 1) `
+        'fresh integration must contain exactly one repair-tip merge.'
+      $freshIntegrationSubject = @(& git -C $root show -s --format='%s' `
+          $integrationMerges[0])
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $freshIntegrationSubject.Count -eq 1 -and
+        [string]$freshIntegrationSubject[0] -ceq
+          [string]$integrationRepair.freshIntegrationMergeSubject
+      ) 'fresh integration merge subject differs from the exact admission.'
     }
     Assert-ProductionSecretSafe -BaseCommit $workStartCommit -HeadCommit $head
     if ($ProductionPhase -cin @('integration_close','candidate_preflight')) {
