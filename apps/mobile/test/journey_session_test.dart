@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -180,6 +182,107 @@ void main() {
     expect(session.stage, JourneyStage.bootFailure);
     expect(session.busy, isFalse);
     expect(session.errorMessage, contains('Nothing was changed'));
+  });
+
+  test('timeout principal change is invalid, never retryable', () async {
+    final protector = const ReviewPrincipalBindingProtector();
+    final before = await protector.protect('private-user-a');
+    final after = await protector.protect('private-user-b');
+    final bootstrap = _TimeoutPrincipalBootstrap([before, after]);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: before);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+      accountBootstrapTimeout: const Duration(milliseconds: 1),
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(
+      session.authenticatedBootstrapState,
+      AuthenticatedAccountBootstrapState.invalidSession,
+    );
+    expect(bootstrap.invalidationCount, 1);
+    expect(receiptStore.binding, isNull);
+  });
+
+  test(
+    'timeout is retryable only across exact pre-post-receipt match',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _TimeoutPrincipalBootstrap([binding, binding]);
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+        accountBootstrapTimeout: const Duration(milliseconds: 1),
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(
+        session.authenticatedBootstrapState,
+        AuthenticatedAccountBootstrapState.retryableUnavailable,
+      );
+      expect(bootstrap.invalidationCount, 0);
+      expect(receiptStore.binding!.matches(binding), isTrue);
+    },
+  );
+
+  test('timeout with mismatched stored receipt invalidates session', () async {
+    final protector = const ReviewPrincipalBindingProtector();
+    final current = await protector.protect('private-user-a');
+    final stored = await protector.protect('private-user-b');
+    final bootstrap = _TimeoutPrincipalBootstrap([current, current]);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: stored);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+      accountBootstrapTimeout: const Duration(milliseconds: 1),
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(
+      session.authenticatedBootstrapState,
+      AuthenticatedAccountBootstrapState.invalidSession,
+    );
+    expect(bootstrap.invalidationCount, 1);
+    expect(receiptStore.binding, isNull);
   });
 
   test(
@@ -872,6 +975,33 @@ class _NeverCompletesAccountBootstrap implements AccountBootstrapGateway {
 
   @override
   Future<void> invalidateLocalSession() async {}
+}
+
+class _TimeoutPrincipalBootstrap implements AccountBootstrapGateway {
+  _TimeoutPrincipalBootstrap(this.bindings);
+
+  final List<VerifiedPrincipalBinding?> bindings;
+  int bindingReadCount = 0;
+  int invalidationCount = 0;
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async {
+    final index = bindingReadCount < bindings.length
+        ? bindingReadCount
+        : bindings.length - 1;
+    bindingReadCount += 1;
+    return bindings[index];
+  }
+
+  @override
+  Future<void> invalidateLocalSession() async {
+    invalidationCount += 1;
+  }
+
+  @override
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) => Completer<AuthenticatedAccountBootstrapResult>().future;
 }
 
 class _CallbackSocialAuthGateway

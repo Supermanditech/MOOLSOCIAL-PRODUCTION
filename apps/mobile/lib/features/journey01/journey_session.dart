@@ -1642,15 +1642,67 @@ class JourneySession extends ChangeNotifier {
         .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
         .timeout(
           accountBootstrapTimeout,
-          onTimeout: () => localBinding == null
+          onTimeout: () => expectedUserId?.trim().isNotEmpty ?? false
               ? const AuthenticatedAccountBootstrapResult.fatal(
                   code: 'auth-session-timeout',
                 )
-              : AuthenticatedAccountBootstrapResult.retryableUnavailable(
-                  localBinding,
-                  code: 'auth-session-timeout',
-                ),
+              : _classifyBootstrapTimeout(localBinding),
         );
+  }
+
+  Future<AuthenticatedAccountBootstrapResult> _classifyBootstrapTimeout(
+    VerifiedPrincipalBinding? before,
+  ) async {
+    if (before == null) {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-unbound',
+      );
+    }
+
+    final VerifiedPrincipalBinding? after;
+    try {
+      after = await _accountBootstrapGateway.currentPrincipalBinding().timeout(
+        accountBootstrapTimeout,
+      );
+    } on Object {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-recheck-failed',
+      );
+    }
+    if (after == null) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-missing',
+      );
+    }
+    if (!before.matches(after)) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-user-mismatch',
+      );
+    }
+
+    final VerifiedPrincipalBinding? stored;
+    try {
+      stored = await _verifiedPrincipalBindingStore.read();
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-binding-reset-required',
+      );
+    }
+    if (stored == null) {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-unbound',
+      );
+    }
+    if (!stored.matches(after)) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-binding-mismatch',
+      );
+    }
+    return AuthenticatedAccountBootstrapResult.retryableUnavailable(
+      after,
+      code: 'auth-session-timeout',
+    );
   }
 
   Future<bool> _acceptAuthenticatedRelaunch(
