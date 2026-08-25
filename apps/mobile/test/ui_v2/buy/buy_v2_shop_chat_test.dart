@@ -2297,6 +2297,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Android Back dismisses inbox search before leaving Chat', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+
+    final search = find.byKey(const ValueKey('buy-shop-chat-search'));
+    await tester.tap(search);
+    await tester.enterText(search, 'order');
+    await tester.pump();
+    expect(tester.widget<TextField>(search).focusNode!.hasFocus, isTrue);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+    expect(tester.widget<TextField>(search).controller!.text, 'order');
+    expect(tester.widget<TextField>(search).focusNode!.hasFocus, isFalse);
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      findsNothing,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Android Back dismisses the composer keyboard before the thread',
     (tester) async {

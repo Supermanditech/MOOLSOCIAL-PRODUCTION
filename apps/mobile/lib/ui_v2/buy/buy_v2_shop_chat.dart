@@ -502,6 +502,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   late final BuyV2ShopChatRetainedState _retainedState;
   late String _filterId;
   late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
   _BuyV2ShopChatSurface _surface = _BuyV2ShopChatSurface.inbox;
   BuyV2ShopChatThread? _selectedThread;
   final GlobalKey<_ShopChatConversationViewState> _threadViewKey = GlobalKey();
@@ -524,6 +525,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         : initialFilterId;
     _retainedState.filterId = _filterId;
     _searchController = TextEditingController(text: _retainedState.inboxQuery);
+    _searchFocusNode = FocusNode(debugLabel: 'Shop Chat inbox search');
     _searchController.addListener(_retainInboxQuery);
   }
 
@@ -533,6 +535,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
               dismissComposerKeyboard: dismissComposerKeyboard,
             ) ??
             false)) {
+      return true;
+    }
+    if (_surface == _BuyV2ShopChatSurface.inbox && _searchFocusNode.hasFocus) {
+      _searchFocusNode.unfocus();
       return true;
     }
     final target = switch (_surface) {
@@ -568,6 +574,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   @override
   void dispose() {
     _searchController.removeListener(_retainInboxQuery);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -648,6 +655,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
             _ShopChatSearch(
               originLabel: widget.originLabel,
               controller: _searchController,
+              focusNode: _searchFocusNode,
               onChanged: (_) => setState(() {}),
               onClear: () {
                 _searchController.clear();
@@ -1091,12 +1099,14 @@ class _ShopChatSearch extends StatelessWidget {
   const _ShopChatSearch({
     required this.originLabel,
     required this.controller,
+    required this.focusNode,
     required this.onChanged,
     required this.onClear,
   });
 
   final String originLabel;
   final TextEditingController controller;
+  final FocusNode focusNode;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
 
@@ -1109,6 +1119,7 @@ class _ShopChatSearch extends StatelessWidget {
         child: TextField(
           key: const ValueKey('buy-shop-chat-search'),
           controller: controller,
+          focusNode: focusNode,
           onChanged: onChanged,
           textInputAction: TextInputAction.search,
           style: context.buyBody.copyWith(fontSize: 13),
