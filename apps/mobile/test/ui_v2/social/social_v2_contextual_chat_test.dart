@@ -958,6 +958,24 @@ void main() {
     expect(work.last.capabilities.locationSharing, isFalse);
   });
 
+  test('context adapter forwards the backend loading contract', () async {
+    final source = _LoadingContextualChatSource();
+    final adapter = MoolContextualChatSourceAdapter(
+      familyId: 'ride',
+      source: source,
+    );
+    addTearDown(source.dispose);
+
+    expect(adapter.loadState, BuyV2ShopChatLoadState.failed);
+    expect(
+      adapter.loadErrorMessage,
+      'Travel conversations could not load. Try again.',
+    );
+    await adapter.retryLoading();
+    expect(source.retryCalls, 1);
+    expect(adapter.loadState, BuyV2ShopChatLoadState.ready);
+  });
+
   testWidgets('contextual Chat family review captures', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -1215,6 +1233,26 @@ class _LiveContextualChatSource extends ChangeNotifier
       orderSharing: false,
     ),
   );
+}
+
+class _LoadingContextualChatSource extends ChangeNotifier
+    implements MoolContextualChatProvisioningSource, BuyV2ShopChatLoadSource {
+  @override
+  BuyV2ShopChatLoadState loadState = BuyV2ShopChatLoadState.failed;
+  @override
+  String? loadErrorMessage = 'Travel conversations could not load. Try again.';
+  int retryCalls = 0;
+
+  @override
+  List<BuyV2ShopChatThread> threadsFor(String familyId) => const [];
+
+  @override
+  Future<void> retryLoading() async {
+    retryCalls += 1;
+    loadState = BuyV2ShopChatLoadState.ready;
+    loadErrorMessage = null;
+    notifyListeners();
+  }
 }
 
 class _Owners {

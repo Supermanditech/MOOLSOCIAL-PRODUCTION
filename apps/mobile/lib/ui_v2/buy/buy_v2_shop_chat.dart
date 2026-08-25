@@ -294,6 +294,14 @@ abstract interface class BuyV2ShopChatProvisioningSource {
   List<BuyV2ShopChatThread> threads(BuyV2Session? session);
 }
 
+enum BuyV2ShopChatLoadState { ready, loading, failed }
+
+abstract interface class BuyV2ShopChatLoadSource {
+  BuyV2ShopChatLoadState get loadState;
+  String? get loadErrorMessage;
+  Future<void> retryLoading();
+}
+
 /// Presentation-only default. A later runtime owner can provide authoritative
 /// participants and messages through [BuyV2ShopChatProvisioningSource]
 /// without changing Shop Chat layout or interaction contracts.
@@ -610,9 +618,12 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
       _BuyV2ShopChatSurface.newConversation => _ShopChatNewConversationView(
         entries: widget.provisioningSource.threads(widget.session),
         presentation: widget.presentation,
+        loadState: _loadSource?.loadState ?? BuyV2ShopChatLoadState.ready,
+        loadErrorMessage: _loadSource?.loadErrorMessage,
         navigationForward: navigationForward,
         onBack: () => handleBack(dismissComposerKeyboard: false),
         onSelected: _openThread,
+        onRetry: _retryProvisioning,
         onOpenAll: widget.onOpenProductionChat,
       ),
       _BuyV2ShopChatSurface.thread => _ShopChatConversationView(
@@ -647,11 +658,13 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     BuildContext context, {
     required Widget? navigationForward,
   }) {
-    final entries = _visibleEntries();
+    final provisionedEntries = widget.provisioningSource.threads(
+      widget.session,
+    );
+    final entries = _visibleEntries(provisionedEntries);
     final query = _searchController.text.trim();
-    final hasProvisionedEntries =
-        entries.isNotEmpty ||
-        widget.provisioningSource.threads(widget.session).isNotEmpty;
+    final hasProvisionedEntries = provisionedEntries.isNotEmpty;
+    final loadSource = _loadSource;
     return Semantics(
       key: const ValueKey('buy-shop-chat'),
       container: true,
@@ -704,6 +717,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                                   ? null
                                   : widget.presentation.filter(_filterId).label,
                               hasProvisionedEntries: hasProvisionedEntries,
+                              loadState:
+                                  loadSource?.loadState ??
+                                  BuyV2ShopChatLoadState.ready,
+                              loadErrorMessage: loadSource?.loadErrorMessage,
                               onClearSearch: () {
                                 _searchController.clear();
                                 setState(() {});
@@ -713,6 +730,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                                 _retainedState.filterId = 'all';
                               }),
                               onChooseConversation: _showNewConversationPicker,
+                              onRetry: _retryProvisioning,
                               onOpenAll: widget.onOpenProductionChat,
                             )
                           : ListView.builder(
@@ -883,6 +901,30 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     _retainedState.inboxQuery = _searchController.text;
   }
 
+  BuyV2ShopChatLoadSource? get _loadSource {
+    final source = widget.provisioningSource;
+    return source is BuyV2ShopChatLoadSource
+        ? source as BuyV2ShopChatLoadSource
+        : null;
+  }
+
+  Future<void> _retryProvisioning() async {
+    final loadSource = _loadSource;
+    if (loadSource == null) return;
+    try {
+      await loadSource.retryLoading();
+    } on Object {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.removeCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Conversations still couldn’t load. Try again.'),
+        ),
+      );
+    }
+  }
+
   void _bindProvisioningSource(BuyV2ShopChatProvisioningSource source) {
     final updates = source is Listenable ? source as Listenable : null;
     _provisioningUpdates = updates;
@@ -949,8 +991,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
           '${entry.thread?.title ?? widget.presentation.familyLabel} info',
       };
 
-  List<BuyV2ShopChatThread> _visibleEntries() {
-    final allEntries = _entriesFor(_filterId);
+  List<BuyV2ShopChatThread> _visibleEntries(
+    List<BuyV2ShopChatThread> provisionedEntries,
+  ) {
+    final allEntries = _entriesFor(_filterId, provisionedEntries);
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return allEntries;
     final tokens = query
@@ -969,8 +1013,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         .toList(growable: false);
   }
 
-  List<BuyV2ShopChatThread> _entriesFor(String filterId) {
-    final allEntries = widget.provisioningSource.threads(widget.session);
+  List<BuyV2ShopChatThread> _entriesFor(
+    String filterId,
+    List<BuyV2ShopChatThread> allEntries,
+  ) {
     if (filterId != 'all') {
       return allEntries
           .where((entry) => entry.resolvedFilterId == filterId)
@@ -1542,15 +1588,104 @@ class _ShopChatEntryTile extends StatelessWidget {
   }
 }
 
+class _ShopChatLoadRecoveryState extends StatelessWidget {
+  const _ShopChatLoadRecoveryState({
+    required this.familyLabel,
+    required this.loadState,
+    required this.loadErrorMessage,
+    required this.retryKey,
+    required this.onRetry,
+  });
+
+  final String familyLabel;
+  final BuyV2ShopChatLoadState loadState;
+  final String? loadErrorMessage;
+  final String retryKey;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = loadState == BuyV2ShopChatLoadState.loading;
+    final title = loading
+        ? 'Loading $familyLabel conversations'
+        : '$familyLabel conversations couldn’t load';
+    final detail = loading
+        ? 'Your conversations will appear here when Chat finishes loading.'
+        : loadErrorMessage?.trim().isNotEmpty == true
+        ? loadErrorMessage!.trim()
+        : 'Chat couldn’t load these conversations. Try again.';
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title. $detail',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              else
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  color: BuyV2Colors.muted,
+                  size: 34,
+                ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: context.buyBody,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                detail,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: context.buyMeta,
+              ),
+              if (!loading) ...[
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  key: ValueKey(retryKey),
+                  onPressed: onRetry,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    backgroundColor: BuyV2Colors.navy,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ShopChatEmptyState extends StatelessWidget {
   const _ShopChatEmptyState({
     required this.familyLabel,
     required this.query,
     required this.filterLabel,
     required this.hasProvisionedEntries,
+    required this.loadState,
+    required this.loadErrorMessage,
     required this.onClearSearch,
     required this.onShowAll,
     required this.onChooseConversation,
+    required this.onRetry,
     required this.onOpenAll,
   });
 
@@ -1558,13 +1693,25 @@ class _ShopChatEmptyState extends StatelessWidget {
   final String query;
   final String? filterLabel;
   final bool hasProvisionedEntries;
+  final BuyV2ShopChatLoadState loadState;
+  final String? loadErrorMessage;
   final VoidCallback onClearSearch;
   final VoidCallback onShowAll;
   final VoidCallback onChooseConversation;
+  final VoidCallback onRetry;
   final VoidCallback onOpenAll;
 
   @override
   Widget build(BuildContext context) {
+    if (!hasProvisionedEntries && loadState != BuyV2ShopChatLoadState.ready) {
+      return _ShopChatLoadRecoveryState(
+        familyLabel: familyLabel,
+        loadState: loadState,
+        loadErrorMessage: loadErrorMessage,
+        retryKey: 'buy-shop-chat-empty-retry',
+        onRetry: onRetry,
+      );
+    }
     final (title, detail, actionLabel, actionKey, action) = query.isNotEmpty
         ? (
             'No conversations match “$query”',
@@ -1648,17 +1795,23 @@ class _ShopChatNewConversationView extends StatelessWidget {
   const _ShopChatNewConversationView({
     required this.entries,
     required this.presentation,
+    required this.loadState,
+    required this.loadErrorMessage,
     required this.navigationForward,
     required this.onBack,
     required this.onSelected,
+    required this.onRetry,
     required this.onOpenAll,
   });
 
   final List<BuyV2ShopChatThread> entries;
   final BuyV2ShopChatPresentation presentation;
+  final BuyV2ShopChatLoadState loadState;
+  final String? loadErrorMessage;
   final Widget? navigationForward;
   final VoidCallback onBack;
   final ValueChanged<BuyV2ShopChatThread> onSelected;
+  final VoidCallback onRetry;
   final VoidCallback onOpenAll;
 
   @override
@@ -1764,6 +1917,9 @@ class _ShopChatNewConversationView extends StatelessWidget {
             child: entries.isEmpty
                 ? _ShopChatNewConversationEmptyState(
                     familyLabel: presentation.familyLabel,
+                    loadState: loadState,
+                    loadErrorMessage: loadErrorMessage,
+                    onRetry: onRetry,
                     onOpenAll: onOpenAll,
                   )
                 : ListView.separated(
@@ -1841,14 +1997,29 @@ class _ShopChatNewConversationView extends StatelessWidget {
 class _ShopChatNewConversationEmptyState extends StatelessWidget {
   const _ShopChatNewConversationEmptyState({
     required this.familyLabel,
+    required this.loadState,
+    required this.loadErrorMessage,
+    required this.onRetry,
     required this.onOpenAll,
   });
 
   final String familyLabel;
+  final BuyV2ShopChatLoadState loadState;
+  final String? loadErrorMessage;
+  final VoidCallback onRetry;
   final VoidCallback onOpenAll;
 
   @override
   Widget build(BuildContext context) {
+    if (loadState != BuyV2ShopChatLoadState.ready) {
+      return _ShopChatLoadRecoveryState(
+        familyLabel: familyLabel,
+        loadState: loadState,
+        loadErrorMessage: loadErrorMessage,
+        retryKey: 'buy-shop-chat-new-retry',
+        onRetry: onRetry,
+      );
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

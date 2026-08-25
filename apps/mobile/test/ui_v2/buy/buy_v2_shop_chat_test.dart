@@ -300,6 +300,52 @@ void main() {
   );
 
   testWidgets(
+    'async provisioning shows truthful loading failure and retry states',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      final source = _LoadingShopChatSource();
+      addTearDown(source.dispose);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(app(session, shopChatSource: source));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Loading Shop conversations'), findsOneWidget);
+      expect(
+        find.text('No Shop conversations are available yet'),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Loading Shop conversations'), findsOneWidget);
+
+      source.failLoading();
+      await tester.pumpAndSettle();
+      expect(find.text('Shop conversations couldn’t load'), findsOneWidget);
+      expect(
+        find.text('Chat service is unavailable right now. Try again.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-retry')));
+      await tester.pumpAndSettle();
+      expect(source.retryCalls, 1);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-new-live-support')),
+        findsOneWidget,
+      );
+      expect(find.text('Loading Shop conversations'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Shop subactions seed the matching Chat filter and return cleanly',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -2866,6 +2912,38 @@ class _LiveShopChatSource extends ChangeNotifier
     contextDetail: 'Current order and delivery context',
     messages: messages,
   );
+}
+
+class _LoadingShopChatSource extends ChangeNotifier
+    implements BuyV2ShopChatProvisioningSource, BuyV2ShopChatLoadSource {
+  List<BuyV2ShopChatThread> _threads = [];
+  @override
+  BuyV2ShopChatLoadState loadState = BuyV2ShopChatLoadState.loading;
+  @override
+  String? loadErrorMessage;
+  int retryCalls = 0;
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
+      List<BuyV2ShopChatThread>.unmodifiable(_threads);
+
+  void failLoading() {
+    loadState = BuyV2ShopChatLoadState.failed;
+    loadErrorMessage = 'Chat service is unavailable right now. Try again.';
+    notifyListeners();
+  }
+
+  @override
+  Future<void> retryLoading() async {
+    retryCalls += 1;
+    loadState = BuyV2ShopChatLoadState.loading;
+    loadErrorMessage = null;
+    notifyListeners();
+    await Future<void>.delayed(Duration.zero);
+    _threads = [_LiveShopChatSource._thread()];
+    loadState = BuyV2ShopChatLoadState.ready;
+    notifyListeners();
+  }
 }
 
 class _RichShopChatSource implements BuyV2ShopChatProvisioningSource {

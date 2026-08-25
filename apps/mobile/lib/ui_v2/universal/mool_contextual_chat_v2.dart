@@ -22,7 +22,10 @@ class MoolDefaultContextualChatProvisioningSource
 }
 
 class MoolContextualChatSourceAdapter
-    implements BuyV2ShopChatProvisioningSource, Listenable {
+    implements
+        BuyV2ShopChatProvisioningSource,
+        BuyV2ShopChatLoadSource,
+        Listenable {
   const MoolContextualChatSourceAdapter({
     required this.familyId,
     required this.source,
@@ -34,6 +37,27 @@ class MoolContextualChatSourceAdapter
   @override
   List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
       source.threadsFor(familyId);
+
+  BuyV2ShopChatLoadSource? get _loadSource {
+    final candidate = source;
+    return candidate is BuyV2ShopChatLoadSource
+        ? candidate as BuyV2ShopChatLoadSource
+        : null;
+  }
+
+  @override
+  BuyV2ShopChatLoadState get loadState =>
+      _loadSource?.loadState ?? BuyV2ShopChatLoadState.ready;
+
+  @override
+  String? get loadErrorMessage => _loadSource?.loadErrorMessage;
+
+  @override
+  Future<void> retryLoading() async {
+    final loadSource = _loadSource;
+    if (loadSource == null) return;
+    await loadSource.retryLoading();
+  }
 
   @override
   void addListener(VoidCallback listener) {
