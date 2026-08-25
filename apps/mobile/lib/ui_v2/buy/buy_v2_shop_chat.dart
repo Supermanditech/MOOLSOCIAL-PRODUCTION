@@ -1713,206 +1713,240 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   @override
   Widget build(BuildContext context) {
     final messages = _visibleMessages();
-    return Semantics(
-      key: const ValueKey('buy-shop-chat-thread'),
-      container: true,
-      label: '${widget.thread.title} conversation',
-      child: ColoredBox(
-        color: const Color(0xFFF2F3F9),
-        child: Column(
-          children: [
-            if (_selectedMessage case final selected?)
-              _ShopChatSelectionHeader(
-                familyLabel: widget.presentation.familyLabel,
-                onClose: () => setState(() => _selectedMessage = null),
-                onReply: () {
-                  setState(() {
-                    _setReplyTarget(selected);
-                    _selectedMessage = null;
-                  });
-                },
-                onReact: () => _dispatchDirect(
-                  BuyV2ShopChatActionKind.reactToMessage,
-                  message: selected,
-                  text: 'like',
-                ),
-                onCopy: () => _copyMessage(selected),
-                onForward: () => _dispatchDirect(
-                  BuyV2ShopChatActionKind.forwardMessage,
-                  message: selected,
-                ),
-              )
-            else
-              _ShopChatThreadHeader(
-                thread: widget.thread,
-                presentation: widget.presentation,
-                onBack: widget.onBack,
-                onOpenInfo: widget.onOpenInfo,
-                onVoiceCall: widget.thread.capabilities.voiceCall
-                    ? () => _dispatchDirect(
-                        BuyV2ShopChatActionKind.startVoiceCall,
-                      )
-                    : null,
-                onVideoCall: widget.thread.capabilities.videoCall
-                    ? () => _dispatchDirect(
-                        BuyV2ShopChatActionKind.startVideoCall,
-                      )
-                    : null,
-                onMore: () => setState(() {
-                  _threadMenuOpen = !_threadMenuOpen;
-                  _attachmentOpen = false;
-                }),
-              ),
-            ?widget.navigationForward,
-            if (_threadMenuOpen)
-              _ShopChatInlineThreadMenu(
-                presentation: widget.presentation,
-                onInfo: () {
-                  setState(() => _threadMenuOpen = false);
-                  widget.onOpenInfo();
-                },
-                onSearch: () => setState(() {
-                  _threadMenuOpen = false;
-                  _setSearchOpen(true);
-                }),
-                onNotifications: () => _dispatchDirect(
-                  BuyV2ShopChatActionKind.manageNotifications,
-                ),
-                onSafety: () =>
-                    _dispatchDirect(BuyV2ShopChatActionKind.openSafety),
-              ),
-            if (_searchOpen)
-              _ShopChatMessageSearch(
-                threadTitle: widget.thread.title,
-                controller: _messageSearchController,
-                onChanged: (_) => setState(() {}),
-                onClose: () {
-                  _messageSearchController.clear();
-                  setState(() => _setSearchOpen(false));
-                },
-              ),
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: _ShopChatConversationCanvas(
-                      accent: widget.presentation.accent,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactInputSurface =
+            constraints.maxWidth <= 340 || constraints.maxHeight < 420;
+        return Semantics(
+          key: const ValueKey('buy-shop-chat-thread'),
+          container: true,
+          label: '${widget.thread.title} conversation',
+          child: ColoredBox(
+            color: const Color(0xFFF2F3F9),
+            child: Column(
+              children: [
+                if (_selectedMessage case final selected?)
+                  _ShopChatSelectionHeader(
+                    familyLabel: widget.presentation.familyLabel,
+                    onClose: () => setState(() => _selectedMessage = null),
+                    onReply: () {
+                      setState(() {
+                        _setReplyTarget(selected);
+                        _selectedMessage = null;
+                      });
+                    },
+                    onReact: () => _dispatchDirect(
+                      BuyV2ShopChatActionKind.reactToMessage,
+                      message: selected,
+                      text: 'like',
                     ),
-                  ),
-                  Positioned.fill(
-                    child: BuyV2ShopChatFilterMotion(
-                      stateKey:
-                          '${widget.thread.id}|${_messageSearchController.text}',
-                      child: ListView(
-                        key: const ValueKey('buy-shop-chat-message-list'),
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                        children: [
-                          _ShopChatCommerceContext(
-                            thread: widget.thread,
-                            onTap: widget.onOpenContext,
-                            familyLabel: widget.presentation.familyLabel,
-                          ),
-                          if (widget.presentation.familyId == 'book') ...[
-                            const SizedBox(height: 10),
-                            _ShopChatCareSafetyNotice(
-                              message: widget.presentation.securityMessage,
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          if (messages.isEmpty)
-                            _ShopChatWelcomePanel(
-                              thread: widget.thread,
-                              presentation: widget.presentation,
-                            )
-                          else ...[
-                            const Center(child: _ShopChatDayChip()),
-                            const SizedBox(height: 10),
-                            ...messages.map(
-                              (message) => _ShopChatMessageBubble(
-                                message: message,
-                                onForward: () => _dispatchDirect(
-                                  BuyV2ShopChatActionKind.forwardMessage,
-                                  message: message,
-                                ),
-                                onTap:
-                                    message.kind ==
-                                        BuyV2ShopChatMessageKind.text
-                                    ? null
-                                    : () => _dispatchDirect(
-                                        BuyV2ShopChatActionKind.openAttachment,
-                                        message: message,
-                                      ),
-                                onLongPress: () {
-                                  HapticFeedback.mediumImpact();
-                                  setState(() => _selectedMessage = message);
-                                },
-                              ),
-                            ),
-                          ],
-                          if (_messageSearchController.text.trim().isEmpty) ...[
-                            const SizedBox(height: 12),
-                            _ShopChatQuickReplies(
-                              values: widget.thread.quickReplies,
-                              onSelected: (value) {
-                                _composerController.text = value;
-                                _composerController.selection =
-                                    TextSelection.collapsed(
-                                      offset: value.length,
-                                    );
-                                setState(() => _emojiOpen = false);
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
+                    onCopy: () => _copyMessage(selected),
+                    onForward: () => _dispatchDirect(
+                      BuyV2ShopChatActionKind.forwardMessage,
+                      message: selected,
                     ),
+                  )
+                else
+                  _ShopChatThreadHeader(
+                    thread: widget.thread,
+                    presentation: widget.presentation,
+                    onBack: widget.onBack,
+                    onOpenInfo: widget.onOpenInfo,
+                    onVoiceCall: widget.thread.capabilities.voiceCall
+                        ? () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.startVoiceCall,
+                          )
+                        : null,
+                    onVideoCall: widget.thread.capabilities.videoCall
+                        ? () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.startVideoCall,
+                          )
+                        : null,
+                    onMore: () => setState(() {
+                      _threadMenuOpen = !_threadMenuOpen;
+                      _attachmentOpen = false;
+                    }),
                   ),
-                ],
-              ),
-            ),
-            if (_attachmentOpen)
-              _ShopChatInlineAttachmentTray(
-                capabilities: widget.thread.capabilities,
-                presentation: widget.presentation,
-                onSelected: (kind) {
-                  setState(() => _attachmentOpen = false);
-                  _dispatchDirect(kind);
-                },
-              ),
-            _ShopChatComposer(
-              controller: _composerController,
-              replyTarget: _replyTarget,
-              emojiOpen: _emojiOpen,
-              busy: _dispatching,
-              onChanged: (_) => setState(() {}),
-              onCancelReply: () => setState(() => _setReplyTarget(null)),
-              onToggleEmoji: () => setState(() => _emojiOpen = !_emojiOpen),
-              onEmoji: (emoji) {
-                final value = '${_composerController.text}$emoji';
-                _composerController.text = value;
-                _composerController.selection = TextSelection.collapsed(
-                  offset: value.length,
-                );
-                setState(() {});
-              },
-              onAttachment: widget.thread.capabilities.canAttach
-                  ? () => setState(() {
-                      _attachmentOpen = !_attachmentOpen;
+                ?widget.navigationForward,
+                if (_threadMenuOpen)
+                  _ShopChatInlineThreadMenu(
+                    presentation: widget.presentation,
+                    onInfo: () {
+                      setState(() => _threadMenuOpen = false);
+                      widget.onOpenInfo();
+                    },
+                    onSearch: () => setState(() {
                       _threadMenuOpen = false;
+                      _setSearchOpen(true);
+                    }),
+                    onNotifications: () => _dispatchDirect(
+                      BuyV2ShopChatActionKind.manageNotifications,
+                    ),
+                    onSafety: () =>
+                        _dispatchDirect(BuyV2ShopChatActionKind.openSafety),
+                  ),
+                if (_searchOpen)
+                  _ShopChatMessageSearch(
+                    threadTitle: widget.thread.title,
+                    controller: _messageSearchController,
+                    onChanged: (_) => setState(() {}),
+                    onClose: () {
+                      _messageSearchController.clear();
+                      setState(() => _setSearchOpen(false));
+                    },
+                  ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _ShopChatConversationCanvas(
+                          accent: widget.presentation.accent,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: BuyV2ShopChatFilterMotion(
+                          stateKey:
+                              '${widget.thread.id}|${_messageSearchController.text}',
+                          child: ListView(
+                            key: const ValueKey('buy-shop-chat-message-list'),
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                            children: [
+                              _ShopChatCommerceContext(
+                                thread: widget.thread,
+                                onTap: widget.onOpenContext,
+                                familyLabel: widget.presentation.familyLabel,
+                              ),
+                              if (widget.presentation.familyId == 'book') ...[
+                                const SizedBox(height: 10),
+                                _ShopChatCareSafetyNotice(
+                                  message: widget.presentation.securityMessage,
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              if (messages.isEmpty)
+                                _ShopChatWelcomePanel(
+                                  thread: widget.thread,
+                                  presentation: widget.presentation,
+                                )
+                              else ...[
+                                const Center(child: _ShopChatDayChip()),
+                                const SizedBox(height: 10),
+                                ...messages.map(
+                                  (message) => _ShopChatMessageBubble(
+                                    message: message,
+                                    onForward: () => _dispatchDirect(
+                                      BuyV2ShopChatActionKind.forwardMessage,
+                                      message: message,
+                                    ),
+                                    onTap:
+                                        message.kind ==
+                                            BuyV2ShopChatMessageKind.text
+                                        ? null
+                                        : () => _dispatchDirect(
+                                            BuyV2ShopChatActionKind
+                                                .openAttachment,
+                                            message: message,
+                                          ),
+                                    onLongPress: () {
+                                      HapticFeedback.mediumImpact();
+                                      setState(
+                                        () => _selectedMessage = message,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                              if (_messageSearchController.text
+                                  .trim()
+                                  .isEmpty) ...[
+                                const SizedBox(height: 12),
+                                _ShopChatQuickReplies(
+                                  values: widget.thread.quickReplies,
+                                  onSelected: (value) {
+                                    _composerController.text = value;
+                                    _composerController.selection =
+                                        TextSelection.collapsed(
+                                          offset: value.length,
+                                        );
+                                    setState(() => _emojiOpen = false);
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_attachmentOpen)
+                  _ShopChatInlineAttachmentTray(
+                    capabilities: widget.thread.capabilities,
+                    presentation: widget.presentation,
+                    compact: compactInputSurface,
+                    onSelected: (kind) {
+                      setState(() => _attachmentOpen = false);
+                      _dispatchDirect(kind);
+                    },
+                  ),
+                _ShopChatComposer(
+                  controller: _composerController,
+                  replyTarget: _replyTarget,
+                  emojiOpen: _emojiOpen,
+                  busy: _dispatching,
+                  onChanged: (_) => setState(() {}),
+                  onTapField: () {
+                    if (!_emojiOpen && !_attachmentOpen) return;
+                    setState(() {
                       _emojiOpen = false;
-                    })
-                  : null,
-              onCamera: widget.thread.capabilities.camera
-                  ? () => _dispatchDirect(BuyV2ShopChatActionKind.captureImage)
-                  : null,
-              onSend: _sendText,
-              onVoice: widget.thread.capabilities.voiceMessages
-                  ? () => _dispatchDirect(BuyV2ShopChatActionKind.recordVoice)
-                  : null,
+                      _attachmentOpen = false;
+                    });
+                  },
+                  onCancelReply: () => setState(() => _setReplyTarget(null)),
+                  onToggleEmoji: () {
+                    final willOpen = !_emojiOpen;
+                    if (willOpen) FocusScope.of(context).unfocus();
+                    setState(() {
+                      _emojiOpen = willOpen;
+                      _attachmentOpen = false;
+                      _threadMenuOpen = false;
+                    });
+                  },
+                  onEmoji: (emoji) {
+                    final value = '${_composerController.text}$emoji';
+                    _composerController.text = value;
+                    _composerController.selection = TextSelection.collapsed(
+                      offset: value.length,
+                    );
+                    setState(() {});
+                  },
+                  onAttachment: widget.thread.capabilities.canAttach
+                      ? () {
+                          final willOpen = !_attachmentOpen;
+                          if (willOpen) FocusScope.of(context).unfocus();
+                          setState(() {
+                            _attachmentOpen = willOpen;
+                            _threadMenuOpen = false;
+                            _emojiOpen = false;
+                          });
+                        }
+                      : null,
+                  onCamera: widget.thread.capabilities.camera
+                      ? () => _dispatchDirect(
+                          BuyV2ShopChatActionKind.captureImage,
+                        )
+                      : null,
+                  onSend: _sendText,
+                  onVoice: widget.thread.capabilities.voiceMessages
+                      ? () =>
+                            _dispatchDirect(BuyV2ShopChatActionKind.recordVoice)
+                      : null,
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -2650,6 +2684,7 @@ class _ShopChatComposer extends StatelessWidget {
     required this.emojiOpen,
     required this.busy,
     required this.onChanged,
+    required this.onTapField,
     required this.onCancelReply,
     required this.onToggleEmoji,
     required this.onEmoji,
@@ -2664,6 +2699,7 @@ class _ShopChatComposer extends StatelessWidget {
   final bool emojiOpen;
   final bool busy;
   final ValueChanged<String> onChanged;
+  final VoidCallback onTapField;
   final VoidCallback onCancelReply;
   final VoidCallback onToggleEmoji;
   final ValueChanged<String> onEmoji;
@@ -2764,6 +2800,7 @@ class _ShopChatComposer extends StatelessWidget {
                               ),
                               controller: controller,
                               onChanged: onChanged,
+                              onTap: onTapField,
                               minLines: 1,
                               maxLines: 4,
                               textCapitalization: TextCapitalization.sentences,
@@ -3204,11 +3241,13 @@ class _ShopChatInlineAttachmentTray extends StatelessWidget {
   const _ShopChatInlineAttachmentTray({
     required this.capabilities,
     required this.presentation,
+    required this.compact,
     required this.onSelected,
   });
 
   final BuyV2ShopChatCapabilities capabilities;
   final BuyV2ShopChatPresentation presentation;
+  final bool compact;
   final ValueChanged<BuyV2ShopChatActionKind> onSelected;
 
   @override
@@ -3264,99 +3303,159 @@ class _ShopChatInlineAttachmentTray extends StatelessWidget {
           BuyV2Colors.navy,
         ),
     ];
-    return Material(
-      key: const ValueKey('buy-shop-chat-attachment-tray'),
-      color: Colors.white,
-      elevation: 8,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+    Widget actionTile(_AttachmentAction action) => Semantics(
+      button: true,
+      label: 'Share ${action.label}',
+      excludeSemantics: true,
+      onTap: () => onSelected(action.kind),
+      child: InkWell(
+        key: ValueKey('buy-shop-chat-attach-${action.kind.name}'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onSelected(action.kind),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: presentation.accent.withValues(alpha: .09),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(
-                    presentation.icon,
-                    color: presentation.accent,
-                    size: 17,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Share in this ${presentation.familyLabel} chat',
-                        style: context.buyBody.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        'Choose what is relevant to this conversation',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(fontSize: 9),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisExtent: 67,
-                mainAxisSpacing: 5,
-                crossAxisSpacing: 8,
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: action.color.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(15),
               ),
-              itemCount: actions.length,
-              itemBuilder: (context, index) {
-                final action = actions[index];
-                return InkWell(
-                  key: ValueKey('buy-shop-chat-attach-${action.kind.name}'),
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => onSelected(action.kind),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: action.color.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Icon(action.icon, color: action.color, size: 21),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        action.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: context.buyMeta.copyWith(fontSize: 8.5),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              child: Icon(action.icon, color: action.color, size: 21),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              action.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: context.buyMeta.copyWith(fontSize: 8.5),
             ),
           ],
         ),
       ),
+    );
+    return Material(
+      key: const ValueKey('buy-shop-chat-attachment-tray'),
+      color: Colors.white,
+      elevation: 8,
+      child: compact
+          ? SizedBox(
+              height: 82,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                itemCount: actions.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return SizedBox(
+                      width: 116,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: presentation.accent.withValues(alpha: .09),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              presentation.icon,
+                              color: presentation.accent,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              'Share in this ${presentation.familyLabel} chat',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.ink,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return SizedBox(
+                    width: 72,
+                    child: actionTile(actions[index - 1]),
+                  );
+                },
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: presentation.accent.withValues(alpha: .09),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Icon(
+                          presentation.icon,
+                          color: presentation.accent,
+                          size: 17,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Share in this ${presentation.familyLabel} chat',
+                              style: context.buyBody.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              'Choose what is relevant to this conversation',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyMeta.copyWith(fontSize: 9),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisExtent: 67,
+                          mainAxisSpacing: 5,
+                          crossAxisSpacing: 8,
+                        ),
+                    itemCount: actions.length,
+                    itemBuilder: (context, index) => actionTile(actions[index]),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

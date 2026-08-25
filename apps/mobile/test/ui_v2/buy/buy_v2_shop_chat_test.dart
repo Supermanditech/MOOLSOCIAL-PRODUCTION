@@ -404,6 +404,95 @@ void main() {
     }
   });
 
+  testWidgets(
+    'composer keeps keyboard emoji and attachment surfaces mutually exclusive',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        app(
+          session,
+          shopChatSource: const _RichShopChatSource(),
+          textScale: 1.4,
+          safePadding: const EdgeInsets.symmetric(vertical: 24),
+          onShopChatAction: (_) async =>
+              const BuyV2ShopChatActionResult.accepted(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const ValueKey('buy-shop-chat-composer-field'));
+      final composer = find.byKey(const ValueKey('buy-shop-chat-composer'));
+      await tester.tap(field);
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      await tester.pumpAndSettle();
+      expect(tester.getBottomRight(composer).dy, lessThanOrEqualTo(328));
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsOneWidget,
+      );
+      final document = find.byKey(
+        const ValueKey('buy-shop-chat-attach-selectDocument'),
+      );
+      expect(tester.getSize(document).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(document).height, greaterThanOrEqualTo(44));
+      expect(find.bySemanticsLabel('Share Document'), findsOneWidget);
+
+      await tester.tap(field);
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsNothing,
+      );
+      expect(tester.getBottomRight(composer).dy, lessThanOrEqualTo(328));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('composer media and calls emit exact inline runtime intents', (
     tester,
   ) async {
