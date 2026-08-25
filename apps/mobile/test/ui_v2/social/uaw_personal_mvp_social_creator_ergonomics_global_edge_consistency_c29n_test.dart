@@ -84,7 +84,7 @@ void main() {
     final owners = _Owners();
     addTearDown(owners.dispose);
 
-    await tester.pumpWidget(_app(owners.consumer(state: 'home')));
+    await tester.pumpWidget(_app(owners.consumer(state: 'text')));
     await tester.pumpAndSettle();
 
     expect(find.byType(Screen04Header), findsNothing);

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
+import 'package:moolsocial/features/chat/screens/chat_inbox_screen.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/universal_intent_catalog.dart';
@@ -295,11 +297,12 @@ void main() {
       await tapVisible(tester, const Key('search-result-chat-business-chat'));
 
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(find.byKey(const Key('chat-filter-business')), findsNothing);
       expect(
         tester
-            .widget<ChoiceChip>(find.byKey(const Key('chat-filter-business')))
-            .selected,
-        isTrue,
+            .widget<ChatInboxScreen>(find.byType(ChatInboxScreen))
+            .initialFilter,
+        ChatThreadType.business,
       );
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
       expect(

@@ -292,6 +292,49 @@ test("expired fallback fails truthfully when refresh cannot start", async () => 
   );
 });
 
+test("expired refresh reports only its safe failing phase", async () => {
+  const store = new MemoryCatalogueStore(
+    snapshot([short("expired")], "2026-08-11T03:59:59.000Z"),
+    true,
+  );
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => {
+      throw new Error("private transport detail");
+    },
+  });
+
+  await assert.rejects(
+    coordinator.load("request-expired-refresh"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.code === "provider_unavailable" &&
+      error.providerReason === "sharedShortsCatalogue.load_page.error" &&
+      !error.message.includes("private transport detail"),
+  );
+});
+
+test("commit refresh reports a whitelisted persistence code", async () => {
+  const store = new MemoryCatalogueStore();
+  store.commitRefresh = async () => {
+    throw Object.assign(new Error("private persistence detail"), { code: 3 });
+  };
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => ({ items: [short("commit-failure")] }),
+  });
+
+  await assert.rejects(
+    coordinator.load("request-commit-failure"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.providerReason === "sharedShortsCatalogue.commit_refresh.code_3" &&
+      !error.message.includes("private persistence detail"),
+  );
+});
+
 test("Firestore store enforces a cross-instance lease and durable outcomes", async () => {
   const database = new MemoryDocumentDatabase();
   const store = new FirestoreSharedShortsCatalogueStore(database);
@@ -321,6 +364,25 @@ test("Firestore store enforces a cross-instance lease and durable outcomes", asy
     cache_hit: -1,
   });
   await assert.rejects(store.recordOutcome("cache_hit", NOW.toISOString()));
+});
+
+test("shared snapshot retains a valid Short with no description", async () => {
+  const database = new MemoryDocumentDatabase();
+  const store = new FirestoreSharedShortsCatalogueStore(database);
+  const lease: SharedShortsCatalogueRefreshLease = {
+    leaseId: "empty-description-lease",
+    acquiredAt: NOW.toISOString(),
+    expiresAt: "2026-08-11T10:02:00.000Z",
+  };
+  assert.equal(await store.tryAcquireRefresh(lease), true);
+  const next = snapshot(
+    [short("empty-description", { description: "" })],
+    "2026-08-11T10:30:00.000Z",
+  );
+
+  await store.commitRefresh(lease.leaseId, next);
+
+  assert.deepEqual(await store.read(), next);
 });
 
 test("eligibility requires public processed embeddable India Shorts", () => {

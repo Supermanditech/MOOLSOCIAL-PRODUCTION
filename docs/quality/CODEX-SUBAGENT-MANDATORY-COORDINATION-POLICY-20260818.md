@@ -245,6 +245,24 @@ authentication/account journey, SMS/email or other external action. The action
 must have one exact ticket, actor, authority, candidate, attempt, preimage and
 journal. Parallel release actions are prohibited.
 
+## Primary-only conflict-qualified integration repair
+
+Independent feature tips that do not merge automatically remain immutable.
+Conflict correction is primary-only and requires a founder-authorized
+`integration_repair` continuation binding. The repair lane may create one exact
+two-parent `repair(<work-id>): ...` merge whose parents and conflict owners are
+machine locked. Direct repair source commits, a second repair merge, edits to an
+automatically merged non-conflict owner, rebase, squash, cherry-pick, force push
+and ordinary integration conflict edits remain forbidden.
+
+The remotely qualified repair tip must contain both sealed feature tips. Before
+the fresh governance-tag integration branch performs its first merge, the repair
+lane runs `integration_admission_authorize` against the exact target worktree,
+branch, work ID and ticket. The fresh integration then accepts only the repair
+tip through one automatic `merge(<work-id>): ...` commit; the existing
+`merge-tree --write-tree`, remote readback, clean-worktree, combined regression
+and no-direct-integration-edit rules remain unchanged.
+
 ## Completion
 
 Before handoff, a subagent proves its owners, hashes, tests, fixture cleanup,

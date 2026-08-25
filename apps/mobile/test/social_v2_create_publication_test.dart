@@ -11,6 +11,7 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/shared_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/social_media_picker.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_create_workbench.dart';
@@ -1036,7 +1037,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Create applies a newer explicit tool route in place', (
+  testWidgets('dirty Create rejects a conflicting explicit tool route', (
     tester,
   ) async {
     final owners = _Owners();
@@ -1052,8 +1053,9 @@ void main() {
 
     expect(
       find.byKey(const Key('screen04-create-quiz-choice-0')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.text('New text post'), findsOneWidget);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
@@ -1223,9 +1225,10 @@ void main() {
           find.byKey(const Key('social-v2-create-workbench')),
           findsNothing,
         );
-        final create = find.byKey(const Key('screen04-feed-create-post'));
-        await tester.ensureVisible(create);
-        await tester.tap(create);
+        expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+        final draft = find.byKey(const Key('screen04-create-draft-entry'));
+        await tester.ensureVisible(draft);
+        await tester.tap(draft);
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('social-v2-create-workbench')),
@@ -1472,6 +1475,7 @@ class _Owners {
       gateway: _ImmediateSharedGateway(),
       socialContentGateway: socialGateway,
     );
+    unawaited(draftCache.configureDurability(_PublicationDraftRepository()));
   }
 
   final JourneySession journey;
@@ -1480,6 +1484,7 @@ class _Owners {
   final socialGateway = ReviewSocialContentGateway();
   late final SharedSession shared;
   final picker = _FakeSocialMediaPicker();
+  final draftCache = SocialCreateDraftStateCache();
 
   SocialUniversalV2 consumer({String? sub, String? state, String? item}) =>
       SocialUniversalV2(
@@ -1488,6 +1493,7 @@ class _Owners {
         retailerSession: retailer,
         sharedSession: shared,
         mediaPicker: picker,
+        createDraftStateCache: draftCache,
         initialSubAction: sub,
         initialState: state,
         initialItem: item,
@@ -1498,6 +1504,28 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+final class _PublicationDraftRepository implements SocialCreateDraftRepository {
+  SocialCreateDraftSnapshot? snapshot;
+
+  @override
+  Future<SocialCreateDraftRead> read() async => SocialCreateDraftRead(
+    freshness: snapshot == null
+        ? SocialCreateDraftFreshness.missing
+        : SocialCreateDraftFreshness.fresh,
+    snapshot: snapshot,
+  );
+
+  @override
+  Future<void> write(SocialCreateDraftSnapshot value) async {
+    snapshot = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    snapshot = null;
   }
 }
 

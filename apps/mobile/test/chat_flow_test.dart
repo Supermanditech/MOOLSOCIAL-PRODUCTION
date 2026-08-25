@@ -6,6 +6,9 @@ import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/shared/shared_models.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
 
 void main() {
   Future<JourneySession> readyJourney() async {
@@ -29,6 +32,7 @@ void main() {
     required String route,
     required JourneySession journey,
     required ChatSession chat,
+    SharedSession? sharedSession,
     Size size = const Size(412, 915),
   }) async {
     await tester.binding.setSurfaceSize(size);
@@ -37,6 +41,7 @@ void main() {
         key: ValueKey(route),
         session: journey,
         chatSession: chat,
+        sharedSession: sharedSession,
         initialLocation: route,
       ),
     );
@@ -131,8 +136,9 @@ void main() {
 
       await tapVisible(tester, const Key('chat-new'));
       expect(find.byKey(const Key('chat-new-open-feed')), findsOneWidget);
+      expect(find.byKey(const Key('chat-new-discover-people')), findsOneWidget);
       expect(
-        find.textContaining('Open a public MoolSocial post'),
+        find.textContaining('Phone contacts are never uploaded'),
         findsOneWidget,
       );
       expect(find.byKey(const Key('chat-new-business')), findsNothing);
@@ -165,59 +171,146 @@ void main() {
   );
 
   testWidgets(
-    'Chat keeps a high-contrast new-chat action and compact global edges',
+    'Discover connects MoolSocial people and starts a real direct Chat',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final journey = await readyJourney();
-      final chat = ChatSession(
-        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
-      );
+      final socialGateway = _PeopleSocialGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      final chatGateway = _PeopleChatGateway();
+      final chat = ChatSession.production(gateway: chatGateway);
       addTearDown(journey.dispose);
+      addTearDown(shared.dispose);
       addTearDown(chat.dispose);
+
       await mount(
         tester,
-        route: '/app/chat/inbox?return=/app/social',
+        route: '/app/chat/inbox?return=/app/social?sub=feed',
         journey: journey,
         chat: chat,
-        size: const Size(360, 800),
+        sharedSession: shared,
       );
 
-      final newChat = tester.widget<IconButton>(
-        find.byKey(const Key('chat-new')),
-      );
-      final background = newChat.style?.backgroundColor?.resolve(
-        const <WidgetState>{},
-      );
-      final foreground = newChat.style?.foregroundColor?.resolve(
-        const <WidgetState>{},
-      );
-      expect(background, isNotNull);
-      expect(foreground, Colors.white);
-      expect(background, isNot(foreground));
+      expect(find.byKey(const Key('chat-section-chats')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-section-discover'));
+      await tester.pumpAndSettle();
 
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+      expect(find.text('Alice News'), findsOneWidget);
+      expect(find.text('Bharat Creator'), findsOneWidget);
       expect(
-        find.byKey(const Key('chat-global-edge-navigation')),
-        findsOneWidget,
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('chat-person-message-person-b')),
+            )
+            .onPressed,
+        isNull,
       );
-      expect(
-        find.byKey(const Key('chat-compact-global-edge-rail')),
-        findsOneWidget,
-      );
-      final mool = find.byKey(const Key('mool-compact-launcher'));
-      final chatEdge = find.byKey(const Key('chat-global-chat-edge'));
-      expect(mool, findsOneWidget);
-      expect(chatEdge, findsOneWidget);
-      expect(tester.getSize(mool).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(mool).height, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).height, greaterThanOrEqualTo(44));
-      expect(tester.getCenter(mool).dx, lessThan(72));
-      expect(tester.getCenter(chatEdge).dx, greaterThan(288));
+
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      expect(socialGateway.followed['person-a'], isTrue);
+      expect(find.widgetWithText(OutlinedButton, 'Disconnect'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-section-people'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(find.byKey(const Key('chat-person-person-b')), findsNothing);
+
+      await tapVisible(tester, const Key('chat-section-discover'));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('chat-person-connect-person-b'));
+      expect(socialGateway.followed['person-b'], isTrue);
+      await tapVisible(tester, const Key('chat-person-message-person-b'));
+      await tester.pumpAndSettle();
+
+      expect(chatGateway.createdTargets, ['person-b']);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(find.text('Bharat Creator'), findsOneWidget);
+      await tapVisible(tester, const Key('chat-back'));
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Chat keeps a high-contrast add-person action on a native root', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social',
+      journey: journey,
+      chat: chat,
+      size: const Size(360, 800),
+    );
+
+    final newChat = tester.widget<FloatingActionButton>(
+      find.byKey(const Key('chat-new')),
+    );
+    expect(newChat.backgroundColor, const Color(0xFF000080));
+    expect(newChat.foregroundColor, Colors.white);
+
+    expect(find.byKey(const Key('chat-global-edge-navigation')), findsNothing);
+    expect(
+      find.byKey(const Key('chat-compact-global-edge-rail')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
+    final addPerson = find.byKey(const Key('chat-new'));
+    expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
+    expect(tester.getSize(addPerson).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chat section motion resolves immediately for reduced motion', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social',
+      journey: journey,
+      chat: chat,
+    );
+
+    final switcher = tester.widget<AnimatedSwitcher>(
+      find.descendant(
+        of: find.byKey(const Key('chat-inbox-screen')),
+        matching: find.byType(AnimatedSwitcher),
+      ),
+    );
+    expect(switcher.duration, Duration.zero);
+    expect(switcher.reverseDuration, Duration.zero);
+
+    await tester.tap(find.byKey(const Key('chat-section-discover')));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Universal Chat choices open the matching production inbox', (
     tester,
@@ -323,18 +416,9 @@ void main() {
 
       await tapVisible(tester, const Key('chat-send'));
       expect(find.text('Write a message.'), findsOneWidget);
-      await tapVisible(tester, const Key('mool-compact-launcher'));
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsOneWidget,
-      );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsNothing,
-      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -444,16 +528,177 @@ void main() {
       size: const Size(360, 800),
     );
 
-    for (final key in const [
-      Key('chat-back'),
-      Key('mool-compact-launcher'),
-      Key('chat-global-chat-edge'),
-      Key('chat-send'),
-    ]) {
+    for (final key in const [Key('chat-back'), Key('chat-send')]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('OPPO bottom inset keeps the composer above system navigation', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/social',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('chat-message-field'));
+    final media = MediaQuery.of(tester.element(field));
+    expect(media.viewPadding.bottom, greaterThan(0));
+    final safeBottom = media.size.height - media.viewPadding.bottom;
+    expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-send'))).dy,
+      lessThanOrEqualTo(safeBottom),
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _PeopleSocialGateway
+    implements SocialContentGateway, SocialAuthorGateway {
+  final Map<String, bool> followed = {'person-a': false, 'person-b': false};
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    return SocialFeedPage(
+      items: [
+        _post('post-a', 'person-a', 'Alice News', '@alice'),
+        _post('post-b', 'person-b', 'Bharat Creator', '@bharat'),
+      ],
+    );
+  }
+
+  @override
+  Future<SocialAuthorProfile> author({
+    required String authorId,
+    bool authenticated = false,
+    int limit = 12,
+  }) async => _profile(authorId);
+
+  @override
+  Future<SocialAuthorProfile> follow({
+    required String authorId,
+    required bool followed,
+  }) async {
+    this.followed[authorId] = followed;
+    return _profile(authorId);
+  }
+
+  SocialAuthorProfile _profile(String authorId) {
+    final alice = authorId == 'person-a';
+    return SocialAuthorProfile(
+      authorId: authorId,
+      authorName: alice ? 'Alice News' : 'Bharat Creator',
+      authorHandle: alice ? '@alice' : '@bharat',
+      followerCount: alice ? 42 : 75,
+      followed: followed[authorId] ?? false,
+      isSelf: false,
+      posts: [
+        _post(
+          alice ? 'post-a' : 'post-b',
+          authorId,
+          alice ? 'Alice News' : 'Bharat Creator',
+          alice ? '@alice' : '@bharat',
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<SocialPublishedItem> interact({
+    required String postId,
+    required String interaction,
+    int? choiceIndex,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
+      Future.error(UnsupportedError('Not used by this test.'));
+}
+
+SocialPublishedItem _post(
+  String id,
+  String authorId,
+  String authorName,
+  String authorHandle,
+) => SocialPublishedItem(
+  id: id,
+  authorId: authorId,
+  type: SocialPublishedContentType.post,
+  authorName: authorName,
+  authorHandle: authorHandle,
+  body: 'Public discovery post',
+  audience: 'Public',
+  publishedAt: DateTime.utc(2026, 8, 24),
+);
+
+class _PeopleChatGateway implements ChatGateway {
+  final List<String> createdTargets = [];
+
+  @override
+  Future<List<ChatThread>> listThreads({int limit = 30}) async => const [];
+
+  @override
+  Future<ChatThread> createDirectThread({required String targetUserId}) async {
+    createdTargets.add(targetUserId);
+    return ChatThread(
+      id: 'direct-$targetUserId',
+      title: targetUserId == 'person-a' ? 'Alice News' : 'Bharat Creator',
+      subtitle: 'MoolSocial person',
+      preview: 'No messages yet',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    );
+  }
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async => const [];
+
+  @override
+  Future<void> markThreadRead({required String threadId}) async {}
+
+  @override
+  Future<ChatMessage> forwardMessage({
+    required String sourceThreadId,
+    required String sourceMessageId,
+    required String targetThreadId,
+    required String idempotencyKey,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<ChatMessage> sendMessage({
+    required String threadId,
+    required String text,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<ChatMessage> setReaction({
+    required String threadId,
+    required String messageId,
+    required bool reacted,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
 }

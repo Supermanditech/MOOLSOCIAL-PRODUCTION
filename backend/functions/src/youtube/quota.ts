@@ -63,6 +63,18 @@ export interface YouTubeQuotaReserveResult {
   readonly limit: number;
 }
 
+export interface YouTubeQuotaMeasurementRequest {
+  readonly principal: string;
+  readonly bucket: YouTubeQuotaBucket;
+  readonly units: number;
+  readonly operation: string;
+  readonly requestId: string;
+  readonly accepted: boolean;
+  readonly local: boolean;
+  readonly windowId: string;
+  readonly occurredAt: string;
+}
+
 /**
  * Implementations must make `reserve` atomic across every function instance
  * sharing the same quota ledger. A read followed by a separate write does not
@@ -72,6 +84,10 @@ export interface YouTubeQuotaStore {
   reserve(
     request: YouTubeQuotaReserveRequest,
   ): Promise<YouTubeQuotaReserveResult>;
+}
+
+export interface YouTubeQuotaMeasurementStore extends YouTubeQuotaStore {
+  recordMeasurement(request: YouTubeQuotaMeasurementRequest): Promise<void>;
 }
 
 interface InMemoryUsage {
@@ -384,5 +400,20 @@ export class YouTubeQuotaGovernor {
     }
 
     return result;
+  }
+
+  async recordMeasurement(
+    request: Omit<YouTubeQuotaMeasurementRequest, "windowId" | "occurredAt">,
+  ): Promise<void> {
+    const measurementStore = this.store as YouTubeQuotaStore &
+      Partial<YouTubeQuotaMeasurementStore>;
+    if (typeof measurementStore.recordMeasurement !== "function") return;
+    const now = this.clock.now();
+    const window = youtubePacificDailyQuotaWindow(now);
+    await measurementStore.recordMeasurement({
+      ...request,
+      windowId: window.id,
+      occurredAt: now.toISOString(),
+    });
   }
 }

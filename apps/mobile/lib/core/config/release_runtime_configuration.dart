@@ -46,6 +46,34 @@ bool isQualifiedDeviceReviewRuntimeMode({
   return true;
 }
 
+const socialRuntimeFirebaseProjectId = 'moolsocial-dev-503018';
+const socialRuntimeYouTubeProviderUrl =
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider';
+const socialRuntimeContentUrl =
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent';
+const socialRuntimeChatUrl =
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat';
+
+bool isQualifiedSocialRuntimeDependencySet({
+  required bool globalSocialLoginAudit,
+  required bool useEmulators,
+  required String firebaseProjectId,
+  required bool youtubePrivateDevProof,
+  required bool youtubeEmbeddedPlayerEnabled,
+  required String youtubeProviderUrl,
+  required String socialContentUrl,
+  required String chatUrl,
+}) {
+  if (!globalSocialLoginAudit) return true;
+  return !useEmulators &&
+      firebaseProjectId.trim() == socialRuntimeFirebaseProjectId &&
+      youtubePrivateDevProof &&
+      youtubeEmbeddedPlayerEnabled &&
+      youtubeProviderUrl.trim() == socialRuntimeYouTubeProviderUrl &&
+      socialContentUrl.trim() == socialRuntimeContentUrl &&
+      chatUrl.trim() == socialRuntimeChatUrl;
+}
+
 @immutable
 class GlobalSocialLoginAuditComposition {
   const GlobalSocialLoginAuditComposition({
