@@ -8,14 +8,14 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": false,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 223,
+  "ticketCount": 224,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 75,
-    "implementedAtomicTicketCount": 75,
+    "totalCodexAtomicEngineeringTicketCount": 76,
+    "implementedAtomicTicketCount": 76,
     "pendingConfirmedImplementationCount": 0,
     "pendingClassificationCount": 0,
     "remainingCodexEngineeringQueueCount": 0,
@@ -98,6 +98,7 @@
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-08","state":"CLOSED","implementation":"Developer-only ArgumentError.value validation strings are non-visible while ordinary endpoint copy remains blocked.","runtime":"Argument and visible-copy fixtures plus the full gate pass."}
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-09","state":"CLOSED","implementation":"Switch input error-code arms ending in an arrow are distinguished from the separate customer-safe result message.","runtime":"Email internal-error mapping remains customer-safe and the full gate passes."}
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-10","state":"CLOSED","implementation":"Quoted auth code named arguments are treated as diagnostic metadata while visible Bootstrap copy remains blocked.","runtime":"Auth-code and visible-copy fixtures plus the full gate pass."}
+      ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-11","state":"CLOSED","implementation":"Stale unpushed integration v2 is preserved and a new v3 identity admits only the copy-qualified repair tip.","runtime":"V3 policy, lock allowlist, exact admission subject and fresh governance-tag topology are machine bound."}
     ],
     "pendingConfirmedImplementation": [],
     "pendingClassification": [],
@@ -355,6 +356,7 @@
     {"id":"RT-INTEGRATION-CHAT-01-CHILD-07","area":"customer_copy_gate","microScope":"x_broker_error_set_internal_literal","layers":["mobile","testing"],"outcome":"Classify X broker error-set internal as protocol metadata without excluding visible Internal copy.","owner":"primary_integration_repair","state":"verified_pass","evidence":"Exact owner/line-shape fixture passes and the complete gate remains green.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01-CHILD-06"]},
     {"id":"RT-INTEGRATION-CHAT-01-CHILD-08","area":"customer_copy_gate","microScope":"x_argument_error_endpoint_literal","layers":["mobile","testing"],"outcome":"Classify developer-only ArgumentError endpoint validation without excluding ordinary quoted customer copy.","owner":"primary_integration_repair","state":"verified_pass","evidence":"ArgumentError and visible-copy fixtures pass; complete gate green.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01-CHILD-06"]},
     {"id":"RT-INTEGRATION-CHAT-01-CHILD-09","area":"customer_copy_gate","microScope":"email_internal_error_code_switch_arm","layers":["mobile","testing"],"outcome":"Classify input error-code switch arms separately from their customer-safe mapped result messages.","owner":"primary_integration_repair","state":"verified_pass","evidence":"The mapped email message remains customer-safe and complete gate green.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01-CHILD-06"]},
-    {"id":"RT-INTEGRATION-CHAT-01-CHILD-10","area":"customer_copy_gate","microScope":"auth_bootstrap_diagnostic_code","layers":["mobile","testing"],"outcome":"Classify quoted auth diagnostic code named arguments without excluding visible Bootstrap copy.","owner":"primary_integration_repair","state":"verified_pass","evidence":"Auth-code and visible-copy fixtures pass; complete gate green.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01-CHILD-06"]}
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-10","area":"customer_copy_gate","microScope":"auth_bootstrap_diagnostic_code","layers":["mobile","testing"],"outcome":"Classify quoted auth diagnostic code named arguments without excluding visible Bootstrap copy.","owner":"primary_integration_repair","state":"verified_pass","evidence":"Auth-code and visible-copy fixtures pass; complete gate green.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01-CHILD-06"]},
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-11","area":"integration_gate","microScope":"fresh_v3_after_copy_qualified_repair_tip","layers":["wiring","testing","deployment_preflight"],"outcome":"Preserve stale unpushed v2 and create one fresh v3 integration that admits only the final copy-qualified repair tip.","owner":"primary_integration_repair","state":"verified_pass","evidence":"REG-20260826-3754 binds the v3 branch, worktree, ticket and exact merge subject; v2 remains unchanged and unpushed.","blocker":"v3 admission and automatic merge pending","dependencies":["RT-INTEGRATION-CHAT-01","RT-INTEGRATION-CHAT-01-CHILD-06"]}
   ]
 }

@@ -71,3 +71,9 @@ forms; embedded fixtures continue to reject ordinary visible `Endpoint`,
 `Payload`, `Internal` and `Bootstrap` copy. The complete customer-copy gate
 passes. This re-closes the repair ticket without modifying auth product source
 or weakening the blocked-word inventory.
+
+The copy-qualified repair tip supersedes the second parent used by local,
+unpushed integration v2. V2 is preserved unchanged. REG-20260826-3754 binds a
+fresh v3 integration ticket and exact automatic merge subject; only v3 may
+admit the final remote-qualified repair tip. This repair evidence update does
+not rewrite v2 and does not authorize an APK or promotion.

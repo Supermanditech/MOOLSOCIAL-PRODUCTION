@@ -42803,6 +42803,16 @@
       "prevention": "Inspect the exact statement and downstream surface; permit only structurally non-visible diagnostics with a negative fixture and retain visible Bootstrap rejection.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-user-facing-copy.ps1", "apps/mobile/lib/features/journey01/review_journey_services.dart"]
+    },
+    {
+      "id": "REG-20260826-3754-FRESH-INTEGRATION-V2-SEALED-BEFORE-REPAIR-TIP-ADVANCED",
+      "status": "registered_preserve_v2_and_issue_fresh_v3_identity_required",
+      "appliesTo": ["primary", "coordination", "integration", "git_discipline"],
+      "mistake": "Fresh integration v2 was locally created and verified from repair tip 0b83816, then the broader copy gate required a later qualified repair tip 5e20dc9 before v2 was pushed.",
+      "rootCause": "The final combined copy gate ran after the first fresh integration merge, so its legitimate repair follow-up advanced the only approved feature branch beyond v2's second parent.",
+      "prevention": "Preserve unpushed v2 unchanged as stale evidence; never reset, amend or add a second merge; bind a new v3 work ID, ticket, branch, worktree and exact merge subject, admit only remote-qualified 5e20dc9 from a fresh governance-tag checkout, and rerun all final gates before push.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/runtime/moolsocial-production-runtime-tickets-20260825.json", "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md"]
     }
   ]
 }

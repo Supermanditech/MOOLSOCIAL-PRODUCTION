@@ -902,24 +902,24 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 4 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-approved-ui-locks.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 3 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 4 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md|scripts/check-codex-subagent-coordination-policy.ps1|scripts/check-user-facing-copy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
+    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md|docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md|scripts/check-approved-ui-locks.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/check-user-facing-copy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
     (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
   [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
   [string]$integrationRepair.freshIntegrationWorkId -ceq
-    'social-runtime-chat-v2-20260825' -and
+    'social-runtime-chat-v3-20260826' -and
   [string]$integrationRepair.freshIntegrationTicketId -ceq
-    'UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825' -and
+    'UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826' -and
   [string]$integrationRepair.freshIntegrationBranch -ceq
-    'integration/moolsocial/social-runtime-chat-v2-20260825' -and
+    'integration/moolsocial/social-runtime-chat-v3-20260826' -and
   [string]$integrationRepair.freshIntegrationWorktreePath -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v2-20260825' -and
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v3-20260826' -and
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
-    'merge(social-runtime-chat-v2-20260825): integrate conflict-qualified runtime and Chat'
+    'merge(social-runtime-chat-v3-20260826): integrate copy-qualified runtime and Chat'
 ) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',

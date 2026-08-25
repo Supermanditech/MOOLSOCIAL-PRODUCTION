@@ -31,7 +31,7 @@ $repairClaim = @($policy.activeClaims | Where-Object {
   [string]$_.task -ceq '/root/repair_social_runtime_chat_20260825'
 })
 $integrationClaim = @($policy.activeClaims | Where-Object {
-  [string]$_.task -ceq '/root/integration_social_runtime_chat_v2_20260825'
+  [string]$_.task -ceq '/root/integration_social_runtime_chat_v3_20260826'
 })
 
 Assert-RepairContract ($repairLane.Count -eq 1) 'repair lane is missing or ambiguous.'
@@ -46,8 +46,8 @@ Assert-RepairContract (
   [int]$repair.maximumMergeCommits -eq 1 -and
   [int]$repair.maximumPreMergeCoordinationCommits -eq 4 -and
   @($repair.preMergeCoordinationOwners).Count -eq 6 -and
-  [int]$repair.maximumPostMergeClosureCommits -eq 3 -and
-  @($repair.postMergeClosureOwners).Count -eq 7 -and
+  [int]$repair.maximumPostMergeClosureCommits -eq 4 -and
+  @($repair.postMergeClosureOwners).Count -eq 9 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed -and
   @($repair.exactConflictOwners).Count -eq 10
@@ -83,6 +83,7 @@ foreach ($lockToken in @(
     'function Test-SealedParallelContinuationUnchanged',
     'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
     'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
     'if (Test-SealedParallelContinuationUnchanged -Path $Path)',
     'Approved UI sealed-parallel continuation fixture failed.'
   )) {

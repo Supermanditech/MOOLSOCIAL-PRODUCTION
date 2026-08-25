@@ -69,7 +69,8 @@ function Test-SealedParallelContinuationUnchanged {
     $LASTEXITCODE -ne 0 -or
     $branch -cnotin @(
       'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
-      'integration/moolsocial/social-runtime-chat-v2-20260825'
+      'integration/moolsocial/social-runtime-chat-v2-20260825',
+      'integration/moolsocial/social-runtime-chat-v3-20260826'
     )
   ) {
     return $false
