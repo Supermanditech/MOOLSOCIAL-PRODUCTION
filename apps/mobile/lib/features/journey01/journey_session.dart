@@ -1537,7 +1537,13 @@ class JourneySession extends ChangeNotifier {
       noticeMessage = null;
       _notifyRevalidationListeners();
       return true;
+    } on JourneyServiceException catch (error) {
+      errorMessage = error.userMessage;
+      _notifyRevalidationListeners();
+      return false;
     } on Object {
+      errorMessage =
+          'Your account could not be revalidated safely. Please sign in again.';
       _notifyRevalidationListeners();
       return false;
     } finally {
@@ -1993,13 +1999,13 @@ class JourneySession extends ChangeNotifier {
     _isAuthenticated = false;
     authenticatedRevalidationPending = false;
     accountIdentity = null;
+    stage = JourneyStage.signIn;
     if (cleanupFailure != null) {
       throw const JourneyServiceException(
         'The invalid account session could not be cleared safely.',
         code: 'auth-session-invalidation-failed',
       );
     }
-    stage = JourneyStage.signIn;
   }
 
   Future<void> _resetUnsafePrincipalBinding() async {

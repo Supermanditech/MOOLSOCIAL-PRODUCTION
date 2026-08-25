@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
@@ -511,6 +513,166 @@ void main() {
     expect(session.stage, JourneyStage.signIn);
     expect(session.isAuthenticated, isFalse);
     expect(session.authenticatedRevalidationPending, isFalse);
+  });
+
+  test('invalid reconnect leaves degraded session signed out', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    final retry = session.retryAuthenticatedAccountRevalidation();
+    bootstrap.complete(
+      const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-user-disabled',
+      ),
+    );
+
+    expect(await retry, isFalse);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(receiptStore.binding, isNull);
+    expect(bootstrap.invalidationCount, 1);
+  });
+
+  test(
+    'invalid reconnect cleanup failure still removes authenticated state',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _ControlledRevalidationBootstrap(
+        binding,
+        invalidationFailure: StateError('private invalidation failure'),
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      final retry = session.retryAuthenticatedAccountRevalidation();
+      bootstrap.complete(
+        const AuthenticatedAccountBootstrapResult.invalidSession(),
+      );
+
+      expect(await retry, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.authenticatedRevalidationPending, isFalse);
+      expect(receiptStore.binding, isNull);
+      expect(session.errorMessage, contains('could not be cleared safely'));
+    },
+  );
+
+  testWidgets('app resume starts exactly one pending revalidation', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, legacyPresentationForTestsOnly: true),
+    );
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(bootstrap.prepareCount, 2);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+    await tester.pump();
+    await tester.pump();
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(bootstrap.prepareCount, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app resume performs no revalidation for verified session', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = ReviewAccountBootstrapGateway(
+      result: AuthenticatedAccountBootstrapResult.verified(binding),
+      currentBinding: binding,
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, legacyPresentationForTestsOnly: true),
+    );
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(bootstrap.prepareCount, 1);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   test(
@@ -1360,13 +1522,14 @@ class _TimeoutPrincipalBootstrap implements AccountBootstrapGateway {
 }
 
 class _ControlledRevalidationBootstrap implements AccountBootstrapGateway {
-  _ControlledRevalidationBootstrap(this.binding);
+  _ControlledRevalidationBootstrap(this.binding, {this.invalidationFailure});
 
   final VerifiedPrincipalBinding binding;
   final Completer<AuthenticatedAccountBootstrapResult> _retry =
       Completer<AuthenticatedAccountBootstrapResult>();
   int prepareCount = 0;
   int invalidationCount = 0;
+  Object? invalidationFailure;
 
   @override
   Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async => binding;
@@ -1374,6 +1537,7 @@ class _ControlledRevalidationBootstrap implements AccountBootstrapGateway {
   @override
   Future<void> invalidateLocalSession() async {
     invalidationCount += 1;
+    if (invalidationFailure case final failure?) throw failure;
   }
 
   @override
