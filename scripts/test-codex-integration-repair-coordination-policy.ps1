@@ -10,8 +10,10 @@ if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
 $root = [IO.Path]::GetFullPath($RepositoryRoot)
 $policyPath = Join-Path $root 'config\codex-subagent-coordination-policy.json'
 $checkerPath = Join-Path $root 'scripts\check-codex-subagent-coordination-policy.ps1'
+$lockCheckerPath = Join-Path $root 'scripts\check-approved-ui-locks.ps1'
 $policy = Get-Content -Raw -LiteralPath $policyPath | ConvertFrom-Json
 $checker = Get-Content -Raw -LiteralPath $checkerPath
+$lockChecker = Get-Content -Raw -LiteralPath $lockCheckerPath
 
 function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
@@ -40,8 +42,8 @@ Assert-RepairContract (
   [string]$repair.requiredCursorCommit -ceq
     '00ce93552091ee51739266c0a8fbe6d207d9f695' -and
   [int]$repair.maximumMergeCommits -eq 1 -and
-  [int]$repair.maximumPreMergeCoordinationCommits -eq 2 -and
-  @($repair.preMergeCoordinationOwners).Count -eq 5 -and
+  [int]$repair.maximumPreMergeCoordinationCommits -eq 3 -and
+  @($repair.preMergeCoordinationOwners).Count -eq 6 -and
   [int]$repair.maximumPostMergeClosureCommits -eq 1 -and
   @($repair.postMergeClosureOwners).Count -eq 2 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
@@ -68,6 +70,23 @@ $requiredCheckerTokens = @(
 foreach ($token in $requiredCheckerTokens) {
   Assert-RepairContract ($checker.Contains($token)) "checker token is missing: $token"
 }
+foreach ($lockToken in @(
+    'function Test-SealedParallelContinuationFacts',
+    'function Test-SealedParallelContinuationUnchanged',
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'if (Test-SealedParallelContinuationUnchanged -Path $Path)',
+    'Approved UI sealed-parallel continuation fixture failed.'
+  )) {
+  Assert-RepairContract ($lockChecker.Contains($lockToken)) `
+    "approved-lock token is missing: $lockToken"
+}
+$sealedFallbackCalls = [regex]::Matches(
+  $lockChecker,
+  'if \(Test-SealedParallelContinuationUnchanged -Path \$(?:Path|resolved)\)'
+).Count
+Assert-RepairContract ($sealedFallbackCalls -eq 2) `
+  'sealed parallel fallback is not applied to both raw and production locks.'
 
 if ($RequireQualifiedGraph) {
   $head = (& git -C $root rev-parse HEAD).Trim()

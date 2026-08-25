@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3708,
-    "sha256": "43EF8D412A5E8AC49C76C669036D7EE26C8ED8CF7AAB507B26D7C7F6BA20112C"
+    "entryCount": 3712,
+    "sha256": "8557603F747FAC73F3391B874E29DBAF74EE6DE52DDC1779E8897971874A7260"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -598,11 +598,12 @@
         "requiredCursorCommit": "00ce93552091ee51739266c0a8fbe6d207d9f695",
         "requiredCursorBranch": "work/cursor-ui/shop-chat-ui-20260824",
         "maximumMergeCommits": 1,
-        "maximumPreMergeCoordinationCommits": 2,
+        "maximumPreMergeCoordinationCommits": 3,
         "preMergeCoordinationOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+          "scripts/check-approved-ui-locks.ps1",
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "scripts/test-codex-integration-repair-coordination-policy.ps1"
         ],

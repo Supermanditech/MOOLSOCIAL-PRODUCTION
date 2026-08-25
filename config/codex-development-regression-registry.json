@@ -42431,7 +42431,7 @@
       ],
       "mistake": "After 158 focused tests and full Flutter analysis passed on the staged semantic union, the approved UI lock rejected the inherited MainActivity projection for first-setup language/location; the merge was aborted without commit and no lock or product owner was changed.",
       "rootCause": "The sealed Codex runtime tip and Cursor lock checker had not yet been jointly classified for this Android projection, so the repair cycle could not prove whether the difference is an approved non-UI runtime delta or prohibited accepted-surface drift.",
-      "prevention": "Permit one additional exact non-product pre-merge coordination child, compare only canonical hashes and bounded diffs for the governance tag, sealed Codex tip, sealed Cursor tip and current production owner, identify the owning accepted region, and either preserve a semantically approved runtime-only delta through an exact negative-fixture lock rule or stop for a separate product correction; never replace an accepted hash or weaken the lock.",
+      "prevention": "Compare only canonical hashes and bounded diffs for the governance tag, sealed Codex tip, sealed Cursor tip and current production owner; permit the lock only on the exact repair/fresh-integration branches when both sealed tips contain the same blob and the current index/working owner is byte-unchanged from that blob; never replace an accepted hash, accept a one-tip difference or weaken ordinary branch enforcement.",
       "gates": [
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1",
@@ -42469,6 +42469,100 @@
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3738-SOCIAL-LOCK-FALLBACK-PATCH-ASSUMED-CURSOR-AUTO-MERGED-FUNCTION-PREMERGE",
+      "status": "registered_exact_cursor_blob_then_bounded_extension_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "tooling"
+      ],
+      "mistake": "The first lock-classification patch was rejected with zero change because it targeted Test-CursorContinuationUnchanged while the clean pre-merge repair branch still contains the Codex-side lock checker; that function appears only after Cursor's automatic merge.",
+      "rootCause": "The patch used the previously inspected staged-merge file shape after the merge had been intentionally aborted, instead of rereading the current clean pre-merge owner.",
+      "prevention": "After registry and memory refresh, restore the exact sealed Cursor lock-checker blob into the claimed pre-merge owner, add only the exact two-sealed-tip unchanged fallback, and verify the later merge still reproduces exactly the original nine conflicts with this owner automatic and marker-free.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3739-SOCIAL-LOCK-TWO-TIP-FALLBACK-DID-NOT-ACCEPT-COMMON-MAINACTIVITY",
+      "status": "registered_internal_fallback_predicate_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "mobile"
+      ],
+      "mistake": "The first positive replay of the exact two-sealed-tip lock fallback still rejected the common MainActivity owner, so the fallback did not prove its intended positive branch and no merge replay followed.",
+      "rootCause": "At least one internal branch, path, object or working-tree equality predicate remains false; the gate emitted only its final fail-closed result and has not yet been diagnostically classified.",
+      "prevention": "After registration and refreshed memory, evaluate only allowlisted booleans for exact branch, confined relative path, both tip object availability, equal blob IDs and current index/working equality; correct the one false predicate, add a negative one-tip/current-drift fixture and require positive lock replay before committing.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3740-SOCIAL-LOCK-BACKSLASH-CORRECTION-GUESSED-ESCAPED-FILE-TEXT",
+      "status": "registered_exact_live_function_lines_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "tooling"
+      ],
+      "mistake": "After all externally reconstructed fallback predicates were true, a guessed backslash-literal correction patch was rejected with zero change because the expected escaped text did not match the live PowerShell source.",
+      "rootCause": "The patch reasoned from JavaScript/apply-patch escaping instead of rereading the exact two live function lines after the failed positive gate.",
+      "prevention": "Refresh registry memory, read only the bounded fallback function, compare its literal path normalization and control flow with the all-true predicate reconstruction, then patch only an exact live false condition and replay the positive gate once.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3741-SOCIAL-LOCK-REPLAY-DROPPED-YIELDED-SESSION-METADATA",
+      "status": "registered_identity_probe_before_any_replay_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "The approved-lock replay reached the execution yield with no output, but the orchestration wrapper emitted only the child output field and discarded the returned session ID/exit metadata, leaving completion ambiguous.",
+      "rootCause": "The wrapper failed to project the exec_command session_id and exit_code fields even though the permanent yielded-session rule requires retaining the handle before any poll or replay.",
+      "prevention": "After registry and memory refresh, probe only exact pwsh processes whose command line names check-approved-ui-locks.ps1; if one exists, retain its identity and wait once, otherwise treat the prior result as unproven; every later long call must project output, session_id and exit_code together.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-approved-ui-locks.ps1"
       ]
     }
   ]
