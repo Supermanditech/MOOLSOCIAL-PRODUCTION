@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../journey01/journey_services.dart';
 import 'youtube_public_catalogue_repository.dart';
 import 'youtube_public_search_state_repository.dart';
+import 'youtube_public_short_state_repository.dart';
 
 enum YouTubePublicWatchOrigin { home, search }
 
@@ -17,15 +18,18 @@ bool youtubePublicWatchHydrationIsDegraded(
     freshness != YouTubePublicWatchFreshness.fresh &&
     freshness != YouTubePublicWatchFreshness.missing;
 
-Future<({bool search, bool watch})> invalidateYouTubePublicRuntimeState({
+Future<({bool search, bool watch, bool short})>
+invalidateYouTubePublicRuntimeState({
   required YouTubePublicCatalogueKeyValueStore searchPersistence,
   required YouTubePublicCatalogueKeyValueStore watchPersistence,
+  required YouTubePublicCatalogueKeyValueStore shortPersistence,
   Duration? timeout,
 }) async {
   Future<void> bounded(Future<void> operation) =>
       timeout == null ? operation : operation.timeout(timeout);
   var searchInvalidated = false;
   var watchInvalidated = false;
+  var shortInvalidated = false;
   try {
     await bounded(
       DurableYouTubePublicSearchStateRepository.invalidateUnbound(
@@ -34,7 +38,7 @@ Future<({bool search, bool watch})> invalidateYouTubePublicRuntimeState({
     );
     searchInvalidated = true;
   } on Object {
-    // Watch invalidation remains mandatory after an independent Search error.
+    // Watch and Short invalidation remain mandatory after a Search error.
   }
   try {
     await bounded(
@@ -44,9 +48,23 @@ Future<({bool search, bool watch})> invalidateYouTubePublicRuntimeState({
     );
     watchInvalidated = true;
   } on Object {
-    // Search invalidation remains authoritative after an independent Watch error.
+    // Search and Short invalidation remain authoritative after a Watch error.
   }
-  return (search: searchInvalidated, watch: watchInvalidated);
+  try {
+    await bounded(
+      DurableYouTubePublicShortStateRepository.invalidateUnbound(
+        shortPersistence,
+      ),
+    );
+    shortInvalidated = true;
+  } on Object {
+    // Search and Watch results remain authoritative after a Short error.
+  }
+  return (
+    search: searchInvalidated,
+    watch: watchInvalidated,
+    short: shortInvalidated,
+  );
 }
 
 final class YouTubePublicWatchSnapshot {

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
 import 'package:moolsocial/features/shared/youtube_public_search_state_repository.dart';
+import 'package:moolsocial/features/shared/youtube_public_short_state_repository.dart';
 import 'package:moolsocial/features/shared/youtube_public_watch_state_repository.dart';
 
 void main() {
@@ -281,46 +282,66 @@ void main() {
     });
 
     test(
-      'Search and Watch auth invalidation attempts are failure-independent',
+      'Search, Watch and Short invalidation are failure-independent',
       () async {
-        final failedSearch = _KeyValueStore()
-          ..values[DurableYouTubePublicSearchStateRepository.storageKey] =
-              'search'
-          ..throwNextStorageRemove = StateError('search delete failed');
-        final healthyWatch = _KeyValueStore()
-          ..values[DurableYouTubePublicWatchStateRepository.storageKey] =
-              'watch';
+        for (final failedOwner in const ['search', 'watch', 'short']) {
+          final search = _KeyValueStore()
+            ..values[DurableYouTubePublicSearchStateRepository.storageKey] =
+                'search';
+          final watch = _KeyValueStore()
+            ..values[DurableYouTubePublicWatchStateRepository.storageKey] =
+                'watch';
+          final short = _KeyValueStore()
+            ..values[DurableYouTubePublicShortStateRepository.storageKey] =
+                'short';
+          switch (failedOwner) {
+            case 'search':
+              search.throwNextStorageRemove = StateError(
+                'search delete failed',
+              );
+              break;
+            case 'watch':
+              watch.throwNextStorageRemove = StateError('watch delete failed');
+              break;
+            case 'short':
+              short.throwNextStorageRemove = StateError('short delete failed');
+              break;
+          }
 
-        final first = await invalidateYouTubePublicRuntimeState(
-          searchPersistence: failedSearch,
-          watchPersistence: healthyWatch,
-        );
+          final result = await invalidateYouTubePublicRuntimeState(
+            searchPersistence: search,
+            watchPersistence: watch,
+            shortPersistence: short,
+          );
 
-        expect(first.search, isFalse);
-        expect(first.watch, isTrue);
-        expect(
-          healthyWatch.values,
-          isNot(contains(DurableYouTubePublicWatchStateRepository.storageKey)),
-        );
-
-        final healthySearch = _KeyValueStore()
-          ..values[DurableYouTubePublicSearchStateRepository.storageKey] =
-              'search';
-        final failedWatch = _KeyValueStore()
-          ..values[DurableYouTubePublicWatchStateRepository.storageKey] =
-              'watch'
-          ..throwNextStorageRemove = StateError('watch delete failed');
-        final second = await invalidateYouTubePublicRuntimeState(
-          searchPersistence: healthySearch,
-          watchPersistence: failedWatch,
-        );
-
-        expect(second.search, isTrue);
-        expect(second.watch, isFalse);
-        expect(
-          healthySearch.values,
-          isNot(contains(DurableYouTubePublicSearchStateRepository.storageKey)),
-        );
+          expect(result.search, failedOwner != 'search');
+          expect(result.watch, failedOwner != 'watch');
+          expect(result.short, failedOwner != 'short');
+          if (failedOwner != 'search') {
+            expect(
+              search.values,
+              isNot(
+                contains(DurableYouTubePublicSearchStateRepository.storageKey),
+              ),
+            );
+          }
+          if (failedOwner != 'watch') {
+            expect(
+              watch.values,
+              isNot(
+                contains(DurableYouTubePublicWatchStateRepository.storageKey),
+              ),
+            );
+          }
+          if (failedOwner != 'short') {
+            expect(
+              short.values,
+              isNot(
+                contains(DurableYouTubePublicShortStateRepository.storageKey),
+              ),
+            );
+          }
+        }
       },
     );
 

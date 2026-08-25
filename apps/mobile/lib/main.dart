@@ -32,6 +32,7 @@ import 'features/journey01/review_journey_services.dart';
 import 'features/shared/social_content_gateway.dart';
 import 'features/shared/youtube_public_catalogue_repository.dart';
 import 'features/shared/youtube_public_search_state_repository.dart';
+import 'features/shared/youtube_public_short_state_repository.dart';
 import 'features/shared/youtube_public_watch_state_repository.dart';
 import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -616,12 +617,16 @@ Future<void> main() async {
       : secureVerifiedPrincipalBindingStore;
   final searchPersistence = SecureStorageYouTubePublicSearchKeyValueStore();
   final watchPersistence = SecureStorageYouTubePublicWatchKeyValueStore();
+  final shortPersistence = SecureStorageYouTubePublicShortKeyValueStore();
   Future<void> bindYouTubeSearchStateToCurrentPrincipal() async {
     _recordReleaseBootstrapStage('youtube_search_state', 'begin');
     _recordReleaseBootstrapStage('youtube_watch_state', 'begin');
+    _recordReleaseBootstrapStage('youtube_short_state', 'begin');
     final searchBindingAttempt = youtubePublicSearchState
         .beginPrincipalBindingAttempt();
     final watchBindingAttempt = youtubePublicWatchState
+        .beginPrincipalBindingAttempt();
+    final shortBindingAttempt = youtubePublicShortState
         .beginPrincipalBindingAttempt();
     try {
       final currentPrincipalId = FirebaseAuth.instance.currentUser?.uid;
@@ -629,6 +634,7 @@ Future<void> main() async {
         final invalidated = await invalidateYouTubePublicRuntimeState(
           searchPersistence: searchPersistence,
           watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
           timeout: _youtubeCatalogueCacheHydrationTimeout,
         );
         _recordReleaseBootstrapStage(
@@ -638,6 +644,10 @@ Future<void> main() async {
         _recordReleaseBootstrapStage(
           'youtube_watch_state',
           invalidated.watch ? 'passed' : 'degraded',
+        );
+        _recordReleaseBootstrapStage(
+          'youtube_short_state',
+          invalidated.short ? 'passed' : 'degraded',
         );
         return;
       }
@@ -654,10 +664,12 @@ Future<void> main() async {
         await invalidateYouTubePublicRuntimeState(
           searchPersistence: searchPersistence,
           watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
           timeout: _youtubeCatalogueCacheHydrationTimeout,
         );
         _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
         _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
         return;
       }
       final currentBinding = await secureVerifiedPrincipalBindingStore
@@ -667,10 +679,12 @@ Future<void> main() async {
         await invalidateYouTubePublicRuntimeState(
           searchPersistence: searchPersistence,
           watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
           timeout: _youtubeCatalogueCacheHydrationTimeout,
         );
         _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
         _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
         return;
       }
       YouTubePublicSearchFreshness? searchFreshness;
@@ -703,6 +717,21 @@ Future<void> main() async {
       } on Object {
         youtubePublicWatchState.beginPrincipalBindingAttempt();
       }
+      YouTubePublicShortFreshness? shortFreshness;
+      try {
+        shortFreshness = await youtubePublicShortState
+            .configureDurability(
+              DurableYouTubePublicShortStateRepository(
+                persistence: shortPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: shortBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicShortState.beginPrincipalBindingAttempt();
+      }
       _recordReleaseBootstrapStage(
         'youtube_search_state',
         youtubePublicSearchHydrationIsDegraded(searchFreshness)
@@ -715,16 +744,25 @@ Future<void> main() async {
             ? 'degraded'
             : 'passed',
       );
+      _recordReleaseBootstrapStage(
+        'youtube_short_state',
+        youtubePublicShortHydrationIsDegraded(shortFreshness)
+            ? 'degraded'
+            : 'passed',
+      );
     } on Object {
       youtubePublicSearchState.beginPrincipalBindingAttempt();
       youtubePublicWatchState.beginPrincipalBindingAttempt();
+      youtubePublicShortState.beginPrincipalBindingAttempt();
       await invalidateYouTubePublicRuntimeState(
         searchPersistence: searchPersistence,
         watchPersistence: watchPersistence,
+        shortPersistence: shortPersistence,
         timeout: _youtubeCatalogueCacheHydrationTimeout,
       );
       _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
       _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+      _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
     }
   }
 
