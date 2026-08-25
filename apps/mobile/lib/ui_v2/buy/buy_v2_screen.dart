@@ -71,6 +71,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _searchOpen = false;
   bool _offersActive = false;
   bool _shopChatActive = false;
+  final Map<String, BuyV2ShopChatRetainedState> _shopChatRetainedStates = {};
   BuyV2ShopChatFilter _shopChatInitialFilter = BuyV2ShopChatFilter.all;
   String _shopChatOriginLabel = 'Shop';
   int _shopChatMotionSequence = 0;
@@ -603,6 +604,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   Widget _currentView(BuyV2Session session) {
     if (_shopChatActive) {
+      final retainedStateKey =
+          '$_shopChatOriginLabel|${_shopChatInitialFilter.name}';
       return BuyV2ShopChatView(
         key: _shopChatViewKey,
         session: session,
@@ -611,6 +614,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onBack: _closeShopChat,
         onOpenProductionChat: _openGlobalChat,
         provisioningSource: widget.shopChatSource,
+        retainedState: _shopChatRetainedStates.putIfAbsent(
+          retainedStateKey,
+          BuyV2ShopChatRetainedState.new,
+        ),
         onAction: widget.onShopChatAction,
         onOpenCommerce: _openShopChatCommerce,
       );

@@ -400,6 +400,22 @@ abstract final class BuyV2ShopChatThreadFactory {
 
 enum _BuyV2ShopChatSurface { inbox, newConversation, thread, info }
 
+class BuyV2ShopChatRetainedState {
+  String? filterId;
+  String inboxQuery = '';
+  final Map<String, _BuyV2ShopChatThreadRetainedState> _threads = {};
+
+  _BuyV2ShopChatThreadRetainedState _thread(String threadId) =>
+      _threads.putIfAbsent(threadId, _BuyV2ShopChatThreadRetainedState.new);
+}
+
+class _BuyV2ShopChatThreadRetainedState {
+  String draft = '';
+  String messageQuery = '';
+  String? replyMessageId;
+  bool messageSearchOpen = false;
+}
+
 @immutable
 class _BuyV2ShopChatHistoryEntry {
   const _BuyV2ShopChatHistoryEntry({required this.surface, this.thread});
@@ -422,6 +438,7 @@ class BuyV2ShopChatView extends StatefulWidget {
     this.onAction,
     this.onOpenCommerce,
     this.onOpenThreadContext,
+    this.retainedState,
   });
 
   final BuyV2Session? session;
@@ -435,20 +452,40 @@ class BuyV2ShopChatView extends StatefulWidget {
   final BuyV2ShopChatActionHandler? onAction;
   final ValueChanged<BuyV2ShopChatCommerceTarget>? onOpenCommerce;
   final ValueChanged<BuyV2ShopChatThread>? onOpenThreadContext;
+  final BuyV2ShopChatRetainedState? retainedState;
 
   @override
   State<BuyV2ShopChatView> createState() => BuyV2ShopChatViewState();
 }
 
 class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
-  late String _filterId = widget.initialFilterId ?? widget.initialFilter.name;
-  final TextEditingController _searchController = TextEditingController();
+  late final BuyV2ShopChatRetainedState _retainedState;
+  late String _filterId;
+  late final TextEditingController _searchController;
   _BuyV2ShopChatSurface _surface = _BuyV2ShopChatSurface.inbox;
   BuyV2ShopChatThread? _selectedThread;
   final GlobalKey<_ShopChatConversationViewState> _threadViewKey = GlobalKey();
   final List<_BuyV2ShopChatHistoryEntry> _forwardHistory = [];
   bool _surfaceForward = true;
   int _surfaceSequence = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _retainedState = widget.retainedState ?? BuyV2ShopChatRetainedState();
+    final initialFilterId = widget.initialFilterId ?? widget.initialFilter.name;
+    final retainedFilterId = _retainedState.filterId;
+    _filterId =
+        retainedFilterId != null &&
+            widget.presentation.filters.any(
+              (filter) => filter.id == retainedFilterId,
+            )
+        ? retainedFilterId
+        : initialFilterId;
+    _retainedState.filterId = _filterId;
+    _searchController = TextEditingController(text: _retainedState.inboxQuery);
+    _searchController.addListener(_retainInboxQuery);
+  }
 
   bool handleBack() {
     if (_surface == _BuyV2ShopChatSurface.thread &&
@@ -481,11 +518,13 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         oldWidget.initialFilterId != widget.initialFilterId ||
         oldWidget.presentation != widget.presentation) {
       _filterId = widget.initialFilterId ?? widget.initialFilter.name;
+      _retainedState.filterId = _filterId;
     }
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_retainInboxQuery);
     _searchController.dispose();
     super.dispose();
   }
@@ -513,6 +552,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
       _BuyV2ShopChatSurface.thread => _ShopChatConversationView(
         key: _threadViewKey,
         thread: _selectedThread!,
+        retainedState: _retainedState._thread(_selectedThread!.id),
         navigationForward: navigationForward,
         onBack: () => handleBack(),
         onOpenInfo: _showInfo,
@@ -571,7 +611,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
               selectedId: _filterId,
               onSelected: (value) {
                 HapticFeedback.selectionClick();
-                setState(() => _filterId = value);
+                setState(() {
+                  _filterId = value;
+                  _retainedState.filterId = value;
+                });
               },
             ),
             const SizedBox(height: 4),
@@ -740,6 +783,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
       _surfaceForward = true;
       _surfaceSequence += 1;
     });
+  }
+
+  void _retainInboxQuery() {
+    _retainedState.inboxQuery = _searchController.text;
   }
 
   String _forwardDestination(_BuyV2ShopChatHistoryEntry entry) =>
@@ -1567,6 +1614,7 @@ class _ShopChatConversationView extends StatefulWidget {
   const _ShopChatConversationView({
     super.key,
     required this.thread,
+    required this.retainedState,
     required this.navigationForward,
     required this.onBack,
     required this.onOpenInfo,
@@ -1576,6 +1624,7 @@ class _ShopChatConversationView extends StatefulWidget {
   });
 
   final BuyV2ShopChatThread thread;
+  final _BuyV2ShopChatThreadRetainedState retainedState;
   final Widget? navigationForward;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
@@ -1589,16 +1638,30 @@ class _ShopChatConversationView extends StatefulWidget {
 }
 
 class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
-  final TextEditingController _composerController = TextEditingController();
-  final TextEditingController _messageSearchController =
-      TextEditingController();
-  BuyV2ShopChatMessage? _replyTarget;
+  late final TextEditingController _composerController;
+  late final TextEditingController _messageSearchController;
+  late BuyV2ShopChatMessage? _replyTarget;
   BuyV2ShopChatMessage? _selectedMessage;
   bool _emojiOpen = false;
-  bool _searchOpen = false;
+  late bool _searchOpen;
   bool _attachmentOpen = false;
   bool _threadMenuOpen = false;
   bool _dispatching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final retained = widget.retainedState;
+    _composerController = TextEditingController(text: retained.draft);
+    _messageSearchController = TextEditingController(
+      text: retained.messageQuery,
+    );
+    _replyTarget = _messageForId(retained.replyMessageId);
+    if (_replyTarget == null) retained.replyMessageId = null;
+    _searchOpen = retained.messageSearchOpen;
+    _composerController.addListener(_retainComposer);
+    _messageSearchController.addListener(_retainMessageSearch);
+  }
 
   bool handleBack() {
     if (_selectedMessage != null) {
@@ -1611,7 +1674,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     }
     if (_searchOpen) {
       _messageSearchController.clear();
-      setState(() => _searchOpen = false);
+      setState(() => _setSearchOpen(false));
       return true;
     }
     if (_attachmentOpen) {
@@ -1623,7 +1686,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
       return true;
     }
     if (_replyTarget != null) {
-      setState(() => _replyTarget = null);
+      setState(() => _setReplyTarget(null));
       return true;
     }
     return false;
@@ -1631,6 +1694,8 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
 
   @override
   void dispose() {
+    _composerController.removeListener(_retainComposer);
+    _messageSearchController.removeListener(_retainMessageSearch);
     _composerController.dispose();
     _messageSearchController.dispose();
     super.dispose();
@@ -1653,7 +1718,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                 onClose: () => setState(() => _selectedMessage = null),
                 onReply: () {
                   setState(() {
-                    _replyTarget = selected;
+                    _setReplyTarget(selected);
                     _selectedMessage = null;
                   });
                 },
@@ -1699,7 +1764,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                 },
                 onSearch: () => setState(() {
                   _threadMenuOpen = false;
-                  _searchOpen = true;
+                  _setSearchOpen(true);
                 }),
                 onNotifications: () => _dispatchDirect(
                   BuyV2ShopChatActionKind.manageNotifications,
@@ -1714,7 +1779,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                 onChanged: (_) => setState(() {}),
                 onClose: () {
                   _messageSearchController.clear();
-                  setState(() => _searchOpen = false);
+                  setState(() => _setSearchOpen(false));
                 },
               ),
             Expanded(
@@ -1807,7 +1872,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
               emojiOpen: _emojiOpen,
               busy: _dispatching,
               onChanged: (_) => setState(() {}),
-              onCancelReply: () => setState(() => _replyTarget = null),
+              onCancelReply: () => setState(() => _setReplyTarget(null)),
               onToggleEmoji: () => setState(() => _emojiOpen = !_emojiOpen),
               onEmoji: (emoji) {
                 final value = '${_composerController.text}$emoji';
@@ -1865,7 +1930,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     if (!mounted) return;
     if (result.disposition == BuyV2ShopChatActionDisposition.accepted) {
       _composerController.clear();
-      _replyTarget = null;
+      _setReplyTarget(null);
       _emojiOpen = false;
     }
     setState(() => _dispatching = false);
@@ -1917,6 +1982,32 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  BuyV2ShopChatMessage? _messageForId(String? messageId) {
+    if (messageId == null) return null;
+    for (final message in widget.thread.messages) {
+      if (message.id == messageId) return message;
+    }
+    return null;
+  }
+
+  void _setReplyTarget(BuyV2ShopChatMessage? message) {
+    _replyTarget = message;
+    widget.retainedState.replyMessageId = message?.id;
+  }
+
+  void _setSearchOpen(bool value) {
+    _searchOpen = value;
+    widget.retainedState.messageSearchOpen = value;
+  }
+
+  void _retainComposer() {
+    widget.retainedState.draft = _composerController.text;
+  }
+
+  void _retainMessageSearch() {
+    widget.retainedState.messageQuery = _messageSearchController.text;
   }
 }
 

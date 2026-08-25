@@ -44,6 +44,7 @@ class _SocialV2RetainedState {
 
   final Map<String, String> choiceByWorld;
   final SocialCreateDraftV2 createDraft = SocialCreateDraftV2();
+  final Map<String, BuyV2ShopChatRetainedState> contextualChatStates = {};
   String createView = 'home';
   int activeShortPage = 0;
   double videoHomeScrollOffset = 0;
@@ -590,6 +591,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                           familyId: _world,
                           source: widget.contextualChatSource,
                         ),
+                        retainedState: _retainedState.contextualChatStates
+                            .putIfAbsent(
+                              '$_world|$choice',
+                              BuyV2ShopChatRetainedState.new,
+                            ),
                         onAction: widget.onContextualChatAction,
                         onBack: _closeContextualChat,
                         onOpenProductionChat: _openProductionChat,

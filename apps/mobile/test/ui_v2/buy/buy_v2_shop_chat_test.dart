@@ -883,6 +883,137 @@ void main() {
     },
   );
 
+  testWidgets(
+    'draft reply search and inbox context survive Info and Chat reopen',
+    (tester) async {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        app(session, shopChatSource: const _RichShopChatSource()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-filter-sellers')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-search')),
+        'Mahadev',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Please keep my basket draft',
+      );
+      await tester.pump();
+      await tester.longPress(
+        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-reply')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+        'basket',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat-info')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+            )
+            .controller!
+            .text,
+        'Please keep my basket draft',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+            )
+            .controller!
+            .text,
+        'basket',
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+          matching: find.byTooltip('Cancel reply'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('buy-shop-chat-filter-sellers')),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-search')),
+            )
+            .controller!
+            .text,
+        'Mahadev',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+            )
+            .controller!
+            .text,
+        'Please keep my basket draft',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Shop Chat public labels and default copy remain truthful', (
     tester,
   ) async {

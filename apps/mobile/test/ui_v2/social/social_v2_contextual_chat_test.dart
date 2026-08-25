@@ -396,6 +396,107 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'context Chat retains a draft on reopen without leaking to another action',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+
+      await tester.pumpWidget(
+        _app(owners, world: 'work', subAction: 'workspace'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-search')),
+        'Workspace',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('buy-shop-chat-entry-work-workspace-support'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Keep this workspace draft',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-commerce-context')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('buy-shop-chat-filter-workspace')),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-search')),
+            )
+            .controller!
+            .text,
+        'Workspace',
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey('buy-shop-chat-entry-work-workspace-support'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+            )
+            .controller!
+            .text,
+        'Keep this workspace draft',
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.pumpWidget(
+        _app(owners, world: 'work', subAction: 'earn-today'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('buy-shop-chat-filter-earn-today')),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-search')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('context Chat stays usable at 320 width and 140 percent text', (
     tester,
   ) async {
