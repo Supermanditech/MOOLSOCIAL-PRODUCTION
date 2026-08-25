@@ -88,6 +88,13 @@ function requiredText(
   return value;
 }
 
+function boundedText(value: unknown, field: string, maximum: number): string {
+  if (typeof value !== "string" || value.length > maximum) {
+    throw new Error(`Shared YouTube catalogue has an invalid ${field}.`);
+  }
+  return value;
+}
+
 function snapshotItem(value: unknown): YouTubeVideoSummary {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Shared YouTube catalogue contains an invalid item.");
@@ -106,7 +113,7 @@ function snapshotItem(value: unknown): YouTubeVideoSummary {
   requiredText(item.channelId, "channelId", 64);
   requiredText(item.channelTitle, "channelTitle");
   requiredText(item.publishedAt, "publishedAt", 64);
-  requiredText(item.description, "description", 25000);
+  boundedText(item.description, "description", 25000);
   requiredText(
     (thumbnail as Record<string, unknown>).url,
     "thumbnail URL",
@@ -360,6 +367,26 @@ function usableStaleSnapshot(
   return expiresAt !== null && nowEpoch <= expiresAt + STALE_FALLBACK_MS;
 }
 
+function safeRefreshFailureClass(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = String((error as { readonly code?: unknown }).code ?? "");
+    if (/^[A-Za-z0-9_-]{1,32}$/u.test(code)) return `code_${code}`;
+  }
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("refresh lease was lost")) return "lease_lost";
+    if (message.includes("undefined")) return "undefined_value";
+    if (message.includes("maximum") && message.includes("size")) {
+      return "document_size";
+    }
+    if (message.includes("transaction")) return "transaction";
+    if (/^[A-Za-z][A-Za-z0-9]{0,31}$/u.test(error.name)) {
+      return error.name.toLowerCase();
+    }
+  }
+  return "unknown";
+}
+
 export class SharedShortsCatalogueCoordinator {
   private readonly now: () => Date;
 
@@ -421,6 +448,7 @@ export class SharedShortsCatalogueCoordinator {
       );
     }
 
+    let refreshPhase = "load_page";
     try {
       const items: YouTubeVideoSummary[] = [];
       const videoIds = new Set<string>();
@@ -464,6 +492,7 @@ export class SharedShortsCatalogueCoordinator {
           refreshedAt.getTime() + SNAPSHOT_TTL_MS,
         ).toISOString(),
       };
+      refreshPhase = "commit_refresh";
       await this.options.store.commitRefresh(lease.leaseId, next);
       await safeRecordOutcome(
         this.options.store,
@@ -492,6 +521,7 @@ export class SharedShortsCatalogueCoordinator {
         "The shared YouTube catalogue is temporarily unavailable.",
         503,
         true,
+        `sharedShortsCatalogue.${refreshPhase}.${safeRefreshFailureClass(error)}`,
       );
     }
   }

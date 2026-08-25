@@ -310,6 +310,36 @@ void main() {
       expect(session.errorMessage, contains('account service is unavailable'));
     },
   );
+
+  test('authenticated identity loads and sign-out clears it', () async {
+    final social = ReviewSocialAuthGateway(
+      defaultResult: const SocialAuthResult.authenticated('google-user'),
+    );
+    final identityGateway = ReviewAuthenticatedAccountIdentityGateway(
+      identity: const AuthenticatedAccountIdentity(
+        displayName: 'Test Member',
+        emailAddress: 'member@example.com',
+        signInMethods: ['Google'],
+      ),
+    );
+    final session = JourneySession(
+      store: completedSetupStore(),
+      socialAuthGateway: social,
+      accountIdentityGateway: identityGateway,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+    expect(session.accountIdentity?.primaryLabel, 'Test Member');
+    expect(session.accountIdentity?.detailLabel, 'member@example.com · Google');
+    expect(identityGateway.readCount, 1);
+
+    await session.signOut();
+    expect(session.accountIdentity, isNull);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.stage, JourneyStage.signIn);
+  });
 }
 
 class _CompletingSocialGateway implements SocialAuthGateway {

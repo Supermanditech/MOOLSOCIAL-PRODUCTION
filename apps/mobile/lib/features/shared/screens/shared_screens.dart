@@ -12,12 +12,14 @@ class SharedHubScreen extends StatefulWidget {
     required this.session,
     required this.screen,
     this.initialItemId,
+    this.onSignOut,
     super.key,
   });
 
   final SharedSession session;
   final int screen;
   final String? initialItemId;
+  final Future<void> Function()? onSignOut;
 
   @override
   State<SharedHubScreen> createState() => _SharedHubScreenState();
@@ -269,6 +271,15 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
                 if (index < items.length - 1)
                   const SizedBox(height: MoolSpacing.sm),
               ],
+            if (spec.screen == 161 && widget.onSignOut != null) ...[
+              const SizedBox(height: MoolSpacing.lg),
+              OutlinedButton.icon(
+                key: const Key('shared-161-sign-out'),
+                onPressed: widget.session.busy ? null : _confirmSignOut,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Sign out of MoolSocial'),
+              ),
+            ],
           ],
         ),
       );
@@ -282,6 +293,31 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
         queryParameters: {'return': _routeForScreen(spec.screen)},
       ).toString(),
     );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out of MoolSocial?'),
+        content: const Text(
+          'Your language and serviceable area will stay saved on this device.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('shared-161-cancel-sign-out'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Stay signed in'),
+          ),
+          FilledButton(
+            key: const Key('shared-161-confirm-sign-out'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await widget.onSignOut?.call();
   }
 
   Future<void> _openItem(SharedItem item) {

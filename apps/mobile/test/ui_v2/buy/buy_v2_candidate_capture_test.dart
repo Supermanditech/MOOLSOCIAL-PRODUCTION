@@ -4,8 +4,10 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_shop_chat.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -505,6 +507,371 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for additive evidence.
     skip: true,
   );
+
+  testWidgets(
+    'OPPO installed baseline header removal review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.orders,
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final reviewRootKey = ValueKey(
+          'buy-header-removal-review-root-${destination.name}',
+        );
+
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: reviewRootKey,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                  disableAnimations: true,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(session: session),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (destination == BuyV2Destination.orders) {
+          session.openOrders();
+          await tester.pumpAndSettle();
+        } else if (destination != BuyV2Destination.shop) {
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+        }
+
+        await _captureHeaderRemovalReview(
+          tester,
+          destination.name,
+          reviewRootKey,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-header-visual-creative-reel')),
+          findsNothing,
+          reason: destination.name,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-open-account')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+
+        if (destination == BuyV2Destination.shop) {
+          await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-account-hub')), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+          await _captureHeaderRemovalReview(tester, 'account', reviewRootKey);
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'post-order confirmation and invoice review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-post-order-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final shop = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.shop,
+      );
+      final wholesale = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.wholesale,
+      );
+      session.addProduct(shop.id);
+      session.increase(shop.id);
+      session.addProduct(wholesale.id);
+      session.openCart();
+      session.openCheckout();
+      session.confirmOrder();
+      await tester.pumpAndSettle();
+
+      await _capturePostOrderReview(
+        tester,
+        'confirmation-shop-wholesale',
+        reviewRootKey,
+      );
+      final shopOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.shop,
+      );
+      final invoiceAction = find.byKey(
+        ValueKey('buy-confirmation-invoice-${shopOrder.id}'),
+      );
+      await tester.ensureVisible(invoiceAction);
+      await tester.tap(invoiceAction);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('buy-invoice-page-${shopOrder.id}')),
+        findsOneWidget,
+      );
+
+      await _capturePostOrderReview(tester, 'invoice-shop', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'Offers progressive browsing laptop review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-offers-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers', reviewRootKey);
+
+      await tester.fling(
+        find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+        const Offset(-1200, 0),
+        2200,
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-paged', reviewRootKey);
+
+      session.openProduct('w-oil');
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offer-product', reviewRootKey);
+
+      session.addProduct('w-oil');
+      session.openCart();
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'cart-browse-more', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-cart-browse-more')));
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'offers-cart-active', reviewRootKey);
+
+      session.openOrders();
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const PageStorageKey('buy-orders')),
+        const Offset(0, -520),
+      );
+      await tester.pumpAndSettle();
+      await _captureOffersReview(tester, 'orders-browse', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
+
+  testWidgets(
+    'Shop Chat professional tap-journey review captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      const reviewRootKey = ValueKey('buy-shop-chat-review-root');
+
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: reviewRootKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                viewPadding: const EdgeInsets.symmetric(vertical: 24),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(
+              session: session,
+              onOpenChat: () {},
+              shopChatSource: const _CaptureShopChatSource(),
+              onShopChatAction: (_) async =>
+                  const BuyV2ShopChatActionResult.accepted(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+      await _captureShopChatReview(tester, 'shop-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'orders-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'offers-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'partners-inbox', reviewRootKey);
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'new-conversation', reviewRootKey);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-new-retail-live')),
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'conversation', reviewRootKey);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Can this arrive tomorrow morning?',
+      );
+      await tester.pump();
+      await _captureShopChatReview(tester, 'composer-draft', reviewRootKey);
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        '',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'emoji-tray', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'attachments', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'thread-menu', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+        'basket',
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(
+        tester,
+        'conversation-search',
+        reviewRootKey,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'business-info', reviewRootKey);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-info-back')));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(
+        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      );
+      await tester.pumpAndSettle();
+      await _captureShopChatReview(tester, 'message-actions', reviewRootKey);
+      expect(tester.takeException(), isNull);
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -513,6 +880,67 @@ Future<void> _capture(WidgetTester tester, String state) async {
     find.byKey(const ValueKey('buy-v2-screen')),
     matchesGoldenFile(
       'candidate_captures/buy-v2-r33-search-media-chat-local-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureHeaderRemovalReview(
+  WidgetTester tester,
+  String destination,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/'
+      'buy-v2-oppo-baseline-header-removed-$destination-360x800.png',
+    ),
+  );
+}
+
+Future<void> _capturePostOrderReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-post-order-$state-360x800.png',
+    ),
+  );
+}
+
+Future<void> _captureOffersReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 120));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-offers-progressive-$state-390x844.png',
+    ),
+  );
+}
+
+Future<void> _captureShopChatReview(
+  WidgetTester tester,
+  String state,
+  Key reviewRootKey,
+) async {
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pumpAndSettle();
+  await expectLater(
+    find.byKey(reviewRootKey),
+    matchesGoldenFile(
+      'candidate_captures/buy-v2-shop-chat-enhanced-$state-390x844.png',
     ),
   );
 }
@@ -568,4 +996,77 @@ Future<void> _captureR34SearchSuggestions(
       'buy-v2-r35-1-dense-flat-suggestions-$destination-$viewport.png',
     ),
   );
+}
+
+class _CaptureShopChatSource implements BuyV2ShopChatProvisioningSource {
+  const _CaptureShopChatSource();
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) {
+    final defaults = const BuyV2SessionShopChatProvisioningSource()
+        .threads(session)
+        .where((thread) => thread.id != 'retail-partner');
+    return [
+      const BuyV2ShopChatThread(
+        id: 'retail-live',
+        filter: BuyV2ShopChatFilter.sellers,
+        participantKind: BuyV2ShopChatParticipantKind.retailer,
+        title: 'Mahadev Fresh Mart',
+        subtitle: 'Retail partner · Groceries and delivery',
+        detail: 'Your basket is ready to review',
+        icon: Icons.storefront_outlined,
+        accent: BuyV2Colors.orange,
+        commerceTarget: BuyV2ShopChatCommerceTarget.shop,
+        contextTitle: 'Fresh grocery basket',
+        contextDetail: '5 items · Delivery to your saved address',
+        previewTimeLabel: '10:42',
+        unreadCount: 1,
+        quickReplies: ['Is everything in stock?', 'When can it arrive?'],
+        messages: [
+          BuyV2ShopChatMessage(
+            id: 'received-text',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: false,
+            sentAtLabel: '10:36',
+            body: 'Your fresh grocery basket is ready to review.',
+          ),
+          BuyV2ShopChatMessage(
+            id: 'sent-text',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: true,
+            sentAtLabel: '10:38',
+            body: 'Can it arrive tomorrow morning?',
+            deliveryState: BuyV2ShopChatDeliveryState.read,
+          ),
+          BuyV2ShopChatMessage(
+            id: 'received-photo',
+            kind: BuyV2ShopChatMessageKind.image,
+            fromCurrentUser: false,
+            sentAtLabel: '10:40',
+            attachmentName: 'Basket photo',
+            attachmentDetail: 'JPG · 1.8 MB',
+            body: 'These are the available packs.',
+          ),
+          BuyV2ShopChatMessage(
+            id: 'sent-document',
+            kind: BuyV2ShopChatMessageKind.document,
+            fromCurrentUser: true,
+            sentAtLabel: '10:41',
+            attachmentName: 'Monthly staples.pdf',
+            attachmentDetail: 'PDF · 240 KB',
+            deliveryState: BuyV2ShopChatDeliveryState.delivered,
+          ),
+          BuyV2ShopChatMessage(
+            id: 'received-voice',
+            kind: BuyV2ShopChatMessageKind.voice,
+            fromCurrentUser: false,
+            sentAtLabel: '10:42',
+            attachmentName: 'Voice message',
+            attachmentDetail: '0:18',
+          ),
+        ],
+      ),
+      ...defaults,
+    ];
+  }
 }

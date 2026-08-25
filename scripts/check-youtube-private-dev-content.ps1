@@ -1,3 +1,8 @@
+param(
+  [switch]$AllowReviewedExistingRuntime,
+  [switch]$ProviderOnlyC30M
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -26,9 +31,11 @@ $scopes = @(
   "scripts/check-youtube-private-dev-preflight.ps1",
   "scripts/check-youtube-private-dev-security-prerequisites.ps1",
   "scripts/contain-youtube-private-dev.ps1",
+  "scripts/deploy-youtube-provider-c30m.ps1",
   "scripts/deploy-youtube-private-dev.ps1",
   "scripts/prepare-youtube-private-dev-runtime.ps1",
   "scripts/test-youtube-private-dev-deployment-controls.ps1",
+  "scripts/test-youtube-provider-c30m-deployment-controls.ps1",
   "scripts/youtube-private-dev-control-common.ps1",
   "scripts/verify-youtube-private-dev-deployment.ps1"
 )
@@ -71,6 +78,8 @@ $requiredPackageFiles = @(
   "apps/mobile/test/youtube_private_dev_client_test.dart",
   "scripts/activate-youtube-private-dev-proof.ps1",
   "scripts/contain-youtube-private-dev.ps1",
+  "scripts/deploy-youtube-provider-c30m.ps1",
+  "scripts/test-youtube-provider-c30m-deployment-controls.ps1",
   "scripts/test-youtube-private-dev-deployment-controls.ps1",
   "scripts/youtube-private-dev-control-common.ps1"
 )
@@ -82,11 +91,25 @@ foreach ($requiredPackageFile in $requiredPackageFiles) {
 
 $ignoredRuntimeFile = Join-Path $repoRoot `
   "backend/functions/.env.moolsocial-dev-503018"
-if (Test-Path -LiteralPath $ignoredRuntimeFile -PathType Leaf) {
+if (
+  -not $AllowReviewedExistingRuntime -and
+  (Test-Path -LiteralPath $ignoredRuntimeFile -PathType Leaf)
+) {
   throw (
     "The ignored Firebase runtime environment exists during package " +
     "verification. It must be materialized only inside a bounded deploy."
   )
+}
+
+if ($ProviderOnlyC30M) {
+  foreach ($providerOwner in @(
+    "scripts/deploy-youtube-provider-c30m.ps1",
+    "scripts/test-youtube-provider-c30m-deployment-controls.ps1"
+  )) {
+    if ($files -notcontains $providerOwner) {
+      throw "Provider-only C30M owner is missing: $providerOwner"
+    }
+  }
 }
 
 $secretLiteralPatterns = [ordered]@{
@@ -199,7 +222,30 @@ foreach ($relativePath in $files) {
     throw "Package text file contains a NUL byte: $relativePath"
   }
   foreach ($secretPattern in $secretLiteralPatterns.GetEnumerator()) {
-    if ($content -match $secretPattern.Value) {
+    $secretMatches = @([regex]::Matches($content, $secretPattern.Value))
+    if ($secretMatches.Count -eq 0) {
+      continue
+    }
+    $allowedHashedFixture = $false
+    if (
+      $relativePath -ceq
+        'backend/functions/src/auth/instagram_oauth_broker.test.ts' -and
+      [string]$secretPattern.Key -ceq 'Bearer credential' -and
+      $secretMatches.Count -eq 2
+    ) {
+      $fixtureHashes = @($secretMatches | ForEach-Object {
+        [Convert]::ToHexString(
+          [Security.Cryptography.SHA256]::HashData(
+            [Text.Encoding]::UTF8.GetBytes($_.Value)
+          )
+        )
+      })
+      $allowedHashedFixture = @($fixtureHashes | Where-Object {
+        $_ -cne
+          '088CCC7E4C6E7D84AB7EFC87811F08DCC6FF46AAEBC45244C78D57827ADF2FFE'
+      }).Count -eq 0
+    }
+    if (-not $allowedHashedFixture) {
       throw (
         "Potential {0} literal found in package file: {1}" -f
           $secretPattern.Key,

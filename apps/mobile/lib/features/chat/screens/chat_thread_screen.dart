@@ -307,8 +307,8 @@ class _MessageBubble extends StatelessWidget {
       child: Container(
         key: Key('chat-message-${message.id}'),
         constraints: const BoxConstraints(maxWidth: 330),
-        margin: const EdgeInsets.only(bottom: MoolSpacing.sm),
-        padding: const EdgeInsets.all(MoolSpacing.sm),
+        margin: const EdgeInsets.only(bottom: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: message.mine ? MoolColors.navy : Colors.white,
           borderRadius: BorderRadius.only(
@@ -321,10 +321,7 @@ class _MessageBubble extends StatelessWidget {
               message.mine ? MoolSpacing.xs : MoolRadii.card,
             ),
           ),
-          border: Border.all(
-            color: failed ? const Color(0xFFD3322F) : const Color(0x18000080),
-          ),
-          boxShadow: MoolShadows.card,
+          border: failed ? Border.all(color: const Color(0xFFD3322F)) : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,60 +564,48 @@ class _MessageBubble extends StatelessWidget {
                 child: const Text('Retry'),
               ),
             if (message.isSettled)
-              Wrap(
-                spacing: MoolSpacing.xs,
-                runSpacing: 2,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextButton.icon(
+                  IconButton(
                     key: Key('chat-reply-${message.id}'),
+                    tooltip: 'Reply',
                     onPressed: session.busy
                         ? null
                         : () => session.startReply(threadId, message.id),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        MoolMetrics.minimumTapTarget,
-                        MoolMetrics.minimumTapTarget,
-                      ),
-                      foregroundColor: message.mine
-                          ? Colors.white
-                          : MoolColors.navy,
-                    ),
-                    icon: const Icon(Icons.reply_rounded, size: 18),
-                    label: const Text('Reply'),
+                    visualDensity: VisualDensity.compact,
+                    color: message.mine ? Colors.white : MoolColors.navy,
+                    icon: const Icon(Icons.reply_rounded, size: 19),
                   ),
-                  TextButton.icon(
+                  IconButton(
                     key: Key('chat-react-${message.id}'),
+                    tooltip: message.reactedByMe ? 'Remove reaction' : 'React',
                     onPressed: session.busy
                         ? null
                         : () => unawaited(
                             session.toggleReaction(threadId, message.id),
                           ),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        MoolMetrics.minimumTapTarget,
-                        MoolMetrics.minimumTapTarget,
+                    visualDensity: VisualDensity.compact,
+                    color: message.mine ? Colors.white : MoolColors.navy,
+                    icon: Badge(
+                      isLabelVisible: message.reactionCount > 0,
+                      label: Text('${message.reactionCount}'),
+                      backgroundColor: MoolColors.orange,
+                      textColor: MoolColors.ink,
+                      child: Icon(
+                        message.reactedByMe
+                            ? Icons.thumb_up_rounded
+                            : Icons.thumb_up_outlined,
+                        size: 19,
                       ),
-                      foregroundColor: message.mine
-                          ? Colors.white
-                          : MoolColors.navy,
-                    ),
-                    icon: Icon(
-                      message.reactedByMe
-                          ? Icons.thumb_up_rounded
-                          : Icons.thumb_up_outlined,
-                      size: 18,
-                    ),
-                    label: Text(
-                      message.reactionCount == 0
-                          ? 'React'
-                          : '${message.reactionCount}',
                     ),
                   ),
                   if (message.photo == null &&
                       message.attachmentLabel == null &&
                       message.text.trim().isNotEmpty)
-                    TextButton.icon(
+                    IconButton(
                       key: Key('chat-forward-${message.id}'),
+                      tooltip: 'Forward',
                       onPressed:
                           session.busy ||
                               session.availableForwardTargets(threadId).isEmpty
@@ -633,17 +618,9 @@ class _MessageBubble extends StatelessWidget {
                                 message,
                               ),
                             ),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(
-                          MoolMetrics.minimumTapTarget,
-                          MoolMetrics.minimumTapTarget,
-                        ),
-                        foregroundColor: message.mine
-                            ? Colors.white
-                            : MoolColors.navy,
-                      ),
-                      icon: const Icon(Icons.forward_rounded, size: 18),
-                      label: const Text('Forward'),
+                      visualDensity: VisualDensity.compact,
+                      color: message.mine ? Colors.white : MoolColors.navy,
+                      icon: const Icon(Icons.forward_rounded, size: 19),
                     ),
                 ],
               ),

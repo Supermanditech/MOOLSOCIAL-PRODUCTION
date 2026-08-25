@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -273,7 +273,10 @@ GoRouter createJourneyRouter(
             state: state,
             child: BuyV2Screen(
               session: buyV2Session,
+              accountIdentity: session.accountIdentity,
+              accountAuthenticated: session.isAuthenticated,
               initialDestination: destination,
+              initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
               initialView: view,
               initialCartScope: cartScope,
               productId: state.uri.queryParameters['product'],
@@ -294,6 +297,8 @@ GoRouter createJourneyRouter(
             ? BuyCatalogScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -306,6 +311,8 @@ GoRouter createJourneyRouter(
             ? BuyMedicineScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.medicine,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -321,6 +328,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.product,
                 productId: state.pathParameters['productId'],
@@ -335,6 +344,8 @@ GoRouter createJourneyRouter(
             ? BuyBasketScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: _buyV2Destination(
                   state.uri.queryParameters['scope'],
                 ),
@@ -353,6 +364,8 @@ GoRouter createJourneyRouter(
             ? BuyReviewScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.checkout,
                 onExit: buyExit(context, state),
@@ -369,6 +382,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -386,6 +401,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -403,6 +420,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -418,6 +437,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -433,6 +454,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.assist,
                 orderId: state.pathParameters['orderId'],
@@ -508,6 +531,7 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
@@ -525,6 +549,7 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
@@ -1340,8 +1365,26 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/security',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 161),
+        builder: (context, state) => SharedHubScreen(
+          session: sharedSession,
+          screen: 161,
+          onSignOut: () async {
+            final signedOut = await session.signOut();
+            if (!context.mounted) return;
+            if (signedOut) {
+              context.go('/sign-in');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    session.errorMessage ??
+                        'Sign-out could not be completed. Please try again.',
+                  ),
+                ),
+              );
+            }
+          },
+        ),
       ),
       GoRoute(
         path: '/app/account/workspaces',
@@ -1475,6 +1518,22 @@ GoRouter createJourneyRouter(
                 },
                 onOpenChat: () =>
                     context.push('/app/chat/inbox?return=/app/mool'),
+                onSignOut: () async {
+                  final signedOut = await session.signOut();
+                  if (!context.mounted) return;
+                  if (signedOut) {
+                    context.go('/sign-in');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          session.errorMessage ??
+                              'Sign-out could not be completed. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
+                },
                 areaLabel: session.currentAreaLabel ?? session.manualArea,
               ),
             );
@@ -1530,7 +1589,11 @@ GoRouter createJourneyRouter(
                 initialSubAction: state.uri.queryParameters['sub'],
                 initialState:
                     state.uri.queryParameters['state'] ??
-                    state.uri.queryParameters['mode'],
+                    state.uri.queryParameters['mode'] ??
+                    (section == 'social' &&
+                            state.uri.queryParameters['sub'] == 'create'
+                        ? 'home'
+                        : null),
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],
