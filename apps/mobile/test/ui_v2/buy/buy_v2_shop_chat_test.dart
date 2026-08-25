@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -1272,7 +1273,7 @@ void main() {
     'conversation pending action disables competing controls and restores them',
     (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = const Size(320, 568);
       addTearDown(tester.view.reset);
       final core = BuySession();
       final session = BuyV2Session(core: core);
@@ -1285,6 +1286,7 @@ void main() {
         app(
           session,
           shopChatSource: const _RichShopChatSource(),
+          textScale: 1.4,
           onShopChatAction: (action) {
             actions.add(action);
             if (actions.length == 1) return firstCall.future;
@@ -1363,12 +1365,21 @@ void main() {
       final safety = find.byKey(const ValueKey('buy-shop-chat-menu-safety'));
       expect(tester.widget<InkWell>(notifications).onTap, isNull);
       expect(tester.widget<InkWell>(safety).onTap, isNull);
+      for (final label in const [
+        'Notification settings',
+        'Safety and support',
+      ]) {
+        final data = tester
+            .getSemantics(find.bySemanticsLabel(label))
+            .getSemanticsData()
+            .flagsCollection;
+        expect(data.isButton, isTrue, reason: label);
+        expect(data.isEnabled, Tristate.isFalse, reason: label);
+      }
 
       await tester.tap(voice);
       await tester.tap(video);
       await tester.tap(forward);
-      await tester.tap(notifications);
-      await tester.tap(safety);
       await tester.pump();
       expect(actions, hasLength(1));
 
@@ -1377,6 +1388,20 @@ void main() {
       expect(find.bySemanticsLabel('Starting voice call'), findsNothing);
       expect(tester.widget<IconButton>(voice).onPressed, isNotNull);
       expect(tester.widget<IconButton>(video).onPressed, isNotNull);
+      for (final label in const [
+        'Notification settings',
+        'Safety and support',
+      ]) {
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel(label))
+              .getSemanticsData()
+              .flagsCollection
+              .isEnabled,
+          Tristate.isTrue,
+          reason: label,
+        );
+      }
       expect(
         tester
             .widget<IconButton>(

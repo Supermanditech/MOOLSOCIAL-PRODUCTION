@@ -2602,24 +2602,28 @@ class _ShopChatInlineThreadMenu extends StatelessWidget {
               keyName: 'info',
               icon: presentation.icon,
               label: '${presentation.familyLabel} info',
+              semanticLabel: '${presentation.familyLabel} Chat info',
               onTap: onInfo,
             ),
             _ShopChatInlineMenuAction(
               keyName: 'search',
               icon: Icons.search_rounded,
               label: 'Search',
+              semanticLabel: 'Search messages',
               onTap: onSearch,
             ),
             _ShopChatInlineMenuAction(
               keyName: 'notifications',
               icon: Icons.notifications_outlined,
-              label: 'Alerts',
+              label: 'Notifications',
+              semanticLabel: 'Notification settings',
               onTap: onNotifications,
             ),
             _ShopChatInlineMenuAction(
               keyName: 'safety',
               icon: Icons.shield_outlined,
               label: 'Safety',
+              semanticLabel: 'Safety and support',
               onTap: onSafety,
             ),
           ],
@@ -2634,42 +2638,50 @@ class _ShopChatInlineMenuAction extends StatelessWidget {
     required this.keyName,
     required this.icon,
     required this.label,
+    required this.semanticLabel,
     required this.onTap,
   });
 
   final String keyName;
   final IconData icon;
   final String label;
+  final String semanticLabel;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return SizedBox(
-      width: 91,
-      child: InkWell(
-        key: ValueKey('buy-shop-chat-menu-$keyName'),
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 19,
-              color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 91,
+        child: InkWell(
+          key: ValueKey('buy-shop-chat-menu-$keyName'),
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 19,
                 color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
