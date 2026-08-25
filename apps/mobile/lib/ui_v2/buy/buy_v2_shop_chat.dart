@@ -2319,7 +2319,9 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
         threadId: widget.thread.id,
         text: text,
         messageId: message?.id,
-        replyToMessageId: _replyTarget?.id,
+        replyToMessageId: kind.createsConversationMessage
+            ? _replyTarget?.id
+            : null,
       ),
     );
     if (!mounted) return;
@@ -2327,6 +2329,10 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
       _dispatching = false;
       _activeAction = null;
       _selectedMessage = null;
+      if (result.disposition == BuyV2ShopChatActionDisposition.accepted &&
+          kind.createsConversationMessage) {
+        _setReplyTarget(null);
+      }
     });
     _report(result);
   }
@@ -4465,6 +4471,19 @@ extension on BuyV2ShopChatDeliveryState {
 }
 
 extension on BuyV2ShopChatActionKind {
+  bool get createsConversationMessage => switch (this) {
+    BuyV2ShopChatActionKind.sendText ||
+    BuyV2ShopChatActionKind.captureImage ||
+    BuyV2ShopChatActionKind.selectMedia ||
+    BuyV2ShopChatActionKind.selectDocument ||
+    BuyV2ShopChatActionKind.recordVoice ||
+    BuyV2ShopChatActionKind.shareProduct ||
+    BuyV2ShopChatActionKind.shareOrder ||
+    BuyV2ShopChatActionKind.shareLocation ||
+    BuyV2ShopChatActionKind.shareContact => true,
+    _ => false,
+  };
+
   String get inProgressMessage => switch (this) {
     BuyV2ShopChatActionKind.sendText => 'Sending message',
     BuyV2ShopChatActionKind.startVoiceCall => 'Starting voice call',

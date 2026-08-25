@@ -1004,6 +1004,74 @@ void main() {
   });
 
   testWidgets(
+    'reply payload belongs to one accepted message-producing action',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final actions = <BuyV2ShopChatAction>[];
+
+      await tester.pumpWidget(
+        app(
+          session,
+          shopChatSource: const _RichShopChatSource(),
+          onShopChatAction: (action) async {
+            actions.add(action);
+            return const BuyV2ShopChatActionResult.accepted();
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      final receivedMessage = find.byKey(
+        const ValueKey('buy-shop-chat-message-received-text'),
+      );
+      await tester.ensureVisible(receivedMessage);
+      await tester.longPress(receivedMessage);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-reply')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-voice-call')));
+      await tester.pumpAndSettle();
+      expect(actions.last.kind, BuyV2ShopChatActionKind.startVoiceCall);
+      expect(actions.last.replyToMessageId, isNull);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-attach-selectDocument')),
+      );
+      await tester.pumpAndSettle();
+      expect(actions.last.kind, BuyV2ShopChatActionKind.selectDocument);
+      expect(actions.last.replyToMessageId, 'received-text');
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'conversation picker stays inside Chat and opens the selected partner',
     (tester) async {
       final core = BuySession();
