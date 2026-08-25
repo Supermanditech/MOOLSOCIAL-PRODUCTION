@@ -25,6 +25,7 @@ void main() {
     double textScale = 1,
     EdgeInsets safePadding = EdgeInsets.zero,
     bool disableAnimations = true,
+    BuyV2Destination initialDestination = BuyV2Destination.shop,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -40,6 +41,7 @@ void main() {
       ),
       home: BuyV2Screen(
         session: session,
+        initialDestination: initialDestination,
         onOpenChat: onOpenChat,
         onShopChatAction: onShopChatAction,
         shopChatSource: shopChatSource,
@@ -211,6 +213,60 @@ void main() {
       expect(sellersChip.selected, isTrue);
       expect(
         find.text('Wholesale · partners, orders and offers'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Medicine global Chat opens the isolated Care conversation context',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        app(session, initialDestination: BuyV2Destination.medicine),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('care-local-destination-tabs')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      expect(find.text('Care Chat'), findsOneWidget);
+      expect(find.text('Medicine · appointments and services'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('buy-shop-chat-filter-medicine')),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-entry-care-medicine-desk')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-care-medicine-desk')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-commerce-context')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('care-local-destination-tabs')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
