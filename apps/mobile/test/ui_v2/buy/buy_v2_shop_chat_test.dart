@@ -687,7 +687,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final received = find.bySemanticsLabel(
-      'Received message at 10:36. Your fresh grocery basket is ready to review.',
+      'Received message from Mahadev Fresh Mart at 10:36. Your fresh grocery basket is ready to review.',
     );
     expect(received, findsOneWidget);
     final receivedData = tester.getSemantics(received).getSemanticsData();
@@ -708,7 +708,7 @@ void main() {
     );
 
     final photo = find.bySemanticsLabel(
-      'Received photo at 10:40. Basket photo. These are the available packs. JPG · 1.8 MB.',
+      'Received photo from Mahadev Fresh Mart at 10:40. Basket photo. These are the available packs. JPG · 1.8 MB.',
     );
     expect(photo, findsOneWidget);
     final photoData = tester.getSemantics(photo).getSemanticsData();
@@ -719,9 +719,25 @@ void main() {
     expect(photoData.hasAction(SemanticsAction.tap), isTrue);
     expect(photoData.hasAction(SemanticsAction.longPress), isTrue);
 
-    await tester.longPress(
-      find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+    final receivedMessage = find.byKey(
+      const ValueKey('buy-shop-chat-message-received-text'),
     );
+    await tester.longPress(receivedMessage);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-reply')));
+    await tester.pumpAndSettle();
+    expect(find.text('Replying to Mahadev Fresh Mart'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        'Replying to Mahadev Fresh Mart. Your fresh grocery basket is ready to review.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Cancel reply'), findsOneWidget);
+    await tester.tap(find.byTooltip('Cancel reply'));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(receivedMessage);
     await tester.pumpAndSettle();
     expect(find.byTooltip('Like'), findsOneWidget);
     expect(find.byTooltip('React'), findsNothing);
@@ -1753,7 +1769,9 @@ void main() {
       await tester.ensureVisible(directForward);
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel('Forward received message from 10:36'),
+        find.bySemanticsLabel(
+          'Forward message from Mahadev Fresh Mart at 10:36',
+        ),
         findsOneWidget,
       );
       expect(

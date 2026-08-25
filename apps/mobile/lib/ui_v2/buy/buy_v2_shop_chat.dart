@@ -2052,6 +2052,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                                 ...messages.map(
                                   (message) => _ShopChatMessageBubble(
                                     message: message,
+                                    participantLabel: widget.thread.title,
                                     onForward: _dispatching
                                         ? null
                                         : () => _dispatchDirect(
@@ -2116,6 +2117,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                   controller: _composerController,
                   focusNode: _composerFocusNode,
                   replyTarget: _replyTarget,
+                  participantLabel: widget.thread.title,
                   emojiOpen: _emojiOpen,
                   busy: _dispatching,
                   busyLabel:
@@ -3057,6 +3059,7 @@ class _ShopChatComposer extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.replyTarget,
+    required this.participantLabel,
     required this.emojiOpen,
     required this.busy,
     required this.busyLabel,
@@ -3074,6 +3077,7 @@ class _ShopChatComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final BuyV2ShopChatMessage? replyTarget;
+  final String participantLabel;
   final bool emojiOpen;
   final bool busy;
   final String busyLabel;
@@ -3112,6 +3116,7 @@ class _ShopChatComposer extends StatelessWidget {
             if (replyTarget != null)
               _ShopChatReplyPreview(
                 message: replyTarget!,
+                participantLabel: participantLabel,
                 onClose: onCancelReply,
               ),
             if (emojiOpen)
@@ -3297,13 +3302,20 @@ class _ShopChatComposerIcon extends StatelessWidget {
 }
 
 class _ShopChatReplyPreview extends StatelessWidget {
-  const _ShopChatReplyPreview({required this.message, required this.onClose});
+  const _ShopChatReplyPreview({
+    required this.message,
+    required this.participantLabel,
+    required this.onClose,
+  });
 
   final BuyV2ShopChatMessage message;
+  final String participantLabel;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final owner = message.fromCurrentUser ? 'your message' : participantLabel;
+    final content = message.body ?? message.attachmentName ?? 'Shared message';
     return Container(
       key: const ValueKey('buy-shop-chat-reply-preview'),
       constraints: const BoxConstraints(minHeight: 46),
@@ -3319,11 +3331,33 @@ class _ShopChatReplyPreview extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              message.body ?? message.attachmentName ?? 'Shared message',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
+            child: Semantics(
+              container: true,
+              explicitChildNodes: true,
+              excludeSemantics: true,
+              label: 'Replying to $owner. $content',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Replying to $owner',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    content,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
+                  ),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -3365,12 +3399,14 @@ class _ShopChatAvatar extends StatelessWidget {
 class _ShopChatMessageBubble extends StatelessWidget {
   const _ShopChatMessageBubble({
     required this.message,
+    required this.participantLabel,
     required this.onForward,
     required this.onTap,
     required this.onLongPress,
   });
 
   final BuyV2ShopChatMessage message;
+  final String participantLabel;
   final VoidCallback? onForward;
   final VoidCallback? onTap;
   final VoidCallback onLongPress;
@@ -3389,12 +3425,16 @@ class _ShopChatMessageBubble extends StatelessWidget {
             )
             .join(' ');
     final accessibilityLabel = [
-      '${mine ? 'Sent' : 'Received'} ${message.kind.customerLabel} at ${message.sentAtLabel}.',
+      if (mine)
+        'Sent ${message.kind.customerLabel} at ${message.sentAtLabel}.'
+      else
+        'Received ${message.kind.customerLabel} from $participantLabel at ${message.sentAtLabel}.',
       if (details.isNotEmpty) details,
       if (mine) '${message.deliveryState.customerLabel}.',
     ].join(' ');
     final forward = _ShopChatMessageForwardButton(
       message: message,
+      participantLabel: participantLabel,
       onPressed: onForward,
     );
     return Padding(
@@ -3520,21 +3560,25 @@ class _ShopChatMessageBubble extends StatelessWidget {
 class _ShopChatMessageForwardButton extends StatelessWidget {
   const _ShopChatMessageForwardButton({
     required this.message,
+    required this.participantLabel,
     required this.onPressed,
   });
 
   final BuyV2ShopChatMessage message;
+  final String participantLabel;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final direction = message.fromCurrentUser ? 'sent' : 'received';
+    final label = message.fromCurrentUser
+        ? 'Forward your message from ${message.sentAtLabel}'
+        : 'Forward message from $participantLabel at ${message.sentAtLabel}';
     return Semantics(
       key: ValueKey('buy-shop-chat-forward-${message.id}'),
       container: true,
       button: true,
       enabled: onPressed != null,
-      label: 'Forward $direction message from ${message.sentAtLabel}',
+      label: label,
       excludeSemantics: true,
       child: Tooltip(
         message: 'Forward message',
