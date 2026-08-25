@@ -557,6 +557,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         navigationForward: navigationForward,
         onBack: () => handleBack(),
         onSelected: _openThread,
+        onOpenAll: widget.onOpenProductionChat,
       ),
       _BuyV2ShopChatSurface.thread => _ShopChatConversationView(
         key: _threadViewKey,
@@ -591,6 +592,10 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     required Widget? navigationForward,
   }) {
     final entries = _visibleEntries();
+    final query = _searchController.text.trim();
+    final hasProvisionedEntries =
+        entries.isNotEmpty ||
+        widget.provisioningSource.threads(widget.session).isNotEmpty;
     return Semantics(
       key: const ValueKey('buy-shop-chat'),
       container: true,
@@ -637,6 +642,21 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                       child: entries.isEmpty
                           ? _ShopChatEmptyState(
                               familyLabel: widget.presentation.familyLabel,
+                              query: query,
+                              filterLabel: _filterId == 'all'
+                                  ? null
+                                  : widget.presentation.filter(_filterId).label,
+                              hasProvisionedEntries: hasProvisionedEntries,
+                              onClearSearch: () {
+                                _searchController.clear();
+                                setState(() {});
+                              },
+                              onShowAll: () => setState(() {
+                                _filterId = 'all';
+                                _retainedState.filterId = 'all';
+                              }),
+                              onChooseConversation: _showNewConversationPicker,
+                              onOpenAll: widget.onOpenProductionChat,
                             )
                           : ListView.builder(
                               key: ValueKey('buy-shop-chat-results-$_filterId'),
@@ -1401,12 +1421,59 @@ class _ShopChatEntryTile extends StatelessWidget {
 }
 
 class _ShopChatEmptyState extends StatelessWidget {
-  const _ShopChatEmptyState({required this.familyLabel});
+  const _ShopChatEmptyState({
+    required this.familyLabel,
+    required this.query,
+    required this.filterLabel,
+    required this.hasProvisionedEntries,
+    required this.onClearSearch,
+    required this.onShowAll,
+    required this.onChooseConversation,
+    required this.onOpenAll,
+  });
 
   final String familyLabel;
+  final String query;
+  final String? filterLabel;
+  final bool hasProvisionedEntries;
+  final VoidCallback onClearSearch;
+  final VoidCallback onShowAll;
+  final VoidCallback onChooseConversation;
+  final VoidCallback onOpenAll;
 
   @override
   Widget build(BuildContext context) {
+    final (title, detail, actionLabel, actionKey, action) = query.isNotEmpty
+        ? (
+            'No conversations match “$query”',
+            'Clear the search to see your $familyLabel conversations.',
+            'Clear search',
+            'buy-shop-chat-empty-clear-search',
+            onClearSearch,
+          )
+        : filterLabel != null
+        ? (
+            'No $filterLabel conversations yet',
+            'Show all $familyLabel conversations or choose another category.',
+            'Show all',
+            'buy-shop-chat-empty-show-all',
+            onShowAll,
+          )
+        : !hasProvisionedEntries
+        ? (
+            'No $familyLabel conversations are available yet',
+            'Open all MoolSocial chats to continue.',
+            'Open all chats',
+            'buy-shop-chat-empty-open-all',
+            onOpenAll,
+          )
+        : (
+            'No $familyLabel conversations yet',
+            'Choose a conversation to start in MoolSocial Chat.',
+            'Choose conversation',
+            'buy-shop-chat-empty-choose',
+            onChooseConversation,
+          );
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1419,12 +1486,31 @@ class _ShopChatEmptyState extends StatelessWidget {
               size: 34,
             ),
             const SizedBox(height: 10),
-            Text('No $familyLabel chats found', style: context.buyBody),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: context.buyBody,
+            ),
             const SizedBox(height: 4),
             Text(
-              'Try another conversation or clear your search.',
+              detail,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: context.buyMeta,
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              key: ValueKey(actionKey),
+              onPressed: action,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: BuyV2Colors.navy,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(actionLabel),
             ),
           ],
         ),
@@ -1443,6 +1529,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
     required this.navigationForward,
     required this.onBack,
     required this.onSelected,
+    required this.onOpenAll,
   });
 
   final List<BuyV2ShopChatThread> entries;
@@ -1450,6 +1537,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
   final Widget? navigationForward;
   final VoidCallback onBack;
   final ValueChanged<BuyV2ShopChatThread> onSelected;
+  final VoidCallback onOpenAll;
 
   @override
   Widget build(BuildContext context) {
@@ -1557,63 +1645,132 @@ class _ShopChatNewConversationView extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-              itemCount: starters.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 7),
-              itemBuilder: (context, index) {
-                final entry = starters[index];
-                return Material(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: BuyV2Colors.line),
-                  ),
-                  child: ListTile(
-                    key: ValueKey('buy-shop-chat-new-${entry.id}'),
-                    minTileHeight: 64,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: entry.accent.withValues(alpha: .11),
-                      foregroundColor: entry.accent,
-                      child: Icon(entry.icon),
-                    ),
-                    title: Text(entry.title, style: context.buyBody),
-                    subtitle: Text(entry.subtitle, style: context.buyMeta),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: entry.accent.withValues(alpha: .09),
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: Text(
-                            presentation.filter(entry.resolvedFilterId).label,
-                            style: context.buyMeta.copyWith(
-                              color: entry.accent,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+            child: starters.isEmpty
+                ? _ShopChatNewConversationEmptyState(
+                    familyLabel: presentation.familyLabel,
+                    onOpenAll: onOpenAll,
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                    itemCount: starters.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 7),
+                    itemBuilder: (context, index) {
+                      final entry = starters[index];
+                      return Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: BuyV2Colors.line),
                         ),
-                        const SizedBox(width: 3),
-                        const Icon(Icons.chevron_right_rounded),
-                      ],
-                    ),
-                    onTap: () => onSelected(entry),
+                        child: ListTile(
+                          key: ValueKey('buy-shop-chat-new-${entry.id}'),
+                          minTileHeight: 64,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: entry.accent.withValues(
+                              alpha: .11,
+                            ),
+                            foregroundColor: entry.accent,
+                            child: Icon(entry.icon),
+                          ),
+                          title: Text(entry.title, style: context.buyBody),
+                          subtitle: Text(
+                            entry.subtitle,
+                            style: context.buyMeta,
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: entry.accent.withValues(alpha: .09),
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                child: Text(
+                                  presentation
+                                      .filter(entry.resolvedFilterId)
+                                      .label,
+                                  style: context.buyMeta.copyWith(
+                                    color: entry.accent,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Icon(Icons.chevron_right_rounded),
+                            ],
+                          ),
+                          onTap: () => onSelected(entry),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ShopChatNewConversationEmptyState extends StatelessWidget {
+  const _ShopChatNewConversationEmptyState({
+    required this.familyLabel,
+    required this.onOpenAll,
+  });
+
+  final String familyLabel;
+  final VoidCallback onOpenAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.forum_outlined,
+              size: 34,
+              color: BuyV2Colors.muted,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'No $familyLabel conversation choices yet',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: context.buyBody,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Open all MoolSocial chats to continue.',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: context.buyMeta,
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              key: const ValueKey('buy-shop-chat-new-open-all'),
+              onPressed: onOpenAll,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: BuyV2Colors.navy,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.forum_outlined),
+              label: const Text('Open all chats'),
+            ),
+          ],
+        ),
       ),
     );
   }

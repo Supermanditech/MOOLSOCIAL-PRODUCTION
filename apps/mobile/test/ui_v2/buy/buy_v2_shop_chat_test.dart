@@ -295,7 +295,14 @@ void main() {
       'missing conversation',
     );
     await tester.pumpAndSettle();
-    expect(find.text('No Shop chats found'), findsOneWidget);
+    expect(
+      find.text('No conversations match “missing conversation”'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-empty-clear-search')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -405,6 +412,102 @@ void main() {
       session.dispose();
       core.dispose();
     }
+  });
+
+  testWidgets('empty Chat inbox and picker provide one-tap global recovery', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    var openAllCalls = 0;
+
+    await tester.pumpWidget(
+      app(
+        session,
+        shopChatSource: const _EmptyShopChatSource(),
+        textScale: 1.4,
+        onOpenChat: () => openAllCalls += 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No Shop conversations are available yet'),
+      findsOneWidget,
+    );
+    final inboxRecovery = find.byKey(
+      const ValueKey('buy-shop-chat-empty-open-all'),
+    );
+    expect(tester.getSize(inboxRecovery).height, greaterThanOrEqualTo(44));
+    await tester.tap(inboxRecovery);
+    await tester.pumpAndSettle();
+    expect(openAllCalls, 1);
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+    await tester.pumpAndSettle();
+    expect(find.text('No Shop conversation choices yet'), findsOneWidget);
+    final pickerRecovery = find.byKey(
+      const ValueKey('buy-shop-chat-new-open-all'),
+    );
+    expect(tester.getSize(pickerRecovery).height, greaterThanOrEqualTo(44));
+    await tester.tap(pickerRecovery);
+    await tester.pumpAndSettle();
+    expect(openAllCalls, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chat search and filter misses recover in one tap', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+
+    await tester.pumpWidget(
+      app(session, shopChatSource: const _RichShopChatSource()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-shop-chat-search')),
+      'no such partner',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No conversations match “no such partner”'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-empty-clear-search')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-filter-orders')));
+    await tester.pumpAndSettle();
+    expect(find.text('No Orders conversations yet'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-empty-show-all')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -1580,6 +1683,13 @@ class _RichShopChatSource implements BuyV2ShopChatProvisioningSource {
       ],
     ),
   ];
+}
+
+class _EmptyShopChatSource implements BuyV2ShopChatProvisioningSource {
+  const _EmptyShopChatSource();
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) => const [];
 }
 
 class _TextOnlyShopChatSource implements BuyV2ShopChatProvisioningSource {
