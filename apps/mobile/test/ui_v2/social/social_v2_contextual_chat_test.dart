@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
@@ -649,6 +650,68 @@ void main() {
     },
   );
 
+  testWidgets('context Chat clears retained identity state on sign-out', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Sardarpura',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    await journey.start();
+    expect(journey.isAuthenticated, isTrue);
+    final owners = _Owners(journey: journey);
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(
+      _app(owners, world: 'work', subAction: 'workspace'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-work-workspace-support')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+      'Private draft from the signed-in account',
+    );
+    await tester.pump();
+
+    await journey.signOut();
+    await tester.pumpAndSettle();
+    expect(journey.isAuthenticated, isFalse);
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-work-workspace-support')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(find.text('Private draft from the signed-in account'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('context Chat stays usable at 320 width and 140 percent text', (
     tester,
   ) async {
@@ -1155,7 +1218,9 @@ class _LiveContextualChatSource extends ChangeNotifier
 }
 
 class _Owners {
-  final journey = JourneySession();
+  _Owners({JourneySession? journey}) : journey = journey ?? JourneySession();
+
+  final JourneySession journey;
   final creator = CreatorSession();
   final retailer = RetailerSession();
   final shared = SharedSession();

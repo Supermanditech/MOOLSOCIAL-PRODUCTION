@@ -121,6 +121,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   final GlobalKey<BuyV2ShopChatViewState> _contextualChatKey = GlobalKey();
   late SocialV2Tab _tab;
   late String _world;
+  late bool _chatAuthenticated;
   bool _contextualChatActive = false;
   late final _SocialV2RetainedState _retainedState;
 
@@ -215,6 +216,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     } else {
       _retainedState = retained;
     }
+    _chatAuthenticated = widget.session.isAuthenticated;
+    widget.session.addListener(_handleChatIdentityBoundary);
     _shortController = PageController(initialPage: _activeShortPage);
     _videoHomeController = ScrollController();
     _videoWatchController = ScrollController();
@@ -288,6 +291,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
 
   @override
   void dispose() {
+    widget.session.removeListener(_handleChatIdentityBoundary);
     if (_videoHomeController.hasClients) {
       _videoHomeScrollOffset = _videoHomeController.offset;
     }
@@ -302,6 +306,13 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   @override
   void didUpdateWidget(covariant SocialUniversalV2 oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session)) {
+      oldWidget.session.removeListener(_handleChatIdentityBoundary);
+      widget.session.addListener(_handleChatIdentityBoundary);
+      _chatAuthenticated = widget.session.isAuthenticated;
+      _retainedState.contextualChatStates.clear();
+      _contextualChatActive = false;
+    }
     if (oldWidget.initialSubAction != widget.initialSubAction ||
         oldWidget.initialState != widget.initialState ||
         oldWidget.initialItem != widget.initialItem ||
@@ -717,6 +728,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     if (GoRouter.maybeOf(context) != null) {
       context.push('/app/mool?from=social');
     }
+  }
+
+  void _handleChatIdentityBoundary() {
+    final authenticated = widget.session.isAuthenticated;
+    if (authenticated == _chatAuthenticated) return;
+    _chatAuthenticated = authenticated;
+    _retainedState.contextualChatStates.clear();
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _contextualChatActive = false);
   }
 
   void _openMainAction(PersonalMoolActionSpec action) {
