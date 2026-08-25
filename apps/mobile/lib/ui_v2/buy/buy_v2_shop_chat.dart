@@ -1958,6 +1958,9 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   @override
   Widget build(BuildContext context) {
     final messages = _visibleMessages();
+    final messageListState = _messageSearchController.text.trim().isEmpty
+        ? 'all'
+        : 'search-${_messageSearchController.text.trim().toLowerCase()}';
     final navigationForward = _forwardHistory.isEmpty
         ? widget.navigationForward
         : _ShopChatNavigationForwardBar(
@@ -2072,7 +2075,9 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                           stateKey:
                               '${widget.thread.id}|${_messageSearchController.text}',
                           child: ListView(
-                            key: const ValueKey('buy-shop-chat-message-list'),
+                            key: PageStorageKey<String>(
+                              'buy-shop-chat-message-list-${widget.thread.id}-$messageListState',
+                            ),
                             padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                             children: [
                               _ShopChatCommerceContext(

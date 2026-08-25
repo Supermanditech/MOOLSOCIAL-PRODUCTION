@@ -1662,9 +1662,11 @@ void main() {
       expect(actions.last.kind, BuyV2ShopChatActionKind.forwardMessage);
       expect(actions.last.messageId, 'received-text');
 
-      await tester.longPress(
-        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      final firstMessage = find.byKey(
+        const ValueKey('buy-shop-chat-message-received-text'),
       );
+      await tester.ensureVisible(firstMessage);
+      await tester.longPress(firstMessage);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('buy-shop-chat-message-actions')),
@@ -1757,9 +1759,19 @@ void main() {
         findsNothing,
       );
 
-      await tester.longPress(
-        find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+      await tester.scrollUntilVisible(
+        firstMessage,
+        -120,
+        scrollable: find.descendant(
+          of: find.byKey(
+            const PageStorageKey<String>(
+              'buy-shop-chat-message-list-retail-live-all',
+            ),
+          ),
+          matching: find.byType(Scrollable),
+        ),
       );
+      await tester.longPress(firstMessage);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('buy-shop-chat-message-actions')),
@@ -1975,6 +1987,73 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('message timeline retains scroll through Chat Info return', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+
+    await tester.pumpWidget(
+      app(session, shopChatSource: const _RichShopChatSource(), textScale: 1.4),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+    );
+    await tester.pumpAndSettle();
+
+    final timelineKey = const PageStorageKey<String>(
+      'buy-shop-chat-message-list-retail-live-all',
+    );
+    final timeline = find.byKey(timelineKey);
+    final lastMessage = find.byKey(
+      const ValueKey('buy-shop-chat-message-received-voice'),
+    );
+    await tester.scrollUntilVisible(
+      lastMessage,
+      120,
+      scrollable: find.descendant(
+        of: timeline,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final beforeInfo = tester
+        .state<ScrollableState>(
+          find.descendant(of: timeline, matching: find.byType(Scrollable)),
+        )
+        .position
+        .pixels;
+    expect(beforeInfo, greaterThan(0));
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat-info')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-info-back')));
+    await tester.pumpAndSettle();
+
+    final restoredTimeline = find.byKey(timelineKey);
+    final afterReturn = tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: restoredTimeline,
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position
+        .pixels;
+    expect(afterReturn, closeTo(beforeInfo, 0.1));
+    expect(lastMessage, findsOneWidget);
+    expect(find.text('Forward to Mahadev Fresh Mart info'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Android Back dismisses the composer keyboard before the thread',
