@@ -537,6 +537,40 @@ void main() {
     expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('OPPO bottom inset keeps the composer above system navigation', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/social',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('chat-message-field'));
+    final media = MediaQuery.of(tester.element(field));
+    expect(media.viewPadding.bottom, greaterThan(0));
+    final safeBottom = media.size.height - media.viewPadding.bottom;
+    expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-send'))).dy,
+      lessThanOrEqualTo(safeBottom),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _PeopleSocialGateway

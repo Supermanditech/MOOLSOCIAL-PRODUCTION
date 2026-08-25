@@ -60,6 +60,9 @@ class ChatPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
+    final bottomSystemInset = MediaQuery.viewInsetsOf(context).bottom > 0
+        ? 0.0
+        : MediaQuery.viewPaddingOf(context).bottom;
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -145,7 +148,12 @@ class ChatPageScaffold extends StatelessWidget {
               ),
             ),
           ),
-          bottomNavigationBar: bottom,
+          bottomNavigationBar: bottom == null
+              ? null
+              : Padding(
+                  padding: EdgeInsets.only(bottom: bottomSystemInset),
+                  child: bottom,
+                ),
           floatingActionButton: floatingActionButton,
         ),
       ),
