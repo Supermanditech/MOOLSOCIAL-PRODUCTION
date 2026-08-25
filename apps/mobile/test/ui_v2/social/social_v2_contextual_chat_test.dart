@@ -219,6 +219,49 @@ void main() {
   );
 
   testWidgets(
+    'thread context returns to the conversation selected inside contextual Chat',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+
+      await tester.pumpWidget(_app(owners, world: 'ride', subAction: 'bike'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('social-global-chat')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-new-travel-cab-support')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cab trip support'), findsWidgets);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-commerce-context')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+      expect(find.byKey(const ValueKey('screen04-rail-cab')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cab · rides and bookings'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('buy-shop-chat-filter-cab')),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'context thread keeps attachments calls and send on the runtime action seam',
     (tester) async {
       tester.view.devicePixelRatio = 1;

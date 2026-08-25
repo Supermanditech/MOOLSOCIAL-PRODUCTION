@@ -599,7 +599,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                         onAction: widget.onContextualChatAction,
                         onBack: _closeContextualChat,
                         onOpenProductionChat: _openProductionChat,
-                        onOpenThreadContext: (_) => _closeContextualChat(),
+                        onOpenThreadContext: _openContextualThreadOrigin,
                       )
                     : Column(
                         children: [
@@ -1174,6 +1174,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     FocusScope.of(context).unfocus();
     HapticFeedback.selectionClick();
     setState(() => _contextualChatActive = false);
+  }
+
+  void _openContextualThreadOrigin(BuyV2ShopChatThread thread) {
+    if (!_contextualChatActive) return;
+    final world = screen04World(_world);
+    final threadChoice = thread.resolvedFilterId;
+    FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (world.choices.any((choice) => choice.id == threadChoice)) {
+        _choiceByWorld[_world] = threadChoice;
+      }
+      _contextualChatActive = false;
+    });
   }
 
   void _openProductionChat() {
