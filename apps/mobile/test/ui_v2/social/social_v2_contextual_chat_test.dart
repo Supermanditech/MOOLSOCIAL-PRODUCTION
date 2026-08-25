@@ -617,6 +617,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('context Chat search clear announces its exact subaction', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(_app(owners, world: 'book', subAction: 'medicine'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-shop-chat-search')),
+      'delivery',
+    );
+    await tester.pump();
+
+    expect(
+      find.byTooltip('Clear Medicine conversations search'),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Clear Shop Chat search'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'every family keeps contextual identity through Chat utility depths',
     (tester) async {

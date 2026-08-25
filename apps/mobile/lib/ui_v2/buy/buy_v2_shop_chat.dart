@@ -1131,7 +1131,7 @@ class _ShopChatSearch extends StatelessWidget {
                 ? null
                 : IconButton(
                     key: const ValueKey('buy-shop-chat-search-clear'),
-                    tooltip: 'Clear Shop Chat search',
+                    tooltip: 'Clear $originLabel conversations search',
                     onPressed: onClear,
                     icon: const Icon(Icons.close_rounded, size: 20),
                   ),
