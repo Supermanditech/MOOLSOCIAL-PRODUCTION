@@ -32,6 +32,7 @@ import 'features/journey01/review_journey_services.dart';
 import 'features/shared/social_content_gateway.dart';
 import 'features/shared/youtube_public_catalogue_repository.dart';
 import 'features/shared/youtube_public_search_state_repository.dart';
+import 'features/shared/youtube_public_watch_state_repository.dart';
 import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
@@ -614,17 +615,30 @@ Future<void> main() async {
       ? MemoryVerifiedPrincipalBindingStore()
       : secureVerifiedPrincipalBindingStore;
   final searchPersistence = SecureStorageYouTubePublicSearchKeyValueStore();
+  final watchPersistence = SecureStorageYouTubePublicWatchKeyValueStore();
   Future<void> bindYouTubeSearchStateToCurrentPrincipal() async {
     _recordReleaseBootstrapStage('youtube_search_state', 'begin');
-    final bindingAttempt = youtubePublicSearchState
+    _recordReleaseBootstrapStage('youtube_watch_state', 'begin');
+    final searchBindingAttempt = youtubePublicSearchState
+        .beginPrincipalBindingAttempt();
+    final watchBindingAttempt = youtubePublicWatchState
         .beginPrincipalBindingAttempt();
     try {
       final currentPrincipalId = FirebaseAuth.instance.currentUser?.uid;
       if (currentPrincipalId == null || currentPrincipalId.isEmpty) {
-        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
-          searchPersistence,
-        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
-        _recordReleaseBootstrapStage('youtube_search_state', 'passed');
+        final invalidated = await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
+        _recordReleaseBootstrapStage(
+          'youtube_search_state',
+          invalidated.search ? 'passed' : 'degraded',
+        );
+        _recordReleaseBootstrapStage(
+          'youtube_watch_state',
+          invalidated.watch ? 'passed' : 'degraded',
+        );
         return;
       }
       final storedBinding =
@@ -637,41 +651,80 @@ Future<void> main() async {
             )
           : null;
       if (storedBinding == null) {
-        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
-          searchPersistence,
-        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+        await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
         _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
         return;
       }
       final currentBinding = await secureVerifiedPrincipalBindingStore
           .protect(currentPrincipalId)
           .timeout(_youtubeCatalogueCacheHydrationTimeout);
       if (!storedBinding.matches(currentBinding)) {
-        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
-          searchPersistence,
-        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+        await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
         _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
         return;
       }
-      final freshness = await youtubePublicSearchState
-          .configureDurability(
-            DurableYouTubePublicSearchStateRepository(
-              persistence: searchPersistence,
-              principalBinding: storedBinding,
-              regionCode: screen04YouTubeRegionCode,
-            ),
-            bindingAttempt: bindingAttempt,
-          )
-          .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      YouTubePublicSearchFreshness? searchFreshness;
+      try {
+        searchFreshness = await youtubePublicSearchState
+            .configureDurability(
+              DurableYouTubePublicSearchStateRepository(
+                persistence: searchPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: searchBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicSearchState.beginPrincipalBindingAttempt();
+      }
+      YouTubePublicWatchFreshness? watchFreshness;
+      try {
+        watchFreshness = await youtubePublicWatchState
+            .configureDurability(
+              DurableYouTubePublicWatchStateRepository(
+                persistence: watchPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: watchBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicWatchState.beginPrincipalBindingAttempt();
+      }
       _recordReleaseBootstrapStage(
         'youtube_search_state',
-        youtubePublicSearchHydrationIsDegraded(freshness)
+        youtubePublicSearchHydrationIsDegraded(searchFreshness)
+            ? 'degraded'
+            : 'passed',
+      );
+      _recordReleaseBootstrapStage(
+        'youtube_watch_state',
+        youtubePublicWatchHydrationIsDegraded(watchFreshness)
             ? 'degraded'
             : 'passed',
       );
     } on Object {
       youtubePublicSearchState.beginPrincipalBindingAttempt();
+      youtubePublicWatchState.beginPrincipalBindingAttempt();
+      await invalidateYouTubePublicRuntimeState(
+        searchPersistence: searchPersistence,
+        watchPersistence: watchPersistence,
+        timeout: _youtubeCatalogueCacheHydrationTimeout,
+      );
       _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+      _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
     }
   }
 

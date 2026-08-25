@@ -18,7 +18,9 @@ import '../../features/retailer/retailer_session.dart';
 import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
+import '../../features/shared/youtube_public_catalogue_repository.dart';
 import '../../features/shared/youtube_public_search_state_repository.dart';
+import '../../features/shared/youtube_public_watch_state_repository.dart';
 import '../buy/buy_v2_shop_chat.dart';
 import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
@@ -42,6 +44,7 @@ void resetSocialV2RetainedStateForAuthenticationBoundary(
 ) {
   _socialV2RetainedStates[session] = _SocialV2RetainedState();
   unawaited(youtubePublicSearchState.clear(detachRepository: true));
+  unawaited(youtubePublicWatchState.clear(detachRepository: true));
 }
 
 class _SocialV2RetainedState {
@@ -56,6 +59,7 @@ class _SocialV2RetainedState {
   String feedState = 'empty';
   int activeShortPage = 0;
   double videoHomeScrollOffset = 0;
+  double videoWatchScrollOffset = 0;
   double youtubeSearchScrollOffset = 0;
   _VideoData? activeVideo;
   _VideoData? youtubeSearchOriginVideo;
@@ -92,6 +96,7 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeSearchLoader,
     @visibleForTesting this.youtubeCatalogueSnapshotStore,
     @visibleForTesting this.youtubeSearchStateCache,
+    @visibleForTesting this.youtubeWatchStateCache,
     super.key,
   });
 
@@ -132,6 +137,9 @@ class SocialUniversalV2 extends StatefulWidget {
   @visibleForTesting
   final YouTubePublicSearchStateCache? youtubeSearchStateCache;
 
+  @visibleForTesting
+  final YouTubePublicWatchStateCache? youtubeWatchStateCache;
+
   @override
   State<SocialUniversalV2> createState() => _SocialUniversalV2State();
 }
@@ -162,7 +170,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
   late final Screen04YouTubeCatalogueSnapshotStore _youtubeCatalogueSnapshots;
   late final YouTubePublicSearchStateCache _youtubeSearchStateCache;
+  late final YouTubePublicWatchStateCache _youtubeWatchStateCache;
   bool _restoredYouTubeSearch = false;
+  bool _preserveDurableSearchForNestedWatch = false;
   _VideoData? get _activeVideo => _retainedState.activeVideo;
   set _activeVideo(_VideoData? value) => _retainedState.activeVideo = value;
   _VideoData? get _youtubeSearchOriginVideo =>
@@ -180,6 +190,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   double get _videoHomeScrollOffset => _retainedState.videoHomeScrollOffset;
   set _videoHomeScrollOffset(double value) =>
       _retainedState.videoHomeScrollOffset = value;
+  double get _videoWatchScrollOffset => _retainedState.videoWatchScrollOffset;
+  set _videoWatchScrollOffset(double value) =>
+      _retainedState.videoWatchScrollOffset = value;
   double get _youtubeSearchScrollOffset =>
       _retainedState.youtubeSearchScrollOffset;
   set _youtubeSearchScrollOffset(double value) =>
@@ -270,7 +283,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         widget.initialWorld == 'social' &&
         (widget.initialSubAction == null ||
             widget.initialSubAction == 'videos') &&
-        widget.initialState == null;
+        (widget.initialState == null || widget.initialState == 'video-watch');
     final restoredSearch = canRestoreDurableSearch
         ? _youtubeSearchStateCache.snapshot
         : null;
@@ -285,9 +298,59 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _youtubeSearchScrollOffset = restoredSearch.resultsScrollOffset;
       _restoredYouTubeSearch = true;
     }
+    _youtubeWatchStateCache =
+        widget.youtubeWatchStateCache ??
+        (widget.youtubeVideosLoader == null &&
+                widget.youtubeSearchLoader == null
+            ? youtubePublicWatchState
+            : YouTubePublicWatchStateCache());
+    final watchCandidate = _youtubeWatchStateCache.snapshot;
+    final matchingExplicitWatchRoute =
+        widget.initialState == 'video-watch' &&
+        widget.initialItem != null &&
+        watchCandidate?.selectedVideo.videoId == widget.initialItem;
+    final canRestoreDurableWatch =
+        !hasRetainedState &&
+        widget.initialWorld == 'social' &&
+        (widget.initialSubAction == null ||
+            widget.initialSubAction == 'videos') &&
+        (widget.initialState == null || matchingExplicitWatchRoute);
+    final watchSearchOriginAvailable =
+        watchCandidate?.origin != YouTubePublicWatchOrigin.search ||
+        (restoredSearch != null && restoredSearch.searchSurfaceOpen);
+    final restoredWatch = canRestoreDurableWatch && watchSearchOriginAvailable
+        ? watchCandidate
+        : null;
+    if (watchCandidate != null && restoredWatch == null) {
+      unawaited(_youtubeWatchStateCache.clear());
+    }
+    if (restoredWatch != null) {
+      _choiceByWorld['social'] = 'videos';
+      _activeVideo = _videoDataFromProvider(
+        mapYouTubePublicCatalogueItemToScreen04Video(
+          restoredWatch.selectedVideo,
+        ),
+      );
+      final searchOriginVideo = restoredWatch.searchOriginVideo;
+      _youtubeSearchOriginVideo = searchOriginVideo == null
+          ? null
+          : _videoDataFromProvider(
+              mapYouTubePublicCatalogueItemToScreen04Video(searchOriginVideo),
+            );
+      _videoHomeScrollOffset = restoredWatch.homeScrollOffset;
+      _videoWatchScrollOffset = restoredWatch.watchScrollOffset;
+      _returnToYouTubeSearchAfterVideo =
+          restoredWatch.origin == YouTubePublicWatchOrigin.search &&
+          watchSearchOriginAvailable;
+      _youtubeSearchOpen = false;
+    } else if (widget.initialState == 'video-watch') {
+      _youtubeSearchOpen = false;
+    }
     _shortController = PageController(initialPage: _activeShortPage);
     _videoHomeController = ScrollController();
-    _videoWatchController = ScrollController();
+    _videoWatchController = ScrollController(
+      initialScrollOffset: _videoWatchScrollOffset,
+    )..addListener(_captureYouTubeWatchScrollOffset);
     _youtubeSearchResultsController = ScrollController(
       initialScrollOffset: _youtubeSearchScrollOffset,
     )..addListener(_captureYouTubeSearchScrollOffset);
@@ -350,7 +413,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         _youtubePublicAccessAvailable && !_hasYouTubeVideosSnapshot;
     _liveYouTubeShortsLoading =
         _youtubePublicAccessAvailable && !_hasYouTubeShortsSnapshot;
-    if (_tab == SocialV2Tab.videos && widget.initialState == 'video-watch') {
+    if (_activeVideo == null &&
+        _tab == SocialV2Tab.videos &&
+        widget.initialState == 'video-watch') {
       _activeVideo = _videoForProviderId(
         _liveYouTubeVideos,
         widget.initialItem,
@@ -382,7 +447,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _youtubeSearchScrollOffset = _youtubeSearchResultsController.offset;
       _youtubeSearchStateCache.updateScrollOffset(_youtubeSearchScrollOffset);
     }
+    if (_videoWatchController.hasClients) {
+      _videoWatchScrollOffset = _videoWatchController.offset;
+      _youtubeWatchStateCache.updateWatchScrollOffset(_videoWatchScrollOffset);
+    }
     unawaited(_youtubeSearchStateCache.settleDurableWrites());
+    unawaited(_youtubeWatchStateCache.settleDurableWrites());
     _shortController.dispose();
     _videoHomeController.dispose();
     _videoWatchController.dispose();
@@ -401,6 +471,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         oldWidget.initialAction != widget.initialAction ||
         oldWidget.initialChoice != widget.initialChoice ||
         oldWidget.initialWorld != widget.initialWorld) {
+      final durableWatch = _youtubeWatchStateCache.snapshot;
+      final matchingDurableWatch =
+          widget.initialWorld == 'social' &&
+          (widget.initialSubAction == null ||
+              widget.initialSubAction == 'videos') &&
+          widget.initialState == 'video-watch' &&
+          widget.initialItem == durableWatch?.selectedVideo.videoId &&
+          (durableWatch?.origin != YouTubePublicWatchOrigin.search ||
+              _youtubeSearchStateCache.snapshot != null);
+      if (!matchingDurableWatch) _discardDurableYouTubeWatch();
       _world = screen04Worlds.any((world) => world.id == widget.initialWorld)
           ? widget.initialWorld
           : 'social';
@@ -426,14 +506,25 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           _tab == SocialV2Tab.feed &&
           (widget.initialItem?.trim().isNotEmpty ?? false);
       _contentUnavailable = widget.initialState == 'unavailable';
-      _activeVideo =
-          _tab == SocialV2Tab.videos && widget.initialState == 'video-watch'
+      _activeVideo = matchingDurableWatch
+          ? _videoDataFromProvider(
+              mapYouTubePublicCatalogueItemToScreen04Video(
+                durableWatch!.selectedVideo,
+              ),
+            )
+          : _tab == SocialV2Tab.videos && widget.initialState == 'video-watch'
           ? _videoForProviderId(_liveYouTubeVideos, widget.initialItem)
           : null;
+      if (matchingDurableWatch) {
+        _returnToYouTubeSearchAfterVideo =
+            durableWatch!.origin == YouTubePublicWatchOrigin.search;
+        _videoHomeScrollOffset = durableWatch.homeScrollOffset;
+        _videoWatchScrollOffset = durableWatch.watchScrollOffset;
+      }
       _resolvedFeedLinkItem = null;
       _unavailableFeedLinkItem = null;
       _openedInitialAuthorItem = null;
-      _resetYouTubeSearch();
+      if (!matchingDurableWatch) _resetYouTubeSearch();
       _resetShorts();
       if (_hasSharedFeedTarget) unawaited(_resolveSharedFeedItem());
     }
@@ -833,6 +924,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     }
     if (_activeVideo != null) {
       if (_returnToYouTubeSearchAfterVideo) {
+        _discardDurableYouTubeWatch();
         setState(() {
           _activeVideo = _youtubeSearchOriginVideo;
           _returnToYouTubeSearchAfterVideo = false;
@@ -842,6 +934,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         return;
       }
       final restoreOffset = _videoHomeScrollOffset;
+      _discardDurableYouTubeWatch();
       setState(() {
         _activeVideo = null;
       });
@@ -870,10 +963,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _ => null,
     };
     if (destination != null && GoRouter.maybeOf(context) != null) {
+      _discardDurableYouTubeWatch();
       HapticFeedback.selectionClick();
       context.go(destination);
       return;
     }
+    _discardDurableYouTubeWatch();
     setState(() {
       _contextualChatActive = false;
       _world = worldId;
@@ -897,6 +992,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       );
       return;
     }
+    _discardDurableYouTubeWatch();
     setState(() {
       _contextualChatActive = false;
       _choiceByWorld[_world] = choiceId;
@@ -928,6 +1024,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       );
       return;
     }
+    _discardDurableYouTubeWatch();
     HapticFeedback.selectionClick();
     setState(() {
       _choiceByWorld['social'] = 'create';
@@ -989,6 +1086,58 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     });
   }
 
+  void _captureYouTubeWatchScrollOffset() {
+    if (!_videoWatchController.hasClients) return;
+    _videoWatchScrollOffset = _videoWatchController.offset;
+    _youtubeWatchStateCache.updateWatchScrollOffset(_videoWatchScrollOffset);
+  }
+
+  YouTubePublicCatalogueItem? _publicItemForVideo(_VideoData video) {
+    final providerVideoId = video.providerVideoId;
+    if (providerVideoId == null || providerVideoId.isEmpty) return null;
+    final searchResults = _youtubeSearchStateCache.snapshot?.results;
+    if (searchResults != null) {
+      for (final item in searchResults) {
+        if (item.videoId == providerVideoId) return item;
+      }
+    }
+    final catalogue = <Screen04YouTubePublicVideo>[
+      ...?_youtubeCatalogueSnapshots.readVideos(),
+      ...?_youtubeCatalogueSnapshots.readShorts(),
+    ];
+    for (final item in catalogue) {
+      if (item.videoId == providerVideoId) {
+        return mapScreen04VideoToYouTubePublicCatalogueItem(item);
+      }
+    }
+    final current = _youtubeWatchStateCache.snapshot?.selectedVideo;
+    return current?.videoId == providerVideoId ? current : null;
+  }
+
+  void _persistYouTubeWatch(_VideoData video, YouTubePublicWatchOrigin origin) {
+    final item = _publicItemForVideo(video);
+    if (item == null) {
+      unawaited(_youtubeWatchStateCache.clear());
+      return;
+    }
+    _videoWatchScrollOffset = 0;
+    _youtubeWatchStateCache.replace(
+      selectedVideo: item,
+      origin: origin,
+      searchOriginVideo:
+          origin == YouTubePublicWatchOrigin.search &&
+              _youtubeSearchOriginVideo != null
+          ? _publicItemForVideo(_youtubeSearchOriginVideo!)
+          : null,
+      homeScrollOffset: _videoHomeScrollOffset,
+    );
+  }
+
+  void _discardDurableYouTubeWatch() {
+    _videoWatchScrollOffset = 0;
+    unawaited(_youtubeWatchStateCache.clear());
+  }
+
   void _captureYouTubeSearchScrollOffset() {
     if (!_youtubeSearchResultsController.hasClients) return;
     _youtubeSearchScrollOffset = _youtubeSearchResultsController.offset;
@@ -996,6 +1145,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _discardDurableYouTubeSearch() {
+    _preserveDurableSearchForNestedWatch = false;
     _restoredYouTubeSearch = false;
     _youtubeSearchScrollOffset = 0;
     unawaited(_youtubeSearchStateCache.clear());
@@ -1016,7 +1166,14 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _openYouTubeSearch() {
-    _discardDurableYouTubeSearch();
+    _preserveDurableSearchForNestedWatch =
+        _activeVideo != null &&
+        _youtubeWatchStateCache.snapshot?.origin ==
+            YouTubePublicWatchOrigin.search &&
+        _youtubeSearchStateCache.snapshot != null;
+    if (!_preserveDurableSearchForNestedWatch) {
+      _discardDurableYouTubeSearch();
+    }
     if (_videoHomeController.hasClients && _activeVideo == null) {
       _videoHomeScrollOffset = _videoHomeController.offset;
     }
@@ -1029,7 +1186,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _youtubeSearchError = null;
       _youtubeSubmittedQuery = '';
       _youtubeSearchResults = const [];
-      _youtubeSearchController.clear();
+      _youtubeSearchController.value = TextEditingValue(
+        text: _youtubeSubmittedQuery,
+        selection: TextSelection.collapsed(
+          offset: _youtubeSubmittedQuery.length,
+        ),
+      );
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _youtubeSearchFocusNode.requestFocus();
@@ -1038,19 +1200,44 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _closeYouTubeSearch() {
-    _discardDurableYouTubeSearch();
+    final preserveSearch = _preserveDurableSearchForNestedWatch;
+    final preservedSearch = preserveSearch
+        ? _youtubeSearchStateCache.snapshot
+        : null;
+    if (!preserveSearch) _discardDurableYouTubeSearch();
+    final restoredWatch = _youtubeSearchOriginVideo;
+    final priorWatch = _youtubeWatchStateCache.snapshot?.searchOriginVideo;
     setState(() {
       _youtubeSearchRequest += 1;
       _youtubeSearchOpen = false;
       _youtubeSearchLoading = false;
-      _returnToYouTubeSearchAfterVideo = false;
+      _returnToYouTubeSearchAfterVideo = preserveSearch;
       _youtubeSearchError = null;
-      _youtubeSubmittedQuery = '';
-      _youtubeSearchResults = const [];
+      _youtubeSubmittedQuery = preservedSearch?.submittedQuery ?? '';
+      _youtubeSearchResults =
+          preservedSearch?.results
+              .map(mapYouTubePublicCatalogueItemToScreen04Video)
+              .map(_videoDataFromProvider)
+              .toList(growable: false) ??
+          const [];
+      _youtubeSearchScrollOffset = preservedSearch?.resultsScrollOffset ?? 0;
       _activeVideo = _youtubeSearchOriginVideo;
-      _youtubeSearchOriginVideo = null;
-      _youtubeSearchController.clear();
+      _youtubeSearchOriginVideo = priorWatch == null
+          ? null
+          : _videoDataFromProvider(
+              mapYouTubePublicCatalogueItemToScreen04Video(priorWatch),
+            );
+      _youtubeSearchController.value = TextEditingValue(
+        text: _youtubeSubmittedQuery,
+        selection: TextSelection.collapsed(
+          offset: _youtubeSubmittedQuery.length,
+        ),
+      );
     });
+    if (restoredWatch != null && !preserveSearch) {
+      _persistYouTubeWatch(restoredWatch, YouTubePublicWatchOrigin.home);
+    }
+    _preserveDurableSearchForNestedWatch = false;
     _youtubeSearchFocusNode.unfocus();
     HapticFeedback.selectionClick();
   }
@@ -1126,6 +1313,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         _videoWatchController.jumpTo(0);
       }
     });
+    _persistYouTubeWatch(video, YouTubePublicWatchOrigin.search);
     _youtubeSearchFocusNode.unfocus();
     HapticFeedback.selectionClick();
   }
@@ -1140,6 +1328,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         _videoWatchController.jumpTo(0);
       }
     });
+    _persistYouTubeWatch(video, YouTubePublicWatchOrigin.home);
     HapticFeedback.selectionClick();
   }
 
@@ -1214,7 +1403,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _liveYouTubeShortsError = shortsFailure == null
           ? null
           : 'YouTube Shorts are unavailable right now. Please try again.';
-      if (_tab == SocialV2Tab.videos && widget.initialState == 'video-watch') {
+      if (_activeVideo == null &&
+          _tab == SocialV2Tab.videos &&
+          widget.initialState == 'video-watch') {
         _activeVideo = _videoForProviderId(
           _liveYouTubeVideos,
           widget.initialItem,
@@ -1912,12 +2103,18 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                 onDetails: () => _openVideoDetails(video),
                 onShare: () => _copyYouTubeLink(video),
                 onOpenProvider: _openYouTubeVideo,
-                onSelectVideo: (next) => setState(() {
-                  _activeVideo = next;
-                  if (_videoWatchController.hasClients) {
-                    _videoWatchController.jumpTo(0);
-                  }
-                }),
+                onSelectVideo: (next) {
+                  final origin = _returnToYouTubeSearchAfterVideo
+                      ? YouTubePublicWatchOrigin.search
+                      : YouTubePublicWatchOrigin.home;
+                  setState(() {
+                    _activeVideo = next;
+                    if (_videoWatchController.hasClients) {
+                      _videoWatchController.jumpTo(0);
+                    }
+                  });
+                  _persistYouTubeWatch(next, origin);
+                },
               ),
             ),
           ],

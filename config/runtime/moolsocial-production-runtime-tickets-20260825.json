@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": true,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 190,
+  "ticketCount": 193,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 42,
-    "implementedAtomicTicketCount": 36,
-    "pendingConfirmedImplementationCount": 6,
+    "totalCodexAtomicEngineeringTicketCount": 45,
+    "implementedAtomicTicketCount": 40,
+    "pendingConfirmedImplementationCount": 5,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 6,
+    "remainingCodexEngineeringQueueCount": 5,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -59,9 +59,12 @@
       ,{"id":"RT-04B-01-CHILD-05","state":"CLOSED","implementation":"Every authenticated MoolSocialApp transition reruns the bounded exact-principal binder and safely reattaches Search persistence for the verified account.","runtime":"Real signed-out-to-authenticated MoolSocialApp callback and 47 Journey/App regressions pass; independent audit GO."}
       ,{"id":"RT-04B-01-CHILD-06","state":"CLOSED","implementation":"Principal-attempt epoch and user-state generation are separate, so Search submitted during binding survives verified attachment and is durably flushed before binder completion.","runtime":"Deterministic bind-submit-attach-relaunch test passes; final independent audit GO."}
       ,{"id":"RT-04B-01","state":"closed_current_round_reopen_on_apk_defect","implementation":"Secure principal-bound versioned Search persistence restores the exact submitted query, provider results, open Search surface and result scroll offset after process death, with explicit clear/auth deletion and safe Search fallback from an unowned Watch state.","runtime":"Closed after 48 repository/codec tests, 6 Search widget tests, 47 Journey/App tests, 43 broad Social tests plus one intentional skip, clean full analysis and three independent audit rounds. Integrated Cursor merge and APK/OPPO may reopen."}
+      ,{"id":"RT-04B-02-CHILD-01","state":"CLOSED","implementation":"Search and Watch authentication invalidation attempts are isolated so one secure-owner failure cannot skip the other.","runtime":"Bidirectional failure test proves the healthy owner is removed; re-audit GO."}
+      ,{"id":"RT-04B-02-CHILD-02","state":"CLOSED","implementation":"Watch origin is independently persisted through recommendations and nested Search; optional prior Watch metadata preserves the exact return stack and missing Search fails closed.","runtime":"Recommendation, nested Search, missing-Search and process-death Back-contract widgets pass; re-audit GO."}
+      ,{"id":"RT-04B-02-CHILD-03","state":"CLOSED","implementation":"An exact matching video-watch/item Chat return consumes durable selected metadata while mismatch clears the fallback; provider refresh cannot overwrite a restored selection.","runtime":"Matching and mismatched route widgets pass; re-audit GO."}
+      ,{"id":"RT-04B-02","state":"closed_current_round_reopen_on_apk_defect","implementation":"Secure principal-bound Watch persistence restores full selected public metadata, Home/Search origin, Watch offset, Home offset and nested return context after process death without persisting playback/controller state.","runtime":"Closed after 23 Watch repository/cache tests, 7 Watch widgets, 50 broad Social tests plus one intentional skip, clean analysis and independent audit/re-audit. Cursor integration and APK/OPPO may reopen."}
     ],
     "pendingConfirmedImplementation": [
-      {"id":"RT-04B-02","order":6,"state":"pending","ownerBoundary":"codex_persistence_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
       {"id":"RT-04B-03","order":7,"state":"pending","ownerBoundary":"codex_persistence_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
       {"id":"RT-04C-01","order":8,"state":"pending","ownerBoundary":"codex_draft_persistence_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
       {"id":"RT-07","order":10,"state":"PENDING","ownerBoundary":"codex_navigation_contract_after_Cursor_owner_release_or_reviewed_integration","blocker":"accepted Screen 04 Back contract is confirmed, but the required Social presentation owner remains actively Cursor-owned"},
@@ -96,9 +99,9 @@
     "activeTicket": null,
     "activeTicketPhase": "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT",
     "activeTicketChildGaps": [],
-    "lastClosedTicket": "RT-04B-01",
-    "lastPreApkClosedTicket": "RT-04B-01",
-    "nextTicket": "RT-04B-02"
+    "lastClosedTicket": "RT-04B-02",
+    "lastPreApkClosedTicket": "RT-04B-02",
+    "nextTicket": "RT-04B-03"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -168,7 +171,10 @@
     {"id":"RT-04B-01-CHILD-04","area":"youtube_search","microScope":"authenticated_missing_receipt_bootstrap_truth","layers":["mobile","firebase_credential","session","deployment"],"outcome":"Classify a live Firebase principal without a verified binding receipt as degraded, never as a passed empty Search bootstrap.","owner":"codex_runtime","state":"CLOSED","evidence":"Signed-out and authenticated-without-receipt branches are exact and tested; audit GO.","blocker":"none for current source round","dependencies":["RT-04B-01","RT-09"]},
     {"id":"RT-04B-01-CHILD-05","area":"youtube_search","microScope":"same_process_authenticated_principal_rebind","layers":["mobile","firebase_credential","session","cache"],"outcome":"Rebind secure Search persistence after a verified same-process sign-in or account switch without allowing timed-out or stale binding attempts to attach.","owner":"codex_runtime","state":"CLOSED","evidence":"Authenticated transition binder, token fencing, cache rebind and real app callback tests pass; audit GO.","blocker":"none for current source round","dependencies":["RT-04B-01","RT-09"]},
     {"id":"RT-04B-01-CHILD-06","area":"youtube_search","microScope":"verified_rebind_user_mutation_race","layers":["mobile","firebase_credential","session","cache"],"outcome":"If Search is submitted while verified-principal binding is pending, attach the verified repository without overwriting the user mutation and durably write the newest Search before rebind completes.","owner":"codex_runtime","state":"CLOSED","evidence":"Separate principal epoch/user generation and deterministic bind-submit-attach-relaunch proof pass; final audit GO.","blocker":"none for current source round","dependencies":["RT-04B-01","RT-04B-01-CHILD-05"]},
-    {"id":"RT-04B-02","area":"youtube","microScope":"watch_process_death_state","layers":["mobile","cache","provider"],"outcome":"Restore selected watch state after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Watch state is in-memory only.","blocker":"durable state implementation absent","dependencies":[]},
+    {"id":"RT-04B-02","area":"youtube","microScope":"watch_process_death_state","layers":["mobile","cache","provider"],"outcome":"Restore selected watch state after process death.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"Secure principal-bound selected metadata, origin stack and Watch/Home offsets restore across process death; three audit children close auth invalidation, recommendation/nested Search and Chat-return gaps; 23 repository/cache, 7 Watch widget and 50 broad Social tests plus one intentional skip pass with clean analysis and re-audit GO.","blocker":"reviewed Cursor integration and final integrated APK/OPPO may reopen","dependencies":["RT-04A-01","RT-04B-01","RT-04B-02-CHILD-01","RT-04B-02-CHILD-02","RT-04B-02-CHILD-03"]},
+    {"id":"RT-04B-02-CHILD-01","area":"youtube_watch","microScope":"failure_independent_auth_invalidation","layers":["mobile","cache","firebase_credential","session"],"outcome":"Attempt Search and Watch durable invalidation independently so either failure cannot skip removal of the other principal-bound state.","owner":"codex_runtime","state":"CLOSED","evidence":"Shared invalidation coordinator reports per-owner truth and bidirectional failure tests prove the healthy owner is removed; re-audit GO.","blocker":"none for current source round","dependencies":["RT-04B-02","RT-04B-01"]},
+    {"id":"RT-04B-02-CHILD-02","area":"youtube_watch","microScope":"exact_search_origin_return_stack","layers":["mobile","cache","navigation"],"outcome":"Preserve Search-origin Watch through recommendations, process death and nested Search without inferring origin from selected result membership.","owner":"codex_runtime","state":"CLOSED","evidence":"Independent origin, optional prior Watch metadata, missing-Search fail-closed and recommendation/nested Search widgets pass; re-audit GO.","blocker":"none for current source round","dependencies":["RT-04B-02","RT-04B-01"]},
+    {"id":"RT-04B-02-CHILD-03","area":"youtube_watch","microScope":"chat_return_durable_watch_fallback","layers":["mobile","cache","navigation","chat"],"outcome":"Allow an exact matching video-watch/item Chat return route to consume durable selected metadata, while mismatched explicit items clear the fallback.","owner":"codex_runtime","state":"CLOSED","evidence":"Matching Search-only and Home Watch route restoration, mismatch clearing and refresh non-overwrite widgets pass; re-audit GO.","blocker":"none for current source round","dependencies":["RT-04B-02"]},
     {"id":"RT-04B-03","area":"youtube","microScope":"active_short_process_death_state","layers":["mobile","cache","provider"],"outcome":"Restore the active Short index/state after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Active Short state is in-memory only.","blocker":"durable state implementation absent","dependencies":["OPPO-YT-SHORT-PLAY-01"]},
     {"id":"RT-04C-01","area":"create","microScope":"draft_process_death_cache","layers":["mobile","cache"],"outcome":"Restore an unpublished Create draft after process death.","owner":"codex_runtime","state":"open_defect","evidence":"Create drafts are in-memory only; navigation-only retention passes, while the sanitized r60.91 force-stop/relaunch probe lost the draft.","blocker":"durable draft storage absent","dependencies":["OPPO-CREATE-DRAFT-01","OPPO-CREATE-DRAFT-DEATH-01"]},
     {"id":"RT-05-01","area":"shop","microScope":"direct_account_action_route","layers":["ui","wiring","navigation"],"outcome":"Reach account sign-out/switch without a long Security-page scroll.","owner":"cursor_ui","state":"pending_cursor","evidence":"Current route requires about six swipes.","blocker":"reviewed Cursor UX solution pending","dependencies":["META-CURSOR-02"]},

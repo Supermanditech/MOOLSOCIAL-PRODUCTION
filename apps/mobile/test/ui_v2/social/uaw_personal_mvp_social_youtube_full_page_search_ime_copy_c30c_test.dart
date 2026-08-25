@@ -384,7 +384,7 @@ void main() {
       expect(runtime, contains('client.channelDetails('));
       expect(runtime, contains('isEligible: _isEligiblePublicVideo'));
       final searchHydration = mainSource.indexOf(
-        'final freshness = await youtubePublicSearchState',
+        'searchFreshness = await youtubePublicSearchState',
       );
       final appStart = mainSource.indexOf('runApp(\n    MoolSocialApp(');
       expect(searchHydration, greaterThan(-1));
@@ -408,7 +408,7 @@ void main() {
       );
       expect(
         mainSource,
-        contains('youtubePublicSearchHydrationIsDegraded(freshness)'),
+        contains('youtubePublicSearchHydrationIsDegraded(searchFreshness)'),
       );
       expect(
         mainSource,
