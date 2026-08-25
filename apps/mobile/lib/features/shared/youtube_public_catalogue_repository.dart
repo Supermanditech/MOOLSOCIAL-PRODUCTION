@@ -125,6 +125,214 @@ final class YouTubePublicCataloguePersistenceException implements Exception {
   String toString() => 'YouTube public catalogue persistence failed ($code).';
 }
 
+final class YouTubePublicCatalogueItemCodecException implements Exception {
+  const YouTubePublicCatalogueItemCodecException();
+
+  @override
+  String toString() => 'Invalid YouTube public catalogue item.';
+}
+
+final class YouTubePublicCatalogueItemJsonCodec {
+  const YouTubePublicCatalogueItemJsonCodec();
+
+  static const fields = <String>{
+    'videoId',
+    'title',
+    'channelId',
+    'channelTitle',
+    'description',
+    'thumbnailUrl',
+    'publishedAt',
+    'duration',
+    'captionAvailable',
+    'viewCount',
+    'likeCount',
+    'commentCount',
+    'embeddable',
+    'hasKnownDeviceRegionExclusion',
+    'hashtags',
+    'channelDescription',
+    'channelThumbnailUrl',
+    'subscriberCount',
+    'channelVideoCount',
+    'channelViewCount',
+  };
+
+  Map<String, Object?> encode(YouTubePublicCatalogueItem item) {
+    validate(item);
+    return <String, Object?>{
+      'videoId': item.videoId,
+      'title': item.title,
+      'channelId': item.channelId,
+      'channelTitle': item.channelTitle,
+      'description': item.description,
+      'thumbnailUrl': item.thumbnailUrl.toString(),
+      'publishedAt': item.publishedAt.toUtc().toIso8601String(),
+      'duration': item.duration,
+      'captionAvailable': item.captionAvailable,
+      'viewCount': item.viewCount,
+      'likeCount': item.likeCount,
+      'commentCount': item.commentCount,
+      'embeddable': item.embeddable,
+      'hasKnownDeviceRegionExclusion': item.hasKnownDeviceRegionExclusion,
+      'hashtags': item.hashtags,
+      'channelDescription': item.channelDescription,
+      'channelThumbnailUrl': item.channelThumbnailUrl?.toString(),
+      'subscriberCount': item.subscriberCount,
+      'channelVideoCount': item.channelVideoCount,
+      'channelViewCount': item.channelViewCount,
+    };
+  }
+
+  YouTubePublicCatalogueItem decode(Object? value) {
+    if (value is! Map<String, dynamic> ||
+        value.length != fields.length ||
+        !value.keys.toSet().containsAll(fields)) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    final rawHashtags = value['hashtags'];
+    if (rawHashtags is! List ||
+        rawHashtags.any((element) => element is! String)) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    final item = YouTubePublicCatalogueItem(
+      videoId: _requiredString(value['videoId']),
+      title: _requiredString(value['title'], allowEmpty: true),
+      channelId: _requiredString(value['channelId']),
+      channelTitle: _requiredString(value['channelTitle'], allowEmpty: true),
+      description: _requiredString(value['description'], allowEmpty: true),
+      thumbnailUrl: _parseHttpsUri(value['thumbnailUrl']),
+      publishedAt: _parseUtcDate(value['publishedAt']),
+      duration: _nullableString(value['duration']),
+      captionAvailable: _nullableBool(value['captionAvailable']),
+      viewCount: _nullableString(value['viewCount']),
+      likeCount: _nullableString(value['likeCount']),
+      commentCount: _nullableString(value['commentCount']),
+      embeddable: _requiredBool(value['embeddable']),
+      hasKnownDeviceRegionExclusion: _requiredBool(
+        value['hasKnownDeviceRegionExclusion'],
+      ),
+      hashtags: rawHashtags.cast<String>(),
+      channelDescription: _nullableString(value['channelDescription']),
+      channelThumbnailUrl: _nullableHttpsUri(value['channelThumbnailUrl']),
+      subscriberCount: _nullableString(value['subscriberCount']),
+      channelVideoCount: _nullableString(value['channelVideoCount']),
+      channelViewCount: _nullableString(value['channelViewCount']),
+    );
+    validate(item);
+    return item;
+  }
+
+  void validate(YouTubePublicCatalogueItem item) {
+    if (!_validString(item.videoId, 128) ||
+        !_validString(item.title, 512, allowEmpty: true) ||
+        !_validString(item.channelId, 128) ||
+        !_validString(item.channelTitle, 512, allowEmpty: true) ||
+        !_validString(item.description, 10000, allowEmpty: true) ||
+        !_validHttpsUri(item.thumbnailUrl) ||
+        !item.publishedAt.isUtc ||
+        !_validNullableString(item.duration, 64) ||
+        !_validCount(item.viewCount) ||
+        !_validCount(item.likeCount) ||
+        !_validCount(item.commentCount) ||
+        !item.embeddable ||
+        item.hasKnownDeviceRegionExclusion ||
+        item.hashtags.length > 3 ||
+        item.hashtags.any((tag) => !_validString(tag, 128)) ||
+        !_validNullableString(
+          item.channelDescription,
+          10000,
+          allowEmpty: true,
+        ) ||
+        (item.channelThumbnailUrl != null &&
+            !_validHttpsUri(item.channelThumbnailUrl!)) ||
+        !_validCount(item.subscriberCount) ||
+        !_validCount(item.channelVideoCount) ||
+        !_validCount(item.channelViewCount)) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+  }
+
+  static String _requiredString(Object? value, {bool allowEmpty = false}) {
+    if (value is! String || (!allowEmpty && value.isEmpty)) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    return value;
+  }
+
+  static String? _nullableString(Object? value) {
+    if (value == null) return null;
+    if (value is! String) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    return value;
+  }
+
+  static bool _requiredBool(Object? value) {
+    if (value is! bool) throw const YouTubePublicCatalogueItemCodecException();
+    return value;
+  }
+
+  static bool? _nullableBool(Object? value) {
+    if (value == null) return null;
+    if (value is! bool) throw const YouTubePublicCatalogueItemCodecException();
+    return value;
+  }
+
+  static DateTime _parseUtcDate(Object? value) {
+    if (value is! String || !value.endsWith('Z')) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null || !parsed.isUtc || parsed.toIso8601String() != value) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    return parsed;
+  }
+
+  static Uri _parseHttpsUri(Object? value) {
+    if (value is! String) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null || !_validHttpsUri(uri)) {
+      throw const YouTubePublicCatalogueItemCodecException();
+    }
+    return uri;
+  }
+
+  static Uri? _nullableHttpsUri(Object? value) {
+    if (value == null) return null;
+    return _parseHttpsUri(value);
+  }
+
+  static bool _validHttpsUri(Uri uri) =>
+      uri.scheme == 'https' &&
+      uri.host.isNotEmpty &&
+      uri.userInfo.isEmpty &&
+      uri.toString().length <= 2048;
+
+  static bool _validString(
+    String value,
+    int maximumLength, {
+    bool allowEmpty = false,
+  }) => (allowEmpty || value.isNotEmpty) && value.length <= maximumLength;
+
+  static bool _validNullableString(
+    String? value,
+    int maximumLength, {
+    bool allowEmpty = false,
+  }) =>
+      value == null ||
+      _validString(value, maximumLength, allowEmpty: allowEmpty);
+
+  static bool _validCount(String? value) =>
+      value == null ||
+      (value.isNotEmpty &&
+          value.length <= 32 &&
+          RegExp(r'^\d+$').hasMatch(value));
+}
+
 final class DurableYouTubePublicCatalogueRepository
     implements YouTubePublicCatalogueRepository {
   DurableYouTubePublicCatalogueRepository({
@@ -161,28 +369,7 @@ final class DurableYouTubePublicCatalogueRepository
     'capturedAtUtc',
     'items',
   };
-  static const _itemFields = <String>{
-    'videoId',
-    'title',
-    'channelId',
-    'channelTitle',
-    'description',
-    'thumbnailUrl',
-    'publishedAt',
-    'duration',
-    'captionAvailable',
-    'viewCount',
-    'likeCount',
-    'commentCount',
-    'embeddable',
-    'hasKnownDeviceRegionExclusion',
-    'hashtags',
-    'channelDescription',
-    'channelThumbnailUrl',
-    'subscriberCount',
-    'channelVideoCount',
-    'channelViewCount',
-  };
+  static const _itemCodec = YouTubePublicCatalogueItemJsonCodec();
 
   final YouTubePublicCatalogueKeyValueStore _store;
   final DateTime Function() _now;
@@ -359,61 +546,14 @@ final class DurableYouTubePublicCatalogueRepository
   }
 
   Map<String, Object?> _encodeItem(YouTubePublicCatalogueItem item) =>
-      <String, Object?>{
-        'videoId': item.videoId,
-        'title': item.title,
-        'channelId': item.channelId,
-        'channelTitle': item.channelTitle,
-        'description': item.description,
-        'thumbnailUrl': item.thumbnailUrl.toString(),
-        'publishedAt': item.publishedAt.toUtc().toIso8601String(),
-        'duration': item.duration,
-        'captionAvailable': item.captionAvailable,
-        'viewCount': item.viewCount,
-        'likeCount': item.likeCount,
-        'commentCount': item.commentCount,
-        'embeddable': item.embeddable,
-        'hasKnownDeviceRegionExclusion': item.hasKnownDeviceRegionExclusion,
-        'hashtags': item.hashtags,
-        'channelDescription': item.channelDescription,
-        'channelThumbnailUrl': item.channelThumbnailUrl?.toString(),
-        'subscriberCount': item.subscriberCount,
-        'channelVideoCount': item.channelVideoCount,
-        'channelViewCount': item.channelViewCount,
-      };
+      _itemCodec.encode(item);
 
   YouTubePublicCatalogueItem _decodeItem(Map<String, dynamic> raw) {
-    if (!_hasExactFields(raw, _itemFields)) {
+    try {
+      return _itemCodec.decode(raw);
+    } on YouTubePublicCatalogueItemCodecException {
       throw const _InvalidCatalogueData();
     }
-    final rawHashtags = raw['hashtags'];
-    if (rawHashtags is! List || rawHashtags.any((value) => value is! String)) {
-      throw const _InvalidCatalogueData();
-    }
-    return YouTubePublicCatalogueItem(
-      videoId: _requiredString(raw['videoId']),
-      title: _requiredString(raw['title'], allowEmpty: true),
-      channelId: _requiredString(raw['channelId']),
-      channelTitle: _requiredString(raw['channelTitle'], allowEmpty: true),
-      description: _requiredString(raw['description'], allowEmpty: true),
-      thumbnailUrl: _parseHttpsUri(raw['thumbnailUrl']),
-      publishedAt: _parseUtcDate(raw['publishedAt']),
-      duration: _nullableString(raw['duration']),
-      captionAvailable: _nullableBool(raw['captionAvailable']),
-      viewCount: _nullableString(raw['viewCount']),
-      likeCount: _nullableString(raw['likeCount']),
-      commentCount: _nullableString(raw['commentCount']),
-      embeddable: _requiredBool(raw['embeddable']),
-      hasKnownDeviceRegionExclusion: _requiredBool(
-        raw['hasKnownDeviceRegionExclusion'],
-      ),
-      hashtags: rawHashtags.cast<String>(),
-      channelDescription: _nullableString(raw['channelDescription']),
-      channelThumbnailUrl: _nullableHttpsUri(raw['channelThumbnailUrl']),
-      subscriberCount: _nullableString(raw['subscriberCount']),
-      channelVideoCount: _nullableString(raw['channelVideoCount']),
-      channelViewCount: _nullableString(raw['channelViewCount']),
-    );
   }
 
   void _validateSnapshot(
@@ -431,32 +571,12 @@ final class DurableYouTubePublicCatalogueRepository
     }
     final seenVideoIds = <String>{};
     for (final item in snapshot.items) {
-      if (!_validString(item.videoId, 128) ||
-          !seenVideoIds.add(item.videoId) ||
-          !_validString(item.title, 512, allowEmpty: true) ||
-          !_validString(item.channelId, 128) ||
-          !_validString(item.channelTitle, 512, allowEmpty: true) ||
-          !_validString(item.description, 10000, allowEmpty: true) ||
-          !_validHttpsUri(item.thumbnailUrl) ||
-          !item.publishedAt.isUtc ||
-          !_validNullableString(item.duration, 64) ||
-          !_validCount(item.viewCount) ||
-          !_validCount(item.likeCount) ||
-          !_validCount(item.commentCount) ||
-          !item.embeddable ||
-          item.hasKnownDeviceRegionExclusion ||
-          item.hashtags.length > 3 ||
-          item.hashtags.any((tag) => !_validString(tag, 128)) ||
-          !_validNullableString(
-            item.channelDescription,
-            10000,
-            allowEmpty: true,
-          ) ||
-          (item.channelThumbnailUrl != null &&
-              !_validHttpsUri(item.channelThumbnailUrl!)) ||
-          !_validCount(item.subscriberCount) ||
-          !_validCount(item.channelVideoCount) ||
-          !_validCount(item.channelViewCount)) {
+      try {
+        _itemCodec.validate(item);
+      } on YouTubePublicCatalogueItemCodecException {
+        invalid();
+      }
+      if (!seenVideoIds.add(item.videoId)) {
         invalid();
       }
     }
@@ -506,30 +626,6 @@ final class DurableYouTubePublicCatalogueRepository
   static bool _hasExactFields(Map<String, dynamic> raw, Set<String> expected) =>
       raw.length == expected.length && raw.keys.toSet().containsAll(expected);
 
-  static String _requiredString(Object? value, {bool allowEmpty = false}) {
-    if (value is! String || (!allowEmpty && value.isEmpty)) {
-      throw const _InvalidCatalogueData();
-    }
-    return value;
-  }
-
-  static String? _nullableString(Object? value) {
-    if (value == null) return null;
-    if (value is! String) throw const _InvalidCatalogueData();
-    return value;
-  }
-
-  static bool _requiredBool(Object? value) {
-    if (value is! bool) throw const _InvalidCatalogueData();
-    return value;
-  }
-
-  static bool? _nullableBool(Object? value) {
-    if (value == null) return null;
-    if (value is! bool) throw const _InvalidCatalogueData();
-    return value;
-  }
-
   static DateTime _parseUtcDate(Object? value) {
     if (value is! String || !value.endsWith('Z')) {
       throw const _InvalidCatalogueData();
@@ -545,46 +641,6 @@ final class DurableYouTubePublicCatalogueRepository
     }
     return parsed;
   }
-
-  static Uri _parseHttpsUri(Object? value) {
-    if (value is! String) throw const _InvalidCatalogueData();
-    final uri = Uri.tryParse(value);
-    if (uri == null || !_validHttpsUri(uri)) {
-      throw const _InvalidCatalogueData();
-    }
-    return uri;
-  }
-
-  static Uri? _nullableHttpsUri(Object? value) {
-    if (value == null) return null;
-    return _parseHttpsUri(value);
-  }
-
-  static bool _validHttpsUri(Uri uri) =>
-      uri.scheme == 'https' &&
-      uri.host.isNotEmpty &&
-      uri.userInfo.isEmpty &&
-      uri.toString().length <= 2048;
-
-  static bool _validString(
-    String value,
-    int maximumLength, {
-    bool allowEmpty = false,
-  }) => (allowEmpty || value.isNotEmpty) && value.length <= maximumLength;
-
-  static bool _validNullableString(
-    String? value,
-    int maximumLength, {
-    bool allowEmpty = false,
-  }) =>
-      value == null ||
-      _validString(value, maximumLength, allowEmpty: allowEmpty);
-
-  static bool _validCount(String? value) =>
-      value == null ||
-      (value.isNotEmpty &&
-          value.length <= 32 &&
-          RegExp(r'^\d+$').hasMatch(value));
 }
 
 final class _InvalidCatalogueData implements Exception {

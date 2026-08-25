@@ -19,6 +19,22 @@ void main() {
       );
     });
 
+    test('public item codec round-trips exact fields and rejects drift', () {
+      const codec = YouTubePublicCatalogueItemJsonCodec();
+      final source = _item('codec-video');
+      final encoded = codec.encode(source);
+      _expectItem(codec.decode(encoded), source);
+
+      expect(
+        () => codec.decode({...encoded, 'unknown': true}),
+        throwsA(isA<YouTubePublicCatalogueItemCodecException>()),
+      );
+      expect(
+        () => codec.decode({...encoded}..remove('description')),
+        throwsA(isA<YouTubePublicCatalogueItemCodecException>()),
+      );
+    });
+
     test(
       'rejects noncanonical region and unbounded retention configuration',
       () {

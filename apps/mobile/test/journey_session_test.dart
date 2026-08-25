@@ -691,6 +691,56 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('authenticated transition invokes runtime rebind callback once', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: ReviewSocialAuthGateway(
+        results: const {
+          SocialAuthProvider.google: SocialAuthResult.authenticated(
+            'private-user-a',
+          ),
+        },
+      ),
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(),
+      availableSocialAuthProviders: const {SocialAuthProvider.google},
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    var rebindCount = 0;
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        legacyPresentationForTestsOnly: true,
+        onAuthenticatedBoundary: () async {
+          rebindCount += 1;
+        },
+      ),
+    );
+    await tester.pump();
+
+    expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+    await tester.pump();
+    await tester.pump();
+
+    expect(rebindCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('app resume performs no revalidation for verified session', (
     tester,
   ) async {

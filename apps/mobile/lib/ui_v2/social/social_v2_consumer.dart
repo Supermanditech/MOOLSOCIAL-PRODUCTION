@@ -18,6 +18,7 @@ import '../../features/retailer/retailer_session.dart';
 import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
+import '../../features/shared/youtube_public_search_state_repository.dart';
 import '../buy/buy_v2_shop_chat.dart';
 import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
@@ -40,6 +41,7 @@ void resetSocialV2RetainedStateForAuthenticationBoundary(
   SharedSession session,
 ) {
   _socialV2RetainedStates[session] = _SocialV2RetainedState();
+  unawaited(youtubePublicSearchState.clear(detachRepository: true));
 }
 
 class _SocialV2RetainedState {
@@ -54,6 +56,7 @@ class _SocialV2RetainedState {
   String feedState = 'empty';
   int activeShortPage = 0;
   double videoHomeScrollOffset = 0;
+  double youtubeSearchScrollOffset = 0;
   _VideoData? activeVideo;
   _VideoData? youtubeSearchOriginVideo;
   String videoQuery = '';
@@ -88,6 +91,7 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeShortsLoader,
     @visibleForTesting this.youtubeSearchLoader,
     @visibleForTesting this.youtubeCatalogueSnapshotStore,
+    @visibleForTesting this.youtubeSearchStateCache,
     super.key,
   });
 
@@ -125,6 +129,9 @@ class SocialUniversalV2 extends StatefulWidget {
   @visibleForTesting
   final Screen04YouTubeCatalogueSnapshotStore? youtubeCatalogueSnapshotStore;
 
+  @visibleForTesting
+  final YouTubePublicSearchStateCache? youtubeSearchStateCache;
+
   @override
   State<SocialUniversalV2> createState() => _SocialUniversalV2State();
 }
@@ -148,11 +155,14 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   late final PageController _shortController;
   late final ScrollController _videoHomeController;
   late final ScrollController _videoWatchController;
+  late final ScrollController _youtubeSearchResultsController;
   late final TextEditingController _youtubeSearchController;
   late final FocusNode _youtubeSearchFocusNode;
   late final SocialMediaPicker _mediaPicker;
   SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
   late final Screen04YouTubeCatalogueSnapshotStore _youtubeCatalogueSnapshots;
+  late final YouTubePublicSearchStateCache _youtubeSearchStateCache;
+  bool _restoredYouTubeSearch = false;
   _VideoData? get _activeVideo => _retainedState.activeVideo;
   set _activeVideo(_VideoData? value) => _retainedState.activeVideo = value;
   _VideoData? get _youtubeSearchOriginVideo =>
@@ -170,6 +180,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   double get _videoHomeScrollOffset => _retainedState.videoHomeScrollOffset;
   set _videoHomeScrollOffset(double value) =>
       _retainedState.videoHomeScrollOffset = value;
+  double get _youtubeSearchScrollOffset =>
+      _retainedState.youtubeSearchScrollOffset;
+  set _youtubeSearchScrollOffset(double value) =>
+      _retainedState.youtubeSearchScrollOffset = value;
   bool get _youtubeSearchOpen => _retainedState.youtubeSearchOpen;
   set _youtubeSearchOpen(bool value) =>
       _retainedState.youtubeSearchOpen = value;
@@ -239,15 +253,44 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   void initState() {
     super.initState();
     final retained = _socialV2RetainedStates[widget.sharedSession];
+    final hasRetainedState = retained != null;
     if (retained == null) {
       _retainedState = _SocialV2RetainedState();
       _socialV2RetainedStates[widget.sharedSession] = _retainedState;
     } else {
       _retainedState = retained;
     }
+    _youtubeSearchStateCache =
+        widget.youtubeSearchStateCache ??
+        (widget.youtubeSearchLoader == null
+            ? youtubePublicSearchState
+            : YouTubePublicSearchStateCache());
+    final canRestoreDurableSearch =
+        !hasRetainedState &&
+        widget.initialWorld == 'social' &&
+        (widget.initialSubAction == null ||
+            widget.initialSubAction == 'videos') &&
+        widget.initialState == null;
+    final restoredSearch = canRestoreDurableSearch
+        ? _youtubeSearchStateCache.snapshot
+        : null;
+    if (restoredSearch != null && restoredSearch.searchSurfaceOpen) {
+      _choiceByWorld['social'] = 'videos';
+      _youtubeSubmittedQuery = restoredSearch.submittedQuery;
+      _youtubeSearchOpen = true;
+      _youtubeSearchResults = restoredSearch.results
+          .map(mapYouTubePublicCatalogueItemToScreen04Video)
+          .map(_videoDataFromProvider)
+          .toList(growable: false);
+      _youtubeSearchScrollOffset = restoredSearch.resultsScrollOffset;
+      _restoredYouTubeSearch = true;
+    }
     _shortController = PageController(initialPage: _activeShortPage);
     _videoHomeController = ScrollController();
     _videoWatchController = ScrollController();
+    _youtubeSearchResultsController = ScrollController(
+      initialScrollOffset: _youtubeSearchScrollOffset,
+    )..addListener(_captureYouTubeSearchScrollOffset);
     _youtubeSearchController = TextEditingController(
       text: _youtubeSubmittedQuery,
     );
@@ -335,9 +378,15 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     if (_videoHomeController.hasClients) {
       _videoHomeScrollOffset = _videoHomeController.offset;
     }
+    if (_youtubeSearchResultsController.hasClients) {
+      _youtubeSearchScrollOffset = _youtubeSearchResultsController.offset;
+      _youtubeSearchStateCache.updateScrollOffset(_youtubeSearchScrollOffset);
+    }
+    unawaited(_youtubeSearchStateCache.settleDurableWrites());
     _shortController.dispose();
     _videoHomeController.dispose();
     _videoWatchController.dispose();
+    _youtubeSearchResultsController.dispose();
     _youtubeSearchController.dispose();
     _youtubeSearchFocusNode.dispose();
     super.dispose();
@@ -940,7 +989,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     });
   }
 
+  void _captureYouTubeSearchScrollOffset() {
+    if (!_youtubeSearchResultsController.hasClients) return;
+    _youtubeSearchScrollOffset = _youtubeSearchResultsController.offset;
+    _youtubeSearchStateCache.updateScrollOffset(_youtubeSearchScrollOffset);
+  }
+
+  void _discardDurableYouTubeSearch() {
+    _restoredYouTubeSearch = false;
+    _youtubeSearchScrollOffset = 0;
+    unawaited(_youtubeSearchStateCache.clear());
+  }
+
   void _resetYouTubeSearch() {
+    _discardDurableYouTubeSearch();
     _youtubeSearchRequest += 1;
     _youtubeSearchOpen = false;
     _youtubeSearchLoading = false;
@@ -954,6 +1016,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _openYouTubeSearch() {
+    _discardDurableYouTubeSearch();
     if (_videoHomeController.hasClients && _activeVideo == null) {
       _videoHomeScrollOffset = _videoHomeController.offset;
     }
@@ -975,6 +1038,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _closeYouTubeSearch() {
+    _discardDurableYouTubeSearch();
     setState(() {
       _youtubeSearchRequest += 1;
       _youtubeSearchOpen = false;
@@ -992,6 +1056,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _clearYouTubeSearch() {
+    _discardDurableYouTubeSearch();
     setState(() {
       _youtubeSearchRequest += 1;
       _youtubeSearchLoading = false;
@@ -1009,6 +1074,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
       _clearYouTubeSearch();
       return;
     }
+    _discardDurableYouTubeSearch();
     final request = ++_youtubeSearchRequest;
     setState(() {
       _youtubeSearchLoading = true;
@@ -1026,12 +1092,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
           widget.youtubeSearchLoader ?? loadScreen04YouTubePublicSearch;
       final results = await loader(query);
       if (!mounted || request != _youtubeSearchRequest) return;
+      final renderedResults = results
+          .map(_videoDataFromProvider)
+          .toList(growable: false);
       setState(() {
         _youtubeSearchLoading = false;
-        _youtubeSearchResults = results
-            .map(_videoDataFromProvider)
-            .toList(growable: false);
+        _youtubeSearchResults = renderedResults;
+        _youtubeSearchScrollOffset = 0;
       });
+      _youtubeSearchStateCache.replace(
+        submittedQuery: query,
+        results: results
+            .map(mapScreen04VideoToYouTubePublicCatalogueItem)
+            .toList(growable: false),
+      );
     } on Object {
       if (!mounted || request != _youtubeSearchRequest) return;
       setState(() {
@@ -1794,7 +1868,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
     if (_youtubeSearchOpen) {
       return _YouTubeSearchSurface(
         controller: _youtubeSearchController,
+        resultsController: _youtubeSearchResultsController,
         focusNode: _youtubeSearchFocusNode,
+        autofocus: !_restoredYouTubeSearch,
         loading: _youtubeSearchLoading,
         submittedQuery: _youtubeSubmittedQuery,
         error: _youtubeSearchError,
@@ -3221,7 +3297,9 @@ class _YouTubeWatchHeader extends StatelessWidget {
 class _YouTubeSearchSurface extends StatelessWidget {
   const _YouTubeSearchSurface({
     required this.controller,
+    required this.resultsController,
     required this.focusNode,
+    required this.autofocus,
     required this.loading,
     required this.submittedQuery,
     required this.error,
@@ -3235,7 +3313,9 @@ class _YouTubeSearchSurface extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final ScrollController resultsController;
   final FocusNode focusNode;
+  final bool autofocus;
   final bool loading;
   final String submittedQuery;
   final String? error;
@@ -3276,7 +3356,7 @@ class _YouTubeSearchSurface extends StatelessWidget {
                         key: const Key('screen04-youtube-search-input'),
                         controller: controller,
                         focusNode: focusNode,
-                        autofocus: true,
+                        autofocus: autofocus,
                         maxLines: 1,
                         textInputAction: TextInputAction.search,
                         textCapitalization: TextCapitalization.sentences,
@@ -3352,6 +3432,7 @@ class _YouTubeSearchSurface extends StatelessWidget {
               ),
               (false, null, true, final searchResults) => ListView.builder(
                 key: const Key('screen04-youtube-search-results'),
+                controller: resultsController,
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.only(bottom: 16),

@@ -42,6 +42,7 @@ class MoolSocialApp extends StatefulWidget {
     this.sharedSession,
     this.workSession,
     this.launchInterruptionGuard,
+    this.onAuthenticatedBoundary,
     this.initialLocation = '/boot',
     this.legacyPresentationForTestsOnly = false,
     this.disposeSession = false,
@@ -76,6 +77,7 @@ class MoolSocialApp extends StatefulWidget {
   final SharedSession? sharedSession;
   final WorkSession? workSession;
   final LaunchInterruptionGuard? launchInterruptionGuard;
+  final Future<void> Function()? onAuthenticatedBoundary;
   final String initialLocation;
 
   /// Keeps historical presentation regression tests attached to the untouched
@@ -174,9 +176,17 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       resetSocialV2RetainedStateForAuthenticationBoundary(_sharedSession);
       return;
     }
-    if (authenticated && _signedOutBoundaryActive) {
-      _signedOutBoundaryActive = false;
-      _sharedSession.setAuthorized(true);
+    if (authenticated) {
+      if (_signedOutBoundaryActive) {
+        _signedOutBoundaryActive = false;
+        _sharedSession.setAuthorized(true);
+      }
+      final onAuthenticatedBoundary = widget.onAuthenticatedBoundary;
+      if (onAuthenticatedBoundary != null) {
+        unawaited(
+          Future<void>.sync(onAuthenticatedBoundary).catchError((Object _) {}),
+        );
+      }
     }
   }
 

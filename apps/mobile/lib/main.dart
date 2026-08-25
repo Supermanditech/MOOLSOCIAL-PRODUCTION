@@ -31,6 +31,7 @@ import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
 import 'features/shared/social_content_gateway.dart';
 import 'features/shared/youtube_public_catalogue_repository.dart';
+import 'features/shared/youtube_public_search_state_repository.dart';
 import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
@@ -612,6 +613,69 @@ Future<void> main() async {
           !_youtubePublicReviewMode
       ? MemoryVerifiedPrincipalBindingStore()
       : secureVerifiedPrincipalBindingStore;
+  final searchPersistence = SecureStorageYouTubePublicSearchKeyValueStore();
+  Future<void> bindYouTubeSearchStateToCurrentPrincipal() async {
+    _recordReleaseBootstrapStage('youtube_search_state', 'begin');
+    final bindingAttempt = youtubePublicSearchState
+        .beginPrincipalBindingAttempt();
+    try {
+      final currentPrincipalId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentPrincipalId == null || currentPrincipalId.isEmpty) {
+        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
+          searchPersistence,
+        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+        _recordReleaseBootstrapStage('youtube_search_state', 'passed');
+        return;
+      }
+      final storedBinding =
+          identical(
+            verifiedPrincipalBindingStore,
+            secureVerifiedPrincipalBindingStore,
+          )
+          ? await secureVerifiedPrincipalBindingStore.read().timeout(
+              _youtubeCatalogueCacheHydrationTimeout,
+            )
+          : null;
+      if (storedBinding == null) {
+        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
+          searchPersistence,
+        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+        _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        return;
+      }
+      final currentBinding = await secureVerifiedPrincipalBindingStore
+          .protect(currentPrincipalId)
+          .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      if (!storedBinding.matches(currentBinding)) {
+        await DurableYouTubePublicSearchStateRepository.invalidateUnbound(
+          searchPersistence,
+        ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+        _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        return;
+      }
+      final freshness = await youtubePublicSearchState
+          .configureDurability(
+            DurableYouTubePublicSearchStateRepository(
+              persistence: searchPersistence,
+              principalBinding: storedBinding,
+              regionCode: screen04YouTubeRegionCode,
+            ),
+            bindingAttempt: bindingAttempt,
+          )
+          .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      _recordReleaseBootstrapStage(
+        'youtube_search_state',
+        youtubePublicSearchHydrationIsDegraded(freshness)
+            ? 'degraded'
+            : 'passed',
+      );
+    } on Object {
+      youtubePublicSearchState.beginPrincipalBindingAttempt();
+      _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+    }
+  }
+
+  await bindYouTubeSearchStateToCurrentPrincipal();
   final firebaseSessionBootstrap = FirebaseAuthenticatedSessionBootstrapGateway(
     FirebaseAuth.instance,
     bindingProtector: secureVerifiedPrincipalBindingStore,
@@ -762,6 +826,7 @@ Future<void> main() async {
       chatSession: ChatSession.production(),
       disposeSession: true,
       disposeChatSession: true,
+      onAuthenticatedBoundary: bindYouTubeSearchStateToCurrentPrincipal,
       initialLocation:
           youtubeInitialLocation ??
           (socialAuthInitialLocation || emailLinkInitialLocation
