@@ -22,7 +22,10 @@ class MoolDefaultContextualChatProvisioningSource
 }
 
 class MoolContextualChatSourceAdapter
-    implements BuyV2ShopChatProvisioningSource {
+    implements
+        BuyV2ShopChatProvisioningSource,
+        BuyV2ShopChatLoadSource,
+        Listenable {
   const MoolContextualChatSourceAdapter({
     required this.familyId,
     required this.source,
@@ -34,6 +37,43 @@ class MoolContextualChatSourceAdapter
   @override
   List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
       source.threadsFor(familyId);
+
+  BuyV2ShopChatLoadSource? get _loadSource {
+    final candidate = source;
+    return candidate is BuyV2ShopChatLoadSource
+        ? candidate as BuyV2ShopChatLoadSource
+        : null;
+  }
+
+  @override
+  BuyV2ShopChatLoadState get loadState =>
+      _loadSource?.loadState ?? BuyV2ShopChatLoadState.ready;
+
+  @override
+  String? get loadErrorMessage => _loadSource?.loadErrorMessage;
+
+  @override
+  Future<void> retryLoading() async {
+    final loadSource = _loadSource;
+    if (loadSource == null) return;
+    await loadSource.retryLoading();
+  }
+
+  @override
+  void addListener(VoidCallback listener) {
+    final updates = source;
+    if (updates is Listenable) {
+      (updates as Listenable).addListener(listener);
+    }
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    final updates = source;
+    if (updates is Listenable) {
+      (updates as Listenable).removeListener(listener);
+    }
+  }
 }
 
 abstract final class MoolContextualChatCatalog {
@@ -63,7 +103,8 @@ abstract final class MoolContextualChatCatalog {
     subtitle: 'orders and reservations',
     icon: Icons.restaurant_outlined,
     accent: Color(0xFFF27A1A),
-    securityMessage: 'Food conversations continue securely in MoolSocial Chat.',
+    securityMessage:
+        'Food conversations stay with your order or reservation in MoolSocial Chat.',
     newConversationPrompt:
         'Choose who can help with your order or reservation.',
     filters: [
@@ -93,7 +134,7 @@ abstract final class MoolContextualChatCatalog {
     icon: Icons.route_outlined,
     accent: Color(0xFF34345E),
     securityMessage:
-        'Travel conversations continue securely in MoolSocial Chat.',
+        'Travel conversations stay with your trip in MoolSocial Chat.',
     newConversationPrompt: 'Choose the trip you need help with.',
     filters: [
       BuyV2ShopChatFilterSpec(
@@ -165,7 +206,8 @@ abstract final class MoolContextualChatCatalog {
     subtitle: 'jobs and workspace',
     icon: Icons.work_outline_rounded,
     accent: Color(0xFF2F7A28),
-    securityMessage: 'Work conversations continue securely in MoolSocial Chat.',
+    securityMessage:
+        'Work conversations stay with your opportunity or workspace in MoolSocial Chat.',
     newConversationPrompt: 'Choose the Work conversation you need.',
     filters: [
       BuyV2ShopChatFilterSpec(
@@ -195,7 +237,7 @@ const _foodThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.restaurant,
     title: 'Food order support',
     subtitle: 'Restaurants, menus and delivery questions',
-    detail: 'Start a secure Order Food conversation',
+    detail: 'Open Order Food support',
     icon: Icons.restaurant_outlined,
     accent: Color(0xFFF27A1A),
     contextTitle: 'Order Food',
@@ -209,7 +251,7 @@ const _foodThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.tableDesk,
     title: 'Table reservation desk',
     subtitle: 'Restaurant, time and party-size questions',
-    detail: 'Start a secure Book Table conversation',
+    detail: 'Open Book Table support',
     icon: Icons.table_restaurant_outlined,
     accent: Color(0xFF7A3E12),
     contextTitle: 'Book Table',
@@ -230,7 +272,7 @@ const _travelThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.travelPartner,
     title: 'Bike trip support',
     subtitle: 'Pickup, destination and fare questions',
-    detail: 'Start a secure Bike conversation',
+    detail: 'Open Bike trip support',
     icon: Icons.two_wheeler_outlined,
     accent: Color(0xFF007C78),
     contextTitle: 'Bike trip',
@@ -248,7 +290,7 @@ const _travelThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.travelPartner,
     title: 'Auto trip support',
     subtitle: 'Pickup, destination and fare questions',
-    detail: 'Start a secure Auto conversation',
+    detail: 'Open Auto trip support',
     icon: Icons.electric_rickshaw_outlined,
     accent: Color(0xFF4E7200),
     contextTitle: 'Auto trip',
@@ -266,7 +308,7 @@ const _travelThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.travelPartner,
     title: 'Cab trip support',
     subtitle: 'Vehicle, pickup and fare questions',
-    detail: 'Start a secure Cab conversation',
+    detail: 'Open Cab trip support',
     icon: Icons.local_taxi_outlined,
     accent: Color(0xFF34345E),
     contextTitle: 'Cab trip',
@@ -284,7 +326,7 @@ const _travelThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.travelPartner,
     title: 'Bus booking desk',
     subtitle: 'Route, date, seat and fare questions',
-    detail: 'Start a secure Bus conversation',
+    detail: 'Open Bus booking support',
     icon: Icons.directions_bus_outlined,
     accent: Color(0xFF234B7A),
     contextTitle: 'Bus booking',
@@ -337,7 +379,7 @@ const _careThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.salonDesk,
     title: 'Salon booking desk',
     subtitle: 'Service, professional, price and time questions',
-    detail: 'Start a secure Salon conversation',
+    detail: 'Open Salon booking support',
     icon: Icons.content_cut_rounded,
     accent: Color(0xFF8A3B70),
     contextTitle: 'Salon appointment',
@@ -358,7 +400,7 @@ const _workThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.workOpportunity,
     title: 'Work opportunity',
     subtitle: 'Requirements, timing and earnings questions',
-    detail: 'Start a secure Earn Today conversation',
+    detail: 'Open Earn Today support',
     icon: Icons.payments_outlined,
     accent: Color(0xFF2F7A28),
     contextTitle: 'Earn Today',
@@ -376,7 +418,7 @@ const _workThreads = <BuyV2ShopChatThread>[
     participantKind: BuyV2ShopChatParticipantKind.workspaceSupport,
     title: 'Workspace support',
     subtitle: 'Active work, documents and account questions',
-    detail: 'Start a secure Workspace conversation',
+    detail: 'Open Workspace support',
     icon: Icons.work_outline_rounded,
     accent: Color(0xFF3F3F82),
     contextTitle: 'Workspace',

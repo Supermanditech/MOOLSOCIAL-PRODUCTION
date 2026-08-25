@@ -67,6 +67,7 @@ class _SocialV2RetainedState {
 
   final Map<String, String> choiceByWorld;
   final SocialCreateDraftV2 createDraft = SocialCreateDraftV2();
+  final Map<String, BuyV2ShopChatRetainedState> contextualChatStates = {};
   String createView = 'home';
   String feedState = 'empty';
   int activeShortPage = 0;
@@ -98,6 +99,7 @@ class SocialUniversalV2 extends StatefulWidget {
     this.onOpenMool,
     this.onOpenMainAction,
     this.onContextualChatAction,
+    this.onContextualChatHandoff,
     this.contextualChatSource =
         const MoolDefaultContextualChatProvisioningSource(),
     this.mediaPicker,
@@ -129,6 +131,7 @@ class SocialUniversalV2 extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final BuyV2ShopChatActionHandler? onContextualChatAction;
+  final BuyV2ShopChatHandoffHandler? onContextualChatHandoff;
   final MoolContextualChatProvisioningSource contextualChatSource;
   final SocialMediaPicker? mediaPicker;
 
@@ -177,6 +180,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   final GlobalKey<BuyV2ShopChatViewState> _contextualChatKey = GlobalKey();
   late SocialV2Tab _tab;
   late String _world;
+  late bool _chatAuthenticated;
   bool _contextualChatActive = false;
   late final _SocialV2RetainedState _retainedState;
 
@@ -315,6 +319,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     } else {
       _retainedState = retained;
     }
+    _chatAuthenticated = widget.session.isAuthenticated;
+    widget.session.addListener(_handleChatIdentityBoundary);
     _youtubeCatalogueSnapshots =
         widget.youtubeCatalogueSnapshotStore ??
         (widget.youtubeVideosLoader == null &&
@@ -541,6 +547,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
 
   @override
   void dispose() {
+    widget.session.removeListener(_handleChatIdentityBoundary);
     WidgetsBinding.instance.removeObserver(this);
     _createDraftHydrationGeneration += 1;
     final draftRequest = ++_createDraftPersistenceRequest;
@@ -579,6 +586,13 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   @override
   void didUpdateWidget(covariant SocialUniversalV2 oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session)) {
+      oldWidget.session.removeListener(_handleChatIdentityBoundary);
+      widget.session.addListener(_handleChatIdentityBoundary);
+      _chatAuthenticated = widget.session.isAuthenticated;
+      _retainedState.contextualChatStates.clear();
+      _contextualChatActive = false;
+    }
     if (oldWidget.initialSubAction != widget.initialSubAction ||
         oldWidget.initialState != widget.initialState ||
         oldWidget.initialItem != widget.initialItem ||
@@ -913,12 +927,18 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                           familyId: _world,
                           source: widget.contextualChatSource,
                         ),
-                        onAction:
-                            widget.onContextualChatAction ??
-                            _handleContextualChatAction,
+                        retainedState: _retainedState.contextualChatStates
+                            .putIfAbsent(
+                              '$_world|$choice',
+                              BuyV2ShopChatRetainedState.new,
+                            ),
+                        onAction: widget.onContextualChatAction,
+                        onHandoff:
+                            widget.onContextualChatHandoff ??
+                            _handoffContextualChatAction,
                         onBack: _closeContextualChat,
                         onOpenProductionChat: _openProductionChat,
-                        onOpenThreadContext: (_) => _closeContextualChat(),
+                        onOpenThreadContext: _openContextualThreadOrigin,
                       )
                     : Column(
                         children: [
@@ -1046,6 +1066,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         route: action.route,
       );
     }
+  }
+
+  void _handleChatIdentityBoundary() {
+    final authenticated = widget.session.isAuthenticated;
+    if (authenticated == _chatAuthenticated) return;
+    _chatAuthenticated = authenticated;
+    _retainedState.contextualChatStates.clear();
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _contextualChatActive = false);
   }
 
   void _handleScreen04Back() {
@@ -1885,66 +1915,72 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     setState(() => _contextualChatActive = false);
   }
 
-  Future<BuyV2ShopChatActionResult> _handleContextualChatAction(
-    BuyV2ShopChatAction action,
-  ) async {
-    switch (action.kind) {
-      case BuyV2ShopChatActionKind.sendText:
-        _openProductionChat(draft: action.text);
-        return const BuyV2ShopChatActionResult.handedOff();
-      case BuyV2ShopChatActionKind.captureImage:
-      case BuyV2ShopChatActionKind.selectMedia:
-      case BuyV2ShopChatActionKind.selectDocument:
-      case BuyV2ShopChatActionKind.recordVoice:
-        _openProductionChat();
-        return const BuyV2ShopChatActionResult.handedOff();
-      case BuyV2ShopChatActionKind.startVoiceCall:
-      case BuyV2ShopChatActionKind.startVideoCall:
-        return const BuyV2ShopChatActionResult.unavailable(
-          'Calls are not available in MoolSocial Chat yet.',
-        );
-      case BuyV2ShopChatActionKind.shareProduct:
-      case BuyV2ShopChatActionKind.shareOrder:
-      case BuyV2ShopChatActionKind.shareLocation:
-      case BuyV2ShopChatActionKind.shareContact:
-      case BuyV2ShopChatActionKind.openAttachment:
-      case BuyV2ShopChatActionKind.reply:
-      case BuyV2ShopChatActionKind.copyMessage:
-      case BuyV2ShopChatActionKind.forwardMessage:
-      case BuyV2ShopChatActionKind.reactToMessage:
-      case BuyV2ShopChatActionKind.manageNotifications:
-      case BuyV2ShopChatActionKind.openSafety:
-        return const BuyV2ShopChatActionResult.unavailable(
-          'Open all Chat to continue this action.',
-        );
-    }
+  void _openContextualThreadOrigin(BuyV2ShopChatThread thread) {
+    if (!_contextualChatActive) return;
+    final world = screen04World(_world);
+    final threadChoice = thread.resolvedFilterId;
+    FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (world.choices.any((choice) => choice.id == threadChoice)) {
+        _choiceByWorld[_world] = threadChoice;
+      }
+      _contextualChatActive = false;
+    });
   }
 
-  void _openProductionChat({String? draft}) {
-    final world = screen04World(_world);
-    final choice = _choiceByWorld[_world] ?? world.choices.first.id;
-    final returnQuery = <String, String>{
-      'world': world.id,
-      'sub': choice,
-      if (_activeVideo case final video?) ...{
-        'state': 'video-watch',
-        'item': video.id,
-      },
-    };
-    final returnRoute = Uri(
-      path: '/app/social',
-      queryParameters: returnQuery,
-    ).toString();
+  void _openProductionChat() {
     context.push(
       Uri(
         path: '/app/chat',
+        queryParameters: {'return': _productionChatReturnRoute()},
+      ).toString(),
+    );
+  }
+
+  void _handoffContextualChatAction(
+    BuyV2ShopChatThread thread,
+    BuyV2ShopChatAction action,
+  ) {
+    final draft = action.kind == BuyV2ShopChatActionKind.sendText
+        ? action.text?.trim()
+        : null;
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
         queryParameters: {
-          'return': returnRoute,
-          if (draft?.trim() case final value? when value.isNotEmpty)
-            'draft': value,
+          'type': thread.productionChatType,
+          if (draft != null && draft.isNotEmpty) 'draft': draft,
+          'return': _productionChatReturnRoute(
+            threadChoice: thread.resolvedFilterId,
+          ),
         },
       ).toString(),
     );
+  }
+
+  String _productionChatReturnRoute({String? threadChoice}) {
+    final world = screen04World(_world);
+    final choice =
+        threadChoice != null &&
+            world.choices.any((candidate) => candidate.id == threadChoice)
+        ? threadChoice
+        : _choiceByWorld[_world] ?? world.choices.first.id;
+    final returnPath = switch (world.id) {
+      'eat' => '/app/eat',
+      'ride' => '/app/ride',
+      'book' => '/app/book',
+      'work' => '/app/work',
+      _ => '/app/social',
+    };
+    final returnQuery = <String, String>{
+      'sub': choice,
+      if (world.id == 'social' && _activeVideo != null) ...{
+        'state': 'video-watch',
+        'item': _activeVideo!.id,
+      },
+    };
+    return Uri(path: returnPath, queryParameters: returnQuery).toString();
   }
 
   void _openUniversalNotifications() {
