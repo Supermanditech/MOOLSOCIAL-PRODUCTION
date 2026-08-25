@@ -137,6 +137,7 @@ class JourneySession extends ChangeNotifier {
   bool _authenticationCompletionInProgress = false;
   bool _socialAuthCleanupRequired = false;
   bool _principalBindingCleanupRequired = false;
+  bool _unsafePrincipalResetRequired = false;
   String? _pendingEmailLink;
   String? _completedEmailLinkReturnRoute;
   String? _completedSocialAuthReturnRoute;
@@ -231,9 +232,13 @@ class JourneySession extends ChangeNotifier {
       }
       _storeRestored = true;
 
-      final signedIn =
+      var signedIn =
           await _otpGateway.hasAuthenticatedUser() ||
           await _socialAuthGateway.hasAuthenticatedUser();
+      if (signedIn && _principalBindingCleanupRequired) {
+        await _resetUnsafePrincipalBinding();
+        signedIn = false;
+      }
       if (!signedIn) await _clearReceiptForSignedOutEntry();
       _isAuthenticated = signedIn;
       final pendingAuthenticationUri = _localAppUri(returnTo);
@@ -1859,16 +1864,22 @@ class JourneySession extends ChangeNotifier {
     _isAuthenticated = false;
     accountIdentity = null;
     _principalBindingCleanupRequired = cleanupFailure != null;
+    _unsafePrincipalResetRequired = cleanupFailure != null;
     if (cleanupFailure != null) {
       throw const JourneyServiceException(
         'Unsafe account verification could not be reset safely.',
         code: 'auth-binding-reset-failed',
       );
     }
+    _unsafePrincipalResetRequired = false;
     stage = JourneyStage.signIn;
   }
 
   Future<void> _clearReceiptForSignedOutEntry() async {
+    if (_unsafePrincipalResetRequired) {
+      await _resetUnsafePrincipalBinding();
+      return;
+    }
     try {
       await _verifiedPrincipalBindingStore.clear();
       _principalBindingCleanupRequired = false;

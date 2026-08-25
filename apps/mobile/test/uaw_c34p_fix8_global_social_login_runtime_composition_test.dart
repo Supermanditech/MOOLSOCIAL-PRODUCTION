@@ -386,6 +386,106 @@ void main() {
       expect(invalidationCount, 1);
       expect(values, isEmpty);
     });
+
+    test(
+      'corrupt install secret resets local session before fresh sign-in',
+      () async {
+        final values = <String, String?>{};
+        SecureVerifiedPrincipalBindingStore createStore() =>
+            SecureVerifiedPrincipalBindingStore.forTesting(
+              readValue: ({required key}) async => values[key],
+              writeValue: ({required key, required value}) async {
+                values[key] = value;
+              },
+              deleteValue: ({required key}) async {
+                values.remove(key);
+              },
+              createSecret: () => List<int>.filled(32, 6),
+            );
+
+        final seedStore = createStore();
+        final binding = await seedStore.protect('private-user');
+        await seedStore.write(binding);
+        values[values.keys.singleWhere((key) => key.contains('secret'))] =
+            'not-valid-base64';
+
+        var invalidationCount = 0;
+        final runtimeStore = createStore();
+        final session = JourneySession(
+          store: completedSetupStore(),
+          socialAuthGateway: ReviewSocialAuthGateway(signedIn: true),
+          accountBootstrapGateway:
+              FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+                currentUserId: () async => 'private-user',
+                verifiedUserId: () async => 'private-user',
+                bindingProtector: runtimeStore,
+                invalidateLocalSession: () async {
+                  invalidationCount += 1;
+                },
+              ),
+          verifiedPrincipalBindingStore: runtimeStore,
+        );
+        addTearDown(session.dispose);
+
+        await session.start();
+
+        expect(session.stage, JourneyStage.signIn);
+        expect(session.isAuthenticated, isFalse);
+        expect(invalidationCount, 1);
+        expect(values, isEmpty);
+      },
+    );
+
+    test(
+      'unsafe reset attempts both deletes and reports any failure',
+      () async {
+        final values = <String, String?>{};
+        final deleted = <String>[];
+        final seedStore = SecureVerifiedPrincipalBindingStore.forTesting(
+          readValue: ({required key}) async => values[key],
+          writeValue: ({required key, required value}) async {
+            values[key] = value;
+          },
+          deleteValue: ({required key}) async {
+            values.remove(key);
+          },
+          createSecret: () => List<int>.filled(32, 4),
+        );
+        await seedStore.write(await seedStore.protect('private-user'));
+        final runtimeStore = SecureVerifiedPrincipalBindingStore.forTesting(
+          readValue: ({required key}) async => values[key],
+          writeValue: ({required key, required value}) async {
+            values[key] = value;
+          },
+          deleteValue: ({required key}) async {
+            deleted.add(key);
+            if (key.contains('secret')) {
+              throw StateError('private delete failure');
+            }
+            values.remove(key);
+          },
+          createSecret: () => List<int>.filled(32, 4),
+        );
+
+        await expectLater(
+          runtimeStore.resetUnsafeState(),
+          throwsA(
+            isA<JourneyServiceException>().having(
+              (error) => error.code,
+              'code',
+              'auth-binding-reset-failed',
+            ),
+          ),
+        );
+
+        expect(deleted.length, 2);
+        expect(
+          deleted.any((key) => key.contains('verified_principal')),
+          isTrue,
+        );
+        expect(deleted.any((key) => key.contains('secret')), isTrue);
+      },
+    );
   });
 
   group('typed Firebase principal revalidation', () {
@@ -429,6 +529,45 @@ void main() {
       expect(result.currentBinding, isNotNull);
       expect(result.toString(), isNot(contains('private-user')));
       expect(result.toString(), isNot(contains('private network detail')));
+    });
+
+    for (final code in const [
+      'web-network-request-failed',
+      'too-many-requests',
+    ]) {
+      test('$code is retryable only with a local binding', () async {
+        final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+          currentUserId: () async => 'private-user',
+          verifiedUserId: () async =>
+              throw FirebaseAuthException(code: code, message: 'private'),
+        );
+
+        final result = await gateway.prepareAuthenticatedAccount();
+
+        expect(
+          result.state,
+          AuthenticatedAccountBootstrapState.retryableUnavailable,
+        );
+        expect(result.currentBinding, isNotNull);
+      });
+    }
+
+    test('missing local principal is invalid before network work', () async {
+      var revalidationCount = 0;
+      final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+        currentUserId: () async => null,
+        verifiedUserId: () async {
+          revalidationCount += 1;
+          return 'private-user';
+        },
+      );
+
+      final result = await gateway.prepareAuthenticatedAccount();
+
+      expect(result.state, AuthenticatedAccountBootstrapState.invalidSession);
+      expect(result.code, 'auth-session-missing');
+      expect(result.currentBinding, isNull);
+      expect(revalidationCount, 0);
     });
 
     for (final code in const [
@@ -510,6 +649,34 @@ void main() {
       );
       expect(upsertCount, 0);
     });
+
+    for (final principalState in const [
+      AuthenticatedAccountBootstrapState.invalidSession,
+      AuthenticatedAccountBootstrapState.fatal,
+    ]) {
+      test(
+        '${principalState.name} principal result prevents account upsert',
+        () async {
+          var upsertCount = 0;
+          final principalResult =
+              principalState ==
+                  AuthenticatedAccountBootstrapState.invalidSession
+              ? const AuthenticatedAccountBootstrapResult.invalidSession()
+              : const AuthenticatedAccountBootstrapResult.fatal();
+          final gateway = DataConnectAccountBootstrapGateway.forTesting(
+            ReviewAccountBootstrapGateway(result: principalResult),
+            () async {
+              upsertCount += 1;
+            },
+          );
+
+          final result = await gateway.prepareAuthenticatedAccount();
+
+          expect(result.state, principalState);
+          expect(upsertCount, 0);
+        },
+      );
+    }
 
     test(
       'verified principal and account upsert retain exact binding',

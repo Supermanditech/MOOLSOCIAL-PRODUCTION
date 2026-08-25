@@ -144,7 +144,7 @@ class ReviewSocialAuthGateway implements SocialAuthGateway {
   final Map<SocialAuthProvider, SocialAuthResult> results;
   final Map<SocialAuthProvider, Object> failures;
   final Duration responseDelay;
-  final Object? signOutFailure;
+  Object? signOutFailure;
   bool signedIn;
   int signInCount = 0;
   int signOutCount = 0;
@@ -730,6 +730,7 @@ class ReviewAuthenticatedAccountIdentityGateway
 class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
   ReviewAccountBootstrapGateway({
     this.failure,
+    this.invalidationFailure,
     AuthenticatedAccountBootstrapResult? result,
     VerifiedPrincipalBinding? currentBinding,
   }) : result =
@@ -743,6 +744,7 @@ class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
       );
 
   Object? failure;
+  Object? invalidationFailure;
   AuthenticatedAccountBootstrapResult result;
   VerifiedPrincipalBinding? currentBinding;
   int prepareCount = 0;
@@ -769,6 +771,7 @@ class ReviewAccountBootstrapGateway implements AccountBootstrapGateway {
   @override
   Future<void> invalidateLocalSession() async {
     invalidationCount += 1;
+    if (invalidationFailure case final failure?) throw failure;
     currentBinding = null;
   }
 }
