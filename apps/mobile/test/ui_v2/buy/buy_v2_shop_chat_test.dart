@@ -873,6 +873,44 @@ void main() {
     },
   );
 
+  testWidgets('conversation picker exposes every same-type target', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
+    await tester.pumpAndSettle();
+
+    final picker = find.byType(Scrollable).last;
+    final details = find.byKey(
+      const ValueKey('buy-shop-chat-new-offer-details'),
+    );
+    await tester.scrollUntilVisible(details, 120, scrollable: picker);
+    expect(details, findsOneWidget);
+    final checkout = find.byKey(
+      const ValueKey('buy-shop-chat-new-offer-checkout'),
+    );
+    await tester.scrollUntilVisible(checkout, 120, scrollable: picker);
+    expect(checkout, findsOneWidget);
+    expect(tester.getSize(checkout).height, greaterThanOrEqualTo(64));
+
+    await tester.tap(checkout);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat-thread')), findsOneWidget);
+    expect(find.text('Offer and checkout help'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('rejected send keeps the draft and gives a truthful recovery', (
     tester,
   ) async {

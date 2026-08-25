@@ -1572,12 +1572,6 @@ class _ShopChatNewConversationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final starters = <BuyV2ShopChatThread>[];
-    final includedGroups = <String>{};
-    for (final entry in entries) {
-      final groupId = entry.filterId ?? entry.participantKind.name;
-      if (includedGroups.add(groupId)) starters.add(entry);
-    }
     return ColoredBox(
       key: const ValueKey('buy-shop-chat-new-surface'),
       color: const Color(0xFFF8F8FC),
@@ -1676,17 +1670,17 @@ class _ShopChatNewConversationView extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: starters.isEmpty
+            child: entries.isEmpty
                 ? _ShopChatNewConversationEmptyState(
                     familyLabel: presentation.familyLabel,
                     onOpenAll: onOpenAll,
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-                    itemCount: starters.length,
+                    itemCount: entries.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 7),
                     itemBuilder: (context, index) {
-                      final entry = starters[index];
+                      final entry = entries[index];
                       return Material(
                         color: Colors.white,
                         shape: RoundedRectangleBorder(
