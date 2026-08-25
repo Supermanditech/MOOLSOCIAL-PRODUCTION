@@ -1867,81 +1867,16 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   }
 
   bool handleBack({required bool dismissComposerKeyboard}) {
-    if (_selectedMessage != null) {
-      setState(() {
-        _forwardHistory.add(
-          _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.messageActions,
-            message: _selectedMessage,
-          ),
-        );
-        _selectedMessage = null;
-      });
-      return true;
-    }
-    if (_threadMenuOpen) {
-      setState(() {
-        _forwardHistory.add(
-          const _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.conversationOptions,
-          ),
-        );
-        _threadMenuOpen = false;
-      });
-      return true;
-    }
-    if (_searchOpen) {
-      final query = _messageSearchController.text;
-      _messageSearchController.clear();
-      setState(() {
-        _forwardHistory.add(
-          _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.messageSearch,
-            messageQuery: query,
-          ),
-        );
-        _setSearchOpen(false);
-      });
-      return true;
-    }
-    if (_attachmentOpen) {
-      setState(() {
-        _forwardHistory.add(
-          const _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.attachmentChoices,
-          ),
-        );
-        _attachmentOpen = false;
-      });
-      return true;
-    }
-    if (_emojiOpen) {
-      setState(() {
-        _forwardHistory.add(
-          const _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.emojiChoices,
-          ),
-        );
-        _emojiOpen = false;
-      });
-      return true;
-    }
+    if (_selectedMessage != null) return _dismissMessageActions();
+    if (_threadMenuOpen) return _dismissConversationOptions();
+    if (_searchOpen) return _dismissMessageSearch();
+    if (_attachmentOpen) return _dismissAttachmentChoices();
+    if (_emojiOpen) return _dismissEmojiChoices();
     if (dismissComposerKeyboard && _composerFocusNode.hasFocus) {
       _composerFocusNode.unfocus();
       return true;
     }
-    if (_replyTarget != null) {
-      setState(() {
-        _forwardHistory.add(
-          _BuyV2ShopChatThreadHistoryEntry(
-            utility: _BuyV2ShopChatThreadUtility.reply,
-            message: _replyTarget,
-          ),
-        );
-        _setReplyTarget(null);
-      });
-      return true;
-    }
+    if (_replyTarget != null) return _dismissReply();
     return false;
   }
 
@@ -1982,7 +1917,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                 if (_selectedMessage case final selected?)
                   _ShopChatSelectionHeader(
                     familyLabel: widget.presentation.familyLabel,
-                    onClose: () => setState(() => _selectedMessage = null),
+                    onClose: _dismissMessageActions,
                     onReply: () {
                       setState(() {
                         _forwardHistory.clear();
@@ -2022,11 +1957,17 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                             BuyV2ShopChatActionKind.startVideoCall,
                           )
                         : null,
-                    onMore: () => setState(() {
-                      _forwardHistory.clear();
-                      _threadMenuOpen = !_threadMenuOpen;
-                      _attachmentOpen = false;
-                    }),
+                    onMore: () {
+                      if (_threadMenuOpen) {
+                        _dismissConversationOptions();
+                        return;
+                      }
+                      setState(() {
+                        _forwardHistory.clear();
+                        _threadMenuOpen = true;
+                        _attachmentOpen = false;
+                      });
+                    },
                   ),
                 ?navigationForward,
                 if (_threadMenuOpen)
@@ -2057,10 +1998,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                     threadTitle: widget.thread.title,
                     controller: _messageSearchController,
                     onChanged: (_) => setState(() {}),
-                    onClose: () {
-                      _messageSearchController.clear();
-                      setState(() => _setSearchOpen(false));
-                    },
+                    onClose: _dismissMessageSearch,
                   ),
                 Expanded(
                   child: Stack(
@@ -2174,20 +2112,22 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                       'Completing Chat action',
                   onChanged: (_) => setState(() {}),
                   onTapField: () {
-                    if (!_emojiOpen && !_attachmentOpen) return;
-                    setState(() {
-                      _forwardHistory.clear();
-                      _emojiOpen = false;
-                      _attachmentOpen = false;
-                    });
+                    if (_emojiOpen) {
+                      _dismissEmojiChoices();
+                      return;
+                    }
+                    if (_attachmentOpen) _dismissAttachmentChoices();
                   },
-                  onCancelReply: () => setState(() => _setReplyTarget(null)),
+                  onCancelReply: _dismissReply,
                   onToggleEmoji: () {
-                    final willOpen = !_emojiOpen;
-                    if (willOpen) FocusScope.of(context).unfocus();
+                    if (_emojiOpen) {
+                      _dismissEmojiChoices();
+                      return;
+                    }
+                    FocusScope.of(context).unfocus();
                     setState(() {
                       _forwardHistory.clear();
-                      _emojiOpen = willOpen;
+                      _emojiOpen = true;
                       _attachmentOpen = false;
                       _threadMenuOpen = false;
                     });
@@ -2202,11 +2142,14 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                   },
                   onAttachment: widget.thread.capabilities.canAttach
                       ? () {
-                          final willOpen = !_attachmentOpen;
-                          if (willOpen) FocusScope.of(context).unfocus();
+                          if (_attachmentOpen) {
+                            _dismissAttachmentChoices();
+                            return;
+                          }
+                          FocusScope.of(context).unfocus();
                           setState(() {
                             _forwardHistory.clear();
-                            _attachmentOpen = willOpen;
+                            _attachmentOpen = true;
                             _threadMenuOpen = false;
                             _emojiOpen = false;
                           });
@@ -2353,6 +2296,91 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
 
   void _retainMessageSearch() {
     widget.retainedState.messageQuery = _messageSearchController.text;
+  }
+
+  bool _dismissMessageActions() {
+    final selectedMessage = _selectedMessage;
+    if (selectedMessage == null) return false;
+    setState(() {
+      _forwardHistory.add(
+        _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.messageActions,
+          message: selectedMessage,
+        ),
+      );
+      _selectedMessage = null;
+    });
+    return true;
+  }
+
+  bool _dismissConversationOptions() {
+    if (!_threadMenuOpen) return false;
+    setState(() {
+      _forwardHistory.add(
+        const _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.conversationOptions,
+        ),
+      );
+      _threadMenuOpen = false;
+    });
+    return true;
+  }
+
+  bool _dismissMessageSearch() {
+    if (!_searchOpen) return false;
+    final query = _messageSearchController.text;
+    _messageSearchController.clear();
+    setState(() {
+      _forwardHistory.add(
+        _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.messageSearch,
+          messageQuery: query,
+        ),
+      );
+      _setSearchOpen(false);
+    });
+    return true;
+  }
+
+  bool _dismissAttachmentChoices() {
+    if (!_attachmentOpen) return false;
+    setState(() {
+      _forwardHistory.add(
+        const _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.attachmentChoices,
+        ),
+      );
+      _attachmentOpen = false;
+    });
+    return true;
+  }
+
+  bool _dismissEmojiChoices() {
+    if (!_emojiOpen) return false;
+    setState(() {
+      _forwardHistory.add(
+        const _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.emojiChoices,
+        ),
+      );
+      _emojiOpen = false;
+    });
+    return true;
+  }
+
+  bool _dismissReply() {
+    final replyTarget = _replyTarget;
+    if (replyTarget == null) return false;
+    setState(() {
+      _forwardHistory.add(
+        _BuyV2ShopChatThreadHistoryEntry(
+          utility: _BuyV2ShopChatThreadUtility.reply,
+          message: replyTarget,
+        ),
+      );
+      _setReplyTarget(null);
+    });
+    return true;
   }
 
   void _showForwardHistory() {

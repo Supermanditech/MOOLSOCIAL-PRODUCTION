@@ -2035,6 +2035,145 @@ void main() {
     },
   );
 
+  testWidgets(
+    'visible dismiss controls preserve the same Forward thread history',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        app(session, shopChatSource: const _RichShopChatSource()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to conversation options'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread-menu')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+        'basket',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to message search'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-shop-chat-message-search-field')),
+            )
+            .controller!
+            .text,
+        'basket',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-message-search-close')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to sharing options'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-attachment-tray')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to emoji choices'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-emoji-tray')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-emoji')));
+      await tester.pumpAndSettle();
+
+      final message = find.byKey(
+        const ValueKey('buy-shop-chat-message-received-text'),
+      );
+      await tester.ensureVisible(message);
+      await tester.longPress(message);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-selection-close')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to message actions'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-actions')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-reply')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Cancel reply'));
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to message reply'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('message timeline retains scroll through Chat Info return', (
     tester,
   ) async {
