@@ -42,3 +42,12 @@ automatic-tree/marker/ownership pre-commit gate. Handoff remained fail-closed
 before push when all-parent history selected Cursor's second-parent commits;
 REG-20260826-3743 requires first-parent bootstrap and subject inventories before
 this candidate can be remotely qualified.
+
+The first-parent correction is committed at
+`1773c0478fd254697d7f6782071d86cc30530770`. The focused real-graph fixture and
+full repair handoff both pass. Independent product audit and independent gate
+audit are GO with zero remaining semantic or fail-open gap. This closes the
+repair ticket for the current source round; the evidence-only closure commit and
+exact remote readback do not authorize an APK, deployment or promotion. Fresh
+integration remains a separate fail-closed ticket and final APK/OPPO evidence
+may reopen the causal repair ticket.
