@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
+    "currentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,65 +1672,59 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
-      "customerOutcome": "A Personal user can request an email sign-in link, open the same-device Android return privately, obtain Firebase credential acceptance and enter a persistent authenticated MoolSocial session without regressing the accepted Google path.",
-      "manifestPath": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
-      "manifestSha256": "9286F0DADB04D669B03921524CF4AB762B59B4AF6BF86305344B033F1979DC3A",
+      "ticketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
+      "customerOutcome": "Every launch-critical Social, authentication, Chat, Feed, Create, provider, cache, deployment and OPPO result has one sanitized atomic machine-state ticket so fixes are selected and verified without losing a micro-scope or exposing private account data.",
+      "manifestPath": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
+      "manifestSha256": "07295DADA54A067071B3164DCDA44C9958FD0326A3DF699D657AFA3182071C8F",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/main.dart",
-        "apps/mobile/lib/core/config/email_link_runtime_configuration.dart",
-        "apps/mobile/lib/features/journey01/journey_services.dart",
-        "apps/mobile/lib/features/journey01/journey_session.dart",
-        "apps/mobile/lib/features/journey01/review_journey_services.dart",
-        "apps/mobile/android/app/src/main/AndroidManifest.xml",
-        "apps/mobile/test/uaw_c33j_fix1_foreground_email_link_return_handoff_test.dart",
-        "apps/mobile/test/uaw_c33j_fix2_android_email_link_same_device_exact_return_test.dart",
-        "apps/mobile/test/uaw_c33j_screen03_passwordless_email_link_native_parity_test.dart",
-        "apps/mobile/test/uaw_c33m_fix4_public_review_fresh_process_auth_return_persistence_test.dart",
-        "apps/mobile/test/uaw_c33m_fix5_public_review_firebase_passwordless_email_gateway_test.dart",
-        "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The current email-link runtime, Firebase gateway, same-device Android return and session owners already exist. Inspecting and correcting only the exact claimed owners is the smallest complete production repair and creates no new screen, route, backend or parallel authentication path.",
+      "necessityProof": "Existing product, provider, session, cache, test and device owners are reused. One separate sanitized manifest plus exact continuation bindings is the smallest complete coordination layer and creates no customer screen, route, backend or parallel runtime implementation.",
       "robustnessCoverage": [
-        "email_link_request_contract_without_live_send",
-        "same_device_Android_deep_link_return",
-        "fresh_process_return_persistence",
-        "Firebase_email_link_credential_acceptance_contract",
-        "authenticated_session_creation_and_MoolSocial_state_transition",
-        "retry_and_invalid_or_foreign_link_fail_closed_behavior",
-        "sanitized_telemetry_without_email_link_token_UID_API_key_or_secret",
-        "accepted_Google_r60_87_path_preserved"
+        "all_runtime_micro_scopes_have_unique_machine_ticket_ids",
+        "owner_state_evidence_blocker_and_dependency_present_per_ticket",
+        "Cursor_and_Codex_continuations_remain_disjoint",
+        "safe_OPPO_investigation_precedes_product_implementation",
+        "private_provider_account_and_credential_values_remain_unemitted",
+        "one_Codex_child_selected_and_committed_at_a_time",
+        "reviewed_Cursor_integration_required_before_successor_APK",
+        "final_integrated_regression_and_OPPO_retest_required"
       ],
       "adjustments": [
-        "select_email_link_as_the_only_active_authentication_ticket",
-        "reuse_existing_runtime_gateway_session_and_Android_return_owners",
-        "implement_only_a_proven_local_defect_with_focused_negative_and_session_tests",
-        "hold_build_device_external_configuration_and_live_email_until_separate_authority"
+        "bind_Codex_after_exact_5f80789_continuation_base",
+        "bind_Cursor_after_exact_817ed21_continuation_base",
+        "register_143_sanitized_atomic_runtime_tickets",
+        "hold_product_mutation_until_safe_OPPO_differential_completes",
+        "hold_successor_APK_until_reviewed_Cursor_integration"
       ],
       "explicitExclusions": [
-        "no_Facebook_Instagram_X_YouTube_Connect_or_Google_authentication_change",
-        "no_new_screen_route_backend_or_unrelated_UI_change",
-        "no_real_email_private_login_external_configuration_or_production_project_mutation",
-        "no_APK_AAB_Play_device_install_uninstall_or_data_clear",
-        "no_email_address_link_token_credential_UID_API_key_secret_or_private_payload_output"
+        "no_product_UI_runtime_backend_or_provider_implementation_in_the_bootstrap",
+        "no_Cursor_product_source_mutation_by_Codex",
+        "no_APK_AAB_Play_install_uninstall_downgrade_or_data_clear",
+        "no_cloud_provider_console_billing_email_SMS_or_external_service_write",
+        "no_credential_OTP_token_cookie_account_identity_or_private_screenshot_emission"
       ],
       "dependenciesAndApprovals": [
-        "founder_parallel_lane_and_email_link_queue_authorization_2026_08_23",
-        "clean_v10_work_start_and_non_overlapping_12_owner_claim",
-        "current_email_link_ticket_manifest_and_hash",
-        "focused_local_tests_and_no_build_preflight_before_any_later_build_request",
-        "founder_only_private_address_link_open_and_real_device_acceptance"
+        "founder_AUTHORIZE_RUNTIME_CONTINUATION_BINDING_5F80789_2026_08_25",
+        "founder_Cursor_separate_and_integrate_before_next_APK_direction_2026_08_25",
+        "clean_exact_Codex_and_Cursor_continuation_heads",
+        "sanitized_runtime_manifest_and_coordination_gate",
+        "later_exact_child_selection_before_product_implementation"
       ],
-      "timelineImpactDays": 2,
+      "timelineImpactDays": 1,
       "within60To75DayLock": true,
-      "implementationState": "email_link_ticket_selected_runtime_and_focused_test_writes_authorized_real_email_private_login_external_configuration_build_device_Play_and_AAB_held",
-      "evidencePath": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+      "implementationState": "runtime_continuation_parent_selected_coordination_manifest_and_safe_investigation_authorized_product_build_install_external_and_Cursor_mutation_held",
+      "evidencePath": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5050,44 +5044,41 @@
     ]
   },
   "ticket": {
-    "id": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
+    "id": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
     "parentTicketId": "UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR",
-    "customerOutcome": "A Personal user can request an email sign-in link, open the same-device Android return privately, obtain Firebase credential acceptance and enter a persistent authenticated MoolSocial session without regressing the accepted Google path.",
-    "classification": "mvp_required",
-    "classificationReason": "Passwordless email-link authentication is a planned launch identity path. Its existing runtime and return owners require production-grade verification and only evidenced repairs before provider acceptance.",
+    "customerOutcome": "Every launch-critical Social, authentication, Chat, Feed, Create, provider, cache, deployment and OPPO result has one sanitized atomic machine-state ticket so fixes are selected and verified without losing a micro-scope or exposing private account data.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Sanitized atomic runtime truth, isolated owner bindings and safe device sequencing directly protect launch readiness without adding a customer-facing feature.",
     "minimumCompleteScope": [
-      "trace_existing_email_link_request_runtime_and_same_device_Android_return",
-      "verify_Firebase_email_link_credential_acceptance_and_authenticated_session_transition",
-      "identify_a_proven_local_defect_or_exact_external_blocker_before_functional_change",
-      "implement_only_the_proven_cause_inside_the_12_claimed_owners",
-      "add_focused_invalid_foreign_retry_fresh_process_and_session_tests",
-      "pass_local_no_build_email_link_preflight_before_any_later_APK_authority",
-      "obtain_founder_private_real_link_and_OPPO_acceptance_only_after_separate_authority"
+      "bind_exact_clean_Codex_5f80789_continuation_without_reassigning_earlier_history",
+      "bind_exact_clean_Cursor_817ed21_continuation_as_an_independent_UI_lane",
+      "register_every_runtime_micro_scope_in_one_separate_sanitized_manifest",
+      "exhaust_safe_non_mutating_OPPO_differential_before_product_implementation",
+      "select_and_implement_one_exact_Codex_owned_child_at_a_time",
+      "integrate_only_a_reviewed_exact_Cursor_commit_before_the_next_APK",
+      "rerun_final_integrated_regression_and_OPPO_acceptance_before_release"
     ],
     "explicitExclusions": [
-      "no_Facebook_Instagram_X_YouTube_Connect_or_Google_authentication_change",
-      "no_new_screen_route_backend_or_unrelated_UI_change",
-      "no_real_email_private_login_external_configuration_or_production_project_mutation",
-      "no_APK_AAB_Play_device_install_uninstall_or_data_clear",
-      "no_email_address_link_token_credential_UID_API_key_secret_or_private_payload_output",
-      "no_end_to_end_acceptance_claim_from_local_or_mock_tests"
+      "no_product_UI_runtime_backend_or_provider_implementation_in_the_bootstrap",
+      "no_Cursor_product_source_mutation_by_Codex",
+      "no_new_repository_worktree_branch_tag_AAB_Play_or_promotion",
+      "no_APK_install_uninstall_downgrade_or_data_clear",
+      "no_cloud_provider_console_billing_email_SMS_or_external_service_write",
+      "no_credential_OTP_token_cookie_account_identity_or_private_screenshot_emission"
     ],
     "dependenciesAndApprovals": [
-      "founder_parallel_lane_and_email_link_queue_authorization_2026_08_23",
-      "clean_v10_work_start_and_non_overlapping_12_owner_claim",
-      "current_email_link_ticket_manifest_and_hash",
-      "focused_local_tests_and_no_build_preflight_before_any_later_build_request",
-      "founder_only_private_address_link_open_and_real_device_acceptance"
+      "founder_AUTHORIZE_RUNTIME_CONTINUATION_BINDING_5F80789_2026_08_25",
+      "founder_Cursor_separate_and_integrate_before_next_APK_direction_2026_08_25",
+      "clean_exact_Codex_and_Cursor_continuation_heads",
+      "sanitized_runtime_manifest_and_coordination_gate",
+      "later_exact_child_selection_before_product_implementation"
     ],
     "testAndEvidencePlan": [
-      "email_link_request_runtime_contract_without_live_send",
-      "same_device_and_foreground_Android_return_handoff",
-      "fresh_process_return_persistence",
-      "Firebase_passwordless_email_gateway_positive_and_negative_contracts",
-      "authenticated_session_creation_persistence_and_MoolSocial_state_transition",
-      "sanitized_invalid_foreign_expired_retry_and_configuration_failures",
-      "focused_no_build_regression_and_preflight",
-      "founder_private_OPPO_end_to_end_acceptance_after_separate_authority"
+      "runtime_manifest_schema_unique_ID_required_field_layer_and_redaction_checks",
+      "Codex_and_Cursor_continuation_bootstrap_positive_and_negative_gate_cases",
+      "safe_OPPO_candidate_geometry_route_lifecycle_cache_and_draft_differential",
+      "one_exact_focused_test_set_per_later_selected_child",
+      "final_integrated_full_regression_and_sanitized_OPPO_acceptance"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5347,23 +5338,23 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md"
+    "evidence": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md"
   },
   "authorization": {
     "state": "founder_acknowledged_mvp_scope",
-    "evidence": "docs/quality/UAW-CODEX-EMAIL-LINK-AUTH-20260823.md",
+    "evidence": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "email_link_runtime_and_focused_test_implementation_authorized_real_email_private_login_external_configuration_build_device_Play_and_AAB_held_2026_08_23"
+    "founderAcceptance": "exact_5f80789_runtime_continuation_binding_sanitized_manifest_safe_OPPO_investigation_and_one_at_a_time_later_child_execution_authorized_Cursor_independent_and_integration_required_before_next_APK_2026_08_25"
   },
   "execution": {
     "referenceWriteAuthorized": false,
-    "runtimeWriteAuthorized": true,
+    "runtimeWriteAuthorized": false,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "email_link_build_not_authorized_until_proven_fix_focused_preflight_and_separate_founder_authority",
-    "deviceInstallAuthorizationScope": "email_link_device_install_not_authorized_until_independent_artifact_qualification_and_separate_founder_authority_no_uninstall_or_data_clear",
+    "buildAuthorizationScope": "successor_APK_not_authorized_until_selected_Codex_children_reviewed_Cursor_integration_and_final_integrated_regression_complete",
+    "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_or_data_clear_in_runtime_continuation_investigation",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,
     "playUploadAuthorized": false,
@@ -5390,20 +5381,20 @@
     "founderAcceptancePending": true
   },
   "providerGate": {
-    "nextTicket": "UAW-CODEX-EMAIL-LINK-AUTH-20260823",
-    "state": "email_link_runtime_and_focused_test_ticket_active_real_email_private_login_external_configuration_build_device_Play_AAB_and_other_provider_work_held",
+    "nextTicket": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
+    "state": "runtime_continuation_safe_investigation_active_all_private_provider_external_build_install_Play_and_successor_APK_actions_held",
     "readOnlyAudit": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-provider-read-audit-20260811-01/deployment-metadata.json",
     "deployedPrivateUpload": false,
     "acceptedPublicDataReviewRevisions": {
       "youtubeProvider": "youtubeprovider-00038-cic",
       "youtubeOAuthCallback": "youtubeoauthcallback-00035-cir"
     },
-    "existingProtectedClientLaunchAndTapAuthorized": false,
-    "existingProtectedClientIdentity": "1.0.0-r60.49+2026081349_Play_installed_acceptance_failed_google_auth_guest_feed_social_identity_and_create_report",
+    "existingProtectedClientLaunchAndTapAuthorized": true,
+    "existingProtectedClientIdentity": "r60.91_versionCode_2026082591_package_com.moolsocial.app_source_6d4d743_in_place_session_preserved_safe_investigation_only",
     "externalServiceWriteAuthorized": false,
     "secretValueAccessAuthorized": false,
     "apkBuildOrInstallAuthorized": false,
-    "apkBuildOrInstallScope": "email_link_APK_build_and_install_not_authorized_until_proven_fix_green_preflight_and_separate_founder_authority",
+    "apkBuildOrInstallScope": "no_successor_APK_until_selected_Codex_children_reviewed_Cursor_integration_final_integrated_regression_and_separate_candidate_authority",
     "successorR60_78InPlaceInstallAuthorized": true,
     "successorR60_78InstallAuthorizationConsumed": true,
     "successorR60_79InPlaceInstallAuthorized": true,
