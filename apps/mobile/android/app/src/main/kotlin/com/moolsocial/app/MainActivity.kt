@@ -4,8 +4,13 @@
 package com.moolsocial.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
@@ -20,16 +25,22 @@ import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
     private val areaChannel = "com.moolsocial.app/current_area"
+    private val invoiceChannel = "com.moolsocial.app/invoice"
+    private val createInvoiceRequestCode = 6108
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_BEGIN
     // Google identity state is owned by the registered google_sign_in plugin.
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_END
     private val geocodingExecutor = Executors.newSingleThreadExecutor()
+    private val invoiceExecutor = Executors.newSingleThreadExecutor()
+    private var pendingInvoiceResult: MethodChannel.Result? = null
+    private var pendingInvoiceBytes: ByteArray? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -46,9 +57,177 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            invoiceChannel,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "saveInvoice" -> saveInvoice(call.arguments, result)
+                else -> result.notImplemented()
+            }
+        }
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_REGISTRATION_BEGIN
         // GeneratedPluginRegistrant registers the official Google identity plugin.
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_REGISTRATION_END
+    }
+
+    @Suppress("DEPRECATION")
+    private fun saveInvoice(arguments: Any?, result: MethodChannel.Result) {
+        if (pendingInvoiceResult != null) {
+            result.error("invoice_busy", "Another invoice save is active.", null)
+            return
+        }
+        val values = arguments as? Map<*, *>
+        if (values == null || values.keys != setOf("fileName", "lines")) {
+            result.error("invalid_invoice", "Invoice data is invalid.", null)
+            return
+        }
+        val fileName = values["fileName"] as? String
+        val rawLines = values["lines"] as? List<*>
+        val lines = rawLines?.mapNotNull { it as? String }
+        if (
+            fileName == null ||
+            !Regex("^[A-Za-z0-9._-]{1,120}\\.pdf$", RegexOption.IGNORE_CASE)
+                .matches(fileName) ||
+            rawLines == null ||
+            lines == null ||
+            lines.size != rawLines.size ||
+            lines.isEmpty() ||
+            lines.size > 200 ||
+            lines.any { line ->
+                line.length > 500 || line.any { character ->
+                    character.code < 0x20 && character != '\t'
+                }
+            }
+        ) {
+            result.error("invalid_invoice", "Invoice data is invalid.", null)
+            return
+        }
+
+        val bytes = try {
+            renderInvoicePdf(lines)
+        } catch (_: Exception) {
+            result.error(
+                "invoice_generation_failed",
+                "The invoice could not be prepared.",
+                null,
+            )
+            return
+        }
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_TITLE, fileName)
+        }
+        pendingInvoiceResult = result
+        pendingInvoiceBytes = bytes
+        try {
+            startActivityForResult(intent, createInvoiceRequestCode)
+        } catch (_: Exception) {
+            pendingInvoiceResult = null
+            pendingInvoiceBytes = null
+            result.success("unavailable")
+        }
+    }
+
+    private fun renderInvoicePdf(lines: List<String>): ByteArray {
+        val document = PdfDocument()
+        return try {
+            val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                textSize = 10.5f
+                typeface = Typeface.create("sans", Typeface.NORMAL)
+            }
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(16, 8, 95)
+                textSize = 16f
+                typeface = Typeface.create("sans", Typeface.BOLD)
+            }
+            val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.DKGRAY
+                textSize = 8f
+                typeface = Typeface.create("sans", Typeface.NORMAL)
+            }
+            val renderedLines = lines.flatMap { line ->
+                wrapInvoiceLine(line, bodyPaint, 507f)
+            }
+            val pages = renderedLines.chunked(50).ifEmpty { listOf(listOf("")) }
+            pages.forEachIndexed { index, pageLines ->
+                val page = document.startPage(
+                    PdfDocument.PageInfo.Builder(595, 842, index + 1).create(),
+                )
+                val canvas = page.canvas
+                canvas.drawText("MoolSocial", 44f, 38f, titlePaint)
+                var y = 64f
+                for (line in pageLines) {
+                    if (line.isNotEmpty()) canvas.drawText(line, 44f, y, bodyPaint)
+                    y += 14f
+                }
+                canvas.drawText(
+                    "Page ${index + 1} of ${pages.size}",
+                    44f,
+                    815f,
+                    footerPaint,
+                )
+                document.finishPage(page)
+            }
+            ByteArrayOutputStream().use { output ->
+                document.writeTo(output)
+                output.toByteArray()
+            }
+        } finally {
+            document.close()
+        }
+    }
+
+    private fun wrapInvoiceLine(
+        value: String,
+        paint: Paint,
+        maximumWidth: Float,
+    ): List<String> {
+        if (value.isEmpty()) return listOf("")
+        val output = mutableListOf<String>()
+        var remaining = value
+        while (remaining.isNotEmpty()) {
+            var count = paint.breakText(remaining, true, maximumWidth, null)
+                .coerceAtLeast(1)
+            if (count < remaining.length) {
+                val whitespace = remaining.substring(0, count).lastIndexOf(' ')
+                if (whitespace > 0) count = whitespace
+            }
+            output.add(remaining.substring(0, count).trimEnd())
+            remaining = remaining.substring(count).trimStart()
+        }
+        return output
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != createInvoiceRequestCode) {
+            super.onActivityResult(requestCode, resultCode, data)
+            return
+        }
+        val result = pendingInvoiceResult
+        val bytes = pendingInvoiceBytes
+        pendingInvoiceResult = null
+        pendingInvoiceBytes = null
+        if (result == null || bytes == null) return
+        val destination = data?.data
+        if (resultCode != Activity.RESULT_OK || destination == null) {
+            result.success("cancelled")
+            return
+        }
+
+        invoiceExecutor.execute {
+            val saved = try {
+                contentResolver.openOutputStream(destination, "w")?.use { output ->
+                    output.write(bytes)
+                    output.flush()
+                } != null
+            } catch (_: Exception) {
+                false
+            }
+            runOnUiThread { result.success(if (saved) "saved" else "failed") }
+        }
     }
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_CALLBACK_BEGIN
     // Credential Manager callbacks are owned by the official Flutter plugin.
@@ -178,6 +357,14 @@ class MainActivity : FlutterActivity() {
         // The Flutter engine disposes the official Google identity plugin.
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_DESTROY_END
         geocodingExecutor.shutdownNow()
+        invoiceExecutor.shutdownNow()
+        pendingInvoiceResult?.error(
+            "activity_destroyed",
+            "The invoice save was interrupted.",
+            null,
+        )
+        pendingInvoiceResult = null
+        pendingInvoiceBytes = null
         super.onDestroy()
     }
 }

@@ -547,8 +547,19 @@ void main() {
           };
           expect(order.id, startsWith(prefix));
           expect(order.productIds, group.productIds);
+          expect(
+            order.lines
+                .map((line) => (line.product.id, line.quantity, line.total))
+                .toList(),
+            group.lines
+                .map((line) => (line.product.id, line.quantity, line.total))
+                .toList(),
+          );
           expect(order.total, group.total);
           expect(order.partnerType, group.partnerType);
+          expect(order.paymentMethod, 'UPI');
+          expect(order.recipient, session.selectedAddress.recipient);
+          expect(order.addressLine, contains(session.selectedAddress.pinCode));
         }
       },
     );

@@ -16,7 +16,7 @@ param(
   [ValidateSet('baseline','cursor_ui','codex_auth','codex_backend','integration')]
   [string]$ProductionLane = 'baseline',
   [ValidateSet(
-    'baseline','governance_preflight','task_start','implementation','pre_commit','handoff',
+    'baseline','governance_preflight','coordination_bootstrap','task_start','implementation','pre_commit','handoff',
     'founder_acceptance','ticket_acceptance','ticket_close',
     'integration_start','integration_verify','integration_close',
     'candidate_preflight'
@@ -305,7 +305,7 @@ Assert-Coordination (
 $gitDiscipline = $policy.productionGitDiscipline
 Assert-ExactNames $gitDiscipline @(
   'state','productionCheckout','acceptedRuntimeBaseline','workStart',
-  'workspaceIsolation','cleanGitState','ticketClosure','agentTicketQueues',
+  'continuationBindings','workspaceIsolation','cleanGitState','ticketClosure','agentTicketQueues',
   'lanes','founderAcceptance','atomicCommits','integration','promotion'
 ) 'production Git discipline'
 Assert-Coordination (
@@ -336,6 +336,46 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.mustDescendFromAcceptedRuntimeBaseline -and
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
+$continuationBindings = @($gitDiscipline.continuationBindings)
+Assert-Coordination ($continuationBindings.Count -eq 2) `
+  'founder-authorized continuation binding inventory changed.'
+$continuationBindingIds = @()
+foreach ($continuationBinding in $continuationBindings) {
+  Assert-ExactNames $continuationBinding @(
+    'id','state','lane','role','task','workId','ticketId','worktreePath',
+    'branch','baselineHead','bootstrapCommitSubject','bootstrapOwners',
+    'cursorIndependent','integrationRequiredBeforeSuccessorApk'
+  ) 'founder-authorized continuation binding'
+  $continuationBranchPrefix = if (
+    [string]$continuationBinding.lane -ceq 'cursor_ui'
+  ) {
+    'work/cursor-ui/'
+  } else {
+    'work/codex-auth/'
+  }
+  Assert-Coordination (
+    [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
+    [string]$continuationBinding.state -ceq 'founder_authorized_2026_08_25' -and
+    [string]$continuationBinding.lane -cin @('cursor_ui','codex_auth') -and
+    [string]$continuationBinding.role -cin @('primary','subagent') -and
+    [string]$continuationBinding.task -cmatch '^/root/[a-z0-9_]+$' -and
+    [string]$continuationBinding.workId -cmatch '^[a-z0-9][a-z0-9-]{2,48}$' -and
+    [string]$continuationBinding.ticketId -cmatch '^[A-Z0-9][A-Z0-9-]{4,159}$' -and
+    [string]$continuationBinding.branch -ceq
+      ($continuationBranchPrefix + [string]$continuationBinding.workId) -and
+    [string]$continuationBinding.baselineHead -cmatch '^[0-9a-f]{40}$' -and
+    [string]$continuationBinding.bootstrapCommitSubject -cmatch
+      '^coordination\([a-z0-9][a-z0-9-]{2,48}\): .+' -and
+    @($continuationBinding.bootstrapOwners).Count -ge 2 -and
+    [bool]$continuationBinding.cursorIndependent -and
+    [bool]$continuationBinding.integrationRequiredBeforeSuccessorApk
+  ) 'founder-authorized continuation binding is invalid or weakened.'
+  $continuationBindingIds += [string]$continuationBinding.id
+}
+Assert-Coordination (
+  @($continuationBindingIds | Select-Object -Unique).Count -eq
+    $continuationBindingIds.Count
+) 'founder-authorized continuation binding ID is duplicated.'
 Assert-ExactNames $gitDiscipline.workspaceIsolation @(
   'parallelMutationInOneWorktreeAllowed','replacementRepositoryAllowed',
   'worktreesRequiredForParallelWork','workspaceParent','parentAgentsPath',
@@ -922,26 +962,63 @@ if ($ProductionLane -ceq 'baseline') {
   Assert-Coordination ($selectedLane.Count -eq 1) `
     'production lane has no exact machine contract.'
   $selectedLane = $selectedLane[0]
-  Assert-Coordination (
-    [string]$selectedLane.agentRole -ceq $AgentRole -and
-    $AgentTask.StartsWith(
-      [string]$selectedLane.taskPrefix,
-      [StringComparison]::Ordinal
-    )
-  ) 'agent role or task does not match the selected production lane.'
+  $selectedContinuationBindings = @($continuationBindings | Where-Object {
+    [string]$_.lane -ceq $ProductionLane -and
+    [string]$_.workId -ceq $ProductionWorkId -and
+    [string]$_.ticketId -ceq $ProductionTicketId
+  })
+  Assert-Coordination ($selectedContinuationBindings.Count -le 1) `
+    'production continuation binding is ambiguous.'
+  $hasContinuationBinding = $selectedContinuationBindings.Count -eq 1
+  $selectedContinuationBinding = if ($hasContinuationBinding) {
+    $selectedContinuationBindings[0]
+  } else {
+    $null
+  }
+  $isCoordinationBootstrap = $ProductionPhase -ceq 'coordination_bootstrap'
+  if ($isCoordinationBootstrap) {
+    Assert-Coordination (
+      $hasContinuationBinding -and
+      $AgentRole -ceq 'primary' -and
+      $AgentTask -ceq '/root'
+    ) 'continuation bootstrap requires the primary coordination owner.'
+  } else {
+    Assert-Coordination (
+      [string]$selectedLane.agentRole -ceq $AgentRole -and
+      $AgentTask.StartsWith(
+        [string]$selectedLane.taskPrefix,
+        [StringComparison]::Ordinal
+      )
+    ) 'agent role or task does not match the selected production lane.'
+    if ($hasContinuationBinding) {
+      Assert-Coordination (
+        [string]$selectedContinuationBinding.role -ceq $AgentRole -and
+        [string]$selectedContinuationBinding.task -ceq $AgentTask
+      ) 'agent identity does not match the founder-authorized continuation.'
+    }
+  }
 
   $workspaceParentForward = [string]$gitDiscipline.workspaceIsolation.workspaceParent
-  $expectedWorktreeForward = (
+  $defaultExpectedWorktreeForward = (
     $workspaceParentForward + '/' + [string]$selectedLane.worktreePrefix +
     $ProductionWorkId
   )
+  $expectedWorktreeForward = if ($hasContinuationBinding) {
+    [string]$selectedContinuationBinding.worktreePath
+  } else {
+    $defaultExpectedWorktreeForward
+  }
   $parentAgentsForward = [string]$gitDiscipline.workspaceIsolation.parentAgentsPath
   Assert-Coordination (
     $rootForward -ceq $expectedWorktreeForward -and
     $rootForward -cne $productionCheckoutForward -and
     (Test-Path -LiteralPath $parentAgentsForward -PathType Leaf)
   ) 'production feature worktree root or parent AGENTS owner is invalid.'
-  $expectedBranch = [string]$selectedLane.branchPrefix + $ProductionWorkId
+  $expectedBranch = if ($hasContinuationBinding) {
+    [string]$selectedContinuationBinding.branch
+  } else {
+    [string]$selectedLane.branchPrefix + $ProductionWorkId
+  }
   Assert-Coordination ($branch -ceq $expectedBranch) `
     'production feature branch does not match its lane and work ID.'
 
@@ -964,6 +1041,64 @@ if ($ProductionLane -ceq 'baseline') {
     'production governance work-start does not descend from r60.87.'
 
   $baseCommit = $workStartCommit
+  if ($hasContinuationBinding) {
+    $continuationBaseline = [string]$selectedContinuationBinding.baselineHead
+    $continuationBaselineType = @(& git -C $root cat-file -t `
+        $continuationBaseline 2>$null)
+    $continuationBaselineTypeExit = $LASTEXITCODE
+    Assert-Coordination (
+      $continuationBaselineTypeExit -eq 0 -and
+      $continuationBaselineType.Count -eq 1 -and
+      [string]$continuationBaselineType[0] -ceq 'commit'
+    ) 'production continuation baseline is unavailable.'
+    & git -C $root merge-base --is-ancestor $workStartCommit `
+      $continuationBaseline
+    Assert-Coordination ($LASTEXITCODE -eq 0) `
+      'production continuation baseline does not descend from the work-start tag.'
+    & git -C $root merge-base --is-ancestor $continuationBaseline $head
+    Assert-Coordination ($LASTEXITCODE -eq 0) `
+      'production lane HEAD does not descend from its continuation baseline.'
+    if ($isCoordinationBootstrap) {
+      Assert-Coordination ($head -ceq $continuationBaseline) `
+        'continuation bootstrap must run before its bootstrap commit.'
+      $baseCommit = $continuationBaseline
+    } else {
+      $continuationCommits = @(& git -C $root rev-list --reverse `
+          "$continuationBaseline..$head")
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $continuationCommits.Count -ge 1
+      ) 'production continuation bootstrap commit is missing.'
+      $bootstrapCommit = [string]$continuationCommits[0]
+      $bootstrapParents = @(& git -C $root rev-list --parents -n 1 `
+          $bootstrapCommit)
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $bootstrapParents.Count -eq 1 -and
+        [string]$bootstrapParents[0] -ceq
+          ($bootstrapCommit + ' ' + $continuationBaseline)
+      ) 'production continuation bootstrap has invalid parentage.'
+      $bootstrapSubject = @(& git -C $root show -s --format=%s `
+          $bootstrapCommit)
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $bootstrapSubject.Count -eq 1 -and
+        [string]$bootstrapSubject[0] -ceq
+          [string]$selectedContinuationBinding.bootstrapCommitSubject
+      ) 'production continuation bootstrap subject is invalid.'
+      $bootstrapChangedOwners = @(& git -C $root diff --name-only `
+          --diff-filter=ACMRTUXBD "$continuationBaseline..$bootstrapCommit")
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'production continuation bootstrap owner inventory failed.'
+      $expectedBootstrapOwners = @(
+        $selectedContinuationBinding.bootstrapOwners | ForEach-Object {
+          Get-CanonicalOwner ([string]$_)
+        }
+      )
+      Assert-Coordination (
+        (@($bootstrapChangedOwners | Sort-Object) -join '|') -ceq
+        (@($expectedBootstrapOwners | Sort-Object) -join '|')
+      ) 'production continuation bootstrap changed an unexpected owner.'
+      $baseCommit = $bootstrapCommit
+    }
+  }
   if ([string]$selectedLane.baseRule -ceq 'founder_accepted_ui_commit') {
     Assert-Coordination (
       $AcceptedUiCommit -cmatch '^[0-9a-f]{40}$' -and
@@ -995,32 +1130,34 @@ if ($ProductionLane -ceq 'baseline') {
   Assert-Coordination ($LASTEXITCODE -eq 0) `
     'production lane HEAD does not descend from its exact required base.'
 
-  foreach ($effectiveOwner in $effectiveOwners) {
-    $allowedOwner = $false
-    foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
-      if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
-        $allowedOwner = $true
-        break
+  if (-not $isCoordinationBootstrap) {
+    foreach ($effectiveOwner in $effectiveOwners) {
+      $allowedOwner = $false
+      foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
+        if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
+          $allowedOwner = $true
+          break
+        }
       }
-    }
-    Assert-Coordination $allowedOwner `
-      "production lane claims an owner outside its allowlist: $effectiveOwner"
-    foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
-      Assert-Coordination (
-        -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
-      ) "production lane claims a forbidden owner: $effectiveOwner"
+      Assert-Coordination $allowedOwner `
+        "production lane claims an owner outside its allowlist: $effectiveOwner"
+      foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
+        Assert-Coordination (
+          -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
+        ) "production lane claims a forbidden owner: $effectiveOwner"
+      }
     }
   }
 
   $validPhases = switch ($ProductionLane) {
     'cursor_ui' {
       @(
-        'task_start','implementation','pre_commit','handoff',
+        'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
     }
     'codex_auth' {
-      @('task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
+      @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
     }
     'codex_backend' {
       @('task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
@@ -1034,13 +1171,30 @@ if ($ProductionLane -ceq 'baseline') {
 
   if ($ProductionLane -cne 'integration') {
     $changedOwners = @(Get-ProductionChangedOwners $baseCommit $head)
-    $effectiveOwnerKeys = @($effectiveOwners | ForEach-Object {
-      $_.ToLowerInvariant()
-    })
-    foreach ($changedOwner in $changedOwners) {
+    if ($isCoordinationBootstrap) {
+      $expectedBootstrapOwners = @(
+        $selectedContinuationBinding.bootstrapOwners | ForEach-Object {
+          Get-CanonicalOwner ([string]$_)
+        }
+      )
+      foreach ($bootstrapOwner in $expectedBootstrapOwners) {
+        Assert-Coordination (
+          $ownerToTask.ContainsKey($bootstrapOwner.ToLowerInvariant())
+        ) "continuation bootstrap owner is unclaimed: $bootstrapOwner"
+      }
       Assert-Coordination (
-        $effectiveOwnerKeys.Contains($changedOwner.ToLowerInvariant())
-      ) "production feature changed an owner outside its claim: $changedOwner"
+        (@($changedOwners | Sort-Object) -join '|') -ceq
+        (@($expectedBootstrapOwners | Sort-Object) -join '|')
+      ) 'continuation bootstrap dirt does not match its exact owner manifest.'
+    } else {
+      $effectiveOwnerKeys = @($effectiveOwners | ForEach-Object {
+        $_.ToLowerInvariant()
+      })
+      foreach ($changedOwner in $changedOwners) {
+        Assert-Coordination (
+          $effectiveOwnerKeys.Contains($changedOwner.ToLowerInvariant())
+        ) "production feature changed an owner outside its claim: $changedOwner"
+      }
     }
   }
 

@@ -184,6 +184,55 @@ void main() {
     }
   });
 
+  test('social runtime candidate requires every live dependency', () {
+    bool qualifies({
+      bool globalSocialLoginAudit = true,
+      bool useEmulators = false,
+      String firebaseProjectId = socialRuntimeFirebaseProjectId,
+      bool youtubePrivateDevProof = true,
+      bool youtubeEmbeddedPlayerEnabled = true,
+      String youtubeProviderUrl = socialRuntimeYouTubeProviderUrl,
+      String socialContentUrl = socialRuntimeContentUrl,
+      String chatUrl = socialRuntimeChatUrl,
+    }) => isQualifiedSocialRuntimeDependencySet(
+      globalSocialLoginAudit: globalSocialLoginAudit,
+      useEmulators: useEmulators,
+      firebaseProjectId: firebaseProjectId,
+      youtubePrivateDevProof: youtubePrivateDevProof,
+      youtubeEmbeddedPlayerEnabled: youtubeEmbeddedPlayerEnabled,
+      youtubeProviderUrl: youtubeProviderUrl,
+      socialContentUrl: socialContentUrl,
+      chatUrl: chatUrl,
+    );
+
+    expect(qualifies(), isTrue);
+    for (final invalid in <bool>[
+      qualifies(useEmulators: true),
+      qualifies(firebaseProjectId: 'wrong-project'),
+      qualifies(youtubePrivateDevProof: false),
+      qualifies(youtubeEmbeddedPlayerEnabled: false),
+      qualifies(youtubeProviderUrl: ''),
+      qualifies(socialContentUrl: ''),
+      qualifies(chatUrl: ''),
+    ]) {
+      expect(invalid, isFalse);
+    }
+    expect(
+      qualifies(
+        globalSocialLoginAudit: false,
+        useEmulators: true,
+        firebaseProjectId: '',
+        youtubePrivateDevProof: false,
+        youtubeEmbeddedPlayerEnabled: false,
+        youtubeProviderUrl: '',
+        socialContentUrl: '',
+        chatUrl: '',
+      ),
+      isTrue,
+      reason: 'Normal non-audit builds retain their existing composition.',
+    );
+  });
+
   test('global social login audit selects only live shared auth owners', () {
     final audit = resolveGlobalSocialLoginAuditComposition(
       deviceReview: true,
