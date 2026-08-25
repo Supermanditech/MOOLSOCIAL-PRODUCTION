@@ -381,6 +381,159 @@ void main() {
     expect(session.errorMessage, isNot(contains('private')));
   });
 
+  test(
+    'signed-out startup must clear stale receipt before authentication',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+        clearFailure: StateError('private clear failure'),
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.principalBindingCleanupRequired, isTrue);
+      expect(receiptStore.binding!.matches(binding), isTrue);
+
+      receiptStore.clearFailure = null;
+      await session.retryBoot();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.principalBindingCleanupRequired, isFalse);
+      expect(receiptStore.binding, isNull);
+    },
+  );
+
+  test(
+    'social rollback clear failure blocks every retry before provider UI',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore();
+      final social = ReviewSocialAuthGateway(
+        results: const {
+          SocialAuthProvider.google: SocialAuthResult.authenticated(
+            'private-user-a',
+          ),
+        },
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        socialAuthGateway: social,
+        accountBootstrapGateway: ReviewAccountBootstrapGateway(
+          result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+          currentBinding: binding,
+        ),
+        verifiedPrincipalBindingStore: receiptStore,
+        availableSocialAuthProviders: const {SocialAuthProvider.google},
+      );
+      addTearDown(session.dispose);
+      await session.start();
+      receiptStore.binding = binding;
+      receiptStore.clearFailure = StateError('private clear failure');
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.google),
+        isFalse,
+      );
+      expect(session.principalBindingCleanupRequired, isTrue);
+      expect(social.signInCount, 1);
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.google),
+        isFalse,
+      );
+      expect(social.signInCount, 1);
+    },
+  );
+
+  test('OTP rollback clear failure blocks a later OTP request', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore();
+    final otp = ReviewOtpGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: otp,
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(await session.requestOtp('9876543210'), isTrue);
+    receiptStore.binding = binding;
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(await session.verifyOtp('123456'), isFalse);
+    expect(session.principalBindingCleanupRequired, isTrue);
+    final requestCount = otp.requestCount;
+
+    expect(await session.requestOtp('9876543210'), isFalse);
+    expect(otp.requestCount, requestCount);
+  });
+
+  test('explicit sign-out clear failure remains fail-closed', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(await session.signOut(), isFalse);
+
+    expect(session.principalBindingCleanupRequired, isTrue);
+    expect(session.isAuthenticated, isTrue);
+    expect(session.errorMessage, isNot(contains('private')));
+  });
+
   test('legacy completed setup must show approved Screen 02 once', () async {
     final store = MemoryJourneyStore(
       snapshot: const JourneySnapshot(

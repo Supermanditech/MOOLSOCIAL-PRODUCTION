@@ -136,6 +136,7 @@ class JourneySession extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _authenticationCompletionInProgress = false;
   bool _socialAuthCleanupRequired = false;
+  bool _principalBindingCleanupRequired = false;
   String? _pendingEmailLink;
   String? _completedEmailLinkReturnRoute;
   String? _completedSocialAuthReturnRoute;
@@ -145,6 +146,7 @@ class JourneySession extends ChangeNotifier {
   bool get isReady => stage == JourneyStage.ready;
   bool get isAuthenticated => _isAuthenticated;
   bool get socialAuthCleanupRequired => _socialAuthCleanupRequired;
+  bool get principalBindingCleanupRequired => _principalBindingCleanupRequired;
   bool isSocialAuthProviderAvailable(SocialAuthProvider provider) =>
       availableSocialAuthProviders.contains(provider);
   bool get canCancelSignIn =>
@@ -232,6 +234,7 @@ class JourneySession extends ChangeNotifier {
       final signedIn =
           await _otpGateway.hasAuthenticatedUser() ||
           await _socialAuthGateway.hasAuthenticatedUser();
+      if (!signedIn) await _clearReceiptForSignedOutEntry();
       _isAuthenticated = signedIn;
       final pendingAuthenticationUri = _localAppUri(returnTo);
       final resumesPersistedAuthentication =
@@ -552,7 +555,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> signInWithSocial(SocialAuthProvider provider) async {
     if (busy) return false;
-    if (_socialAuthCleanupRequired &&
+    if ((_socialAuthCleanupRequired || _principalBindingCleanupRequired) &&
         !await _retrySocialAuthCleanup(provider)) {
       return false;
     }
@@ -643,6 +646,12 @@ class JourneySession extends ChangeNotifier {
 
     final coldStart = !_started;
     await start();
+    if (stage == JourneyStage.bootFailure || _principalBindingCleanupRequired) {
+      errorMessage =
+          'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+      notifyListeners();
+      return true;
+    }
     final completionRoute = _canonicalPersistedReadyRoute(returnTo);
     if (_isAuthenticated) {
       _beginSocialAuthAttempt();
@@ -808,6 +817,13 @@ class JourneySession extends ChangeNotifier {
     _pendingEmailLink = emailLink;
     _recordEmailLinkReceipt('email-link-callback-received');
     await start();
+    if (stage == JourneyStage.bootFailure || _principalBindingCleanupRequired) {
+      emailLinkState = EmailLinkState.failed;
+      errorMessage =
+          'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+      notifyListeners();
+      return true;
+    }
     if (_isAuthenticated) {
       _pendingEmailLink = null;
       await _clearPendingEmailLinkAddress();
@@ -852,6 +868,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestEmailLink(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!emailLinkAvailable) {
       emailLinkState = EmailLinkState.failed;
       _recordEmailLinkReceipt('email-link-unavailable');
@@ -931,6 +948,7 @@ class JourneySession extends ChangeNotifier {
   Future<bool> completeEmailLink(String value) async {
     if (isReady || _authenticationCompletionInProgress) return true;
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     final emailLink = _pendingEmailLink;
     if (emailLink == null) {
       _applyEmailLinkFailure(
@@ -1023,6 +1041,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestOtp(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!mobileOtpAvailable) {
       errorMessage =
           'Mobile OTP is not available right now. Choose another method.';
@@ -1044,6 +1063,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestEmailOtp(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!emailOtpAvailable) {
       errorMessage =
           'Email OTP is not available right now. Choose another method.';
@@ -1162,6 +1182,7 @@ class JourneySession extends ChangeNotifier {
   Future<bool> verifyOtp(String value) async {
     if (isReady || _authenticationCompletionInProgress) return true;
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     final code = value.replaceAll(RegExp(r'\D'), '');
     if (code.length != 6) {
       errorMessage = 'Enter the complete 6-digit code.';
@@ -1240,7 +1261,7 @@ class JourneySession extends ChangeNotifier {
     _socialAuthCleanupRequired = true;
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
-      await _verifiedPrincipalBindingStore.clear();
+      if (!await _clearVerifiedPrincipalAfterAuthFailure()) return false;
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
@@ -1267,7 +1288,12 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
-      await _verifiedPrincipalBindingStore.clear();
+      if (!await _clearVerifiedPrincipalAfterAuthFailure()) {
+        throw const JourneyServiceException(
+          'Saved account verification could not be cleared safely.',
+          code: 'auth-binding-clear-failed',
+        );
+      }
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
@@ -1287,10 +1313,10 @@ class JourneySession extends ChangeNotifier {
     accountIdentity = null;
     try {
       await _otpGateway.signOut();
-      await _verifiedPrincipalBindingStore.clear();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
+    await _clearVerifiedPrincipalAfterAuthFailure();
   }
 
   Future<void> _rollbackIncompleteEmailLinkAuthentication() async {
@@ -1298,10 +1324,10 @@ class JourneySession extends ChangeNotifier {
     accountIdentity = null;
     try {
       await _emailLinkGateway.signOut();
-      await _verifiedPrincipalBindingStore.clear();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
+    await _clearVerifiedPrincipalAfterAuthFailure();
   }
 
   void changeSignInMethod() {
@@ -1382,12 +1408,20 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       Object? cleanupFailure;
+      try {
+        await _verifiedPrincipalBindingStore.clear().timeout(
+          socialAuthRollbackTimeout,
+        );
+        _principalBindingCleanupRequired = false;
+      } on Object catch (error) {
+        _principalBindingCleanupRequired = true;
+        cleanupFailure = error;
+      }
       for (final cleanup in <Future<void> Function()>[
         _otpGateway.signOut,
         _socialAuthGateway.signOut,
         _emailLinkGateway.signOut,
         _accountBootstrapGateway.invalidateLocalSession,
-        _verifiedPrincipalBindingStore.clear,
       ]) {
         try {
           await cleanup().timeout(socialAuthRollbackTimeout);
@@ -1719,6 +1753,39 @@ class JourneySession extends ChangeNotifier {
       );
     }
     stage = JourneyStage.signIn;
+  }
+
+  Future<void> _clearReceiptForSignedOutEntry() async {
+    try {
+      await _verifiedPrincipalBindingStore.clear();
+      _principalBindingCleanupRequired = false;
+    } on Object {
+      _principalBindingCleanupRequired = true;
+      throw const JourneyServiceException(
+        'The previous account verification could not be cleared safely.',
+        code: 'auth-binding-cleanup-required',
+      );
+    }
+  }
+
+  Future<bool> _clearVerifiedPrincipalAfterAuthFailure() async {
+    try {
+      await _verifiedPrincipalBindingStore.clear();
+      _principalBindingCleanupRequired = false;
+      return true;
+    } on Object {
+      _principalBindingCleanupRequired = true;
+      return false;
+    }
+  }
+
+  bool _bindingCleanupAllowsAuthentication() {
+    if (!_principalBindingCleanupRequired) return true;
+    errorMessage =
+        'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+    noticeMessage = null;
+    notifyListeners();
+    return false;
   }
 
   Future<void> _refreshAuthenticatedAccountIdentity() async {
