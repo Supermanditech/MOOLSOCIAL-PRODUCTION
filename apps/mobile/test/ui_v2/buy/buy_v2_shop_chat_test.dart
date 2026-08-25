@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -920,6 +922,82 @@ void main() {
       ),
       hasLength(2),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chat info prevents duplicate actions and restores controls', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final firstCall = Completer<BuyV2ShopChatActionResult>();
+    final actions = <BuyV2ShopChatAction>[];
+
+    await tester.pumpWidget(
+      app(
+        session,
+        shopChatSource: const _RichShopChatSource(),
+        onShopChatAction: (action) {
+          actions.add(action);
+          if (actions.length == 1) return firstCall.future;
+          return Future.value(const BuyV2ShopChatActionResult.accepted());
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+    await tester.pumpAndSettle();
+
+    final voice = find.byKey(const ValueKey('buy-shop-chat-info-voice-call'));
+    final video = find.byKey(const ValueKey('buy-shop-chat-info-video-call'));
+    await tester.tap(voice);
+    await tester.pump();
+    expect(actions.single.kind, BuyV2ShopChatActionKind.startVoiceCall);
+    expect(find.bySemanticsLabel('Starting voice call'), findsOneWidget);
+    expect(tester.widget<OutlinedButton>(voice).onPressed, isNull);
+    expect(tester.widget<OutlinedButton>(video).onPressed, isNull);
+    expect(
+      tester
+          .widget<ListTile>(
+            find.ancestor(
+              of: find.text('Notifications'),
+              matching: find.byType(ListTile),
+            ),
+          )
+          .onTap,
+      isNull,
+    );
+
+    await tester.tap(voice);
+    await tester.tap(video);
+    await tester.tap(find.text('Notifications'));
+    await tester.pump();
+    expect(actions, hasLength(1));
+
+    firstCall.complete(const BuyV2ShopChatActionResult.accepted());
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-info-progress')),
+      findsNothing,
+    );
+    expect(tester.widget<OutlinedButton>(voice).onPressed, isNotNull);
+    expect(tester.widget<OutlinedButton>(video).onPressed, isNotNull);
+
+    await tester.tap(voice);
+    await tester.pumpAndSettle();
+    expect(actions, hasLength(2));
+    expect(actions.last.kind, BuyV2ShopChatActionKind.startVoiceCall);
     expect(tester.takeException(), isNull);
   });
 

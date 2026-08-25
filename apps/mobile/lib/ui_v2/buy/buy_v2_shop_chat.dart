@@ -3488,7 +3488,7 @@ class _AttachmentAction {
   final Color color;
 }
 
-class _ShopChatInfoView extends StatelessWidget {
+class _ShopChatInfoView extends StatefulWidget {
   const _ShopChatInfoView({
     super.key,
     required this.thread,
@@ -3505,6 +3505,21 @@ class _ShopChatInfoView extends StatelessWidget {
   final VoidCallback onBack;
   final _ShopChatDispatch onDispatch;
   final VoidCallback? onOpenContext;
+
+  @override
+  State<_ShopChatInfoView> createState() => _ShopChatInfoViewState();
+}
+
+class _ShopChatInfoViewState extends State<_ShopChatInfoView> {
+  bool _dispatching = false;
+  BuyV2ShopChatActionKind? _activeAction;
+
+  BuyV2ShopChatThread get thread => widget.thread;
+  BuyV2ShopChatPresentation get presentation => widget.presentation;
+  Widget? get navigationForward => widget.navigationForward;
+  VoidCallback get onBack => widget.onBack;
+  _ShopChatDispatch get onDispatch => widget.onDispatch;
+  VoidCallback? get onOpenContext => widget.onOpenContext;
 
   @override
   Widget build(BuildContext context) {
@@ -3580,6 +3595,14 @@ class _ShopChatInfoView extends StatelessWidget {
                 ],
               ),
             ),
+            if (_activeAction case final action?)
+              Semantics(
+                key: const ValueKey('buy-shop-chat-info-progress'),
+                container: true,
+                liveRegion: true,
+                label: action.inProgressMessage,
+                child: const LinearProgressIndicator(minHeight: 3),
+              ),
             ?navigationForward,
             Expanded(
               child: ListView(
@@ -3607,10 +3630,12 @@ class _ShopChatInfoView extends StatelessWidget {
                           keyName: 'voice-call',
                           icon: Icons.call_outlined,
                           label: 'Voice',
-                          onTap: () => _dispatchInfoAction(
-                            context,
-                            BuyV2ShopChatActionKind.startVoiceCall,
-                          ),
+                          onTap: _dispatching
+                              ? null
+                              : () => _dispatchInfoAction(
+                                  context,
+                                  BuyV2ShopChatActionKind.startVoiceCall,
+                                ),
                         ),
                       if (thread.capabilities.videoCall) ...[
                         const SizedBox(width: 10),
@@ -3618,10 +3643,12 @@ class _ShopChatInfoView extends StatelessWidget {
                           keyName: 'video-call',
                           icon: Icons.videocam_outlined,
                           label: 'Video',
-                          onTap: () => _dispatchInfoAction(
-                            context,
-                            BuyV2ShopChatActionKind.startVideoCall,
-                          ),
+                          onTap: _dispatching
+                              ? null
+                              : () => _dispatchInfoAction(
+                                  context,
+                                  BuyV2ShopChatActionKind.startVideoCall,
+                                ),
                         ),
                       ],
                     ],
@@ -3631,8 +3658,10 @@ class _ShopChatInfoView extends StatelessWidget {
                     title: thread.contextTitle,
                     subtitle: thread.contextDetail,
                     icon: thread.icon,
-                    trailing: onOpenContext == null ? null : 'Open',
-                    onTap: onOpenContext,
+                    trailing: onOpenContext == null || _dispatching
+                        ? null
+                        : 'Open',
+                    onTap: _dispatching ? null : onOpenContext,
                   ),
                   const SizedBox(height: 10),
                   _ShopChatInfoCard(
@@ -3647,22 +3676,26 @@ class _ShopChatInfoView extends StatelessWidget {
                     title: 'Notifications',
                     subtitle: 'Manage alerts for this conversation',
                     icon: Icons.notifications_outlined,
-                    trailing: 'Manage',
-                    onTap: () => _dispatchInfoAction(
-                      context,
-                      BuyV2ShopChatActionKind.manageNotifications,
-                    ),
+                    trailing: _dispatching ? null : 'Manage',
+                    onTap: _dispatching
+                        ? null
+                        : () => _dispatchInfoAction(
+                            context,
+                            BuyV2ShopChatActionKind.manageNotifications,
+                          ),
                   ),
                   const SizedBox(height: 10),
                   _ShopChatInfoCard(
                     title: 'Safety and support',
                     subtitle: 'Block, report or ask MoolSocial for help',
                     icon: Icons.shield_outlined,
-                    trailing: 'Open',
-                    onTap: () => _dispatchInfoAction(
-                      context,
-                      BuyV2ShopChatActionKind.openSafety,
-                    ),
+                    trailing: _dispatching ? null : 'Open',
+                    onTap: _dispatching
+                        ? null
+                        : () => _dispatchInfoAction(
+                            context,
+                            BuyV2ShopChatActionKind.openSafety,
+                          ),
                   ),
                 ],
               ),
@@ -3677,10 +3710,19 @@ class _ShopChatInfoView extends StatelessWidget {
     BuildContext context,
     BuyV2ShopChatActionKind kind,
   ) async {
+    if (_dispatching) return;
+    setState(() {
+      _dispatching = true;
+      _activeAction = kind;
+    });
     final result = await onDispatch(
       BuyV2ShopChatAction(kind: kind, threadId: thread.id),
     );
     if (!context.mounted) return;
+    setState(() {
+      _dispatching = false;
+      _activeAction = null;
+    });
     final messenger = ScaffoldMessenger.of(context);
     messenger.removeCurrentSnackBar();
     if (result.customerMessage == null) return;
@@ -3705,10 +3747,11 @@ class _ShopChatInfoAction extends StatelessWidget {
   final String keyName;
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return SizedBox(
       width: 76,
       height: 68,
@@ -3725,11 +3768,17 @@ class _ShopChatInfoAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: BuyV2Colors.navy),
+            Icon(
+              icon,
+              size: 20,
+              color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+            ),
             const SizedBox(height: 3),
             Text(
               label,
-              style: context.buyMeta.copyWith(color: BuyV2Colors.navy),
+              style: context.buyMeta.copyWith(
+                color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+              ),
             ),
           ],
         ),
@@ -3890,6 +3939,15 @@ extension on BuyV2ShopChatDeliveryState {
 }
 
 extension on BuyV2ShopChatActionKind {
+  String get inProgressMessage => switch (this) {
+    BuyV2ShopChatActionKind.startVoiceCall => 'Starting voice call',
+    BuyV2ShopChatActionKind.startVideoCall => 'Starting video call',
+    BuyV2ShopChatActionKind.manageNotifications =>
+      'Opening notification settings',
+    BuyV2ShopChatActionKind.openSafety => 'Opening safety and support',
+    _ => 'Completing Chat action',
+  };
+
   String get unexpectedFailureMessage => switch (this) {
     BuyV2ShopChatActionKind.sendText => 'Message wasn’t sent. Try again.',
     BuyV2ShopChatActionKind.startVoiceCall ||
