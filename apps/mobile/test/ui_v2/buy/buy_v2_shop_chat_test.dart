@@ -245,13 +245,47 @@ void main() {
         findsNothing,
       );
 
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+      expect(find.text('Forward to Live order support'), findsOneWidget);
+
       source.publishIncomingMessage();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('buy-shop-chat-message-live-message')),
         findsOneWidget,
       );
       expect(find.text('Your live order update is ready.'), findsOneWidget);
+
+      final liveMessage = find.byKey(
+        const ValueKey('buy-shop-chat-message-live-message'),
+      );
+      await tester.longPress(liveMessage);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Forward to message actions'), findsOneWidget);
+
+      source.publishIncomingMessage(body: 'Your updated live order is ready.');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-reply')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-chat-reply-preview')),
+          matching: find.text('Your updated live order is ready.'),
+        ),
+        findsOneWidget,
+      );
 
       source.removeConversation();
       await tester.pumpAndSettle();
@@ -2792,16 +2826,18 @@ class _LiveShopChatSource extends ChangeNotifier
   List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
       List<BuyV2ShopChatThread>.unmodifiable(_threads);
 
-  void publishIncomingMessage() {
+  void publishIncomingMessage({
+    String body = 'Your live order update is ready.',
+  }) {
     _threads = [
       _thread(
-        messages: const [
+        messages: [
           BuyV2ShopChatMessage(
             id: 'live-message',
             kind: BuyV2ShopChatMessageKind.text,
             fromCurrentUser: false,
             sentAtLabel: 'Now',
-            body: 'Your live order update is ready.',
+            body: body,
           ),
         ],
       ),

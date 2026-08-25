@@ -901,15 +901,28 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   }
 
   void _applyProvisionedThreads(List<BuyV2ShopChatThread> threads) {
+    final threadsById = <String, BuyV2ShopChatThread>{
+      for (final thread in threads) thread.id: thread,
+    };
+    for (var index = _forwardHistory.length - 1; index >= 0; index -= 1) {
+      final entry = _forwardHistory[index];
+      final historyThread = entry.thread;
+      if (historyThread == null) continue;
+      final replacement = threadsById[historyThread.id];
+      if (replacement == null &&
+          (entry.surface == _BuyV2ShopChatSurface.thread ||
+              entry.surface == _BuyV2ShopChatSurface.info)) {
+        _forwardHistory.removeAt(index);
+        continue;
+      }
+      _forwardHistory[index] = _BuyV2ShopChatHistoryEntry(
+        surface: entry.surface,
+        thread: replacement,
+      );
+    }
     final selected = _selectedThread;
     if (selected == null) return;
-    BuyV2ShopChatThread? replacement;
-    for (final thread in threads) {
-      if (thread.id == selected.id) {
-        replacement = thread;
-        break;
-      }
-    }
+    final replacement = threadsById[selected.id];
     if (replacement != null) {
       _selectedThread = replacement;
       return;
@@ -1947,6 +1960,21 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     if (_replyTarget == null) widget.retainedState.replyMessageId = null;
     final selectedMessageId = _selectedMessage?.id;
     _selectedMessage = _messageForId(selectedMessageId);
+    for (var index = _forwardHistory.length - 1; index >= 0; index -= 1) {
+      final entry = _forwardHistory[index];
+      final historyMessage = entry.message;
+      if (historyMessage == null) continue;
+      final replacement = _messageForId(historyMessage.id);
+      if (replacement == null) {
+        _forwardHistory.removeAt(index);
+        continue;
+      }
+      _forwardHistory[index] = _BuyV2ShopChatThreadHistoryEntry(
+        utility: entry.utility,
+        message: replacement,
+        messageQuery: entry.messageQuery,
+      );
+    }
   }
 
   bool handleBack({required bool dismissComposerKeyboard}) {
