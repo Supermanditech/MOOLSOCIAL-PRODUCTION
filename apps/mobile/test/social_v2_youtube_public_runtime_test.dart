@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/youtube/youtube_private_dev_models.dart';
+import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 void main() {
@@ -31,6 +33,354 @@ void main() {
     expect(store.readFreshShorts(), isNull);
   });
 
+  test(
+    'durable hydration restores fresh videos and truthful stale Shorts',
+    () async {
+      final now = DateTime.utc(2026, 8, 25, 6);
+      final repository = _CatalogueRepositoryFake()
+        ..reads[YouTubePublicCatalogueKind.videos] = YouTubePublicCatalogueRead(
+          freshness: YouTubeCatalogueFreshness.fresh,
+          snapshot: YouTubePublicCatalogueSnapshot(
+            kind: YouTubePublicCatalogueKind.videos,
+            capturedAtUtc: now.subtract(const Duration(minutes: 1)),
+            items: [
+              mapScreen04VideoToYouTubePublicCatalogueItem(
+                _publicVideo('durable-video'),
+              ),
+            ],
+          ),
+        )
+        ..reads[YouTubePublicCatalogueKind.shorts] = YouTubePublicCatalogueRead(
+          freshness: YouTubeCatalogueFreshness.stale,
+          snapshot: YouTubePublicCatalogueSnapshot(
+            kind: YouTubePublicCatalogueKind.shorts,
+            capturedAtUtc: now.subtract(const Duration(minutes: 6)),
+            items: [
+              mapScreen04VideoToYouTubePublicCatalogueItem(
+                _publicVideo('durable-short'),
+              ),
+            ],
+          ),
+        );
+      final store = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+
+      await store.configureDurability(repository);
+
+      expect(store.readFreshVideos()?.single.videoId, 'durable-video');
+      expect(store.readFreshShorts(), isNull);
+      expect(store.readShorts()?.single.videoId, 'durable-short');
+    },
+  );
+
+  test('late hydration cannot overwrite a newer live replacement', () async {
+    final now = DateTime.utc(2026, 8, 25, 6);
+    final gate = Completer<void>();
+    final repository = _CatalogueRepositoryFake()
+      ..readGates[YouTubePublicCatalogueKind.videos] = gate
+      ..reads[YouTubePublicCatalogueKind.videos] = YouTubePublicCatalogueRead(
+        freshness: YouTubeCatalogueFreshness.fresh,
+        snapshot: YouTubePublicCatalogueSnapshot(
+          kind: YouTubePublicCatalogueKind.videos,
+          capturedAtUtc: now,
+          items: [
+            mapScreen04VideoToYouTubePublicCatalogueItem(
+              _publicVideo('old-durable-video'),
+            ),
+          ],
+        ),
+      );
+    final store = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+    final hydration = store.configureDurability(repository);
+    await repository.readStarted[YouTubePublicCatalogueKind.videos]!.future;
+
+    store.replaceVideos([_publicVideo('new-live-video')]);
+    gate.complete();
+    await hydration;
+
+    expect(store.readVideos()?.single.videoId, 'new-live-video');
+  });
+
+  test(
+    'new repository and runtime instances restore both process-death lanes',
+    () async {
+      var now = DateTime.utc(2026, 8, 25, 6);
+      final persistence = _CatalogueKeyValueStoreFake();
+      final firstRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final firstRuntime = Screen04YouTubeCatalogueSnapshotStore(
+        now: () => now,
+      );
+      await firstRuntime.configureDurability(firstRepository);
+      firstRuntime.replaceVideos([_publicVideo('process-video')]);
+      firstRuntime.replaceShorts([_publicVideo('process-short')]);
+      await firstRuntime.settleDurableWrites();
+
+      now = now.add(const Duration(minutes: 5));
+      final relaunchedRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final relaunchedRuntime = Screen04YouTubeCatalogueSnapshotStore(
+        now: () => now,
+      );
+      await relaunchedRuntime.configureDurability(relaunchedRepository);
+
+      expect(
+        relaunchedRuntime.readFreshVideos()?.single.videoId,
+        'process-video',
+      );
+      expect(
+        relaunchedRuntime.readFreshShorts()?.single.videoId,
+        'process-short',
+      );
+      now = now.add(const Duration(microseconds: 1));
+      expect(relaunchedRuntime.readFreshVideos(), isNull);
+      expect(relaunchedRuntime.readVideos()?.single.videoId, 'process-video');
+    },
+  );
+
+  test('durable mapping preserves every catalogue field exactly', () {
+    final source = Screen04YouTubePublicVideo(
+      videoId: 'video-full',
+      title: 'Full title',
+      channelId: 'channel-full',
+      channelTitle: 'Full channel',
+      description: 'Full description',
+      thumbnailUrl: Uri.parse('https://i.ytimg.com/vi/video-full/hq.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 24, 1, 2, 3),
+      duration: 'PT2M3S',
+      captionAvailable: false,
+      viewCount: '101',
+      likeCount: '11',
+      commentCount: '2',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const ['#one', '#two'],
+      channelDescription: 'Channel description',
+      channelThumbnailUrl: Uri.parse(
+        'https://yt3.ggpht.com/channel-full/photo.jpg',
+      ),
+      subscriberCount: '1001',
+      channelVideoCount: '51',
+      channelViewCount: '50001',
+    );
+
+    final restored = mapYouTubePublicCatalogueItemToScreen04Video(
+      mapScreen04VideoToYouTubePublicCatalogueItem(source),
+    );
+
+    expect(restored.videoId, source.videoId);
+    expect(restored.title, source.title);
+    expect(restored.channelId, source.channelId);
+    expect(restored.channelTitle, source.channelTitle);
+    expect(restored.description, source.description);
+    expect(restored.thumbnailUrl, source.thumbnailUrl);
+    expect(restored.publishedAt, source.publishedAt);
+    expect(restored.duration, source.duration);
+    expect(restored.captionAvailable, source.captionAvailable);
+    expect(restored.viewCount, source.viewCount);
+    expect(restored.likeCount, source.likeCount);
+    expect(restored.commentCount, source.commentCount);
+    expect(restored.embeddable, source.embeddable);
+    expect(
+      restored.hasKnownDeviceRegionExclusion,
+      source.hasKnownDeviceRegionExclusion,
+    );
+    expect(restored.hashtags, source.hashtags);
+    expect(restored.channelDescription, source.channelDescription);
+    expect(restored.channelThumbnailUrl, source.channelThumbnailUrl);
+    expect(restored.subscriberCount, source.subscriberCount);
+    expect(restored.channelVideoCount, source.channelVideoCount);
+    expect(restored.channelViewCount, source.channelViewCount);
+  });
+
+  test(
+    'live replacements write through while cache failures stay nonfatal',
+    () async {
+      final repository = _CatalogueRepositoryFake();
+      final store = Screen04YouTubeCatalogueSnapshotStore();
+      await store.configureDurability(repository);
+
+      store.replaceVideos([_publicVideo('live-video')]);
+      store.replaceShorts([_publicVideo('live-short')]);
+      await store.settleDurableWrites();
+      expect(
+        repository.writes[YouTubePublicCatalogueKind.videos]?.single.videoId,
+        'live-video',
+      );
+      expect(
+        repository.writes[YouTubePublicCatalogueKind.shorts]?.single.videoId,
+        'live-short',
+      );
+
+      repository.failWrites = true;
+      store.replaceVideos([_publicVideo('memory-still-live')]);
+      await store.settleDurableWrites();
+      expect(store.readVideos()?.single.videoId, 'memory-still-live');
+    },
+  );
+
+  test('settleDurableWrites joins both concurrent lane mutations', () async {
+    final videosGate = Completer<void>();
+    final shortsGate = Completer<void>();
+    final repository = _CatalogueRepositoryFake()
+      ..writeGates[YouTubePublicCatalogueKind.videos] = videosGate
+      ..writeGates[YouTubePublicCatalogueKind.shorts] = shortsGate;
+    final store = Screen04YouTubeCatalogueSnapshotStore();
+    await store.configureDurability(repository);
+    store.replaceVideos([_publicVideo('joined-video')]);
+    store.replaceShorts([_publicVideo('joined-short')]);
+    await Future.wait([
+      repository.writeStarted[YouTubePublicCatalogueKind.videos]!.future,
+      repository.writeStarted[YouTubePublicCatalogueKind.shorts]!.future,
+    ]);
+    var settled = false;
+    final settlement = store.settleDurableWrites().then((_) {
+      settled = true;
+    });
+
+    shortsGate.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(settled, isFalse);
+    videosGate.complete();
+    await settlement;
+    expect(settled, isTrue);
+  });
+
+  test(
+    'one durable read failure is isolated from the valid other lane',
+    () async {
+      final now = DateTime.utc(2026, 8, 25, 6);
+      final repository = _CatalogueRepositoryFake()
+        ..failedReads.add(YouTubePublicCatalogueKind.videos)
+        ..reads[YouTubePublicCatalogueKind.shorts] = YouTubePublicCatalogueRead(
+          freshness: YouTubeCatalogueFreshness.fresh,
+          snapshot: YouTubePublicCatalogueSnapshot(
+            kind: YouTubePublicCatalogueKind.shorts,
+            capturedAtUtc: now,
+            items: [
+              mapScreen04VideoToYouTubePublicCatalogueItem(
+                _publicVideo('valid-short'),
+              ),
+            ],
+          ),
+        );
+      final store = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+
+      final hydration = await store.configureDurability(repository);
+
+      expect(store.readVideos(), isNull);
+      expect(store.readShorts()?.single.videoId, 'valid-short');
+      expect(repository.cleared, isEmpty);
+      expect(hydration.degraded, isTrue);
+    },
+  );
+
+  test('invalid durable Short is rejected and cleared', () async {
+    final now = DateTime.utc(2026, 8, 25, 6);
+    final invalidShort = mapScreen04VideoToYouTubePublicCatalogueItem(
+      Screen04YouTubePublicVideo(
+        videoId: 'invalid-short',
+        title: 'Declared #Shorts',
+        channelId: 'channel-invalid',
+        channelTitle: 'Channel',
+        description: 'Too long for the accepted Shorts contract.',
+        thumbnailUrl: Uri.parse(
+          'https://i.ytimg.com/vi/invalid-short/hqdefault.jpg',
+        ),
+        publishedAt: DateTime.utc(2026, 8, 24),
+        duration: 'PT4M',
+        captionAvailable: true,
+        viewCount: '1',
+        likeCount: '1',
+        commentCount: '1',
+        embeddable: true,
+        hasKnownDeviceRegionExclusion: false,
+        hashtags: const ['#Shorts'],
+      ),
+    );
+    final repository = _CatalogueRepositoryFake()
+      ..reads[YouTubePublicCatalogueKind.shorts] = YouTubePublicCatalogueRead(
+        freshness: YouTubeCatalogueFreshness.fresh,
+        snapshot: YouTubePublicCatalogueSnapshot(
+          kind: YouTubePublicCatalogueKind.shorts,
+          capturedAtUtc: now,
+          items: [invalidShort],
+        ),
+      );
+    final store = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+
+    final hydration = await store.configureDurability(repository);
+
+    expect(store.readShorts(), isNull);
+    expect(repository.cleared, [YouTubePublicCatalogueKind.shorts]);
+    expect(hydration.degraded, isFalse);
+  });
+
+  test('inconsistent durable kind or freshness fails closed', () async {
+    final now = DateTime.utc(2026, 8, 25, 6);
+    final repository = _CatalogueRepositoryFake()
+      ..reads[YouTubePublicCatalogueKind.videos] = YouTubePublicCatalogueRead(
+        freshness: YouTubeCatalogueFreshness.expired,
+        snapshot: YouTubePublicCatalogueSnapshot(
+          kind: YouTubePublicCatalogueKind.shorts,
+          capturedAtUtc: now,
+          items: [
+            mapScreen04VideoToYouTubePublicCatalogueItem(
+              _publicVideo('inconsistent'),
+            ),
+          ],
+        ),
+      );
+    final store = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+
+    await store.configureDurability(repository);
+
+    expect(store.readVideos(), isNull);
+    expect(repository.cleared, [YouTubePublicCatalogueKind.videos]);
+  });
+
+  test('main hydrates the no-cache async repository before runApp', () {
+    final source = File('lib/main.dart').readAsStringSync();
+    final hydration = source.indexOf(
+      'screen04YouTubeCatalogueSnapshots\n'
+      '        .configureDurability(',
+    );
+    final appStart = source.indexOf('runApp(\n    MoolSocialApp(');
+
+    expect(hydration, greaterThan(-1));
+    expect(appStart, greaterThan(hydration));
+    expect(
+      source,
+      contains('SharedPreferencesAsyncYouTubePublicCatalogueStore('),
+    );
+    expect(
+      source,
+      isNot(contains('SharedPreferencesYouTubePublicCatalogueStore(')),
+    );
+    expect(
+      source,
+      contains(
+        "_recordReleaseBootstrapStage('youtube_catalogue_cache', 'begin')",
+      ),
+    );
+    expect(source, contains("hydration.degraded ? 'degraded' : 'passed'"));
+    expect(
+      source,
+      contains(
+        "_recordReleaseBootstrapStage('youtube_catalogue_cache', 'degraded')",
+      ),
+    );
+    expect(
+      source,
+      isNot(
+        contains("_showReleaseBootstrapFailure('youtube_catalogue_cache')"),
+      ),
+    );
+  });
+
   test('private-Dev public review restores Screen 04 after safe boot', () {
     final source = File('lib/main.dart').readAsStringSync();
 
@@ -39,20 +389,25 @@ void main() {
     expect(
       source,
       contains(
-        'final emailLinkInitialLocation =\n'
-        '      youtubeInitialLocation == null &&\n'
-        '      await session.prepareEmailLinkReturn(platformRouteName);',
+        'emailLinkInitialLocation =\n'
+        '        youtubeInitialLocation == null &&\n'
+        '        !socialAuthInitialLocation &&\n'
+        '        await session\n'
+        '            .prepareEmailLinkReturn(platformRouteName)\n'
+        '            .timeout(_releasePlatformStageTimeout);',
       ),
       reason:
-          'A YouTube provider return remains authoritative before the email '
-          'link handoff is considered.',
+          'YouTube and social-provider returns remain authoritative before '
+          'the email-link handoff is considered.',
     );
     expect(
       source,
       contains(
         'initialLocation:\n'
         '          youtubeInitialLocation ??\n'
-        "          (emailLinkInitialLocation ? '/sign-in' : '/boot'),",
+        '          (socialAuthInitialLocation || emailLinkInitialLocation\n'
+        "              ? '/sign-in'\n"
+        "              : '/boot'),",
       ),
       reason:
           'Safe boot must remain the final fallback after exact provider and '
@@ -452,6 +807,86 @@ void main() {
     expect(result, hasLength(4));
     expect(requestedTokens, [null, 'page-2', 'page-3', 'page-4']);
   });
+}
+
+final class _CatalogueRepositoryFake
+    implements YouTubePublicCatalogueRepository {
+  final Map<YouTubePublicCatalogueKind, YouTubePublicCatalogueRead> reads = {};
+  final Map<YouTubePublicCatalogueKind, List<YouTubePublicCatalogueItem>>
+  writes = {};
+  final Set<YouTubePublicCatalogueKind> failedReads = {};
+  final Map<YouTubePublicCatalogueKind, Completer<void>> readGates = {};
+  final Map<YouTubePublicCatalogueKind, Completer<void>> readStarted = {
+    YouTubePublicCatalogueKind.videos: Completer<void>(),
+    YouTubePublicCatalogueKind.shorts: Completer<void>(),
+  };
+  final Map<YouTubePublicCatalogueKind, Completer<void>> writeGates = {};
+  final Map<YouTubePublicCatalogueKind, Completer<void>> writeStarted = {
+    YouTubePublicCatalogueKind.videos: Completer<void>(),
+    YouTubePublicCatalogueKind.shorts: Completer<void>(),
+  };
+  final List<YouTubePublicCatalogueKind> cleared = [];
+  bool failWrites = false;
+
+  @override
+  Future<YouTubePublicCatalogueRead> read(
+    YouTubePublicCatalogueKind kind,
+  ) async {
+    final started = readStarted[kind]!;
+    if (!started.isCompleted) started.complete();
+    final gate = readGates[kind];
+    if (gate != null) await gate.future;
+    if (failedReads.contains(kind)) throw StateError('sanitized test failure');
+    return reads[kind] ??
+        const YouTubePublicCatalogueRead(
+          freshness: YouTubeCatalogueFreshness.missing,
+        );
+  }
+
+  @override
+  Future<void> replace(
+    YouTubePublicCatalogueKind kind,
+    List<YouTubePublicCatalogueItem> items,
+  ) async {
+    final started = writeStarted[kind]!;
+    if (!started.isCompleted) started.complete();
+    final gate = writeGates[kind];
+    if (gate != null) await gate.future;
+    if (failWrites) throw StateError('sanitized test failure');
+    writes[kind] = List<YouTubePublicCatalogueItem>.unmodifiable(items);
+  }
+
+  @override
+  Future<void> clear(YouTubePublicCatalogueKind kind) async {
+    cleared.add(kind);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    cleared
+      ..add(YouTubePublicCatalogueKind.videos)
+      ..add(YouTubePublicCatalogueKind.shorts);
+  }
+}
+
+final class _CatalogueKeyValueStoreFake
+    implements YouTubePublicCatalogueKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<bool> writeString(String key, String value) async {
+    values[key] = value;
+    return true;
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    values.remove(key);
+    return true;
+  }
 }
 
 Screen04YouTubePublicVideo _publicVideo(String id) =>

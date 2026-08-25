@@ -793,6 +793,33 @@ class ChatSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void resetForAuthenticationBoundary() {
+    _threads.clear();
+    _messages.clear();
+    _messageLoadErrors.clear();
+    _threadActionErrors.clear();
+    _threadActionNotices.clear();
+    _readThreads.clear();
+    _retryKeys.clear();
+    _forwardRetryKeys.clear();
+    _replyTargets.clear();
+    _pendingPhotos.clear();
+    selectedFilter = null;
+    unreadOnly = false;
+    noticeMessage = null;
+    errorMessage = null;
+    busy = false;
+    loadingThreads = false;
+    threadsLoaded = false;
+    loadingMessageThreads.clear();
+    readingThreads.clear();
+    invitedMembers.clear();
+    pollOptions
+      ..clear()
+      ..addAll(const ['Today evening', 'Tomorrow morning', 'Tomorrow evening']);
+    notifyListeners();
+  }
+
   void clearThreadMessages(String threadId) {
     final hadError = _threadActionErrors.remove(threadId) != null;
     final hadNotice = _threadActionNotices.remove(threadId) != null;

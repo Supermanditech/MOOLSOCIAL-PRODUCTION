@@ -1,124 +1,119 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
-import 'package:moolsocial/features/journey01/journey_services.dart';
-import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
-  testWidgets(
-    'Buy uses one connected MoolSocial launcher without local rails',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final session = BuyV2Session(core: BuySession());
-      addTearDown(session.dispose);
-      final routes = <String>[];
-      var chatTaps = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: MoolTheme.light(),
-          home: BuyV2Screen(
-            session: session,
-            onOpenMainAction: (action) => routes.add(action.route),
-            onOpenChat: () => chatTaps += 1,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('buy-local-destination-tabs')),
-        findsNothing,
-      );
-      expect(find.byKey(const ValueKey('buy-persistent-dock')), findsNothing);
-      expect(find.text('MoolSocial'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('mool-home-launcher')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsOneWidget,
-      );
-      for (final action in const ['shop', 'wholesale', 'medicine', 'orders']) {
-        final target = find.byKey(ValueKey('mool-navigator-buy-$action'));
-        expect(target, findsOneWidget);
-        expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
-      }
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('Medicine'))
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-
-      await tester.tap(
-        find.byKey(const ValueKey('mool-navigator-buy-medicine')),
-      );
-      await tester.pumpAndSettle();
-      expect(routes, ['/app/buy?sub=medicine']);
-      expect(session.destination.name, 'shop');
-
-      session.openAssist();
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('mool-home-launcher')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('mool-connected-navigator-chat')));
-      await tester.pumpAndSettle();
-      expect(chatTaps, 1);
-      expect(session.view.name, 'assist');
-      semantics.dispose();
-    },
-  );
-
-  testWidgets('Buy Medicine survives chooser dismissal and system Back', (
+  testWidgets('Buy keeps one compact launcher and one local destination rail', (
     tester,
   ) async {
-    final journey = JourneySession(
-      store: MemoryJourneyStore(
-        snapshot: const JourneySnapshot(
-          languageCode: 'en',
-          areaMode: 'current',
-          currentAreaLabel: 'Khema-Ka-Kuwa, Jodhpur, Rajasthan',
-          setupComplete: true,
-          setupExperienceVersion: approvedSetupExperienceVersion,
-        ),
-      ),
-      otpGateway: ReviewOtpGateway(signedIn: true),
-    );
-    addTearDown(journey.dispose);
-    await journey.start();
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    var chatTaps = 0;
     await tester.pumpWidget(
-      MoolSocialApp(session: journey, initialLocation: '/app/buy?sub=medicine'),
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session, onOpenChat: () => chatTaps += 1),
+      ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('mool-home-launcher')));
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('buy-persistent-dock')), findsNothing);
+    for (final keyName in const [
+      'buy-local-tab-wholesale',
+      'buy-local-tab-orders',
+      'buy-local-tab-offers',
+    ]) {
+      final action = find.byKey(ValueKey(keyName));
+      expect(action, findsOneWidget);
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+    }
+
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+    expect(chatTaps, 0);
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-open-all')));
+    await tester.pumpAndSettle();
+    expect(chatTaps, 1);
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('mool-connected-action-navigator')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
-
-    await tester.binding.handlePopRoute();
+    await tester.tapAt(const Offset(8, 8));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('mool-connected-action-navigator')),
       findsNothing,
     );
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Buy Medicine survives product depth and system Back', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.medicine,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Search medicines and wellness'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-local-destination-tabs')),
-      findsNothing,
+      find.byKey(const ValueKey('care-local-destination-tabs')),
+      findsOneWidget,
+    );
+    final product = session.visibleProducts.first;
+    session.openProduct(product.id);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.product);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.medicine);
+    expect(session.view, BuyV2View.catalogue);
+    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('care-local-destination-tabs')),
+      findsOneWidget,
     );
   });
 }

@@ -134,6 +134,8 @@ if ($fullSocialRequested) {
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/youtubeProvider'
     MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED = 'true'
     MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED = 'false'
+    MOOLSOCIAL_CHAT_URL =
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat'
   }
   foreach ($fact in $fullSocialRequiredFacts.GetEnumerator()) {
     Assert-Gate -Condition (
@@ -414,6 +416,7 @@ $allowedDefineNames = @(
   'MOOLSOCIAL_YOUTUBE_EMBEDDED_PLAYER_ENABLED',
   'MOOLSOCIAL_YOUTUBE_SHORTS_AUTOPLAY_ENABLED',
   'MOOLSOCIAL_SOCIAL_CONTENT_URL',
+  'MOOLSOCIAL_CHAT_URL',
   'MOOLSOCIAL_FIREBASE_API_KEY',
   'MOOLSOCIAL_FIREBASE_APP_ID',
   'MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID',

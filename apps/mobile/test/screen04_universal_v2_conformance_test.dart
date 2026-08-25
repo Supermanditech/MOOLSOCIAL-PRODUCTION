@@ -127,7 +127,7 @@ void main() {
         'shorts': Key('screen04-youtube-shorts-state-provider-access'),
         'videos': Key('screen04-youtube-videos-state-provider-access'),
         'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': Key('screen04-create-workbench'),
+        'create': Key('screen04-create-home'),
       };
       for (final choice in screen04World('social').choices) {
         final owners = _AuthenticatedOwners();
@@ -150,12 +150,12 @@ void main() {
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+            find.byKey(const Key('screen04-context-tabs')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         } else {
@@ -179,10 +179,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
         if (choice.id == 'create') {
-          expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-            findsOneWidget,
-          );
+          expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
         } else {
           expect(
             find.byKey(directRouteOwnerKeys[choice.id]!),
@@ -197,7 +194,7 @@ void main() {
     },
   );
 
-  testWidgets('Create hides the dock until the composer closes', (
+  testWidgets('Create landing owns the dock and nested composer Back', (
     tester,
   ) async {
     final owners = _AuthenticatedOwners();
@@ -218,6 +215,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-workbench')), findsOneWidget);
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
     expect(find.text('Reel'), findsNothing);
@@ -242,9 +246,9 @@ void main() {
     expect(find.byKey(const Key('social-global-chat')), findsNothing);
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('screen04-create-close')));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-workbench')), findsNothing);
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
     expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
 
@@ -256,10 +260,7 @@ void main() {
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -812,7 +813,7 @@ void main() {
         'shorts': Key('screen04-youtube-shorts-state-provider-access'),
         'videos': Key('screen04-youtube-videos-state-provider-access'),
         'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': ValueKey('screen04-create-workbench'),
+        'create': ValueKey('screen04-create-home'),
       };
       for (final choice in social.choices) {
         await _openConnectedAction(tester, family: 'social', action: choice.id);
@@ -821,12 +822,12 @@ void main() {
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+            find.byKey(const Key('screen04-context-tabs')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         } else {
@@ -904,6 +905,7 @@ void main() {
       find.byKey(const Key('screen04-account-youtube-connection')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('screen04-account-sign-out')), findsOneWidget);
     expect(find.text('Creator workspace'), findsNothing);
     expect(find.textContaining('Minimum read-only access'), findsOneWidget);
     await tester.tap(find.byTooltip('Close'));
@@ -926,6 +928,37 @@ void main() {
     expect(find.text('Voice search'), findsOneWidget);
     expect(tester.takeException(), isNull);
     _expectCustomerCopy(tester, 'header actions');
+  });
+
+  testWidgets('authenticated account shows identity and switching action', (
+    tester,
+  ) async {
+    final owners = _AuthenticatedOwners();
+    addTearDown(owners.dispose);
+    await owners.journey.start();
+    await _pump(
+      tester,
+      const Size(390, 844),
+      1,
+      SocialUniversalV2(
+        session: owners.journey,
+        creatorSession: owners.creator,
+        retailerSession: owners.retailer,
+        sharedSession: owners.shared,
+        initialWorld: 'buy',
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('screen04-profile')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-account-authenticated-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Test Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsOneWidget);
   });
 }
 
@@ -1056,6 +1089,13 @@ class _AuthenticatedOwners {
       ),
     ),
     otpGateway: ReviewOtpGateway(signedIn: true),
+    accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+      identity: const AuthenticatedAccountIdentity(
+        displayName: 'Test Member',
+        emailAddress: 'member@example.com',
+        signInMethods: ['Google'],
+      ),
+    ),
   );
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();

@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart' as facebook;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app/moolsocial_app.dart';
@@ -22,10 +23,21 @@ import 'core/config/email_link_runtime_configuration.dart';
 import 'core/navigation/youtube_connect_return_route.dart';
 import 'core/platform/mool_system_ui_viewport.dart';
 import 'core/youtube/youtube_private_dev_app_check.dart';
+import 'core/youtube/youtube_embedded_player_contract.dart';
+import 'core/youtube/youtube_private_dev_client.dart';
+import 'features/chat/chat_services.dart';
 import 'features/chat/chat_session.dart';
 import 'features/journey01/journey_services.dart';
 import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
+import 'features/shared/social_content_gateway.dart';
+import 'features/shared/social_create_draft_media_store.dart';
+import 'features/shared/social_create_draft_repository.dart';
+import 'features/shared/youtube_public_catalogue_repository.dart';
+import 'features/shared/youtube_public_search_state_repository.dart';
+import 'features/shared/youtube_public_short_state_repository.dart';
+import 'features/shared/youtube_public_watch_state_repository.dart';
+import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
   apiKey: 'demo-moolsocial-local-key',
@@ -35,6 +47,7 @@ const _localFirebaseOptions = FirebaseOptions(
 );
 const _releaseFirstFrameTimeout = Duration(seconds: 5);
 const _releasePlatformStageTimeout = Duration(seconds: 15);
+const _youtubeCatalogueCacheHydrationTimeout = Duration(seconds: 2);
 
 const _useEmulators = bool.fromEnvironment(
   'MOOLSOCIAL_USE_EMULATORS',
@@ -437,6 +450,25 @@ Future<void> main() async {
     return;
   }
   _recordReleaseBootstrapStage('shared_preferences', 'passed');
+  _recordReleaseBootstrapStage('youtube_catalogue_cache', 'begin');
+  try {
+    final hydration = await screen04YouTubeCatalogueSnapshots
+        .configureDurability(
+          DurableYouTubePublicCatalogueRepository(
+            persistence: SharedPreferencesAsyncYouTubePublicCatalogueStore(
+              SharedPreferencesAsync(),
+            ),
+            regionCode: screen04YouTubeRegionCode,
+          ),
+        )
+        .timeout(_youtubeCatalogueCacheHydrationTimeout);
+    _recordReleaseBootstrapStage(
+      'youtube_catalogue_cache',
+      hydration.degraded ? 'degraded' : 'passed',
+    );
+  } on Object {
+    _recordReleaseBootstrapStage('youtube_catalogue_cache', 'degraded');
+  }
   final platformRouteName =
       WidgetsBinding.instance.platformDispatcher.defaultRouteName;
   final youtubeInitialLocation = youtubeConnectReturnLocation(
@@ -575,6 +607,269 @@ Future<void> main() async {
     EmailLinkGatewaySelection.unavailable =>
       const UnavailableEmailLinkGateway(),
   };
+  final pendingEmailLinkAddressStore = SecurePendingEmailLinkAddressStore();
+  final accountIdentityGateway = FirebaseAuthenticatedAccountIdentityGateway(
+    FirebaseAuth.instance,
+  );
+  final secureVerifiedPrincipalBindingStore =
+      SecureVerifiedPrincipalBindingStore();
+  final VerifiedPrincipalBindingStore verifiedPrincipalBindingStore =
+      globalSocialLoginAuditComposition.useReviewAuthentication &&
+          !_youtubePublicReviewMode
+      ? MemoryVerifiedPrincipalBindingStore()
+      : secureVerifiedPrincipalBindingStore;
+  final searchPersistence = SecureStorageYouTubePublicSearchKeyValueStore();
+  final watchPersistence = SecureStorageYouTubePublicWatchKeyValueStore();
+  final shortPersistence = SecureStorageYouTubePublicShortKeyValueStore();
+  final draftPersistence = SecureStorageSocialCreateDraftKeyValueStore();
+  SocialCreateDraftMediaStore? draftMediaStore;
+  try {
+    final support = await getApplicationSupportDirectory().timeout(
+      _youtubeCatalogueCacheHydrationTimeout,
+    );
+    draftMediaStore = SocialCreateDraftMediaStore(
+      root: Directory('${support.path}${Platform.pathSeparator}create_drafts'),
+    );
+    configureSocialCreateDraftMediaStore(draftMediaStore);
+  } on Object {
+    draftMediaStore = null;
+  }
+
+  Future<bool> invalidateCreateDraftState() async {
+    var envelopeInvalidated = false;
+    var mediaPurged = draftMediaStore == null;
+    try {
+      await DurableSocialCreateDraftRepository.invalidateUnbound(
+        draftPersistence,
+      ).timeout(_youtubeCatalogueCacheHydrationTimeout);
+      envelopeInvalidated = true;
+    } on Object {
+      // Media purge remains mandatory after an independent envelope failure.
+    }
+    try {
+      final mediaStore = draftMediaStore;
+      if (mediaStore != null) {
+        mediaPurged = await mediaStore.disableStagingAndPurgeAll().timeout(
+          _youtubeCatalogueCacheHydrationTimeout,
+        );
+      }
+      if (mediaStore == null) mediaPurged = true;
+    } on Object {
+      // Envelope invalidation remains authoritative after media cleanup failure.
+    }
+    return envelopeInvalidated && mediaPurged;
+  }
+
+  Future<void> bindYouTubeSearchStateToCurrentPrincipal() async {
+    _recordReleaseBootstrapStage('youtube_search_state', 'begin');
+    _recordReleaseBootstrapStage('youtube_watch_state', 'begin');
+    _recordReleaseBootstrapStage('youtube_short_state', 'begin');
+    _recordReleaseBootstrapStage('social_create_draft', 'begin');
+    final searchBindingAttempt = youtubePublicSearchState
+        .beginPrincipalBindingAttempt();
+    final watchBindingAttempt = youtubePublicWatchState
+        .beginPrincipalBindingAttempt();
+    final shortBindingAttempt = youtubePublicShortState
+        .beginPrincipalBindingAttempt();
+    final draftBindingAttempt = socialCreateDraftState
+        .beginPrincipalBindingAttempt();
+    try {
+      final currentPrincipalId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentPrincipalId == null || currentPrincipalId.isEmpty) {
+        final invalidated = await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
+        final draftInvalidated = await invalidateCreateDraftState();
+        _recordReleaseBootstrapStage(
+          'youtube_search_state',
+          invalidated.search ? 'passed' : 'degraded',
+        );
+        _recordReleaseBootstrapStage(
+          'youtube_watch_state',
+          invalidated.watch ? 'passed' : 'degraded',
+        );
+        _recordReleaseBootstrapStage(
+          'youtube_short_state',
+          invalidated.short ? 'passed' : 'degraded',
+        );
+        _recordReleaseBootstrapStage(
+          'social_create_draft',
+          draftInvalidated ? 'passed' : 'degraded',
+        );
+        return;
+      }
+      final storedBinding =
+          identical(
+            verifiedPrincipalBindingStore,
+            secureVerifiedPrincipalBindingStore,
+          )
+          ? await secureVerifiedPrincipalBindingStore.read().timeout(
+              _youtubeCatalogueCacheHydrationTimeout,
+            )
+          : null;
+      if (storedBinding == null) {
+        await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
+        await invalidateCreateDraftState();
+        _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
+        _recordReleaseBootstrapStage('social_create_draft', 'degraded');
+        return;
+      }
+      final currentBinding = await secureVerifiedPrincipalBindingStore
+          .protect(currentPrincipalId)
+          .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      if (!storedBinding.matches(currentBinding)) {
+        await invalidateYouTubePublicRuntimeState(
+          searchPersistence: searchPersistence,
+          watchPersistence: watchPersistence,
+          shortPersistence: shortPersistence,
+          timeout: _youtubeCatalogueCacheHydrationTimeout,
+        );
+        await invalidateCreateDraftState();
+        _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+        _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
+        _recordReleaseBootstrapStage('social_create_draft', 'degraded');
+        return;
+      }
+      YouTubePublicSearchFreshness? searchFreshness;
+      try {
+        searchFreshness = await youtubePublicSearchState
+            .configureDurability(
+              DurableYouTubePublicSearchStateRepository(
+                persistence: searchPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: searchBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicSearchState.beginPrincipalBindingAttempt();
+      }
+      YouTubePublicWatchFreshness? watchFreshness;
+      try {
+        watchFreshness = await youtubePublicWatchState
+            .configureDurability(
+              DurableYouTubePublicWatchStateRepository(
+                persistence: watchPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: watchBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicWatchState.beginPrincipalBindingAttempt();
+      }
+      YouTubePublicShortFreshness? shortFreshness;
+      try {
+        shortFreshness = await youtubePublicShortState
+            .configureDurability(
+              DurableYouTubePublicShortStateRepository(
+                persistence: shortPersistence,
+                principalBinding: storedBinding,
+                regionCode: screen04YouTubeRegionCode,
+              ),
+              bindingAttempt: shortBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+      } on Object {
+        youtubePublicShortState.beginPrincipalBindingAttempt();
+      }
+      SocialCreateDraftFreshness? draftFreshness;
+      try {
+        draftFreshness = await socialCreateDraftState
+            .configureDurability(
+              DurableSocialCreateDraftRepository(
+                persistence: draftPersistence,
+                principalBinding: storedBinding,
+              ),
+              bindingAttempt: draftBindingAttempt,
+            )
+            .timeout(_youtubeCatalogueCacheHydrationTimeout);
+        final mediaStore = draftMediaStore;
+        if (mediaStore != null) {
+          mediaStore.enableStaging();
+          final snapshot = socialCreateDraftState.snapshot;
+          if (snapshot == null) {
+            await mediaStore.purgeAll().timeout(
+              _youtubeCatalogueCacheHydrationTimeout,
+            );
+          } else {
+            await mediaStore
+                .purgeExcept(<String>{
+                  ...snapshot.media.map((item) => item.id),
+                  ...snapshot.imagePollMedia
+                      .whereType<SocialCreateDraftMediaReference>()
+                      .map((item) => item.id),
+                })
+                .timeout(_youtubeCatalogueCacheHydrationTimeout);
+          }
+        }
+      } on Object {
+        socialCreateDraftState.beginPrincipalBindingAttempt();
+      }
+      _recordReleaseBootstrapStage(
+        'youtube_search_state',
+        youtubePublicSearchHydrationIsDegraded(searchFreshness)
+            ? 'degraded'
+            : 'passed',
+      );
+      _recordReleaseBootstrapStage(
+        'youtube_watch_state',
+        youtubePublicWatchHydrationIsDegraded(watchFreshness)
+            ? 'degraded'
+            : 'passed',
+      );
+      _recordReleaseBootstrapStage(
+        'youtube_short_state',
+        youtubePublicShortHydrationIsDegraded(shortFreshness)
+            ? 'degraded'
+            : 'passed',
+      );
+      _recordReleaseBootstrapStage(
+        'social_create_draft',
+        draftMediaStore != null &&
+                (draftFreshness == SocialCreateDraftFreshness.fresh ||
+                    draftFreshness == SocialCreateDraftFreshness.stale ||
+                    draftFreshness == SocialCreateDraftFreshness.missing)
+            ? 'passed'
+            : 'degraded',
+      );
+    } on Object {
+      youtubePublicSearchState.beginPrincipalBindingAttempt();
+      youtubePublicWatchState.beginPrincipalBindingAttempt();
+      youtubePublicShortState.beginPrincipalBindingAttempt();
+      socialCreateDraftState.beginPrincipalBindingAttempt();
+      await invalidateYouTubePublicRuntimeState(
+        searchPersistence: searchPersistence,
+        watchPersistence: watchPersistence,
+        shortPersistence: shortPersistence,
+        timeout: _youtubeCatalogueCacheHydrationTimeout,
+      );
+      await invalidateCreateDraftState();
+      _recordReleaseBootstrapStage('youtube_search_state', 'degraded');
+      _recordReleaseBootstrapStage('youtube_watch_state', 'degraded');
+      _recordReleaseBootstrapStage('youtube_short_state', 'degraded');
+      _recordReleaseBootstrapStage('social_create_draft', 'degraded');
+    }
+  }
+
+  await bindYouTubeSearchStateToCurrentPrincipal();
+  final firebaseSessionBootstrap = FirebaseAuthenticatedSessionBootstrapGateway(
+    FirebaseAuth.instance,
+    bindingProtector: secureVerifiedPrincipalBindingStore,
+  );
   final session = _youtubePublicReviewMode
       ? JourneySession(
           store: SeededJourneyStore(
@@ -594,6 +889,7 @@ Future<void> main() async {
             apiBaseUrl: _authApiBaseUrl,
           ),
           emailLinkGateway: emailLinkGateway,
+          pendingEmailLinkAddressStore: pendingEmailLinkAddressStore,
           socialAuthGateway: FirebaseSocialAuthGateway(
             FirebaseAuth.instance,
             googleServerClientId: _googleServerClientId,
@@ -606,7 +902,11 @@ Future<void> main() async {
           emailLinkAvailable:
               publicAuthRuntimeConfiguration.passwordlessEmailAvailable,
           mobileOtpAvailable: publicAuthRuntimeConfiguration.mobileOtpAvailable,
-          accountBootstrapGateway: DataConnectAccountBootstrapGateway(),
+          accountBootstrapGateway: DataConnectAccountBootstrapGateway(
+            principalGateway: firebaseSessionBootstrap,
+          ),
+          verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
+          accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
           allowGuestReady: true,
@@ -638,6 +938,7 @@ Future<void> main() async {
                   apiBaseUrl: _authApiBaseUrl,
                 ),
           emailLinkGateway: emailLinkGateway,
+          pendingEmailLinkAddressStore: pendingEmailLinkAddressStore,
           socialAuthGateway:
               globalSocialLoginAuditComposition.useReviewAuthentication
               ? ReviewSocialAuthGateway(
@@ -669,12 +970,13 @@ Future<void> main() async {
               globalSocialLoginAuditComposition.useReviewAuthentication
               ? ReviewAccountBootstrapGateway()
               : globalSocialLoginAuditComposition.useFirebaseSessionBootstrap
-              ? FirebaseAuthenticatedSessionBootstrapGateway(
-                  FirebaseAuth.instance,
-                )
+              ? firebaseSessionBootstrap
               : DataConnectAccountBootstrapGateway(
+                  principalGateway: firebaseSessionBootstrap,
                   emulatorHost: _useEmulators ? emulatorHost : null,
                 ),
+          verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
+          accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
         );
@@ -714,6 +1016,7 @@ Future<void> main() async {
       chatSession: ChatSession.production(),
       disposeSession: true,
       disposeChatSession: true,
+      onAuthenticatedBoundary: bindYouTubeSearchStateToCurrentPrincipal,
       initialLocation:
           youtubeInitialLocation ??
           (socialAuthInitialLocation || emailLinkInitialLocation
@@ -726,14 +1029,24 @@ Future<void> main() async {
 
 bool _runtimeModeIsValid() {
   return isQualifiedDeviceReviewRuntimeMode(
-    deviceReview: _deviceReviewMode,
-    useEmulators: _useEmulators,
-    youtubePublicReview: _youtubePublicReviewMode,
-    youtubePrivateDevProof: youtubePrivateDevProofEnabled,
-    sideloadPreflightEnabled: _sideloadPreflightEnabled,
-    googleSideloadSigningQualified: _googleSideloadSigningQualified,
-    globalSocialLoginAudit: _globalSocialLoginAuditMode,
-  );
+        deviceReview: _deviceReviewMode,
+        useEmulators: _useEmulators,
+        youtubePublicReview: _youtubePublicReviewMode,
+        youtubePrivateDevProof: youtubePrivateDevProofEnabled,
+        sideloadPreflightEnabled: _sideloadPreflightEnabled,
+        googleSideloadSigningQualified: _googleSideloadSigningQualified,
+        globalSocialLoginAudit: _globalSocialLoginAuditMode,
+      ) &&
+      isQualifiedSocialRuntimeDependencySet(
+        globalSocialLoginAudit: _globalSocialLoginAuditMode,
+        useEmulators: _useEmulators,
+        firebaseProjectId: _firebaseProjectId,
+        youtubePrivateDevProof: youtubePrivateDevProofEnabled,
+        youtubeEmbeddedPlayerEnabled: youtubeEmbeddedPlayerEnabled,
+        youtubeProviderUrl: youtubePrivateDevProviderUrl,
+        socialContentUrl: moolSocialContentUrl,
+        chatUrl: moolSocialChatUrl,
+      );
 }
 
 FirebaseOptions _firebaseOptions() {

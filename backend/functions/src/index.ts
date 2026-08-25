@@ -2466,6 +2466,10 @@ export const youtubeProvider = onRequest(
           requestId: id,
           error,
           code: providerError.code,
+          providerReason:
+            error instanceof YouTubeProviderError
+              ? error.providerReason
+              : undefined,
         }),
       );
       response.status(providerError.httpStatus).json({

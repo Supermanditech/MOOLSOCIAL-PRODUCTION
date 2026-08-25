@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/youtube/youtube_private_dev_models.dart';
 import 'package:moolsocial/core/youtube/youtube_private_dev_uploader.dart';
 import 'package:moolsocial/features/shared/social_media_picker.dart';
@@ -13,6 +14,32 @@ const _uploadPermission = 'https://www.googleapis.com/auth/youtube.upload';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('production account and channel destinations are exact', () {
+    for (final value in [
+      'https://moolsocial.com/privacy',
+      'https://moolsocial.com/disconnect',
+      'https://moolsocial.com/delete-account',
+      'https://myaccount.google.com/permissions',
+      'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
+      'https://www.youtube.com/watch?v=video12345',
+      'https://www.youtube.com/playlist?list=playlist12345',
+    ]) {
+      expect(isTrustedSocialYouTubeExternalUri(Uri.parse(value)), isTrue);
+    }
+    for (final value in [
+      'http://moolsocial.com/privacy',
+      'https://moolsocial.com/privacy?return=elsewhere',
+      'https://moolsocial.com/app/auth/x',
+      'https://myaccount.google.com/permissions#private',
+      'https://youtube.com/watch?v=video12345',
+      'https://www.youtube.com/watch?v=video12345&token=private',
+      'https://www.youtube.com/channel/not-a-channel',
+      'https://example.com/delete-account',
+    ]) {
+      expect(isTrustedSocialYouTubeExternalUri(Uri.parse(value)), isFalse);
+    }
+  });
 
   test('production routes keep YouTube upload unreachable', () {
     final router = File(
@@ -230,6 +257,97 @@ void main() {
     expect(find.byKey(const Key('youtube-creator-pick-gallery')), findsNothing);
   });
 
+  testWidgets(
+    'connected channel browses details uploads playlists and returns locally',
+    (tester) async {
+      final gateway = _FakeCreatorGateway(
+        capabilities: _capabilities(),
+        connection: _connected(scopes: const ['youtube-read']),
+      );
+
+      await _pumpScreen(tester, gateway: gateway);
+      expect(
+        find.byKey(const Key('youtube-creator-browse-channel')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('youtube-creator-browse-channel')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('youtube-channel-browser')), findsOneWidget);
+      expect(
+        find.byKey(const Key('youtube-channel-browser-title')),
+        findsOneWidget,
+      );
+      expect(find.text('District bulletin one'), findsOneWidget);
+      expect(find.text('Local reports'), findsOneWidget);
+      expect(gateway.channelDetailsCalls, 1);
+      expect(gateway.playlistVideosCalls, 1);
+      expect(gateway.channelPlaylistsCalls, 1);
+
+      await _reveal(tester, const Key('youtube-channel-load-more'));
+      await tester.tap(find.byKey(const Key('youtube-channel-load-more')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('District bulletin two'), findsOneWidget);
+      expect(gateway.playlistVideosCalls, 2);
+      expect(gateway.channelPlaylistsCalls, 1);
+
+      await _reveal(tester, const Key('youtube-channel-load-more-playlists'));
+      await tester.tap(
+        find.byKey(const Key('youtube-channel-load-more-playlists')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('National reports'), findsOneWidget);
+      expect(gateway.channelPlaylistsCalls, 2);
+
+      await tester.tap(find.byKey(const Key('youtube-creator-back')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('youtube-creator-connected')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('youtube-channel-browser')), findsNothing);
+    },
+  );
+
+  testWidgets('root channel return has an explicit route back to Social', (
+    tester,
+  ) async {
+    final gateway = _FakeCreatorGateway(
+      capabilities: _capabilities(),
+      connection: _connected(scopes: const ['youtube-read']),
+    );
+    final router = GoRouter(
+      initialLocation: '/connect',
+      routes: [
+        GoRoute(
+          path: '/connect',
+          builder: (_, _) => SocialYouTubeCreatorUploadScreen(gateway: gateway),
+        ),
+        GoRoute(
+          path: '/app/social',
+          builder: (_, _) =>
+              const Scaffold(body: Text('Social videos destination')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('youtube-creator-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Social videos destination'), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/app/social?sub=videos',
+    );
+  });
+
   testWidgets('opens exact privacy revocation and deletion destinations', (
     tester,
   ) async {
@@ -421,6 +539,41 @@ void main() {
     expect(find.byKey(const Key('youtube-creator-connected')), findsNothing);
   });
 
+  testWidgets(
+    'callback completion refreshes a retained screen from backend truth',
+    (tester) async {
+      final gateway = _FakeCreatorGateway(
+        capabilities: _capabilities(),
+        connection: const YouTubeDisconnected(),
+      );
+
+      await _pumpScreen(tester, gateway: gateway);
+      expect(gateway.connectionStatusCalls, 1);
+      expect(
+        find.byKey(const Key('youtube-creator-disconnected')),
+        findsOneWidget,
+      );
+
+      gateway.connectionValue = _connected(scopes: const ['youtube-read']);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialYouTubeCreatorUploadScreen(
+            gateway: gateway,
+            youtubeConnectResult: 'complete',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gateway.connectionStatusCalls, 2);
+      expect(
+        find.byKey(const Key('youtube-creator-connected')),
+        findsOneWidget,
+      );
+      expect(find.text('MoolSocial News'), findsOneWidget);
+    },
+  );
+
   testWidgets('older lifecycle refresh cannot replace newer channel status', (
     tester,
   ) async {
@@ -544,7 +697,8 @@ YouTubeConnected _connected({required List<String> scopes}) {
   );
 }
 
-class _FakeCreatorGateway implements SocialYouTubeCreatorGateway {
+class _FakeCreatorGateway
+    implements SocialYouTubeCreatorGateway, SocialYouTubeChannelBrowserGateway {
   _FakeCreatorGateway({
     required YouTubePrivateDevCapabilities capabilities,
     required YouTubeConnectionStatus connection,
@@ -560,6 +714,9 @@ class _FakeCreatorGateway implements SocialYouTubeCreatorGateway {
   int connectCalls = 0;
   int disconnectCalls = 0;
   int connectionStatusCalls = 0;
+  int channelDetailsCalls = 0;
+  int playlistVideosCalls = 0;
+  int channelPlaylistsCalls = 0;
   int uploadCalls = 0;
   YouTubeConnectPurpose? lastConnectPurpose;
   bool observedCancellation = false;
@@ -577,6 +734,82 @@ class _FakeCreatorGateway implements SocialYouTubeCreatorGateway {
       return responses[connectionStatusCalls - 1];
     }
     return connectionValue;
+  }
+
+  @override
+  Future<YouTubePublicChannelDetails> channelDetails({
+    required String channelId,
+  }) async {
+    channelDetailsCalls += 1;
+    return YouTubePublicChannelDetails(
+      channelId: channelId,
+      title: 'MoolSocial News channel',
+      description: 'Public reports from the connected channel.',
+      publishedAt: DateTime.utc(2020),
+      uploadsPlaylistId: 'UUabcdefghijklmnopqrstuv',
+      statistics: const YouTubePublicChannelStatistics(
+        hiddenSubscriberCount: false,
+        subscriberCount: '1250',
+        videoCount: '42',
+        viewCount: '9000',
+      ),
+      topicCategories: const [],
+    );
+  }
+
+  @override
+  Future<YouTubeVideoPage> playlistVideos({
+    required String playlistId,
+    String? pageToken,
+  }) async {
+    playlistVideosCalls += 1;
+    if (pageToken == 'page-2') {
+      return YouTubeVideoPage(
+        items: [_channelVideo('video-2', 'District bulletin two')],
+      );
+    }
+    return YouTubeVideoPage(
+      items: [_channelVideo('video-1', 'District bulletin one')],
+      nextPageToken: 'page-2',
+    );
+  }
+
+  @override
+  Future<YouTubePublicPlaylistPage> channelPlaylists({
+    required String channelId,
+    String? pageToken,
+    int? maxResults,
+  }) async {
+    channelPlaylistsCalls += 1;
+    if (pageToken == 'playlist-page-2') {
+      return YouTubePublicPlaylistPage(
+        items: [
+          YouTubePublicPlaylistDetails(
+            playlistId: 'playlist-2',
+            title: 'National reports',
+            description: 'National reporting playlist.',
+            publishedAt: DateTime.utc(2026, 8, 2),
+            channelId: channelId,
+            channelTitle: 'MoolSocial News channel',
+            itemCount: 8,
+          ),
+        ],
+      );
+    }
+    return YouTubePublicPlaylistPage(
+      items: [
+        YouTubePublicPlaylistDetails(
+          playlistId: 'playlist-1',
+          title: 'Local reports',
+          description: 'District reporting playlist.',
+          publishedAt: DateTime.utc(2026, 8, 1),
+          channelId: channelId,
+          channelTitle: 'MoolSocial News channel',
+          itemCount: 12,
+        ),
+      ],
+      nextPageToken: 'playlist-page-2',
+    );
   }
 
   @override
@@ -630,6 +863,21 @@ class _FakeCreatorGateway implements SocialYouTubeCreatorGateway {
 
   @override
   void dispose() {}
+}
+
+YouTubeVideoSummary _channelVideo(String id, String title) {
+  return YouTubeVideoSummary(
+    videoId: id,
+    title: title,
+    channelId: 'UCabcdefghijklmnopqrstuv',
+    channelTitle: 'MoolSocial News channel',
+    publishedAt: DateTime.utc(2026, 8, 20),
+    description: '',
+    thumbnail: YouTubeThumbnail(
+      url: Uri.parse('https://i.ytimg.com/vi/$id/hqdefault.jpg'),
+    ),
+    viewCount: '1200',
+  );
 }
 
 class _FakeVideoPicker implements SocialMediaPicker {

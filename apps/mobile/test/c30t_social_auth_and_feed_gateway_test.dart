@@ -78,7 +78,7 @@ void main() {
 
     await tester.tap(find.text('Create a post'));
     await tester.pump();
-    expect(find.byKey(const Key('screen04-create-workbench')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(journey.stage, JourneyStage.ready);
     expect(journey.isAuthenticated, isTrue);
   });
