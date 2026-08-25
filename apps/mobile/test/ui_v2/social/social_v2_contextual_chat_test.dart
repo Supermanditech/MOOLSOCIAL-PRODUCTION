@@ -47,6 +47,17 @@ void main() {
           );
           expect(find.text(presentation.title), findsOneWidget);
           expect(
+            find.textContaining(presentation.securityMessage),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining(
+              RegExp(r'\bsecure(?:ly)?\b|\bencrypt', caseSensitive: false),
+            ),
+            findsNothing,
+          );
+          expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
+          expect(
             find.text('${subAction.label} · ${presentation.subtitle}'),
             findsOneWidget,
           );
@@ -380,7 +391,7 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.text('MoolSocial Chat · choose a trusted context'),
+          find.text('MoolSocial Chat · choose a conversation context'),
           findsOneWidget,
         );
         await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-back')));
@@ -460,6 +471,16 @@ void main() {
         containsAll(family.subActions.map((action) => action.id)),
       );
       expect(threads.every((thread) => thread.messages.isEmpty), isTrue);
+      final customerCopy = <String>[
+        MoolContextualChatCatalog.presentationFor(family.id).securityMessage,
+        ...threads.map((thread) => thread.detail),
+      ];
+      expect(
+        customerCopy.where(
+          RegExp(r'\bsecure(?:ly)?\b|\bencrypt', caseSensitive: false).hasMatch,
+        ),
+        isEmpty,
+      );
     }
 
     final food = source.threadsFor('eat');

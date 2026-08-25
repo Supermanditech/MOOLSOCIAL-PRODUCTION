@@ -2368,7 +2368,7 @@ void main() {
   });
 
   testWidgets(
-    'Buy Chat presents order progress honest intents and secure channels',
+    'Buy Chat presents order progress honest intents and in-app channels',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
@@ -2419,7 +2419,7 @@ void main() {
       await tester.pump();
       expect(
         session.notice,
-        'Question ready. Choose Chat in app to continue securely.',
+        'Question ready. Choose Chat to select a conversation and continue.',
       );
 
       final chat = find.byKey(const ValueKey('buy-assist-channel-Chat in app'));

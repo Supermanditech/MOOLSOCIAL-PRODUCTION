@@ -72,6 +72,20 @@ void main() {
       expect(find.text('Shop Chat'), findsOneWidget);
       expect(find.text('Shop · partners, orders and offers'), findsOneWidget);
       expect(
+        find.textContaining(BuyV2ShopChatPresentation.shop.securityMessage),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-chat')),
+          matching: find.textContaining(
+            RegExp(r'\bsecure(?:ly)?\b|\bencrypt', caseSensitive: false),
+          ),
+        ),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
+      expect(
         find.byKey(const ValueKey('buy-shop-chat-search')),
         findsOneWidget,
       );
@@ -96,6 +110,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Order MS-240782'), findsWidgets);
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
       expect(productionChatCalls, 0);
 
       await tester.enterText(
@@ -735,13 +750,32 @@ void main() {
     },
   );
 
-  testWidgets('Shop Chat public filter labels remain stable', (tester) async {
+  testWidgets('Shop Chat public labels and default copy remain truthful', (
+    tester,
+  ) async {
     expect(BuyV2ShopChatFilter.values.map((value) => value.name), [
       'all',
       'orders',
       'sellers',
       'offers',
     ]);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final threads = const BuyV2SessionShopChatProvisioningSource().threads(
+      session,
+    );
+    final customerCopy = <String>[
+      BuyV2ShopChatPresentation.shop.securityMessage,
+      ...threads.map((thread) => thread.detail),
+    ];
+    expect(
+      customerCopy.where(
+        RegExp(r'\bsecure(?:ly)?\b|\bencrypt', caseSensitive: false).hasMatch,
+      ),
+      isEmpty,
+    );
   });
 }
 

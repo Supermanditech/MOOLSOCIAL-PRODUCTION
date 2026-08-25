@@ -44,7 +44,8 @@ class BuyV2ShopChatPresentation {
     subtitle: 'partners, orders and offers',
     icon: Icons.storefront_outlined,
     accent: BuyV2Colors.navy,
-    securityMessage: 'Shop conversations continue securely in MoolSocial Chat.',
+    securityMessage:
+        'Shop conversations stay with your purchase in MoolSocial Chat.',
     newConversationPrompt: 'Choose who can help with this purchase.',
     filters: [
       BuyV2ShopChatFilterSpec(
@@ -307,7 +308,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.retailer,
         title: 'Mool Retail Partner',
         subtitle: 'Products, stock and local delivery',
-        detail: 'Start a secure Shop conversation',
+        detail: 'Start a Shop conversation',
         icon: Icons.storefront_outlined,
         accent: BuyV2Colors.orange,
         commerceTarget: BuyV2ShopChatCommerceTarget.shop,
@@ -321,7 +322,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.wholesaler,
         title: 'Mool Trade Partner',
         subtitle: 'Packs, pricing and fulfilment',
-        detail: 'Start a secure wholesale conversation',
+        detail: 'Start a wholesale conversation',
         icon: Icons.inventory_2_outlined,
         accent: BuyV2Colors.green,
         commerceTarget: BuyV2ShopChatCommerceTarget.wholesale,
@@ -335,7 +336,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.manufacturer,
         title: 'Mool Manufacturer',
         subtitle: 'Catalogue, packs and supply enquiries',
-        detail: 'Start a secure manufacturer conversation',
+        detail: 'Start a manufacturer conversation',
         icon: Icons.factory_outlined,
         accent: BuyV2Colors.navy,
         commerceTarget: BuyV2ShopChatCommerceTarget.wholesale,
@@ -349,7 +350,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.offerSupport,
         title: 'Offer details',
         subtitle: 'Price, pack size and validity',
-        detail: 'Continue securely in Chat',
+        detail: 'Continue in MoolSocial Chat',
         icon: Icons.local_offer_outlined,
         accent: BuyV2Colors.orange,
         commerceTarget: BuyV2ShopChatCommerceTarget.offers,
@@ -363,7 +364,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.offerSupport,
         title: 'Offer and checkout help',
         subtitle: 'Eligibility, cart and payment questions',
-        detail: 'Continue securely in Chat',
+        detail: 'Continue in MoolSocial Chat',
         icon: Icons.shopping_bag_outlined,
         accent: BuyV2Colors.navy,
         commerceTarget: BuyV2ShopChatCommerceTarget.offers,
@@ -1052,22 +1053,22 @@ class _ShopChatContextBanner extends StatelessWidget {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: BuyV2Colors.softGreen,
+                          color: presentation.accent.withValues(alpha: .08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.lock_outline_rounded,
-                              color: BuyV2Colors.green,
+                            Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: presentation.accent,
                               size: 11,
                             ),
                             const SizedBox(width: 3),
                             Text(
                               'MoolSocial',
                               style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.green,
+                                color: presentation.accent,
                                 fontSize: 8,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -1353,7 +1354,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'MoolSocial Chat · choose a trusted context',
+                        'MoolSocial Chat · choose a conversation context',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.buyMeta.copyWith(fontSize: 9.5),
@@ -2278,9 +2279,9 @@ class _ShopChatWelcomePanel extends StatelessWidget {
               style: context.buyMeta.copyWith(fontSize: 10.5),
             ),
             const SizedBox(height: 10),
-            const Icon(
-              Icons.lock_outline_rounded,
-              color: BuyV2Colors.green,
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: presentation.accent,
               size: 18,
             ),
           ],

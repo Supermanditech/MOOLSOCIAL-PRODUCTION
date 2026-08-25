@@ -3746,7 +3746,7 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
     widget.session.showNotice(
-      'Question ready. Choose Chat in app to continue securely.',
+      'Question ready. Choose Chat to select a conversation and continue.',
     );
   }
 
