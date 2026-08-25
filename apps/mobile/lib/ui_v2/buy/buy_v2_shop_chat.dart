@@ -1821,6 +1821,10 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                             ...messages.map(
                               (message) => _ShopChatMessageBubble(
                                 message: message,
+                                onForward: () => _dispatchDirect(
+                                  BuyV2ShopChatActionKind.forwardMessage,
+                                  message: message,
+                                ),
                                 onTap:
                                     message.kind ==
                                         BuyV2ShopChatMessageKind.text
@@ -2910,11 +2914,13 @@ class _ShopChatAvatar extends StatelessWidget {
 class _ShopChatMessageBubble extends StatelessWidget {
   const _ShopChatMessageBubble({
     required this.message,
+    required this.onForward,
     required this.onTap,
     required this.onLongPress,
   });
 
   final BuyV2ShopChatMessage message;
+  final VoidCallback onForward;
   final VoidCallback? onTap;
   final VoidCallback onLongPress;
 
@@ -2922,105 +2928,155 @@ class _ShopChatMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final mine = message.fromCurrentUser;
     final bubbleColor = mine ? const Color(0xFFE5E4FF) : Colors.white;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Semantics(
-        button: true,
-        label:
-            '${mine ? 'Sent' : 'Received'} ${message.kind.customerLabel}. '
-            '${message.body ?? message.attachmentName ?? ''}',
-        child: Container(
-          constraints: BoxConstraints(
-            minWidth: 92,
-            maxWidth: MediaQuery.sizeOf(context).width * .78,
-          ),
-          margin: EdgeInsets.only(
-            left: mine ? 42 : 0,
-            right: mine ? 0 : 42,
-            bottom: 7,
-          ),
-          child: BuyV2IntentDepth(
-            child: Material(
-              color: bubbleColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(mine ? 16 : 4),
-                  bottomRight: Radius.circular(mine ? 4 : 16),
+    final forward = _ShopChatMessageForwardButton(
+      message: message,
+      onPressed: onForward,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        mainAxisAlignment: mine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (mine) ...[forward, const SizedBox(width: 6)],
+          Flexible(
+            child: Semantics(
+              container: true,
+              button: onTap != null,
+              label:
+                  '${mine ? 'Sent' : 'Received'} ${message.kind.customerLabel}. '
+                  '${message.body ?? message.attachmentName ?? ''}',
+              child: Container(
+                constraints: BoxConstraints(
+                  minWidth: 92,
+                  maxWidth: MediaQuery.sizeOf(context).width * .68,
                 ),
-                side: const BorderSide(color: BuyV2Colors.line),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: ValueKey('buy-shop-chat-message-${message.id}'),
-                onTap: onTap,
-                onLongPress: onLongPress,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 8, 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (message.replyToLabel != null)
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: .62),
-                            borderRadius: BorderRadius.circular(9),
-                            border: const Border(
-                              left: BorderSide(
-                                color: BuyV2Colors.navy,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            message.replyToLabel!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.buyMeta.copyWith(fontSize: 9),
-                          ),
-                        ),
-                      _ShopChatMessageContent(message: message),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (message.reaction != null) ...[
-                            Text(
-                              message.reaction!,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            const SizedBox(width: 5),
-                          ],
-                          Text(
-                            message.sentAtLabel,
-                            style: context.buyMeta.copyWith(fontSize: 8.5),
-                          ),
-                          if (mine) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              message.deliveryState.deliveryIcon,
-                              size: 14,
-                              color:
-                                  message.deliveryState ==
-                                      BuyV2ShopChatDeliveryState.read
-                                  ? BuyV2Colors.royal
-                                  : message.deliveryState ==
-                                        BuyV2ShopChatDeliveryState.failed
-                                  ? Colors.redAccent
-                                  : BuyV2Colors.muted,
-                            ),
-                          ],
-                        ],
+                child: BuyV2IntentDepth(
+                  child: Material(
+                    color: bubbleColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(mine ? 16 : 4),
+                        bottomRight: Radius.circular(mine ? 4 : 16),
                       ),
-                    ],
+                      side: const BorderSide(color: BuyV2Colors.line),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      key: ValueKey('buy-shop-chat-message-${message.id}'),
+                      onTap: onTap,
+                      onLongPress: onLongPress,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 8, 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (message.replyToLabel != null)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .62),
+                                  borderRadius: BorderRadius.circular(9),
+                                  border: const Border(
+                                    left: BorderSide(
+                                      color: BuyV2Colors.navy,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  message.replyToLabel!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyMeta.copyWith(fontSize: 9),
+                                ),
+                              ),
+                            _ShopChatMessageContent(message: message),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (message.reaction != null) ...[
+                                  Text(
+                                    message.reaction!,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 5),
+                                ],
+                                Text(
+                                  message.sentAtLabel,
+                                  style: context.buyMeta.copyWith(
+                                    fontSize: 8.5,
+                                  ),
+                                ),
+                                if (mine) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    message.deliveryState.deliveryIcon,
+                                    size: 14,
+                                    color:
+                                        message.deliveryState ==
+                                            BuyV2ShopChatDeliveryState.read
+                                        ? BuyV2Colors.royal
+                                        : message.deliveryState ==
+                                              BuyV2ShopChatDeliveryState.failed
+                                        ? Colors.redAccent
+                                        : BuyV2Colors.muted,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
+          ),
+          if (!mine) ...[const SizedBox(width: 6), forward],
+        ],
+      ),
+    );
+  }
+}
+
+class _ShopChatMessageForwardButton extends StatelessWidget {
+  const _ShopChatMessageForwardButton({
+    required this.message,
+    required this.onPressed,
+  });
+
+  final BuyV2ShopChatMessage message;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final direction = message.fromCurrentUser ? 'sent' : 'received';
+    return Semantics(
+      key: ValueKey('buy-shop-chat-forward-${message.id}'),
+      container: true,
+      button: true,
+      label: 'Forward $direction message from ${message.sentAtLabel}',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Forward message',
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: IconButton(
+            onPressed: onPressed,
+            padding: EdgeInsets.zero,
+            iconSize: 18,
+            color: BuyV2Colors.navy,
+            icon: const Icon(Icons.forward_rounded),
           ),
         ),
       ),

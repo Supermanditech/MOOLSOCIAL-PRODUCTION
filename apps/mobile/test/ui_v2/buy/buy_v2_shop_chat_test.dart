@@ -384,6 +384,18 @@ void main() {
         expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
         expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
       }
+      final forwardMessage = find.byKey(
+        const ValueKey('buy-shop-chat-forward-received-text'),
+      );
+      await tester.ensureVisible(forwardMessage);
+      final forwardMessageSize = tester.getSize(forwardMessage);
+      expect(forwardMessageSize.width, greaterThanOrEqualTo(44));
+      expect(forwardMessageSize.height, greaterThanOrEqualTo(44));
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'message ${viewport.size}',
+      );
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -733,6 +745,38 @@ void main() {
         find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
       );
       await tester.pumpAndSettle();
+
+      final directForward = find.byKey(
+        const ValueKey('buy-shop-chat-forward-received-text'),
+      );
+      expect(directForward, findsOneWidget);
+      for (final messageId in const [
+        'received-text',
+        'sent-text',
+        'received-photo',
+        'sent-document',
+        'received-voice',
+      ]) {
+        expect(
+          find.byKey(ValueKey('buy-shop-chat-forward-$messageId')),
+          findsOneWidget,
+          reason: messageId,
+        );
+      }
+      await tester.ensureVisible(directForward);
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel('Forward received message from 10:36'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+        findsNothing,
+      );
+      await tester.tap(directForward);
+      await tester.pumpAndSettle();
+      expect(actions.last.kind, BuyV2ShopChatActionKind.forwardMessage);
+      expect(actions.last.messageId, 'received-text');
 
       await tester.longPress(
         find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
