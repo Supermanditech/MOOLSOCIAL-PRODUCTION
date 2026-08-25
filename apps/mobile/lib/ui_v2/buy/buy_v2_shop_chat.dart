@@ -1604,6 +1604,12 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                             onTap: widget.onOpenContext,
                             familyLabel: widget.presentation.familyLabel,
                           ),
+                          if (widget.presentation.familyId == 'book') ...[
+                            const SizedBox(height: 10),
+                            _ShopChatCareSafetyNotice(
+                              message: widget.presentation.securityMessage,
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           if (messages.isEmpty)
                             _ShopChatWelcomePanel(
@@ -2221,6 +2227,53 @@ class _ShopChatCommerceContext extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopChatCareSafetyNotice extends StatelessWidget {
+  const _ShopChatCareSafetyNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: const ValueKey('buy-shop-chat-care-safety'),
+      container: true,
+      excludeSemantics: true,
+      label: 'Care Chat safety notice. $message',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: buyV2CardDecoration(
+          color: const Color(0xFFFFF8E7),
+          border: const Color(0xFFE7B84B).withValues(alpha: .55),
+          radius: 14,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFF8A5A00),
+              size: 19,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: context.buyMeta.copyWith(
+                  color: const Color(0xFF5F4307),
+                  fontSize: 10.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -298,6 +298,58 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Care doctor and medicine threads retain the safety notice at compact size',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+
+      for (final target in const [
+        (subAction: 'doctor', threadId: 'care-doctor-desk'),
+        (subAction: 'medicine', threadId: 'care-medicine-desk'),
+      ]) {
+        final owners = _Owners();
+        await tester.pumpWidget(
+          _app(
+            owners,
+            world: 'book',
+            subAction: target.subAction,
+            textScale: 1.4,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(ValueKey('buy-shop-chat-entry-${target.threadId}')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('buy-shop-chat-care-safety')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(MoolContextualChatCatalog.care.securityMessage),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            'Care Chat safety notice. '
+            '${MoolContextualChatCatalog.care.securityMessage}',
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        owners.dispose();
+      }
+    },
+  );
+
   testWidgets('context Chat stays usable at 320 width and 140 percent text', (
     tester,
   ) async {
@@ -354,6 +406,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('buy-shop-chat-composer')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-care-safety')),
+      findsNothing,
     );
     await tester.tap(find.byKey(const ValueKey('buy-shop-chat-attach')));
     await tester.pumpAndSettle();
