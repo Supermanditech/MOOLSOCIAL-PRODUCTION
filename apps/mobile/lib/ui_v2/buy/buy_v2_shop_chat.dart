@@ -512,6 +512,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   BuyV2ShopChatThread? _selectedThread;
   final GlobalKey<_ShopChatConversationViewState> _threadViewKey = GlobalKey();
   final List<_BuyV2ShopChatHistoryEntry> _forwardHistory = [];
+  Listenable? _provisioningUpdates;
   bool _surfaceForward = true;
   int _surfaceSequence = 0;
 
@@ -532,6 +533,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     _searchController = TextEditingController(text: _retainedState.inboxQuery);
     _searchFocusNode = FocusNode(debugLabel: 'Shop Chat inbox search');
     _searchController.addListener(_retainInboxQuery);
+    _bindProvisioningSource(widget.provisioningSource);
   }
 
   bool handleBack({bool dismissComposerKeyboard = true}) {
@@ -568,6 +570,13 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   @override
   void didUpdateWidget(covariant BuyV2ShopChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.provisioningSource, widget.provisioningSource)) {
+      _unbindProvisioningSource();
+      _bindProvisioningSource(widget.provisioningSource);
+      _applyProvisionedThreads(
+        widget.provisioningSource.threads(widget.session),
+      );
+    }
     if (oldWidget.initialFilter != widget.initialFilter ||
         oldWidget.initialFilterId != widget.initialFilterId ||
         oldWidget.presentation != widget.presentation) {
@@ -578,6 +587,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
 
   @override
   void dispose() {
+    _unbindProvisioningSource();
     _searchController.removeListener(_retainInboxQuery);
     _searchFocusNode.dispose();
     _searchController.dispose();
@@ -871,6 +881,47 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
 
   void _retainInboxQuery() {
     _retainedState.inboxQuery = _searchController.text;
+  }
+
+  void _bindProvisioningSource(BuyV2ShopChatProvisioningSource source) {
+    final updates = source is Listenable ? source as Listenable : null;
+    _provisioningUpdates = updates;
+    updates?.addListener(_handleProvisioningUpdate);
+  }
+
+  void _unbindProvisioningSource() {
+    _provisioningUpdates?.removeListener(_handleProvisioningUpdate);
+    _provisioningUpdates = null;
+  }
+
+  void _handleProvisioningUpdate() {
+    if (!mounted) return;
+    final threads = widget.provisioningSource.threads(widget.session);
+    setState(() => _applyProvisionedThreads(threads));
+  }
+
+  void _applyProvisionedThreads(List<BuyV2ShopChatThread> threads) {
+    final selected = _selectedThread;
+    if (selected == null) return;
+    BuyV2ShopChatThread? replacement;
+    for (final thread in threads) {
+      if (thread.id == selected.id) {
+        replacement = thread;
+        break;
+      }
+    }
+    if (replacement != null) {
+      _selectedThread = replacement;
+      return;
+    }
+    if (_surface == _BuyV2ShopChatSurface.thread ||
+        _surface == _BuyV2ShopChatSurface.info) {
+      _selectedThread = null;
+      _surface = _BuyV2ShopChatSurface.inbox;
+      _forwardHistory.clear();
+      _surfaceForward = false;
+      _surfaceSequence += 1;
+    }
   }
 
   String _forwardDestination(_BuyV2ShopChatHistoryEntry entry) =>
@@ -1886,6 +1937,16 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     _searchOpen = retained.messageSearchOpen;
     _composerController.addListener(_retainComposer);
     _messageSearchController.addListener(_retainMessageSearch);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShopChatConversationView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.thread, widget.thread)) return;
+    _replyTarget = _messageForId(widget.retainedState.replyMessageId);
+    if (_replyTarget == null) widget.retainedState.replyMessageId = null;
+    final selectedMessageId = _selectedMessage?.id;
+    _selectedMessage = _messageForId(selectedMessageId);
   }
 
   bool handleBack({required bool dismissComposerKeyboard}) {

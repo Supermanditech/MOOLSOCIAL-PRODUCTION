@@ -220,6 +220,52 @@ void main() {
   );
 
   testWidgets(
+    'live provisioning refreshes the open thread and recovers removed context',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      final source = _LiveShopChatSource();
+      addTearDown(source.dispose);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(app(session, shopChatSource: source));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-live-support')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-live-message')),
+        findsNothing,
+      );
+
+      source.publishIncomingMessage();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-message-live-message')),
+        findsOneWidget,
+      );
+      expect(find.text('Your live order update is ready.'), findsOneWidget);
+
+      source.removeConversation();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-shop-chat-thread')), findsNothing);
+      expect(
+        find.text('No Shop conversations are available yet'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Shop subactions seed the matching Chat filter and return cleanly',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -2666,6 +2712,56 @@ void main() {
       isEmpty,
     );
   });
+}
+
+class _LiveShopChatSource extends ChangeNotifier
+    implements BuyV2ShopChatProvisioningSource {
+  _LiveShopChatSource() : _threads = [_thread()];
+
+  List<BuyV2ShopChatThread> _threads;
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
+      List<BuyV2ShopChatThread>.unmodifiable(_threads);
+
+  void publishIncomingMessage() {
+    _threads = [
+      _thread(
+        messages: const [
+          BuyV2ShopChatMessage(
+            id: 'live-message',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: false,
+            sentAtLabel: 'Now',
+            body: 'Your live order update is ready.',
+          ),
+        ],
+      ),
+    ];
+    notifyListeners();
+  }
+
+  void removeConversation() {
+    _threads = [];
+    notifyListeners();
+  }
+
+  static BuyV2ShopChatThread _thread({
+    List<BuyV2ShopChatMessage> messages = const [],
+  }) => BuyV2ShopChatThread(
+    id: 'live-support',
+    filter: BuyV2ShopChatFilter.orders,
+    participantKind: BuyV2ShopChatParticipantKind.orderSupport,
+    title: 'Live order support',
+    subtitle: 'Current order updates',
+    detail: 'Open live order support',
+    icon: Icons.local_shipping_outlined,
+    accent: BuyV2Colors.navy,
+    commerceTarget: BuyV2ShopChatCommerceTarget.orders,
+    contextTitle: 'Live order',
+    contextDetail: 'Current order and delivery context',
+    messages: messages,
+  );
 }
 
 class _RichShopChatSource implements BuyV2ShopChatProvisioningSource {

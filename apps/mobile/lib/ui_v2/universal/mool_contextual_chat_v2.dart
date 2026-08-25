@@ -22,7 +22,7 @@ class MoolDefaultContextualChatProvisioningSource
 }
 
 class MoolContextualChatSourceAdapter
-    implements BuyV2ShopChatProvisioningSource {
+    implements BuyV2ShopChatProvisioningSource, Listenable {
   const MoolContextualChatSourceAdapter({
     required this.familyId,
     required this.source,
@@ -34,6 +34,22 @@ class MoolContextualChatSourceAdapter
   @override
   List<BuyV2ShopChatThread> threads(BuyV2Session? _) =>
       source.threadsFor(familyId);
+
+  @override
+  void addListener(VoidCallback listener) {
+    final updates = source;
+    if (updates is Listenable) {
+      (updates as Listenable).addListener(listener);
+    }
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    final updates = source;
+    if (updates is Listenable) {
+      (updates as Listenable).removeListener(listener);
+    }
+  }
 }
 
 abstract final class MoolContextualChatCatalog {

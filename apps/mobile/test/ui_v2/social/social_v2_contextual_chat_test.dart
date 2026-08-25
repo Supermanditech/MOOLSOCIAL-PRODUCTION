@@ -329,6 +329,47 @@ void main() {
     },
   );
 
+  testWidgets('context adapter forwards live provisioning updates', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    final source = _LiveContextualChatSource();
+    addTearDown(source.dispose);
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(
+      _app(
+        owners,
+        world: 'book',
+        subAction: 'doctor',
+        contextualChatSource: source,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('social-global-chat')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-live-doctor-support')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-message-live-doctor-message')),
+      findsNothing,
+    );
+
+    source.publishIncomingMessage();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-message-live-doctor-message')),
+      findsOneWidget,
+    );
+    expect(find.text('Your appointment time is confirmed.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'context thread keeps attachments calls and send on the runtime action seam',
     (tester) async {
@@ -943,6 +984,8 @@ Widget _app(
   required String world,
   required String subAction,
   BuyV2ShopChatActionHandler? onAction,
+  MoolContextualChatProvisioningSource contextualChatSource =
+      const MoolDefaultContextualChatProvisioningSource(),
   double textScale = 1,
 }) {
   return MaterialApp(
@@ -963,6 +1006,7 @@ Widget _app(
       initialWorld: world,
       initialSubAction: subAction,
       onContextualChatAction: onAction,
+      contextualChatSource: contextualChatSource,
       youtubePublicAccessOverride: false,
       youtubeCreatorAccessOverride: false,
     ),
@@ -1059,6 +1103,56 @@ const _captureFamilies =
         contextTitle: 'Earn Today',
       ),
     ];
+
+class _LiveContextualChatSource extends ChangeNotifier
+    implements MoolContextualChatProvisioningSource {
+  _LiveContextualChatSource() : _threads = [_thread()];
+
+  List<BuyV2ShopChatThread> _threads;
+
+  @override
+  List<BuyV2ShopChatThread> threadsFor(String familyId) => familyId == 'book'
+      ? List<BuyV2ShopChatThread>.unmodifiable(_threads)
+      : const [];
+
+  void publishIncomingMessage() {
+    _threads = [
+      _thread(
+        messages: const [
+          BuyV2ShopChatMessage(
+            id: 'live-doctor-message',
+            kind: BuyV2ShopChatMessageKind.text,
+            fromCurrentUser: false,
+            sentAtLabel: 'Now',
+            body: 'Your appointment time is confirmed.',
+          ),
+        ],
+      ),
+    ];
+    notifyListeners();
+  }
+
+  static BuyV2ShopChatThread _thread({
+    List<BuyV2ShopChatMessage> messages = const [],
+  }) => BuyV2ShopChatThread(
+    id: 'live-doctor-support',
+    filter: BuyV2ShopChatFilter.orders,
+    filterId: 'doctor',
+    participantKind: BuyV2ShopChatParticipantKind.doctorDesk,
+    title: 'Live doctor support',
+    subtitle: 'Appointment coordination',
+    detail: 'Booking support only · not medical advice',
+    icon: Icons.medical_services_outlined,
+    accent: Color(0xFF00757B),
+    contextTitle: 'Doctor appointment',
+    contextDetail: 'Provider, fee and appointment time context',
+    messages: messages,
+    capabilities: BuyV2ShopChatCapabilities(
+      productSharing: false,
+      orderSharing: false,
+    ),
+  );
+}
 
 class _Owners {
   final journey = JourneySession();
