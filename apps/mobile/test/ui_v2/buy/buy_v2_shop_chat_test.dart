@@ -4,6 +4,7 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
@@ -147,6 +148,71 @@ void main() {
         find.byKey(const ValueKey('buy-local-destination-tabs')),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Shop Chat handoff carries draft category and exact return route',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      Uri? handoffUri;
+      late final GoRouter router;
+      router = GoRouter(
+        initialLocation: '/app/buy',
+        routes: [
+          GoRoute(
+            path: '/app/buy',
+            builder: (context, state) => BuyV2Screen(session: session),
+          ),
+          GoRoute(
+            path: '/app/chat/inbox',
+            builder: (context, state) {
+              handoffUri = state.uri;
+              return const Scaffold(body: Text('Production Chat inbox'));
+            },
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          routerConfig: router,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-partner')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Please check local delivery',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Production Chat inbox'), findsOneWidget);
+      expect(handoffUri?.path, '/app/chat/inbox');
+      expect(handoffUri?.queryParameters['type'], 'business');
+      expect(
+        handoffUri?.queryParameters['draft'],
+        'Please check local delivery',
+      );
+      expect(handoffUri?.queryParameters['return'], '/app/buy');
+      expect(handoffUri?.queryParameters.containsKey('start'), isFalse);
       expect(tester.takeException(), isNull);
     },
   );

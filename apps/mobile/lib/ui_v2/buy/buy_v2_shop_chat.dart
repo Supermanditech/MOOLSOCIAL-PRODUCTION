@@ -287,6 +287,9 @@ class BuyV2ShopChatActionResult {
 typedef BuyV2ShopChatActionHandler =
     Future<BuyV2ShopChatActionResult> Function(BuyV2ShopChatAction action);
 
+typedef BuyV2ShopChatHandoffHandler =
+    void Function(BuyV2ShopChatThread thread, BuyV2ShopChatAction action);
+
 abstract interface class BuyV2ShopChatProvisioningSource {
   List<BuyV2ShopChatThread> threads(BuyV2Session? session);
 }
@@ -476,6 +479,7 @@ class BuyV2ShopChatView extends StatefulWidget {
     this.presentation = BuyV2ShopChatPresentation.shop,
     this.provisioningSource = const BuyV2SessionShopChatProvisioningSource(),
     this.onAction,
+    this.onHandoff,
     this.onOpenCommerce,
     this.onOpenThreadContext,
     this.retainedState,
@@ -490,6 +494,7 @@ class BuyV2ShopChatView extends StatefulWidget {
   final BuyV2ShopChatPresentation presentation;
   final BuyV2ShopChatProvisioningSource provisioningSource;
   final BuyV2ShopChatActionHandler? onAction;
+  final BuyV2ShopChatHandoffHandler? onHandoff;
   final ValueChanged<BuyV2ShopChatCommerceTarget>? onOpenCommerce;
   final ValueChanged<BuyV2ShopChatThread>? onOpenThreadContext;
   final BuyV2ShopChatRetainedState? retainedState;
@@ -791,7 +796,13 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
   ) async {
     final handler = widget.onAction;
     if (handler == null) {
-      widget.onOpenProductionChat();
+      final handoff = widget.onHandoff;
+      final thread = _selectedThread;
+      if (handoff != null && thread != null) {
+        handoff(thread, action);
+      } else {
+        widget.onOpenProductionChat();
+      }
       return const BuyV2ShopChatActionResult.handedOff();
     }
     try {
@@ -4291,6 +4302,24 @@ extension on BuyV2ShopChatParticipantKind {
     BuyV2ShopChatParticipantKind.salonDesk => 'Salon partner',
     BuyV2ShopChatParticipantKind.workOpportunity => 'Work opportunity',
     BuyV2ShopChatParticipantKind.workspaceSupport => 'Workspace support',
+  };
+}
+
+extension BuyV2ShopChatProductionHandoff on BuyV2ShopChatThread {
+  String get productionChatType => switch (participantKind) {
+    BuyV2ShopChatParticipantKind.retailer ||
+    BuyV2ShopChatParticipantKind.wholesaler ||
+    BuyV2ShopChatParticipantKind.manufacturer ||
+    BuyV2ShopChatParticipantKind.restaurant ||
+    BuyV2ShopChatParticipantKind.tableDesk ||
+    BuyV2ShopChatParticipantKind.salonDesk ||
+    BuyV2ShopChatParticipantKind.workOpportunity => 'business',
+    BuyV2ShopChatParticipantKind.orderSupport ||
+    BuyV2ShopChatParticipantKind.medicineDesk => 'order',
+    BuyV2ShopChatParticipantKind.offerSupport ||
+    BuyV2ShopChatParticipantKind.travelPartner ||
+    BuyV2ShopChatParticipantKind.doctorDesk ||
+    BuyV2ShopChatParticipantKind.workspaceSupport => 'support',
   };
 }
 

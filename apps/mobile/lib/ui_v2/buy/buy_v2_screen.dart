@@ -35,6 +35,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMainAction,
     this.onOpenChat,
     this.onShopChatAction,
+    this.onShopChatHandoff,
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.offersSource = const BuyV2CataloguePublishedOffersSource(),
@@ -57,6 +58,7 @@ class BuyV2Screen extends StatefulWidget {
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
   final BuyV2ShopChatActionHandler? onShopChatAction;
+  final BuyV2ShopChatHandoffHandler? onShopChatHandoff;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PublishedOffersSource offersSource;
@@ -559,6 +561,37 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  void _handoffShopChatAction(
+    BuyV2ShopChatThread thread,
+    BuyV2ShopChatAction action,
+  ) {
+    final externalHandoff = widget.onShopChatHandoff;
+    if (externalHandoff != null) {
+      externalHandoff(thread, action);
+      return;
+    }
+    final onOpenChat = widget.onOpenChat;
+    if (onOpenChat != null) {
+      onOpenChat();
+      return;
+    }
+    final router = GoRouter.maybeOf(context);
+    final returnRoute = router?.routeInformationProvider.value.uri.toString();
+    final draft = action.kind == BuyV2ShopChatActionKind.sendText
+        ? action.text?.trim()
+        : null;
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {
+          'type': thread.productionChatType,
+          if (draft != null && draft.isNotEmpty) 'draft': draft,
+          'return': returnRoute ?? '/app/buy',
+        },
+      ).toString(),
+    );
+  }
+
   void _openShopChat() {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
@@ -662,6 +695,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           BuyV2ShopChatRetainedState.new,
         ),
         onAction: widget.onShopChatAction,
+        onHandoff: _handoffShopChatAction,
         onOpenCommerce: careChat ? null : _openShopChatCommerce,
         onOpenThreadContext: careChat ? _openCareChatContext : null,
       );

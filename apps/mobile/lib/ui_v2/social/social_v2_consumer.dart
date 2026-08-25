@@ -65,6 +65,7 @@ class SocialUniversalV2 extends StatefulWidget {
     this.onOpenMool,
     this.onOpenMainAction,
     this.onContextualChatAction,
+    this.onContextualChatHandoff,
     this.contextualChatSource =
         const MoolDefaultContextualChatProvisioningSource(),
     this.mediaPicker,
@@ -90,6 +91,7 @@ class SocialUniversalV2 extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final BuyV2ShopChatActionHandler? onContextualChatAction;
+  final BuyV2ShopChatHandoffHandler? onContextualChatHandoff;
   final MoolContextualChatProvisioningSource contextualChatSource;
   final SocialMediaPicker? mediaPicker;
 
@@ -597,6 +599,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
                               BuyV2ShopChatRetainedState.new,
                             ),
                         onAction: widget.onContextualChatAction,
+                        onHandoff:
+                            widget.onContextualChatHandoff ??
+                            _handoffContextualChatAction,
                         onBack: _closeContextualChat,
                         onOpenProductionChat: _openProductionChat,
                         onOpenThreadContext: _openContextualThreadOrigin,
@@ -1191,6 +1196,34 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   }
 
   void _openProductionChat() {
+    context.push(
+      Uri(
+        path: '/app/chat',
+        queryParameters: {'return': _productionChatReturnRoute()},
+      ).toString(),
+    );
+  }
+
+  void _handoffContextualChatAction(
+    BuyV2ShopChatThread thread,
+    BuyV2ShopChatAction action,
+  ) {
+    final draft = action.kind == BuyV2ShopChatActionKind.sendText
+        ? action.text?.trim()
+        : null;
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {
+          'type': thread.productionChatType,
+          if (draft != null && draft.isNotEmpty) 'draft': draft,
+          'return': _productionChatReturnRoute(),
+        },
+      ).toString(),
+    );
+  }
+
+  String _productionChatReturnRoute() {
     final world = screen04World(_world);
     final choice = _choiceByWorld[_world] ?? world.choices.first.id;
     final returnPath = switch (world.id) {
@@ -1207,16 +1240,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
         'item': _activeVideo!.id,
       },
     };
-    final returnRoute = Uri(
-      path: returnPath,
-      queryParameters: returnQuery,
-    ).toString();
-    context.push(
-      Uri(
-        path: '/app/chat',
-        queryParameters: {'return': returnRoute},
-      ).toString(),
-    );
+    return Uri(path: returnPath, queryParameters: returnQuery).toString();
   }
 
   void _openUniversalNotifications() {

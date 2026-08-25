@@ -262,6 +262,72 @@ void main() {
   );
 
   testWidgets(
+    'context Chat handoff carries draft category and exact subaction return',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+      Uri? handoffUri;
+      late final GoRouter router;
+      router = GoRouter(
+        initialLocation: '/app/ride?sub=cab',
+        routes: [
+          GoRoute(
+            path: '/app/chat/inbox',
+            builder: (context, state) {
+              handoffUri = state.uri;
+              return const Scaffold(body: Text('Production Chat inbox'));
+            },
+          ),
+          GoRoute(
+            path: '/app/:world',
+            builder: (context, state) => SocialUniversalV2(
+              session: owners.journey,
+              creatorSession: owners.creator,
+              retailerSession: owners.retailer,
+              sharedSession: owners.shared,
+              initialWorld: state.pathParameters['world'] ?? 'social',
+              initialSubAction: state.uri.queryParameters['sub'],
+              youtubePublicAccessOverride: false,
+              youtubeCreatorAccessOverride: false,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(_routedApp(router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-travel-cab-support')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Please check my cab pickup',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Production Chat inbox'), findsOneWidget);
+      expect(handoffUri?.path, '/app/chat/inbox');
+      expect(handoffUri?.queryParameters['type'], 'support');
+      expect(
+        handoffUri?.queryParameters['draft'],
+        'Please check my cab pickup',
+      );
+      expect(handoffUri?.queryParameters['return'], '/app/ride?sub=cab');
+      expect(handoffUri?.queryParameters.containsKey('start'), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'context thread keeps attachments calls and send on the runtime action seam',
     (tester) async {
       tester.view.devicePixelRatio = 1;
