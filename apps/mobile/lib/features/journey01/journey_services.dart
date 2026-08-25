@@ -583,15 +583,14 @@ class ReviewPrincipalBindingProtector implements PrincipalBindingProtector {
 
   @override
   Future<VerifiedPrincipalBinding> protect(String principalId) async {
-    final normalized = principalId.trim();
-    if (normalized.isEmpty) {
+    if (principalId.isEmpty) {
       throw const JourneyServiceException(
         'Your signed-in account could not be verified. Please sign in again.',
         code: 'auth-session-missing',
       );
     }
     final digest = _reviewHmac.convert(
-      utf8.encode('moolsocial.verified-principal.v1\u0000$normalized'),
+      utf8.encode('moolsocial.verified-principal.v1\u0000$principalId'),
     );
     return VerifiedPrincipalBinding.fromStorage('v1:$digest');
   }

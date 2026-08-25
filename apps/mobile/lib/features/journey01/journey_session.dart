@@ -600,7 +600,7 @@ class JourneySession extends ChangeNotifier {
         provider,
         result.code ?? 'auth-provider-credential-complete',
       );
-      final expectedUserId = result.userId?.trim();
+      final expectedUserId = result.userId;
       if (expectedUserId == null || expectedUserId.isEmpty) {
         throw const JourneyServiceException(
           'Your signed-in account could not be verified. Please sign in again.',
@@ -701,7 +701,7 @@ class JourneySession extends ChangeNotifier {
         provider,
         result.code ?? 'auth-provider-credential-complete',
       );
-      final expectedUserId = result.userId?.trim();
+      final expectedUserId = result.userId;
       if (expectedUserId == null || expectedUserId.isEmpty) {
         throw const JourneyServiceException(
           'Your signed-in account could not be verified. Please sign in again.',
@@ -1642,7 +1642,7 @@ class JourneySession extends ChangeNotifier {
         .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
         .timeout(
           accountBootstrapTimeout,
-          onTimeout: () => expectedUserId?.trim().isNotEmpty ?? false
+          onTimeout: () => expectedUserId?.isNotEmpty ?? false
               ? const AuthenticatedAccountBootstrapResult.fatal(
                   code: 'auth-session-timeout',
                 )

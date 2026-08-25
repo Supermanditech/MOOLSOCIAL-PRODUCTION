@@ -246,8 +246,7 @@ class SecureVerifiedPrincipalBindingStore
 
   @override
   Future<VerifiedPrincipalBinding> protect(String principalId) async {
-    final normalized = principalId.trim();
-    if (normalized.isEmpty) {
+    if (principalId.isEmpty) {
       throw const JourneyServiceException(
         'Your signed-in account could not be verified. Please sign in again.',
         code: 'auth-session-missing',
@@ -257,7 +256,7 @@ class SecureVerifiedPrincipalBindingStore
     final digest = Hmac(
       sha256,
       secret,
-    ).convert(utf8.encode('$_bindingContext$normalized'));
+    ).convert(utf8.encode('$_bindingContext$principalId'));
     return VerifiedPrincipalBinding.fromStorage('v1:$digest');
   }
 
@@ -1858,7 +1857,7 @@ class FirebaseAuthenticatedSessionBootstrapGateway
   Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
     String? expectedUserId,
   }) async {
-    final expected = expectedUserId?.trim();
+    final expected = expectedUserId;
     if (expected != null && expected.isNotEmpty) {
       return _prepareInteractive(expected);
     }
@@ -1870,7 +1869,7 @@ class FirebaseAuthenticatedSessionBootstrapGateway
           ? null
           : await currentUserIdReader();
       if (_currentUserId != null) {
-        if (currentUserId == null || currentUserId.trim().isEmpty) {
+        if (currentUserId == null || currentUserId.isEmpty) {
           return const AuthenticatedAccountBootstrapResult.invalidSession(
             code: 'auth-session-missing',
           );
@@ -1879,7 +1878,7 @@ class FirebaseAuthenticatedSessionBootstrapGateway
       }
 
       final refreshedUserId = await _revalidatedUserId();
-      if (refreshedUserId == null || refreshedUserId.trim().isEmpty) {
+      if (refreshedUserId == null || refreshedUserId.isEmpty) {
         return const AuthenticatedAccountBootstrapResult.invalidSession(
           code: 'auth-session-missing',
         );
@@ -1906,7 +1905,7 @@ class FirebaseAuthenticatedSessionBootstrapGateway
   ) async {
     try {
       final userId = await _interactiveVerifiedUserId();
-      if (userId == null || userId.trim().isEmpty) {
+      if (userId == null || userId.isEmpty) {
         return const AuthenticatedAccountBootstrapResult.invalidSession(
           code: 'auth-session-missing',
         );
@@ -1980,7 +1979,7 @@ class FirebaseAuthenticatedSessionBootstrapGateway
     final currentUserId = currentUserIdReader == null
         ? null
         : await currentUserIdReader();
-    if (currentUserId == null || currentUserId.trim().isEmpty) return null;
+    if (currentUserId == null || currentUserId.isEmpty) return null;
     return _bindingProtector.protect(currentUserId);
   }
 

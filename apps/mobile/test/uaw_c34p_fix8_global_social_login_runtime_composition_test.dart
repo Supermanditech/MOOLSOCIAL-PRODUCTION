@@ -301,6 +301,47 @@ void main() {
       },
     );
 
+    test(
+      'opaque UID whitespace is bound exactly and never normalized',
+      () async {
+        final review = const ReviewPrincipalBindingProtector();
+        final plain = await review.protect('private-user');
+        final padded = await review.protect(' private-user ');
+        final whitespace = await review.protect(' ');
+
+        expect(plain.matches(padded), isFalse);
+        expect(plain.matches(whitespace), isFalse);
+        await expectLater(
+          review.protect(''),
+          throwsA(
+            isA<JourneyServiceException>().having(
+              (error) => error.code,
+              'code',
+              'auth-session-missing',
+            ),
+          ),
+        );
+
+        final values = <String, String?>{};
+        final secure = SecureVerifiedPrincipalBindingStore.forTesting(
+          readValue: ({required key}) async => values[key],
+          writeValue: ({required key, required value}) async {
+            values[key] = value;
+          },
+          deleteValue: ({required key}) async {
+            values.remove(key);
+          },
+          createSecret: () => List<int>.filled(32, 9),
+        );
+        expect(
+          (await secure.protect(
+            'private-user',
+          )).matches(await secure.protect(' private-user ')),
+          isFalse,
+        );
+      },
+    );
+
     test('missing secret resets local session before fresh sign-in', () async {
       final values = <String, String?>{};
       SecureVerifiedPrincipalBindingStore createStore() =>
@@ -348,6 +389,27 @@ void main() {
   });
 
   group('typed Firebase principal revalidation', () {
+    test('interactive expected UID comparison uses exact bytes', () async {
+      final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+        verifiedUserId: () async => 'unused',
+        interactiveVerifiedUserId: () async => ' private-user ',
+      );
+
+      final exact = await gateway.prepareAuthenticatedAccount(
+        expectedUserId: ' private-user ',
+      );
+      final normalized = await gateway.prepareAuthenticatedAccount(
+        expectedUserId: 'private-user',
+      );
+
+      expect(exact.state, AuthenticatedAccountBootstrapState.verified);
+      expect(
+        normalized.state,
+        AuthenticatedAccountBootstrapState.invalidSession,
+      );
+      expect(normalized.code, 'auth-session-user-mismatch');
+    });
+
     test('explicit network failure is retryable with local binding', () async {
       final gateway = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
         currentUserId: () async => 'private-user',
