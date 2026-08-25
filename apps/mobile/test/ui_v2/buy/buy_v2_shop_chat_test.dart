@@ -647,6 +647,78 @@ void main() {
   });
 
   testWidgets(
+    'text-only capability hides unsupported controls before the first tap',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final actions = <BuyV2ShopChatAction>[];
+
+      await tester.pumpWidget(
+        app(
+          session,
+          shopChatSource: const _TextOnlyShopChatSource(),
+          textScale: 1.4,
+          onShopChatAction: (action) async {
+            actions.add(action);
+            return const BuyV2ShopChatActionResult.accepted();
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-text-only')),
+      );
+      await tester.pumpAndSettle();
+
+      for (final key in const [
+        'buy-shop-chat-voice-call',
+        'buy-shop-chat-video-call',
+        'buy-shop-chat-camera',
+        'buy-shop-chat-attach',
+        'buy-shop-chat-voice',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsNothing, reason: key);
+      }
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-send-disabled')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('Type a message to send'), findsOneWidget);
+      expect(
+        const BuyV2ShopChatCapabilities(
+          camera: false,
+          media: false,
+          documents: false,
+          productSharing: false,
+          orderSharing: false,
+          locationSharing: false,
+          contactSharing: false,
+        ).canAttach,
+        isFalse,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+        'Text still works',
+      );
+      await tester.pump();
+      expect(find.byKey(const ValueKey('buy-shop-chat-send')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
+      await tester.pumpAndSettle();
+      expect(actions.single.kind, BuyV2ShopChatActionKind.sendText);
+      expect(actions.single.text, 'Text still works');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'thread info and system Back unwind one Shop Chat surface at a time',
     (tester) async {
       final core = BuySession();
@@ -1151,6 +1223,38 @@ class _RichShopChatSource implements BuyV2ShopChatProvisioningSource {
           attachmentDetail: '0:18',
         ),
       ],
+    ),
+  ];
+}
+
+class _TextOnlyShopChatSource implements BuyV2ShopChatProvisioningSource {
+  const _TextOnlyShopChatSource();
+
+  @override
+  List<BuyV2ShopChatThread> threads(BuyV2Session? session) => const [
+    BuyV2ShopChatThread(
+      id: 'text-only',
+      filter: BuyV2ShopChatFilter.sellers,
+      participantKind: BuyV2ShopChatParticipantKind.retailer,
+      title: 'Text support',
+      subtitle: 'Text messages only',
+      detail: 'Open text support',
+      icon: Icons.chat_bubble_outline_rounded,
+      accent: BuyV2Colors.navy,
+      contextTitle: 'Text support',
+      contextDetail: 'Text-only conversation context',
+      capabilities: BuyV2ShopChatCapabilities(
+        voiceCall: false,
+        videoCall: false,
+        camera: false,
+        media: false,
+        documents: false,
+        voiceMessages: false,
+        productSharing: false,
+        orderSharing: false,
+        locationSharing: false,
+        contactSharing: false,
+      ),
     ),
   ];
 }

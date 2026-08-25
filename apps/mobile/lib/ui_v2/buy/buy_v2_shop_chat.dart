@@ -169,6 +169,15 @@ class BuyV2ShopChatCapabilities {
   final bool orderSharing;
   final bool locationSharing;
   final bool contactSharing;
+
+  bool get canAttach =>
+      camera ||
+      media ||
+      documents ||
+      productSharing ||
+      orderSharing ||
+      locationSharing ||
+      contactSharing;
 }
 
 @immutable
@@ -1886,11 +1895,13 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                 );
                 setState(() {});
               },
-              onAttachment: () => setState(() {
-                _attachmentOpen = !_attachmentOpen;
-                _threadMenuOpen = false;
-                _emojiOpen = false;
-              }),
+              onAttachment: widget.thread.capabilities.canAttach
+                  ? () => setState(() {
+                      _attachmentOpen = !_attachmentOpen;
+                      _threadMenuOpen = false;
+                      _emojiOpen = false;
+                    })
+                  : null,
               onCamera: widget.thread.capabilities.camera
                   ? () => _dispatchDirect(BuyV2ShopChatActionKind.captureImage)
                   : null,
@@ -2649,7 +2660,7 @@ class _ShopChatComposer extends StatelessWidget {
   final VoidCallback onCancelReply;
   final VoidCallback onToggleEmoji;
   final ValueChanged<String> onEmoji;
-  final VoidCallback onAttachment;
+  final VoidCallback? onAttachment;
   final VoidCallback? onCamera;
   final VoidCallback onSend;
   final VoidCallback? onVoice;
@@ -2657,6 +2668,15 @@ class _ShopChatComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canSend = controller.text.trim().isNotEmpty;
+    final canRecordVoice = onVoice != null;
+    final primaryEnabled = !busy && (canSend || canRecordVoice);
+    final primaryLabel = busy
+        ? 'Sending message'
+        : canSend
+        ? 'Send message'
+        : canRecordVoice
+        ? 'Record voice message'
+        : 'Type a message to send';
     return Material(
       key: const ValueKey('buy-shop-chat-composer'),
       color: Colors.white,
@@ -2752,12 +2772,13 @@ class _ShopChatComposer extends StatelessWidget {
                               ),
                             ),
                           ),
-                          _ShopChatComposerIcon(
-                            key: const ValueKey('buy-shop-chat-attach'),
-                            tooltip: 'Share in this conversation',
-                            onPressed: busy ? null : onAttachment,
-                            icon: Icons.attach_file_rounded,
-                          ),
+                          if (onAttachment != null)
+                            _ShopChatComposerIcon(
+                              key: const ValueKey('buy-shop-chat-attach'),
+                              tooltip: 'Share in this conversation',
+                              onPressed: busy ? null : onAttachment,
+                              icon: Icons.attach_file_rounded,
+                            ),
                           if (onCamera != null)
                             _ShopChatComposerIcon(
                               key: const ValueKey('buy-shop-chat-camera'),
@@ -2773,7 +2794,8 @@ class _ShopChatComposer extends StatelessWidget {
                   const SizedBox(width: 5),
                   Semantics(
                     button: true,
-                    label: canSend ? 'Send message' : 'Record voice message',
+                    enabled: primaryEnabled,
+                    label: primaryLabel,
                     child: SizedBox(
                       width: 46,
                       height: 46,
@@ -2781,17 +2803,19 @@ class _ShopChatComposer extends StatelessWidget {
                         key: ValueKey(
                           canSend
                               ? 'buy-shop-chat-send'
-                              : 'buy-shop-chat-voice',
+                              : canRecordVoice
+                              ? 'buy-shop-chat-voice'
+                              : 'buy-shop-chat-send-disabled',
                         ),
                         heroTag: null,
                         elevation: 0,
                         backgroundColor: BuyV2Colors.navy,
                         foregroundColor: Colors.white,
-                        onPressed: busy
-                            ? null
-                            : canSend
-                            ? onSend
-                            : onVoice,
+                        onPressed: primaryEnabled
+                            ? canSend
+                                  ? onSend
+                                  : onVoice
+                            : null,
                         child: busy
                             ? const SizedBox(
                                 width: 18,
@@ -2804,7 +2828,9 @@ class _ShopChatComposer extends StatelessWidget {
                             : Icon(
                                 canSend
                                     ? Icons.send_rounded
-                                    : Icons.mic_none_rounded,
+                                    : canRecordVoice
+                                    ? Icons.mic_none_rounded
+                                    : Icons.send_rounded,
                                 size: 21,
                               ),
                       ),
