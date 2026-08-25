@@ -1675,10 +1675,10 @@
       "ticketId": "UAW-CODEX-SOCIAL-SHARE-RUNTIME-20260826",
       "customerOutcome": "A person can use the phone's real share sheet for an exact public MoolSocial post or selected public YouTube video without a false delivery claim.",
       "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-      "manifestSha256": "DFED4BEFE68554B1E4AE65BCCC8AFC6BC981D2ED20E0069EA6D3E46A4BED6DC5",
+      "manifestSha256": "796E0F4ACC2E129EE51E39B6741E56BE173E2A6AD59FBBC7E45C0D70A4EECDA6",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
-      "implementationDisposition": ["reuse", "thin_adapter", "test_only_acceptance", "new_necessary_work"],
+      "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
       "sharedImplementationOwners": [
         "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
         "apps/mobile/pubspec.yaml",
