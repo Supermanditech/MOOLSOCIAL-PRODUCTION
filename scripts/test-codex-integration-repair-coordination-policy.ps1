@@ -42,13 +42,13 @@ Assert-RepairContract (
   [string]$repair.requiredCursorCommit -ceq
     '00ce93552091ee51739266c0a8fbe6d207d9f695' -and
   [int]$repair.maximumMergeCommits -eq 1 -and
-  [int]$repair.maximumPreMergeCoordinationCommits -eq 3 -and
+  [int]$repair.maximumPreMergeCoordinationCommits -eq 4 -and
   @($repair.preMergeCoordinationOwners).Count -eq 6 -and
   [int]$repair.maximumPostMergeClosureCommits -eq 1 -and
   @($repair.postMergeClosureOwners).Count -eq 2 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed -and
-  @($repair.exactConflictOwners).Count -eq 9
+  @($repair.exactConflictOwners).Count -eq 10
 ) 'sealed parents or one-merge conflict boundary changed.'
 
 $requiredCheckerTokens = @(

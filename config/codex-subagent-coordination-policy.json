@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3712,
-    "sha256": "8557603F747FAC73F3391B874E29DBAF74EE6DE52DDC1779E8897971874A7260"
+    "entryCount": 3713,
+    "sha256": "17A184FB3242312843DFFA02BB07FB53E683C4C6FBAA711B07450A29BFFB6B9E"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -227,6 +227,7 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
         "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
+        "scripts/check-approved-ui-locks.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     },
@@ -598,7 +599,7 @@
         "requiredCursorCommit": "00ce93552091ee51739266c0a8fbe6d207d9f695",
         "requiredCursorBranch": "work/cursor-ui/shop-chat-ui-20260824",
         "maximumMergeCommits": 1,
-        "maximumPreMergeCoordinationCommits": 3,
+        "maximumPreMergeCoordinationCommits": 4,
         "preMergeCoordinationOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
@@ -623,6 +624,7 @@
           "apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
+          "scripts/check-approved-ui-locks.ps1",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,

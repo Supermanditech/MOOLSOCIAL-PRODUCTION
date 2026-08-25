@@ -42564,6 +42564,32 @@
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-approved-ui-locks.ps1"
       ]
+    },
+    {
+      "id": "REG-20260826-3742-SOCIAL-LOCK-HARDENING-EXPANDED-REPAIR-CONFLICT-SET-TO-TEN",
+      "status": "registered_exact_tenth_primary_repair_owner_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing"
+      ],
+      "mistake": "After the sealed-parallel lock fallback and its fixtures passed, replaying the exact Cursor merge produced the original nine conflicts plus scripts/check-approved-ui-locks.ps1 because the pre-merge repair branch now intentionally extends the Cursor lock checker; the merge was aborted without commit.",
+      "rootCause": "REG-20260826-3738 incorrectly required the post-hardening merge to retain the original nine-conflict inventory even though a deliberate first-parent extension of a Cursor-changed file necessarily makes that owner a legitimate content conflict.",
+      "prevention": "Machine-lock the repair inventory to ten exact owners, transfer the approved-lock checker to the primary repair claim, require its resolved blob to be the hardened first-parent version, and continue to prove every non-conflict owner equals Git's automatic tree; no product conflict or accepted hash changes.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
     }
   ]
 }

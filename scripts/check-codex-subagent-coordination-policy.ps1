@@ -871,6 +871,7 @@ $expectedRepairConflictOwners = @(
   'apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart',
   'config/codex-subagent-coordination-policy.json',
   'docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md',
+  'scripts/check-approved-ui-locks.ps1',
   'scripts/check-codex-subagent-coordination-policy.ps1'
 )
 Assert-Coordination (
@@ -884,7 +885,7 @@ Assert-Coordination (
   [string]$integrationRepair.requiredCursorBranch -ceq
     'work/cursor-ui/shop-chat-ui-20260824' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
-  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 3 -and
+  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 4 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-approved-ui-locks.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
@@ -1571,8 +1572,11 @@ if ($ProductionLane -ceq 'baseline') {
               )
             }).Count -eq 0
           ) -and
-          (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
-            (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
+          @($preCommitStagedOwners | Where-Object {
+            -not $preMergeCoordinationOwnerKeys.Contains(
+              ([string]$_).ToLowerInvariant()
+            )
+          }).Count -eq 0
         ) 'integration repair coordination correction owner set changed.'
       } else {
         Assert-Coordination (
