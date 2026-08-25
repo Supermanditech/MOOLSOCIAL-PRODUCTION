@@ -21,6 +21,7 @@ void main() {
 
   test('main composes the explicit live global social login audit lane', () {
     final source = File('lib/main.dart').readAsStringSync();
+    final appSource = File('lib/app/moolsocial_app.dart').readAsStringSync();
 
     for (final token in const [
       "'MOOLSOCIAL_GLOBAL_SOCIAL_LOGIN_AUDIT'",
@@ -35,6 +36,10 @@ void main() {
     ]) {
       expect(source, contains(token), reason: token);
     }
+    expect(
+      appSource,
+      contains('_session.retryAuthenticatedAccountRevalidation()'),
+    );
   });
 
   test('Android Credential Manager plugin is complete and legacy bridge absent', () {

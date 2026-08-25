@@ -243,7 +243,9 @@ void main() {
 
       await session.start();
 
-      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.stage, JourneyStage.ready);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.authenticatedRevalidationPending, isTrue);
       expect(
         session.authenticatedBootstrapState,
         AuthenticatedAccountBootstrapState.retryableUnavailable,
@@ -323,7 +325,7 @@ void main() {
   );
 
   test(
-    'retryable relaunch remains fail-closed even with matching receipt',
+    'retryable relaunch restores only a matching verified receipt',
     () async {
       final binding = await const ReviewPrincipalBindingProtector().protect(
         'private-user-a',
@@ -353,13 +355,124 @@ void main() {
 
       await session.start();
 
-      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.stage, JourneyStage.ready);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.authenticatedRevalidationPending, isTrue);
+      expect(session.noticeMessage, contains('offline'));
       expect(
         session.authenticatedBootstrapState,
         AuthenticatedAccountBootstrapState.retryableUnavailable,
       );
       expect(receiptStore.binding!.matches(binding), isTrue);
       expect(bootstrap.invalidationCount, 0);
+    },
+  );
+
+  test(
+    'retryable relaunch without prior receipt remains fail-closed',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: ReviewAccountBootstrapGateway(
+          result: AuthenticatedAccountBootstrapResult.retryableUnavailable(
+            binding,
+          ),
+          currentBinding: binding,
+        ),
+        verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(),
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.authenticatedRevalidationPending, isFalse);
+    },
+  );
+
+  test('offline revalidation is single-flight and clears on success', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedRevalidationPending, isTrue);
+
+    final first = session.retryAuthenticatedAccountRevalidation();
+    final second = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    expect(bootstrap.prepareCount, 2);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+
+    expect(await first, isTrue);
+    expect(await second, isTrue);
+    expect(bootstrap.prepareCount, 2);
+    expect(session.stage, JourneyStage.ready);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(session.noticeMessage, isNull);
+  });
+
+  test(
+    'fatal reconnect revalidation invalidates the degraded session',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _ControlledRevalidationBootstrap(binding);
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+          binding: binding,
+        ),
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      final retry = session.retryAuthenticatedAccountRevalidation();
+      bootstrap.complete(
+        const AuthenticatedAccountBootstrapResult.fatal(
+          code: 'auth-session-verification-fatal',
+        ),
+      );
+
+      expect(await retry, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.authenticatedRevalidationPending, isFalse);
+      expect(bootstrap.invalidationCount, 1);
     },
   );
 
@@ -1207,6 +1320,41 @@ class _TimeoutPrincipalBootstrap implements AccountBootstrapGateway {
   Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
     String? expectedUserId,
   }) => Completer<AuthenticatedAccountBootstrapResult>().future;
+}
+
+class _ControlledRevalidationBootstrap implements AccountBootstrapGateway {
+  _ControlledRevalidationBootstrap(this.binding);
+
+  final VerifiedPrincipalBinding binding;
+  final Completer<AuthenticatedAccountBootstrapResult> _retry =
+      Completer<AuthenticatedAccountBootstrapResult>();
+  int prepareCount = 0;
+  int invalidationCount = 0;
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async => binding;
+
+  @override
+  Future<void> invalidateLocalSession() async {
+    invalidationCount += 1;
+  }
+
+  @override
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) {
+    prepareCount += 1;
+    if (prepareCount == 1) {
+      return Future.value(
+        AuthenticatedAccountBootstrapResult.retryableUnavailable(binding),
+      );
+    }
+    return _retry.future;
+  }
+
+  void complete(AuthenticatedAccountBootstrapResult result) {
+    _retry.complete(result);
+  }
 }
 
 class _CallbackSocialAuthGateway

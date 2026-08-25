@@ -118,6 +118,7 @@ class JourneySession extends ChangeNotifier {
   String? noticeMessage;
   AuthenticatedAccountIdentity? accountIdentity;
   AuthenticatedAccountBootstrapState? authenticatedBootstrapState;
+  bool authenticatedRevalidationPending = false;
   String? reviewCode;
   String? returnTo;
   String? _authenticationCancelTo;
@@ -138,6 +139,7 @@ class JourneySession extends ChangeNotifier {
   bool _socialAuthCleanupRequired = false;
   bool _principalBindingCleanupRequired = false;
   bool _unsafePrincipalResetRequired = false;
+  Future<bool>? _authenticatedRevalidationFuture;
   String? _pendingEmailLink;
   String? _completedEmailLinkReturnRoute;
   String? _completedSocialAuthReturnRoute;
@@ -203,6 +205,7 @@ class JourneySession extends ChangeNotifier {
     _completedSetupExperienceVersion = 0;
     _setBusy(true);
     errorMessage = null;
+    authenticatedRevalidationPending = false;
 
     try {
       final capturedRoute = returnTo;
@@ -264,7 +267,9 @@ class JourneySession extends ChangeNotifier {
       } else if (signedIn) {
         final bootstrap = await _prepareAuthenticatedAccount();
         if (await _acceptAuthenticatedRelaunch(bootstrap)) {
-          await _refreshAuthenticatedAccountIdentity();
+          if (!authenticatedRevalidationPending) {
+            await _refreshAuthenticatedAccountIdentity();
+          }
           stage = JourneyStage.ready;
         }
       } else if (snapshot.setupComplete) {
@@ -292,7 +297,7 @@ class JourneySession extends ChangeNotifier {
           'authenticated=$_isAuthenticated',
         );
       }
-      noticeMessage = null;
+      if (!authenticatedRevalidationPending) noticeMessage = null;
     } on Object {
       stage = JourneyStage.bootFailure;
       if (kDebugMode || _deviceReviewMode) {
@@ -534,7 +539,9 @@ class JourneySession extends ChangeNotifier {
       if (_authenticatedAtBoot) {
         final bootstrap = await _prepareAuthenticatedAccount();
         if (await _acceptAuthenticatedRelaunch(bootstrap)) {
-          await _refreshAuthenticatedAccountIdentity();
+          if (!authenticatedRevalidationPending) {
+            await _refreshAuthenticatedAccountIdentity();
+          }
           stage = JourneyStage.ready;
         } else {
           stage = JourneyStage.signIn;
@@ -545,7 +552,7 @@ class JourneySession extends ChangeNotifier {
         stage = JourneyStage.signIn;
       }
       errorMessage = null;
-      noticeMessage = null;
+      if (!authenticatedRevalidationPending) noticeMessage = null;
       notifyListeners();
       return true;
     } on Object {
@@ -1246,6 +1253,7 @@ class JourneySession extends ChangeNotifier {
       await _persist(setupComplete: true);
       await _retainVerifiedPrincipalForOnlineSession(bootstrap.currentBinding!);
       _isAuthenticated = true;
+      authenticatedRevalidationPending = false;
       stage = JourneyStage.ready;
       errorMessage = null;
       noticeMessage = null;
@@ -1465,6 +1473,7 @@ class JourneySession extends ChangeNotifier {
 
   void _applyLocallySignedOutState() {
     _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
     accountIdentity = null;
     stage = JourneyStage.signIn;
     phoneNumber = null;
@@ -1478,6 +1487,49 @@ class JourneySession extends ChangeNotifier {
     socialAuthProvider = null;
     socialAuthState = SocialAuthState.idle;
     authenticationPurpose = JourneyAuthenticationPurpose.general;
+  }
+
+  Future<bool> retryAuthenticatedAccountRevalidation() {
+    final existing = _authenticatedRevalidationFuture;
+    if (existing != null) return existing;
+    if (!_isAuthenticated || !authenticatedRevalidationPending) {
+      return Future<bool>.value(false);
+    }
+    final attempt = _runAuthenticatedAccountRevalidation();
+    _authenticatedRevalidationFuture = attempt;
+    return attempt;
+  }
+
+  Future<bool> _runAuthenticatedAccountRevalidation() async {
+    try {
+      final bootstrap = await _prepareAuthenticatedAccount();
+      if (bootstrap.state == AuthenticatedAccountBootstrapState.fatal) {
+        await _invalidateMismatchedPrincipal();
+        errorMessage =
+            'Your account session could not be verified safely. Please sign in again.';
+        notifyListeners();
+        return false;
+      }
+      final accepted = await _acceptAuthenticatedRelaunch(bootstrap);
+      if (!accepted) {
+        notifyListeners();
+        return false;
+      }
+      if (authenticatedRevalidationPending) {
+        notifyListeners();
+        return false;
+      }
+      await _refreshAuthenticatedAccountIdentity();
+      errorMessage = null;
+      noticeMessage = null;
+      notifyListeners();
+      return true;
+    } on Object {
+      notifyListeners();
+      return false;
+    } finally {
+      _authenticatedRevalidationFuture = null;
+    }
   }
 
   void captureReturnTo(String location) {
@@ -1729,6 +1781,7 @@ class JourneySession extends ChangeNotifier {
     authenticatedBootstrapState = bootstrap.state;
     switch (bootstrap.state) {
       case AuthenticatedAccountBootstrapState.verified:
+        authenticatedRevalidationPending = false;
         final current = bootstrap.currentBinding!;
         final VerifiedPrincipalBinding? stored;
         try {
@@ -1747,10 +1800,29 @@ class JourneySession extends ChangeNotifier {
         );
         return true;
       case AuthenticatedAccountBootstrapState.retryableUnavailable:
-        throw JourneyServiceException(
-          'Your account could not be verified while offline. Check the connection and retry.',
-          code: bootstrap.code,
-        );
+        final current = bootstrap.currentBinding!;
+        final VerifiedPrincipalBinding? stored;
+        try {
+          stored = await _verifiedPrincipalBindingStore.read();
+        } on Object {
+          await _resetUnsafePrincipalBinding();
+          return false;
+        }
+        if (stored == null) {
+          throw const JourneyServiceException(
+            'Your account must complete one online verification before offline access is available.',
+            code: 'auth-session-offline-unbound',
+          );
+        }
+        if (!stored.matches(current)) {
+          await _invalidateMismatchedPrincipal();
+          return false;
+        }
+        authenticatedRevalidationPending = true;
+        accountIdentity = null;
+        noticeMessage =
+            'You are offline. Eligible saved content remains available while account verification waits.';
+        return true;
       case AuthenticatedAccountBootstrapState.invalidSession:
         if (bootstrap.code == 'auth-binding-reset-required') return false;
         await _invalidateMismatchedPrincipal();
@@ -1836,6 +1908,7 @@ class JourneySession extends ChangeNotifier {
       }
     }
     _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
     accountIdentity = null;
     if (cleanupFailure != null) {
       throw const JourneyServiceException(
@@ -1862,6 +1935,7 @@ class JourneySession extends ChangeNotifier {
       }
     }
     _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
     accountIdentity = null;
     _principalBindingCleanupRequired = cleanupFailure != null;
     _unsafePrincipalResetRequired = cleanupFailure != null;

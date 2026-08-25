@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/design/moolsocial_brand_motion.dart';
@@ -186,6 +188,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
         _brandCadence.appPaused();
       case AppLifecycleState.resumed:
         _brandCadence.appResumed();
+        unawaited(_session.retryAuthenticatedAccountRevalidation());
       case AppLifecycleState.inactive:
         break;
     }
