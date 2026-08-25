@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3725,
-    "sha256": "D7CEBF7B0D7CEE863685413E18A5599E3F3B183192DD4E22922258B03EC9A7CA"
+    "entryCount": 3747,
+    "sha256": "79715247F9DFE1EDE5D063C1C3D17E566C8AC75C78C75E512996285626A459A8"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -228,15 +228,22 @@
         "docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md",
         "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
         "scripts/check-approved-ui-locks.ps1",
+        "scripts/check-brand-integrity.ps1",
+        "scripts/check-buy-approved-reference.ps1",
+        "scripts/check-buy-backend-contract-boundary.ps1",
+        "scripts/check-buy-data-egress-boundary.ps1",
+        "scripts/check-buy-protected-baseline.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-interaction-contracts.ps1",
+        "scripts/check-social-protected-baseline.ps1",
         "scripts/check-user-facing-copy.ps1"
       ]
     },
     {
-      "task": "/root/integration_social_runtime_chat_v3_20260826",
+      "task": "/root/integration_social_runtime_chat_v4_20260826",
       "role": "primary",
       "owners": [
-        "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md"
+        "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826.md"
       ]
     }
   ],
@@ -609,15 +616,23 @@
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "scripts/test-codex-integration-repair-coordination-policy.ps1"
         ],
-        "maximumPostMergeClosureCommits": 4,
+        "maximumPostMergeClosureCommits": 5,
         "postMergeClosureOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
           "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
           "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md",
+          "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826.md",
           "scripts/check-approved-ui-locks.ps1",
+          "scripts/check-brand-integrity.ps1",
+          "scripts/check-buy-approved-reference.ps1",
+          "scripts/check-buy-backend-contract-boundary.ps1",
+          "scripts/check-buy-data-egress-boundary.ps1",
+          "scripts/check-buy-protected-baseline.ps1",
           "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/check-interaction-contracts.ps1",
+          "scripts/check-social-protected-baseline.ps1",
           "scripts/check-user-facing-copy.ps1",
           "scripts/test-codex-integration-repair-coordination-policy.ps1"
         ],
@@ -636,11 +651,11 @@
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
-        "freshIntegrationWorkId": "social-runtime-chat-v3-20260826",
-        "freshIntegrationTicketId": "UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826",
-        "freshIntegrationBranch": "integration/moolsocial/social-runtime-chat-v3-20260826",
-        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v3-20260826",
-        "freshIntegrationMergeSubject": "merge(social-runtime-chat-v3-20260826): integrate copy-qualified runtime and Chat"
+        "freshIntegrationWorkId": "social-runtime-chat-v4-20260826",
+        "freshIntegrationTicketId": "UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826",
+        "freshIntegrationBranch": "integration/moolsocial/social-runtime-chat-v4-20260826",
+        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v4-20260826",
+        "freshIntegrationMergeSubject": "merge(social-runtime-chat-v4-20260826): integrate fully-qualified runtime and Chat"
       }
     },
     "promotion": {

@@ -42813,6 +42813,226 @@
       "prevention": "Preserve unpushed v2 unchanged as stale evidence; never reset, amend or add a second merge; bind a new v3 work ID, ticket, branch, worktree and exact merge subject, admit only remote-qualified 5e20dc9 from a fresh governance-tag checkout, and rerun all final gates before push.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/runtime/moolsocial-production-runtime-tickets-20260825.json", "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md"]
+    },
+    {
+      "id": "REG-20260826-3755-INTERACTION-GATE-TREATED-DART-ROUTE-INTERPOLATION-AS-LITERAL",
+      "status": "registered_semantic_interpolated_route_fixture_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After v3 passed 194 frontend, 594 backend and 7 hosting tests plus analysis, copy and lock gates, check-interaction-contracts.ps1 rejected the inherited template /app/auth/$operationPath as an unregistered literal route.",
+      "rootCause": "The static route extractor does not distinguish Dart interpolated route templates from literal navigable destinations.",
+      "prevention": "Preserve v3 unpushed; inspect the exact extractor and registered-route oracle, ignore only route strings containing a Dart interpolation token, add positive literal and negative interpolated fixtures, retain final missing-literal rejection, and complete all static gates on the repair branch before binding another integration identity.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-interaction-contracts.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/runtime/moolsocial-production-runtime-tickets-20260825.json", "scripts/check-interaction-contracts.ps1"]
+    },
+    {
+      "id": "REG-20260826-3756-INTERACTION-GATE-NORMALIZED-AUTH-TEMPLATE-STILL-HAD-NO-LITERAL-ROUTER-PATTERN",
+      "status": "registered_dynamic_router_composition_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "The interpolated-route fixture and normalization passed, but the interaction gate still rejected normalized /app/auth/dynamic because the router's corresponding auth destinations are not present in its literal path extraction set.",
+      "rootCause": "The first correction assumed simple interpolation normalization would match a literal parameterized router path without first proving how auth callback destinations are composed in journey_router.dart.",
+      "prevention": "After refreshed memory, inspect only the auth route composition and the adapter operation allowlist; require the template prefix plus exact finite operation set through a semantic fixture, skip only that proven template, and retain rejection for arbitrary interpolated app routes.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-interaction-contracts.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-interaction-contracts.ps1", "apps/mobile/lib/features/journey01/journey_router.dart", "apps/mobile/lib/core/auth/x_oauth2_pkce_network_adapter.dart"]
+    },
+    {
+      "id": "REG-20260826-3757-INTERACTION-GATE-TREATED-EMAIL-CONTINUE-BASE-PATH-AS-APP-ROUTE",
+      "status": "registered_email_continue_uri_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After the exact external auth callback template was excluded, the interaction gate advanced and rejected inherited email_link_runtime_configuration.dart target /app as an unregistered navigation destination.",
+      "rootCause": "The extractor scans every quoted /app string without distinguishing Firebase email continue-URI base paths from in-app GoRouter navigation calls, and still short-circuits at the first Write-Error.",
+      "prevention": "After refreshed memory, inspect the bounded email continue-URI contract, add an exact owner/content semantic exclusion with positive and wrong-owner fixtures, make violation reporting non-short-circuiting while retaining the final throw, then classify all remaining targets in one pass.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-interaction-contracts.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-interaction-contracts.ps1", "apps/mobile/lib/core/config/email_link_runtime_configuration.dart"]
+    },
+    {
+      "id": "REG-20260826-3758-INTERACTION-GATE-REPORTED-THIRTEEN-DYNAMIC-PREFIX-AND-LEGACY-TARGETS",
+      "status": "registered_atomic_route_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After non-short-circuit interaction reporting, the gate emitted thirteen inherited targets across JourneySession, Buy invoice and legacy containment: eight trailing-slash dynamic prefixes, one braced invoice route and four legacy compatibility targets.",
+      "rootCause": "The literal extractor evaluates quoted route fragments independently from adjacent identifiers/interpolation and does not distinguish legacy containment destinations from primary registered GoRouter paths.",
+      "prevention": "Register every emitted target as an atomic machine ticket, compare each exact source construction with router or containment ownership, build a semantic target classifier that accepts only proven dynamic prefixes, parameterized invoice routes and exact legacy containment targets, retain arbitrary prefix/literal rejection fixtures, and rerun the complete gate once.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-interaction-contracts.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/runtime/moolsocial-production-runtime-tickets-20260825.json", "scripts/check-interaction-contracts.ps1", "apps/mobile/lib/features/journey01/journey_session.dart", "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart", "apps/mobile/lib/ui_v2/universal/legacy_route_containment_screen_v2.dart"]
+    },
+    {
+      "id": "REG-20260826-3759-BUY-APPROVED-REFERENCE-GATE-REJECTED-INHERITED-VERIFICATION-HASH",
+      "status": "registered_sealed_parallel_reference_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After the interaction gate passed, check-buy-approved-reference.ps1 rejected evidence/buy-complete-v1-verification.json because its working hash differs from the immutable manifest hash.",
+      "rootCause": "The broad final gate has not yet classified whether the evidence owner is an inherited common sealed-tip byte representation, a line-ending projection or prohibited reference drift.",
+      "prevention": "Compare raw and canonical hashes plus Git blob identity across governance, production, Codex, Cursor and repair; never rewrite the immutable expected hash; permit only an exact branch-limited two-sealed-tip/current-byte or canonical text representation with negative drift fixtures, otherwise stop for evidence-owner correction.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-buy-approved-reference.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-buy-approved-reference.ps1", "approved-references/screens/09-buy-complete/v1/evidence/buy-complete-v1-verification.json"]
+    },
+    {
+      "id": "REG-20260826-3760-BUY-REFERENCE-REGISTRATION-GUESSED-MANIFEST-RELATIVE-EVIDENCE-PATH",
+      "status": "registered_exact_repository_owner_discovery_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling"],
+      "mistake": "Regression memory rejected REG-20260826-3759 because its evidence array copied the gate's approved-root-relative label evidence/buy-complete-v1-verification.json as if it were a repository-root path.",
+      "rootCause": "The registration did not resolve the gate label through approved-references before writing the permanent repository evidence owner.",
+      "prevention": "Resolve the exact filename with rg --files, replace only the invalid evidence member with the canonical repository path, update the registry binding and rerun memory before reference classification.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-buy-approved-reference.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-buy-approved-reference.ps1"]
+    },
+    {
+      "id": "REG-20260826-3761-SOCIAL-PROTECTED-BASELINE-INVENTORY-PREDATES-SEALED-RUNTIME-AND-CHAT-FILES",
+      "status": "registered_sealed_delta_overlay_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After interaction and immutable Buy reference gates passed, check-social-protected-baseline.ps1 rejected the integrated tree because its fixed inventory expects 119 files while the sealed runtime/Chat tree contains 231.",
+      "rootCause": "The historical protected baseline gate requires exact legacy inventory cardinality and has no machine-bound overlay proof for the founder-authorized Codex and Cursor feature tips.",
+      "prevention": "Inspect the gate schema and exact added/changed/deleted inventory relative to its protected baseline; retain every historical owner/hash check, permit only a branch-limited overlay whose current protected subtree equals the final remote-qualified repair tip, add missing/changed/extra negative fixtures, and never rewrite the historical baseline manifest.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-social-protected-baseline.ps1"]
+    },
+    {
+      "id": "REG-20260826-3762-SOCIAL-PROTECTED-BASELINE-REGISTRATION-GUESSED-NONEXISTENT-CONFIG-OWNER",
+      "status": "registered_live_gate_embedded_baseline_discovery_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling"],
+      "mistake": "REG-20260826-3761 initially referenced a guessed config/social-protected-baseline.json owner, but exact rg --files discovery found only the gate script and no separate config manifest.",
+      "rootCause": "The registration assumed a conventional external baseline manifest before reading whether the live gate embeds its baseline inventory.",
+      "prevention": "Remove the nonexistent evidence member, bind only existing owners, inspect the live gate after refreshed memory, and do not invent a replacement manifest path.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-social-protected-baseline.ps1"]
+    },
+    {
+      "id": "REG-20260826-3763-SOCIAL-GATE-OWNER-PATCH-USED-STALE-REGISTRY-BINDING-ANCHOR",
+      "status": "registered_live_binding_read_before_patch_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The combined policy update for the Social protected gate was rejected with zero change because its registryBinding hunk used an older count/hash anchor after later copy/interaction registrations had already advanced the working policy.",
+      "rootCause": "The patch combined the new owner additions with a remembered binding preimage instead of reading the current two live binding lines.",
+      "prevention": "Recompute the final registry generation, read the exact current binding and owner neighborhoods, then patch binding and owner arrays as separate operations before memory replay.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260826-3764-BUY-PROTECTED-GATE-DEFAULT-BASELINE-ARTIFACT-ABSENT-IN-ISOLATED-WORKTREE",
+      "status": "registered_immutable_production_fallback_or_explicit_path_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After the sealed Social overlay gate passed, check-buy-protected-baseline.ps1 stopped because its default artifacts/quality/buy-protected-baseline-r40-3-20260801-49/BASELINE.json is absent from the isolated repair worktree.",
+      "rootCause": "The protected Buy gate assumes a local retained baseline artifact and has no confined immutable fallback to the production checkout used by the regression-memory dependency model.",
+      "prevention": "Inspect the gate parameters and exact production artifact availability; prefer an explicit existing baseline path when supported, otherwise add a confined read-only production fallback with path/hash identity and missing/tampered negative fixtures; do not copy or regenerate the baseline.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-buy-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-buy-protected-baseline.ps1"]
+    },
+    {
+      "id": "REG-20260826-3765-BUY-BACKEND-BOUNDARY-ALLOWLIST-PREDATES-SEALED-COMMERCE-CONTRACTS",
+      "status": "registered_complete_nonshort_owner_delta_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "backend"],
+      "mistake": "After protected Buy passed through its sealed overlay, check-buy-backend-contract-boundary.ps1 rejected acceptance_policy_governance_contract.test.ts as an unapproved backend owner.",
+      "rootCause": "The boundary allowlist predates sealed commerce contract/test additions and short-circuits at its first Write-Error, so the complete owner delta is unknown.",
+      "prevention": "Make owner violation reporting non-short-circuiting while retaining final failure, inventory every emitted owner, compare exact backend subtree identity with the remote-qualified repair product merge, add a branch-limited sealed overlay or exact owner additions with forbidden-owner negative fixtures, and never broaden data egress or provider roots.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-buy-backend-contract-boundary.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-buy-backend-contract-boundary.ps1", "backend/functions/src/commerce/acceptance_policy_governance_contract.test.ts"]
+    },
+    {
+      "id": "REG-20260826-3766-BUY-DATA-EGRESS-GATE-PREDATES-USER-INVOKED-CHAT-COPY",
+      "status": "registered_exact_clipboard_action_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After the sealed backend boundary passed, check-buy-data-egress-boundary.ps1 rejected buy_v2_shop_chat.dart for an unapproved clipboard write.",
+      "rootCause": "The historical Buy egress gate predates Cursor's explicit selected-message Copy action and has not distinguished user-invoked local clipboard output from automatic/network data egress.",
+      "prevention": "Inspect the exact clipboard call, message-selection/action guard and tests; allow only the sealed byte-exact Chat owner on branch-limited repair/integration overlays or an exact user-action pattern, retain automatic clipboard and network/storage negative fixtures, and make violation reporting complete before replay.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-buy-data-egress-boundary.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-buy-data-egress-boundary.ps1", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3767-DATA-EGRESS-OWNER-PATCH-REUSED-STALE-POLICY-BINDING",
+      "status": "registered_independent_live_binding_patch_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The combined data-egress policy update was rejected with zero change because it again bundled owner additions with a stale registryBinding preimage during the same accumulating static-gate correction commit.",
+      "rootCause": "The binding anchor was copied from an earlier generation instead of read from the live dirty policy immediately before patching.",
+      "prevention": "Compute the final registry generation, read the live binding, patch binding alone, then patch exact owner-array adjacency separately; never combine a moving generation preimage with unrelated owner additions.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260826-3768-BRAND-INTEGRITY-GATE-PREDATES-CURSOR-BUY-THEME-STRUCTURE",
+      "status": "registered_sealed_buy_theme_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After Buy egress passed, check-brand-integrity.ps1 -Surface App rejected the integrated Buy theme motion because it expects exactly one canvas and one header integration.",
+      "rootCause": "The historical brand static assertion predates the sealed Cursor Buy screen structure and has not been compared with the current motion/theme ownership or tests.",
+      "prevention": "Inspect the exact brand assertion and sealed Buy theme symbols, prove one effective canvas owner and truthful header behavior through source/tests, update only the static oracle or branch-limited sealed projection with duplicate/missing negative fixtures, and retain all other App brand checks.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-brand-integrity.ps1", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3769-BRAND-DIAGNOSTIC-PASSED-WINDOWS-GLOB-AS-LITERAL-RG-PATH",
+      "status": "registered_rg_glob_option_or_directory_root_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "A read-only Buy theme symbol search passed apps/mobile/lib/ui_v2/buy/*.dart as a literal Windows path to rg, which rejected the invalid filename after the gate-path search succeeded.",
+      "rootCause": "The command used a shell-style path glob instead of searching the directory root with rg's --glob option.",
+      "prevention": "After refreshed memory, search the exact Buy directory root with --glob '*.dart' and discard the failed symbol inventory.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-brand-integrity.ps1"]
+    },
+    {
+      "id": "REG-20260826-3770-BRAND-GATE-SEALED-HEADER-BRANCH-STILL-RAN-OBSOLETE-CINEMATIC-TOKENS",
+      "status": "registered_complete_sealed_header_branch_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "The sealed Buy canvas/header branch passed its first conditional assertions, then brand integrity still rejected missing buy-header-signature-shop from a later unconditional historical cinematic-header token block.",
+      "rootCause": "The first oracle correction scoped only the integration-source header tokens and did not include the subsequent motion-source cinematic header assertions owned by the same removed header design.",
+      "prevention": "After refreshed memory, inspect the complete contiguous historical header assertion block, guard all obsolete cinematic-header tokens under the non-sealed branch, and require the sealed branch's exact header-absence/navigation-motion structure plus existing Buy tests before one replay.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-brand-integrity.ps1", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3771-BRAND-FOLLOWUP-AGAIN-GUESSED-MOVING-POLICY-BINDING",
+      "status": "registered_scalar_live_binding_before_every_generation_patch_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The brand follow-up binding patch was rejected with zero change because the accumulating static-gate work again made the remembered policy generation stale.",
+      "rootCause": "The command did not scalar-read the live policy binding immediately before applying the registry update.",
+      "prevention": "For the remainder of this bounded correction, always emit only current registry count/hash and current policy count/hash, then patch those exact two lines alone before any other policy hunk.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260826-3772-BRAND-GATE-SEALED-BUY-BRANCH-STILL-RAN-OBSOLETE-SEARCH-BAND-CONTRACT",
+      "status": "registered_complete_historical_buy_block_boundary_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After both cinematic header assertion groups were correctly scoped, brand integrity advanced and rejected an obsolete longQueryBandHeight search-band token absent from the sealed Cursor Buy structure.",
+      "rootCause": "Historical Buy integration assertions continue beyond the header groups into a legacy search-band contract, so piecemeal token guards remain incomplete.",
+      "prevention": "After refreshed memory, locate the exact end of the contiguous historical Buy integration block, keep shared palette/motion primitives and later non-Buy brand checks unconditional, and for sealed Buy require the byte-exact audited screen plus current Buy screen/navigation/search tests instead of any obsolete token in that block.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-brand-integrity.ps1", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3773-BRAND-GATE-PREDATES-STANDALONE-CHAT-MOOL-NAVIGATION",
+      "status": "registered_sealed_chat_launcher_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After the complete historical Buy search/header block was scoped, brand integrity advanced and rejected the sealed Chat source for not containing the old canonical launcher icon expression.",
+      "rootCause": "The Chat brand assertion predates the standalone native Chat/inbox navigation accepted in the sealed runtime tree and has not been compared with the current Mool return control and exact-return tests.",
+      "prevention": "Inspect the exact Chat source owner, current Mool/back control and C10D return tests; accept only a byte-exact sealed Chat projection with current brand/navigation symbols and missing/changed negative facts, while retaining the historical launcher assertion on ordinary branches.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-brand-integrity.ps1", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_chat_global_dock_exact_return_c10d_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3774-BRAND-GATE-PREDATES-SEALED-SOCIAL-MOOL-ENTRY-PROJECTION",
+      "status": "registered_sealed_social_entry_contract_classification_required",
+      "appliesTo": ["primary", "coordination", "integration", "testing", "mobile"],
+      "mistake": "After sealed standalone Chat branding was accepted, brand integrity advanced and rejected the protected Social Mool entry in screen04_universal_components.dart.",
+      "rootCause": "The historical assertion requires a specific grid_view icon regex and has not been reconciled with the sealed Social navigation projection already covered by RT-07/08 and Mool return tests.",
+      "prevention": "Compare the exact Social/creator entry owners with the audited product merge, require their current Mool labels, action identities and return semantics under a branch-limited byte-exact projection, retain the historical regex on ordinary branches, and add negative fact fixtures.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-brand-integrity.ps1", "apps/mobile/lib/ui_v2/social/screen04_universal_components.dart", "apps/mobile/test/ui_v2/social/rt07_feed_android_back_contract_test.dart", "apps/mobile/test/ui_v2/social/rt08_create_android_back_contract_test.dart"]
+    },
+    {
+      "id": "REG-20260826-3775-FRESH-INTEGRATION-V3-SEALED-BEFORE-STATIC-GATE-REPAIR-ADVANCED",
+      "status": "registered_preserve_v3_and_issue_final_v4_identity_required",
+      "appliesTo": ["primary", "coordination", "integration", "git_discipline"],
+      "mistake": "Fresh integration v3 was locally verified and kept unpushed, then the full static App gates required branch-limited oracle corrections that advance the qualified repair tip again.",
+      "rootCause": "V3 was created before every check.ps1 static component had completed, so later legitimate gate repairs changed only scripts/config/docs after its automatic merge.",
+      "prevention": "Preserve v3 unchanged and unpushed; bind one final v4 ticket/branch/worktree/subject in the same static-gate repair commit, run every static gate plus combined tests before v4 creation, admit only the final remote repair tip, and do not issue another integration identity before all final gates are complete.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/runtime/moolsocial-production-runtime-tickets-20260825.json", "docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826.md"]
+    },
+    {
+      "id": "REG-20260826-3776-REPAIR-FIXTURE-STALE-AFTER-FINAL-POST-OWNER-EXPANSION",
+      "status": "registered_exact_policy_fixture_scalar_alignment_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling"],
+      "mistake": "The final repair graph fixture rejected its sealed-parent/merge boundary condition after the post-merge static-gate owner set and v4 binding were expanded.",
+      "rootCause": "At least one expected scalar in the combined fixture condition remains stale relative to the live policy; the failure message groups parent, merge, correction-count, owner-count and conflict-count facts.",
+      "prevention": "After refreshed memory, project only those allowlisted scalar facts from policy and fixture source, update the single stale expectation, then rerun the focused graph fixture before any commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/test-codex-integration-repair-coordination-policy.ps1"]
     }
   ]
 }

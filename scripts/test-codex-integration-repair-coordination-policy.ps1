@@ -12,10 +12,24 @@ $policyPath = Join-Path $root 'config\codex-subagent-coordination-policy.json'
 $checkerPath = Join-Path $root 'scripts\check-codex-subagent-coordination-policy.ps1'
 $lockCheckerPath = Join-Path $root 'scripts\check-approved-ui-locks.ps1'
 $copyCheckerPath = Join-Path $root 'scripts\check-user-facing-copy.ps1'
+$interactionCheckerPath = Join-Path $root 'scripts\check-interaction-contracts.ps1'
+$buyReferenceCheckerPath = Join-Path $root 'scripts\check-buy-approved-reference.ps1'
+$socialBaselineCheckerPath = Join-Path $root 'scripts\check-social-protected-baseline.ps1'
+$buyBaselineCheckerPath = Join-Path $root 'scripts\check-buy-protected-baseline.ps1'
+$buyBackendCheckerPath = Join-Path $root 'scripts\check-buy-backend-contract-boundary.ps1'
+$buyEgressCheckerPath = Join-Path $root 'scripts\check-buy-data-egress-boundary.ps1'
+$brandCheckerPath = Join-Path $root 'scripts\check-brand-integrity.ps1'
 $policy = Get-Content -Raw -LiteralPath $policyPath | ConvertFrom-Json
 $checker = Get-Content -Raw -LiteralPath $checkerPath
 $lockChecker = Get-Content -Raw -LiteralPath $lockCheckerPath
 $copyChecker = Get-Content -Raw -LiteralPath $copyCheckerPath
+$interactionChecker = Get-Content -Raw -LiteralPath $interactionCheckerPath
+$buyReferenceChecker = Get-Content -Raw -LiteralPath $buyReferenceCheckerPath
+$socialBaselineChecker = Get-Content -Raw -LiteralPath $socialBaselineCheckerPath
+$buyBaselineChecker = Get-Content -Raw -LiteralPath $buyBaselineCheckerPath
+$buyBackendChecker = Get-Content -Raw -LiteralPath $buyBackendCheckerPath
+$buyEgressChecker = Get-Content -Raw -LiteralPath $buyEgressCheckerPath
+$brandChecker = Get-Content -Raw -LiteralPath $brandCheckerPath
 
 function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
@@ -31,7 +45,7 @@ $repairClaim = @($policy.activeClaims | Where-Object {
   [string]$_.task -ceq '/root/repair_social_runtime_chat_20260825'
 })
 $integrationClaim = @($policy.activeClaims | Where-Object {
-  [string]$_.task -ceq '/root/integration_social_runtime_chat_v3_20260826'
+  [string]$_.task -ceq '/root/integration_social_runtime_chat_v4_20260826'
 })
 
 Assert-RepairContract ($repairLane.Count -eq 1) 'repair lane is missing or ambiguous.'
@@ -46,8 +60,8 @@ Assert-RepairContract (
   [int]$repair.maximumMergeCommits -eq 1 -and
   [int]$repair.maximumPreMergeCoordinationCommits -eq 4 -and
   @($repair.preMergeCoordinationOwners).Count -eq 6 -and
-  [int]$repair.maximumPostMergeClosureCommits -eq 4 -and
-  @($repair.postMergeClosureOwners).Count -eq 9 -and
+  [int]$repair.maximumPostMergeClosureCommits -eq 5 -and
+  @($repair.postMergeClosureOwners).Count -eq 17 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed -and
   @($repair.exactConflictOwners).Count -eq 10
@@ -84,6 +98,7 @@ foreach ($lockToken in @(
     'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
     'integration/moolsocial/social-runtime-chat-v2-20260825',
     'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826',
     'if (Test-SealedParallelContinuationUnchanged -Path $Path)',
     'Approved UI sealed-parallel continuation fixture failed.'
   )) {
@@ -110,6 +125,62 @@ foreach ($copyToken in @(
   )) {
   Assert-RepairContract ($copyChecker.Contains($copyToken)) `
     "customer-copy token is missing: $copyToken"
+}
+foreach ($interactionToken in @(
+    'function Test-InterpolatedRouteTarget',
+    'function Test-ExternalAuthCallbackTemplate',
+    'function Test-EmailContinuePathContract',
+    'function Test-RoutePredicateLiteral',
+    'function Test-NavigatorRouteSettingsName',
+    '$violations | ForEach-Object { Write-Output $_ }',
+    'Interaction contract interpolated-route fixture failed.'
+  )) {
+  Assert-RepairContract ($interactionChecker.Contains($interactionToken)) `
+    "interaction-contract token is missing: $interactionToken"
+}
+foreach ($buyReferenceToken in @(
+    'function Test-BuyReferenceBytes',
+    'Buy approved sealed-parallel fixture failed.'
+  )) {
+  Assert-RepairContract ($buyReferenceChecker.Contains($buyReferenceToken)) `
+    "Buy approved-reference token is missing: $buyReferenceToken"
+}
+foreach ($socialBaselineToken in @(
+    'function Test-SealedSocialOverlay',
+    'Social protected sealed-overlay fixture failed.'
+  )) {
+  Assert-RepairContract ($socialBaselineChecker.Contains($socialBaselineToken)) `
+    "Social protected-baseline token is missing: $socialBaselineToken"
+}
+foreach ($buyBaselineToken in @(
+    'function Resolve-BuyProtectedBaselinePath',
+    'Buy protected baseline resolver fixture failed.'
+  )) {
+  Assert-RepairContract ($buyBaselineChecker.Contains($buyBaselineToken)) `
+    "Buy protected-baseline token is missing: $buyBaselineToken"
+}
+foreach ($buyBackendToken in @(
+    'function Test-SealedBuyBackendOverlay',
+    'Buy backend sealed-overlay fixture failed.'
+  )) {
+  Assert-RepairContract ($buyBackendChecker.Contains($buyBackendToken)) `
+    "Buy backend-boundary token is missing: $buyBackendToken"
+}
+foreach ($buyEgressToken in @(
+    'function Test-SealedBuyEgressClipboardAction',
+    'Buy egress clipboard fixture failed.'
+  )) {
+  Assert-RepairContract ($buyEgressChecker.Contains($buyEgressToken)) `
+    "Buy data-egress token is missing: $buyEgressToken"
+}
+foreach ($brandToken in @(
+    'function Test-SealedBuyThemeIntegration',
+    'function Test-SealedChatBrandProjection',
+    'function Test-SealedSocialBrandEntries',
+    'Brand integrity sealed Buy theme fixture failed.'
+  )) {
+  Assert-RepairContract ($brandChecker.Contains($brandToken)) `
+    "brand-integrity token is missing: $brandToken"
 }
 
 if ($RequireQualifiedGraph) {

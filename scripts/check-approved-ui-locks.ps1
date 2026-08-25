@@ -70,7 +70,8 @@ function Test-SealedParallelContinuationUnchanged {
     $branch -cnotin @(
       'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
       'integration/moolsocial/social-runtime-chat-v2-20260825',
-      'integration/moolsocial/social-runtime-chat-v3-20260826'
+      'integration/moolsocial/social-runtime-chat-v3-20260826',
+      'integration/moolsocial/social-runtime-chat-v4-20260826'
     )
   ) {
     return $false

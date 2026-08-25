@@ -77,3 +77,13 @@ unpushed integration v2. V2 is preserved unchanged. REG-20260826-3754 binds a
 fresh v3 integration ticket and exact automatic merge subject; only v3 may
 admit the final remote-qualified repair tip. This repair evidence update does
 not rewrite v2 and does not authorize an APK or promotion.
+
+The complete App static-gate sweep then found only inherited oracle gaps, each
+registered as an atomic runtime child: auth callback/continue templates,
+thirteen route predicate or RouteSettings literals, canonical UTF-8 reference
+bytes, sealed Social/Buy/backend overlays, selected-message clipboard Copy and
+sealed Buy/Chat/Social brand projections. Every oracle remains fail-closed on
+ordinary branches and accepts only exact audited owners/structures with
+negative fixtures. Interaction, immutable Buy reference, protected Social,
+protected Buy, backend boundary, data-egress and App brand gates all pass.
+Unpushed v3 is preserved; final v4 is bound only after this complete gate sweep.
