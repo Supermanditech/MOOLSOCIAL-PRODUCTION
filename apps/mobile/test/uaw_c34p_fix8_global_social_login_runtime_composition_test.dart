@@ -276,6 +276,75 @@ void main() {
         ),
       );
     });
+
+    test(
+      'same UID binds differently under different install secrets',
+      () async {
+        SecureVerifiedPrincipalBindingStore storeFor(int byte) {
+          final values = <String, String?>{};
+          return SecureVerifiedPrincipalBindingStore.forTesting(
+            readValue: ({required key}) async => values[key],
+            writeValue: ({required key, required value}) async {
+              values[key] = value;
+            },
+            deleteValue: ({required key}) async {
+              values.remove(key);
+            },
+            createSecret: () => List<int>.filled(32, byte),
+          );
+        }
+
+        final first = await storeFor(1).protect('private-user');
+        final second = await storeFor(2).protect('private-user');
+
+        expect(first.matches(second), isFalse);
+      },
+    );
+
+    test('missing secret resets local session before fresh sign-in', () async {
+      final values = <String, String?>{};
+      SecureVerifiedPrincipalBindingStore createStore() =>
+          SecureVerifiedPrincipalBindingStore.forTesting(
+            readValue: ({required key}) async => values[key],
+            writeValue: ({required key, required value}) async {
+              values[key] = value;
+            },
+            deleteValue: ({required key}) async {
+              values.remove(key);
+            },
+            createSecret: () => List<int>.filled(32, 5),
+          );
+
+      final seedStore = createStore();
+      final binding = await seedStore.protect('private-user');
+      await seedStore.write(binding);
+      values.remove(values.keys.singleWhere((key) => key.contains('secret')));
+
+      var invalidationCount = 0;
+      final runtimeStore = createStore();
+      final bootstrap = FirebaseAuthenticatedSessionBootstrapGateway.forTesting(
+        currentUserId: () async => 'private-user',
+        verifiedUserId: () async => 'private-user',
+        bindingProtector: runtimeStore,
+        invalidateLocalSession: () async {
+          invalidationCount += 1;
+        },
+      );
+      final session = JourneySession(
+        store: completedSetupStore(),
+        socialAuthGateway: ReviewSocialAuthGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: runtimeStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(invalidationCount, 1);
+      expect(values, isEmpty);
+    });
   });
 
   group('typed Firebase principal revalidation', () {

@@ -1632,6 +1632,11 @@ class JourneySession extends ChangeNotifier {
           .timeout(accountBootstrapTimeout);
     } on TimeoutException {
       localBinding = null;
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-binding-reset-required',
+      );
     }
     return _accountBootstrapGateway
         .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
@@ -1655,7 +1660,13 @@ class JourneySession extends ChangeNotifier {
     switch (bootstrap.state) {
       case AuthenticatedAccountBootstrapState.verified:
         final current = bootstrap.currentBinding!;
-        final stored = await _verifiedPrincipalBindingStore.read();
+        final VerifiedPrincipalBinding? stored;
+        try {
+          stored = await _verifiedPrincipalBindingStore.read();
+        } on Object {
+          await _resetUnsafePrincipalBinding();
+          return false;
+        }
         if (stored != null && !stored.matches(current)) {
           await _invalidateMismatchedPrincipal();
           return false;
@@ -1671,6 +1682,7 @@ class JourneySession extends ChangeNotifier {
           code: bootstrap.code,
         );
       case AuthenticatedAccountBootstrapState.invalidSession:
+        if (bootstrap.code == 'auth-binding-reset-required') return false;
         await _invalidateMismatchedPrincipal();
         return false;
       case AuthenticatedAccountBootstrapState.fatal:
@@ -1712,7 +1724,16 @@ class JourneySession extends ChangeNotifier {
     VerifiedPrincipalBinding binding, {
     VerifiedPrincipalBinding? existing,
   }) async {
-    final prior = existing ?? await _verifiedPrincipalBindingStore.read();
+    final VerifiedPrincipalBinding? prior;
+    try {
+      prior = existing ?? await _verifiedPrincipalBindingStore.read();
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      throw const JourneyServiceException(
+        'Saved account verification was unsafe and has been reset. Please sign in again.',
+        code: 'auth-binding-reset-required',
+      );
+    }
     if (prior != null && prior.matches(binding)) return;
     try {
       await _verifiedPrincipalBindingStore.write(binding);
@@ -1750,6 +1771,33 @@ class JourneySession extends ChangeNotifier {
       throw const JourneyServiceException(
         'The invalid account session could not be cleared safely.',
         code: 'auth-session-invalidation-failed',
+      );
+    }
+    stage = JourneyStage.signIn;
+  }
+
+  Future<void> _resetUnsafePrincipalBinding() async {
+    Object? cleanupFailure;
+    for (final cleanup in <Future<void> Function()>[
+      _verifiedPrincipalBindingStore.resetUnsafeState,
+      _accountBootstrapGateway.invalidateLocalSession,
+      _otpGateway.signOut,
+      _socialAuthGateway.signOut,
+      _emailLinkGateway.signOut,
+    ]) {
+      try {
+        await cleanup().timeout(socialAuthRollbackTimeout);
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
+    }
+    _isAuthenticated = false;
+    accountIdentity = null;
+    _principalBindingCleanupRequired = cleanupFailure != null;
+    if (cleanupFailure != null) {
+      throw const JourneyServiceException(
+        'Unsafe account verification could not be reset safely.',
+        code: 'auth-binding-reset-failed',
       );
     }
     stage = JourneyStage.signIn;

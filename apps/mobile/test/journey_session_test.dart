@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/journey01/review_journey_services.dart';
 
 void main() {
   test('returning authenticated session restores directly to ready', () async {
@@ -533,6 +534,57 @@ void main() {
     expect(session.isAuthenticated, isTrue);
     expect(session.errorMessage, isNot(contains('private')));
   });
+
+  test(
+    'corrupt receipt resets secure binding and requires fresh sign-in',
+    () async {
+      final values = <String, String?>{};
+      final receiptStore = SecureVerifiedPrincipalBindingStore.forTesting(
+        readValue: ({required key}) async => values[key],
+        writeValue: ({required key, required value}) async {
+          values[key] = value;
+        },
+        deleteValue: ({required key}) async {
+          values.remove(key);
+        },
+        createSecret: () => List<int>.filled(32, 11),
+      );
+      final binding = await receiptStore.protect('private-user-a');
+      await receiptStore.write(binding);
+      final receiptKey = values.keys.singleWhere(
+        (key) => key.contains('verified_principal'),
+      );
+      values[receiptKey] = 'v2:corrupt';
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(values, isEmpty);
+      expect(bootstrap.invalidationCount, 1);
+
+      final replacement = await receiptStore.protect('private-user-a');
+      await receiptStore.write(replacement);
+      expect((await receiptStore.read())!.matches(replacement), isTrue);
+    },
+  );
 
   test('legacy completed setup must show approved Screen 02 once', () async {
     final store = MemoryJourneyStore(

@@ -225,6 +225,26 @@ class SecureVerifiedPrincipalBindingStore
   }
 
   @override
+  Future<void> resetUnsafeState() async {
+    _secretBytes = null;
+    _secretInFlight = null;
+    Object? failure;
+    for (final key in const [_bindingKey, _secretKey]) {
+      try {
+        await _deleteValue(key: key);
+      } on Object catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure != null) {
+      throw const JourneyServiceException(
+        'Unsafe account verification state could not be reset safely.',
+        code: 'auth-binding-reset-failed',
+      );
+    }
+  }
+
+  @override
   Future<VerifiedPrincipalBinding> protect(String principalId) async {
     final normalized = principalId.trim();
     if (normalized.isEmpty) {

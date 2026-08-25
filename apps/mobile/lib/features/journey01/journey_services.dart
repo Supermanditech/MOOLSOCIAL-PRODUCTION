@@ -603,6 +603,8 @@ abstract interface class VerifiedPrincipalBindingStore {
   Future<void> write(VerifiedPrincipalBinding binding);
 
   Future<void> clear();
+
+  Future<void> resetUnsafeState();
 }
 
 class MemoryVerifiedPrincipalBindingStore
@@ -612,15 +614,18 @@ class MemoryVerifiedPrincipalBindingStore
     this.readFailure,
     this.writeFailure,
     this.clearFailure,
+    this.resetFailure,
   });
 
   VerifiedPrincipalBinding? binding;
   Object? readFailure;
   Object? writeFailure;
   Object? clearFailure;
+  Object? resetFailure;
   int readCount = 0;
   int writeCount = 0;
   int clearCount = 0;
+  int resetCount = 0;
 
   @override
   Future<VerifiedPrincipalBinding?> read() async {
@@ -640,6 +645,13 @@ class MemoryVerifiedPrincipalBindingStore
   Future<void> clear() async {
     clearCount += 1;
     if (clearFailure case final failure?) throw failure;
+    binding = null;
+  }
+
+  @override
+  Future<void> resetUnsafeState() async {
+    resetCount += 1;
+    if (resetFailure case final failure?) throw failure;
     binding = null;
   }
 }
