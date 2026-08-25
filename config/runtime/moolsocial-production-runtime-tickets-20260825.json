@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": false,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 253,
+  "ticketCount": 256,
   "stateVocabulary": ["constraint", "PENDING", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 104,
-    "implementedAtomicTicketCount": 100,
-    "pendingConfirmedImplementationCount": 4,
+    "totalCodexAtomicEngineeringTicketCount": 107,
+    "implementedAtomicTicketCount": 104,
+    "pendingConfirmedImplementationCount": 3,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 4,
+    "remainingCodexEngineeringQueueCount": 3,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -123,10 +123,13 @@
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-33","state":"CLOSED","implementation":"Standalone Chat branding requires exact MoolSocial title, return route and add-people identity.","runtime":"Byte/structure proof, Chat tests and App brand gate pass."}
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-34","state":"CLOSED","implementation":"Sealed Social/creator local navigation requires exact current family and Mool entry structure.","runtime":"Byte/structure proof, Social Back tests and App brand gate pass."}
       ,{"id":"RT-INTEGRATION-CHAT-01-CHILD-35","state":"CLOSED","implementation":"Stale unpushed v3 is preserved and one final v4 identity is bound after every static gate passes.","runtime":"V4 ticket, branch, worktree, merge subject and gate allowlists are machine bound."}
+      ,{"id":"RT-11-01-GAP-01","state":"CLOSED","implementation":"Dependency resolution and focused tests now run in one tracked-support-byte guard operation.","runtime":"share_plus resolved, 30 focused tests passed and all four generated support owners returned to their exact pre-command bytes."}
+      ,{"id":"RT-11-01-GAP-02","state":"CLOSED","implementation":"Selected and dismissed fixtures use ShareResult(String raw, ShareResultStatus status); unavailable uses the package constant.","runtime":"Exact package API compiles and all focused outcome tests pass."}
+      ,{"id":"RT-11-01-GAP-03","state":"CLOSED","implementation":"ShareParams explicitly disables email and download fallbacks.","runtime":"Focused parameter assertions and the complete 30-test retest pass."}
+      ,{"id":"RT-11-01","state":"closed_current_round_reopen_on_apk_defect","implementation":"A typed share_plus 13.3.0 adapter validates safe HTTPS URI/title/origin input, serializes duplicate taps and maps selected, dismissed and unavailable outcomes without claiming delivery.","runtime":"Closed after 30 focused tests, clean focused analysis, dependency/platform compatibility audit and three gap fix/retest/re-audit loops; final containing-APK/OPPO share-sheet proof may reopen."}
     ],
     "pendingConfirmedImplementation": [
       {"id":"RT-11","state":"GAP_FOUND","implementation":"Provide one truthful native share capability for Social URLs and reuse it across in-scope public content surfaces.","runtime":"Fresh v4 audit proved no native share gateway exists; source/widget proof is pending and final APK/OPPO may reopen."},
-      {"id":"RT-11-01","state":"PENDING","implementation":"Add a typed, single-flight platform share adapter with exact URI, title, origin rectangle and truthful success/dismissed/unavailable outcomes.","runtime":"Focused gateway tests, dependency integrity, analysis and no-APK platform preflight pending."},
       {"id":"RT-11-02","state":"PENDING","implementation":"Add a distinct Feed action that opens the system share sheet for the exact stable public post URL while retaining Copy link.","runtime":"Guest, exact-link, dismissal/failure and duplicate-tap widget proof pending."},
       {"id":"RT-11-03","state":"PENDING","implementation":"Make the YouTube Video Share button open the system share sheet for the exact provider watch URL without losing Watch return state.","runtime":"Exact provider URL, title, dismissal/failure, duplicate-tap and route-retention widget proof pending."}
     ],
@@ -155,12 +158,12 @@
       "select_the_next_atomic_ticket"
     ],
     "nextTicketBlockedUntilActiveClosed": true,
-    "activeTicket": "RT-11-01",
+    "activeTicket": "RT-11-02",
     "activeTicketPhase": "PENDING",
     "activeTicketChildGaps": [],
-    "lastClosedTicket": "RT-08-02",
-    "lastPreApkClosedTicket": "RT-08-02",
-    "nextTicket": "RT-11-01"
+    "lastClosedTicket": "RT-11-01",
+    "lastPreApkClosedTicket": "RT-11-01",
+    "nextTicket": "RT-11-02"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -412,9 +415,12 @@
     {"id":"RT-INTEGRATION-CHAT-01-CHILD-34","area":"brand_gate","microScope":"sealed_social_creator_navigation_identity","layers":["ui","navigation","testing"],"outcome":"Validate current Social/creator family and Mool entry structure.","owner":"primary_integration_repair","state":"verified_pass","evidence":"Byte/structure proof and App brand gate pass.","blocker":"none","dependencies":["RT-INTEGRATION-CHAT-01"]},
     {"id":"RT-INTEGRATION-CHAT-01-CHILD-35","area":"integration_gate","microScope":"final_v4_after_all_static_gates","layers":["wiring","testing","deployment_preflight"],"outcome":"Preserve stale unpushed v3 and bind one final v4 after every static gate passes.","owner":"primary_integration_repair","state":"verified_pass","evidence":"REG-20260826-3775 binds final v4 identity and subject.","blocker":"none; v4 is remotely closed at 0a40f68dc7697ae226aef469604761fa8b3d1301","dependencies":["RT-INTEGRATION-CHAT-01","RT-INTEGRATION-CHAT-01-CHILD-34"]},
     {"id":"RT-11","area":"global_sharing","microScope":"social_native_share_parent","layers":["ui","wiring","mobile","testing","apk","oppo"],"outcome":"Every in-scope Social action labelled Share opens a truthful operating-system share pathway for the exact public content identity.","owner":"codex_runtime","state":"GAP_FOUND","evidence":"Fresh audit from integrated v4 found clipboard-only Feed/YouTube behavior and no native share dependency or platform adapter.","blocker":"RT-11-01 through RT-11-03 pending; final containing-APK/OPPO confirmation deferred by founder no-APK instruction","dependencies":["RT-INTEGRATION-CHAT-01"]},
-    {"id":"RT-11-01","area":"global_sharing","microScope":"typed_native_share_gateway","layers":["wiring","mobile","testing"],"outcome":"Open the platform share sheet once with an exact URI, safe title and valid popover origin, then distinguish selected, dismissed and unavailable results without a false delivery claim.","owner":"codex_runtime","state":"PENDING","evidence":"No share package, ACTION_SEND bridge, UIActivityViewController bridge or reusable share gateway exists at v4 baseline.","blocker":"none","dependencies":["RT-11"]},
+    {"id":"RT-11-01","area":"global_sharing","microScope":"typed_native_share_gateway","layers":["wiring","mobile","testing"],"outcome":"Open the platform share sheet once with an exact URI, safe title and valid popover origin, then distinguish selected, dismissed and unavailable results without a false delivery claim.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"30 focused tests and focused analysis pass after all three child gaps were fixed and re-audited.","blocker":"final containing-APK/OPPO native sheet confirmation may reopen","dependencies":["RT-11"]},
     {"id":"RT-11-02","area":"feed_mutation","microScope":"feed_external_native_share","layers":["ui","wiring","mobile","testing","apk","oppo"],"outcome":"Let any Feed reader open the native share sheet for the exact stable MoolSocial post URL while retaining an independent Copy link action.","owner":"codex_runtime","state":"PENDING","evidence":"The existing option is titled Copy post link and calls only Clipboard.setData.","blocker":"RT-11-01 must close first; final containing-APK/OPPO confirmation deferred by founder no-APK instruction","dependencies":["RT-11-01","FEED-SHARE-01"]},
     {"id":"RT-11-03","area":"youtube_public_video","microScope":"youtube_watch_native_share","layers":["ui","wiring","provider","mobile","testing","apk","oppo"],"outcome":"Open the native share sheet for the exact selected public YouTube watch URL while preserving Watch, Search and discovery return state.","owner":"codex_runtime","state":"PENDING","evidence":"The visible screen04-video-share action currently calls Clipboard.setData and reports YouTube link copied.","blocker":"RT-11-02 must close first; final containing-APK/OPPO confirmation deferred by founder no-APK instruction","dependencies":["RT-11-01"]},
-    {"id":"RT-11-DEFER-01","area":"global_sharing","microScope":"contextual_non_social_share_placeholders","layers":["ui","wiring","navigation","mobile"],"outcome":"Replace contextual Share placeholders only after each excluded Buy, Travel, Work and Care surface supplies an exact shareable item identity and return contract.","owner":"codex_runtime_later","state":"pending_selection","evidence":"Fresh v4 audit found case Share returns only Open an item before sharing it across contextual non-Social families.","blocker":"founder explicitly excluded Buy and other remaining contextual surfaces from this audit/fix round","dependencies":["RT-11-01"]}
+    {"id":"RT-11-DEFER-01","area":"global_sharing","microScope":"contextual_non_social_share_placeholders","layers":["ui","wiring","navigation","mobile"],"outcome":"Replace contextual Share placeholders only after each excluded Buy, Travel, Work and Care surface supplies an exact shareable item identity and return contract.","owner":"codex_runtime_later","state":"pending_selection","evidence":"Fresh v4 audit found case Share returns only Open an item before sharing it across contextual non-Social families.","blocker":"founder explicitly excluded Buy and other remaining contextual surfaces from this audit/fix round","dependencies":["RT-11-01"]},
+    {"id":"RT-11-01-GAP-01","area":"dependency_preflight","microScope":"guarded_dependency_resolution_and_test_same_operation","layers":["wiring","testing"],"outcome":"Run dependency resolution and the focused share test in one byte-restoring guard so the child process sees share_plus while tracked Flutter support owners return to their exact pre-command bytes.","owner":"codex_runtime","state":"verified_pass","evidence":"Same-operation offline resolution plus 30 tests passed and generated support owners were restored.","blocker":"none","dependencies":["RT-11-01","REL-BUILD-CLEAN-01"]},
+    {"id":"RT-11-01-GAP-02","area":"test_fixture","microScope":"share_result_constructor_contract","layers":["wiring","testing"],"outcome":"Use the exact share_plus 13.3.0 ShareResult(String raw, ShareResultStatus status) API for selected and dismissed fixtures while retaining ShareResult.unavailable for the unavailable fixture.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact public constructor/status fixtures compile and all outcome tests pass.","blocker":"none","dependencies":["RT-11-01-GAP-01"]},
+    {"id":"RT-11-01-GAP-03","area":"data_egress","microScope":"disable_non_native_share_fallbacks","layers":["wiring","mobile","testing"],"outcome":"When the native share pathway is unavailable, return unavailable without silently opening email or downloading content as a substitute action.","owner":"codex_runtime","state":"verified_pass","evidence":"Both fallback flags are false and asserted by the passing focused suite.","blocker":"none","dependencies":["RT-11-01-GAP-02"]}
   ]
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/design/mool_design_system.dart';
@@ -38,6 +39,93 @@ typedef Screen04YouTubePublicVideoLoader =
     Future<List<Screen04YouTubePublicVideo>> Function();
 typedef Screen04YouTubePublicSearchLoader =
     Future<List<Screen04YouTubePublicVideo>> Function(String query);
+
+enum SocialV2ShareOutcome { selected, dismissed, unavailable }
+
+@immutable
+class SocialV2ShareRequest {
+  const SocialV2ShareRequest({
+    required this.uri,
+    required this.title,
+    required this.sharePositionOrigin,
+    this.subject,
+  });
+
+  final Uri uri;
+  final String title;
+  final String? subject;
+  final Rect sharePositionOrigin;
+}
+
+abstract interface class SocialV2ShareGateway {
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest request);
+}
+
+typedef SocialV2PlatformShareInvoker =
+    Future<ShareResult> Function(ShareParams params);
+
+class SocialV2PlatformShareGateway implements SocialV2ShareGateway {
+  SocialV2PlatformShareGateway({SocialV2PlatformShareInvoker? invoker})
+    : _invoker = invoker ?? SharePlus.instance.share;
+
+  final SocialV2PlatformShareInvoker _invoker;
+  Future<SocialV2ShareOutcome>? _inFlight;
+
+  @override
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest request) {
+    final active = _inFlight;
+    if (active != null) return active;
+
+    final operation = _shareOnce(request);
+    _inFlight = operation;
+    unawaited(
+      operation.whenComplete(() {
+        if (identical(_inFlight, operation)) _inFlight = null;
+      }),
+    );
+    return operation;
+  }
+
+  Future<SocialV2ShareOutcome> _shareOnce(SocialV2ShareRequest request) async {
+    final title = request.title.trim();
+    final subject = request.subject?.trim();
+    final origin = request.sharePositionOrigin;
+    if (request.uri.scheme != 'https' ||
+        request.uri.host.isEmpty ||
+        request.uri.userInfo.isNotEmpty ||
+        title.isEmpty ||
+        title.length > 120 ||
+        title.contains(RegExp(r'[\u0000-\u001F\u007F]')) ||
+        (subject != null &&
+            (subject.length > 200 ||
+                subject.contains(RegExp(r'[\u0000-\u001F\u007F]')))) ||
+        !origin.isFinite ||
+        origin.width <= 0 ||
+        origin.height <= 0) {
+      return SocialV2ShareOutcome.unavailable;
+    }
+
+    try {
+      final result = await _invoker(
+        ShareParams(
+          uri: request.uri,
+          title: title,
+          subject: subject == null || subject.isEmpty ? null : subject,
+          sharePositionOrigin: origin,
+          downloadFallbackEnabled: false,
+          mailToFallbackEnabled: false,
+        ),
+      );
+      return switch (result.status) {
+        ShareResultStatus.success => SocialV2ShareOutcome.selected,
+        ShareResultStatus.dismissed => SocialV2ShareOutcome.dismissed,
+        ShareResultStatus.unavailable => SocialV2ShareOutcome.unavailable,
+      };
+    } on Object {
+      return SocialV2ShareOutcome.unavailable;
+    }
+  }
+}
 
 final Expando<_SocialV2RetainedState> _socialV2RetainedStates =
     Expando<_SocialV2RetainedState>();

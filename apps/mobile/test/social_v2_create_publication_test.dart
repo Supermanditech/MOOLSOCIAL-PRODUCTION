@@ -16,11 +16,124 @@ import 'package:moolsocial/features/shared/social_media_picker.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_create_workbench.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_public_content.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'support/review_social_content_gateway.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const shareOrigin = Rect.fromLTWH(12, 24, 180, 44);
+  final shareRequest = SocialV2ShareRequest(
+    uri: Uri.https('moolsocial.com', '/app/social', {
+      'sub': 'feed',
+      'item': 'post-1',
+    }),
+    title: 'Share MoolSocial post',
+    subject: 'MoolSocial post',
+    sharePositionOrigin: shareOrigin,
+  );
+
+  test(
+    'native share gateway forwards exact safe URI and presentation',
+    () async {
+      ShareParams? captured;
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (params) async {
+          captured = params;
+          return const ShareResult('target.app', ShareResultStatus.success);
+        },
+      );
+
+      final outcome = await gateway.share(shareRequest);
+
+      expect(outcome, SocialV2ShareOutcome.selected);
+      expect(captured?.uri, shareRequest.uri);
+      expect(captured?.title, 'Share MoolSocial post');
+      expect(captured?.subject, 'MoolSocial post');
+    expect(captured?.sharePositionOrigin, shareOrigin);
+    expect(captured?.downloadFallbackEnabled, isFalse);
+    expect(captured?.mailToFallbackEnabled, isFalse);
+    expect(captured?.text, isNull);
+      expect(captured?.files, isNull);
+    },
+  );
+
+  test(
+    'native share gateway preserves dismissed and unavailable truth',
+    () async {
+      final dismissed = SocialV2PlatformShareGateway(
+        invoker: (_) async =>
+            const ShareResult('', ShareResultStatus.dismissed),
+      );
+      final unavailable = SocialV2PlatformShareGateway(
+        invoker: (_) async => ShareResult.unavailable,
+      );
+      final failed = SocialV2PlatformShareGateway(
+        invoker: (_) => throw StateError('platform share failed'),
+      );
+
+      expect(
+        await dismissed.share(shareRequest),
+        SocialV2ShareOutcome.dismissed,
+      );
+      expect(
+        await unavailable.share(shareRequest),
+        SocialV2ShareOutcome.unavailable,
+      );
+      expect(
+        await failed.share(shareRequest),
+        SocialV2ShareOutcome.unavailable,
+      );
+    },
+  );
+
+  test(
+    'native share gateway rejects unsafe input before platform egress',
+    () async {
+      var calls = 0;
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (_) async {
+          calls += 1;
+          return const ShareResult('target.app', ShareResultStatus.success);
+        },
+      );
+
+      final result = await gateway.share(
+        SocialV2ShareRequest(
+          uri: Uri.parse('http://moolsocial.com/app/social?item=post-1'),
+          title: 'Share MoolSocial post',
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
+
+      expect(result, SocialV2ShareOutcome.unavailable);
+      expect(calls, 0);
+    },
+  );
+
+  test(
+    'native share gateway contains duplicate taps with one operation',
+    () async {
+      var calls = 0;
+      final result = Completer<ShareResult>();
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (_) {
+          calls += 1;
+          return result.future;
+        },
+      );
+
+      final first = gateway.share(shareRequest);
+      final second = gateway.share(shareRequest);
+      expect(identical(first, second), isTrue);
+      expect(calls, 1);
+
+      result.complete(const ShareResult('', ShareResultStatus.dismissed));
+      expect(await first, SocialV2ShareOutcome.dismissed);
+      expect(await second, SocialV2ShareOutcome.dismissed);
+    },
+  );
 
   test('Feed published time uses the authoritative provider timestamp', () {
     final now = DateTime.utc(2026, 8, 13, 12);
