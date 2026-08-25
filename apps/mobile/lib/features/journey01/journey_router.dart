@@ -1589,7 +1589,11 @@ GoRouter createJourneyRouter(
                 initialSubAction: state.uri.queryParameters['sub'],
                 initialState:
                     state.uri.queryParameters['state'] ??
-                    state.uri.queryParameters['mode'],
+                    state.uri.queryParameters['mode'] ??
+                    (section == 'social' &&
+                            state.uri.queryParameters['sub'] == 'create'
+                        ? 'home'
+                        : null),
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],

@@ -127,7 +127,7 @@ void main() {
         'shorts': Key('screen04-youtube-shorts-state-provider-access'),
         'videos': Key('screen04-youtube-videos-state-provider-access'),
         'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': Key('screen04-create-workbench'),
+        'create': Key('screen04-create-home'),
       };
       for (final choice in screen04World('social').choices) {
         final owners = _AuthenticatedOwners();
@@ -150,12 +150,12 @@ void main() {
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+            find.byKey(const Key('screen04-context-tabs')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         } else {
@@ -179,10 +179,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
         if (choice.id == 'create') {
-          expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-            findsOneWidget,
-          );
+          expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
         } else {
           expect(
             find.byKey(directRouteOwnerKeys[choice.id]!),
@@ -197,7 +194,7 @@ void main() {
     },
   );
 
-  testWidgets('Create hides the dock until the composer closes', (
+  testWidgets('Create landing owns the dock and nested composer Back', (
     tester,
   ) async {
     final owners = _AuthenticatedOwners();
@@ -218,6 +215,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-workbench')), findsOneWidget);
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
     expect(find.text('Reel'), findsNothing);
@@ -242,9 +246,9 @@ void main() {
     expect(find.byKey(const Key('social-global-chat')), findsNothing);
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('screen04-create-close')));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-workbench')), findsNothing);
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
     expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
 
@@ -256,10 +260,7 @@ void main() {
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -812,7 +813,7 @@ void main() {
         'shorts': Key('screen04-youtube-shorts-state-provider-access'),
         'videos': Key('screen04-youtube-videos-state-provider-access'),
         'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': ValueKey('screen04-create-workbench'),
+        'create': ValueKey('screen04-create-home'),
       };
       for (final choice in social.choices) {
         await _openConnectedAction(tester, family: 'social', action: choice.id);
@@ -821,12 +822,12 @@ void main() {
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+            find.byKey(const Key('screen04-context-tabs')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         } else {

@@ -120,6 +120,7 @@ void main() {
           retailerSession: owners.retailer,
           sharedSession: owners.shared,
           initialSubAction: 'create',
+          initialState: 'text',
         ),
       );
       expect(

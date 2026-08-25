@@ -8,6 +8,7 @@ import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
@@ -104,6 +105,7 @@ void main() {
       tester,
       owners.consumer(
         subAction: 'create',
+        initialState: 'text',
         store: store,
         videosLoader: loader,
         shortsLoader: loader,
@@ -156,6 +158,7 @@ void main() {
       tester,
       owners.consumer(
         subAction: 'create',
+        initialState: 'text',
         store: store,
         videosLoader: loader,
         shortsLoader: loader,
@@ -169,8 +172,10 @@ void main() {
     await tester.pump();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
-
-    resetSocialV2RetainedStateForAuthenticationBoundary(owners.shared);
+    unawaited(
+      resetSocialV2RetainedStateForAuthenticationBoundary(owners.shared),
+    );
+    socialCreateDraftState.beginPrincipalBindingAttempt();
     await _mount(
       tester,
       owners.consumer(
@@ -180,6 +185,10 @@ void main() {
         shortsLoader: loader,
       ),
     );
+    await tester.pump();
+
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
     await tester.pump();
 
     expect(

@@ -45,6 +45,16 @@ class SocialCreateDraftV2 {
   String get formatName => _format.name;
   String get toolName => _postTool.name;
   int get correctChoice => _correctChoice;
+  bool get hasUserContent =>
+      _body.trim().isNotEmpty ||
+      _choices.any((choice) => choice.trim().isNotEmpty) ||
+      _media.isNotEmpty ||
+      _imagePollMedia.any((item) => item != null) ||
+      _quotedPost != null;
+  bool get hasMeaningfulContent =>
+      hasUserContent ||
+      _format != SocialCreateFormatV2.post ||
+      _postTool != _SocialPostTool.none;
 
   void setChangeListener(VoidCallback? listener) => _onChanged = listener;
 
@@ -120,6 +130,39 @@ class SocialCreateDraftV2 {
       mediaPath: item.mediaPaths.firstOrNull,
     );
     _markChanged();
+  }
+
+  bool prepareFreshIntent(SocialCreateIntentV2 intent) {
+    if (hasUserContent) return false;
+    _initialized = true;
+    _applyIntent(intent);
+    _body = '';
+    _choices.fillRange(0, _choices.length, '');
+    _media.clear();
+    _imagePollMedia.fillRange(0, _imagePollMedia.length, null);
+    _correctChoice = 0;
+    _quotedPost = null;
+    _markChanged();
+    return true;
+  }
+
+  void retargetIntent(SocialCreateIntentV2 intent) {
+    _initialized = true;
+    _applyIntent(intent);
+    _markChanged();
+  }
+
+  void _applyIntent(SocialCreateIntentV2 intent) {
+    _format = intent == SocialCreateIntentV2.carousel
+        ? SocialCreateFormatV2.carousel
+        : SocialCreateFormatV2.post;
+    _postTool = switch (intent) {
+      SocialCreateIntentV2.image => _SocialPostTool.image,
+      SocialCreateIntentV2.imagePoll => _SocialPostTool.imagePoll,
+      SocialCreateIntentV2.quickPoll => _SocialPostTool.quickPoll,
+      SocialCreateIntentV2.quiz => _SocialPostTool.quiz,
+      _ => _SocialPostTool.none,
+    };
   }
 
   void _clear() {

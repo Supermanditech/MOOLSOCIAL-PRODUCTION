@@ -1224,9 +1224,10 @@ void main() {
           find.byKey(const Key('social-v2-create-workbench')),
           findsNothing,
         );
-        final create = find.byKey(const Key('screen04-feed-create-post'));
-        await tester.ensureVisible(create);
-        await tester.tap(create);
+        expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+        final draft = find.byKey(const Key('screen04-create-draft-entry'));
+        await tester.ensureVisible(draft);
+        await tester.tap(draft);
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('social-v2-create-workbench')),

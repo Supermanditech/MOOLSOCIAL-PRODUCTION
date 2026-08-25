@@ -208,6 +208,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   bool _restoredCreateDraft = false;
   int _createDraftPersistenceRequest = 0;
   int _createDraftHydrationGeneration = 0;
+  bool _createBackBusy = false;
   final Map<String, SocialCreateDraftMediaReference> _draftMediaRefs = {};
   final Set<Future<SocialCreateDraftMediaReference?>> _draftStagingOperations =
       {};
@@ -477,6 +478,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         : SocialV2Tab.shorts;
     if (widget.initialState != null) {
       _createView = _createViewFor(widget.initialState);
+    } else if (_tab == SocialV2Tab.create && !hasRetainedState) {
+      _createView = 'post';
     } else if (_tab != SocialV2Tab.create) {
       _createView = 'home';
     }
@@ -607,8 +610,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           : SocialV2Tab.shorts;
       if (widget.initialState != null) {
         _createView = _tab == SocialV2Tab.create
-            ? _createViewFor(widget.initialState)
+            ? _createViewFor(widget.initialState ?? 'post')
             : 'home';
+        if (_tab == SocialV2Tab.create && _createView != 'home') {
+          _createDraft.retargetIntent(_createIntentForView(_createView));
+        }
       } else if (_tab != SocialV2Tab.create) {
         _createView = 'home';
       }
@@ -814,7 +820,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         _world == 'social' &&
         (_tab == SocialV2Tab.videos || _tab == SocialV2Tab.shorts);
     final shortsOwned = _world == 'social' && _tab == SocialV2Tab.shorts;
-    final composerOpen = _world == 'social' && _tab == SocialV2Tab.create;
+    final nestedCreateOpen =
+        _world == 'social' &&
+        _tab == SocialV2Tab.create &&
+        _createView != 'home';
+    final composerOpen = nestedCreateOpen;
     final contextualChatOpen =
         _contextualChatActive && MoolContextualChatCatalog.supports(_world);
     final area =
@@ -823,9 +833,15 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         'Khema-Ka-Kuwa';
 
     final hasInlineBack =
-        _activeVideo != null || _youtubeSearchOpen || contextualChatOpen;
-    final focusedFeedBack =
-        _world == 'social' && _tab == SocialV2Tab.feed && !hasInlineBack;
+        _activeVideo != null ||
+        _youtubeSearchOpen ||
+        contextualChatOpen ||
+        nestedCreateOpen;
+    final focusedRibbonBack =
+        _world == 'social' &&
+        (_tab == SocialV2Tab.feed ||
+            (_tab == SocialV2Tab.create && !nestedCreateOpen)) &&
+        !hasInlineBack;
 
     return MediaQuery(
       data: media,
@@ -838,7 +854,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           ),
         ),
         child: PopScope<Object?>(
-          canPop: !(hasInlineBack || focusedFeedBack),
+          canPop: !(hasInlineBack || focusedRibbonBack),
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _handleScreen04Back();
           },
@@ -918,7 +934,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                             child: _world == 'social'
                                 ? KeyedSubtree(
                                     key: ValueKey(
-                                      '${_tab.name}-${_tab == SocialV2Tab.create ? 'workbench' : _createView}-${_youtubeSearchOpen ? 'search' : _activeVideo?.id ?? 'home'}',
+                                      '${_tab.name}-${_tab == SocialV2Tab.create ? _createView : 'ribbon'}-${_youtubeSearchOpen ? 'search' : _activeVideo?.id ?? 'home'}',
                                     ),
                                     child: switch (_tab) {
                                       SocialV2Tab.shorts => _buildShorts(),
@@ -1035,6 +1051,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _closeYouTubeSearch();
       return;
     }
+    if (_world == 'social' &&
+        _tab == SocialV2Tab.create &&
+        _createView != 'home') {
+      unawaited(_backFromCreateEditor());
+      return;
+    }
     if (_activeVideo != null) {
       if (_returnToYouTubeSearchAfterVideo) {
         _discardDurableYouTubeWatch();
@@ -1064,7 +1086,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       HapticFeedback.selectionClick();
       return;
     }
-    if (_world == 'social' && _tab == SocialV2Tab.feed) {
+    if (_world == 'social' &&
+        (_tab == SocialV2Tab.feed ||
+            (_tab == SocialV2Tab.create && _createView == 'home'))) {
       _openMool();
     }
   }
@@ -1287,9 +1311,27 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _createView = 'home';
-      _choiceByWorld['social'] = 'feed';
-      _tab = SocialV2Tab.feed;
+      _choiceByWorld['social'] = 'create';
+      _tab = SocialV2Tab.create;
     });
+    if (widget.initialSubAction == 'create' && widget.initialState != null) {
+      final router = GoRouter.maybeOf(context);
+      if (router != null) context.replace('/app/social?sub=create');
+    }
+  }
+
+  Future<void> _backFromCreateEditor() async {
+    if (_createBackBusy) return;
+    _createBackBusy = true;
+    final persisted = await _flushCreateDraft().catchError((Object _) => false);
+    if (mounted) {
+      if (persisted) {
+        _closeCreate();
+      } else {
+        showSocialV2Message(context, 'Draft save failed. Please try again.');
+      }
+    }
+    _createBackBusy = false;
   }
 
   @override
@@ -2871,6 +2913,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         child: CircularProgressIndicator(),
       );
     }
+    if (_createView == 'home') return _buildCreateHome();
     final workbench = SocialCreateWorkbenchV2(
       key: const ValueKey('social-creator-gateway'),
       session: widget.sharedSession,
@@ -2933,6 +2976,101 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         Expanded(child: workbench),
       ],
     );
+  }
+
+  Widget _buildCreateHome() {
+    final hasDraft = _createDraft.hasMeaningfulContent;
+    final hasUserContent = _createDraft.hasUserContent;
+    return ListView(
+      key: const Key('screen04-create-home'),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
+      children: [
+        SocialV2Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Create',
+                style: TextStyle(
+                  color: SocialV2Colors.navy,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Choose what you want to make. Your unpublished work stays private until you post it.',
+                style: TextStyle(
+                  color: SocialV2Colors.muted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('screen04-create-post-entry'),
+                onPressed: hasUserContent
+                    ? null
+                    : () => _openCreateEditor('post'),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('Create a post'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('screen04-create-carousel-entry'),
+                onPressed: hasUserContent
+                    ? null
+                    : () => _openCreateEditor('carousel'),
+                icon: const Icon(Icons.view_carousel_outlined),
+                label: const Text('Create a carousel'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('screen04-create-draft-entry'),
+                onPressed: hasDraft
+                    ? () => _openCreateEditor(
+                        _createDraftResumeView(),
+                        preserveIntent: true,
+                      )
+                    : null,
+                icon: const Icon(Icons.drafts_outlined),
+                label: Text(hasDraft ? 'Continue draft' : 'No saved draft'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openCreateEditor(String view, {bool preserveIntent = false}) {
+    HapticFeedback.selectionClick();
+    if (!preserveIntent && !_createDraft.hasUserContent) {
+      _createDraft.prepareFreshIntent(_createIntentForView(view));
+    }
+    setState(() => _createView = view);
+  }
+
+  SocialCreateIntentV2 _createIntentForView(String view) => switch (view) {
+    'image' => SocialCreateIntentV2.image,
+    'carousel' => SocialCreateIntentV2.carousel,
+    'image-poll' => SocialCreateIntentV2.imagePoll,
+    'quick-poll' => SocialCreateIntentV2.quickPoll,
+    'quiz' => SocialCreateIntentV2.quiz,
+    _ => SocialCreateIntentV2.text,
+  };
+
+  String _createDraftResumeView() {
+    if (_createDraft.formatName == SocialCreateFormatV2.carousel.name) {
+      return 'carousel';
+    }
+    return switch (_createDraft.toolName) {
+      'image' => 'image',
+      'imagePoll' => 'image-poll',
+      'quickPoll' => 'quick-poll',
+      'quiz' => 'quiz',
+      _ => 'post',
+    };
   }
 
   String get _publicAuthorName {
