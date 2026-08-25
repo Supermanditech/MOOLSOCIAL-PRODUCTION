@@ -51,3 +51,23 @@ repair ticket for the current source round; the evidence-only closure commit and
 exact remote readback do not authorize an APK, deployment or promotion. Fresh
 integration remains a separate fail-closed ticket and final APK/OPPO evidence
 may reopen the causal repair ticket.
+
+The first fresh integration remained local and unpushed after its automatic
+merge and machine verification. Final integrated replay passed 194 tests plus
+one intentional capture skip, full analysis and approved locks. The broader
+customer-copy gate then rejected one `endpoint` occurrence in the Facebook
+native adapter. REG-20260826-3744 and child
+`RT-INTEGRATION-CHAT-01-CHILD-06` reopen this ticket only for bounded sealed-tip
+and customer-reachability classification; no source fix, integration push or
+APK is authorized before that child closes.
+
+Child 06 and its four atomic follow-ups proved every flagged owner is identical
+across governance, production, Codex, Cursor and the repair tip. The occurrences
+are Dart interpolation, auth diagnostic codes, protocol error-set values,
+developer-only `ArgumentError` validation or switch input codes mapped to
+separate customer-safe messages. The copy gate now strips only Dart
+interpolation expressions and recognizes only structurally non-visible code
+forms; embedded fixtures continue to reject ordinary visible `Endpoint`,
+`Payload`, `Internal` and `Bootstrap` copy. The complete customer-copy gate
+passes. This re-closes the repair ticket without modifying auth product source
+or weakening the blocked-word inventory.

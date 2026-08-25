@@ -42617,6 +42617,192 @@
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
+    },
+    {
+      "id": "REG-20260826-3744-FINAL-INTEGRATED-COPY-GATE-FOUND-AUTH-ENDPOINT-WORD",
+      "status": "registered_sealed_tip_and_customer_reachability_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "mobile"
+      ],
+      "mistake": "After final integration passed 194 affected tests plus one intentional capture skip, full analysis and approved locks, check-user-facing-copy.ps1 rejected facebook_native_sdk_adapter.dart for the prohibited word endpoint; the integration branch remains local and unpushed.",
+      "rootCause": "The combined final gate had not previously classified whether this authentication-source occurrence is inherited by both sealed tips, customer reachable, or a static false positive outside the contextual Chat correction.",
+      "prevention": "Preserve the verified integration branch unpushed; compare the exact owner blob across governance, sealed Codex, sealed Cursor, repair and production; inspect only the bounded flagged statement and its customer mapping; if reachable, create one exact owner-qualified child fix and tests, otherwise add only a semantic negative fixture without weakening the prohibited customer-copy rule; rerun the full copy gate before fresh integration.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3745-COPY-GATE-INTERPOLATION-PATCH-GUESSED-ESCAPED-REGEX-TEXT",
+      "status": "registered_small_exact_live_copy_gate_hunks_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "tooling"
+      ],
+      "mistake": "The first semantic interpolation-filter patch was rejected with zero copy-gate change because its final hunk guessed the escaped PowerShell regex source instead of matching the live line exactly.",
+      "rootCause": "The patch combined function, fixtures, loop state and regex replacement while crossing JavaScript, patch and PowerShell escaping layers.",
+      "prevention": "After refreshed memory, read the exact bounded blocked-word loop and patch the helper, fixtures, sanitized line and matcher as four small live-anchored operations; parse and run the focused copy gate once before any integration rebuild.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3746-COPY-GATE-LIVE-REGEX-REPLACEMENT-ESCAPED-BACKTICK-INCORRECTLY",
+      "status": "registered_programmatic_literal_line_patch_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "tooling"
+      ],
+      "mistake": "The small matcher hunk still failed with zero change because the patch payload inserted a backslash before PowerShell's literal backtick-escaped quote, so it did not equal the freshly read source line.",
+      "rootCause": "The retry again hand-escaped a line crossing JavaScript and PowerShell instead of constructing the exact backtick character programmatically.",
+      "prevention": "After refreshed memory, construct the one old and new matcher lines with character code 96 inside the patch orchestration, verify only that exact line changes, then parse and run the copy gate without another hand-escaped retry.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3747-COPY-GATE-INTERPOLATION-HELPER-REJECTED-EMPTY-SOURCE-LINES",
+      "status": "registered_allow_empty_string_helper_input_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "tooling"
+      ],
+      "mistake": "The focused copy-gate replay reached the new interpolation helper and failed when Get-Content supplied a blank source line because the mandatory string parameter did not allow an empty string.",
+      "rootCause": "The helper contract modeled every source line as non-empty even though blank lines are valid and must sanitize to the same blank value.",
+      "prevention": "Add AllowEmptyString to the exact helper parameter, extend its fixture with an empty-input equality assertion, then rerun the focused copy gate once before coordination pre-commit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3748-COPY-GATE-NEXT-INHERITED-X-PAYLOAD-OCCURRENCE",
+      "status": "registered_bounded_x_payload_customer_mapping_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "mobile"
+      ],
+      "mistake": "After the Facebook interpolation false positive and empty-line helper contract were corrected, the copy gate advanced and rejected x_oauth2_pkce_network_adapter.dart for the next inherited quoted word payload.",
+      "rootCause": "The gate stops at the first Write-Error under ErrorActionPreference Stop, so the prior run could not expose this later occurrence or classify whether it is protocol-only or customer-visible.",
+      "prevention": "Compare the exact X adapter blob across sealed baselines, inspect only the bounded flagged statement and its mapped customer error, then either correct reachable customer copy or add one semantic protocol-data negative fixture without weakening literal visible payload detection; rerun once after memory refresh.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3749-COPY-GATE-NEXT-INHERITED-X-INTERNAL-SAFE-CODE",
+      "status": "registered_x_safe_code_mapping_classification_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing",
+        "mobile"
+      ],
+      "mistake": "After protocol-only safeCode named arguments were excluded and the copy gate advanced, it rejected the next inherited X adapter quoted word internal at the safe-code mapping region.",
+      "rootCause": "The non-visible metadata rule covers safeCode named arguments but not internal diagnostic-code literals returned by a safe-code mapping function, and the gate still stops after its first emitted Write-Error.",
+      "prevention": "After refreshed memory, inspect only the bounded safe-code mapping and public-message boundary, classify the exact code literal, make violation reporting non-short-circuiting while retaining the final throw, and add a semantic safe-code-return negative fixture without excluding visible Internal copy.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-user-facing-copy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-user-facing-copy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3750-COPY-GATE-X-DEPENDENCY-INTERNAL-SAFE-CODE-CANDIDATE",
+      "status": "registered_bounded_dependency_mapping_classification_required",
+      "appliesTo": ["primary", "implementation", "testing", "mobile"],
+      "mistake": "The non-short-circuit copy gate reported X adapter line 602 for quoted internal after the first safe-code mapping exclusion.",
+      "rootCause": "The remaining occurrence has not yet been classified as a dependency safe-code mapping or reachable public copy.",
+      "prevention": "Inspect the exact bounded mapping and its publicMessage consumer; permit only a structurally proven auth-code return and keep visible Internal copy rejected.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-user-facing-copy.ps1", "apps/mobile/lib/core/auth/x_oauth2_pkce_network_adapter.dart"]
+    },
+    {
+      "id": "REG-20260826-3751-COPY-GATE-X-ARGUMENT-ENDPOINT-CANDIDATE",
+      "status": "registered_bounded_argument_validation_classification_required",
+      "appliesTo": ["primary", "implementation", "testing", "mobile"],
+      "mistake": "The non-short-circuit copy gate reported x_oauth2_pkce.dart line 84 for quoted endpoint.",
+      "rootCause": "The occurrence has not yet been classified as developer-only ArgumentError validation or reachable customer copy.",
+      "prevention": "Inspect only the exact constructor/validator and call boundary; permit a developer assertion only through a semantic ArgumentError fixture while retaining visible endpoint rejection.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-user-facing-copy.ps1", "apps/mobile/lib/core/auth/x_oauth2_pkce.dart"]
+    },
+    {
+      "id": "REG-20260826-3752-COPY-GATE-EMAIL-INTERNAL-ERROR-CODE-CANDIDATE",
+      "status": "registered_bounded_email_error_mapping_classification_required",
+      "appliesTo": ["primary", "implementation", "testing", "mobile"],
+      "mistake": "The non-short-circuit copy gate reported review_journey_services.dart line 1645 for quoted internal.",
+      "rootCause": "The occurrence has not yet been classified as an input error-code pattern mapped to separate customer-safe copy or direct visible text.",
+      "prevention": "Inspect the exact switch arm and returned message; permit only code-to-safe-message mapping syntax and keep literal visible Internal copy rejected.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-user-facing-copy.ps1", "apps/mobile/lib/features/journey01/review_journey_services.dart"]
+    },
+    {
+      "id": "REG-20260826-3753-COPY-GATE-AUTH-BOOTSTRAP-DIAGNOSTIC-CANDIDATE",
+      "status": "registered_bounded_bootstrap_diagnostic_classification_required",
+      "appliesTo": ["primary", "implementation", "testing", "mobile"],
+      "mistake": "The non-short-circuit copy gate reported review_journey_services.dart line 2029 for quoted bootstrap.",
+      "rootCause": "The occurrence has not yet been classified as a diagnostic/telemetry literal or reachable customer copy.",
+      "prevention": "Inspect the exact statement and downstream surface; permit only structurally non-visible diagnostics with a negative fixture and retain visible Bootstrap rejection.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-user-facing-copy.ps1", "apps/mobile/lib/features/journey01/review_journey_services.dart"]
     }
   ]
 }

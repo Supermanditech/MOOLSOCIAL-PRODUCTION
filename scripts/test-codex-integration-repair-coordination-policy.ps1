@@ -11,9 +11,11 @@ $root = [IO.Path]::GetFullPath($RepositoryRoot)
 $policyPath = Join-Path $root 'config\codex-subagent-coordination-policy.json'
 $checkerPath = Join-Path $root 'scripts\check-codex-subagent-coordination-policy.ps1'
 $lockCheckerPath = Join-Path $root 'scripts\check-approved-ui-locks.ps1'
+$copyCheckerPath = Join-Path $root 'scripts\check-user-facing-copy.ps1'
 $policy = Get-Content -Raw -LiteralPath $policyPath | ConvertFrom-Json
 $checker = Get-Content -Raw -LiteralPath $checkerPath
 $lockChecker = Get-Content -Raw -LiteralPath $lockCheckerPath
+$copyChecker = Get-Content -Raw -LiteralPath $copyCheckerPath
 
 function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
@@ -44,8 +46,8 @@ Assert-RepairContract (
   [int]$repair.maximumMergeCommits -eq 1 -and
   [int]$repair.maximumPreMergeCoordinationCommits -eq 4 -and
   @($repair.preMergeCoordinationOwners).Count -eq 6 -and
-  [int]$repair.maximumPostMergeClosureCommits -eq 2 -and
-  @($repair.postMergeClosureOwners).Count -eq 6 -and
+  [int]$repair.maximumPostMergeClosureCommits -eq 3 -and
+  @($repair.postMergeClosureOwners).Count -eq 7 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed -and
   @($repair.exactConflictOwners).Count -eq 10
@@ -93,6 +95,21 @@ $sealedFallbackCalls = [regex]::Matches(
 ).Count
 Assert-RepairContract ($sealedFallbackCalls -eq 2) `
   'sealed parallel fallback is not applied to both raw and production locks.'
+foreach ($copyToken in @(
+    'function Remove-DartInterpolationForCustomerCopy',
+    'User-facing copy interpolation fixture failed.',
+    'function Test-NonVisibleDartCopyLine',
+    'User-facing copy non-visible Dart metadata fixture failed.',
+    '$safeCodeMapFixture',
+    '$brokerSetFixture',
+    '$argumentFixture',
+    '$switchCodeFixture',
+    '$authCodeFixture',
+    '$violations | ForEach-Object { Write-Output $_ }'
+  )) {
+  Assert-RepairContract ($copyChecker.Contains($copyToken)) `
+    "customer-copy token is missing: $copyToken"
+}
 
 if ($RequireQualifiedGraph) {
   $head = (& git -C $root rev-parse HEAD).Trim()
