@@ -1408,6 +1408,7 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       Object? cleanupFailure;
+      var localSessionInvalidated = false;
       try {
         await _verifiedPrincipalBindingStore.clear().timeout(
           socialAuthRollbackTimeout,
@@ -1421,7 +1422,6 @@ class JourneySession extends ChangeNotifier {
         _otpGateway.signOut,
         _socialAuthGateway.signOut,
         _emailLinkGateway.signOut,
-        _accountBootstrapGateway.invalidateLocalSession,
       ]) {
         try {
           await cleanup().timeout(socialAuthRollbackTimeout);
@@ -1429,28 +1429,24 @@ class JourneySession extends ChangeNotifier {
           cleanupFailure ??= error;
         }
       }
+      try {
+        await _accountBootstrapGateway.invalidateLocalSession().timeout(
+          socialAuthRollbackTimeout,
+        );
+        localSessionInvalidated = true;
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
       await _clearPendingEmailLinkAddress();
+      if (localSessionInvalidated) _applyLocallySignedOutState();
       if (cleanupFailure != null) {
-        errorMessage =
-            'Sign-out could not be completed safely. Check the connection and try again.';
+        errorMessage = localSessionInvalidated
+            ? 'You are signed out on this device, but saved verification cleanup must finish before another sign-in. Retry startup.'
+            : 'Sign-out could not be completed safely. Check the connection and try again.';
         noticeMessage = null;
         notifyListeners();
         return false;
       }
-      _isAuthenticated = false;
-      accountIdentity = null;
-      stage = JourneyStage.signIn;
-      phoneNumber = null;
-      emailAddress = null;
-      otpChannel = null;
-      emailLinkState = EmailLinkState.idle;
-      emailLinkReceiptCode = null;
-      _pendingEmailLink = null;
-      _completedEmailLinkReturnRoute = null;
-      _completedSocialAuthReturnRoute = null;
-      socialAuthProvider = null;
-      socialAuthState = SocialAuthState.idle;
-      authenticationPurpose = JourneyAuthenticationPurpose.general;
       errorMessage = null;
       noticeMessage =
           'You are signed out. Your language and area are retained.';
@@ -1460,6 +1456,23 @@ class JourneySession extends ChangeNotifier {
     } finally {
       _setBusy(false);
     }
+  }
+
+  void _applyLocallySignedOutState() {
+    _isAuthenticated = false;
+    accountIdentity = null;
+    stage = JourneyStage.signIn;
+    phoneNumber = null;
+    emailAddress = null;
+    otpChannel = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    _pendingEmailLink = null;
+    _completedEmailLinkReturnRoute = null;
+    _completedSocialAuthReturnRoute = null;
+    socialAuthProvider = null;
+    socialAuthState = SocialAuthState.idle;
+    authenticationPurpose = JourneyAuthenticationPurpose.general;
   }
 
   void captureReturnTo(String location) {

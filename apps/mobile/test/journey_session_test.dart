@@ -109,7 +109,7 @@ void main() {
   );
 
   test(
-    'sign-out attempts every cleanup and retains authenticated state on failure',
+    'sign-out attempts every cleanup and removes local auth after invalidation',
     () async {
       final pendingAddress = MemoryPendingEmailLinkAddressStore();
       await pendingAddress.write('member@example.com');
@@ -141,9 +141,9 @@ void main() {
       expect(social.signOutCount, 1);
       expect(emailLink.signOutCount, 1);
       expect(await pendingAddress.read(), isNull);
-      expect(session.isAuthenticated, isTrue);
-      expect(session.stage, JourneyStage.ready);
-      expect(session.errorMessage, contains('could not be completed safely'));
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.errorMessage, contains('signed out on this device'));
       expect(session.busy, isFalse);
     },
   );
@@ -634,7 +634,8 @@ void main() {
     expect(await session.signOut(), isFalse);
 
     expect(session.principalBindingCleanupRequired, isTrue);
-    expect(session.isAuthenticated, isTrue);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.stage, JourneyStage.signIn);
     expect(session.errorMessage, isNot(contains('private')));
   });
 
