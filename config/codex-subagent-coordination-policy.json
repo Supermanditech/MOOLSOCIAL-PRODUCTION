@@ -178,6 +178,7 @@
         "apps/mobile/lib/ui_v2/social/social_v2_youtube_public_runtime.dart",
         "apps/mobile/test/journey_session_test.dart",
         "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
+        "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_catalogue_continuity_c29t_test.dart",
         "apps/mobile/test/youtube_public_catalogue_repository_test.dart",
         "apps/mobile/test/uaw_c34p_fix8_global_social_login_runtime_composition_test.dart",
         "scripts/build-buy-device-review.ps1",

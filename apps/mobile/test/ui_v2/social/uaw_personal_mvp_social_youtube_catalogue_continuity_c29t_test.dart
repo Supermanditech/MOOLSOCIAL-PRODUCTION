@@ -8,6 +8,7 @@ import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -583,6 +584,96 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'RT-04A-02 stale process-death catalogue survives offline refresh',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      var now = DateTime.utc(2026, 8, 25, 6);
+      final persistence = _CatalogueKeyValueStoreFake();
+      final firstRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final firstStore = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+      await firstStore.configureDurability(firstRepository);
+      firstStore.replaceVideos([
+        _publicVideo('offline-video', duration: 'PT4M'),
+      ]);
+      firstStore.replaceShorts([
+        _publicVideo('offline-short', duration: 'PT30S'),
+      ]);
+      await firstStore.settleDurableWrites();
+
+      now = now.add(const Duration(minutes: 6));
+      final relaunchedRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final relaunchedStore = Screen04YouTubeCatalogueSnapshotStore(
+        now: () => now,
+      );
+      final hydration = await relaunchedStore.configureDurability(
+        relaunchedRepository,
+      );
+      expect(hydration.degraded, isFalse);
+      expect(relaunchedStore.readFreshVideos(), isNull);
+      expect(relaunchedStore.readFreshShorts(), isNull);
+
+      final videoOwners = _Owners();
+      addTearDown(videoOwners.dispose);
+      await _mount(
+        tester,
+        videoOwners.consumer(
+          subAction: 'videos',
+          store: relaunchedStore,
+          videosLoader: () => Future.error(StateError('offline')),
+          shortsLoader: () => Future.error(StateError('offline')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Provider title offline-video'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-refresh-error')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-state-error')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      final shortsOwners = _Owners();
+      addTearDown(shortsOwners.dispose);
+      await _mount(
+        tester,
+        shortsOwners.consumer(
+          subAction: 'shorts',
+          store: relaunchedStore,
+          videosLoader: () => Future.error(StateError('offline')),
+          shortsLoader: () => Future.error(StateError('offline')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        find.byKey(const ValueKey('screen04-youtube-short-offline-short')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-youtube-shorts-refresh-error')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _mount(WidgetTester tester, Widget child) => tester.pumpWidget(
@@ -651,6 +742,26 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+final class _CatalogueKeyValueStoreFake
+    implements YouTubePublicCatalogueKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<bool> writeString(String key, String value) async {
+    values[key] = value;
+    return true;
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    values.remove(key);
+    return true;
   }
 }
 
