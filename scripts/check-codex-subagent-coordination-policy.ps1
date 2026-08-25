@@ -696,7 +696,10 @@ Assert-Coordination (
 $integrationRepair = $gitDiscipline.integration.repair
 Assert-ExactNames $integrationRepair @(
   'lane','requiredCodexCommit','requiredCodexBranch','requiredCursorCommit',
-  'requiredCursorBranch','maximumMergeCommits','directSourceCommitsAllowed',
+  'requiredCursorBranch','maximumMergeCommits',
+  'maximumPreMergeCoordinationCommits','preMergeCoordinationOwners',
+  'maximumPostMergeClosureCommits','postMergeClosureOwners',
+  'directSourceCommitsAllowed',
   'conflictResolutionAllowed','exactConflictOwners',
   'remoteRepairBranchMustEqualHeadBeforeAdmission','freshIntegrationWorkId',
   'freshIntegrationTicketId','freshIntegrationBranch',
@@ -724,6 +727,12 @@ Assert-Coordination (
   [string]$integrationRepair.requiredCursorBranch -ceq
     'work/cursor-ui/shop-chat-ui-20260824' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
+  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
+  (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
+    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
+  (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
+    'config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
@@ -1317,8 +1326,7 @@ if ($ProductionLane -ceq 'baseline') {
           $ProductionLane -ceq 'integration_repair' -and
           -not @($expectedRepairConflictOwners | ForEach-Object {
             $_.ToLowerInvariant()
-          }).Contains($changedOwnerKey) -and
-          $ownerToTask.ContainsKey($changedOwnerKey)
+          }).Contains($changedOwnerKey)
         )
         Assert-Coordination (
           $effectiveOwnerKeys.Contains($changedOwnerKey) -or
@@ -1349,24 +1357,54 @@ if ($ProductionLane -ceq 'baseline') {
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head `
       -IndexOnly
     if ($ProductionLane -ceq 'integration_repair') {
-      Assert-Coordination ($head -ceq $baseCommit) `
-        'integration repair pre-commit must retain the bootstrap HEAD.'
       $repairMergeHeadPath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
-      Assert-Coordination (
-        $LASTEXITCODE -eq 0 -and
-        (Test-Path -LiteralPath $repairMergeHeadPath -PathType Leaf)
-      ) 'integration repair pre-commit requires an active merge.'
-      $repairMergeHead = (Get-Content -Raw -LiteralPath $repairMergeHeadPath).Trim()
-      $repairUnmergedOwners = @(& git -C $root diff --name-only --diff-filter=U)
-      Assert-Coordination (
-        $LASTEXITCODE -eq 0 -and $repairUnmergedOwners.Count -eq 0
-      ) 'integration repair pre-commit contains unresolved index entries.'
-      $repairIndexTree = (& git -C $root write-tree).Trim()
-      Assert-Coordination (
-        $LASTEXITCODE -eq 0 -and $repairIndexTree -cmatch '^[0-9a-f]{40}$'
-      ) 'integration repair staged tree could not be written.'
-      Assert-IntegrationRepairMerge -FirstParent $head `
-        -SecondParent $repairMergeHead -ActualTree $repairIndexTree
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'integration repair merge-state path read failed.'
+      $repairMergeActive = Test-Path -LiteralPath $repairMergeHeadPath -PathType Leaf
+      $existingRepairMerges = @(& git -C $root rev-list --merges `
+          "$baseCommit..$head")
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'integration repair existing merge inventory failed.'
+      if ($repairMergeActive) {
+        $preMergeDirectCommits = @(& git -C $root rev-list --no-merges `
+            "$baseCommit..$head")
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and
+          $existingRepairMerges.Count -eq 0 -and
+          $preMergeDirectCommits.Count -eq
+            [int]$integrationRepair.maximumPreMergeCoordinationCommits
+        ) 'integration repair pre-merge coordination commit inventory changed.'
+        $preMergeChangedOwners = @(& git -C $root diff --name-only `
+            "$baseCommit..$head")
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and
+          (@($preMergeChangedOwners | Sort-Object) -join '|') -ceq
+            (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
+        ) 'integration repair pre-merge coordination owner set changed.'
+        $repairMergeHead = (Get-Content -Raw -LiteralPath $repairMergeHeadPath).Trim()
+        $repairUnmergedOwners = @(& git -C $root diff --name-only --diff-filter=U)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $repairUnmergedOwners.Count -eq 0
+        ) 'integration repair pre-commit contains unresolved index entries.'
+        $repairIndexTree = (& git -C $root write-tree).Trim()
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $repairIndexTree -cmatch '^[0-9a-f]{40}$'
+        ) 'integration repair staged tree could not be written.'
+        Assert-IntegrationRepairMerge -FirstParent $head `
+          -SecondParent $repairMergeHead -ActualTree $repairIndexTree
+      } elseif ($existingRepairMerges.Count -eq 0) {
+        Assert-Coordination (
+          $head -ceq $baseCommit -and
+          (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+            (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
+        ) 'integration repair coordination correction owner set changed.'
+      } else {
+        Assert-Coordination (
+          $existingRepairMerges.Count -eq 1 -and
+          (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+            (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|')
+        ) 'integration repair post-merge closure owner set changed.'
+      }
     }
   }
 
@@ -1412,22 +1450,55 @@ if ($ProductionLane -ceq 'baseline') {
       ) "production feature commit subject is not atomic: $featureCommit"
     }
     if ($ProductionLane -ceq 'integration_repair') {
-      $repairDirectCommits = @(& git -C $root rev-list --no-merges `
-          "$baseCommit..$head")
-      Assert-Coordination (
-        $LASTEXITCODE -eq 0 -and $repairDirectCommits.Count -eq 0
-      ) 'integration repair contains a forbidden direct commit.'
-      Assert-Coordination ($featureCommits.Count -eq 1 -and $head -ceq $featureCommits[0]) `
-        'integration repair must end at its single merge commit.'
-      $repairParentOutput = @(& git -C $root show -s --format='%P' $head)
+      $repairMergeCommit = [string]$featureMergeCommits[0]
+      $repairParentOutput = @(& git -C $root show -s --format='%P' `
+          $repairMergeCommit)
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $repairParentOutput.Count -eq 1
       ) 'integration repair merge parent read failed.'
       $repairParents = @([string]$repairParentOutput[0] -split ' ')
       Assert-Coordination (
-        $repairParents.Count -eq 2 -and $repairParents[0] -ceq $baseCommit
+        $repairParents.Count -eq 2
+      ) 'integration repair merge does not have two exact parents.'
+      $preMergeDirectCommits = @(& git -C $root rev-list --no-merges `
+          "$baseCommit..$($repairParents[0])")
+      $preMergeChangedOwners = @(& git -C $root diff --name-only `
+          "$baseCommit..$($repairParents[0])")
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and
+        $preMergeDirectCommits.Count -eq
+          [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+        (@($preMergeChangedOwners | Sort-Object) -join '|') -ceq
+          (@($integrationRepair.preMergeCoordinationOwners | Sort-Object) -join '|')
       ) 'integration repair merge first parent changed.'
-      $repairActualTree = (& git -C $root show -s --format='%T' $head).Trim()
+      $postMergeCommits = @(& git -C $root rev-list --reverse `
+          "$repairMergeCommit..$head")
+      $postMergeMerges = @(& git -C $root rev-list --merges `
+          "$repairMergeCommit..$head")
+      Assert-Coordination (
+        $LASTEXITCODE -eq 0 -and $postMergeMerges.Count -eq 0 -and
+        $postMergeCommits.Count -le
+          [int]$integrationRepair.maximumPostMergeClosureCommits
+      ) 'integration repair contains a forbidden direct commit.'
+      if ($postMergeCommits.Count -eq 0) {
+        Assert-Coordination ($head -ceq $repairMergeCommit) `
+          'integration repair HEAD moved beyond its merge unexpectedly.'
+      } else {
+        $postMergeChangedOwners = @(& git -C $root diff --name-only `
+            "$repairMergeCommit..$head")
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $head -ceq $postMergeCommits[-1] -and
+          (@($postMergeChangedOwners | Sort-Object) -join '|') -ceq
+            (@($integrationRepair.postMergeClosureOwners | Sort-Object) -join '|')
+        ) 'integration repair post-merge closure owner set changed.'
+      }
+      Assert-Coordination (
+        $featureCommits.Count -eq
+          (1 + [int]$integrationRepair.maximumPreMergeCoordinationCommits +
+            $postMergeCommits.Count)
+      ) 'integration repair commit inventory changed.'
+      $repairActualTree = (& git -C $root show -s --format='%T' `
+          $repairMergeCommit).Trim()
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $repairActualTree -cmatch '^[0-9a-f]{40}$'
       ) 'integration repair merge tree read failed.'

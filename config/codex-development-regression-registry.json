@@ -42394,6 +42394,30 @@
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md"
       ]
+    },
+    {
+      "id": "REG-20260826-3735-SOCIAL-INTEGRATION-REPAIR-GATE-REJECTED-UNCLAIMED-AUTOMATIC-LOCK-CHECKER",
+      "status": "registered_premerge_coordination_child_required",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "testing"
+      ],
+      "mistake": "The first conflict-correction pre-commit gate reproduced the exact nine conflicts and reached zero unresolved entries, then rejected the automatically merged scripts/check-approved-ui-locks.ps1 because that sealed Cursor change has no active claim; the merge was aborted without commit.",
+      "rootCause": "The new repair gate allowed automatically merged non-conflict owners only when an active task claimed them, but the historical Cursor coordination bootstrap legitimately changed the primary-only lock checker outside the remaining Cursor claim.",
+      "prevention": "Before replaying the merge, permit exactly one pre-merge coordination correction commit limited to the registry, machine policy, runtime ticket manifest, coordination checker and its focused fixture; machine-lock the complete sealed Cursor delta so every non-conflict path is accepted only when its resolved tree bytes equal Git's automatic merge tree, regardless of stale active-claim ownership.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
     }
   ]
 }

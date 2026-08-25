@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3705,
-    "sha256": "46745ADBCC8CC9CA3286AACC88AD3A9C9B1247C2502339E0FFC9B1AB14997C0A"
+    "entryCount": 3706,
+    "sha256": "DF2FB3F0579FFBAB987981090CE89C380AE991AEBE08C34E5E6A6D4E5AA5FD06"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -598,6 +598,19 @@
         "requiredCursorCommit": "00ce93552091ee51739266c0a8fbe6d207d9f695",
         "requiredCursorBranch": "work/cursor-ui/shop-chat-ui-20260824",
         "maximumMergeCommits": 1,
+        "maximumPreMergeCoordinationCommits": 1,
+        "preMergeCoordinationOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
+        "maximumPostMergeClosureCommits": 1,
+        "postMergeClosureOwners": [
+          "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+          "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md"
+        ],
         "directSourceCommitsAllowed": false,
         "conflictResolutionAllowed": true,
         "exactConflictOwners": [

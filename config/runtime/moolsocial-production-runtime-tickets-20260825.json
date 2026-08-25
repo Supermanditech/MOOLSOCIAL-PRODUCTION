@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": false,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 213,
+  "ticketCount": 214,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "GAP_FOUND", "audited_pending_final_runtime", "closed_current_round_reopen_on_apk_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 65,
+    "totalCodexAtomicEngineeringTicketCount": 66,
     "implementedAtomicTicketCount": 64,
-    "pendingConfirmedImplementationCount": 1,
+    "pendingConfirmedImplementationCount": 2,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 1,
+    "remainingCodexEngineeringQueueCount": 2,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -91,9 +91,15 @@
     "pendingConfirmedImplementation": [
       {
         "id": "RT-INTEGRATION-CHAT-01",
-        "state": "PENDING",
+        "state": "GAP_FOUND",
         "implementation": "Reconcile the exact sealed Codex runtime and Cursor contextual Chat tips in one primary-owned two-parent conflict-correction merge limited to the recorded overlap owners.",
-        "runtime": "Focused, combined and non-building runtime-safe preflight proof pending; final integrated APK/OPPO proof remains deferred and may reopen the ticket."
+        "runtime": "The first repair pre-commit stopped before commit on an unclaimed automatically merged lock-checker owner; child RT-INTEGRATION-CHAT-01-CHILD-01 is selected before replay."
+      },
+      {
+        "id": "RT-INTEGRATION-CHAT-01-CHILD-01",
+        "state": "IMPLEMENTED",
+        "implementation": "Machine-lock non-conflict files to Git's automatic merge tree regardless of stale claim ownership and permit one exact pre-merge coordination correction commit with no direct product edits.",
+        "runtime": "Regression memory and the corrected coordination fixture must pass before the exact merge is replayed."
       }
     ],
     "pendingClassification": [],
@@ -341,6 +347,7 @@
     {"id":"OPPO-CARE-ROUTE-01","area":"care","microScope":"doctor_entry_and_shop_return","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Open Care Doctor from Shop through Mool and return to the exact Shop origin with Android Back.","owner":"cursor_ui","state":"verified_pass","evidence":"Installed r60.91 opened Doctor with Clinic selected; one Android Back restored the prior Shop frame and no search, booking, provider or Chat action occurred.","blocker":"none for this entry/return; broader Care contextual UX remains Cursor-owned","dependencies":["SAFE-OPPO-04","OPPO-SHOP-ROUTE-01"]},
     {"id":"OPPO-WORK-ROUTE-BACK-01","area":"work","microScope":"earn_today_entry_and_shop_return","layers":["ui","wiring","navigation","mobile","oppo"],"outcome":"Open Work Earn Today from Shop through Mool and return to the exact Shop origin with Android Back.","owner":"cursor_ui","state":"verified_pass","evidence":"Installed r60.91 opened Earn Today read-only; one Android Back restored the prior Shop frame.","blocker":"none for this entry/return; broader Work contextual UX remains Cursor-owned","dependencies":["SAFE-OPPO-04","OPPO-SHOP-ROUTE-01"]},
     {"id":"SAFE-OPPO-EXHAUSTED-01","area":"oppo","microScope":"safe_investigation_boundary_complete","layers":["ui","wiring","navigation","mobile","provider","session","cache","apk","oppo"],"outcome":"Exhaust every currently safe non-publishing, non-messaging, non-account-changing OPPO differential before Codex implementation selection.","owner":"primary_device_coordinator","state":"verified_pass","evidence":"Safe checks covered candidate identity, background/re-entry, Feed/Create/Chat navigation, Chat composer with and without IME, guarded offline/process-death recovery, sanitized text-draft process death, sanitized Quick Poll local retention/discard, visible Feed/Create affordances and Shop/Travel/Care/Work entry/return. Search/Short persistence and all private/external mutations were explicitly deferred at their privacy/provider boundaries.","blocker":"none for safe investigation sequencing; RT-02, RT-04A, RT-04C, RT-06, RT-07, RT-08, RT-09 and RT-10 remain open or source-pending","dependencies":["SAFE-OPPO-01","SAFE-OPPO-02","SAFE-OPPO-03","SAFE-OPPO-04","SAFE-OPPO-05","SAFE-OPPO-08","SAFE-OPPO-09","SAFE-OPPO-10"]},
-    {"id":"RT-INTEGRATION-CHAT-01","area":"social_runtime_contextual_chat_integration","microScope":"sealed_codex_cursor_conflict_correction_and_zero_regression_union","layers":["ui","wiring","navigation","mobile","session","cache","testing","deployment_preflight","apk","oppo"],"outcome":"Preserve all Codex durable Social/Create/Back/account behavior and all Cursor contextual Chat handoff, retention, provisioning, capability, truthful-copy and Android navigation behavior in one auditable combined source tree.","owner":"primary_integration_repair","state":"pending_integration","evidence":"Sealed inputs are Codex 922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9 and Cursor 00ce93552091ee51739266c0a8fbe6d207d9f695; the first integration attempt was aborted on the exact conflict inventory and remains local, clean and unpushed.","blocker":"none after founder ownership transfer; one exact conflict-correction merge, focused and combined proof, independent audit and fresh automatic integration remain","dependencies":["RT-04A-01","RT-04B-01","RT-04B-02","RT-04B-03","RT-04C-01","RT-07","RT-08","RT-08-02","RT-10"]}
+    {"id":"RT-INTEGRATION-CHAT-01","area":"social_runtime_contextual_chat_integration","microScope":"sealed_codex_cursor_conflict_correction_and_zero_regression_union","layers":["ui","wiring","navigation","mobile","session","cache","testing","deployment_preflight","apk","oppo"],"outcome":"Preserve all Codex durable Social/Create/Back/account behavior and all Cursor contextual Chat handoff, retention, provisioning, capability, truthful-copy and Android navigation behavior in one auditable combined source tree.","owner":"primary_integration_repair","state":"GAP_FOUND","evidence":"Sealed inputs are Codex 922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9 and Cursor 00ce93552091ee51739266c0a8fbe6d207d9f695; the first repair pre-commit reproduced the exact conflict set and stopped before commit on stale ownership for an automatically merged lock checker.","blocker":"child RT-INTEGRATION-CHAT-01-CHILD-01 must pass corrected gate replay before the exact repair merge continues","dependencies":["RT-04A-01","RT-04B-01","RT-04B-02","RT-04B-03","RT-04C-01","RT-07","RT-08","RT-08-02","RT-10"]},
+    {"id":"RT-INTEGRATION-CHAT-01-CHILD-01","area":"integration_gate","microScope":"automatic_nonconflict_owner_and_premerge_coordination_correction","layers":["wiring","testing","deployment_preflight"],"outcome":"Accept every unclaimed non-conflict owner only when its resolved bytes equal Git's automatic merge tree, while permitting one exact non-product coordination correction commit before merge replay.","owner":"primary_integration_repair","state":"IMPLEMENTED","evidence":"The rejected cycle created no merge commit and was aborted cleanly; REG-20260826-3735 binds the exact gate correction.","blocker":"corrected regression memory, fixture and coordination implementation gates pending","dependencies":["RT-INTEGRATION-CHAT-01"]}
   ]
 }
