@@ -48,7 +48,16 @@ void main() {
 
     await tester.tap(find.byKey(const Key('mool-global-chat-tap')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+    expect(chatTaps, 0);
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-open-all')));
+    await tester.pumpAndSettle();
     expect(chatTaps, 1);
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-shop-chat')), findsNothing);
 
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
