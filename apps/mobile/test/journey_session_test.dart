@@ -607,6 +607,116 @@ void main() {
     expect(otp.requestCount, requestCount);
   });
 
+  test('email-link rollback clear failure blocks another request', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore();
+    final emailLink = ReviewEmailLinkGateway(userId: 'private-user-a');
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      emailLinkGateway: emailLink,
+      emailLinkAvailable: true,
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(await session.requestEmailLink('person@example.com'), isTrue);
+    receiptStore.binding = binding;
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(
+      await session.prepareEmailLinkReturn(emailLink.acceptedLink),
+      isTrue,
+    );
+    expect(session.principalBindingCleanupRequired, isTrue);
+    expect(emailLink.completionCount, 1);
+    expect(emailLink.signOutCount, 1);
+    final sendCount = emailLink.sendCount;
+
+    expect(await session.requestEmailLink('person@example.com'), isFalse);
+    expect(emailLink.sendCount, sendCount);
+  });
+
+  test('Social callback cannot bypass receipt-cleanup latch', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+      clearFailure: StateError('private clear failure'),
+    );
+    final callbackGateway = _CallbackSocialAuthGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: callbackGateway,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.principalBindingCleanupRequired, isTrue);
+
+    expect(
+      await session.prepareSocialAuthReturn(
+        'moolsocial://auth/x?code=fixture&state=fixture',
+      ),
+      isTrue,
+    );
+
+    expect(callbackGateway.callbackCompletionCount, 0);
+    expect(session.isAuthenticated, isFalse);
+  });
+
+  test('email callback cannot bypass receipt-cleanup latch', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+      clearFailure: StateError('private clear failure'),
+    );
+    final emailLink = ReviewEmailLinkGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      emailLinkGateway: emailLink,
+      emailLinkAvailable: true,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.principalBindingCleanupRequired, isTrue);
+
+    expect(
+      await session.prepareEmailLinkReturn(emailLink.acceptedLink),
+      isTrue,
+    );
+
+    expect(emailLink.completionCount, 0);
+    expect(session.isAuthenticated, isFalse);
+  });
+
   test('explicit sign-out clear failure remains fail-closed', () async {
     final binding = await const ReviewPrincipalBindingProtector().protect(
       'private-user-a',
