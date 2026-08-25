@@ -824,6 +824,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
 
     final hasInlineBack =
         _activeVideo != null || _youtubeSearchOpen || contextualChatOpen;
+    final focusedFeedBack =
+        _world == 'social' && _tab == SocialV2Tab.feed && !hasInlineBack;
 
     return MediaQuery(
       data: media,
@@ -836,7 +838,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           ),
         ),
         child: PopScope<Object?>(
-          canPop: !hasInlineBack,
+          canPop: !(hasInlineBack || focusedFeedBack),
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _handleScreen04Back();
           },
@@ -1060,6 +1062,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         );
       });
       HapticFeedback.selectionClick();
+      return;
+    }
+    if (_world == 'social' && _tab == SocialV2Tab.feed) {
+      _openMool();
     }
   }
 
