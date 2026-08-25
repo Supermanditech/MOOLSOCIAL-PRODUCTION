@@ -533,7 +533,7 @@ void main() {
   });
 
   testWidgets(
-    'new conversation stays inside Chat and opens the selected partner',
+    'conversation picker stays inside Chat and opens the selected partner',
     (tester) async {
       final core = BuySession();
       final session = BuyV2Session(core: core);
@@ -550,6 +550,13 @@ void main() {
       expect(
         find.byKey(const ValueKey('buy-shop-chat-new-surface')),
         findsOneWidget,
+      );
+      expect(find.text('Choose a Shop conversation'), findsOneWidget);
+      expect(
+        find.textContaining(
+          RegExp(r'\bnew\s+Shop\s+conversation\b', caseSensitive: false),
+        ),
+        findsNothing,
       );
       expect(find.byType(BottomSheet), findsNothing);
 

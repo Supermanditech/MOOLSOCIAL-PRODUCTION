@@ -336,7 +336,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
     await tester.pumpAndSettle();
-    expect(find.text('New Travel conversation'), findsOneWidget);
+    expect(find.text('Choose a Travel conversation'), findsOneWidget);
+    expect(
+      find.textContaining(
+        RegExp(r'\bnew\s+Travel\s+conversation\b', caseSensitive: false),
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new-back')));
     await tester.pumpAndSettle();
@@ -387,7 +393,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
         await tester.pumpAndSettle();
         expect(
-          find.text('New ${presentation.familyLabel} conversation'),
+          find.text('Choose a ${presentation.familyLabel} conversation'),
           findsOneWidget,
         );
         expect(

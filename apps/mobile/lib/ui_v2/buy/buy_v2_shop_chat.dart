@@ -308,7 +308,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.retailer,
         title: 'Mool Retail Partner',
         subtitle: 'Products, stock and local delivery',
-        detail: 'Start a Shop conversation',
+        detail: 'Open Shop support',
         icon: Icons.storefront_outlined,
         accent: BuyV2Colors.orange,
         commerceTarget: BuyV2ShopChatCommerceTarget.shop,
@@ -322,7 +322,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.wholesaler,
         title: 'Mool Trade Partner',
         subtitle: 'Packs, pricing and fulfilment',
-        detail: 'Start a wholesale conversation',
+        detail: 'Open wholesale support',
         icon: Icons.inventory_2_outlined,
         accent: BuyV2Colors.green,
         commerceTarget: BuyV2ShopChatCommerceTarget.wholesale,
@@ -336,7 +336,7 @@ class BuyV2SessionShopChatProvisioningSource
         participantKind: BuyV2ShopChatParticipantKind.manufacturer,
         title: 'Mool Manufacturer',
         subtitle: 'Catalogue, packs and supply enquiries',
-        detail: 'Start a manufacturer conversation',
+        detail: 'Open manufacturer support',
         icon: Icons.factory_outlined,
         accent: BuyV2Colors.navy,
         commerceTarget: BuyV2ShopChatCommerceTarget.wholesale,
@@ -610,10 +610,11 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                     bottom: 16,
                     child: Semantics(
                       label:
-                          'Start a new ${widget.presentation.familyLabel} chat',
+                          'Choose a ${widget.presentation.familyLabel} conversation',
                       button: true,
                       child: Tooltip(
-                        message: 'New ${widget.presentation.familyLabel} chat',
+                        message:
+                            'Choose a ${widget.presentation.familyLabel} conversation',
                         child: FloatingActionButton(
                           key: const ValueKey('buy-shop-chat-new'),
                           heroTag: 'buy-shop-chat-new',
@@ -1347,7 +1348,7 @@ class _ShopChatNewConversationView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'New ${presentation.familyLabel} conversation',
+                        'Choose a ${presentation.familyLabel} conversation',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.buyTitle.copyWith(fontSize: 18),
@@ -2268,7 +2269,7 @@ class _ShopChatWelcomePanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Start with ${thread.title}',
+              'Continue with ${thread.title}',
               textAlign: TextAlign.center,
               style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
             ),
