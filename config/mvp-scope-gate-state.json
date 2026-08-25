@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
+    "currentTicketId": "UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,59 +1672,54 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-      "customerOutcome": "Every launch-critical Social, authentication, Chat, Feed, Create, provider, cache, deployment and OPPO result has one sanitized atomic machine-state ticket so fixes are selected and verified without losing a micro-scope or exposing private account data.",
-      "manifestPath": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
-      "manifestSha256": "07295DADA54A067071B3164DCDA44C9958FD0326A3DF699D657AFA3182071C8F",
+      "ticketId": "UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825",
+      "customerOutcome": "An isolated YouTube provider deployment cannot silently disable the accepted Social runtime because the complete permanent non-secret tuple is restored and verified on the new revision.",
+      "manifestPath": "docs/quality/UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825.md",
+      "manifestSha256": "089437384A80EDB59282C93BC41FDE1941D50D2AE1217630E95E03BCDAE2D897",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "test_only_acceptance", "new_necessary_work"],
       "sharedImplementationOwners": [
-        "config/codex-subagent-coordination-policy.json",
-        "config/mvp-scope-gate-state.json",
+        "scripts/deploy-youtube-provider-c30m.ps1",
+        "scripts/test-youtube-provider-c30m-deployment-controls.ps1",
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "docs/quality/UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825.md"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Existing product, provider, session, cache, test and device owners are reused. One separate sanitized manifest plus exact continuation bindings is the smallest complete coordination layer and creates no customer screen, route, backend or parallel runtime implementation.",
+      "necessityProof": "The existing provider-only deploy wrapper remains authoritative. One explicit permanent environment restoration/readback plus its existing source gate is the smallest complete prevention and creates no alternate deploy path.",
       "robustnessCoverage": [
-        "all_runtime_micro_scopes_have_unique_machine_ticket_ids",
-        "owner_state_evidence_blocker_and_dependency_present_per_ticket",
-        "Cursor_and_Codex_continuations_remain_disjoint",
-        "safe_OPPO_investigation_precedes_product_implementation",
-        "private_provider_account_and_credential_values_remain_unemitted",
-        "one_Codex_child_selected_and_committed_at_a_time",
-        "reviewed_Cursor_integration_required_before_successor_APK",
-        "final_integrated_regression_and_OPPO_retest_required"
+        "provider_only_Firebase_target_preserved",
+        "permanent_provider_environment_restored",
+        "exact_OAuth_callback_restored",
+        "Social_auth_enabled_flag_restored",
+        "accepted_runtime_mode_restored",
+        "new_revision_environment_and_100_percent_traffic_verified",
+        "omission_or_wrong_order_rejected_before_cloud_action"
       ],
       "adjustments": [
-        "bind_Codex_after_exact_5f80789_continuation_base",
-        "bind_Cursor_after_exact_817ed21_continuation_base",
-        "register_143_sanitized_atomic_runtime_tickets",
-        "hold_product_mutation_until_safe_OPPO_differential_completes",
-        "hold_successor_APK_until_reviewed_Cursor_integration"
+        "add_exact_permanent_runtime_tuple_to_provider_postdeploy_update",
+        "read_back_and_assert_the_four_non_secret_values",
+        "extend_existing_provider_deployment_control_test"
       ],
       "explicitExclusions": [
-        "no_product_UI_runtime_backend_or_provider_implementation_in_the_bootstrap",
-        "no_Cursor_product_source_mutation_by_Codex",
-        "no_APK_AAB_Play_install_uninstall_downgrade_or_data_clear",
-        "no_cloud_provider_console_billing_email_SMS_or_external_service_write",
-        "no_credential_OTP_token_cookie_account_identity_or_private_screenshot_emission"
+        "no_cloud_Firebase_provider_console_or_deployment_action",
+        "no_callback_content_UI_mobile_session_cache_Cursor_or_APK_change",
+        "no_proof_window_timer_expiry_secret_credential_or_private_value",
+        "no_build_install_Play_AAB_tag_integration_or_promotion"
       ],
       "dependenciesAndApprovals": [
-        "founder_AUTHORIZE_RUNTIME_CONTINUATION_BINDING_5F80789_2026_08_25",
-        "founder_Cursor_separate_and_integrate_before_next_APK_direction_2026_08_25",
-        "clean_exact_Codex_and_Cursor_continuation_heads",
-        "sanitized_runtime_manifest_and_coordination_gate",
-        "later_exact_child_selection_before_product_implementation"
+        "founder_full_one_at_a_time_Codex_ticket_authorization_2026_08_25",
+        "SAFE_OPPO_EXHAUSTED_01",
+        "RT_01_live_recovery_at_youtubeprovider_00055_suf",
+        "existing_C30M_provider_only_deploy_wrapper_and_control_test",
+        "local_source_gate_before_atomic_commit"
       ],
       "timelineImpactDays": 1,
       "within60To75DayLock": true,
-      "implementationState": "runtime_continuation_parent_selected_coordination_manifest_and_safe_investigation_authorized_product_build_install_external_and_Cursor_mutation_held",
-      "evidencePath": "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md"
+      "implementationState": "REL_CONFIG_01_selected_exact_provider_deploy_wrapper_and_control_test_authorized_all_cloud_provider_Cursor_build_install_and_private_actions_held",
+      "evidencePath": "docs/quality/UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825.md"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5044,41 +5039,37 @@
     ]
   },
   "ticket": {
-    "id": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-    "parentTicketId": "UAW-C34P-FIX8-GLOBAL-SOCIAL-LOGIN-OPPO-SUCCESSOR-AUDIT-REPAIR",
-    "customerOutcome": "Every launch-critical Social, authentication, Chat, Feed, Create, provider, cache, deployment and OPPO result has one sanitized atomic machine-state ticket so fixes are selected and verified without losing a micro-scope or exposing private account data.",
-    "classification": "mvp_supporting",
-    "classificationReason": "Sanitized atomic runtime truth, isolated owner bindings and safe device sequencing directly protect launch readiness without adding a customer-facing feature.",
+    "id": "UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825",
+    "parentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
+    "customerOutcome": "An isolated YouTube provider deployment cannot silently disable the accepted Social runtime because the complete permanent non-secret tuple is restored and verified on the new revision.",
+    "classification": "mvp_required",
+    "classificationReason": "The configuration omission already disabled production Videos, Shorts, Search and related Social journeys once, so prevention is launch-required.",
     "minimumCompleteScope": [
-      "bind_exact_clean_Codex_5f80789_continuation_without_reassigning_earlier_history",
-      "bind_exact_clean_Cursor_817ed21_continuation_as_an_independent_UI_lane",
-      "register_every_runtime_micro_scope_in_one_separate_sanitized_manifest",
-      "exhaust_safe_non_mutating_OPPO_differential_before_product_implementation",
-      "select_and_implement_one_exact_Codex_owned_child_at_a_time",
-      "integrate_only_a_reviewed_exact_Cursor_commit_before_the_next_APK",
-      "rerun_final_integrated_regression_and_OPPO_acceptance_before_release"
+      "keep_deploy_target_limited_to_youtubeProvider",
+      "restore_complete_permanent_non_secret_runtime_tuple_after_Firebase_deploy",
+      "read_back_new_revision_environment_and_traffic",
+      "reject_missing_or_misordered_tuple_in_existing_local_control_test",
+      "pass_source_gate_and_commit_atomically"
     ],
     "explicitExclusions": [
-      "no_product_UI_runtime_backend_or_provider_implementation_in_the_bootstrap",
-      "no_Cursor_product_source_mutation_by_Codex",
-      "no_new_repository_worktree_branch_tag_AAB_Play_or_promotion",
-      "no_APK_install_uninstall_downgrade_or_data_clear",
-      "no_cloud_provider_console_billing_email_SMS_or_external_service_write",
-      "no_credential_OTP_token_cookie_account_identity_or_private_screenshot_emission"
+      "no_cloud_Firebase_provider_console_or_deployment_action",
+      "no_callback_content_UI_mobile_session_cache_Cursor_or_APK_change",
+      "no_proof_window_timer_expiry_secret_credential_or_private_value",
+      "no_build_install_Play_AAB_tag_integration_or_promotion"
     ],
     "dependenciesAndApprovals": [
-      "founder_AUTHORIZE_RUNTIME_CONTINUATION_BINDING_5F80789_2026_08_25",
-      "founder_Cursor_separate_and_integrate_before_next_APK_direction_2026_08_25",
-      "clean_exact_Codex_and_Cursor_continuation_heads",
-      "sanitized_runtime_manifest_and_coordination_gate",
-      "later_exact_child_selection_before_product_implementation"
+      "founder_full_one_at_a_time_Codex_ticket_authorization_2026_08_25",
+      "SAFE_OPPO_EXHAUSTED_01",
+      "RT_01_live_recovery_at_youtubeprovider_00055_suf",
+      "existing_C30M_provider_only_deploy_wrapper_and_control_test",
+      "local_source_gate_before_atomic_commit"
     ],
     "testAndEvidencePlan": [
-      "runtime_manifest_schema_unique_ID_required_field_layer_and_redaction_checks",
-      "Codex_and_Cursor_continuation_bootstrap_positive_and_negative_gate_cases",
-      "safe_OPPO_candidate_geometry_route_lifecycle_cache_and_draft_differential",
-      "one_exact_focused_test_set_per_later_selected_child",
-      "final_integrated_full_regression_and_sanitized_OPPO_acceptance"
+      "PowerShell_AST_parse",
+      "provider_deployment_control_source_gate",
+      "wrong_project_negative_fixture",
+      "required_permanent_tuple_and_exact_provider_only_ordering_assertions",
+      "diff_check_and_package_content_containment_replay"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5348,7 +5339,7 @@
   },
   "execution": {
     "referenceWriteAuthorized": false,
-    "runtimeWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
     "buildAuthorized": false,
@@ -5381,8 +5372,8 @@
     "founderAcceptancePending": true
   },
   "providerGate": {
-    "nextTicket": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-    "state": "runtime_continuation_safe_investigation_active_all_private_provider_external_build_install_Play_and_successor_APK_actions_held",
+    "nextTicket": "UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825",
+    "state": "REL_CONFIG_01_local_provider_deploy_prevention_active_all_cloud_provider_Cursor_build_install_Play_and_private_actions_held",
     "readOnlyAudit": "artifacts/quality/uaw-personal-mvp-social-youtube-creator-connection-private-short-upload-c29l-provider-read-audit-20260811-01/deployment-metadata.json",
     "deployedPrivateUpload": false,
     "acceptedPublicDataReviewRevisions": {

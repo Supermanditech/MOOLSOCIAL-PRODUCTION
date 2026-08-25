@@ -37,8 +37,6 @@
         ".gitattributes",
         "AGENTS.md",
         "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
-        "config/mvp-scope-gate-state.json",
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
@@ -165,8 +163,16 @@
       "task": "/root/codex_auth_social_runtime_core_20260824",
       "role": "primary",
       "owners": [
+        "config/codex-subagent-coordination-policy.json",
+        "config/mvp-scope-gate-state.json",
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md"
+        "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
+        "docs/quality/UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825.md",
+        "scripts/check-youtube-private-dev-content.ps1",
+        "scripts/check-youtube-private-dev-exports.mjs",
+        "scripts/check-youtube-private-dev-package.ps1",
+        "scripts/deploy-youtube-provider-c30m.ps1",
+        "scripts/test-youtube-provider-c30m-deployment-controls.ps1"
       ]
     }
   ],
