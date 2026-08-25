@@ -527,9 +527,12 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     _searchController.addListener(_retainInboxQuery);
   }
 
-  bool handleBack() {
+  bool handleBack({bool dismissComposerKeyboard = true}) {
     if (_surface == _BuyV2ShopChatSurface.thread &&
-        (_threadViewKey.currentState?.handleBack() ?? false)) {
+        (_threadViewKey.currentState?.handleBack(
+              dismissComposerKeyboard: dismissComposerKeyboard,
+            ) ??
+            false)) {
       return true;
     }
     final target = switch (_surface) {
@@ -586,7 +589,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         entries: widget.provisioningSource.threads(widget.session),
         presentation: widget.presentation,
         navigationForward: navigationForward,
-        onBack: () => handleBack(),
+        onBack: () => handleBack(dismissComposerKeyboard: false),
         onSelected: _openThread,
         onOpenAll: widget.onOpenProductionChat,
       ),
@@ -595,7 +598,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         thread: _selectedThread!,
         retainedState: _retainedState._thread(_selectedThread!.id),
         navigationForward: navigationForward,
-        onBack: () => handleBack(),
+        onBack: () => handleBack(dismissComposerKeyboard: false),
         onOpenInfo: _showInfo,
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
@@ -605,7 +608,7 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
         key: ValueKey('buy-shop-chat-info-${_selectedThread!.id}'),
         thread: _selectedThread!,
         navigationForward: navigationForward,
-        onBack: () => handleBack(),
+        onBack: () => handleBack(dismissComposerKeyboard: false),
         onDispatch: _dispatch,
         onOpenContext: _openContextFor(_selectedThread!),
         presentation: widget.presentation,
@@ -1831,6 +1834,7 @@ class _ShopChatConversationView extends StatefulWidget {
 class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   late final TextEditingController _composerController;
   late final TextEditingController _messageSearchController;
+  late final FocusNode _composerFocusNode;
   late BuyV2ShopChatMessage? _replyTarget;
   BuyV2ShopChatMessage? _selectedMessage;
   bool _emojiOpen = false;
@@ -1849,6 +1853,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     _messageSearchController = TextEditingController(
       text: retained.messageQuery,
     );
+    _composerFocusNode = FocusNode(debugLabel: 'Shop Chat composer');
     _replyTarget = _messageForId(retained.replyMessageId);
     if (_replyTarget == null) retained.replyMessageId = null;
     _searchOpen = retained.messageSearchOpen;
@@ -1856,7 +1861,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     _messageSearchController.addListener(_retainMessageSearch);
   }
 
-  bool handleBack() {
+  bool handleBack({required bool dismissComposerKeyboard}) {
     if (_selectedMessage != null) {
       setState(() {
         _forwardHistory.add(
@@ -1916,6 +1921,10 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
       });
       return true;
     }
+    if (dismissComposerKeyboard && _composerFocusNode.hasFocus) {
+      _composerFocusNode.unfocus();
+      return true;
+    }
     if (_replyTarget != null) {
       setState(() {
         _forwardHistory.add(
@@ -1935,6 +1944,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   void dispose() {
     _composerController.removeListener(_retainComposer);
     _messageSearchController.removeListener(_retainMessageSearch);
+    _composerFocusNode.dispose();
     _composerController.dispose();
     _messageSearchController.dispose();
     super.dispose();
@@ -2145,6 +2155,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                   ),
                 _ShopChatComposer(
                   controller: _composerController,
+                  focusNode: _composerFocusNode,
                   replyTarget: _replyTarget,
                   emojiOpen: _emojiOpen,
                   busy: _dispatching,
@@ -2983,6 +2994,7 @@ class _ShopChatQuickReplies extends StatelessWidget {
 class _ShopChatComposer extends StatelessWidget {
   const _ShopChatComposer({
     required this.controller,
+    required this.focusNode,
     required this.replyTarget,
     required this.emojiOpen,
     required this.busy,
@@ -2999,6 +3011,7 @@ class _ShopChatComposer extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final BuyV2ShopChatMessage? replyTarget;
   final bool emojiOpen;
   final bool busy;
@@ -3104,6 +3117,7 @@ class _ShopChatComposer extends StatelessWidget {
                                 'buy-shop-chat-composer-field',
                               ),
                               controller: controller,
+                              focusNode: focusNode,
                               onChanged: onChanged,
                               onTap: onTapField,
                               minLines: 1,

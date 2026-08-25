@@ -1842,6 +1842,65 @@ void main() {
   );
 
   testWidgets(
+    'Android Back dismisses the composer keyboard before the thread',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        app(
+          session,
+          shopChatSource: const _RichShopChatSource(),
+          textScale: 1.4,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const ValueKey('buy-shop-chat-composer-field'));
+      await tester.enterText(
+        field,
+        'Keep this draft while hiding the keyboard',
+      );
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-thread')),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        contains('draft'),
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-chat-history-forward')),
+        findsNothing,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shop-chat')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-shop-chat-thread')), findsNothing);
+      expect(find.text('Forward to Mahadev Fresh Mart'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'commerce context returns directly to the connected Orders surface',
     (tester) async {
       final core = BuySession();
