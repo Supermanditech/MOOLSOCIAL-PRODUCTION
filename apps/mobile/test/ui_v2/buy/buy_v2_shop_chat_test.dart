@@ -1105,6 +1105,187 @@ void main() {
   });
 
   testWidgets(
+    'conversation pending action disables competing controls and restores them',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final firstCall = Completer<BuyV2ShopChatActionResult>();
+      final actions = <BuyV2ShopChatAction>[];
+
+      await tester.pumpWidget(
+        app(
+          session,
+          shopChatSource: const _RichShopChatSource(),
+          onShopChatAction: (action) {
+            actions.add(action);
+            if (actions.length == 1) return firstCall.future;
+            return Future.value(const BuyV2ShopChatActionResult.accepted());
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+      );
+      await tester.pumpAndSettle();
+
+      final voice = find.byKey(const ValueKey('buy-shop-chat-voice-call'));
+      final video = find.byKey(const ValueKey('buy-shop-chat-video-call'));
+      final forward = find.byKey(
+        const ValueKey('buy-shop-chat-forward-received-text'),
+      );
+      await tester.ensureVisible(forward);
+      await tester.tap(voice);
+      await tester.pump();
+
+      expect(actions.single.kind, BuyV2ShopChatActionKind.startVoiceCall);
+      expect(find.bySemanticsLabel('Starting voice call'), findsOneWidget);
+      expect(tester.widget<IconButton>(voice).onPressed, isNull);
+      expect(tester.widget<IconButton>(video).onPressed, isNull);
+      for (final key in const [
+        'buy-shop-chat-emoji',
+        'buy-shop-chat-attach',
+        'buy-shop-chat-camera',
+      ]) {
+        final control = find.byKey(ValueKey(key));
+        expect(
+          tester
+              .widget<IconButton>(
+                find.descendant(of: control, matching: find.byType(IconButton)),
+              )
+              .onPressed,
+          isNull,
+          reason: key,
+        );
+      }
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const ValueKey('buy-shop-chat-voice')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<IconButton>(
+              find.descendant(of: forward, matching: find.byType(IconButton)),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-more')));
+      await tester.pump();
+      final notifications = find.byKey(
+        const ValueKey('buy-shop-chat-menu-notifications'),
+      );
+      final safety = find.byKey(const ValueKey('buy-shop-chat-menu-safety'));
+      expect(tester.widget<InkWell>(notifications).onTap, isNull);
+      expect(tester.widget<InkWell>(safety).onTap, isNull);
+
+      await tester.tap(voice);
+      await tester.tap(video);
+      await tester.tap(forward);
+      await tester.tap(notifications);
+      await tester.tap(safety);
+      await tester.pump();
+      expect(actions, hasLength(1));
+
+      firstCall.complete(const BuyV2ShopChatActionResult.accepted());
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Starting voice call'), findsNothing);
+      expect(tester.widget<IconButton>(voice).onPressed, isNotNull);
+      expect(tester.widget<IconButton>(video).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.descendant(of: forward, matching: find.byType(IconButton)),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(forward);
+      await tester.pumpAndSettle();
+      expect(actions, hasLength(2));
+      expect(actions.last.kind, BuyV2ShopChatActionKind.forwardMessage);
+      expect(actions.last.messageId, 'received-text');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('selected-message remote actions share the conversation guard', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final firstAction = Completer<BuyV2ShopChatActionResult>();
+    final actions = <BuyV2ShopChatAction>[];
+
+    await tester.pumpWidget(
+      app(
+        session,
+        shopChatSource: const _RichShopChatSource(),
+        onShopChatAction: (action) {
+          actions.add(action);
+          return firstAction.future;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+    );
+    await tester.pumpAndSettle();
+
+    final message = find.byKey(
+      const ValueKey('buy-shop-chat-message-received-text'),
+    );
+    await tester.ensureVisible(message);
+    await tester.longPress(message);
+    await tester.pumpAndSettle();
+    final like = find.byKey(const ValueKey('buy-shop-chat-menu-react'));
+    final forward = find.byKey(const ValueKey('buy-shop-chat-menu-forward'));
+    await tester.tap(like);
+    await tester.pump();
+
+    expect(actions.single.kind, BuyV2ShopChatActionKind.reactToMessage);
+    expect(actions.single.messageId, 'received-text');
+    expect(find.bySemanticsLabel('Liking message'), findsOneWidget);
+    expect(tester.widget<IconButton>(like).onPressed, isNull);
+    expect(tester.widget<IconButton>(forward).onPressed, isNull);
+
+    await tester.tap(like);
+    await tester.tap(forward);
+    await tester.pump();
+    expect(actions, hasLength(1));
+
+    firstAction.complete(const BuyV2ShopChatActionResult.accepted());
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-chat-message-actions')),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('Liking message'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
     'text-only capability hides unsupported controls before the first tap',
     (tester) async {
       tester.view.devicePixelRatio = 1;

@@ -1813,6 +1813,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   bool _attachmentOpen = false;
   bool _threadMenuOpen = false;
   bool _dispatching = false;
+  BuyV2ShopChatActionKind? _activeAction;
 
   @override
   void initState() {
@@ -1892,21 +1893,26 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                         _selectedMessage = null;
                       });
                     },
-                    onReact: () => _dispatchDirect(
-                      BuyV2ShopChatActionKind.reactToMessage,
-                      message: selected,
-                      text: 'like',
-                    ),
+                    onReact: _dispatching
+                        ? null
+                        : () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.reactToMessage,
+                            message: selected,
+                            text: 'like',
+                          ),
                     onCopy: () => _copyMessage(selected),
-                    onForward: () => _dispatchDirect(
-                      BuyV2ShopChatActionKind.forwardMessage,
-                      message: selected,
-                    ),
+                    onForward: _dispatching
+                        ? null
+                        : () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.forwardMessage,
+                            message: selected,
+                          ),
                   )
                 else
                   _ShopChatThreadHeader(
                     thread: widget.thread,
                     presentation: widget.presentation,
+                    busy: _dispatching,
                     onBack: widget.onBack,
                     onOpenInfo: widget.onOpenInfo,
                     onVoiceCall: widget.thread.capabilities.voiceCall
@@ -1936,11 +1942,16 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                       _threadMenuOpen = false;
                       _setSearchOpen(true);
                     }),
-                    onNotifications: () => _dispatchDirect(
-                      BuyV2ShopChatActionKind.manageNotifications,
-                    ),
-                    onSafety: () =>
-                        _dispatchDirect(BuyV2ShopChatActionKind.openSafety),
+                    onNotifications: _dispatching
+                        ? null
+                        : () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.manageNotifications,
+                          ),
+                    onSafety: _dispatching
+                        ? null
+                        : () => _dispatchDirect(
+                            BuyV2ShopChatActionKind.openSafety,
+                          ),
                   ),
                 if (_searchOpen)
                   _ShopChatMessageSearch(
@@ -1991,13 +2002,17 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                                 ...messages.map(
                                   (message) => _ShopChatMessageBubble(
                                     message: message,
-                                    onForward: () => _dispatchDirect(
-                                      BuyV2ShopChatActionKind.forwardMessage,
-                                      message: message,
-                                    ),
+                                    onForward: _dispatching
+                                        ? null
+                                        : () => _dispatchDirect(
+                                            BuyV2ShopChatActionKind
+                                                .forwardMessage,
+                                            message: message,
+                                          ),
                                     onTap:
-                                        message.kind ==
-                                            BuyV2ShopChatMessageKind.text
+                                        _dispatching ||
+                                            message.kind ==
+                                                BuyV2ShopChatMessageKind.text
                                         ? null
                                         : () => _dispatchDirect(
                                             BuyV2ShopChatActionKind
@@ -2051,6 +2066,9 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
                   replyTarget: _replyTarget,
                   emojiOpen: _emojiOpen,
                   busy: _dispatching,
+                  busyLabel:
+                      _activeAction?.inProgressMessage ??
+                      'Completing Chat action',
                   onChanged: (_) => setState(() {}),
                   onTapField: () {
                     if (!_emojiOpen && !_attachmentOpen) return;
@@ -2124,7 +2142,10 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
   Future<void> _sendText() async {
     final text = _composerController.text.trim();
     if (text.isEmpty || _dispatching) return;
-    setState(() => _dispatching = true);
+    setState(() {
+      _dispatching = true;
+      _activeAction = BuyV2ShopChatActionKind.sendText;
+    });
     final result = await widget.onDispatch(
       BuyV2ShopChatAction(
         kind: BuyV2ShopChatActionKind.sendText,
@@ -2139,7 +2160,10 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
       _setReplyTarget(null);
       _emojiOpen = false;
     }
-    setState(() => _dispatching = false);
+    setState(() {
+      _dispatching = false;
+      _activeAction = null;
+    });
     _report(result);
   }
 
@@ -2152,6 +2176,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     if (_dispatching) return;
     setState(() {
       _dispatching = true;
+      _activeAction = kind;
       _threadMenuOpen = false;
     });
     final result = await widget.onDispatch(
@@ -2166,6 +2191,7 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
     if (!mounted) return;
     setState(() {
       _dispatching = false;
+      _activeAction = null;
       _selectedMessage = null;
     });
     _report(result);
@@ -2228,6 +2254,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
   const _ShopChatThreadHeader({
     required this.thread,
     required this.presentation,
+    required this.busy,
     required this.onBack,
     required this.onOpenInfo,
     required this.onVoiceCall,
@@ -2237,6 +2264,7 @@ class _ShopChatThreadHeader extends StatelessWidget {
 
   final BuyV2ShopChatThread thread;
   final BuyV2ShopChatPresentation presentation;
+  final bool busy;
   final VoidCallback onBack;
   final VoidCallback onOpenInfo;
   final VoidCallback? onVoiceCall;
@@ -2310,17 +2338,19 @@ class _ShopChatThreadHeader extends StatelessWidget {
             IconButton(
               key: const ValueKey('buy-shop-chat-voice-call'),
               tooltip: 'Voice call',
-              onPressed: onVoiceCall,
+              onPressed: busy ? null : onVoiceCall,
               icon: const Icon(Icons.call_outlined),
               color: BuyV2Colors.navy,
+              disabledColor: BuyV2Colors.muted,
             ),
           if (onVideoCall != null)
             IconButton(
               key: const ValueKey('buy-shop-chat-video-call'),
               tooltip: 'Video call',
-              onPressed: onVideoCall,
+              onPressed: busy ? null : onVideoCall,
               icon: const Icon(Icons.videocam_outlined),
               color: BuyV2Colors.navy,
+              disabledColor: BuyV2Colors.muted,
             ),
           IconButton(
             key: const ValueKey('buy-shop-chat-thread-more'),
@@ -2347,9 +2377,9 @@ class _ShopChatSelectionHeader extends StatelessWidget {
   final String familyLabel;
   final VoidCallback onClose;
   final VoidCallback onReply;
-  final VoidCallback onReact;
+  final VoidCallback? onReact;
   final VoidCallback onCopy;
-  final VoidCallback onForward;
+  final VoidCallback? onForward;
 
   @override
   Widget build(BuildContext context) {
@@ -2421,8 +2451,8 @@ class _ShopChatInlineThreadMenu extends StatelessWidget {
   final BuyV2ShopChatPresentation presentation;
   final VoidCallback onInfo;
   final VoidCallback onSearch;
-  final VoidCallback onNotifications;
-  final VoidCallback onSafety;
+  final VoidCallback? onNotifications;
+  final VoidCallback? onSafety;
 
   @override
   Widget build(BuildContext context) {
@@ -2478,10 +2508,11 @@ class _ShopChatInlineMenuAction extends StatelessWidget {
   final String keyName;
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return SizedBox(
       width: 91,
       child: InkWell(
@@ -2490,14 +2521,18 @@ class _ShopChatInlineMenuAction extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 19, color: BuyV2Colors.navy),
+            Icon(
+              icon,
+              size: 19,
+              color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
+            ),
             const SizedBox(height: 2),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: BuyV2Colors.navy,
+              style: TextStyle(
+                color: enabled ? BuyV2Colors.navy : BuyV2Colors.muted,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
@@ -2840,6 +2875,7 @@ class _ShopChatComposer extends StatelessWidget {
     required this.replyTarget,
     required this.emojiOpen,
     required this.busy,
+    required this.busyLabel,
     required this.onChanged,
     required this.onTapField,
     required this.onCancelReply,
@@ -2855,6 +2891,7 @@ class _ShopChatComposer extends StatelessWidget {
   final BuyV2ShopChatMessage? replyTarget;
   final bool emojiOpen;
   final bool busy;
+  final String busyLabel;
   final ValueChanged<String> onChanged;
   final VoidCallback onTapField;
   final VoidCallback onCancelReply;
@@ -2871,7 +2908,7 @@ class _ShopChatComposer extends StatelessWidget {
     final canRecordVoice = onVoice != null;
     final primaryEnabled = !busy && (canSend || canRecordVoice);
     final primaryLabel = busy
-        ? 'Sending message'
+        ? busyLabel
         : canSend
         ? 'Send message'
         : canRecordVoice
@@ -3147,7 +3184,7 @@ class _ShopChatMessageBubble extends StatelessWidget {
   });
 
   final BuyV2ShopChatMessage message;
-  final VoidCallback onForward;
+  final VoidCallback? onForward;
   final VoidCallback? onTap;
   final VoidCallback onLongPress;
 
@@ -3300,7 +3337,7 @@ class _ShopChatMessageForwardButton extends StatelessWidget {
   });
 
   final BuyV2ShopChatMessage message;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -3309,6 +3346,7 @@ class _ShopChatMessageForwardButton extends StatelessWidget {
       key: ValueKey('buy-shop-chat-forward-${message.id}'),
       container: true,
       button: true,
+      enabled: onPressed != null,
       label: 'Forward $direction message from ${message.sentAtLabel}',
       excludeSemantics: true,
       child: Tooltip(
@@ -3320,7 +3358,7 @@ class _ShopChatMessageForwardButton extends StatelessWidget {
             onPressed: onPressed,
             padding: EdgeInsets.zero,
             iconSize: 18,
-            color: BuyV2Colors.navy,
+            color: onPressed == null ? BuyV2Colors.muted : BuyV2Colors.navy,
             icon: const Icon(Icons.forward_rounded),
           ),
         ),
@@ -4097,11 +4135,23 @@ extension on BuyV2ShopChatDeliveryState {
 
 extension on BuyV2ShopChatActionKind {
   String get inProgressMessage => switch (this) {
+    BuyV2ShopChatActionKind.sendText => 'Sending message',
     BuyV2ShopChatActionKind.startVoiceCall => 'Starting voice call',
     BuyV2ShopChatActionKind.startVideoCall => 'Starting video call',
+    BuyV2ShopChatActionKind.recordVoice => 'Starting voice message',
+    BuyV2ShopChatActionKind.openAttachment => 'Opening shared item',
+    BuyV2ShopChatActionKind.forwardMessage => 'Forwarding message',
+    BuyV2ShopChatActionKind.reactToMessage => 'Liking message',
     BuyV2ShopChatActionKind.manageNotifications =>
       'Opening notification settings',
     BuyV2ShopChatActionKind.openSafety => 'Opening safety and support',
+    BuyV2ShopChatActionKind.captureImage ||
+    BuyV2ShopChatActionKind.selectMedia ||
+    BuyV2ShopChatActionKind.selectDocument ||
+    BuyV2ShopChatActionKind.shareProduct ||
+    BuyV2ShopChatActionKind.shareOrder ||
+    BuyV2ShopChatActionKind.shareLocation ||
+    BuyV2ShopChatActionKind.shareContact => 'Adding item to conversation',
     _ => 'Completing Chat action',
   };
 
