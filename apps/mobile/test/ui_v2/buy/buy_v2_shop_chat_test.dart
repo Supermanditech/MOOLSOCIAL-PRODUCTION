@@ -646,6 +646,116 @@ void main() {
     );
   });
 
+  testWidgets('thrown Chat actions restore send direct and info retry paths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final actions = <BuyV2ShopChatAction>[];
+    final failures = <BuyV2ShopChatActionKind>{
+      BuyV2ShopChatActionKind.sendText,
+      BuyV2ShopChatActionKind.captureImage,
+      BuyV2ShopChatActionKind.manageNotifications,
+    };
+
+    await tester.pumpWidget(
+      app(
+        session,
+        shopChatSource: const _RichShopChatSource(),
+        onShopChatAction: (action) async {
+          actions.add(action);
+          if (failures.remove(action.kind)) {
+            throw StateError('runtime detail stays out of customer copy');
+          }
+          return const BuyV2ShopChatActionResult.accepted();
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+      'Please retry this message',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
+    await tester.pumpAndSettle();
+    expect(find.text('Message wasn’t sent. Try again.'), findsOneWidget);
+    expect(find.textContaining('Chat could not continue'), findsNothing);
+    expect(find.textContaining('runtime detail'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+          )
+          .controller!
+          .text,
+      'Please retry this message',
+    );
+    expect(find.byKey(const ValueKey('buy-shop-chat-send')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('buy-shop-chat-composer-field')),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-camera')));
+    await tester.pumpAndSettle();
+    expect(find.text('That item wasn’t added. Try again.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-shop-chat-camera')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-camera')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-thread-info')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Notifications'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(
+      find.text('Notification settings couldn’t open. Try again.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Notifications'));
+    await tester.pumpAndSettle();
+
+    expect(
+      actions.where(
+        (action) => action.kind == BuyV2ShopChatActionKind.sendText,
+      ),
+      hasLength(2),
+    );
+    expect(
+      actions.where(
+        (action) => action.kind == BuyV2ShopChatActionKind.captureImage,
+      ),
+      hasLength(2),
+    );
+    expect(
+      actions.where(
+        (action) => action.kind == BuyV2ShopChatActionKind.manageNotifications,
+      ),
+      hasLength(2),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'text-only capability hides unsupported controls before the first tap',
     (tester) async {

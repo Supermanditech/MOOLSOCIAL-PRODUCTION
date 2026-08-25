@@ -733,8 +733,8 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
     try {
       return await handler(action);
     } catch (_) {
-      return const BuyV2ShopChatActionResult.unavailable(
-        'Chat could not continue. Please try again.',
+      return BuyV2ShopChatActionResult.unavailable(
+        action.kind.unexpectedFailureMessage,
       );
     }
   }
@@ -1993,10 +1993,17 @@ class _ShopChatConversationViewState extends State<_ShopChatConversationView> {
 
   void _report(BuyV2ShopChatActionResult result) {
     final message = result.customerMessage;
-    if (message == null || !mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.removeCurrentSnackBar();
+    if (message == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 82),
+      ),
+    );
   }
 
   BuyV2ShopChatMessage? _messageForId(String? messageId) {
@@ -3556,10 +3563,17 @@ class _ShopChatInfoView extends StatelessWidget {
     final result = await onDispatch(
       BuyV2ShopChatAction(kind: kind, threadId: thread.id),
     );
-    if (!context.mounted || result.customerMessage == null) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(result.customerMessage!)));
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.removeCurrentSnackBar();
+    if (result.customerMessage == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(result.customerMessage!),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(12),
+      ),
+    );
   }
 }
 
@@ -3747,6 +3761,36 @@ extension on BuyV2ShopChatDeliveryState {
     BuyV2ShopChatDeliveryState.delivered => Icons.done_all_rounded,
     BuyV2ShopChatDeliveryState.read => Icons.done_all_rounded,
     BuyV2ShopChatDeliveryState.failed => Icons.error_outline_rounded,
+  };
+}
+
+extension on BuyV2ShopChatActionKind {
+  String get unexpectedFailureMessage => switch (this) {
+    BuyV2ShopChatActionKind.sendText => 'Message wasn’t sent. Try again.',
+    BuyV2ShopChatActionKind.startVoiceCall ||
+    BuyV2ShopChatActionKind.startVideoCall =>
+      'The call didn’t start. Try again.',
+    BuyV2ShopChatActionKind.openAttachment =>
+      'That shared item couldn’t open. Try again.',
+    BuyV2ShopChatActionKind.forwardMessage =>
+      'The message wasn’t forwarded. Try again.',
+    BuyV2ShopChatActionKind.manageNotifications =>
+      'Notification settings couldn’t open. Try again.',
+    BuyV2ShopChatActionKind.openSafety =>
+      'Safety and support couldn’t open. Try again.',
+    BuyV2ShopChatActionKind.reply ||
+    BuyV2ShopChatActionKind.copyMessage ||
+    BuyV2ShopChatActionKind.reactToMessage =>
+      'That message action didn’t complete. Try again.',
+    BuyV2ShopChatActionKind.captureImage ||
+    BuyV2ShopChatActionKind.selectMedia ||
+    BuyV2ShopChatActionKind.selectDocument ||
+    BuyV2ShopChatActionKind.recordVoice ||
+    BuyV2ShopChatActionKind.shareProduct ||
+    BuyV2ShopChatActionKind.shareOrder ||
+    BuyV2ShopChatActionKind.shareLocation ||
+    BuyV2ShopChatActionKind.shareContact =>
+      'That item wasn’t added. Try again.',
   };
 }
 
