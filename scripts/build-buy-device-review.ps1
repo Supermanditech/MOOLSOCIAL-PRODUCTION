@@ -47,6 +47,10 @@ $repositoryRoot = [IO.Path]::GetFullPath(
   [IO.Path]::AltDirectorySeparatorChar
 ))
 $mobileRoot = Join-Path $repositoryRoot 'apps\mobile'
+$flutterSupportGuard = Join-Path `
+  $PSScriptRoot `
+  'invoke-flutter-with-clean-support.ps1'
+. $flutterSupportGuard
 $artifactPathGuard = Join-Path `
   $PSScriptRoot `
   'release-artifact-path-guard.ps1'
@@ -505,8 +509,12 @@ try {
       $buildArguments += @('--dart-define', $runtimeDefine)
     }
   }
-  & flutter @buildArguments
-  if ($LASTEXITCODE -ne 0) {
+  $flutterExit = Invoke-MoolSocialFlutterWithCleanSupport `
+    -RepositoryRoot $repositoryRoot `
+    -Invocation {
+      & flutter @buildArguments
+    }
+  if ($flutterExit -ne 0) {
     throw 'Flutter device-review APK build failed.'
   }
 

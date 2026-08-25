@@ -8,17 +8,17 @@
   "privateValuesEmitted": false,
   "cursorIndependentUntilReviewedIntegration": true,
   "cursorIntegrationRequiredBeforeSuccessorApk": true,
-  "ticketCount": 166,
+  "ticketCount": 167,
   "stateVocabulary": ["constraint", "verified_pass", "fixed_deployed", "fixed_source_pending_runtime", "open_defect", "pending_classification", "pending_safe_investigation", "pending_private_founder_action", "pending_external_acceptance", "blocked_external", "pending_cursor", "pending_integration", "pending_release", "pending_selection"],
   "codexImplementationLedger": {
     "schema": "moolsocial_codex_atomic_implementation_ledger_v1",
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
-    "totalCodexAtomicEngineeringTicketCount": 20,
-    "implementedAtomicTicketCount": 9,
-    "pendingConfirmedImplementationCount": 7,
+    "totalCodexAtomicEngineeringTicketCount": 21,
+    "implementedAtomicTicketCount": 11,
+    "pendingConfirmedImplementationCount": 6,
     "pendingClassificationCount": 4,
-    "remainingCodexEngineeringQueueCount": 11,
+    "remainingCodexEngineeringQueueCount": 10,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "GAP_FOUND"],
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
     "implemented": [
@@ -31,9 +31,10 @@
       {"id":"REL-CONFIG-01-GAP-02","state":"verified_pass","implementation":"Export gate now requires exactly the current five legitimate backend exports.","runtime":"Export gate and 594 of 594 backend tests passed."},
       {"id":"REL-CONFIG-01-GAP-03","state":"verified_pass","implementation":"Secret scanner allows only two exact path/count/SHA-bound fake Bearer fixtures while retaining all other secret patterns.","runtime":"Content scan passed across 181 UTF-8 package files."}
       ,{"id":"REL-CONFIG-01-GAP-04","state":"CLOSED","implementation":"Runtime harness now establishes a fresh visible route through explicit app launch before coordinate-free result inspection.","runtime":"Retest opened MoolSocial directly and proved the live YouTube catalogue; the earlier local Ride selection caused no external action."}
+      ,{"id":"REL-BUILD-CLEAN-01","state":"CLOSED","implementation":"Exact four-owner byte guard and supported review-build integration restore pre-command support bytes in finally under a worktree mutex.","runtime":"Fixture matrix and a real three-test Flutter command returned scalar exit zero with four exact support hashes and zero support dirt."}
+      ,{"id":"REL-BUILD-CLEAN-01-GAP-01","state":"CLOSED","implementation":"Child console output is streamed through Out-Host while the guard returns one Int32 exit code.","runtime":"Real guarded Flutter retest returned System.Int32 zero and all tests passed."}
     ],
     "pendingConfirmedImplementation": [
-      {"id":"REL-BUILD-CLEAN-01","order":2,"state":"pending","ownerBoundary":"codex_release_controls_only","blocker":"starts only after REL-CONFIG-01 closes"},
       {"id":"RT-04A-01","order":3,"state":"pending","ownerBoundary":"codex_cache_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
       {"id":"RT-04A-02","order":4,"state":"pending","ownerBoundary":"codex_cache_logic_after_RT-04A-01","blocker":"offline acceptance follows durable catalogue implementation"},
       {"id":"RT-04B-01","order":5,"state":"pending","ownerBoundary":"codex_persistence_logic_after_Cursor_owner_release_or_reviewed_integration","blocker":"active Cursor Social presentation owner must remain untouched"},
@@ -75,7 +76,7 @@
     "activeTicketPhase": "CLOSED",
     "activeTicketChildGaps": [],
     "lastClosedTicket": "REL-CONFIG-01",
-    "nextTicket": "REL-BUILD-CLEAN-01"
+    "nextTicket": "RT-04A-01"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -147,7 +148,8 @@
     {"id":"REL-CONFIG-01-GAP-02","area":"deployment","microScope":"current_backend_export_inventory","layers":["backend","deployment"],"outcome":"The provider package export gate accepts exactly the current five legitimate function exports and rejects any missing or additional export.","owner":"codex_backend","state":"verified_pass","evidence":"Exact five-function export gate passed after 594 of 594 backend tests.","blocker":"none","dependencies":["REL-CONFIG-01","REL-CONFIG-01-GAP-01"]},
     {"id":"REL-CONFIG-01-GAP-03","area":"deployment","microScope":"hashed_fake_bearer_fixture_allowance","layers":["backend","deployment"],"outcome":"The package scanner allows only the exact hashed fake Bearer expectation used twice by the Instagram transport test while continuing to reject every other Bearer/JWT/key/secret literal.","owner":"codex_backend","state":"verified_pass","evidence":"Exact path/count/SHA-bound fixture allowance passed while the complete 181-file secret/content scan remained active.","blocker":"none","dependencies":["REL-CONFIG-01","REL-CONFIG-01-GAP-02"]},
     {"id":"REL-CONFIG-01-GAP-04","area":"runtime_harness","microScope":"fresh_route_precondition_before_coordinate_action","layers":["mobile","oppo"],"outcome":"Every coordinate-driven runtime proof captures and verifies the current route immediately before each tap so stale coordinates cannot mutate an unrelated local surface.","owner":"primary_device_coordinator","state":"verified_pass","evidence":"The failed attempt changed only local Ride Cash selection and caused no external action. Retest used explicit MainActivity launch as the fresh precondition and then proved the real YouTube catalogue on the deployed provider.","blocker":"none","dependencies":["REL-CONFIG-01"]},
-    {"id":"REL-BUILD-CLEAN-01","area":"build","microScope":"tracked_flutter_support_dirt","layers":["mobile","deployment","apk"],"outcome":"Prevent builds from generating tracked Flutter support-file dirt.","owner":"release_coordinator","state":"open_defect","evidence":"Build-generated tracked dirt recorded in handoff.","blocker":"exact generated owners/root cause require selected prevention ticket","dependencies":[]},
+    {"id":"REL-BUILD-CLEAN-01","area":"build","microScope":"tracked_flutter_support_dirt","layers":["mobile","deployment","apk"],"outcome":"Prevent builds from generating tracked Flutter support-file dirt.","owner":"release_coordinator","state":"verified_pass","evidence":"Guard fixture passed success, nonzero exit 37, deletion restore, pre-existing bytes, outside-file safety and cross-process mutex rejection. A real focused Flutter run passed three tests, returned scalar Int32 zero and restored all four support SHA-256 values with zero support dirt. Supported review-build wrapper now invokes the guard; no APK was built.","blocker":"none","dependencies":[]},
+    {"id":"REL-BUILD-CLEAN-01-GAP-01","area":"build","microScope":"guard_scalar_exit_contract","layers":["mobile","deployment"],"outcome":"The Flutter support guard streams child output for humans but returns exactly one integer exit code to its caller.","owner":"release_coordinator","state":"verified_pass","evidence":"After output/exit separation, the real guarded Flutter command returned System.Int32 zero, all three tests passed and support hashes remained exact.","blocker":"none","dependencies":["REL-BUILD-CLEAN-01"]},
     {"id":"REL-SUCCESSOR-01","area":"apk","microScope":"source_apk_parity","layers":["deployment","apk","oppo"],"outcome":"Ensure the final successor APK contains the final integrated source HEAD.","owner":"release_coordinator","state":"pending_release","evidence":"Installed r60.91 is from 6d4d743 while source already advanced.","blocker":"selected Codex work and reviewed Cursor integration incomplete","dependencies":["META-CURSOR-03","FINAL-REGRESSION-01"]},
     {"id":"REL-SUCCESSOR-02","area":"apk","microScope":"no_premature_successor","layers":["deployment","apk"],"outcome":"Build no successor APK before selected tickets and Cursor integration complete.","owner":"release_coordinator","state":"constraint","evidence":"Founder explicitly reaffirmed integration before next APK.","blocker":"none","dependencies":["META-CURSOR-03","REL-SUCCESSOR-01"]},
     {"id":"SAFE-OPPO-01","area":"oppo","microScope":"candidate_identity_and_geometry","layers":["mobile","apk","oppo"],"outcome":"Reconfirm candidate identity and non-private system-window geometry without install.","owner":"primary_device_coordinator","state":"verified_pass","evidence":"OPPO CPH2375 reported r60.91, versionCode 2026082591, package com.moolsocial.app and physical size 720x1612 without install or data mutation.","blocker":"none","dependencies":["DEVICE-OPPO-01","APK-BASE-01"]},

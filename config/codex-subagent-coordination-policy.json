@@ -168,10 +168,14 @@
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825.md",
         "docs/quality/UAW-CODEX-REL-CONFIG-01-YOUTUBE-FLAG-PRESERVATION-20260825.md",
+        "docs/quality/UAW-CODEX-REL-BUILD-CLEAN-01-20260825.md",
+        "scripts/build-buy-device-review.ps1",
         "scripts/check-youtube-private-dev-content.ps1",
         "scripts/check-youtube-private-dev-exports.mjs",
         "scripts/check-youtube-private-dev-package.ps1",
         "scripts/deploy-youtube-provider-c30m.ps1",
+        "scripts/invoke-flutter-with-clean-support.ps1",
+        "scripts/test-flutter-clean-support.ps1",
         "scripts/test-youtube-provider-c30m-deployment-controls.ps1"
       ]
     }
