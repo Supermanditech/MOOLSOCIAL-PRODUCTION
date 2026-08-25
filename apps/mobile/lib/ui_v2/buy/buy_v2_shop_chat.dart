@@ -2226,7 +2226,7 @@ class _ShopChatSelectionHeader extends StatelessWidget {
             ),
             IconButton(
               key: const ValueKey('buy-shop-chat-menu-react'),
-              tooltip: 'React',
+              tooltip: 'Like',
               onPressed: onReact,
               icon: const Icon(Icons.thumb_up_alt_outlined),
               color: BuyV2Colors.navy,
@@ -2998,6 +2998,20 @@ class _ShopChatMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final mine = message.fromCurrentUser;
     final bubbleColor = mine ? const Color(0xFFE5E4FF) : Colors.white;
+    final details =
+        [message.attachmentName, message.body, message.attachmentDetail]
+            .whereType<String>()
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .map(
+              (value) => RegExp(r'[.!?]$').hasMatch(value) ? value : '$value.',
+            )
+            .join(' ');
+    final accessibilityLabel = [
+      '${mine ? 'Sent' : 'Received'} ${message.kind.customerLabel} at ${message.sentAtLabel}.',
+      if (details.isNotEmpty) details,
+      if (mine) '${message.deliveryState.customerLabel}.',
+    ].join(' ');
     final forward = _ShopChatMessageForwardButton(
       message: message,
       onPressed: onForward,
@@ -3015,9 +3029,13 @@ class _ShopChatMessageBubble extends StatelessWidget {
             child: Semantics(
               container: true,
               button: onTap != null,
-              label:
-                  '${mine ? 'Sent' : 'Received'} ${message.kind.customerLabel}. '
-                  '${message.body ?? message.attachmentName ?? ''}',
+              label: accessibilityLabel,
+              hint: onTap == null
+                  ? 'Long press for Reply, Like, Copy, and Forward.'
+                  : 'Double tap to open. Long press for Reply, Like, Copy, and Forward.',
+              excludeSemantics: true,
+              onTap: onTap,
+              onLongPress: onLongPress,
               child: Container(
                 constraints: BoxConstraints(
                   minWidth: 92,
@@ -3854,6 +3872,14 @@ extension on BuyV2ShopChatMessageKind {
 }
 
 extension on BuyV2ShopChatDeliveryState {
+  String get customerLabel => switch (this) {
+    BuyV2ShopChatDeliveryState.pending => 'Sending',
+    BuyV2ShopChatDeliveryState.sent => 'Sent',
+    BuyV2ShopChatDeliveryState.delivered => 'Delivered',
+    BuyV2ShopChatDeliveryState.read => 'Read',
+    BuyV2ShopChatDeliveryState.failed => 'Not sent',
+  };
+
   IconData get deliveryIcon => switch (this) {
     BuyV2ShopChatDeliveryState.pending => Icons.schedule_rounded,
     BuyV2ShopChatDeliveryState.sent => Icons.check_rounded,

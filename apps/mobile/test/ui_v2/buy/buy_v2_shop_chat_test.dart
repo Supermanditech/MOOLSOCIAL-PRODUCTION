@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -492,6 +493,83 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('message semantics expose content status and discoverable actions', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final actions = <BuyV2ShopChatAction>[];
+
+    await tester.pumpWidget(
+      app(
+        session,
+        shopChatSource: const _RichShopChatSource(),
+        onShopChatAction: (action) async {
+          actions.add(action);
+          return const BuyV2ShopChatActionResult.accepted();
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-shop-chat-entry-retail-live')),
+    );
+    await tester.pumpAndSettle();
+
+    final received = find.bySemanticsLabel(
+      'Received message at 10:36. Your fresh grocery basket is ready to review.',
+    );
+    expect(received, findsOneWidget);
+    final receivedData = tester.getSemantics(received).getSemanticsData();
+    expect(receivedData.hint, 'Long press for Reply, Like, Copy, and Forward.');
+    expect(receivedData.hasAction(SemanticsAction.longPress), isTrue);
+    expect(receivedData.hasAction(SemanticsAction.tap), isFalse);
+
+    final sent = find.bySemanticsLabel(
+      'Sent message at 10:38. Can it arrive tomorrow morning? Read.',
+    );
+    expect(sent, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(sent)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.longPress),
+      isTrue,
+    );
+
+    final photo = find.bySemanticsLabel(
+      'Received photo at 10:40. Basket photo. These are the available packs. JPG · 1.8 MB.',
+    );
+    expect(photo, findsOneWidget);
+    final photoData = tester.getSemantics(photo).getSemanticsData();
+    expect(
+      photoData.hint,
+      'Double tap to open. Long press for Reply, Like, Copy, and Forward.',
+    );
+    expect(photoData.hasAction(SemanticsAction.tap), isTrue);
+    expect(photoData.hasAction(SemanticsAction.longPress), isTrue);
+
+    await tester.longPress(
+      find.byKey(const ValueKey('buy-shop-chat-message-received-text')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Like'), findsOneWidget);
+    expect(find.byTooltip('React'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-chat-menu-react')));
+    await tester.pumpAndSettle();
+    expect(actions.single.kind, BuyV2ShopChatActionKind.reactToMessage);
+    expect(actions.single.messageId, 'received-text');
+    expect(actions.single.text, 'like');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('composer media and calls emit exact inline runtime intents', (
     tester,
