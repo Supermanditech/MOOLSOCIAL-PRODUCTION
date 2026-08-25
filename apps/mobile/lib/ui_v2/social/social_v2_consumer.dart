@@ -1173,16 +1173,22 @@ class _SocialUniversalV2State extends State<SocialUniversalV2> {
   void _openProductionChat() {
     final world = screen04World(_world);
     final choice = _choiceByWorld[_world] ?? world.choices.first.id;
+    final returnPath = switch (world.id) {
+      'eat' => '/app/eat',
+      'ride' => '/app/ride',
+      'book' => '/app/book',
+      'work' => '/app/work',
+      _ => '/app/social',
+    };
     final returnQuery = <String, String>{
-      'world': world.id,
       'sub': choice,
-      if (_activeVideo case final video?) ...{
+      if (world.id == 'social' && _activeVideo != null) ...{
         'state': 'video-watch',
-        'item': video.id,
+        'item': _activeVideo!.id,
       },
     };
     final returnRoute = Uri(
-      path: '/app/social',
+      path: returnPath,
       queryParameters: returnQuery,
     ).toString();
     context.push(

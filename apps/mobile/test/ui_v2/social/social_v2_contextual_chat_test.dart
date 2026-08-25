@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -96,6 +97,110 @@ void main() {
 
           await tester.pumpWidget(const SizedBox.shrink());
           await tester.pump();
+          owners.dispose();
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'production Chat return restores every exact contextual family subaction',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      for (final family in _families) {
+        for (final subAction in family.subActions) {
+          final owners = _Owners();
+          String? capturedReturnRoute;
+          late final GoRouter router;
+          router = GoRouter(
+            initialLocation: Uri(
+              path: '/app/${family.id}',
+              queryParameters: {'sub': subAction.id},
+            ).toString(),
+            routes: [
+              GoRoute(
+                path: '/app/chat',
+                builder: (context, state) {
+                  capturedReturnRoute = state.uri.queryParameters['return'];
+                  return Scaffold(
+                    body: Center(
+                      child: FilledButton(
+                        key: const ValueKey('follow-contextual-chat-return'),
+                        onPressed: () => context.go(capturedReturnRoute!),
+                        child: const Text('Return to origin'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: '/app/:world',
+                builder: (context, state) => SocialUniversalV2(
+                  session: owners.journey,
+                  creatorSession: owners.creator,
+                  retailerSession: owners.retailer,
+                  sharedSession: owners.shared,
+                  initialWorld: state.pathParameters['world'] ?? 'social',
+                  initialSubAction: state.uri.queryParameters['sub'],
+                  youtubePublicAccessOverride: false,
+                  youtubeCreatorAccessOverride: false,
+                ),
+              ),
+            ],
+          );
+
+          await tester.pumpWidget(_routedApp(router));
+          await tester.pumpAndSettle();
+          final opensFromHeader = subAction == family.subActions.first;
+          await tester.tap(
+            find.byKey(
+              ValueKey(
+                opensFromHeader ? 'social-global-chat' : 'mool-global-chat-tap',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('buy-shop-chat-open-all')),
+          );
+          await tester.pumpAndSettle();
+
+          final expectedReturnRoute = Uri(
+            path: '/app/${family.id}',
+            queryParameters: {'sub': subAction.id},
+          ).toString();
+          expect(capturedReturnRoute, expectedReturnRoute);
+          expect(
+            find.byKey(const ValueKey('follow-contextual-chat-return')),
+            findsOneWidget,
+          );
+
+          router.go(
+            Uri(
+              path: '/app/chat',
+              queryParameters: {'return': capturedReturnRoute!},
+            ).toString(),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('follow-contextual-chat-return')),
+          );
+          await tester.pumpAndSettle();
+          final restoredLocation = router.routeInformationProvider.value.uri;
+          expect(restoredLocation.path, '/app/${family.id}');
+          expect(restoredLocation.queryParameters['sub'], subAction.id);
+          expect(
+            find.byKey(Key('screen04-rail-${subAction.id}')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pump();
+          router.dispose();
           owners.dispose();
         }
       }
@@ -493,6 +598,18 @@ Widget _app(
       youtubePublicAccessOverride: false,
       youtubeCreatorAccessOverride: false,
     ),
+  );
+}
+
+Widget _routedApp(GoRouter router) {
+  return MaterialApp.router(
+    debugShowCheckedModeBanner: false,
+    theme: MoolTheme.light(),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(disableAnimations: true),
+      child: child!,
+    ),
+    routerConfig: router,
   );
 }
 
