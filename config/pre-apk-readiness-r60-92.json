@@ -85,6 +85,12 @@
     "mapPath": "config/social-runtime-deployment-map-r60-92.json",
     "mapSha256": "E36906CB0E78BCCF0B44B29B19DFA3E438FC6BDA0379DE4D1D30F3D88877D5FC",
     "mapHashMode": "canonical_utf8_lf_sha256",
+    "executionStatePath": "config/social-runtime-deployment-execution-r60-92.json",
+    "executionStateSha256": "A952BEE4405B043595349738F30EB6CF16BED12DD0CD76870F05C4407FB15A81",
+    "executionStateHashMode": "canonical_utf8_lf_sha256",
+    "executionPhase": "Prepared",
+    "executionPrepared": true,
+    "actualDeploymentCompleted": false,
     "eligibleDeployments": ["youtubeProvider", "youtubeOAuthCallback"],
     "preservedFunctions": ["moolSocialPublicAuth", "moolSocialChat", "moolSocialContent"],
     "coordinatedWindowFunctions": ["youtubeProvider", "youtubeOAuthCallback"],
@@ -109,6 +115,7 @@
     {"id": "android-static-release-readiness", "state": "pending", "evidence": []},
     {"id": "runtime-define-sanitized-binding", "state": "pending", "evidence": []},
     {"id": "social-deployment-map", "state": "passed", "evidence": ["config/social-runtime-deployment-map-r60-92.json", "scripts/check-social-runtime-deployment-map-r60-92.ps1", "scripts/test-social-runtime-deployment-map-r60-92.ps1"]},
+    {"id": "social-deployment-execution", "state": "pending", "evidence": ["config/social-runtime-deployment-execution-r60-92.json", "scripts/check-social-runtime-deployment-execution-r60-92.ps1", "scripts/test-social-runtime-deployment-execution-r60-92.ps1"]},
     {"id": "secret-scan", "state": "pending", "evidence": []},
     {"id": "clean-remote-readback", "state": "pending", "evidence": []},
     {"id": "wrapper-self-test", "state": "passed", "evidence": ["scripts/test-public-auth-sideload-build-controls.ps1", "scripts/test-release-production-plugin-integrity.ps1"]}
@@ -136,6 +143,7 @@
     "source_seal_and_two_cycles_pending",
     "runtime_define_sanitized_binding_pending",
     "social_backend_two_function_deployment_pending_final_integration_and_founder_authority",
+    "secure_exact_social_deployment_runtime_file_pending",
     "one_build_authority_founder_held"
   ],
   "privateValuesEmitted": false

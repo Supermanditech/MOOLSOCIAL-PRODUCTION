@@ -79,6 +79,12 @@ try {
   ) -Destination (
     Join-Path $fixtureRoot 'config\social-runtime-deployment-map-r60-92.json'
   )
+  Copy-Item -LiteralPath (
+    Join-Path $root 'config\social-runtime-deployment-execution-r60-92.json'
+  ) -Destination (
+    Join-Path $fixtureRoot `
+      'config\social-runtime-deployment-execution-r60-92.json'
+  )
   New-Item -ItemType Directory -Path (
     Join-Path $fixtureRoot (
       'artifacts\quality\uaw-r60-92-social-runtime-consolidated-apk-20260826-01'

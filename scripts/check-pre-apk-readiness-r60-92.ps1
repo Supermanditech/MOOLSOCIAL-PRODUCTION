@@ -93,6 +93,8 @@ Assert-PreApk (
 $socialDeployment = $state.socialDeployment
 Assert-ExactNames $socialDeployment @(
   'state','mapPath','mapSha256','mapHashMode','eligibleDeployments',
+  'executionStatePath','executionStateSha256','executionStateHashMode',
+  'executionPhase','executionPrepared','actualDeploymentCompleted',
   'preservedFunctions','coordinatedWindowFunctions',
   'actualDeploymentAuthorized','privateValuesEmitted'
 ) 'Social deployment'
@@ -107,9 +109,30 @@ Assert-PreApk (
   [string]$socialDeployment.mapHashMode -ceq 'canonical_utf8_lf_sha256' -and
   [string]$socialDeployment.mapSha256 -ceq
     (Get-CanonicalTextSha256 $socialMapPath) -and
+  [string]$socialDeployment.executionStatePath -ceq
+    'config/social-runtime-deployment-execution-r60-92.json' -and
+  [string]$socialDeployment.executionStateHashMode -ceq
+    'canonical_utf8_lf_sha256' -and
+  [string]$socialDeployment.executionPhase -cin @(
+    'Prepared','RemoteReady','Completed','Contained'
+  ) -and
+  [string]$socialDeployment.executionStateSha256 -cmatch '^[0-9A-F]{64}$' -and
+  [bool]$socialDeployment.executionPrepared -and
+  -not [bool]$socialDeployment.actualDeploymentCompleted -and
   -not [bool]$socialDeployment.actualDeploymentAuthorized -and
   -not [bool]$socialDeployment.privateValuesEmitted
 ) 'Social deployment map path, hash mode, hash or authority changed.'
+$socialExecutionPath = [IO.Path]::GetFullPath((Join-Path $root `
+  ([string]$socialDeployment.executionStatePath)))
+Assert-PreApk (
+  $socialExecutionPath.StartsWith(
+    $rootPrefix,
+    [StringComparison]::OrdinalIgnoreCase
+  ) -and
+  (Test-Path -LiteralPath $socialExecutionPath -PathType Leaf) -and
+  (Get-CanonicalTextSha256 $socialExecutionPath) -ceq
+    [string]$socialDeployment.executionStateSha256
+) 'Social deployment execution state path or hash changed.'
 Assert-ExactStringSet $socialDeployment.eligibleDeployments @(
   'youtubeProvider','youtubeOAuthCallback'
 ) 'eligible Social deployments'
