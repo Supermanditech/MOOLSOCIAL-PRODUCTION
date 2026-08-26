@@ -4322,10 +4322,10 @@ class BuyV2AccountView extends StatelessWidget {
           key: const ValueKey('buy-account-security'),
           icon: Icons.security_outlined,
           title: accountAuthenticated
-              ? 'Sign out or switch account'
+              ? 'Account & security'
               : 'Sign in to MoolSocial',
           detail: accountAuthenticated
-              ? 'Account security and provider access'
+              ? 'Manage sign-in methods, privacy and sign out'
               : 'Use one identity across MoolSocial',
           onTap: () => context.push('/app/account/security'),
         ),

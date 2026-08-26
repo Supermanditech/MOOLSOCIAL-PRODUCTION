@@ -1371,7 +1371,7 @@ GoRouter createJourneyRouter(
           onSignOut: () async {
             final signedOut = await session.signOut();
             if (!context.mounted) return;
-            if (signedOut) {
+            if (signedOut || !session.isAuthenticated) {
               context.go('/sign-in');
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1521,7 +1521,7 @@ GoRouter createJourneyRouter(
                 onSignOut: () async {
                   final signedOut = await session.signOut();
                   if (!context.mounted) return;
-                  if (signedOut) {
+                  if (signedOut || !session.isAuthenticated) {
                     context.go('/sign-in');
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(

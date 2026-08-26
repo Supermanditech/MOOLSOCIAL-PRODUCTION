@@ -1028,7 +1028,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Test Member'), findsOneWidget);
-    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('member@example.com'), findsOneWidget);
     expect(find.text('Sign out or switch account'), findsOneWidget);
   });
 }

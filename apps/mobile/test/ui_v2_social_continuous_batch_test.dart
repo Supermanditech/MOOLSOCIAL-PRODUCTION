@@ -242,8 +242,10 @@ void main() {
 
       expect(find.text('Account access video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsNothing);
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      expect(find.byTooltip('MoolSocial account'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('continuous-youtube-status-owner')),
@@ -271,7 +273,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -312,7 +316,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('youtube-connect-auth-cancel')));
       await tester.pumpAndSettle();
@@ -348,7 +354,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
@@ -382,7 +390,7 @@ void main() {
         );
 
         await tester.tap(
-          find.byKey(const Key('screen04-youtube-home-account')),
+          find.byKey(const Key('screen04-youtube-home-channel-status')),
         );
         await tester.pumpAndSettle();
         await tester.tap(

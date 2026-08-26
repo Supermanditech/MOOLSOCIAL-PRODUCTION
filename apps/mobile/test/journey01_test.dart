@@ -301,7 +301,7 @@ void main() {
     await tapVisible(tester, const Key('open-profile'));
     expect(find.text('Your account'), findsOneWidget);
     expect(find.text('Runtime Member'), findsOneWidget);
-    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('member@example.com'), findsOneWidget);
     await tapVisible(tester, const Key('close-profile'));
 
     await tapVisible(tester, const Key('open-search'));
@@ -435,8 +435,8 @@ void main() {
     await tapVisible(tester, const ValueKey('buy-open-account'));
 
     expect(find.text('Runtime Member'), findsOneWidget);
-    expect(find.text('member@example.com · Google'), findsOneWidget);
-    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('member@example.com'), findsOneWidget);
+    expect(find.text('Account & security'), findsOneWidget);
     expect(find.text('Dharmendra Choudhary'), findsNothing);
   });
 }

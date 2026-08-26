@@ -54,7 +54,7 @@ void main() {
 
       expect(find.text('Public provider video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsNothing);
+      expect(find.byTooltip('MoolSocial account'), findsOneWidget);
       expect(
         find.byKey(const Key('c30j-youtube-status-destination')),
         findsNothing,
@@ -63,6 +63,19 @@ void main() {
       expect(owners.journey.isAuthenticated, isFalse);
 
       await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your MoolSocial account'), findsOneWidget);
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsNothing,
+      );
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -97,7 +110,7 @@ void main() {
     },
   );
 
-  test('C30J source never infers YouTube authorization from an avatar', () {
+  test('C30J source separates MoolSocial account from YouTube status', () {
     final source = File(
       'lib/ui_v2/social/social_v2_consumer.dart',
     ).readAsStringSync();
@@ -108,8 +121,9 @@ void main() {
     final header = source.substring(headerStart, nextOwner);
 
     expect(header, contains("tooltip: 'YouTube channel status'"));
+    expect(header, contains("tooltip: 'MoolSocial account'"));
     expect(header, contains('Icons.account_circle_outlined'));
-    expect(header, isNot(contains("tooltip: 'MoolSocial account'")));
+    expect(header, contains('Icons.ondemand_video_outlined'));
     expect(header, isNot(contains('CircleAvatar')));
     const statusSignature = 'Future<void> _openYouTubeChannelStatus() async {';
     final statusStart = source.indexOf(statusSignature);
@@ -133,6 +147,7 @@ void main() {
       source.contains('onChannelStatus: _openYouTubeChannelStatus'),
       isTrue,
     );
+    expect(source.contains('onAccount: _openAccount'), isTrue);
     expect(
       source.contains('onCreateYouTubeShort: _openYouTubeChannelStatus'),
       isFalse,

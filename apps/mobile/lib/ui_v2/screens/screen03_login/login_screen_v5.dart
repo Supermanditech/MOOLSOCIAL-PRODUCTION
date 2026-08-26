@@ -314,6 +314,9 @@ class _LoginScreenV5State extends State<LoginScreenV5> {
   }
 
   Widget _buildMethodChooser() {
+    final availableProviders = SocialAuthProvider.values
+        .where(widget.session.isSocialAuthProviderAvailable)
+        .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -321,45 +324,45 @@ class _LoginScreenV5State extends State<LoginScreenV5> {
         const SizedBox(height: 8),
         const Text('Choose one method to continue.', style: Screen03Text.body),
         const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Screen03Colors.navy),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('SOCIAL ACCOUNT', style: Screen03Text.cardLabel),
-              const SizedBox(height: 12),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 3,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.08,
-                children: [
-                  for (final provider in SocialAuthProvider.values)
-                    _ProviderButton(
-                      provider: provider,
-                      available: widget.session.isSocialAuthProviderAvailable(
-                        provider,
+        if (availableProviders.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Screen03Colors.navy),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('SIGN-IN METHODS', style: Screen03Text.cardLabel),
+                const SizedBox(height: 12),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 1.08,
+                  children: [
+                    for (final provider in availableProviders)
+                      _ProviderButton(
+                        provider: provider,
+                        available: true,
+                        pending:
+                            widget.session.busy &&
+                            widget.session.socialAuthProvider == provider,
+                        enabled: !widget.session.busy,
+                        onTap: () => _startProvider(provider),
                       ),
-                      pending:
-                          widget.session.busy &&
-                          widget.session.socialAuthProvider == provider,
-                      enabled: !widget.session.busy,
-                      onTap: () => _startProvider(provider),
-                    ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 9),
+          const SizedBox(height: 9),
+        ],
         _MethodButton(
           key: const Key('email-link-method'),
           title: 'Email link',
@@ -371,18 +374,16 @@ class _LoginScreenV5State extends State<LoginScreenV5> {
               ? null
               : widget.session.openEmailLinkEntry,
         ),
-        const SizedBox(height: 9),
-        _MethodButton(
-          key: const Key('mobile-otp-method'),
-          title: 'Mobile OTP',
-          subtitle: widget.session.mobileOtpAvailable
-              ? 'Use mobile number'
-              : 'Not available on this build',
-          icon: const _MobileArtwork(),
-          onTap: widget.session.busy || !widget.session.mobileOtpAvailable
-              ? null
-              : _showMobileTarget,
-        ),
+        if (widget.session.mobileOtpAvailable) ...[
+          const SizedBox(height: 9),
+          _MethodButton(
+            key: const Key('mobile-otp-method'),
+            title: 'Mobile OTP',
+            subtitle: 'Use mobile number',
+            icon: const _MobileArtwork(),
+            onTap: widget.session.busy ? null : _showMobileTarget,
+          ),
+        ],
         const SizedBox(height: 24),
         _buildLegalCopy(),
       ],

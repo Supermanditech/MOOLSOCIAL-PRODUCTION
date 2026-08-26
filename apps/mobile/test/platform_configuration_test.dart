@@ -169,4 +169,19 @@ void main() {
     );
     expect(mainSource, contains('MOOLSOCIAL_EMULATOR_FALLBACK_HOST'));
   });
+
+  test('locally signed-out users always leave authenticated routes', () {
+    final routerSource = File(
+      'lib/features/journey01/journey_router.dart',
+    ).readAsStringSync();
+
+    expect(
+      RegExp(
+        r'signedOut \|\| !session\.isAuthenticated',
+      ).allMatches(routerSource).length,
+      2,
+      reason:
+          'Security and Mool account routes must leave authenticated UI after local invalidation even when provider cleanup remains pending.',
+    );
+  });
 }

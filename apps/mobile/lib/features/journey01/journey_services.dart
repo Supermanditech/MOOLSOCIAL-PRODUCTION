@@ -698,13 +698,13 @@ class AuthenticatedAccountIdentity {
     final details = <String>[
       if (emailAddress?.trim() case final email? when email.isNotEmpty) email,
       if (phoneNumber?.trim() case final phone? when phone.isNotEmpty) phone,
-      if (providerAccountLabel?.trim() case final account?
-          when account.isNotEmpty)
-        account,
-      if (signInMethods.isNotEmpty) signInMethods.join(' · '),
     ];
     return details.isEmpty ? 'Signed in to MoolSocial' : details.join(' · ');
   }
+
+  String get signInMethodsLabel => signInMethods.isEmpty
+      ? 'Manage sign-in methods in Account & security'
+      : 'Sign-in methods: ${signInMethods.join(' · ')}';
 }
 
 abstract interface class AuthenticatedAccountIdentityGateway {

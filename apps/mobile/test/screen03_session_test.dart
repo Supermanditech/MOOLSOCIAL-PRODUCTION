@@ -332,7 +332,11 @@ void main() {
 
     expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
     expect(session.accountIdentity?.primaryLabel, 'Test Member');
-    expect(session.accountIdentity?.detailLabel, 'member@example.com · Google');
+    expect(session.accountIdentity?.detailLabel, 'member@example.com');
+    expect(
+      session.accountIdentity?.signInMethodsLabel,
+      'Sign-in methods: Google',
+    );
     expect(identityGateway.readCount, 1);
 
     await session.signOut();

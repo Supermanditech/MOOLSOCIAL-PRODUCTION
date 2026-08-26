@@ -2779,6 +2779,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             onSearch: _openYouTubeSearch,
             onNotifications: _openUniversalNotifications,
             onChannelStatus: _openYouTubeChannelStatus,
+            onAccount: _openAccount,
           ),
           _YouTubeTopicStrip(
             selectedQuery: _videoQuery,
@@ -2845,6 +2846,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             onSearch: _openYouTubeSearch,
             onNotifications: _openUniversalNotifications,
             onChannelStatus: _openYouTubeChannelStatus,
+            onAccount: _openAccount,
           ),
           Expanded(child: status),
         ],
@@ -4132,11 +4134,13 @@ class _YouTubeHomeHeader extends StatelessWidget {
     required this.onSearch,
     required this.onNotifications,
     required this.onChannelStatus,
+    required this.onAccount,
   });
 
   final VoidCallback onSearch;
   final VoidCallback onNotifications;
   final VoidCallback onChannelStatus;
+  final VoidCallback onAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -4178,9 +4182,16 @@ class _YouTubeHomeHeader extends StatelessWidget {
                 icon: const Icon(Icons.notifications_none_rounded),
               ),
               IconButton(
-                key: const Key('screen04-youtube-home-account'),
+                key: const Key('screen04-youtube-home-channel-status'),
                 tooltip: 'YouTube channel status',
                 onPressed: onChannelStatus,
+                color: Colors.white,
+                icon: const Icon(Icons.ondemand_video_outlined),
+              ),
+              IconButton(
+                key: const Key('screen04-youtube-home-account'),
+                tooltip: 'MoolSocial account',
+                onPressed: onAccount,
                 color: Colors.white,
                 icon: const Icon(Icons.account_circle_outlined),
               ),

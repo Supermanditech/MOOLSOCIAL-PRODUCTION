@@ -174,18 +174,13 @@ const _releaseRuntimeConfiguration = ReleaseRuntimeConfiguration(
 Set<SocialAuthProvider> _productionSocialIdentityProviders(
   PublicAuthRuntimeConfiguration configuration, {
   bool googleOnlyForensicMode = false,
-}) => <SocialAuthProvider>{
-  if (configuration.googleAndYoutubeAvailable) SocialAuthProvider.google,
-  if (!googleOnlyForensicMode && configuration.googleAndYoutubeAvailable)
-    SocialAuthProvider.youtube,
-  if (!googleOnlyForensicMode && configuration.appleAvailable)
-    SocialAuthProvider.apple,
-  if (!googleOnlyForensicMode && configuration.xAvailable) SocialAuthProvider.x,
-  if (!googleOnlyForensicMode && configuration.instagramAvailable)
-    SocialAuthProvider.instagram,
-  if (!googleOnlyForensicMode && configuration.facebookAvailable)
-    SocialAuthProvider.facebook,
-};
+}) {
+  return <SocialAuthProvider>{
+    if (configuration.googleAndYoutubeAvailable) SocialAuthProvider.google,
+    if (!googleOnlyForensicMode && configuration.googleAndYoutubeAvailable)
+      SocialAuthProvider.youtube,
+  };
+}
 
 Uri? _qualifiedHttpsUri(String value) {
   final uri = Uri.tryParse(value.trim());

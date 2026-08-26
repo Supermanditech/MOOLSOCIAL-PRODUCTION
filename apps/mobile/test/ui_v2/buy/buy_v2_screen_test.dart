@@ -1001,8 +1001,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Runtime Member'), findsOneWidget);
-    expect(find.text('member@example.com · Google'), findsOneWidget);
-    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('member@example.com'), findsOneWidget);
+    expect(find.text('Account & security'), findsOneWidget);
+    expect(
+      find.text('Manage sign-in methods, privacy and sign out'),
+      findsOneWidget,
+    );
     expect(find.text('Dharmendra Choudhary'), findsNothing);
   });
 
