@@ -159,6 +159,7 @@
       "owners": [
         "config/codex-subagent-coordination-policy.json",
         "config/mvp-scope-gate-state.json",
+        "config/pre-apk-readiness-r60-92.json",
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "apps/mobile/pubspec.yaml",
         "apps/mobile/pubspec.lock",
@@ -169,7 +170,9 @@
         "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_action_truth_accessibility_c29o_test.dart",
         "scripts/check-approved-ui-locks.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-pre-apk-readiness-r60-92.ps1",
+        "scripts/test-pre-apk-readiness-r60-92.ps1"
       ]
     },
     {

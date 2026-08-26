@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-PRE-APK-READINESS-001",
+  "state": "candidate_reserved_build_held",
+  "candidate": {
+    "id": "UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK",
+    "versionName": "1.0.0-r60.92",
+    "versionCode": "2026082692",
+    "packageName": "com.moolsocial.app",
+    "buildMode": "release",
+    "runtimeProfile": "PublicAuthSideloadPreflight",
+    "finalIntegrationBranch": "integration/moolsocial/social-runtime-share-v5-20260826",
+    "finalIntegrationHead": "",
+    "artifactDirectory": "artifacts/quality/uaw-r60-92-social-runtime-consolidated-apk-20260826-01",
+    "artifactName": "uaw-r60.92-social-runtime-consolidated-apk-device-review-release.apk"
+  },
+  "predecessor": {
+    "versionName": "1.0.0-r60.91",
+    "versionCode": "2026082591",
+    "packageName": "com.moolsocial.app",
+    "sourceCommit": "6d4d74354c7ce73fd41b23d394064c6b4607da9a",
+    "apkSha256": "947F11206CB38222ED44C3DABF6EB0C7D0FBD490E2F099DE753891D79A2F3C01",
+    "preserved": true
+  },
+  "authority": {
+    "preApkPreparationAuthorized": true,
+    "buildAuthorized": false,
+    "oneBuildAuthorizationConsumed": false,
+    "buildCount": 0,
+    "cloudDeploymentAuthorized": false,
+    "cloudDeploymentCount": 0,
+    "installAuthorized": false,
+    "installCount": 0,
+    "playUploadAuthorized": false,
+    "playUploadCount": 0,
+    "oppoMutationAuthorized": false,
+    "secretValueAccessAuthorized": false
+  },
+  "versionGate": {
+    "state": "passed",
+    "candidateNumber": 92,
+    "predecessorNumber": 91,
+    "versionCodeDatePrefix": "20260826",
+    "allowedIdentityOwners": [
+      "config/pre-apk-readiness-r60-92.json",
+      "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+    ]
+  },
+  "integrationGate": {
+    "state": "pending",
+    "governanceTag": "moolsocial-parallel-production-discipline-20260824-v86",
+    "baseIntegrationBranch": "integration/moolsocial/social-runtime-chat-v4-20260826",
+    "baseIntegrationCommit": "0a40f68dc7697ae226aef469604761fa8b3d1301",
+    "socialShareBranch": "work/codex-auth/social-share-runtime-20260826",
+    "socialShareCommit": "dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
+    "mergeStrategy": "two_automatic_no_edit_no_ff_merges",
+    "remoteExactRequired": true
+  },
+  "sourceSeal": {
+    "state": "pending",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "fileCount": 0,
+    "cycle1": "pending",
+    "cycle2": "pending"
+  },
+  "runtimeConfiguration": {
+    "state": "pending_sanitized_binding",
+    "exactNonSecretDefinesBound": false,
+    "requiredPrivateDefineNamesBoundWithoutValues": false,
+    "mixedClientServerContractPrevented": false,
+    "privateValuesEmitted": false
+  },
+  "dependencyGate": {
+    "state": "gap_found",
+    "lockfile": "apps/mobile/pubspec.lock",
+    "newNativePlugin": "share_plus",
+    "newNativePluginVersion": "13.3.0",
+    "sameGuardedPubGetAndBuildRequired": true,
+    "wrapperQualified": false,
+    "postBuildPluginIntegrityQualified": false
+  },
+  "socialDeployment": {
+    "state": "mapping_in_progress",
+    "mapPath": "config/social-runtime-deployment-map-r60-92.json",
+    "mapSha256": "",
+    "eligibleDeployments": [],
+    "preservedFunctions": [],
+    "coordinatedWindowFunctions": [],
+    "actualDeploymentAuthorized": false,
+    "privateValuesEmitted": false
+  },
+  "preBuildGates": [
+    {"id": "candidate-version", "state": "passed", "evidence": ["config/pre-apk-readiness-r60-92.json"]},
+    {"id": "final-integration", "state": "pending", "evidence": []},
+    {"id": "source-manifest", "state": "pending", "evidence": []},
+    {"id": "format-analysis", "state": "pending", "evidence": []},
+    {"id": "focused-tests", "state": "pending", "evidence": []},
+    {"id": "full-regression-cycle-1", "state": "pending", "evidence": []},
+    {"id": "full-regression-cycle-2", "state": "pending", "evidence": []},
+    {"id": "backend-functions", "state": "pending", "evidence": []},
+    {"id": "hosting", "state": "pending", "evidence": []},
+    {"id": "approved-locks", "state": "pending", "evidence": []},
+    {"id": "protected-boundaries", "state": "pending", "evidence": []},
+    {"id": "brand-copy-interactions", "state": "pending", "evidence": []},
+    {"id": "dependency-integrity", "state": "pending", "evidence": []},
+    {"id": "native-plugin-source-integrity", "state": "pending", "evidence": []},
+    {"id": "android-static-release-readiness", "state": "pending", "evidence": []},
+    {"id": "runtime-define-sanitized-binding", "state": "pending", "evidence": []},
+    {"id": "social-deployment-map", "state": "pending", "evidence": []},
+    {"id": "secret-scan", "state": "pending", "evidence": []},
+    {"id": "clean-remote-readback", "state": "pending", "evidence": []},
+    {"id": "wrapper-self-test", "state": "pending", "evidence": []}
+  ],
+  "postBuildGates": [
+    {"id": "apk-exists-once", "state": "pending"},
+    {"id": "apk-checksum-and-size", "state": "pending"},
+    {"id": "package-version-badging", "state": "pending"},
+    {"id": "signer-and-app-links", "state": "pending"},
+    {"id": "native-plugin-apk-integrity", "state": "pending"},
+    {"id": "firebase-and-app-check-bootstrap", "state": "pending"},
+    {"id": "in-place-install-checksum-match", "state": "pending"},
+    {"id": "retained-session-and-upgrade", "state": "pending"},
+    {"id": "cold-start-and-process-death", "state": "pending"},
+    {"id": "social-feed-create-youtube-share", "state": "pending"},
+    {"id": "authentication-provider-matrix", "state": "pending"},
+    {"id": "chat-composer-and-context", "state": "pending"},
+    {"id": "accessibility-large-text-ime-insets", "state": "pending"},
+    {"id": "runtime-failure-and-anr-scan", "state": "pending"},
+    {"id": "performance", "state": "pending"},
+    {"id": "founder-acceptance", "state": "pending"}
+  ],
+  "blockers": [
+    "final_integration_pending",
+    "dependency_wrapper_gap",
+    "share_plus_plugin_integrity_gap",
+    "source_seal_and_two_cycles_pending",
+    "runtime_define_sanitized_binding_pending",
+    "social_backend_deployment_map_pending",
+    "one_build_authority_founder_held"
+  ],
+  "privateValuesEmitted": false
+}
