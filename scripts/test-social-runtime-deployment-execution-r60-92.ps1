@@ -120,8 +120,8 @@ try {
   Assert-Test $receiptRejected 'existing one-use receipt was accepted.'
   Remove-Item -LiteralPath $receipt -Force
 
-  $source = [IO.File]::ReadAllText($executor)
-  $checkerSource = [IO.File]::ReadAllText($checker)
+  $source = [IO.File]::ReadAllText($executor).Replace("`r`n", "`n")
+  $checkerSource = [IO.File]::ReadAllText($checker).Replace("`r`n", "`n")
   $recoverStart = $source.IndexOf("if (`$Mode -ceq 'Recover')",
     [StringComparison]::Ordinal)
   $recoverEndMarker = "`n}`n`n& `$checker -RepositoryRoot"
