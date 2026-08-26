@@ -32,6 +32,71 @@ function Write-Fixture($State) {
   )
 }
 
+function Get-CanonicalTextSha256([string]$Path) {
+  $text = [IO.File]::ReadAllText($Path).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  return [Convert]::ToHexString(
+    [Security.Cryptography.SHA256]::HashData(
+      [Text.UTF8Encoding]::new($false).GetBytes($text)
+    )
+  )
+}
+
+function Write-ReceiptFixture($State, [string]$ReceiptState) {
+  $deployCount = if ($ReceiptState -ceq 'attempt_claimed') { 0 } else { 1 }
+  $completed = $ReceiptState -ceq 'completed'
+  $contained = $ReceiptState -ceq 'failed_contained'
+  $metadataCount = if ($completed -or $contained) { 2 } else { 0 }
+  $rollbackCount = if ($contained) { 2 } else { 0 }
+  $newProviderRevision = if ($completed) { 'youtubeprovider-99999-abc' } else { '' }
+  $newProviderGeneration = if ($completed) { '1999999999999991' } else { '' }
+  $newCallbackRevision = if ($completed) { 'youtubeoauthcallback-99999-def' } else { '' }
+  $newCallbackGeneration = if ($completed) { '1999999999999992' } else { '' }
+  $preservedHash = if ($completed) { 'B' * 64 } else { '' }
+  $postdeployHash = if ($completed) { 'C' * 64 } else { '' }
+  $rollbackHash = if ($contained) { 'D' * 64 } else { '' }
+  $receiptFixture = [ordered]@{
+    schema = 'moolsocial_social_runtime_deploy_attempt_v1'
+    state = $ReceiptState
+    projectId = 'moolsocial-dev-503018'
+    region = 'asia-south1'
+    integrationHead = [string]$State.source.finalIntegrationHead
+    executionStateSha256 = Get-CanonicalTextSha256 $fixture
+    confirmationSha256 = [string]$State.authority.requiredConfirmationSha256
+    onlyTargetSha256 = [string]$State.authority.authorizedOnlyTargetSha256
+    authorizationId = 'SOCIAL-R60-92-20260826T080000Z-ABCDEF12'
+    authorizationNonceSha256 = ('A' * 64)
+    issuedAtUtc = '2026-08-26T08:00:00.000Z'
+    expiresAtUtc = '2026-08-26T08:15:00.000Z'
+    maxDeployAttempts = 1
+    firebaseDryRunCommandCount = 1
+    firebaseDeployCommandCount = $deployCount
+    rollbackTrafficCommandCount = $rollbackCount
+    metadataRestoreCommandCount = $metadataCount
+    cloudWriteActionCount = $deployCount + $metadataCount + $rollbackCount
+    providerMetadataRestoreClaimed = $completed -or $contained
+    callbackMetadataRestoreClaimed = $completed -or $contained
+    providerTrafficRestoreClaimed = $contained
+    callbackTrafficRestoreClaimed = $contained
+    predecessorProviderRevision = 'youtubeprovider-00049-kxt'
+    predecessorCallbackRevision = 'youtubeoauthcallback-00037-5rz'
+    newProviderRevision = $newProviderRevision
+    newProviderSourceGeneration = $newProviderGeneration
+    newCallbackRevision = $newCallbackRevision
+    newCallbackSourceGeneration = $newCallbackGeneration
+    preservedFunctionFingerprintSetSha256 = $preservedHash
+    postdeployRuntimeFingerprintSetSha256 = $postdeployHash
+    rollbackTrafficFingerprintSetSha256 = $rollbackHash
+    updatedAtUtc = '2026-08-26T08:00:01.000Z'
+    privateValuesEmitted = $false
+  }
+  [IO.File]::WriteAllText(
+    $receipt,
+    (($receiptFixture | ConvertTo-Json -Depth 100) + "`n"),
+    [Text.UTF8Encoding]::new($false)
+  )
+}
+
 function Assert-Rejected([string]$Label, [scriptblock]$Mutation) {
   $state = Get-Content -LiteralPath $liveState -Raw | ConvertFrom-Json -Depth 100
   & $Mutation $state
@@ -120,6 +185,29 @@ try {
   Assert-Test $receiptRejected 'existing one-use receipt was accepted.'
   Remove-Item -LiteralPath $receipt -Force
 
+  $receiptFixtureCount = 0
+  foreach ($receiptStateName in @(
+      'attempt_claimed','deployment_started','completed','failed_contained'
+    )) {
+    $receiptState = Get-Content -LiteralPath $liveState -Raw |
+      ConvertFrom-Json -Depth 100
+    Write-Fixture $receiptState
+    Write-ReceiptFixture $receiptState $receiptStateName
+    & $executor -RepositoryRoot $root -StatePath $fixture -Mode Validate `
+      -ValidateReceiptFixture | Out-Null
+    if ($receiptStateName -ceq 'completed') {
+      & $checker -RepositoryRoot $root -StatePath $fixture -Phase Completed |
+        Out-Null
+    } elseif ($receiptStateName -ceq 'failed_contained') {
+      & $checker -RepositoryRoot $root -StatePath $fixture -Phase Contained |
+        Out-Null
+    }
+    $receiptFixtureCount++
+    Remove-Item -LiteralPath $receipt -Force
+  }
+  Assert-Test ($receiptFixtureCount -eq 4) `
+    'receipt lifecycle fixture count changed.'
+
   $source = [IO.File]::ReadAllText($executor).Replace("`r`n", "`n")
   $checkerSource = [IO.File]::ReadAllText($checker).Replace("`r`n", "`n")
   $recoverStart = $source.IndexOf("if (`$Mode -ceq 'Recover')",
@@ -145,6 +233,16 @@ try {
     $source.Contains('[IO.FileMode]::CreateNew', [StringComparison]::Ordinal) -and
     $source.Contains("[ValidateSet('Validate', 'Deploy', 'Recover')]",
       [StringComparison]::Ordinal) -and
+    $source.Contains('[switch]$ValidateReceiptFixture',
+      [StringComparison]::Ordinal) -and
+    $source.Contains('ConvertFrom-Json -AsHashtable',
+      [StringComparison]::Ordinal) -and
+    -not $source.Contains('Where-Object deployTarget',
+      [StringComparison]::Ordinal) -and
+    -not [regex]::IsMatch(
+      $source,
+      'Where-Object\s+(?:function|name)\s+-eq'
+    ) -and
     $source.Contains('--clear-tags', [StringComparison]::Ordinal) -and
     $source.Contains(
       '1177B4137BA5ADAA56354AE40F1080C7450E8AE09CECB47DA459D1C52AC99F97',
@@ -188,5 +286,5 @@ try {
 
 Write-Output (
   'Social runtime deployment execution self-test passed: live=1; source=1; ' +
-  'negative=12; dryRuns=0; deploys=0; cloudWrites=0.'
+  'negative=12; receiptFixtures=4; dryRuns=0; deploys=0; cloudWrites=0.'
 )
