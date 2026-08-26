@@ -92,6 +92,16 @@ class Screen04YouTubePublicVideo {
   final String? channelViewCount;
 }
 
+class Screen04YouTubePublicChannelCatalogue {
+  const Screen04YouTubePublicChannelCatalogue({
+    required this.channel,
+    required this.videos,
+  });
+
+  final YouTubePublicChannelDetails channel;
+  final List<Screen04YouTubePublicVideo> videos;
+}
+
 final screen04YouTubeCatalogueSnapshots =
     Screen04YouTubeCatalogueSnapshotStore();
 
@@ -491,6 +501,45 @@ Future<List<Screen04YouTubePublicVideo>> loadScreen04YouTubePublicSearch(
           ),
         )
         .toList(growable: false);
+  } finally {
+    transport.close(force: true);
+  }
+}
+
+Future<Screen04YouTubePublicChannelCatalogue>
+loadScreen04YouTubePublicChannelCatalogue(String channelId) async {
+  final selectedChannelId = channelId.trim();
+  if (selectedChannelId.isEmpty) {
+    throw ArgumentError.value(channelId, 'channelId', 'must not be empty');
+  }
+
+  final transport = IoYouTubeHttpTransport();
+  try {
+    final client = YouTubePrivateDevClient.fromBuildConfiguration(
+      transport: transport,
+    );
+    final capabilities = await client.capabilities();
+    if (!capabilities.publicData) {
+      throw StateError('Public YouTube channel viewing is unavailable.');
+    }
+    final channel = await client.channelDetails(channelId: selectedChannelId);
+    final uploadsPlaylistId = channel.uploadsPlaylistId?.trim();
+    if (uploadsPlaylistId == null || uploadsPlaylistId.isEmpty) {
+      throw StateError('This channel has no public uploads catalogue.');
+    }
+    final eligible = await collectScreen04YouTubeCatalogue(
+      loadPage: (pageToken) =>
+          client.playlist(playlistId: uploadsPlaylistId, pageToken: pageToken),
+      isEligible: _isEligiblePublicVideo,
+    );
+    return Screen04YouTubePublicChannelCatalogue(
+      channel: channel,
+      videos: List<Screen04YouTubePublicVideo>.unmodifiable(
+        eligible.map(
+          (video) => mapScreen04YouTubePublicVideo(video, channel: channel),
+        ),
+      ),
+    );
   } finally {
     transport.close(force: true);
   }

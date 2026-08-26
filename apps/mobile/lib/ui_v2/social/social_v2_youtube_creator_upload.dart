@@ -15,7 +15,9 @@ import '../../core/youtube/youtube_private_dev_transport.dart';
 import '../../core/youtube/youtube_private_dev_uploader.dart';
 import '../../core/youtube/youtube_private_dev_workflow.dart';
 import '../../features/shared/social_media_picker.dart';
+import '../../features/shared/youtube_public_watch_state_repository.dart';
 import 'social_v2_create_workbench.dart';
+import 'social_v2_youtube_public_runtime.dart';
 
 const _youtubeUploadPermission =
     'https://www.googleapis.com/auth/youtube.upload';
@@ -43,21 +45,7 @@ bool isTrustedSocialYouTubeExternalUri(Uri uri) {
   if (uri.host == 'myaccount.google.com') {
     return uri.path == '/permissions' && !uri.hasQuery;
   }
-  if (uri.host != 'www.youtube.com') return false;
-  final values = uri.queryParametersAll;
-  if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'channel') {
-    return values.isEmpty &&
-        RegExp(r'^UC[A-Za-z0-9_-]{20,64}$').hasMatch(uri.pathSegments.last);
-  }
-  final expectedKey = switch (uri.path) {
-    '/watch' => 'v',
-    '/playlist' => 'list',
-    _ => null,
-  };
-  if (expectedKey == null || values.length != 1) return false;
-  final selected = values[expectedKey];
-  return selected?.length == 1 &&
-      RegExp(r'^[A-Za-z0-9_-]{6,128}$').hasMatch(selected!.single);
+  return false;
 }
 
 Future<void> launchTrustedSocialYouTubeExternalUri(Uri uri) async {
@@ -525,6 +513,8 @@ class _SocialYouTubeCreatorUploadScreenState
   bool _channelBrowseLoading = false;
   bool _channelBrowseLoadingMore = false;
   bool _channelPlaylistsLoadingMore = false;
+  String? _activeChannelPlaylistId;
+  String? _activeChannelPlaylistTitle;
   int _channelBrowseRequest = 0;
   SocialPickedMedia? _media;
   SocialYouTubeShortMediaInfo? _mediaInfo;
@@ -684,6 +674,8 @@ class _SocialYouTubeCreatorUploadScreenState
     _channelPlaylists = const [];
     _channelVideosNextPageToken = null;
     _channelPlaylistsNextPageToken = null;
+    _activeChannelPlaylistId = null;
+    _activeChannelPlaylistTitle = null;
     _channelBrowseError = null;
   }
 
@@ -721,7 +713,7 @@ class _SocialYouTubeCreatorUploadScreenState
       _channelBrowseError = null;
     });
     try {
-      final details = loadMore
+      final details = loadMore || _activeChannelPlaylistId != null
           ? _channelDetails!
           : await browser.channelDetails(channelId: connection.channelId);
       final uploadsPlaylistId = details.uploadsPlaylistId;
@@ -730,11 +722,12 @@ class _SocialYouTubeCreatorUploadScreenState
           'This channel does not expose a public uploads playlist.',
         );
       }
+      final selectedPlaylistId = _activeChannelPlaylistId ?? uploadsPlaylistId;
       final videosPage = await browser.playlistVideos(
-        playlistId: uploadsPlaylistId,
+        playlistId: selectedPlaylistId,
         pageToken: pageToken,
       );
-      final playlistsPage = loadMore
+      final playlistsPage = loadMore || _activeChannelPlaylistId != null
           ? null
           : await browser.channelPlaylists(
               channelId: connection.channelId,
@@ -772,6 +765,46 @@ class _SocialYouTubeCreatorUploadScreenState
         _channelBrowseError = _customerMessage(error);
       });
     }
+  }
+
+  Future<void> _openChannelPlaylist(
+    YouTubePublicPlaylistDetails playlist,
+  ) async {
+    final browser = _channelBrowser;
+    if (browser == null) return;
+    final request = ++_channelBrowseRequest;
+    setState(() {
+      _channelBrowseLoading = true;
+      _channelBrowseError = null;
+    });
+    try {
+      final page = await browser.playlistVideos(
+        playlistId: playlist.playlistId,
+      );
+      if (!mounted || request != _channelBrowseRequest) return;
+      setState(() {
+        _activeChannelPlaylistId = playlist.playlistId;
+        _activeChannelPlaylistTitle = playlist.title;
+        _channelVideos = List<YouTubeVideoSummary>.unmodifiable(page.items);
+        _channelVideosNextPageToken = page.nextPageToken;
+        _channelBrowseLoading = false;
+        _channelBrowseLoadingMore = false;
+      });
+    } on Object catch (error) {
+      if (!mounted || request != _channelBrowseRequest) return;
+      setState(() {
+        _channelBrowseLoading = false;
+        _channelBrowseError = _customerMessage(error);
+      });
+    }
+  }
+
+  void _showChannelUploads() {
+    setState(() {
+      _activeChannelPlaylistId = null;
+      _activeChannelPlaylistTitle = null;
+    });
+    _loadChannelBrowser();
   }
 
   Future<void> _loadMoreChannelPlaylists() async {
@@ -813,6 +846,10 @@ class _SocialYouTubeCreatorUploadScreenState
   }
 
   void _handleScreenBack() {
+    if (_channelBrowseOpen && _activeChannelPlaylistId != null) {
+      _showChannelUploads();
+      return;
+    }
     if (_channelBrowseOpen) {
       setState(() => _channelBrowseOpen = false);
       return;
@@ -1329,11 +1366,23 @@ class _SocialYouTubeCreatorUploadScreenState
           ],
           const SizedBox(height: 20),
           Text(
-            'Uploads',
+            _activeChannelPlaylistTitle ?? 'Uploads',
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
+          if (_activeChannelPlaylistId != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('youtube-channel-back-to-uploads'),
+                onPressed: _showChannelUploads,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back to channel uploads'),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           if (_channelVideos.isEmpty)
             const _CreatorNotice(
@@ -1356,7 +1405,7 @@ class _SocialYouTubeCreatorUploadScreenState
                     )
                   : const Icon(Icons.expand_more_rounded),
               label: Text(
-                _channelBrowseLoadingMore ? 'Loading…' : 'Load more uploads',
+                _channelBrowseLoadingMore ? 'Loading…' : 'Load more videos',
               ),
             ),
           ],
@@ -1456,15 +1505,6 @@ class _SocialYouTubeCreatorUploadScreenState
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: const Key('youtube-channel-open-external'),
-            onPressed: () => _openExternal(
-              Uri.https('www.youtube.com', '/channel/${details.channelId}'),
-            ),
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: const Text('Open full channel on YouTube'),
-          ),
         ],
       ),
     );
@@ -1478,9 +1518,7 @@ class _SocialYouTubeCreatorUploadScreenState
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _openExternal(
-          Uri.https('www.youtube.com', '/watch', {'v': video.videoId}),
-        ),
+        onTap: () => _openChannelVideoInMoolSocial(video),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1529,11 +1567,7 @@ class _SocialYouTubeCreatorUploadScreenState
       surfaceTintColor: Colors.transparent,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        onTap: () => _openExternal(
-          Uri.https('www.youtube.com', '/playlist', {
-            'list': playlist.playlistId,
-          }),
-        ),
+        onTap: () => _openChannelPlaylist(playlist),
         leading: _YouTubeNetworkThumbnail(
           url: playlist.thumbnail?.url,
           width: 72,
@@ -1548,6 +1582,37 @@ class _SocialYouTubeCreatorUploadScreenState
         subtitle: Text('${playlist.itemCount} videos'),
         trailing: const Icon(Icons.chevron_right_rounded),
       ),
+    );
+  }
+
+  void _openChannelVideoInMoolSocial(YouTubeVideoSummary selectedVideo) {
+    final details = _channelDetails;
+    if (details == null) return;
+    final videos = _channelVideos
+        .map((video) => mapScreen04YouTubePublicVideo(video, channel: details))
+        .toList(growable: false);
+    Screen04YouTubePublicVideo? selected;
+    for (final video in videos) {
+      if (video.videoId == selectedVideo.videoId) {
+        selected = video;
+        break;
+      }
+    }
+    if (selected == null) {
+      setState(() {
+        _channelBrowseError =
+            'This channel video is unavailable in MoolSocial right now.';
+      });
+      return;
+    }
+    screen04YouTubeCatalogueSnapshots.replaceVideos(videos);
+    youtubePublicWatchState.replace(
+      selectedVideo: mapScreen04VideoToYouTubePublicCatalogueItem(selected),
+      origin: YouTubePublicWatchOrigin.home,
+    );
+    context.go(
+      '/app/social?sub=videos&state=video-watch&item='
+      '${Uri.encodeQueryComponent(selectedVideo.videoId)}',
     );
   }
 

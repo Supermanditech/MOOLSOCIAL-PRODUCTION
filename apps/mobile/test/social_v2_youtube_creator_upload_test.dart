@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/youtube/youtube_private_dev_models.dart';
 import 'package:moolsocial/core/youtube/youtube_private_dev_uploader.dart';
 import 'package:moolsocial/features/shared/social_media_picker.dart';
+import 'package:moolsocial/features/shared/youtube_public_watch_state_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_creator_upload.dart';
 
 const _uploadPermission = 'https://www.googleapis.com/auth/youtube.upload';
@@ -21,9 +22,6 @@ void main() {
       'https://moolsocial.com/disconnect',
       'https://moolsocial.com/delete-account',
       'https://myaccount.google.com/permissions',
-      'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
-      'https://www.youtube.com/watch?v=video12345',
-      'https://www.youtube.com/playlist?list=playlist12345',
     ]) {
       expect(isTrustedSocialYouTubeExternalUri(Uri.parse(value)), isTrue);
     }
@@ -32,6 +30,9 @@ void main() {
       'https://moolsocial.com/privacy?return=elsewhere',
       'https://moolsocial.com/app/auth/x',
       'https://myaccount.google.com/permissions#private',
+      'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
+      'https://www.youtube.com/watch?v=video12345',
+      'https://www.youtube.com/playlist?list=playlist12345',
       'https://youtube.com/watch?v=video12345',
       'https://www.youtube.com/watch?v=video12345&token=private',
       'https://www.youtube.com/channel/not-a-channel',
@@ -122,6 +123,61 @@ void main() {
       );
     },
   );
+
+  testWidgets('connected channel videos stay inside MoolSocial Videos', (
+    tester,
+  ) async {
+    await youtubePublicWatchState.clear(detachRepository: true);
+    addTearDown(() => youtubePublicWatchState.clear(detachRepository: true));
+    final opened = <Uri>[];
+    final gateway = _FakeCreatorGateway(
+      capabilities: _capabilities(),
+      connection: _connected(scopes: const ['youtube-read']),
+    );
+    final router = GoRouter(
+      initialLocation: '/connect',
+      routes: [
+        GoRoute(
+          path: '/connect',
+          builder: (_, _) => SocialYouTubeCreatorUploadScreen(
+            gateway: gateway,
+            externalLauncher: (uri) async => opened.add(uri),
+          ),
+        ),
+        GoRoute(
+          path: '/app/social',
+          builder: (_, state) => Scaffold(
+            body: Text('MoolSocial video ${state.uri.queryParameters['item']}'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('youtube-creator-browse-channel')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('youtube-channel-open-external')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const Key('youtube-channel-video-video-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MoolSocial video video-1'), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/app/social?sub=videos&state=video-watch&item=video-1',
+    );
+    expect(youtubePublicWatchState.snapshot?.selectedVideo.videoId, 'video-1');
+    expect(
+      youtubePublicWatchState.snapshot?.origin,
+      YouTubePublicWatchOrigin.home,
+    );
+    expect(opened, isEmpty);
+  });
 
   testWidgets('fails closed when creator capabilities are unavailable', (
     tester,
@@ -301,6 +357,26 @@ void main() {
 
       expect(find.text('National reports'), findsOneWidget);
       expect(gateway.channelPlaylistsCalls, 2);
+
+      await _reveal(tester, const Key('youtube-channel-playlist-playlist-1'));
+      await tester.tap(
+        find.byKey(const Key('youtube-channel-playlist-playlist-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('youtube-channel-back-to-uploads')),
+        findsOneWidget,
+      );
+      expect(gateway.playlistVideosCalls, 3);
+
+      await tester.tap(
+        find.byKey(const Key('youtube-channel-back-to-uploads')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Uploads'), findsOneWidget);
+      expect(gateway.playlistVideosCalls, 4);
 
       await tester.tap(find.byKey(const Key('youtube-creator-back')));
       await tester.pumpAndSettle();

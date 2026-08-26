@@ -39,6 +39,8 @@ typedef Screen04YouTubePublicVideoLoader =
     Future<List<Screen04YouTubePublicVideo>> Function();
 typedef Screen04YouTubePublicSearchLoader =
     Future<List<Screen04YouTubePublicVideo>> Function(String query);
+typedef Screen04YouTubePublicChannelLoader =
+    Future<Screen04YouTubePublicChannelCatalogue> Function(String channelId);
 
 enum SocialV2ShareOutcome { selected, dismissed, unavailable }
 
@@ -196,6 +198,7 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeVideosLoader,
     @visibleForTesting this.youtubeShortsLoader,
     @visibleForTesting this.youtubeSearchLoader,
+    @visibleForTesting this.youtubeChannelLoader,
     @visibleForTesting this.youtubeCatalogueSnapshotStore,
     @visibleForTesting this.youtubeSearchStateCache,
     @visibleForTesting this.youtubeWatchStateCache,
@@ -238,6 +241,9 @@ class SocialUniversalV2 extends StatefulWidget {
 
   @visibleForTesting
   final Screen04YouTubePublicSearchLoader? youtubeSearchLoader;
+
+  @visibleForTesting
+  final Screen04YouTubePublicChannelLoader? youtubeChannelLoader;
 
   @visibleForTesting
   final Screen04YouTubeCatalogueSnapshotStore? youtubeCatalogueSnapshotStore;
@@ -358,6 +364,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   bool _liveYouTubeShortsLoading = false;
   bool _hasYouTubeShortsSnapshot = false;
   String? _liveYouTubeShortsError;
+  List<Screen04YouTubePublicVideo>? _youtubeChannelOriginSnapshot;
+  String? _activeYouTubeChannelId;
+  String? _activeYouTubeChannelTitle;
+  String? _youtubeChannelError;
+  bool _youtubeChannelLoading = false;
+  int _youtubeChannelRequest = 0;
   int _feedLinkRequest = 0;
   bool _feedLinkResolving = false;
   bool _feedLinkContextActive = false;
@@ -674,6 +686,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     _youtubeSearchResultsController.dispose();
     _youtubeSearchController.dispose();
     _youtubeSearchFocusNode.dispose();
+    _youtubeChannelRequest += 1;
     super.dispose();
   }
 
@@ -2647,7 +2660,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         onSubmitted: _submitYouTubeSearch,
         onRetry: () => _submitYouTubeSearch(_youtubeSubmittedQuery),
         onVideo: _openVideoFromSearch,
-        onProvider: _openYouTubeVideo,
       );
     }
     if (_activeVideo case final video?) {
@@ -2718,6 +2730,30 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           icon: Icons.smart_display_outlined,
           title: 'YouTube Videos are unavailable right now',
           detail: 'Please try again later.',
+        ),
+      );
+    }
+    if (_youtubeChannelLoading) {
+      return _buildYouTubeHomeStatus(
+        const _YouTubeVideosStatusView(
+          key: Key('screen04-youtube-channel-state-loading'),
+          icon: Icons.video_library_outlined,
+          title: 'Loading channel videos',
+          detail:
+              'Bringing this channel’s eligible public uploads into MoolSocial.',
+          loading: true,
+        ),
+      );
+    }
+    if (_youtubeChannelError case final error?) {
+      return _buildYouTubeHomeStatus(
+        _YouTubeVideosStatusView(
+          key: const Key('screen04-youtube-channel-state-error'),
+          icon: Icons.wifi_off_rounded,
+          title: 'Channel videos could not load',
+          detail: error,
+          actionLabel: 'Try again',
+          onAction: () => _openYouTubeChannel(_activeYouTubeChannelId),
         ),
       );
     }
@@ -2799,6 +2835,41 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
               controller: _videoHomeController,
               padding: const EdgeInsets.only(bottom: 16),
               children: [
+                if (_activeYouTubeChannelTitle case final channelTitle?)
+                  Container(
+                    key: const Key('screen04-youtube-channel-catalogue'),
+                    margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF202020),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.video_library_outlined,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Videos from $channelTitle',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('screen04-youtube-channel-all-videos'),
+                          onPressed: _restoreYouTubePublicCatalogue,
+                          child: const Text('All videos'),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (homeShorts.isNotEmpty)
                   _YouTubeHomeShortsShelf(
                     shorts: homeShorts.take(8).toList(growable: false),
@@ -2811,7 +2882,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     _VideoCard(
                       data: video,
                       onTap: () => _openVideoFromDiscovery(video),
-                      onProvider: () => _openYouTubeVideo(video),
                     ),
                 if (shownVideos.length < videos.length)
                   Padding(
@@ -3530,14 +3600,80 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  Future<void> _openYouTubeChannel(String? channelId) {
-    if (channelId == null || channelId.trim().isEmpty) {
-      return _openYouTubeHome();
+  Future<void> _openYouTubeChannel(String? channelId) async {
+    final selectedChannelId = channelId?.trim();
+    if (selectedChannelId == null || selectedChannelId.isEmpty) {
+      showSocialV2Message(
+        context,
+        'This channel’s videos are unavailable in MoolSocial right now.',
+      );
+      return;
     }
-    return _openYouTubeUri(
-      Uri.https('www.youtube.com', '/channel/${channelId.trim()}'),
-      unavailableMessage: 'This channel could not be opened on YouTube',
-    );
+    final request = ++_youtubeChannelRequest;
+    _youtubeChannelOriginSnapshot ??= _youtubeCatalogueSnapshots.readVideos();
+    setState(() {
+      _activeYouTubeChannelId = selectedChannelId;
+      _activeYouTubeChannelTitle = null;
+      _youtubeChannelError = null;
+      _youtubeChannelLoading = true;
+      _choiceByWorld['social'] = 'videos';
+      _tab = SocialV2Tab.videos;
+      _activeVideo = null;
+      _youtubeSearchOpen = false;
+      _returnToYouTubeSearchAfterVideo = false;
+      _videoQuery = '';
+      _visibleVideoCount = 20;
+    });
+    try {
+      final loader =
+          widget.youtubeChannelLoader ??
+          loadScreen04YouTubePublicChannelCatalogue;
+      final catalogue = await loader(selectedChannelId);
+      if (!mounted || request != _youtubeChannelRequest) return;
+      final videos = catalogue.videos
+          .map(_videoDataFromProvider)
+          .toList(growable: false);
+      _youtubeCatalogueSnapshots.replaceVideos(catalogue.videos);
+      setState(() {
+        _liveYouTubeVideos = videos;
+        _hasYouTubeVideosSnapshot = true;
+        _activeYouTubeChannelTitle = catalogue.channel.title;
+        _youtubeChannelLoading = false;
+        _youtubeChannelError = null;
+      });
+    } on Object {
+      if (!mounted || request != _youtubeChannelRequest) return;
+      setState(() {
+        _youtubeChannelLoading = false;
+        _youtubeChannelError =
+            'MoolSocial could not load this channel’s public videos. Please try again.';
+      });
+    }
+  }
+
+  void _restoreYouTubePublicCatalogue() {
+    _youtubeChannelRequest += 1;
+    final origin = _youtubeChannelOriginSnapshot;
+    setState(() {
+      _activeYouTubeChannelId = null;
+      _activeYouTubeChannelTitle = null;
+      _youtubeChannelError = null;
+      _youtubeChannelLoading = false;
+      _youtubeChannelOriginSnapshot = null;
+      _videoQuery = '';
+      _visibleVideoCount = 20;
+      if (origin != null) {
+        _liveYouTubeVideos = origin
+            .map(_videoDataFromProvider)
+            .toList(growable: false);
+        _hasYouTubeVideosSnapshot = true;
+      }
+    });
+    if (origin != null) {
+      _youtubeCatalogueSnapshots.replaceVideos(origin);
+    } else {
+      _loadLiveYouTubeVideos();
+    }
   }
 
   Future<void> _openYouTubeUri(
@@ -4257,7 +4393,6 @@ class _YouTubeSearchSurface extends StatelessWidget {
     required this.onSubmitted,
     required this.onRetry,
     required this.onVideo,
-    required this.onProvider,
   });
 
   final TextEditingController controller;
@@ -4273,7 +4408,6 @@ class _YouTubeSearchSurface extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
   final VoidCallback onRetry;
   final ValueChanged<_VideoData> onVideo;
-  final ValueChanged<_VideoData> onProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -4387,11 +4521,7 @@ class _YouTubeSearchSurface extends StatelessWidget {
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final video = searchResults[index];
-                  return _VideoCard(
-                    data: video,
-                    onTap: () => onVideo(video),
-                    onProvider: () => onProvider(video),
-                  );
+                  return _VideoCard(data: video, onTap: () => onVideo(video));
                 },
               ),
               _ => const SizedBox.expand(
@@ -4668,52 +4798,37 @@ class _YouTubeHomeEmptySearch extends StatelessWidget {
 }
 
 class _YouTubeAttribution extends StatelessWidget {
-  const _YouTubeAttribution({this.onDark = true, required this.onTap});
-
-  final bool onDark;
-  final VoidCallback onTap;
+  const _YouTubeAttribution();
 
   @override
   Widget build(BuildContext context) {
-    final foreground = onDark ? Colors.white : SocialV2Colors.ink;
+    const foreground = Colors.white;
     return Semantics(
-      button: true,
-      link: true,
-      label: 'Open this content on YouTube',
-      child: InkWell(
+      label: 'YouTube content source',
+      child: ConstrainedBox(
         key: const Key('screen04-youtube-attribution'),
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  'assets/prototype/provider-youtube.svg',
-                  width: 18,
-                  height: 13,
-                  fit: BoxFit.contain,
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/prototype/provider-youtube.svg',
+                width: 18,
+                height: 13,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'YouTube',
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(width: 5),
-                Text(
-                  'YouTube',
-                  style: TextStyle(
-                    color: foreground,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                Icon(
-                  Icons.open_in_new_rounded,
-                  color: foreground.withValues(alpha: .72),
-                  size: 11,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -5298,14 +5413,9 @@ _VideoData? _videoForProviderId(List<_VideoData> videos, String? id) {
 }
 
 class _VideoCard extends StatelessWidget {
-  const _VideoCard({
-    required this.data,
-    required this.onTap,
-    required this.onProvider,
-  });
+  const _VideoCard({required this.data, required this.onTap});
   final _VideoData data;
   final VoidCallback onTap;
-  final VoidCallback onProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -5357,7 +5467,7 @@ class _VideoCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 7),
-                    _YouTubeAttribution(onTap: onProvider),
+                    const _YouTubeAttribution(),
                   ],
                 ),
               ),
@@ -5442,10 +5552,7 @@ class _InlineVideoWatch extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _VideoProviderLine(
-                data: data,
-                onProvider: () => onOpenProvider(data),
-              ),
+              _VideoProviderLine(data: data),
               const SizedBox(height: 10),
               InkWell(
                 key: const Key('screen04-video-details-trigger'),
@@ -5550,11 +5657,7 @@ class _InlineVideoWatch extends StatelessWidget {
             ),
           ),
           for (final video in moreVideos)
-            _VideoCard(
-              data: video,
-              onTap: () => onSelectVideo(video),
-              onProvider: () => onOpenProvider(video),
-            ),
+            _VideoCard(data: video, onTap: () => onSelectVideo(video)),
         ],
       ],
     );
@@ -5831,16 +5934,15 @@ class _Screen04OfficialYouTubePlayerState
 }
 
 class _VideoProviderLine extends StatelessWidget {
-  const _VideoProviderLine({required this.data, required this.onProvider});
+  const _VideoProviderLine({required this.data});
 
   final _VideoData data;
-  final VoidCallback onProvider;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _YouTubeAttribution(onTap: onProvider),
+        const _YouTubeAttribution(),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -6092,7 +6194,11 @@ class _VideoChannelIdentity extends StatelessWidget {
               ],
             ),
           ),
-          _YouTubeAttribution(onDark: false, onTap: onProvider),
+          TextButton(
+            key: const Key('screen04-video-channel-videos'),
+            onPressed: onProvider,
+            child: const Text('Videos'),
+          ),
         ],
       ),
     );

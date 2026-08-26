@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/youtube/youtube_private_dev_models.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -571,6 +572,115 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'public provider badge and channel taps stay in MoolSocial Videos',
+    (tester) async {
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+      final sourceVideo = Screen04YouTubePublicVideo(
+        videoId: 'channelSrc01',
+        title: 'Channel source video',
+        channelId: 'UCchannel123',
+        channelTitle: 'Public channel',
+        description: 'The video used to open its public channel.',
+        thumbnailUrl: Uri.https(
+          'i.ytimg.com',
+          '/vi/channelSrc01/hqdefault.jpg',
+        ),
+        publishedAt: DateTime.utc(2026, 8, 20),
+        duration: 'PT6M',
+        captionAvailable: true,
+        viewCount: '1200',
+        likeCount: '80',
+        commentCount: '12',
+        embeddable: true,
+        hasKnownDeviceRegionExclusion: false,
+        hashtags: const ['#Public'],
+      );
+      final channelVideos = <Screen04YouTubePublicVideo>[
+        sourceVideo,
+        Screen04YouTubePublicVideo(
+          videoId: 'channelDst02',
+          title: 'Another channel upload',
+          channelId: 'UCchannel123',
+          channelTitle: 'Public channel',
+          description: 'Another eligible public upload.',
+          thumbnailUrl: Uri.https(
+            'i.ytimg.com',
+            '/vi/channelDst02/hqdefault.jpg',
+          ),
+          publishedAt: DateTime.utc(2026, 8, 21),
+          duration: 'PT8M',
+          captionAvailable: true,
+          viewCount: '2400',
+          likeCount: '140',
+          commentCount: '21',
+          embeddable: true,
+          hasKnownDeviceRegionExclusion: false,
+          hashtags: const ['#Public'],
+        ),
+      ];
+      var requestedChannelId = '';
+
+      await _pump(
+        tester,
+        const Size(390, 844),
+        1,
+        owners.consumer(
+          sub: 'videos',
+          youtubePublicAccessOverride: true,
+          youtubeVideosLoader: () async => [sourceVideo],
+          youtubeShortsLoader: () async => const [],
+          youtubeChannelLoader: (channelId) async {
+            requestedChannelId = channelId;
+            return Screen04YouTubePublicChannelCatalogue(
+              channel: YouTubePublicChannelDetails(
+                channelId: channelId,
+                title: 'Public channel',
+                description: 'Public channel uploads.',
+                publishedAt: DateTime.utc(2020),
+                uploadsPlaylistId: 'UUchannel123',
+                statistics: const YouTubePublicChannelStatistics(
+                  hiddenSubscriberCount: false,
+                  subscriberCount: '5000',
+                  videoCount: '2',
+                  viewCount: '3600',
+                ),
+                topicCategories: const [],
+              ),
+              videos: channelVideos,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      final attribution = find.byKey(const Key('screen04-youtube-attribution'));
+      expect(attribution, findsOneWidget);
+      await tester.tap(attribution);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('screen04-video-channel')),
+      );
+      await tester.tap(find.byKey(const Key('screen04-video-channel')));
+      await tester.pumpAndSettle();
+
+      expect(requestedChannelId, 'UCchannel123');
+      expect(
+        find.byKey(const Key('screen04-youtube-channel-catalogue')),
+        findsOneWidget,
+      );
+      expect(find.text('Videos from Public channel'), findsOneWidget);
+      expect(find.text('Another channel upload'), findsOneWidget);
+      expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
+
+      await tester.tap(find.text('Another channel upload'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+      expect(find.text('Another channel upload'), findsWidgets);
+    },
+  );
+
   testWidgets('YouTube Search share preserves the exact result return', (
     tester,
   ) async {
@@ -1128,6 +1238,7 @@ class _Owners {
     Screen04YouTubePublicVideoLoader? youtubeVideosLoader,
     Screen04YouTubePublicVideoLoader? youtubeShortsLoader,
     Screen04YouTubePublicSearchLoader? youtubeSearchLoader,
+    Screen04YouTubePublicChannelLoader? youtubeChannelLoader,
     SocialV2ShareGateway? shareGateway,
   }) {
     return SocialUniversalV2(
@@ -1141,6 +1252,7 @@ class _Owners {
       youtubeVideosLoader: youtubeVideosLoader,
       youtubeShortsLoader: youtubeShortsLoader,
       youtubeSearchLoader: youtubeSearchLoader,
+      youtubeChannelLoader: youtubeChannelLoader,
       shareGateway: shareGateway,
     );
   }
