@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'journey_services.dart';
@@ -31,12 +33,15 @@ class JourneySession extends ChangeNotifier {
     OtpGateway? otpGateway,
     EmailOtpGateway? emailOtpGateway,
     EmailLinkGateway? emailLinkGateway,
+    PendingEmailLinkAddressStore? pendingEmailLinkAddressStore,
     SocialAuthGateway? socialAuthGateway,
     Set<SocialAuthProvider>? availableSocialAuthProviders,
     this.emailOtpAvailable = true,
     this.emailLinkAvailable = false,
     this.mobileOtpAvailable = true,
     AccountBootstrapGateway? accountBootstrapGateway,
+    VerifiedPrincipalBindingStore? verifiedPrincipalBindingStore,
+    AuthenticatedAccountIdentityGateway? accountIdentityGateway,
     LocationPermissionGateway? locationGateway,
     CurrentAreaGateway? currentAreaGateway,
     DateTime Function()? now,
@@ -50,12 +55,20 @@ class JourneySession extends ChangeNotifier {
        _emailOtpGateway = emailOtpGateway ?? ReviewEmailOtpGateway(),
        _emailLinkGateway =
            emailLinkGateway ?? const UnavailableEmailLinkGateway(),
+       _pendingEmailLinkAddressStore =
+           pendingEmailLinkAddressStore ?? MemoryPendingEmailLinkAddressStore(),
        _socialAuthGateway = socialAuthGateway ?? ReviewSocialAuthGateway(),
        availableSocialAuthProviders = Set.unmodifiable(
          availableSocialAuthProviders ?? SocialAuthProvider.values.toSet(),
        ),
        _accountBootstrapGateway =
            accountBootstrapGateway ?? ReviewAccountBootstrapGateway(),
+       _verifiedPrincipalBindingStore =
+           verifiedPrincipalBindingStore ??
+           MemoryVerifiedPrincipalBindingStore(),
+       _accountIdentityGateway =
+           accountIdentityGateway ??
+           ReviewAuthenticatedAccountIdentityGateway(),
        _locationGateway = locationGateway ?? ReviewLocationPermissionGateway(),
        _currentAreaGateway = currentAreaGateway ?? ReviewCurrentAreaGateway(),
        _now = now ?? DateTime.now;
@@ -64,12 +77,15 @@ class JourneySession extends ChangeNotifier {
   final OtpGateway _otpGateway;
   final EmailOtpGateway _emailOtpGateway;
   final EmailLinkGateway _emailLinkGateway;
+  final PendingEmailLinkAddressStore _pendingEmailLinkAddressStore;
   final SocialAuthGateway _socialAuthGateway;
   final Set<SocialAuthProvider> availableSocialAuthProviders;
   final bool emailOtpAvailable;
   final bool emailLinkAvailable;
   final bool mobileOtpAvailable;
   final AccountBootstrapGateway _accountBootstrapGateway;
+  final VerifiedPrincipalBindingStore _verifiedPrincipalBindingStore;
+  final AuthenticatedAccountIdentityGateway _accountIdentityGateway;
   final LocationPermissionGateway _locationGateway;
   final CurrentAreaGateway _currentAreaGateway;
   final DateTime Function() _now;
@@ -100,6 +116,9 @@ class JourneySession extends ChangeNotifier {
   String? emailLinkReceiptCode;
   String? errorMessage;
   String? noticeMessage;
+  AuthenticatedAccountIdentity? accountIdentity;
+  AuthenticatedAccountBootstrapState? authenticatedBootstrapState;
+  bool authenticatedRevalidationPending = false;
   String? reviewCode;
   String? returnTo;
   String? _authenticationCancelTo;
@@ -118,15 +137,22 @@ class JourneySession extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _authenticationCompletionInProgress = false;
   bool _socialAuthCleanupRequired = false;
+  bool _principalBindingCleanupRequired = false;
+  bool _unsafePrincipalResetRequired = false;
+  Future<bool>? _authenticatedRevalidationFuture;
   String? _pendingEmailLink;
   String? _completedEmailLinkReturnRoute;
   String? _completedSocialAuthReturnRoute;
   int _completedSetupExperienceVersion = 0;
   Future<void> _persistenceTail = Future<void>.value();
+  Future<void> _principalBindingMutationTail = Future<void>.value();
+  int _authenticationGeneration = 0;
+  bool _disposed = false;
 
   bool get isReady => stage == JourneyStage.ready;
   bool get isAuthenticated => _isAuthenticated;
   bool get socialAuthCleanupRequired => _socialAuthCleanupRequired;
+  bool get principalBindingCleanupRequired => _principalBindingCleanupRequired;
   bool isSocialAuthProviderAvailable(SocialAuthProvider provider) =>
       availableSocialAuthProviders.contains(provider);
   bool get canCancelSignIn =>
@@ -179,9 +205,11 @@ class JourneySession extends ChangeNotifier {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    _authenticationGeneration += 1;
     _completedSetupExperienceVersion = 0;
     _setBusy(true);
     errorMessage = null;
+    authenticatedRevalidationPending = false;
 
     try {
       final capturedRoute = returnTo;
@@ -211,9 +239,14 @@ class JourneySession extends ChangeNotifier {
       }
       _storeRestored = true;
 
-      final signedIn =
+      var signedIn =
           await _otpGateway.hasAuthenticatedUser() ||
           await _socialAuthGateway.hasAuthenticatedUser();
+      if (signedIn && _principalBindingCleanupRequired) {
+        await _resetUnsafePrincipalBinding();
+        signedIn = false;
+      }
+      if (!signedIn) await _clearReceiptForSignedOutEntry();
       _isAuthenticated = signedIn;
       final pendingAuthenticationUri = _localAppUri(returnTo);
       final resumesPersistedAuthentication =
@@ -236,8 +269,13 @@ class JourneySession extends ChangeNotifier {
         _authenticatedAtBoot = signedIn;
         stage = JourneyStage.setup;
       } else if (signedIn) {
-        await _prepareAuthenticatedAccount();
-        stage = JourneyStage.ready;
+        final bootstrap = await _prepareAuthenticatedAccount();
+        if (await _acceptAuthenticatedRelaunch(bootstrap)) {
+          if (!authenticatedRevalidationPending) {
+            await _refreshAuthenticatedAccountIdentity();
+          }
+          stage = JourneyStage.ready;
+        }
       } else if (snapshot.setupComplete) {
         stage = resumesPersistedAuthentication
             ? JourneyStage.signIn
@@ -260,10 +298,10 @@ class JourneySession extends ChangeNotifier {
           'setupComplete=${snapshot?.setupComplete ?? false} '
           'completedSetupVersion=$_completedSetupExperienceVersion '
           'requiredSetupVersion=$approvedSetupExperienceVersion '
-          'authenticated=$signedIn',
+          'authenticated=$_isAuthenticated',
         );
       }
-      noticeMessage = null;
+      if (!authenticatedRevalidationPending) noticeMessage = null;
     } on Object {
       stage = JourneyStage.bootFailure;
       if (kDebugMode || _deviceReviewMode) {
@@ -503,15 +541,22 @@ class JourneySession extends ChangeNotifier {
     try {
       await _persist(setupComplete: true);
       if (_authenticatedAtBoot) {
-        await _prepareAuthenticatedAccount();
-        stage = JourneyStage.ready;
+        final bootstrap = await _prepareAuthenticatedAccount();
+        if (await _acceptAuthenticatedRelaunch(bootstrap)) {
+          if (!authenticatedRevalidationPending) {
+            await _refreshAuthenticatedAccountIdentity();
+          }
+          stage = JourneyStage.ready;
+        } else {
+          stage = JourneyStage.signIn;
+        }
       } else if (allowGuestReady) {
         stage = JourneyStage.ready;
       } else {
         stage = JourneyStage.signIn;
       }
       errorMessage = null;
-      noticeMessage = null;
+      if (!authenticatedRevalidationPending) noticeMessage = null;
       notifyListeners();
       return true;
     } on Object {
@@ -526,7 +571,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> signInWithSocial(SocialAuthProvider provider) async {
     if (busy) return false;
-    if (_socialAuthCleanupRequired &&
+    if ((_socialAuthCleanupRequired || _principalBindingCleanupRequired) &&
         !await _retrySocialAuthCleanup(provider)) {
       return false;
     }
@@ -571,7 +616,7 @@ class JourneySession extends ChangeNotifier {
         provider,
         result.code ?? 'auth-provider-credential-complete',
       );
-      final expectedUserId = result.userId?.trim();
+      final expectedUserId = result.userId;
       if (expectedUserId == null || expectedUserId.isEmpty) {
         throw const JourneyServiceException(
           'Your signed-in account could not be verified. Please sign in again.',
@@ -580,12 +625,9 @@ class JourneySession extends ChangeNotifier {
       }
       try {
         await _completeAuthentication(expectedUserId: expectedUserId);
-      } on Object {
+      } on Object catch (error) {
         if (!await _rollbackIncompleteSocialAuthentication()) {
-          throw const JourneyServiceException(
-            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
-            code: 'auth-rollback-failed',
-          );
+          throw _socialAuthRollbackFailure(error);
         }
         rethrow;
       }
@@ -620,6 +662,12 @@ class JourneySession extends ChangeNotifier {
 
     final coldStart = !_started;
     await start();
+    if (stage == JourneyStage.bootFailure || _principalBindingCleanupRequired) {
+      errorMessage =
+          'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+      notifyListeners();
+      return true;
+    }
     final completionRoute = _canonicalPersistedReadyRoute(returnTo);
     if (_isAuthenticated) {
       _beginSocialAuthAttempt();
@@ -669,7 +717,7 @@ class JourneySession extends ChangeNotifier {
         provider,
         result.code ?? 'auth-provider-credential-complete',
       );
-      final expectedUserId = result.userId?.trim();
+      final expectedUserId = result.userId;
       if (expectedUserId == null || expectedUserId.isEmpty) {
         throw const JourneyServiceException(
           'Your signed-in account could not be verified. Please sign in again.',
@@ -678,12 +726,9 @@ class JourneySession extends ChangeNotifier {
       }
       try {
         await _completeAuthentication(expectedUserId: expectedUserId);
-      } on Object {
+      } on Object catch (error) {
         if (!await _rollbackIncompleteSocialAuthentication()) {
-          throw const JourneyServiceException(
-            'The previous sign-in could not be cleared safely. Please close and reopen the app before trying again.',
-            code: 'auth-rollback-failed',
-          );
+          throw _socialAuthRollbackFailure(error);
         }
         rethrow;
       }
@@ -756,6 +801,7 @@ class JourneySession extends ChangeNotifier {
     if (busy) return;
     emailAddress = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     emailLinkState = EmailLinkState.entering;
     emailLinkReceiptCode = null;
     resendAvailableAt = null;
@@ -768,6 +814,7 @@ class JourneySession extends ChangeNotifier {
     if (busy) return;
     emailAddress = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     resendAvailableAt = null;
@@ -786,14 +833,34 @@ class JourneySession extends ChangeNotifier {
     _pendingEmailLink = emailLink;
     _recordEmailLinkReceipt('email-link-callback-received');
     await start();
+    if (stage == JourneyStage.bootFailure || _principalBindingCleanupRequired) {
+      emailLinkState = EmailLinkState.failed;
+      errorMessage =
+          'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+      notifyListeners();
+      return true;
+    }
     if (_isAuthenticated) {
       _pendingEmailLink = null;
+      await _clearPendingEmailLinkAddress();
       return false;
     }
 
     stage = JourneyStage.signIn;
     errorMessage = null;
     noticeMessage = null;
+    try {
+      final retainedAddress = (await _pendingEmailLinkAddressStore.read())
+          ?.trim()
+          .toLowerCase();
+      if (retainedAddress != null && _isValidEmail(retainedAddress)) {
+        emailAddress = retainedAddress;
+      } else if (retainedAddress != null) {
+        await _clearPendingEmailLinkAddress();
+      }
+    } on Object {
+      // Cross-device and unavailable local recovery use matching-address entry.
+    }
     if (emailAddress == null) {
       emailLinkState = EmailLinkState.awaitingEmail;
       _recordEmailLinkReceipt('email-link-awaiting-address');
@@ -817,6 +884,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestEmailLink(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!emailLinkAvailable) {
       emailLinkState = EmailLinkState.failed;
       _recordEmailLinkReceipt('email-link-unavailable');
@@ -844,7 +912,10 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     errorMessage = null;
     noticeMessage = null;
+    var recoveryAddressPersisted = false;
     try {
+      await _pendingEmailLinkAddressStore.write(email);
+      recoveryAddressPersisted = true;
       await _emailLinkGateway.sendSignInLink(email);
       resendAvailableAt = _now().add(resendCooldown);
       emailLinkState = EmailLinkState.sent;
@@ -853,14 +924,21 @@ class JourneySession extends ChangeNotifier {
       notifyListeners();
       return true;
     } on JourneyServiceException catch (error) {
+      await _clearPendingEmailLinkAddress();
       _applyEmailLinkFailure(error);
       return false;
     } on Object {
+      await _clearPendingEmailLinkAddress();
       _applyEmailLinkFailure(
-        const JourneyServiceException(
-          'The email service is unavailable. Check the connection and retry.',
-          code: 'email-link-bridge-failure',
-        ),
+        recoveryAddressPersisted
+            ? const JourneyServiceException(
+                'The email service is unavailable. Check the connection and retry.',
+                code: 'email-link-bridge-failure',
+              )
+            : const JourneyServiceException(
+                'This device could not save the secure sign-in request. Please try again.',
+                code: 'email-link-local-recovery-unavailable',
+              ),
       );
       return false;
     } finally {
@@ -886,6 +964,7 @@ class JourneySession extends ChangeNotifier {
   Future<bool> completeEmailLink(String value) async {
     if (isReady || _authenticationCompletionInProgress) return true;
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     final emailLink = _pendingEmailLink;
     if (emailLink == null) {
       _applyEmailLinkFailure(
@@ -925,6 +1004,7 @@ class JourneySession extends ChangeNotifier {
         rethrow;
       }
       _pendingEmailLink = null;
+      await _clearPendingEmailLinkAddress();
       emailLinkState = EmailLinkState.idle;
       _recordEmailLinkReceipt('email-link-session-ready');
       return true;
@@ -950,12 +1030,22 @@ class JourneySession extends ChangeNotifier {
       'expired-action-code' => EmailLinkState.expired,
       'email-link-already-used' => EmailLinkState.used,
       'invalid-action-code' => EmailLinkState.invalid,
-      'invalid-email' => EmailLinkState.awaitingEmail,
+      'invalid-email' ||
+      'invalid-recipient-email' ||
+      'missing-email' => EmailLinkState.awaitingEmail,
       _ => EmailLinkState.failed,
     };
     errorMessage = error.userMessage;
     noticeMessage = null;
     notifyListeners();
+  }
+
+  Future<void> _clearPendingEmailLinkAddress() async {
+    try {
+      await _pendingEmailLinkAddressStore.clear();
+    } on Object {
+      // The provider failure remains the customer-visible recovery path.
+    }
   }
 
   void _recordEmailLinkReceipt(String code) {
@@ -967,6 +1057,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestOtp(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!mobileOtpAvailable) {
       errorMessage =
           'Mobile OTP is not available right now. Choose another method.';
@@ -988,6 +1079,7 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> requestEmailOtp(String value) async {
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     if (!emailOtpAvailable) {
       errorMessage =
           'Email OTP is not available right now. Choose another method.';
@@ -1106,6 +1198,7 @@ class JourneySession extends ChangeNotifier {
   Future<bool> verifyOtp(String value) async {
     if (isReady || _authenticationCompletionInProgress) return true;
     if (busy) return false;
+    if (!_bindingCleanupAllowsAuthentication()) return false;
     final code = value.replaceAll(RegExp(r'\D'), '');
     if (code.length != 6) {
       errorMessage = 'Enter the complete 6-digit code.';
@@ -1154,11 +1247,18 @@ class JourneySession extends ChangeNotifier {
     if (stage == JourneyStage.ready || _authenticationCompletionInProgress) {
       return;
     }
+    _authenticationGeneration += 1;
     _authenticationCompletionInProgress = true;
     try {
-      await _prepareAuthenticatedAccount(expectedUserId: expectedUserId);
+      final bootstrap = await _prepareAuthenticatedAccount(
+        expectedUserId: expectedUserId,
+      );
+      _requireVerifiedInteractiveBootstrap(bootstrap);
+      await _refreshAuthenticatedAccountIdentity();
       await _persist(setupComplete: true);
+      await _retainVerifiedPrincipalForOnlineSession(bootstrap.currentBinding!);
       _isAuthenticated = true;
+      authenticatedRevalidationPending = false;
       stage = JourneyStage.ready;
       errorMessage = null;
       noticeMessage = null;
@@ -1175,14 +1275,27 @@ class JourneySession extends ChangeNotifier {
 
   Future<bool> _rollbackIncompleteSocialAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     _socialAuthCleanupRequired = true;
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      if (!await _clearVerifiedPrincipalAfterAuthFailure()) return false;
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
       return false;
     }
+  }
+
+  JourneyServiceException _socialAuthRollbackFailure(Object originalError) {
+    final originalMessage = originalError is JourneyServiceException
+        ? '${originalError.userMessage} '
+        : '';
+    return JourneyServiceException(
+      '${originalMessage}The incomplete sign-in could not be cleared safely. '
+      'Please close and reopen the app before trying again.',
+      code: 'auth-rollback-failed',
+    );
   }
 
   Future<bool> _retrySocialAuthCleanup(SocialAuthProvider provider) async {
@@ -1193,6 +1306,12 @@ class JourneySession extends ChangeNotifier {
     _setBusy(true);
     try {
       await _socialAuthGateway.signOut().timeout(socialAuthRollbackTimeout);
+      if (!await _clearVerifiedPrincipalAfterAuthFailure()) {
+        throw const JourneyServiceException(
+          'Saved account verification could not be cleared safely.',
+          code: 'auth-binding-clear-failed',
+        );
+      }
       _socialAuthCleanupRequired = false;
       return true;
     } on Object {
@@ -1209,20 +1328,24 @@ class JourneySession extends ChangeNotifier {
 
   Future<void> _rollbackIncompleteOtpAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     try {
       await _otpGateway.signOut();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
+    await _clearVerifiedPrincipalAfterAuthFailure();
   }
 
   Future<void> _rollbackIncompleteEmailLinkAuthentication() async {
     _isAuthenticated = false;
+    accountIdentity = null;
     try {
       await _emailLinkGateway.signOut();
     } on Object {
       // The original account-bootstrap failure remains the visible recovery.
     }
+    await _clearVerifiedPrincipalAfterAuthFailure();
   }
 
   void changeSignInMethod() {
@@ -1234,6 +1357,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     errorMessage = null;
@@ -1260,6 +1384,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     socialAuthProvider = null;
@@ -1286,6 +1411,7 @@ class JourneySession extends ChangeNotifier {
     emailLinkState = EmailLinkState.idle;
     emailLinkReceiptCode = null;
     _pendingEmailLink = null;
+    unawaited(_clearPendingEmailLinkAddress());
     _completedEmailLinkReturnRoute = null;
     _completedSocialAuthReturnRoute = null;
     socialAuthProvider = null;
@@ -1295,34 +1421,145 @@ class JourneySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signOut() async {
-    if (busy) return;
+  Future<bool> signOut() async {
+    if (busy) return false;
+    _authenticationGeneration += 1;
     _setBusy(true);
     try {
-      await _otpGateway.signOut();
-      await _socialAuthGateway.signOut();
-      await _emailLinkGateway.signOut();
-      _isAuthenticated = false;
-      stage = allowGuestReady ? JourneyStage.ready : JourneyStage.signIn;
-      phoneNumber = null;
-      emailAddress = null;
-      otpChannel = null;
-      emailLinkState = EmailLinkState.idle;
-      emailLinkReceiptCode = null;
-      _pendingEmailLink = null;
-      _completedEmailLinkReturnRoute = null;
-      _completedSocialAuthReturnRoute = null;
-      socialAuthProvider = null;
-      socialAuthState = SocialAuthState.idle;
-      authenticationPurpose = JourneyAuthenticationPurpose.general;
+      Object? cleanupFailure;
+      var localSessionInvalidated = false;
+      try {
+        await _clearVerifiedPrincipalBinding().timeout(
+          socialAuthRollbackTimeout,
+        );
+        _principalBindingCleanupRequired = false;
+      } on Object catch (error) {
+        _principalBindingCleanupRequired = true;
+        cleanupFailure = error;
+      }
+      for (final cleanup in <Future<void> Function()>[
+        _otpGateway.signOut,
+        _socialAuthGateway.signOut,
+        _emailLinkGateway.signOut,
+      ]) {
+        try {
+          await cleanup().timeout(socialAuthRollbackTimeout);
+        } on Object catch (error) {
+          cleanupFailure ??= error;
+        }
+      }
+      try {
+        await _accountBootstrapGateway.invalidateLocalSession().timeout(
+          socialAuthRollbackTimeout,
+        );
+        localSessionInvalidated = true;
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
+      await _clearPendingEmailLinkAddress();
+      if (localSessionInvalidated) _applyLocallySignedOutState();
+      if (cleanupFailure != null) {
+        errorMessage = localSessionInvalidated
+            ? 'You are signed out on this device, but saved verification cleanup must finish before another sign-in. Retry startup.'
+            : 'Sign-out could not be completed safely. Check the connection and try again.';
+        noticeMessage = null;
+        notifyListeners();
+        return false;
+      }
       errorMessage = null;
       noticeMessage =
           'You are signed out. Your language and area are retained.';
       await _persist(setupComplete: true);
       notifyListeners();
+      return true;
     } finally {
       _setBusy(false);
     }
+  }
+
+  void _applyLocallySignedOutState() {
+    _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
+    accountIdentity = null;
+    stage = JourneyStage.signIn;
+    phoneNumber = null;
+    emailAddress = null;
+    otpChannel = null;
+    emailLinkState = EmailLinkState.idle;
+    emailLinkReceiptCode = null;
+    _pendingEmailLink = null;
+    _completedEmailLinkReturnRoute = null;
+    _completedSocialAuthReturnRoute = null;
+    socialAuthProvider = null;
+    socialAuthState = SocialAuthState.idle;
+    authenticationPurpose = JourneyAuthenticationPurpose.general;
+  }
+
+  Future<bool> retryAuthenticatedAccountRevalidation() {
+    final existing = _authenticatedRevalidationFuture;
+    if (existing != null) return existing;
+    if (!_isAuthenticated || !authenticatedRevalidationPending) {
+      return Future<bool>.value(false);
+    }
+    final generation = _authenticationGeneration;
+    final attempt = _runAuthenticatedAccountRevalidation(generation);
+    _authenticatedRevalidationFuture = attempt;
+    return attempt;
+  }
+
+  Future<bool> _runAuthenticatedAccountRevalidation(int generation) async {
+    try {
+      final bootstrap = await _prepareAuthenticatedAccount();
+      if (!_isActiveRevalidationGeneration(generation)) return false;
+      if (bootstrap.state == AuthenticatedAccountBootstrapState.fatal) {
+        await _invalidateMismatchedPrincipal();
+        errorMessage =
+            'Your account session could not be verified safely. Please sign in again.';
+        _notifyRevalidationListeners();
+        return false;
+      }
+      final accepted = await _acceptAuthenticatedRelaunch(
+        bootstrap,
+        revalidationGeneration: generation,
+      );
+      if (!_isCurrentAuthenticationGeneration(generation)) return false;
+      if (!accepted) {
+        _notifyRevalidationListeners();
+        return false;
+      }
+      if (authenticatedRevalidationPending) {
+        _notifyRevalidationListeners();
+        return false;
+      }
+      await _refreshAuthenticatedAccountIdentity(generation: generation);
+      if (!_isCurrentAuthenticationGeneration(generation)) return false;
+      errorMessage = null;
+      noticeMessage = null;
+      _notifyRevalidationListeners();
+      return true;
+    } on JourneyServiceException catch (error) {
+      errorMessage = error.userMessage;
+      _notifyRevalidationListeners();
+      return false;
+    } on Object {
+      errorMessage =
+          'Your account could not be revalidated safely. Please sign in again.';
+      _notifyRevalidationListeners();
+      return false;
+    } finally {
+      _authenticatedRevalidationFuture = null;
+    }
+  }
+
+  bool _isActiveRevalidationGeneration(int generation) =>
+      _isCurrentAuthenticationGeneration(generation) &&
+      authenticatedRevalidationPending;
+
+  bool _isCurrentAuthenticationGeneration(int generation) =>
+      !_disposed && generation == _authenticationGeneration && _isAuthenticated;
+
+  void _notifyRevalidationListeners() {
+    if (!_disposed) notifyListeners();
   }
 
   void captureReturnTo(String location) {
@@ -1485,16 +1722,400 @@ class JourneySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _prepareAuthenticatedAccount({String? expectedUserId}) {
+  Future<AuthenticatedAccountBootstrapResult> _prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) async {
+    VerifiedPrincipalBinding? localBinding;
+    try {
+      localBinding = await _accountBootstrapGateway
+          .currentPrincipalBinding()
+          .timeout(accountBootstrapTimeout);
+    } on TimeoutException {
+      localBinding = null;
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-binding-reset-required',
+      );
+    }
     return _accountBootstrapGateway
         .prepareAuthenticatedAccount(expectedUserId: expectedUserId)
         .timeout(
           accountBootstrapTimeout,
-          onTimeout: () => throw const JourneyServiceException(
-            'Your account service did not respond. Check the connection and try again.',
-            code: 'auth-session-timeout',
-          ),
+          onTimeout: () => expectedUserId?.isNotEmpty ?? false
+              ? const AuthenticatedAccountBootstrapResult.fatal(
+                  code: 'auth-session-timeout',
+                )
+              : _classifyBootstrapTimeout(localBinding),
         );
+  }
+
+  Future<AuthenticatedAccountBootstrapResult> _classifyBootstrapTimeout(
+    VerifiedPrincipalBinding? before,
+  ) async {
+    if (before == null) {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-unbound',
+      );
+    }
+
+    final VerifiedPrincipalBinding? after;
+    try {
+      after = await _accountBootstrapGateway.currentPrincipalBinding().timeout(
+        accountBootstrapTimeout,
+      );
+    } on Object {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-recheck-failed',
+      );
+    }
+    if (after == null) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-missing',
+      );
+    }
+    if (!before.matches(after)) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-user-mismatch',
+      );
+    }
+
+    final VerifiedPrincipalBinding? stored;
+    try {
+      stored = await _verifiedPrincipalBindingStore.read();
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-binding-reset-required',
+      );
+    }
+    if (stored == null) {
+      return const AuthenticatedAccountBootstrapResult.fatal(
+        code: 'auth-session-timeout-unbound',
+      );
+    }
+    if (!stored.matches(after)) {
+      return const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-binding-mismatch',
+      );
+    }
+    return AuthenticatedAccountBootstrapResult.retryableUnavailable(
+      after,
+      code: 'auth-session-timeout',
+    );
+  }
+
+  Future<bool> _acceptAuthenticatedRelaunch(
+    AuthenticatedAccountBootstrapResult bootstrap, {
+    int? revalidationGeneration,
+  }) async {
+    authenticatedBootstrapState = bootstrap.state;
+    if (revalidationGeneration != null &&
+        !_isActiveRevalidationGeneration(revalidationGeneration)) {
+      return false;
+    }
+    switch (bootstrap.state) {
+      case AuthenticatedAccountBootstrapState.verified:
+        final current = bootstrap.currentBinding!;
+        final VerifiedPrincipalBinding? stored;
+        try {
+          stored = await _verifiedPrincipalBindingStore.read();
+        } on Object {
+          await _resetUnsafePrincipalBinding();
+          return false;
+        }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
+          return false;
+        }
+        if (stored != null && !stored.matches(current)) {
+          await _invalidateMismatchedPrincipal();
+          return false;
+        }
+        if (!await _retainVerifiedPrincipalForOnlineSession(
+          current,
+          existing: stored,
+          revalidationGeneration: revalidationGeneration,
+        )) {
+          return false;
+        }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
+          return false;
+        }
+        authenticatedRevalidationPending = false;
+        return true;
+      case AuthenticatedAccountBootstrapState.retryableUnavailable:
+        final current = bootstrap.currentBinding!;
+        final VerifiedPrincipalBinding? stored;
+        try {
+          stored = await _verifiedPrincipalBindingStore.read();
+        } on Object {
+          await _resetUnsafePrincipalBinding();
+          return false;
+        }
+        if (revalidationGeneration != null &&
+            !_isActiveRevalidationGeneration(revalidationGeneration)) {
+          return false;
+        }
+        if (stored == null) {
+          throw const JourneyServiceException(
+            'Your account must complete one online verification before offline access is available.',
+            code: 'auth-session-offline-unbound',
+          );
+        }
+        if (!stored.matches(current)) {
+          await _invalidateMismatchedPrincipal(
+            notifyBoundary: revalidationGeneration != null,
+          );
+          return false;
+        }
+        authenticatedRevalidationPending = true;
+        accountIdentity = null;
+        noticeMessage =
+            'You are offline. Eligible saved content remains available while account verification waits.';
+        return true;
+      case AuthenticatedAccountBootstrapState.invalidSession:
+        if (bootstrap.code == 'auth-binding-reset-required') return false;
+        await _invalidateMismatchedPrincipal(
+          notifyBoundary: revalidationGeneration != null,
+        );
+        return false;
+      case AuthenticatedAccountBootstrapState.fatal:
+        throw JourneyServiceException(
+          'Your account session could not be verified safely. Please retry online.',
+          code: bootstrap.code,
+        );
+    }
+  }
+
+  void _requireVerifiedInteractiveBootstrap(
+    AuthenticatedAccountBootstrapResult bootstrap,
+  ) {
+    authenticatedBootstrapState = bootstrap.state;
+    if (bootstrap.state == AuthenticatedAccountBootstrapState.verified &&
+        bootstrap.currentBinding != null) {
+      return;
+    }
+    if (bootstrap.code == 'auth-session-timeout') {
+      throw const JourneyServiceException(
+        'Your account service did not respond. Check the connection and try again.',
+        code: 'auth-session-timeout',
+      );
+    }
+    final message = switch (bootstrap.state) {
+      AuthenticatedAccountBootstrapState.retryableUnavailable =>
+        'Your account service did not respond. Check the connection and try again.',
+      AuthenticatedAccountBootstrapState.invalidSession =>
+        'Your signed-in account could not be verified. Please sign in again.',
+      AuthenticatedAccountBootstrapState.fatal =>
+        'Your account session could not be verified safely. Please try again.',
+      AuthenticatedAccountBootstrapState.verified =>
+        'Your signed-in account could not be verified. Please sign in again.',
+    };
+    throw JourneyServiceException(message, code: bootstrap.code);
+  }
+
+  Future<bool> _retainVerifiedPrincipalForOnlineSession(
+    VerifiedPrincipalBinding binding, {
+    VerifiedPrincipalBinding? existing,
+    int? revalidationGeneration,
+  }) async {
+    final VerifiedPrincipalBinding? prior;
+    try {
+      prior = existing ?? await _verifiedPrincipalBindingStore.read();
+    } on Object {
+      await _resetUnsafePrincipalBinding();
+      throw const JourneyServiceException(
+        'Saved account verification was unsafe and has been reset. Please sign in again.',
+        code: 'auth-binding-reset-required',
+      );
+    }
+    if (revalidationGeneration != null &&
+        !_isActiveRevalidationGeneration(revalidationGeneration)) {
+      return false;
+    }
+    if (prior != null && prior.matches(binding)) return true;
+    try {
+      await _writeVerifiedPrincipalBinding(binding);
+      if (revalidationGeneration != null &&
+          !_isActiveRevalidationGeneration(revalidationGeneration)) {
+        return false;
+      }
+    } on Object {
+      try {
+        await _clearVerifiedPrincipalBinding();
+      } on Object {
+        throw const JourneyServiceException(
+          'Your account verification could not be stored or cleared safely.',
+          code: 'auth-binding-unsafe-state',
+        );
+      }
+      // The online session remains valid, but no offline receipt is retained.
+    }
+    return true;
+  }
+
+  Future<T> _runPrincipalBindingMutation<T>(Future<T> Function() operation) {
+    final completer = Completer<T>();
+    _principalBindingMutationTail = _principalBindingMutationTail.then((
+      _,
+    ) async {
+      try {
+        completer.complete(await operation());
+      } on Object catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _writeVerifiedPrincipalBinding(
+    VerifiedPrincipalBinding binding,
+  ) => _runPrincipalBindingMutation(
+    () => _verifiedPrincipalBindingStore.write(binding),
+  );
+
+  Future<void> _clearVerifiedPrincipalBinding() =>
+      _runPrincipalBindingMutation(_verifiedPrincipalBindingStore.clear);
+
+  Future<void> _resetUnsafeVerifiedPrincipalBinding() =>
+      _runPrincipalBindingMutation(
+        _verifiedPrincipalBindingStore.resetUnsafeState,
+      );
+
+  Future<void> _invalidateMismatchedPrincipal({
+    bool notifyBoundary = false,
+  }) async {
+    _authenticationGeneration += 1;
+    Object? cleanupFailure;
+    for (final cleanup in <Future<void> Function()>[
+      _clearVerifiedPrincipalBinding,
+      _accountBootstrapGateway.invalidateLocalSession,
+      _otpGateway.signOut,
+      _socialAuthGateway.signOut,
+      _emailLinkGateway.signOut,
+    ]) {
+      try {
+        await cleanup().timeout(socialAuthRollbackTimeout);
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
+    }
+    _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
+    accountIdentity = null;
+    stage = JourneyStage.signIn;
+    if (cleanupFailure != null) {
+      throw const JourneyServiceException(
+        'The invalid account session could not be cleared safely.',
+        code: 'auth-session-invalidation-failed',
+      );
+    }
+    if (notifyBoundary) _notifyRevalidationListeners();
+  }
+
+  Future<void> _resetUnsafePrincipalBinding() async {
+    _authenticationGeneration += 1;
+    Object? cleanupFailure;
+    for (final cleanup in <Future<void> Function()>[
+      _resetUnsafeVerifiedPrincipalBinding,
+      _accountBootstrapGateway.invalidateLocalSession,
+      _otpGateway.signOut,
+      _socialAuthGateway.signOut,
+      _emailLinkGateway.signOut,
+    ]) {
+      try {
+        await cleanup().timeout(socialAuthRollbackTimeout);
+      } on Object catch (error) {
+        cleanupFailure ??= error;
+      }
+    }
+    _isAuthenticated = false;
+    authenticatedRevalidationPending = false;
+    accountIdentity = null;
+    _principalBindingCleanupRequired = cleanupFailure != null;
+    _unsafePrincipalResetRequired = cleanupFailure != null;
+    if (cleanupFailure != null) {
+      throw const JourneyServiceException(
+        'Unsafe account verification could not be reset safely.',
+        code: 'auth-binding-reset-failed',
+      );
+    }
+    _unsafePrincipalResetRequired = false;
+    stage = JourneyStage.signIn;
+  }
+
+  Future<void> _clearReceiptForSignedOutEntry() async {
+    if (_unsafePrincipalResetRequired) {
+      await _resetUnsafePrincipalBinding();
+      return;
+    }
+    try {
+      await _clearVerifiedPrincipalBinding();
+      _principalBindingCleanupRequired = false;
+    } on Object {
+      _principalBindingCleanupRequired = true;
+      throw const JourneyServiceException(
+        'The previous account verification could not be cleared safely.',
+        code: 'auth-binding-cleanup-required',
+      );
+    }
+  }
+
+  Future<bool> _clearVerifiedPrincipalAfterAuthFailure() async {
+    try {
+      await _clearVerifiedPrincipalBinding();
+      _principalBindingCleanupRequired = false;
+      return true;
+    } on Object {
+      _principalBindingCleanupRequired = true;
+      return false;
+    }
+  }
+
+  bool _bindingCleanupAllowsAuthentication() {
+    if (!_principalBindingCleanupRequired) return true;
+    errorMessage =
+        'The previous account verification must be cleared before sign-in can continue. Retry startup.';
+    noticeMessage = null;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> _refreshAuthenticatedAccountIdentity({int? generation}) async {
+    AuthenticatedAccountIdentity? refreshed;
+    try {
+      refreshed = await _accountIdentityGateway.currentIdentity();
+    } on Object {
+      refreshed = null;
+    }
+    if (generation != null && !_isCurrentAuthenticationGeneration(generation)) {
+      return;
+    }
+    accountIdentity = refreshed;
+    accountIdentity ??= switch ((emailAddress, phoneNumber)) {
+      (final email?, _) when email.trim().isNotEmpty =>
+        AuthenticatedAccountIdentity(
+          emailAddress: email.trim(),
+          signInMethods: const ['Email'],
+        ),
+      (_, final phone?) when phone.trim().isNotEmpty =>
+        AuthenticatedAccountIdentity(
+          phoneNumber: phone.trim(),
+          signInMethods: const ['Phone'],
+        ),
+      _ => null,
+    };
+  }
+
+  @override
+  void dispose() {
+    if (!_disposed) {
+      _disposed = true;
+      _authenticationGeneration += 1;
+    }
+    super.dispose();
   }
 }
 

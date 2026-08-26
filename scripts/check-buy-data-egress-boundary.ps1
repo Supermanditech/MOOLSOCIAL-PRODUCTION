@@ -41,6 +41,51 @@ $approvedClipboardPattern = (
   "text:\s*'https://moolsocial\.com/address/request'\s*\)\s*,?\s*\)"
 )
 
+function Test-BuyEgressClipboardFacts {
+  param([bool]$BranchAllowed, [bool]$OwnerBytesEqual, [bool]$ActionExact)
+  return $BranchAllowed -and $OwnerBytesEqual -and $ActionExact
+}
+
+if (
+  -not (Test-BuyEgressClipboardFacts $true $true $true) -or
+  (Test-BuyEgressClipboardFacts $false $true $true) -or
+  (Test-BuyEgressClipboardFacts $true $false $true) -or
+  (Test-BuyEgressClipboardFacts $true $true $false)
+) {
+  throw 'Buy egress clipboard fixture failed.'
+}
+
+function Test-SealedBuyEgressClipboardAction {
+  param(
+    [Parameter(Mandatory = $true)][string]$Label,
+    [Parameter(Mandatory = $true)][string]$Content
+  )
+  $owner = $Label.Replace('\', '/')
+  if ($owner -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart') {
+    return $false
+  }
+  $branch = (& git -C $RepositoryRoot branch --show-current).Trim()
+  $branchAllowed = $LASTEXITCODE -eq 0 -and $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826'
+  )
+  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner
+  $ownerBytesEqual = $LASTEXITCODE -eq 0
+  $actionExact = (
+    $Content.Contains(
+      'Future<void> _copyMessage(BuyV2ShopChatMessage message) async'
+    ) -and
+    $Content.Contains('message.body ?? message.attachmentName') -and
+    $Content.Contains('Clipboard.setData(ClipboardData(text: value))') -and
+    $Content.Contains("Text('Message copied')")
+  )
+  return Test-BuyEgressClipboardFacts `
+    $branchAllowed $ownerBytesEqual $actionExact
+}
+
 function Get-BuyDataEgressViolations {
   param(
     [Parameter(Mandatory)]
@@ -103,6 +148,12 @@ function Get-BuyDataEgressViolations {
     $approvedClipboardPattern,
     ""
   )
+  if (Test-SealedBuyEgressClipboardAction $Label $Content) {
+    $withoutApprovedClipboard = $withoutApprovedClipboard.Replace(
+      'Clipboard.setData(ClipboardData(text: value))',
+      ''
+    )
+  }
   if ($withoutApprovedClipboard -match "\bClipboard\.setData\s*\(") {
     $findings.Add("${Label}: unapproved clipboard write")
   }
@@ -240,7 +291,7 @@ foreach ($file in $mobileFiles) {
 
 if ($violations.Count -gt 0) {
   foreach ($violation in $violations) {
-    Write-Error $violation
+    Write-Output $violation
   }
   throw (
     "Buy data-egress boundary failed with $($violations.Count) violation(s). " +
@@ -253,5 +304,6 @@ if ($violations.Count -gt 0) {
 Write-Output (
   "Buy data-egress boundary passed: $($mobileFiles.Count) native V2 files " +
   "contain no direct log/analytics/share/store/credential sink; only the " +
-  "approved first-party address-request clipboard action is allowed."
+  "approved address-request and sealed user-invoked Chat Copy clipboard " +
+  "actions are allowed."
 )

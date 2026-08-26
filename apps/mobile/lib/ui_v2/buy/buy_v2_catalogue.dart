@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show immutable, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +11,370 @@ import 'buy_v2_design.dart';
 import 'buy_v2_info_sheet_motion.dart';
 import 'buy_v2_saved_clear_sheet_motion.dart';
 import 'buy_v2_views.dart';
+
+enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer }
+
+@immutable
+class BuyV2PublishedOffer {
+  const BuyV2PublishedOffer({
+    required this.productId,
+    required this.publisherType,
+    required this.headline,
+  });
+
+  final String productId;
+  final BuyV2OfferPublisherType publisherType;
+  final String headline;
+}
+
+/// Presentation seam for the ordered offer placements published for Buy.
+///
+/// The source supplies catalogue product IDs and merchandising copy only. The
+/// existing Buy session remains the authority for product facts, cart state,
+/// checkout and order creation.
+abstract interface class BuyV2PublishedOffersSource {
+  List<BuyV2PublishedOffer> get publishedOffers;
+}
+
+final class BuyV2CataloguePublishedOffersSource
+    implements BuyV2PublishedOffersSource {
+  const BuyV2CataloguePublishedOffersSource();
+
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers => _publishedOffers;
+
+  static const _publishedOffers = <BuyV2PublishedOffer>[
+    BuyV2PublishedOffer(
+      productId: 'w-oil',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Manufacturer price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-tomato',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Fresh price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-rice',
+      publisherType: BuyV2OfferPublisherType.wholesaler,
+      headline: 'Bulk saving',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-atta',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Everyday value',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-notebook',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Direct supply',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-soap',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Family pack deal',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-turmeric',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Trade price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-milk',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Daily essential',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-foil',
+      publisherType: BuyV2OfferPublisherType.wholesaler,
+      headline: 'Business pack',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-toothpaste',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Care saving',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-detergent',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Manufacturer deal',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-banana',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Fresh today',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-tea',
+      publisherType: BuyV2OfferPublisherType.wholesaler,
+      headline: 'Stock-up price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-pasta',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Meal deal',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-paper-cups',
+      publisherType: BuyV2OfferPublisherType.wholesaler,
+      headline: 'Volume saving',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-diapers',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Family saving',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-groundnut-oil',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Direct price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-dog-food',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Pet care deal',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-shampoo',
+      publisherType: BuyV2OfferPublisherType.wholesaler,
+      headline: 'Case saving',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-chocolate',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Popular offer',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-mustard-oil',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Maker price',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-curd',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Chilled value',
+    ),
+    BuyV2PublishedOffer(
+      productId: 'w-thermal-rolls',
+      publisherType: BuyV2OfferPublisherType.manufacturer,
+      headline: 'Direct supply',
+    ),
+    BuyV2PublishedOffer(
+      productId: 's-water',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Pack offer',
+    ),
+  ];
+}
+
+class BuyV2OffersView extends StatelessWidget {
+  const BuyV2OffersView({
+    super.key,
+    required this.session,
+    required this.source,
+  });
+
+  final BuyV2Session session;
+  final BuyV2PublishedOffersSource source;
+
+  @override
+  Widget build(BuildContext context) {
+    final query = session.query.trim().toLowerCase();
+    final resolved = <({BuyV2PublishedOffer offer, BuyV2Product product})>[];
+    final productIds = <String>{};
+    for (final offer in source.publishedOffers) {
+      final product = session.findProduct(offer.productId);
+      if (product == null || !productIds.add(product.id)) continue;
+      if (query.isNotEmpty &&
+          !_matchesPublishedOffer(query, [
+            product.title,
+            product.brand,
+            product.pack,
+            product.badge,
+            product.seller,
+            product.sellerType,
+            offer.headline,
+          ])) {
+        continue;
+      }
+      resolved.add((offer: offer, product: product));
+    }
+    final products = resolved
+        .map((entry) => entry.product)
+        .toList(growable: false);
+    final publisherCounts = {
+      for (final type in BuyV2OfferPublisherType.values)
+        type: resolved
+            .where((entry) => entry.offer.publisherType == type)
+            .length,
+    };
+
+    return CustomScrollView(
+      key: const PageStorageKey('buy-offers'),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Semantics(
+            key: const ValueKey('buy-offers-publisher-summary'),
+            container: true,
+            label:
+                'Published offers from manufacturers, wholesalers and retailers.',
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+              padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+              decoration: buyV2CardDecoration(
+                color: BuyV2Colors.softOrange,
+                radius: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.local_offer_outlined,
+                        color: BuyV2Colors.orange,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Offers',
+                              style: context.buyTitle.copyWith(fontSize: 17),
+                            ),
+                            Text(
+                              'Published prices from trusted sellers',
+                              style: context.buyMeta.copyWith(fontSize: 8),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${products.length} available',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.orange,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final type in BuyV2OfferPublisherType.values) ...[
+                        Expanded(
+                          child: _OfferPublisherChip(
+                            type: type,
+                            count: publisherCounts[type] ?? 0,
+                          ),
+                        ),
+                        if (type != BuyV2OfferPublisherType.retailer)
+                          const SizedBox(width: 5),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (products.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.search_off_rounded,
+                      color: BuyV2Colors.muted,
+                      size: 34,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No matching offers',
+                      style: context.buyTitle.copyWith(fontSize: 17),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Try another product, brand or seller.',
+                      textAlign: TextAlign.center,
+                      style: context.buyMeta,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          SliverToBoxAdapter(
+            child: BuyV2ProgressiveProductGrid(
+              session: session,
+              products: products,
+              storageKey: 'buy-offers-products',
+              semanticLabel: 'Offer products',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+bool _matchesPublishedOffer(String query, List<String> values) {
+  final queryTokens = query
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((token) => token.isNotEmpty);
+  final valueTokens = values
+      .expand(
+        (value) => value
+            .toLowerCase()
+            .split(RegExp(r'[^a-z0-9]+'))
+            .where((token) => token.isNotEmpty),
+      )
+      .toList(growable: false);
+  return queryTokens.every(
+    (queryToken) => valueTokens.any((value) => value.startsWith(queryToken)),
+  );
+}
+
+class _OfferPublisherChip extends StatelessWidget {
+  const _OfferPublisherChip({required this.type, required this.count});
+
+  final BuyV2OfferPublisherType type;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (type) {
+      BuyV2OfferPublisherType.manufacturer => 'Makers',
+      BuyV2OfferPublisherType.wholesaler => 'Wholesale',
+      BuyV2OfferPublisherType.retailer => 'Retail',
+    };
+    return Container(
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .88),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0x1F000080)),
+      ),
+      child: Text(
+        '$label · $count',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: context.buyMeta.copyWith(
+          color: BuyV2Colors.navy,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
 
 class BuyV2CatalogueView extends StatefulWidget {
   const BuyV2CatalogueView({super.key, required this.session});
@@ -2488,7 +2853,59 @@ class _SavedClearDecisionSheet extends StatelessWidget {
   }
 }
 
-class _HorizontalProductGrid extends StatelessWidget {
+class BuyV2ProgressiveProductGrid extends StatelessWidget {
+  const BuyV2ProgressiveProductGrid({
+    super.key,
+    required this.session,
+    required this.products,
+    required this.storageKey,
+    required this.semanticLabel,
+    this.laneCount,
+    this.savedContext = false,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Product> products;
+  final String storageKey;
+  final String semanticLabel;
+  final int? laneCount;
+  final bool savedContext;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final accessibleText = textScale > 1.25;
+        final columns = accessibleText && constraints.maxWidth < 460
+            ? 2
+            : constraints.maxWidth >= 320
+            ? 3
+            : 2;
+        final width =
+            (constraints.maxWidth - 12 - ((columns - 1) * 5)) / columns;
+        final tileHeight = accessibleText
+            ? 254.0
+            : columns == 3
+            ? 188.0
+            : 260.0;
+        return _HorizontalProductGrid(
+          session: session,
+          products: products,
+          cardWidth: width,
+          tileHeight: tileHeight,
+          storageKey: storageKey,
+          compact: true,
+          laneCount: laneCount,
+          savedContext: savedContext,
+          semanticLabel: semanticLabel,
+        );
+      },
+    );
+  }
+}
+
+class _HorizontalProductGrid extends StatefulWidget {
   const _HorizontalProductGrid({
     required this.session,
     required this.products,
@@ -2498,6 +2915,7 @@ class _HorizontalProductGrid extends StatelessWidget {
     this.compact = true,
     this.laneCount,
     this.savedContext = false,
+    this.semanticLabel = 'Products',
   });
 
   final BuyV2Session session;
@@ -2508,18 +2926,86 @@ class _HorizontalProductGrid extends StatelessWidget {
   final bool compact;
   final int? laneCount;
   final bool savedContext;
+  final String semanticLabel;
+
+  @override
+  State<_HorizontalProductGrid> createState() => _HorizontalProductGridState();
+}
+
+class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
+  static const _pageSize = 8;
+
+  late int _visibleCount;
+  late List<String> _productIds;
+  bool _pageRequestPending = false;
+
+  int get _initialCount =>
+      widget.products.length < _pageSize ? widget.products.length : _pageSize;
+
+  static List<String> _idsFor(List<BuyV2Product> products) =>
+      products.map((product) => product.id).toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleCount = _initialCount;
+    _productIds = _idsFor(widget.products);
+  }
+
+  @override
+  void didUpdateWidget(covariant _HorizontalProductGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextIds = _idsFor(widget.products);
+    if (!listEquals(_productIds, nextIds) ||
+        oldWidget.storageKey != widget.storageKey) {
+      _productIds = nextIds;
+      _visibleCount = _initialCount;
+    }
+  }
+
+  bool _loadNextPage(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification &&
+        notification is! OverscrollNotification) {
+      return false;
+    }
+    if (notification.metrics.axis != Axis.horizontal ||
+        notification.metrics.extentAfter > widget.cardWidth ||
+        _visibleCount >= widget.products.length ||
+        _pageRequestPending) {
+      return false;
+    }
+    _pageRequestPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final next = _visibleCount + _pageSize;
+      setState(() {
+        _visibleCount = next < widget.products.length
+            ? next
+            : widget.products.length;
+        _pageRequestPending = false;
+      });
+    });
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final resolvedLaneCount = laneCount ?? (products.length > 1 ? 2 : 1);
+    final products = widget.products
+        .take(_visibleCount)
+        .toList(growable: false);
+    final resolvedLaneCount = widget.laneCount ?? (products.length > 1 ? 2 : 1);
     return Semantics(
       key: const ValueKey('buy-horizontal-product-grid'),
       container: true,
+      liveRegion: true,
       label:
-          'Products in $resolvedLaneCount independently scrollable '
-          '${resolvedLaneCount == 1 ? 'lane' : 'lanes'}.',
+          '${widget.semanticLabel}. Showing ${products.length} of '
+          '${widget.products.length} in $resolvedLaneCount independently '
+          'scrollable ${resolvedLaneCount == 1 ? 'lane' : 'lanes'}. '
+          '${_visibleCount < widget.products.length ? 'More products load near the end.' : 'All products loaded.'}',
       child: SizedBox(
-        height: (tileHeight * resolvedLaneCount) + 14,
+        key: ValueKey('buy-progressive-product-count-${widget.storageKey}'),
+        height: (widget.tileHeight * resolvedLaneCount) + 14,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 12, 10),
           child: Column(
@@ -2537,32 +3023,37 @@ class _HorizontalProductGrid extends StatelessWidget {
                     label:
                         'Product lane ${laneIndex + 1}. '
                         'Swipe left or right for more.',
-                    child: ListView.separated(
-                      key: PageStorageKey('$storageKey-lane-$laneIndex'),
-                      scrollDirection: Axis.horizontal,
-                      primary: false,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      itemCount:
-                          (products.length -
-                              laneIndex +
-                              resolvedLaneCount -
-                              1) ~/
-                          resolvedLaneCount,
-                      separatorBuilder: (_, _) => const SizedBox(width: 7),
-                      itemBuilder: (context, index) {
-                        final productIndex =
-                            (index * resolvedLaneCount) + laneIndex;
-                        return SizedBox(
-                          width: cardWidth,
-                          child: BuyV2ProductCard(
-                            session: session,
-                            product: products[productIndex],
-                            compact: compact,
-                            savedContext: savedContext,
-                          ),
-                        );
-                      },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _loadNextPage,
+                      child: ListView.separated(
+                        key: PageStorageKey(
+                          '${widget.storageKey}-lane-$laneIndex',
+                        ),
+                        scrollDirection: Axis.horizontal,
+                        primary: false,
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        itemCount:
+                            (products.length -
+                                laneIndex +
+                                resolvedLaneCount -
+                                1) ~/
+                            resolvedLaneCount,
+                        separatorBuilder: (_, _) => const SizedBox(width: 7),
+                        itemBuilder: (context, index) {
+                          final productIndex =
+                              (index * resolvedLaneCount) + laneIndex;
+                          return SizedBox(
+                            width: widget.cardWidth,
+                            child: BuyV2ProductCard(
+                              session: widget.session,
+                              product: products[productIndex],
+                              compact: widget.compact,
+                              savedContext: widget.savedContext,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

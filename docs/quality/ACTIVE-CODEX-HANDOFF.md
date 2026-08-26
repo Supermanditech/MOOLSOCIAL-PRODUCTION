@@ -1,5 +1,25 @@
 # Active Codex handoff
 
+## 2026-08-26 — founder transferred Cursor overlap ownership for conflict-qualified integration
+
+The independent Codex runtime tip `922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9`
+and Cursor contextual Chat tip
+`00ce93552091ee51739266c0a8fbe6d207d9f695` are sealed and match their remote
+branches. The founder transferred only their integration overlap to the primary
+for zero-regression reconciliation; Cursor's completed branch remains immutable.
+
+The first local integration attempt at `792ad84b2a033a489add056b3e21620b142e9dcc`
+is clean, unpushed and retained as failed evidence because its merge subject was
+not machine-conforming and the next exact merge exposed genuine conflicts. It
+must not be amended, reset, reused or promoted.
+
+Ticket `UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825` owns one
+exact two-parent repair merge limited to the machine-recorded overlap. After
+focused and combined regression, runtime-safe preflight, audit and exact remote
+readback, only the qualified repair tip may enter fresh integration ticket
+`UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V2-20260825`. No APK, install, deployment,
+promotion, main or remediation mutation is authorized.
+
 ## 2026-08-23 — parallel Cursor Buy UI and Codex Email Link lanes activated
 
 The founder activated two disjoint production tickets from annotated work-start

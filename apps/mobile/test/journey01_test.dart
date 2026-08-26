@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
 
 void main() {
   Future<void> tapVisible(WidgetTester tester, Key key) async {
@@ -273,7 +275,15 @@ void main() {
   testWidgets('universal screen visible controls complete their tap intents', (
     tester,
   ) async {
-    final session = JourneySession();
+    final session = JourneySession(
+      accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+        identity: const AuthenticatedAccountIdentity(
+          displayName: 'Runtime Member',
+          emailAddress: 'member@example.com',
+          signInMethods: ['Google'],
+        ),
+      ),
+    );
     addTearDown(session.dispose);
 
     await authenticate(tester, session);
@@ -290,6 +300,8 @@ void main() {
     );
     await tapVisible(tester, const Key('open-profile'));
     expect(find.text('Your account'), findsOneWidget);
+    expect(find.text('Runtime Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
     await tapVisible(tester, const Key('close-profile'));
 
     await tapVisible(tester, const Key('open-search'));
@@ -336,5 +348,95 @@ void main() {
     expect(find.byKey(const Key('mobile-otp-method')), findsOneWidget);
     expect(session.areaChoice, AreaChoice.current);
     expect(auth.signedIn, isFalse);
+  });
+
+  testWidgets(
+    'successful sign-out clears prior-account Chat and Social state',
+    (tester) async {
+      final auth = ReviewOtpGateway(signedIn: true);
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: auth,
+        allowGuestReady: true,
+      );
+      final chat = ChatSession();
+      final shared = SharedSession()
+        ..saveSocialReplyDraft('prior-post', 'Private');
+      addTearDown(session.dispose);
+      addTearDown(chat.dispose);
+      addTearDown(shared.dispose);
+      await session.start();
+
+      expect(chat.visibleThreads(), isNotEmpty);
+      expect(shared.socialReplyDraft('prior-post'), 'Private');
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: session,
+          chatSession: chat,
+          sharedSession: shared,
+          initialLocation: '/app/mool',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tapVisible(tester, const Key('mool-home-sign-out'));
+      await tapVisible(tester, const Key('mool-confirm-sign-out'));
+
+      expect(session.isAuthenticated, isFalse);
+      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+      expect(chat.visibleThreads(), isEmpty);
+      expect(shared.socialReplyDraft('prior-post'), isEmpty);
+      expect(shared.authorized, isFalse);
+
+      expect(await session.requestOtp('9876543210'), isTrue);
+      expect(await session.verifyOtp('123456'), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(session.isAuthenticated, isTrue);
+      expect(shared.authorized, isTrue);
+      expect(chat.visibleThreads(), isEmpty);
+      expect(shared.socialReplyDraft('prior-post'), isEmpty);
+    },
+  );
+
+  testWidgets('authenticated identity is global in the Shop account route', (
+    tester,
+  ) async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+        identity: const AuthenticatedAccountIdentity(
+          displayName: 'Runtime Member',
+          emailAddress: 'member@example.com',
+          signInMethods: ['Google'],
+        ),
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, initialLocation: '/app/buy?sub=shop'),
+    );
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const ValueKey('buy-open-account'));
+
+    expect(find.text('Runtime Member'), findsOneWidget);
+    expect(find.text('member@example.com · Google'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('Dharmendra Choudhary'), findsNothing);
   });
 }

@@ -55,7 +55,7 @@ void main() {
       'shorts': Key('screen04-youtube-shorts-state-provider-access'),
       'videos': Key('screen04-youtube-videos-state-provider-access'),
       'feed': Key('screen04-moolsocial-feed-state-empty'),
-      'create': Key('social-creator-gateway'),
+      'create': Key('screen04-create-home'),
     };
     for (final journey in journeys.entries) {
       final action = find.byKey(Key('screen04-rail-${journey.key}'));
