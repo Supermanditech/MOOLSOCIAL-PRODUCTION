@@ -866,6 +866,7 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
     GoogleLegacyIdentitySignIn? legacyAuthenticateIdToken,
     GoogleLegacyIdentitySignOut? legacySignOut,
     bool Function()? isAndroid,
+    bool? legacyFallbackEnabled,
     GoogleAuthStageObserver? stageObserver,
   }) : _initialize =
            initialize ??
@@ -885,6 +886,7 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
            legacyAuthenticateIdToken ?? _authenticateGoogleLegacyIdentity,
        _legacySignOut = legacySignOut ?? _signOutGoogleLegacyIdentity,
        _isAndroid = isAndroid ?? (() => Platform.isAndroid),
+       _legacyFallbackEnabled = legacyFallbackEnabled ?? kDebugMode,
        _stageObserver = stageObserver ?? _emitSanitizedGoogleAuthStage;
 
   final String serverClientId;
@@ -896,6 +898,7 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
   final GoogleLegacyIdentitySignIn _legacyAuthenticateIdToken;
   final GoogleLegacyIdentitySignOut _legacySignOut;
   final bool Function() _isAndroid;
+  final bool _legacyFallbackEnabled;
   final GoogleAuthStageObserver _stageObserver;
   Future<void>? _initialization;
 
@@ -932,7 +935,7 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
       );
     } on GoogleSignInException catch (error) {
       if (error.code == GoogleSignInExceptionCode.canceled) {
-        if (!_isAndroid()) {
+        if (!_isAndroid() || !_legacyFallbackEnabled) {
           _stageObserver('auth-google-native-no-identity');
           return null;
         }

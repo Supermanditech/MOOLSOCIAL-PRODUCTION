@@ -685,6 +685,7 @@ void main() {
           },
           legacySignOut: () async {},
           isAndroid: () => true,
+          legacyFallbackEnabled: true,
           stageObserver: stages.add,
         );
 
@@ -696,6 +697,38 @@ void main() {
         expect(stages, contains('auth-google-native-legacy-fallback-started'));
         expect(stages, contains('auth-google-native-legacy-identity-returned'));
         expect(stages, isNot(contains('auth-google-native-no-identity')));
+      },
+    );
+
+    test(
+      'Android release cancellation does not reopen a legacy chooser',
+      () async {
+        var legacyCalls = 0;
+        final stages = <String>[];
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          ),
+          legacyAuthenticateIdToken: (_) async {
+            legacyCalls += 1;
+            return 'must-not-be-used';
+          },
+          legacySignOut: () async {},
+          isAndroid: () => true,
+          legacyFallbackEnabled: false,
+          stageObserver: stages.add,
+        );
+
+        expect(await gateway.authenticateIdToken(), isNull);
+        expect(legacyCalls, 0);
+        expect(stages, contains('auth-google-native-no-identity'));
+        expect(
+          stages,
+          isNot(contains('auth-google-native-legacy-fallback-started')),
+        );
       },
     );
 

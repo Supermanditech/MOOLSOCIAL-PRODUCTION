@@ -24,7 +24,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPORTS_BEGIN
-// No custom Google identity imports: the registered Flutter plugin owns them.
+// Credential Manager stays primary; these imports support only the bounded
+// debug fallback selected by the Dart gateway.
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPORTS_END
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

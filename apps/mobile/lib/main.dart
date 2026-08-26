@@ -904,7 +904,7 @@ Future<void> main() async {
           accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
           currentAreaGateway: DeviceCurrentAreaGateway(),
-          allowGuestReady: true,
+          allowGuestReady: false,
         )
       : JourneySession(
           store: SharedPreferencesJourneyStore(preferences),

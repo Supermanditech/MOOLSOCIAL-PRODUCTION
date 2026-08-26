@@ -42,57 +42,89 @@ void main() {
     );
   });
 
-  test('Android Credential Manager plugin is complete and legacy bridge absent', () {
-    final activity = File(
-      'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
-    ).readAsStringSync();
-    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
-    final lock = File('pubspec.lock').readAsStringSync();
-    final gateway = File(
-      'lib/features/journey01/review_journey_services.dart',
-    ).readAsStringSync();
-    final googleBridge = _googleIdentityBridgeBlocks(activity);
+  test(
+    'Credential Manager is primary and release cannot reopen the fallback',
+    () {
+      final activity = File(
+        'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+      ).readAsStringSync();
+      final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+      final lock = File('pubspec.lock').readAsStringSync();
+      final gateway = File(
+        'lib/features/journey01/review_journey_services.dart',
+      ).readAsStringSync();
+      final googleBridge = _googleIdentityBridgeBlocks(activity);
 
-    for (final token in const <String>[
-      'Official google_sign_in owns the Android Credential Manager integration.',
-      'GeneratedPluginRegistrant registers the official Google identity plugin.',
-      'No legacy activity-result identity bridge is permitted in the FIX11 path.',
-    ]) {
-      expect(activity, contains(token), reason: token);
-    }
-    for (final forbidden in const <String>[
-      'com.moolsocial.app/google_identity',
-      'GoogleSignInOptions',
-      'GoogleSignIn.getSignedInAccountFromIntent',
-    ]) {
-      expect(activity, isNot(contains(forbidden)), reason: forbidden);
-      expect(gateway, isNot(contains(forbidden)), reason: forbidden);
-    }
+      for (final token in const <String>[
+        'Official google_sign_in owns the Android Credential Manager integration.',
+        'GoogleSignInOptions',
+        'GoogleSignIn.getSignedInAccountFromIntent',
+        'fallback_started',
+      ]) {
+        expect(activity, contains(token), reason: token);
+      }
+      for (final token in const <String>[
+        'legacyFallbackEnabled ?? kDebugMode',
+        'if (!_isAndroid() || !_legacyFallbackEnabled)',
+        "'auth-google-native-no-identity'",
+        "'auth-google-native-legacy-fallback-started'",
+      ]) {
+        expect(gateway, contains(token), reason: token);
+      }
+      expect(googleBridge, isNot(contains('startActivityForResult')));
+      expect(gradle, contains('play-services-auth:21.6.0'));
+      expect(lock, contains('google_sign_in_android:'));
+      expect(lock, contains('version: "7.2.16"'));
+      for (final token in const <String>[
+        'GoogleSignIn.instance.initialize(',
+        'GoogleSignIn.instance.authenticate()',
+        "'auth-google-native-ui-requested'",
+        "'auth-google-native-no-identity'",
+        "'auth-google-firebase-credential-complete'",
+        'GoogleAuthProvider.credential(idToken: idToken)',
+        '_auth.signInWithCredential(credential)',
+        "'auth-google-firebase-exception-code-'",
+      ]) {
+        expect(gateway, contains(token), reason: token);
+      }
+    },
+  );
+
+  test('disabled Facebook provider cannot auto-initialize its native SDK', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
     expect(
-      googleBridge,
-      isNot(contains('startActivityForResult')),
-      reason: 'legacy Google activity-result bridge',
+      gradle,
+      contains(
+        'facebookAutoInitEnabled = facebookAppId != null && '
+        'facebookClientToken != null',
+      ),
+    );
+    expect(gradle, contains('"facebook_auto_init_enabled"'));
+    expect(manifest, contains('com.facebook.sdk.AutoInitEnabled'));
+    expect(manifest, contains('@bool/facebook_auto_init_enabled'));
+  });
+
+  test('debug and profile APKs cannot overwrite the production package', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+
+    expect(
+      RegExp(r'applicationIdSuffix = "\.runtime"').allMatches(gradle).length,
+      2,
     );
     expect(
-      gateway,
-      isNot(contains('startActivityForResult')),
-      reason: 'legacy Google activity-result bridge',
+      RegExp(r'versionNameSuffix = "-runtime"').allMatches(gradle).length,
+      2,
     );
-    expect(gradle, isNot(contains('play-services-auth')));
-    expect(lock, contains('google_sign_in_android:'));
-    expect(lock, contains('version: "7.2.16"'));
-    for (final token in const <String>[
-      'GoogleSignIn.instance.initialize(',
-      'GoogleSignIn.instance.authenticate()',
-      "'auth-google-native-ui-requested'",
-      "'auth-google-native-no-identity'",
-      "'auth-google-firebase-credential-complete'",
-      'GoogleAuthProvider.credential(idToken: idToken)',
-      '_auth.signInWithCredential(credential)',
-      "'auth-google-firebase-exception-code-'",
-    ]) {
-      expect(gateway, contains(token), reason: token);
-    }
+    expect(
+      RegExp(
+        r'resValue\("string", "app_name", "MoolSocial Runtime"\)',
+      ).allMatches(gradle).length,
+      2,
+    );
   });
 
   test('Firebase session bootstrap accepts one verified user', () async {
@@ -1033,24 +1065,21 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: LoginScreenV5(session: session)));
 
-    final appleButton = tester.widget<InkWell>(
+    expect(
       find.byKey(const Key('screen03-v5-provider-apple')),
+      findsNothing,
+      reason: 'An unavailable provider must not expose an actionable widget.',
     );
-    expect(appleButton.onTap, isNull);
 
-    for (final methodKey in const <Key>[
-      Key('email-link-method'),
-      Key('mobile-otp-method'),
-    ]) {
-      final inkWell = tester.widget<InkWell>(
-        find.descendant(
-          of: find.byKey(methodKey),
-          matching: find.byType(InkWell),
-        ),
-      );
-      expect(inkWell.onTap, isNull, reason: methodKey.toString());
-    }
-    expect(find.text('Not available on this build'), findsNWidgets(2));
+    final emailLink = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const Key('email-link-method')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(emailLink.onTap, isNull);
+    expect(find.byKey(const Key('mobile-otp-method')), findsNothing);
+    expect(find.text('Not available on this build'), findsOneWidget);
   });
 
   testWidgets('login legal actions open only exact public destinations', (

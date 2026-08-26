@@ -31,6 +31,7 @@ if ((facebookAppId == null) != (facebookClientToken == null)) {
         "Facebook Login requires both founder-controlled Android configuration values.",
     )
 }
+val facebookAutoInitEnabled = facebookAppId != null && facebookClientToken != null
 val uploadSigningConfigured = listOf(
     uploadStoreFile,
     uploadStorePassword,
@@ -183,6 +184,11 @@ android {
             "facebook_client_token",
             facebookClientToken ?: "0",
         )
+        resValue(
+            "bool",
+            "facebook_auto_init_enabled",
+            facebookAutoInitEnabled.toString(),
+        )
     }
 
     signingConfigs {
@@ -197,6 +203,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".runtime"
+            versionNameSuffix = "-runtime"
+            resValue("string", "app_name", "MoolSocial Runtime")
+        }
+        getByName("profile") {
+            applicationIdSuffix = ".runtime"
+            versionNameSuffix = "-runtime"
+            resValue("string", "app_name", "MoolSocial Runtime")
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             configure<CrashlyticsExtension> {

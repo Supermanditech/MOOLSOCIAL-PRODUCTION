@@ -383,8 +383,21 @@ void main() {
 
   test('private-Dev public review restores Screen 04 after safe boot', () {
     final source = File('lib/main.dart').readAsStringSync();
+    final publicReviewCompositionStart = source.indexOf(
+      'final session = _youtubePublicReviewMode',
+    );
+    final normalCompositionStart = source.indexOf(
+      ': JourneySession(',
+      publicReviewCompositionStart,
+    );
+    final publicReviewComposition = source.substring(
+      publicReviewCompositionStart,
+      normalCompositionStart,
+    );
 
     expect(source, contains("pendingRoute: '/app/social?sub=videos'"));
+    expect(publicReviewComposition, contains('allowGuestReady: false'));
+    expect(publicReviewComposition, isNot(contains('allowGuestReady: true')));
     expect(source, contains('youtubeConnectReturnLocation('));
     expect(
       source,
