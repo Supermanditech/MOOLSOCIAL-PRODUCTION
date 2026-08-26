@@ -270,8 +270,13 @@ $candidateRuntimeStateBound = if (
   $candidatePreApkState.Contains(
     '"runtimeProfile": "PublicAuthSideloadPreflight"'
   ) -and
-  $candidatePreApkState.Contains(
-    '"state": "pending_sanitized_binding"'
+  (
+    $candidatePreApkState.Contains(
+      '"state": "pending_sanitized_binding"'
+    ) -or
+    $candidatePreApkState.Contains(
+      '"state": "passed_sanitized_binding"'
+    )
   ) -and
   $candidatePreApkState.Contains('"privateValuesEmitted": false')
 } else {
@@ -729,6 +734,9 @@ Assert-SideloadControl (
   $wrapper.Contains(
     "'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'"
   ) -and
+  $wrapper.Contains('$RuntimeStatePath') -and
+  $wrapper.Contains('$runtimeStateFile') -and
+  $wrapper.Contains('R60.92 runtime-definition state path is missing.') -and
   $wrapper.Contains('-Phase BuildAuthorized') -and
   $wrapper.Contains('$successorBuildFoundationPassed = $?') -and
   $wrapper.Contains('Mandatory successor APK build-foundation gate failed.') -and
