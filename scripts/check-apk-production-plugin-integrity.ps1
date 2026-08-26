@@ -111,6 +111,7 @@ $packageText = $packageOutput -join "`n"
 $required = @(
   'io.flutter.plugins.GeneratedPluginRegistrant',
   'io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin',
+  'dev.fluttercommunity.plus.share.SharePlusPlugin',
   'com.moolsocial.app.MainActivity'
 )
 foreach ($className in $required) {
@@ -141,5 +142,5 @@ Write-Output (
   'APK production plugin integrity passed: ' +
   "candidate=$CandidateId; package=$applicationId; " +
   "mappingAware=$($mappingAware.ToString().ToLowerInvariant()); " +
-  'registrant=true; firebaseCore=true; integrationTest=false.'
+  'registrant=true; firebaseCore=true; sharePlus=true; integrationTest=false.'
 )

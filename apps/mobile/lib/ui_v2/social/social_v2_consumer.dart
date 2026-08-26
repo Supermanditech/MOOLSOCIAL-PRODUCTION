@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/design/mool_design_system.dart';
@@ -38,6 +39,93 @@ typedef Screen04YouTubePublicVideoLoader =
     Future<List<Screen04YouTubePublicVideo>> Function();
 typedef Screen04YouTubePublicSearchLoader =
     Future<List<Screen04YouTubePublicVideo>> Function(String query);
+
+enum SocialV2ShareOutcome { selected, dismissed, unavailable }
+
+@immutable
+class SocialV2ShareRequest {
+  const SocialV2ShareRequest({
+    required this.uri,
+    required this.title,
+    required this.sharePositionOrigin,
+    this.subject,
+  });
+
+  final Uri uri;
+  final String title;
+  final String? subject;
+  final Rect sharePositionOrigin;
+}
+
+abstract interface class SocialV2ShareGateway {
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest request);
+}
+
+typedef SocialV2PlatformShareInvoker =
+    Future<ShareResult> Function(ShareParams params);
+
+class SocialV2PlatformShareGateway implements SocialV2ShareGateway {
+  SocialV2PlatformShareGateway({SocialV2PlatformShareInvoker? invoker})
+    : _invoker = invoker ?? SharePlus.instance.share;
+
+  final SocialV2PlatformShareInvoker _invoker;
+  Future<SocialV2ShareOutcome>? _inFlight;
+
+  @override
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest request) {
+    final active = _inFlight;
+    if (active != null) return active;
+
+    final operation = _shareOnce(request);
+    _inFlight = operation;
+    unawaited(
+      operation.whenComplete(() {
+        if (identical(_inFlight, operation)) _inFlight = null;
+      }),
+    );
+    return operation;
+  }
+
+  Future<SocialV2ShareOutcome> _shareOnce(SocialV2ShareRequest request) async {
+    final title = request.title.trim();
+    final subject = request.subject?.trim();
+    final origin = request.sharePositionOrigin;
+    if (request.uri.scheme != 'https' ||
+        request.uri.host.isEmpty ||
+        request.uri.userInfo.isNotEmpty ||
+        title.isEmpty ||
+        title.length > 120 ||
+        title.contains(RegExp(r'[\u0000-\u001F\u007F]')) ||
+        (subject != null &&
+            (subject.length > 200 ||
+                subject.contains(RegExp(r'[\u0000-\u001F\u007F]')))) ||
+        !origin.isFinite ||
+        origin.width <= 0 ||
+        origin.height <= 0) {
+      return SocialV2ShareOutcome.unavailable;
+    }
+
+    try {
+      final result = await _invoker(
+        ShareParams(
+          uri: request.uri,
+          title: title,
+          subject: subject == null || subject.isEmpty ? null : subject,
+          sharePositionOrigin: origin,
+          downloadFallbackEnabled: false,
+          mailToFallbackEnabled: false,
+        ),
+      );
+      return switch (result.status) {
+        ShareResultStatus.success => SocialV2ShareOutcome.selected,
+        ShareResultStatus.dismissed => SocialV2ShareOutcome.dismissed,
+        ShareResultStatus.unavailable => SocialV2ShareOutcome.unavailable,
+      };
+    } on Object {
+      return SocialV2ShareOutcome.unavailable;
+    }
+  }
+}
 
 final Expando<_SocialV2RetainedState> _socialV2RetainedStates =
     Expando<_SocialV2RetainedState>();
@@ -114,6 +202,7 @@ class SocialUniversalV2 extends StatefulWidget {
     @visibleForTesting this.youtubeShortStateCache,
     @visibleForTesting this.createDraftStateCache,
     @visibleForTesting this.createDraftMediaStore,
+    @visibleForTesting this.shareGateway,
     @visibleForTesting this.disableLocalDraftMediaPreviewForTesting = false,
     super.key,
   });
@@ -169,6 +258,9 @@ class SocialUniversalV2 extends StatefulWidget {
   final SocialCreateDraftMediaStore? createDraftMediaStore;
 
   @visibleForTesting
+  final SocialV2ShareGateway? shareGateway;
+
+  @visibleForTesting
   final bool disableLocalDraftMediaPreviewForTesting;
 
   @override
@@ -207,6 +299,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   late final YouTubePublicShortStateCache _youtubeShortStateCache;
   late final SocialCreateDraftStateCache _createDraftStateCache;
   late final SocialCreateDraftMediaStore? _createDraftMediaStore;
+  late final SocialV2ShareGateway _shareGateway;
   bool _createDraftHydrating = false;
   bool _createDraftMediaLoss = false;
   bool _restoredCreateDraft = false;
@@ -321,6 +414,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     }
     _chatAuthenticated = widget.session.isAuthenticated;
     widget.session.addListener(_handleChatIdentityBoundary);
+    _shareGateway = widget.shareGateway ?? SocialV2PlatformShareGateway();
     _youtubeCatalogueSnapshots =
         widget.youtubeCatalogueSnapshotStore ??
         (widget.youtubeVideosLoader == null &&
@@ -2581,7 +2675,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 onOpenChannel: () =>
                     _openYouTubeChannel(video.providerChannelId),
                 onDetails: () => _openVideoDetails(video),
-                onShare: () => _copyYouTubeLink(video),
+                onShare: () => _shareYouTubeVideo(video),
                 onOpenProvider: _openYouTubeVideo,
                 onSelectVideo: (next) {
                   final origin = _returnToYouTubeSearchAfterVideo
@@ -3160,7 +3254,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openShare(SocialPublishedItem item) {
-    final postLink = _publicPostLink(item);
+    final postUri = _publicPostUri(item);
+    final postLink = postUri.toString();
     showSocialV2Sheet(
       context,
       title: 'Share',
@@ -3190,10 +3285,17 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           onTap: () => _sendPostLinkInChat(item, postLink),
         ),
         SocialV2ListTile(
+          key: const Key('social-share-other-apps'),
+          icon: Icons.share_outlined,
+          title: 'Share to another app',
+          detail: "Open your phone's share options",
+          onTap: () => _sharePostExternally(postUri),
+        ),
+        SocialV2ListTile(
           key: const Key('social-copy-post-link'),
           icon: Icons.link_rounded,
           title: 'Copy post link',
-          detail: 'Share through another app',
+          detail: 'Copy the public link',
           onTap: () async {
             try {
               await Clipboard.setData(ClipboardData(text: postLink));
@@ -3215,11 +3317,47 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  String _publicPostLink(SocialPublishedItem item) => Uri.https(
+  Uri _publicPostUri(SocialPublishedItem item) => Uri.https(
     'moolsocial.com',
     '/app/social',
     {'sub': 'feed', 'item': item.id},
-  ).toString();
+  );
+
+  Rect _sharePositionOrigin() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      final origin =
+          renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      if (origin.isFinite && origin.width > 0 && origin.height > 0) {
+        return origin;
+      }
+    }
+    final size = MediaQuery.sizeOf(context);
+    return Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: 1,
+      height: 1,
+    );
+  }
+
+  Future<void> _sharePostExternally(Uri postUri) async {
+    Navigator.of(context).pop();
+    final outcome = await _shareGateway.share(
+      SocialV2ShareRequest(
+        uri: postUri,
+        title: 'Share MoolSocial post',
+        subject: 'MoolSocial post',
+        sharePositionOrigin: _sharePositionOrigin(),
+      ),
+    );
+    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) {
+      return;
+    }
+    showSocialV2Message(
+      context,
+      'Sharing is unavailable right now. You can copy the link instead.',
+    );
+  }
 
   Future<void> _toggleRepostFromShare(SocialPublishedItem item) async {
     Navigator.of(context).pop();
@@ -3351,7 +3489,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  Future<void> _copyYouTubeLink(_VideoData video) async {
+  Future<void> _shareYouTubeVideo(_VideoData video) async {
     final videoId = video.providerVideoId?.trim();
     if (videoId == null || videoId.isEmpty) {
       showSocialV2Message(context, 'This YouTube link is unavailable');
@@ -3360,18 +3498,21 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     final url = Uri.https('www.youtube.com', '/watch', <String, String>{
       'v': videoId,
     });
-    try {
-      await Clipboard.setData(ClipboardData(text: url.toString()));
-    } on Object {
-      if (mounted) {
-        showSocialV2Message(
-          context,
-          'YouTube link could not be copied. Try again.',
-        );
-      }
+    final outcome = await _shareGateway.share(
+      SocialV2ShareRequest(
+        uri: url,
+        title: 'Share YouTube video',
+        subject: 'YouTube video',
+        sharePositionOrigin: _sharePositionOrigin(),
+      ),
+    );
+    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) {
       return;
     }
-    if (mounted) showSocialV2Message(context, 'YouTube link copied');
+    showSocialV2Message(
+      context,
+      'Sharing is unavailable right now. You can open this video on YouTube instead.',
+    );
   }
 
   Future<void> _openYouTubeShort(_ShortData short) {

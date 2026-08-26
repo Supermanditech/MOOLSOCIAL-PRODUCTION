@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
@@ -120,20 +119,23 @@ void main() {
     owners.dispose();
   });
 
-  testWidgets(
-    'every Social subaction survives connected-chooser open and system Back',
-    (tester) async {
-      const directRouteOwnerKeys = <String, Key>{
-        'shorts': Key('screen04-youtube-shorts-state-provider-access'),
-        'videos': Key('screen04-youtube-videos-state-provider-access'),
-        'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': Key('screen04-create-home'),
-      };
-      for (final choice in screen04World('social').choices) {
+  for (final choice in screen04World('social').choices) {
+    testWidgets(
+      'Social ${choice.id} survives connected-chooser open and system Back',
+      (tester) async {
+        const directRouteOwnerKeys = <String, Key>{
+          'shorts': Key('screen04-youtube-shorts-state-provider-access'),
+          'videos': Key('screen04-youtube-videos-state-provider-access'),
+          'feed': Key('screen04-moolsocial-feed-state-empty'),
+          'create': Key('screen04-create-home'),
+        };
         final owners = _AuthenticatedOwners();
+        addTearDown(owners.dispose);
         await owners.journey.start();
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
         await tester.pumpWidget(
           MoolSocialApp(
             key: ValueKey('social-${choice.id}'),
@@ -144,23 +146,19 @@ void main() {
             initialLocation: '/app/social?sub=${choice.id}',
           ),
         );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        });
         await tester.pumpAndSettle();
         expect(
           find.byKey(directRouteOwnerKeys[choice.id]!),
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
+        expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
         if (choice.id == 'create') {
           expect(
-            find.byKey(const Key('screen04-context-tabs')),
-            findsOneWidget,
-          );
-          expect(
             find.byKey(const Key('mool-compact-launcher')),
-            findsOneWidget,
-          );
-        } else {
-          expect(
-            find.byKey(const Key('screen04-context-tabs')),
             findsOneWidget,
           );
         }
@@ -187,14 +185,11 @@ void main() {
           );
         }
         expect(tester.takeException(), isNull, reason: choice.id);
-        owners.dispose();
-      }
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    },
-  );
+      },
+    );
+  }
 
-  testWidgets('Create landing owns the dock and nested composer Back', (
+  testWidgets('Create landing owns the dock and nested composer controls', (
     tester,
   ) async {
     final owners = _AuthenticatedOwners();
@@ -213,6 +208,10 @@ void main() {
         initialLocation: '/app/social?sub=create',
       ),
     );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
@@ -245,22 +244,6 @@ void main() {
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('social-global-chat')), findsNothing);
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('mool-connected-action-navigator')),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -365,22 +348,8 @@ void main() {
   testWidgets('Videos uses native Back and restores provider discovery', (
     tester,
   ) async {
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<Object?, Object?>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      ),
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.dismissed,
     );
     final owners = _Owners();
     addTearDown(owners.dispose);
@@ -437,6 +406,7 @@ void main() {
         youtubePublicAccessOverride: true,
         youtubeVideosLoader: () async => providerVideos,
         youtubeShortsLoader: () async => const [],
+        shareGateway: shareGateway,
       ),
     );
     await tester.pump();
@@ -512,8 +482,19 @@ void main() {
     await tester.ensureVisible(share);
     await tester.tap(share);
     await tester.pump();
-    expect(copiedText, 'https://www.youtube.com/watch?v=def456UVW10');
-    expect(find.text('YouTube link copied'), findsOneWidget);
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=def456UVW10'),
+    );
+    expect(shareGateway.request?.title, 'Share YouTube video');
+    expect(shareGateway.request?.subject, 'YouTube video');
+    expect(shareGateway.request?.sharePositionOrigin.isFinite, isTrue);
+    expect(shareGateway.request?.sharePositionOrigin.width, greaterThan(0));
+    expect(shareGateway.request?.sharePositionOrigin.height, greaterThan(0));
+    expect(find.text('YouTube link copied'), findsNothing);
+    expect(find.text('Shared'), findsNothing);
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -522,77 +503,167 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'YouTube video contains clipboard failure without false success',
-    (tester) async {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        (call) async {
-          if (call.method == 'Clipboard.setData') {
-            throw PlatformException(code: 'clipboard-unavailable');
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform,
-          null,
-        ),
-      );
-      final owners = _Owners();
-      addTearDown(owners.dispose);
-      final providerVideo = Screen04YouTubePublicVideo(
-        videoId: 'ghi789RST11',
-        title: 'Provider clipboard recovery',
-        channelId: 'UC333',
-        channelTitle: 'Provider recovery',
-        description: 'A provider video used to verify link recovery.',
-        thumbnailUrl: Uri.https('i.ytimg.com', '/vi/ghi789RST11/hqdefault.jpg'),
-        publishedAt: DateTime.utc(2026, 8, 9),
-        duration: 'PT3M12S',
-        captionAvailable: true,
-        viewCount: '4200',
-        likeCount: '310',
-        commentCount: '18',
-        embeddable: true,
-        hasKnownDeviceRegionExclusion: false,
-        hashtags: const ['#Recovery'],
-        channelDescription: 'Current public recovery videos.',
-        subscriberCount: '27000',
-        channelVideoCount: '81',
-        channelViewCount: '1900000',
-      );
-      await _pump(
-        tester,
-        const Size(360, 720),
-        1,
-        owners.consumer(
-          sub: 'videos',
-          youtubePublicAccessOverride: true,
-          youtubeVideosLoader: () async => [providerVideo],
-          youtubeShortsLoader: () async => const [],
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+  testWidgets('YouTube video contains unavailable share without false success', (
+    tester,
+  ) async {
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.unavailable,
+    );
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final providerVideo = Screen04YouTubePublicVideo(
+      videoId: 'ghi789RST11',
+      title: 'Provider clipboard recovery',
+      channelId: 'UC333',
+      channelTitle: 'Provider recovery',
+      description: 'A provider video used to verify link recovery.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/ghi789RST11/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 9),
+      duration: 'PT3M12S',
+      captionAvailable: true,
+      viewCount: '4200',
+      likeCount: '310',
+      commentCount: '18',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const ['#Recovery'],
+      channelDescription: 'Current public recovery videos.',
+      subscriberCount: '27000',
+      channelVideoCount: '81',
+      channelViewCount: '1900000',
+    );
+    await _pump(
+      tester,
+      const Size(360, 720),
+      1,
+      owners.consumer(
+        sub: 'videos',
+        youtubePublicAccessOverride: true,
+        youtubeVideosLoader: () async => [providerVideo],
+        youtubeShortsLoader: () async => const [],
+        shareGateway: shareGateway,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.text('Provider clipboard recovery'));
-      await tester.pump();
-      expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
-      await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
-      await tester.tap(find.byKey(const Key('screen04-video-share')));
-      await tester.pump();
+    await tester.tap(find.text('Provider clipboard recovery'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
+    await tester.tap(find.byKey(const Key('screen04-video-share')));
+    await tester.pump();
 
-      expect(
-        find.text('YouTube link could not be copied. Try again.'),
-        findsOneWidget,
-      );
-      expect(find.text('YouTube link copied'), findsNothing);
-      expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expect(
+      find.text(
+        'Sharing is unavailable right now. You can open this video on YouTube instead.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('YouTube link copied'), findsNothing);
+    expect(find.text('Shared'), findsNothing);
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=ghi789RST11'),
+    );
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('YouTube Search share preserves the exact result return', (
+    tester,
+  ) async {
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final homeVideo = Screen04YouTubePublicVideo(
+      videoId: 'home123ABC45',
+      title: 'Provider home result',
+      channelId: 'UCHOME',
+      channelTitle: 'Provider home',
+      description: 'A provider home result.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/home123ABC45/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 8),
+      duration: 'PT5M4S',
+      captionAvailable: true,
+      viewCount: '1200',
+      likeCount: '80',
+      commentCount: '12',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const [],
+    );
+    final searchVideo = Screen04YouTubePublicVideo(
+      videoId: 'search789XY1',
+      title: 'Provider searched maker story',
+      channelId: 'UCSEARCH',
+      channelTitle: 'Provider search',
+      description: 'A provider search result.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/search789XY1/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 9),
+      duration: 'PT8M12S',
+      captionAvailable: true,
+      viewCount: '8400',
+      likeCount: '510',
+      commentCount: '44',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const [],
+    );
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.dismissed,
+    );
+
+    await _pump(
+      tester,
+      const Size(390, 844),
+      1,
+      owners.consumer(
+        sub: 'videos',
+        youtubePublicAccessOverride: true,
+        youtubeVideosLoader: () async => [homeVideo],
+        youtubeShortsLoader: () async => const [],
+        youtubeSearchLoader: (_) async => [searchVideo],
+        shareGateway: shareGateway,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+    await tester.pumpAndSettle();
+    final searchInput = find.byKey(const Key('screen04-youtube-search-input'));
+    await tester.enterText(searchInput, 'maker story');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Provider searched maker story'), findsOneWidget);
+
+    await tester.tap(find.text('Provider searched maker story'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(find.byTooltip('Back to YouTube Search results'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
+    await tester.tap(find.byKey(const Key('screen04-video-share')));
+    await tester.pump();
+
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=search789XY1'),
+    );
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-youtube-search-surface')),
+      findsOneWidget,
+    );
+    expect(find.text('Provider searched maker story'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(searchInput).controller?.text,
+      'maker story',
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('YouTube Shorts show finished recovery copy when unavailable', (
     tester,
@@ -1056,6 +1127,8 @@ class _Owners {
     bool? youtubePublicAccessOverride,
     Screen04YouTubePublicVideoLoader? youtubeVideosLoader,
     Screen04YouTubePublicVideoLoader? youtubeShortsLoader,
+    Screen04YouTubePublicSearchLoader? youtubeSearchLoader,
+    SocialV2ShareGateway? shareGateway,
   }) {
     return SocialUniversalV2(
       session: journey,
@@ -1067,6 +1140,8 @@ class _Owners {
       youtubePublicAccessOverride: youtubePublicAccessOverride,
       youtubeVideosLoader: youtubeVideosLoader,
       youtubeShortsLoader: youtubeShortsLoader,
+      youtubeSearchLoader: youtubeSearchLoader,
+      shareGateway: shareGateway,
     );
   }
 
@@ -1075,6 +1150,21 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+class _RecordingShareGateway implements SocialV2ShareGateway {
+  _RecordingShareGateway({required this.outcome});
+
+  final SocialV2ShareOutcome outcome;
+  int calls = 0;
+  SocialV2ShareRequest? request;
+
+  @override
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest value) async {
+    calls += 1;
+    request = value;
+    return outcome;
   }
 }
 

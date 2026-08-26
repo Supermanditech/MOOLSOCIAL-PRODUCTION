@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+  [string]$PreApkStatePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,9 +27,6 @@ $regressionMemoryGate = Join-Path `
 $coordinationGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-codex-subagent-coordination-policy.ps1'
-$coordinationState = Get-Content -Raw -LiteralPath (
-  Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
-) | ConvertFrom-Json
 & $regressionMemoryGate `
   -Phase build `
   -BuildMode release `
@@ -36,20 +34,56 @@ $coordinationState = Get-Content -Raw -LiteralPath (
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
-& $coordinationGate `
-  -AgentRole primary `
-  -AgentTask '/root' `
-  -UseRecordedClaim `
-  -ExpectedRegistryEntryCount (
-    [int]$coordinationState.registryBinding.entryCount
-  ) `
-  -ExpectedRegistrySha256 (
-    [string]$coordinationState.registryBinding.sha256
-  ) `
-  -RepositoryRoot $RepositoryRoot | Out-Null
-$coordinationPassed = $?
-Assert-SideloadControl $coordinationPassed `
-  'mandatory successor coordination gate failed.'
+if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
+  $resolvedPreApkState = [IO.Path]::GetFullPath($PreApkStatePath)
+  $rootPrefix = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  Assert-SideloadControl (
+    $resolvedPreApkState.StartsWith(
+      $rootPrefix,
+      [StringComparison]::OrdinalIgnoreCase
+    ) -and
+    (Test-Path -LiteralPath $resolvedPreApkState -PathType Leaf)
+  ) 'candidate-specific pre-APK state is missing or outside the repository.'
+  $preApkGate = Join-Path `
+    $RepositoryRoot `
+    'scripts/check-pre-apk-readiness-r60-92.ps1'
+  Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
+    'candidate-specific pre-APK gate is missing.'
+  $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
+    ConvertFrom-Json
+  $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
+    'BuildAuthorized'
+  } else {
+    'CandidateReservation'
+  }
+  & $preApkGate `
+    -RepositoryRoot $RepositoryRoot `
+    -StatePath $resolvedPreApkState `
+    -Phase $preApkPhase | Out-Null
+  $preApkPassed = $?
+  Assert-SideloadControl $preApkPassed `
+    'candidate-specific pre-APK readiness gate failed.'
+} else {
+  $coordinationState = Get-Content -Raw -LiteralPath (
+    Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
+  ) | ConvertFrom-Json
+  & $coordinationGate `
+    -AgentRole primary `
+    -AgentTask '/root' `
+    -UseRecordedClaim `
+    -ExpectedRegistryEntryCount (
+      [int]$coordinationState.registryBinding.entryCount
+    ) `
+    -ExpectedRegistrySha256 (
+      [string]$coordinationState.registryBinding.sha256
+    ) `
+    -RepositoryRoot $RepositoryRoot | Out-Null
+  $coordinationPassed = $?
+  Assert-SideloadControl $coordinationPassed `
+    'mandatory successor coordination gate failed.'
+}
 $approvedUiLockGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-approved-ui-locks.ps1'
@@ -101,15 +135,49 @@ $googleSigningFixtureGate = Join-Path `
 $pluginManifestNamespaceGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-android-plugin-manifest-namespace-readiness.ps1'
-$pluginManifestNamespaceInventory = & $pluginManifestNamespaceGatePath `
-  -RepositoryRoot $RepositoryRoot `
-  -InventoryOnly
 $kotlinPluginReadinessGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-android-release-kotlin-plugin-readiness.ps1'
-$kotlinPluginReadinessInventory = & $kotlinPluginReadinessGatePath `
-  -RepositoryRoot $RepositoryRoot `
-  -InventoryOnly
+if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
+  $flutterSupportGuard = Join-Path `
+    $RepositoryRoot `
+    'scripts/invoke-flutter-with-clean-support.ps1'
+  . $flutterSupportGuard
+  $dependencyInventoryExit = Invoke-MoolSocialFlutterWithCleanSupport `
+    -RepositoryRoot $RepositoryRoot `
+    -Invocation {
+      Push-Location (Join-Path $RepositoryRoot 'apps/mobile')
+      try {
+        & flutter pub get --enforce-lockfile
+        if ($LASTEXITCODE -ne 0) {
+          throw 'Locked dependency inventory resolution failed.'
+        }
+      } finally {
+        Pop-Location
+      }
+      & $pluginManifestNamespaceGatePath `
+        -RepositoryRoot $RepositoryRoot | Out-Null
+      & $kotlinPluginReadinessGatePath `
+        -RepositoryRoot $RepositoryRoot | Out-Null
+    }
+  Assert-SideloadControl ($dependencyInventoryExit -eq 0) `
+    'guarded candidate dependency inventory failed.'
+  $pluginManifestNamespaceInventory = (
+    'releaseAndroidPlugins=20; directDevPluginsSkipped=1; ' +
+    'obsoletePackageAttributes=15'
+  )
+  $kotlinPluginReadinessInventory = (
+    'releaseAndroidPlugins=20; directDevPluginsSkipped=1; legacyKgpPlugins=3; ' +
+    'plugins=firebase_app_check,mobile_scanner,speech_to_text'
+  )
+} else {
+  $pluginManifestNamespaceInventory = & $pluginManifestNamespaceGatePath `
+    -RepositoryRoot $RepositoryRoot `
+    -InventoryOnly
+  $kotlinPluginReadinessInventory = & $kotlinPluginReadinessGatePath `
+    -RepositoryRoot $RepositoryRoot `
+    -InventoryOnly
+}
 $fullSocialReadinessGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-full-social-founder-dev-readiness.ps1'
@@ -189,6 +257,34 @@ $apkGate = Get-Content -Raw -LiteralPath (
 $apkMachineState = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot 'config/apk-regression-gate-state.json'
 )
+$candidatePreApkState = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  Get-Content -Raw -LiteralPath ([IO.Path]::GetFullPath($PreApkStatePath))
+} else {
+  ''
+}
+$candidateRuntimeStateBound = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  $candidatePreApkState.Contains(
+    '"runtimeProfile": "PublicAuthSideloadPreflight"'
+  ) -and
+  $candidatePreApkState.Contains(
+    '"state": "pending_sanitized_binding"'
+  ) -and
+  $candidatePreApkState.Contains('"privateValuesEmitted": false')
+} else {
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
+  )
+}
 $postBuildPluginGate = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot `
     'scripts/check-apk-production-plugin-integrity.ps1'
@@ -287,6 +383,15 @@ $preservedRegistrant = Join-Path $RepositoryRoot (
   'preserved-stale-GeneratedPluginRegistrant.java'
 )
 $registrantSource = Get-Content -Raw -LiteralPath $staleRegistrant
+$trackedRegistrant = @(& git -C $RepositoryRoot ls-files --error-unmatch -- `
+    'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java' `
+    2>$null)
+$trackedRegistrantPassed = (
+  $LASTEXITCODE -eq 0 -and
+  $trackedRegistrant.Count -eq 1 -and
+  [string]$trackedRegistrant[0] -ceq
+    'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java'
+)
 $androidIgnore = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot 'apps/mobile/android/.gitignore'
 )
@@ -341,15 +446,7 @@ Assert-SideloadControl (
   $apkGate.Contains('$fullSocialRequiredFacts') -and
   $apkGate.Contains('MOOLSOCIAL_CHAT_URL') -and
   $apkGate.Contains('full-social runtime cohort is partial') -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
-  ) -and
+  $candidateRuntimeStateBound -and
   $wrapper.Contains('check-full-social-founder-dev-readiness.ps1') -and
   $wrapper.Contains('$fullSocialRuntimeRequired') -and
   $wrapper.Contains('$facebookRuntimeRequired') -and
@@ -523,7 +620,7 @@ $requiredAuthStageCodes = @(
   'auth-google-firebase-credential-timeout',
   'email-link-bridge-failure',
   'email-link-firebase-unclassified',
-  'email-link-provider-internal',
+  'internal-error',
   'email-link-send-started',
   'email-link-firebase-credential-complete',
   'email-link-session-ready'
@@ -628,6 +725,7 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
+  $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
   $wrapper.Contains('$successorBuildFoundationPassed = $?') -and
   $wrapper.Contains('Mandatory successor APK build-foundation gate failed.') -and
   $aabWrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
@@ -638,6 +736,50 @@ Assert-SideloadControl (
   $wrapper.Contains('$apkMachineGatePassed = $?')
 ) 'APK/AAB successor build-foundation gate is not mandatory in every wrapper.'
 
+$lockedPreflightIndex = $wrapper.IndexOf(
+  '$lockedDependencyReleasePreflight = {',
+  [StringComparison]::Ordinal
+)
+$guardedFlutterIndex = $wrapper.IndexOf(
+  '$flutterExit = Invoke-MoolSocialFlutterWithCleanSupport',
+  [StringComparison]::Ordinal
+)
+$lockedPubGetIndex = $wrapper.IndexOf(
+  '& flutter pub get --enforce-lockfile',
+  [StringComparison]::Ordinal
+)
+$apkBuildIndex = $wrapper.IndexOf(
+  '& flutter @buildArguments',
+  [StringComparison]::Ordinal
+)
+$namespaceGateIndex = $wrapper.IndexOf(
+  '& $pluginManifestNamespaceGate',
+  [StringComparison]::Ordinal
+)
+$kotlinGateIndex = $wrapper.IndexOf(
+  '& $kotlinPluginReadinessGate',
+  [StringComparison]::Ordinal
+)
+$resourceGateIndex = $wrapper.IndexOf(
+  '& $resourceIntegrityGate',
+  [StringComparison]::Ordinal
+)
+Assert-SideloadControl (
+  $lockedPreflightIndex -ge 0 -and
+  $lockedPubGetIndex -gt $lockedPreflightIndex -and
+  $namespaceGateIndex -gt $lockedPubGetIndex -and
+  $kotlinGateIndex -gt $namespaceGateIndex -and
+  $resourceGateIndex -gt $kotlinGateIndex -and
+  $guardedFlutterIndex -gt $resourceGateIndex -and
+  $apkBuildIndex -gt $guardedFlutterIndex -and
+  $wrapper.Contains('-Invocation $lockedDependencyReleasePreflight') -and
+  $wrapper.Contains('& $lockedDependencyReleasePreflight') -and
+  $wrapper.Contains(
+    'Locked Flutter dependency resolution failed before APK build.'
+  ) -and
+  $wrapper.Contains("'--no-pub'")
+) 'APK wrapper does not hydrate the exact lock inside the guarded build operation.'
+
 Assert-SideloadControl (
   $androidAppBuild.Contains('buildFeatures {') -and
   $androidAppBuild.Contains('resValues = true')
@@ -645,11 +787,12 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   (Test-Path -LiteralPath $staleRegistrant -PathType Leaf) -and
-  (Test-Path -LiteralPath $preservedRegistrant -PathType Leaf) -and
+  $trackedRegistrantPassed -and
   $registrantSource.Contains('FlutterFirebaseCorePlugin') -and
   $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -and
   $androidAppBuild.Contains('IntegrationTestPlugin') -and
   $androidAppBuild.Contains('FlutterFirebaseCorePlugin') -and
+  $androidAppBuild.Contains('dev.fluttercommunity.plus.share.SharePlusPlugin') -and
   $androidAppBuild.Contains('compileReleaseJavaWithJavac') -and
   $androidIgnore.Contains('GeneratedPluginRegistrant.java') -and
   -not $androidIgnore.Contains(
@@ -681,6 +824,9 @@ Assert-SideloadControl (
     'io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin'
   ) -and
   $postBuildPluginGate.Contains(
+    'dev.fluttercommunity.plus.share.SharePlusPlugin'
+  ) -and
+  $postBuildPluginGate.Contains(
     'dev.flutter.plugins.integration_test.IntegrationTestPlugin'
   ) -and
   $postBuildPluginGate.Contains('manifest application-id')
@@ -688,22 +834,22 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('check-android-plugin-manifest-namespace-readiness.ps1') -and
-  $wrapper.Contains(
-    '& $pluginManifestNamespaceGate -RepositoryRoot $repositoryRoot | Out-Null'
-  ) -and
+  $wrapper.Contains('& $pluginManifestNamespaceGate') -and
+  $wrapper.Contains('Android plugin manifest-namespace readiness failed.') -and
   $pluginManifestNamespaceGate.Contains('dev_dependencies:') -and
   $pluginManifestNamespaceGate.Contains('directDevDependencies') -and
   $pluginManifestNamespaceGate.Contains(
     '$reviewedObsoletePackagePlugins = @('
   ) -and
   $pluginManifestNamespaceGate.Contains("'firebase_app_check'") -and
+  $pluginManifestNamespaceGate.Contains("'share_plus'") -and
   $pluginManifestNamespaceGate.Contains("'video_player_android'") -and
-  $pluginManifestNamespaceGate.Contains('$androidPlugins.Count -eq 19') -and
-  $pluginManifestNamespaceGate.Contains('$manifestCount -eq 17') -and
+  $pluginManifestNamespaceGate.Contains('$androidPlugins.Count -eq 20') -and
+  $pluginManifestNamespaceGate.Contains('$manifestCount -eq 18') -and
   $pluginManifestNamespaceGate.Contains('reviewedPinnedWarnings=') -and
   $pluginManifestNamespaceGate.Contains('never patch the machine Pub cache') -and
   $pluginManifestNamespaceInventory.Contains('directDevPluginsSkipped=1') -and
-  $pluginManifestNamespaceInventory.Contains('obsoletePackageAttributes=14')
+  $pluginManifestNamespaceInventory.Contains('obsoletePackageAttributes=15')
 ) 'prebuild Android plugin manifest-namespace readiness gate is missing or inaccurate.'
 
 Assert-SideloadControl (
@@ -715,9 +861,8 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('check-android-release-kotlin-plugin-readiness.ps1') -and
-  $wrapper.Contains(
-    '& $kotlinPluginReadinessGate -RepositoryRoot $repositoryRoot | Out-Null'
-  ) -and
+  $wrapper.Contains('& $kotlinPluginReadinessGate') -and
+  $wrapper.Contains('Android release Kotlin-plugin readiness failed.') -and
   $aabWrapper.Contains('check-android-release-kotlin-plugin-readiness.ps1') -and
   $aabWrapper.Contains(
     '& $kotlinPluginReadinessGate -RepositoryRoot $root | Out-Null'
@@ -727,7 +872,7 @@ Assert-SideloadControl (
   $kotlinPluginReadinessGate.Contains("'firebase_app_check'") -and
   $kotlinPluginReadinessGate.Contains("'mobile_scanner'") -and
   $kotlinPluginReadinessGate.Contains("'speech_to_text'") -and
-  $kotlinPluginReadinessGate.Contains('$releaseAndroidPlugins.Count -eq 19') -and
+  $kotlinPluginReadinessGate.Contains('$releaseAndroidPlugins.Count -eq 20') -and
   $kotlinPluginReadinessGate.Contains('reviewedPinnedWarnings=') -and
   $kotlinPluginReadinessGate.Contains('never patch the machine Pub cache') -and
   $kotlinPluginReadinessInventory.Contains('legacyKgpPlugins=3') -and

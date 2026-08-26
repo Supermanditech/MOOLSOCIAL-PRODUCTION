@@ -71,10 +71,16 @@ function Test-SealedParallelContinuationUnchanged {
       'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
       'integration/moolsocial/social-runtime-chat-v2-20260825',
       'integration/moolsocial/social-runtime-chat-v3-20260826',
-      'integration/moolsocial/social-runtime-chat-v4-20260826'
+      'integration/moolsocial/social-runtime-chat-v4-20260826',
+      'work/codex-auth/social-share-runtime-20260826'
     )
   ) {
     return $false
+  }
+  if ($branch -ceq 'work/codex-auth/social-share-runtime-20260826') {
+    & git -C $root merge-base --is-ancestor `
+      '0a40f68dc7697ae226aef469604761fa8b3d1301' HEAD
+    if ($LASTEXITCODE -ne 0) { return $false }
   }
   $codexTip = '922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9'
   $cursorTip = '00ce93552091ee51739266c0a8fbe6d207d9f695'

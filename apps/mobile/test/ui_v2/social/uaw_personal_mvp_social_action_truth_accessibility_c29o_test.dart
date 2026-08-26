@@ -89,8 +89,9 @@ void main() {
     expect(source, contains("hintText: 'Search YouTube'"));
     expect(source, contains('class _YouTubeSearchSurface'));
     expect(source, isNot(contains('Filter loaded videos')));
-    expect(source, contains("'YouTube link copied'"));
-    expect(source, contains('Clipboard.setData'));
+    expect(source, contains('_shareYouTubeVideo(video)'));
+    expect(source, contains("title: 'Share YouTube video'"));
+    expect(source, isNot(contains("'YouTube link copied'")));
   });
 }
 

@@ -84,6 +84,11 @@ val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
                 "Firebase Core is missing from the release plugin registrant.",
             )
         }
+        if (!source.contains("dev.fluttercommunity.plus.share.SharePlusPlugin")) {
+            throw GradleException(
+                "Share Plus is missing from the release plugin registrant.",
+            )
+        }
         if (source.contains("IntegrationTestPlugin")) {
             throw GradleException(
                 "Integration test plugin remains in the release registrant.",

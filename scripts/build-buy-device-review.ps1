@@ -89,7 +89,8 @@ $successorBuildFoundationGate = Join-Path `
   $PSScriptRoot `
   'test-public-auth-sideload-build-controls.ps1'
 & $successorBuildFoundationGate `
-  -RepositoryRoot $repositoryRoot | Out-Null
+  -RepositoryRoot $repositoryRoot `
+  -PreApkStatePath $machineStateFile | Out-Null
 $successorBuildFoundationPassed = $?
 if (-not $successorBuildFoundationPassed) {
   throw 'Mandatory successor APK build-foundation gate failed.'
@@ -106,11 +107,12 @@ $pluginIntegrityFixtureGate = Join-Path `
 $pluginManifestNamespaceGate = Join-Path `
   $PSScriptRoot `
   'check-android-plugin-manifest-namespace-readiness.ps1'
-& $pluginManifestNamespaceGate -RepositoryRoot $repositoryRoot | Out-Null
 $kotlinPluginReadinessGate = Join-Path `
   $PSScriptRoot `
   'check-android-release-kotlin-plugin-readiness.ps1'
-& $kotlinPluginReadinessGate -RepositoryRoot $repositoryRoot | Out-Null
+$resourceIntegrityGate = Join-Path `
+  $PSScriptRoot `
+  'check-android-release-resource-integrity.ps1'
 
 if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) {
   New-Item -ItemType Directory -Path $artifactRoot | Out-Null
@@ -467,17 +469,36 @@ try {
     throw 'APK regression pre-build machine gate failed.'
   }
 
-  $resourceIntegrityGate = Join-Path $repositoryRoot (
-    'scripts\check-android-release-resource-integrity.ps1'
-  )
-  & $resourceIntegrityGate `
-    -RepositoryRoot $repositoryRoot `
-    -RunGradleLink
-  if (-not $?) {
-    throw 'Android release resource-integrity preflight failed.'
+  $lockedDependencyReleasePreflight = {
+    & flutter pub get --enforce-lockfile
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Locked Flutter dependency resolution failed before APK build.'
+    }
+    & $pluginManifestNamespaceGate `
+      -RepositoryRoot $repositoryRoot | Out-Null
+    if (-not $?) {
+      throw 'Android plugin manifest-namespace readiness failed.'
+    }
+    & $kotlinPluginReadinessGate `
+      -RepositoryRoot $repositoryRoot | Out-Null
+    if (-not $?) {
+      throw 'Android release Kotlin-plugin readiness failed.'
+    }
+    & $resourceIntegrityGate `
+      -RepositoryRoot $repositoryRoot `
+      -RunGradleLink | Out-Null
+    if (-not $?) {
+      throw 'Android release resource-integrity preflight failed.'
+    }
   }
 
   if ($PreflightOnly) {
+    $dependencyPreflightExit = Invoke-MoolSocialFlutterWithCleanSupport `
+      -RepositoryRoot $repositoryRoot `
+      -Invocation $lockedDependencyReleasePreflight
+    if ($dependencyPreflightExit -ne 0) {
+      throw 'Guarded Android dependency preflight failed.'
+    }
     Write-Output (
       'Device-review APK preflight passed without artifact build: ' +
       "candidate=$CandidateId; version=$BuildName; buildNumber=$BuildNumber; " +
@@ -512,6 +533,7 @@ try {
   $flutterExit = Invoke-MoolSocialFlutterWithCleanSupport `
     -RepositoryRoot $repositoryRoot `
     -Invocation {
+      & $lockedDependencyReleasePreflight
       & flutter @buildArguments
     }
   if ($flutterExit -ne 0) {

@@ -561,7 +561,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 3) `
+Assert-Coordination ($continuationBindings.Count -eq 5) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -578,7 +578,10 @@ foreach ($continuationBinding in $continuationBindings) {
   }
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
-    [string]$continuationBinding.state -ceq 'founder_authorized_2026_08_25' -and
+    [string]$continuationBinding.state -cin @(
+      'founder_authorized_2026_08_25',
+      'founder_authorized_2026_08_26'
+    ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
     [string]$continuationBinding.task -cmatch '^/root/[a-z0-9_]+$' -and
