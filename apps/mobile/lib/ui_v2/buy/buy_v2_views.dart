@@ -30,6 +30,94 @@ String _destinationSummary(Set<BuyV2Destination> destinations) {
       .join(' + ');
 }
 
+enum BuyV2PurchasePurpose { personal, business }
+
+@immutable
+class BuyV2BusinessBillingDetails {
+  const BuyV2BusinessBillingDetails({
+    required this.id,
+    required this.legalName,
+    required this.gstin,
+    required this.billingAddress,
+  });
+
+  final String id;
+  final String legalName;
+  final String gstin;
+  final String billingAddress;
+
+  String get gstLabel => gstin.isEmpty ? 'GSTIN not added' : gstin;
+}
+
+class BuyV2CheckoutBillingController extends ChangeNotifier {
+  final Map<BuyV2Destination, BuyV2PurchasePurpose> _purposes = {
+    BuyV2Destination.shop: BuyV2PurchasePurpose.personal,
+    BuyV2Destination.wholesale: BuyV2PurchasePurpose.personal,
+  };
+  final Map<BuyV2Destination, BuyV2BusinessBillingDetails> _selected = {};
+  final List<BuyV2BusinessBillingDetails> _savedProfiles = [];
+  int _nextProfileId = 1;
+
+  BuyV2PurchasePurpose purposeFor(BuyV2Destination destination) =>
+      _purposes[destination] ?? BuyV2PurchasePurpose.personal;
+
+  BuyV2BusinessBillingDetails? detailsFor(BuyV2Destination destination) =>
+      _selected[destination];
+
+  List<BuyV2BusinessBillingDetails> get savedProfiles =>
+      List.unmodifiable(_savedProfiles);
+
+  void choosePurpose(
+    BuyV2Destination destination,
+    BuyV2PurchasePurpose purpose,
+  ) {
+    if (destination != BuyV2Destination.shop &&
+        destination != BuyV2Destination.wholesale) {
+      return;
+    }
+    if (_purposes[destination] == purpose) return;
+    _purposes[destination] = purpose;
+    notifyListeners();
+  }
+
+  void selectSavedProfile(
+    BuyV2Destination destination,
+    BuyV2BusinessBillingDetails details,
+  ) {
+    _purposes[destination] = BuyV2PurchasePurpose.business;
+    _selected[destination] = details;
+    notifyListeners();
+  }
+
+  void saveBusinessDetails({
+    required BuyV2Destination destination,
+    required String legalName,
+    required String gstin,
+    required String billingAddress,
+    required bool saveToProfile,
+  }) {
+    final normalizedGstin = gstin.trim().toUpperCase();
+    final existing = _selected[destination];
+    final details = BuyV2BusinessBillingDetails(
+      id: existing?.id ?? 'billing-${_nextProfileId++}',
+      legalName: legalName.trim(),
+      gstin: normalizedGstin,
+      billingAddress: billingAddress.trim(),
+    );
+    _purposes[destination] = BuyV2PurchasePurpose.business;
+    _selected[destination] = details;
+    if (saveToProfile) {
+      final index = _savedProfiles.indexWhere((item) => item.id == details.id);
+      if (index == -1) {
+        _savedProfiles.add(details);
+      } else {
+        _savedProfiles[index] = details;
+      }
+    }
+    notifyListeners();
+  }
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({super.key, required this.session});
 
@@ -2055,6 +2143,21 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           (destination) =>
               lines.any((line) => line.product.destination == destination),
         );
+    final visibleDestinations = destinations.toSet();
+    final visibleItemCount = lines.fold<int>(
+      0,
+      (total, line) => total + line.quantity,
+    );
+    final visibleTotal = lines.fold<int>(
+      0,
+      (total, line) => total + line.total,
+    );
+    void clearVisibleCart() {
+      for (final line in List<BuyV2CartLine>.of(lines)) {
+        session.remove(line.product.id);
+      }
+    }
+
     return Column(
       children: [
         Padding(
@@ -2088,9 +2191,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final summary =
-                              '${_productCountLabel(session.itemCount)} · '
-                              '${_destinationSummary(session.cartDestinations)} · '
-                              '${buyV2Money(session.cartTotal)}';
+                              '${_productCountLabel(visibleItemCount)} · '
+                              '${_destinationSummary(visibleDestinations)} · '
+                              '${buyV2Money(visibleTotal)}';
                           return BuyV2FiniteValueTransition(
                             key: const ValueKey('buy-cart-header-value-motion'),
                             stateKey: summary,
@@ -2105,7 +2208,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   ),
                 ),
                 TextButton(
-                  onPressed: session.clearCart,
+                  onPressed: clearVisibleCart,
                   child: const Text(
                     'Clear',
                     style: TextStyle(color: Color(0xFFB42318), fontSize: 10),
@@ -2216,10 +2319,371 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   }
 }
 
+class _PurchasePurposeCard extends StatelessWidget {
+  const _PurchasePurposeCard({
+    required this.destination,
+    required this.controller,
+  });
+
+  final BuyV2Destination destination;
+  final BuyV2CheckoutBillingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final purpose = controller.purposeFor(destination);
+    final details = controller.detailsFor(destination);
+    final label = destination == BuyV2Destination.wholesale
+        ? 'Wholesale'
+        : 'Shop';
+    return Container(
+      key: ValueKey('buy-purchase-purpose-${destination.name}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.softBlue,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$label purchase', style: context.buyBody),
+                    Text(
+                      'Choose invoice details. This never changes what you can buy.',
+                      style: context.buyMeta.copyWith(fontSize: 8),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Expanded(
+                child: _PurchasePurposeChoice(
+                  key: ValueKey('buy-purchase-personal-${destination.name}'),
+                  label: 'Personal',
+                  selected: purpose == BuyV2PurchasePurpose.personal,
+                  onTap: () => controller.choosePurpose(
+                    destination,
+                    BuyV2PurchasePurpose.personal,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: _PurchasePurposeChoice(
+                  key: ValueKey('buy-purchase-business-${destination.name}'),
+                  label: 'Business / GST',
+                  selected: purpose == BuyV2PurchasePurpose.business,
+                  onTap: () => controller.choosePurpose(
+                    destination,
+                    BuyV2PurchasePurpose.business,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (purpose == BuyV2PurchasePurpose.business) ...[
+            const SizedBox(height: 9),
+            if (controller.savedProfiles.isNotEmpty) ...[
+              Text(
+                'Saved billing details',
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+              const SizedBox(height: 5),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final profile in controller.savedProfiles)
+                    ChoiceChip(
+                      key: ValueKey('buy-billing-profile-${profile.id}'),
+                      label: Text(profile.legalName),
+                      selected: details?.id == profile.id,
+                      onSelected: (_) =>
+                          controller.selectSavedProfile(destination, profile),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 7),
+            ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: details == null
+                    ? BuyV2Colors.softOrange
+                    : BuyV2Colors.softGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          details?.legalName ?? 'Add business invoice details',
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        Text(
+                          details == null
+                              ? 'GSTIN can be added when applicable.'
+                              : '${details.gstLabel} · ${details.billingAddress}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: ValueKey(
+                      'buy-business-billing-${details == null ? 'add' : 'edit'}-'
+                      '${destination.name}',
+                    ),
+                    onPressed: () => showBuyV2BusinessBillingSheet(
+                      context,
+                      controller: controller,
+                      destination: destination,
+                    ),
+                    child: Text(details == null ? 'Add' : 'Edit'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PurchasePurposeChoice extends StatelessWidget {
+  const _PurchasePurposeChoice({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    button: true,
+    child: SizedBox(
+      height: 44,
+      child: OutlinedButton(
+        onPressed: selected ? null : onTap,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected ? BuyV2Colors.navy : Colors.white,
+          foregroundColor: selected ? Colors.white : BuyV2Colors.navy,
+          disabledBackgroundColor: BuyV2Colors.navy,
+          disabledForegroundColor: Colors.white,
+          side: const BorderSide(color: BuyV2Colors.line),
+        ),
+        child: Text(label, textAlign: TextAlign.center),
+      ),
+    ),
+  );
+}
+
+Future<void> showBuyV2BusinessBillingSheet(
+  BuildContext context, {
+  required BuyV2CheckoutBillingController controller,
+  required BuyV2Destination destination,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  routeSettings: const RouteSettings(name: 'buy-business-billing-details'),
+  builder: (context) => _BuyV2BusinessBillingSheet(
+    controller: controller,
+    destination: destination,
+  ),
+);
+
+class _BuyV2BusinessBillingSheet extends StatefulWidget {
+  const _BuyV2BusinessBillingSheet({
+    required this.controller,
+    required this.destination,
+  });
+
+  final BuyV2CheckoutBillingController controller;
+  final BuyV2Destination destination;
+
+  @override
+  State<_BuyV2BusinessBillingSheet> createState() =>
+      _BuyV2BusinessBillingSheetState();
+}
+
+class _BuyV2BusinessBillingSheetState
+    extends State<_BuyV2BusinessBillingSheet> {
+  late final TextEditingController _legalName;
+  late final TextEditingController _gstin;
+  late final TextEditingController _billingAddress;
+  bool _saveToProfile = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.controller.detailsFor(widget.destination);
+    _legalName = TextEditingController(text: existing?.legalName);
+    _gstin = TextEditingController(text: existing?.gstin);
+    _billingAddress = TextEditingController(text: existing?.billingAddress);
+  }
+
+  @override
+  void dispose() {
+    _legalName.dispose();
+    _gstin.dispose();
+    _billingAddress.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final legalName = _legalName.text.trim();
+    final gstin = _gstin.text.trim().toUpperCase();
+    final billingAddress = _billingAddress.text.trim();
+    final gstinPattern = RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$',
+    );
+    if (legalName.length < 3 || billingAddress.length < 8) {
+      setState(() => _error = 'Add the business name and billing address.');
+      return;
+    }
+    if (gstin.isNotEmpty && !gstinPattern.hasMatch(gstin)) {
+      setState(() => _error = 'Check the 15-character GSTIN format.');
+      return;
+    }
+    widget.controller.saveBusinessDetails(
+      destination: widget.destination,
+      legalName: legalName,
+      gstin: gstin,
+      billingAddress: billingAddress,
+      saveToProfile: _saveToProfile,
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: const ValueKey('buy-business-billing-sheet'),
+    padding: EdgeInsets.fromLTRB(
+      16,
+      12,
+      16,
+      16 + MediaQuery.viewInsetsOf(context).bottom,
+    ),
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Business invoice details',
+            style: context.buyTitle.copyWith(fontSize: 20),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'These details change the invoice only—not what you can buy.',
+            style: context.buyMeta,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('buy-business-legal-name'),
+            controller: _legalName,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Business / legal name',
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('buy-business-gstin'),
+            controller: _gstin,
+            textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.next,
+            maxLength: 15,
+            decoration: const InputDecoration(
+              labelText: 'GSTIN (when applicable)',
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            key: const ValueKey('buy-business-billing-address'),
+            controller: _billingAddress,
+            minLines: 2,
+            maxLines: 3,
+            textInputAction: TextInputAction.newline,
+            decoration: const InputDecoration(labelText: 'Billing address'),
+          ),
+          SwitchListTile.adaptive(
+            key: const ValueKey('buy-business-save-profile'),
+            contentPadding: EdgeInsets.zero,
+            value: _saveToProfile,
+            onChanged: (value) => setState(() => _saveToProfile = value),
+            title: const Text('Save to my billing profiles'),
+            subtitle: const Text('Reuse these details on a later purchase.'),
+          ),
+          if (_error case final error?) ...[
+            Text(
+              error,
+              key: const ValueKey('buy-business-billing-error'),
+              style: const TextStyle(
+                color: Color(0xFFB42318),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              key: const ValueKey('buy-business-billing-save'),
+              onPressed: _save,
+              child: const Text('Use business details'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class BuyV2CheckoutView extends StatelessWidget {
-  const BuyV2CheckoutView({super.key, required this.session});
+  const BuyV2CheckoutView({
+    super.key,
+    required this.session,
+    required this.billingController,
+  });
 
   final BuyV2Session session;
+  final BuyV2CheckoutBillingController billingController;
 
   @override
   Widget build(BuildContext context) {
@@ -2232,139 +2696,175 @@ class BuyV2CheckoutView extends StatelessWidget {
             'Your Cart is unchanged. Select or add an address before placing the order.',
       );
     }
-    final destinations = session.checkoutDestinations;
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            key: const PageStorageKey('buy-checkout'),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-            children: [
-              _ReturnAffordance(
-                label: 'Cart',
-                onTap: () => session.openCart(scope: session.checkoutScope),
-                tightHitOwner: true,
-                hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
-                minimumHeight: 44,
-              ),
-              const SizedBox(height: 7),
-              Text(
-                'Review order',
-                style: context.buyTitle.copyWith(fontSize: 19),
-              ),
-              const SizedBox(height: 8),
-              _SavedAddressReminder(
-                address: address,
-                onEdit: () => showBuyV2AddressSheet(context, session),
-              ),
-              const SizedBox(height: 9),
-              for (final group in session.checkoutFulfilmentGroups) ...[
-                _CheckoutCard(
-                  icon: switch (group.destination) {
-                    BuyV2Destination.shop => Icons.storefront_outlined,
-                    BuyV2Destination.wholesale => Icons.inventory_2_outlined,
-                    BuyV2Destination.medicine => Icons.medication_outlined,
-                    BuyV2Destination.orders => Icons.receipt_long_outlined,
-                  },
-                  title:
-                      '${group.destination.label} fulfilment · ${group.partner}',
-                  detail: [
-                    '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
-                    group.promise,
-                    if (session.selectedDeliveryInstructionFor(
-                          group.destination,
-                        )
-                        case final instruction?)
-                      '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
-                    if (session.tipForGroup(group) > 0)
-                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
-                  ].join('\n'),
-                ),
-                const SizedBox(height: 7),
-              ],
-              for (final benefit in session.selectedCartBenefitsFor(
-                destinations,
-              )) ...[
-                _CheckoutCard(
-                  key: ValueKey(
-                    'buy-checkout-benefit-${benefit.destination.name}-'
-                    '${benefit.kind.name}',
+    return AnimatedBuilder(
+      animation: billingController,
+      builder: (context, _) {
+        final destinations = session.checkoutDestinations;
+        final purchaseDestinations = destinations
+            .where(
+              (destination) =>
+                  destination == BuyV2Destination.shop ||
+                  destination == BuyV2Destination.wholesale,
+            )
+            .toList(growable: false);
+        final missingBusinessDetails = purchaseDestinations.where(
+          (destination) =>
+              billingController.purposeFor(destination) ==
+                  BuyV2PurchasePurpose.business &&
+              billingController.detailsFor(destination) == null,
+        );
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                key: const PageStorageKey('buy-checkout'),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                children: [
+                  _ReturnAffordance(
+                    label: 'Cart',
+                    onTap: () => session.openCart(scope: session.checkoutScope),
+                    tightHitOwner: true,
+                    hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
+                    minimumHeight: 44,
                   ),
-                  icon: benefit.kind == BuyV2CartBenefitKind.coupon
-                      ? Icons.local_offer_outlined
-                      : Icons.account_balance_wallet_outlined,
-                  title:
-                      '${benefit.destination.label} '
-                      '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
-                  detail:
-                      '${benefit.title}\nEligibility and any saving will be '
-                      'confirmed before payment. No amount has been deducted '
-                      'from this review total.',
-                  action: 'Review',
-                  onTap: () => _openCartBenefitsPage(
-                    context,
-                    session: session,
-                    kind: benefit.kind,
-                    destination: benefit.destination,
+                  const SizedBox(height: 7),
+                  Text(
+                    'Review order',
+                    style: context.buyTitle.copyWith(fontSize: 19),
                   ),
-                ),
-                const SizedBox(height: 7),
-              ],
-              const SizedBox(height: 11),
-              _CheckoutCard(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Payment · ${session.selectedPayment}',
-                detail: destinations.contains(BuyV2Destination.wholesale)
-                    ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
-                    : 'Selected payment method for this order.',
-                action: 'Change',
-                onTap: () => showBuyV2PaymentSheet(context, session),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-        Container(
-          key: const ValueKey('buy-checkout-action-bar'),
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _productCountLabel(session.checkoutItemCount),
-                      style: context.buyMeta.copyWith(fontSize: 8),
+                  const SizedBox(height: 8),
+                  _SavedAddressReminder(
+                    address: address,
+                    onEdit: () => showBuyV2AddressSheet(context, session),
+                  ),
+                  const SizedBox(height: 9),
+                  for (final destination in purchaseDestinations) ...[
+                    _PurchasePurposeCard(
+                      destination: destination,
+                      controller: billingController,
                     ),
-                    Text(
-                      buyV2Money(session.checkoutPayableTotal),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 19,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
+                    const SizedBox(height: 7),
+                  ],
+                  for (final group in session.checkoutFulfilmentGroups) ...[
+                    _CheckoutCard(
+                      icon: switch (group.destination) {
+                        BuyV2Destination.shop => Icons.storefront_outlined,
+                        BuyV2Destination.wholesale =>
+                          Icons.inventory_2_outlined,
+                        BuyV2Destination.medicine => Icons.medication_outlined,
+                        BuyV2Destination.orders => Icons.receipt_long_outlined,
+                      },
+                      title:
+                          '${group.destination.label} fulfilment · ${group.partner}',
+                      detail: [
+                        '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
+                        group.promise,
+                        if (session.selectedDeliveryInstructionFor(
+                              group.destination,
+                            )
+                            case final instruction?)
+                          '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
+                        if (session.tipForGroup(group) > 0)
+                          'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
+                      ].join('\n'),
+                    ),
+                    const SizedBox(height: 7),
+                  ],
+                  for (final benefit in session.selectedCartBenefitsFor(
+                    destinations,
+                  )) ...[
+                    _CheckoutCard(
+                      key: ValueKey(
+                        'buy-checkout-benefit-${benefit.destination.name}-'
+                        '${benefit.kind.name}',
+                      ),
+                      icon: benefit.kind == BuyV2CartBenefitKind.coupon
+                          ? Icons.local_offer_outlined
+                          : Icons.account_balance_wallet_outlined,
+                      title:
+                          '${benefit.destination.label} '
+                          '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
+                      detail:
+                          '${benefit.title}\nEligibility and any saving will be '
+                          'confirmed before payment. No amount has been deducted '
+                          'from this review total.',
+                      action: 'Review',
+                      onTap: () => _openCartBenefitsPage(
+                        context,
+                        session: session,
+                        kind: benefit.kind,
+                        destination: benefit.destination,
                       ),
                     ),
+                    const SizedBox(height: 7),
                   ],
-                ),
+                  const SizedBox(height: 11),
+                  _CheckoutCard(
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'Payment · ${session.selectedPayment}',
+                    detail: destinations.contains(BuyV2Destination.wholesale)
+                        ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
+                        : 'Selected payment method for this order.',
+                    action: 'Change',
+                    onTap: () => showBuyV2PaymentSheet(context, session),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              SizedBox(
-                width: 176,
-                height: 44,
-                child: FilledButton(
-                  onPressed: session.confirmOrder,
-                  child: const Text('Place order'),
-                ),
+            ),
+            Container(
+              key: const ValueKey('buy-checkout-action-bar'),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: BuyV2Colors.line)),
               ),
-            ],
-          ),
-        ),
-      ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _productCountLabel(session.checkoutItemCount),
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        Text(
+                          buyV2Money(session.checkoutPayableTotal),
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 19,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    height: 44,
+                    child: FilledButton(
+                      onPressed: missingBusinessDetails.isEmpty
+                          ? session.confirmOrder
+                          : () => showBuyV2BusinessBillingSheet(
+                              context,
+                              controller: billingController,
+                              destination: missingBusinessDetails.first,
+                            ),
+                      child: Text(
+                        missingBusinessDetails.isEmpty
+                            ? 'Place order'
+                            : 'Add business details',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -6084,12 +6584,9 @@ class _CartScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopes = const [
-      BuyV2CartScope.all,
-      BuyV2CartScope.shop,
-      BuyV2CartScope.wholesale,
-      BuyV2CartScope.medicine,
-    ];
+    final scopes = session.cartScope == BuyV2CartScope.medicine
+        ? const [BuyV2CartScope.medicine]
+        : const [BuyV2CartScope.shop, BuyV2CartScope.wholesale];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Container(

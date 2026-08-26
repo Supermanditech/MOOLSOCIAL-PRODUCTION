@@ -148,6 +148,118 @@ void main() {
     );
   });
 
+  testWidgets(
+    'B01 T01 keeps Shop buyer-open and wires reusable business GST details',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = mixedSession();
+      addTearDown(session.dispose);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('buy-purchase-purpose-shop')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-purchase-purpose-medicine')),
+        findsNothing,
+      );
+      expect(find.text('Personal'), findsOneWidget);
+      expect(find.text('Business / GST'), findsOneWidget);
+      expect(find.text('Place order'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-purchase-business-shop')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Add business details'), findsWidgets);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-business-billing-add-shop')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-business-billing-sheet')),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-business-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-business-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-business-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('buy-business-billing-save')),
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-business-billing-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shree Balaji Retail'), findsWidgets);
+      expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
+      expect(find.text('Place order'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-billing-profile-billing-1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-return-cart')));
+      await tester.pumpAndSettle();
+      expect(session.cartScope, BuyV2CartScope.shop);
+      expect(
+        session.cartLines.every(
+          (line) => line.product.destination == BuyV2Destination.shop,
+        ),
+        isTrue,
+      );
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Shree Balaji Retail'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('B01 T01 Shop cart entry never opens Medicine cart content', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.medicine).id),
+      isTrue,
+    );
+    session.openDestination(BuyV2Destination.shop);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-compact-cart-indicator')));
+    await tester.pumpAndSettle();
+
+    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(
+      session.cartLines.every(
+        (line) => line.product.destination == BuyV2Destination.shop,
+      ),
+      isTrue,
+    );
+    expect(find.textContaining('Medicine'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
     tester,
   ) async {
