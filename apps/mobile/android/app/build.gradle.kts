@@ -222,4 +222,5 @@ dependencies {
     // Android Credential Manager can report a provider/configuration failure
     // as a user cancellation after account selection. Keep one explicit,
     // production-proven Play Services identity bridge for the Google button.
+    implementation("com.google.android.gms:play-services-auth:21.6.0")
 }

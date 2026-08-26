@@ -839,14 +839,33 @@ abstract interface class GoogleIdentityGateway {
   Future<void> signOut();
 }
 
+typedef GoogleLegacyIdentitySignIn =
+    Future<String?> Function(String serverClientId);
+typedef GoogleLegacyIdentitySignOut = Future<void> Function();
+
+const _googleLegacyIdentityChannel = MethodChannel(
+  'com.moolsocial.app/google_identity_fallback',
+);
+
+Future<String?> _authenticateGoogleLegacyIdentity(String serverClientId) =>
+    _googleLegacyIdentityChannel.invokeMethod<String>('authenticateIdToken', {
+      'serverClientId': serverClientId,
+    });
+
+Future<void> _signOutGoogleLegacyIdentity() =>
+    _googleLegacyIdentityChannel.invokeMethod<void>('signOut');
+
 class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
   NativeGoogleIdentityGateway({
     required this.serverClientId,
-    this.authenticationTimeout = const Duration(seconds: 45),
+    this.authenticationTimeout = const Duration(minutes: 5),
     Future<void> Function(String serverClientId)? initialize,
     bool Function()? supportsAuthenticate,
     Future<String?> Function()? authenticateIdToken,
     Future<void> Function()? signOut,
+    GoogleLegacyIdentitySignIn? legacyAuthenticateIdToken,
+    GoogleLegacyIdentitySignOut? legacySignOut,
+    bool Function()? isAndroid,
     GoogleAuthStageObserver? stageObserver,
   }) : _initialize =
            initialize ??
@@ -862,6 +881,10 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
              return account.authentication.idToken;
            }),
        _signOut = signOut ?? GoogleSignIn.instance.signOut,
+       _legacyAuthenticateIdToken =
+           legacyAuthenticateIdToken ?? _authenticateGoogleLegacyIdentity,
+       _legacySignOut = legacySignOut ?? _signOutGoogleLegacyIdentity,
+       _isAndroid = isAndroid ?? (() => Platform.isAndroid),
        _stageObserver = stageObserver ?? _emitSanitizedGoogleAuthStage;
 
   final String serverClientId;
@@ -870,6 +893,9 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
   final bool Function() _supportsAuthenticate;
   final Future<String?> Function() _authenticateIdToken;
   final Future<void> Function() _signOut;
+  final GoogleLegacyIdentitySignIn _legacyAuthenticateIdToken;
+  final GoogleLegacyIdentitySignOut _legacySignOut;
+  final bool Function() _isAndroid;
   final GoogleAuthStageObserver _stageObserver;
   Future<void>? _initialization;
 
@@ -906,8 +932,25 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
       );
     } on GoogleSignInException catch (error) {
       if (error.code == GoogleSignInExceptionCode.canceled) {
-        _stageObserver('auth-google-native-no-identity');
-        return null;
+        if (!_isAndroid()) {
+          _stageObserver('auth-google-native-no-identity');
+          return null;
+        }
+        _stageObserver('auth-google-native-legacy-fallback-started');
+        try {
+          final idToken = await _legacyAuthenticateIdToken(
+            clientId,
+          ).timeout(authenticationTimeout);
+          if (idToken == null || idToken.isEmpty) {
+            _stageObserver('auth-google-native-no-identity');
+            return null;
+          }
+          _stageObserver('auth-google-native-legacy-identity-returned');
+          return idToken;
+        } on PlatformException catch (fallbackError) {
+          _stageObserver('auth-google-native-legacy-fallback-failed');
+          throw _googleFailure(fallbackError.code);
+        }
       }
       _stageObserver('auth-google-native-provider-failed');
       throw _googleFailure(error.code.name);
@@ -935,6 +978,7 @@ class NativeGoogleIdentityGateway implements GoogleIdentityGateway {
   Future<void> signOut() async {
     if (_initialization == null) return;
     await _signOut();
+    if (_isAndroid()) await _legacySignOut();
   }
 
   JourneyServiceException _googleFailure(String code) {

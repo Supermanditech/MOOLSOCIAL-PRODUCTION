@@ -33,7 +33,8 @@ void main() {
       signInMethods: ['X'],
     );
     expect(brokeredIdentity.primaryLabel, '@vetonewsline');
-    expect(brokeredIdentity.detailLabel, '@vetonewsline · X');
+    expect(brokeredIdentity.detailLabel, 'Signed in to MoolSocial');
+    expect(brokeredIdentity.detailLabel, isNot(contains('X')));
   });
 
   group('FirebaseSocialAuthGateway', () {
@@ -664,6 +665,63 @@ void main() {
       expect(stages, contains('auth-google-native-no-identity'));
       expect(stages.join(' '), isNot(contains('private')));
     });
+
+    test(
+      'Android cancellation uses the bounded Play Services fallback',
+      () async {
+        var legacyCalls = 0;
+        final stages = <String>[];
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          ),
+          legacyAuthenticateIdToken: (clientId) async {
+            expect(clientId, 'synthetic-client-id');
+            legacyCalls += 1;
+            return 'synthetic-legacy-id-token';
+          },
+          legacySignOut: () async {},
+          isAndroid: () => true,
+          stageObserver: stages.add,
+        );
+
+        expect(
+          await gateway.authenticateIdToken(),
+          'synthetic-legacy-id-token',
+        );
+        expect(legacyCalls, 1);
+        expect(stages, contains('auth-google-native-legacy-fallback-started'));
+        expect(stages, contains('auth-google-native-legacy-identity-returned'));
+        expect(stages, isNot(contains('auth-google-native-no-identity')));
+      },
+    );
+
+    test(
+      'Android sign-out clears primary and fallback identity state',
+      () async {
+        var primarySignOuts = 0;
+        var legacySignOuts = 0;
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => 'synthetic-id-token',
+          signOut: () async => primarySignOuts += 1,
+          legacyAuthenticateIdToken: (_) async => null,
+          legacySignOut: () async => legacySignOuts += 1,
+          isAndroid: () => true,
+        );
+
+        expect(await gateway.authenticateIdToken(), 'synthetic-id-token');
+        await gateway.signOut();
+
+        expect(primarySignOuts, 1);
+        expect(legacySignOuts, 1);
+      },
+    );
 
     test(
       'Google stage telemetry spans native identity and Firebase exchange',

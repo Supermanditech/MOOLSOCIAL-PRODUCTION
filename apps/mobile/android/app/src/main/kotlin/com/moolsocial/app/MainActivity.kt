@@ -19,6 +19,10 @@ import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPORTS_BEGIN
 // No custom Google identity imports: the registered Flutter plugin owns them.
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPORTS_END
@@ -34,6 +38,8 @@ class MainActivity : FlutterActivity() {
     private val areaChannel = "com.moolsocial.app/current_area"
     private val invoiceChannel = "com.moolsocial.app/invoice"
     private val createInvoiceRequestCode = 6108
+    private val googleIdentityChannel = "com.moolsocial.app/google_identity_fallback"
+    private val googleIdentityRequestCode = 6110
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_BEGIN
     // Google identity state is owned by the registered google_sign_in plugin.
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_END
@@ -41,6 +47,7 @@ class MainActivity : FlutterActivity() {
     private val invoiceExecutor = Executors.newSingleThreadExecutor()
     private var pendingInvoiceResult: MethodChannel.Result? = null
     private var pendingInvoiceBytes: ByteArray? = null
+    private var pendingGoogleIdentityResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -66,9 +73,70 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            googleIdentityChannel,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "authenticateIdToken" -> {
+                    val serverClientId = call.argument<String>("serverClientId")?.trim()
+                    if (serverClientId.isNullOrEmpty()) {
+                        result.error(
+                            "google_identity_configuration",
+                            "Google sign-in is not configured.",
+                            null,
+                        )
+                    } else {
+                        authenticateGoogleIdToken(serverClientId, result)
+                    }
+                }
+                "signOut" -> signOutGoogleIdentity(result)
+                else -> result.notImplemented()
+            }
+        }
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_REGISTRATION_BEGIN
-        // GeneratedPluginRegistrant registers the official Google identity plugin.
+        // Credential Manager remains primary; the Play Services bridge handles
+        // only devices that falsely return cancellation before showing identity UI.
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_REGISTRATION_END
+    }
+
+    @Suppress("DEPRECATION")
+    private fun authenticateGoogleIdToken(
+        serverClientId: String,
+        result: MethodChannel.Result,
+    ) {
+        if (pendingGoogleIdentityResult != null) {
+            result.error("google_identity_busy", "Google sign-in is already active.", null)
+            return
+        }
+        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(serverClientId)
+            .requestEmail()
+            .build()
+        pendingGoogleIdentityResult = result
+        try {
+            Log.i("MoolSocialGoogle", "fallback_started")
+            startActivityForResult(
+                GoogleSignIn.getClient(this, options).signInIntent,
+                googleIdentityRequestCode,
+            )
+        } catch (_: Exception) {
+            pendingGoogleIdentityResult = null
+            result.error(
+                "google_identity_ui_unavailable",
+                "Google account selection is unavailable.",
+                null,
+            )
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signOutGoogleIdentity(result: MethodChannel.Result) {
+        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(this, options).signOut()
+            .addOnCompleteListener { result.success(null) }
     }
 
     @Suppress("DEPRECATION")
@@ -202,6 +270,38 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == googleIdentityRequestCode) {
+            Log.i("MoolSocialGoogle", "fallback_result_$resultCode")
+            val result = pendingGoogleIdentityResult
+            pendingGoogleIdentityResult = null
+            if (result == null) return
+            if (resultCode != Activity.RESULT_OK || data == null) {
+                result.success(null)
+                return
+            }
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(data)
+                    .getResult(ApiException::class.java)
+                val idToken = account.idToken
+                if (idToken.isNullOrEmpty()) {
+                    result.error(
+                        "google_identity_missing_token",
+                        "Google did not return an identity token.",
+                        null,
+                    )
+                } else {
+                    result.success(idToken)
+                }
+            } catch (error: ApiException) {
+                Log.i("MoolSocialGoogle", "fallback_status_${error.statusCode}")
+                result.error(
+                    "google_identity_status_${error.statusCode}",
+                    "Google account selection could not be completed.",
+                    null,
+                )
+            }
+            return
+        }
         if (requestCode != createInvoiceRequestCode) {
             super.onActivityResult(requestCode, resultCode, data)
             return
@@ -365,9 +465,15 @@ class MainActivity : FlutterActivity() {
         )
         pendingInvoiceResult = null
         pendingInvoiceBytes = null
+        pendingGoogleIdentityResult?.error(
+            "google_identity_interrupted",
+            "Google account selection was interrupted.",
+            null,
+        )
+        pendingGoogleIdentityResult = null
         super.onDestroy()
     }
 }
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPLEMENTATION_BEGIN
-// No legacy activity-result identity bridge is permitted in the FIX11 path.
+// Play Services fallback is bounded to false Credential Manager cancellations.
 // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPLEMENTATION_END
