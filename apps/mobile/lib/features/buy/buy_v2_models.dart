@@ -160,6 +160,7 @@ class BuyV2FulfilmentGroup {
     required this.partnerType,
     required this.promise,
     required this.lines,
+    this.promisedByLabel,
   });
 
   final BuyV2Destination destination;
@@ -167,6 +168,7 @@ class BuyV2FulfilmentGroup {
   final String partnerType;
   final String promise;
   final List<BuyV2CartLine> lines;
+  final String? promisedByLabel;
 
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
@@ -219,6 +221,9 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.purchaseId,
+    this.promisedByLabel,
+    this.updatedDeliveryEstimate,
     this.productIds = const [],
     this.lines = const [],
     this.paymentMethod,
@@ -239,6 +244,9 @@ class BuyV2Order {
   final String destinationLabel;
   final double progress;
   final BuyV2OrderStatus status;
+  final String? purchaseId;
+  final String? promisedByLabel;
+  final String? updatedDeliveryEstimate;
   final List<String> productIds;
   final List<BuyV2CartLine> lines;
   final String? paymentMethod;

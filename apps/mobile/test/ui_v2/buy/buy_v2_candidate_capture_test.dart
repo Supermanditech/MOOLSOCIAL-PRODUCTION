@@ -940,6 +940,76 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'B01 T01C delivery plan and split founder captures',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const _CaptureT01CDeliveryFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 47, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-oil'), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery plan'), findsOneWidget);
+      expect(
+        find.textContaining('Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Delivered in 1 day · by tomorrow 4:00 PM'),
+        findsOneWidget,
+      );
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t01c-checkout-delivery-plan-founder-390x844.png',
+        ),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t01c-confirmation-split-founder-390x844.png',
+        ),
+      );
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -1062,6 +1132,27 @@ final class _CaptureAutomaticFulfilmentFactsAdapter
         .copyWith(
           deliveryPromise: 'within 5 min',
           sourceId: 'b01-t02-founder-capture',
+        );
+  }
+}
+
+final class _CaptureT01CDeliveryFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _CaptureT01CDeliveryFactsAdapter();
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final quote = switch (product.destination) {
+      BuyV2Destination.shop => ('within 5 min', 'by 6:35 PM'),
+      BuyV2Destination.wholesale => ('within 1 day', 'by tomorrow 4:00 PM'),
+      _ => (product.deliveryPromise, null),
+    };
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: quote.$1,
+          promisedByLabel: quote.$2,
+          sourceId: 'b01-t01c-founder-capture',
         );
   }
 }

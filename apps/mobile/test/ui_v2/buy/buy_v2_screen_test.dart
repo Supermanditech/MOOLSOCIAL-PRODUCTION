@@ -48,6 +48,30 @@ final class _FixedDeliveryPromiseFactsAdapter
   }
 }
 
+final class _T01CMutableDeliveryFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  final promises = <BuyV2Destination, (String, String)>{
+    BuyV2Destination.shop: ('within 5 min', 'by 6:35 PM'),
+    BuyV2Destination.wholesale: ('within 1 day', 'by tomorrow 4:00 PM'),
+  };
+
+  void updateShop({required String promise, required String promisedBy}) {
+    promises[BuyV2Destination.shop] = (promise, promisedBy);
+  }
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final quote = promises[product.destination];
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: quote?.$1 ?? product.deliveryPromise,
+          promisedByLabel: quote?.$2,
+          sourceId: 'b01-t01c-ui-quote',
+        );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -2912,9 +2936,134 @@ void main() {
     session.openCheckout();
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Shop fulfilment ·'), findsOneWidget);
-    expect(find.textContaining('Wholesale fulfilment ·'), findsNothing);
-    expect(find.textContaining('Medicine fulfilment ·'), findsNothing);
+    expect(find.text('Delivery plan'), findsOneWidget);
+    expect(find.textContaining('Delivery 1 ·'), findsOneWidget);
+    expect(session.checkoutDestinations, {BuyV2Destination.shop});
+    expect(session.checkoutFulfilmentGroups, hasLength(1));
+    expect(
+      find.byKey(
+        ValueKey(
+          'buy-checkout-delivery-plan-${session.checkoutFulfilmentGroups.single.key}',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'T01C carries exact mixed delivery promises through one purchase',
+    (tester) async {
+      final adapter = _T01CMutableDeliveryFactsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: adapter,
+      );
+      final shop = session.product('s-tomato');
+      final wholesale = session.product('w-oil');
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct(wholesale.id), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery plan'), findsOneWidget);
+      expect(
+        find.textContaining('Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Delivered in 1 day · by tomorrow 4:00 PM'),
+        findsOneWidget,
+      );
+      expect(find.text(shop.seller), findsNothing);
+      expect(find.text(wholesale.seller), findsNothing);
+      expect(find.text('Place order'), findsOneWidget);
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Order placed'), findsOneWidget);
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      expect(
+        find.text('Promised at Checkout · Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Promised at Checkout · Delivered in 1 day · by tomorrow 4:00 PM',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining(shop.seller), findsWidgets);
+      expect(find.textContaining(wholesale.seller), findsWidgets);
+      expect(session.confirmedPurchaseId, 'BUY-NEW-01');
+      expect(session.confirmedOrders.map((order) => order.purchaseId).toSet(), {
+        'BUY-NEW-01',
+      });
+    },
+  );
+
+  testWidgets('T01C blocks and explains a changed pre-commit promise', (
+    tester,
+  ) async {
+    final adapter = _T01CMutableDeliveryFactsAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: adapter,
+    );
+    final shop = session.product('s-tomato');
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.addProduct(shop.id), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await tester.pumpAndSettle();
+
+    adapter.updateShop(promise: 'within 10 min', promisedBy: 'by 6:40 PM');
+    await tester.tap(find.text('Place order'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-checkout-promise-change-review')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Previous · Delivered in 5 min · by 6:35 PM'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Updated · Delivered in 10 min · by 6:40 PM'),
+      findsOneWidget,
+    );
+    expect(session.confirmedOrders, isEmpty);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Place order'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('buy-accept-updated-delivery-times')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-promise-change-review')),
+      findsNothing,
+    );
+    await tester.tap(find.text('Place order'));
+    await tester.pumpAndSettle();
+    expect(find.text('Order placed'), findsOneWidget);
+    expect(
+      find.text('Promised at Checkout · Delivered in 10 min · by 6:40 PM'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -2945,9 +3094,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
-      expect(find.text('Shop order confirmed'), findsOneWidget);
-      expect(find.text('Wholesale order confirmed'), findsOneWidget);
-      expect(find.text('Medicine order confirmed'), findsNothing);
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      expect(find.text('Delivery 3 of 3'), findsNothing);
+      expect(find.textContaining('Promised at Checkout'), findsNWidgets(2));
+      expect(find.textContaining('Purchase BUY-NEW-01'), findsOneWidget);
       expect(
         find.textContaining(session.confirmedOrders.first.partner),
         findsWidgets,
@@ -2989,6 +3141,10 @@ void main() {
       await tester.tap(ordersAction);
       await tester.pumpAndSettle();
       expect(find.text('PURCHASES'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-purchase-group-BUY-NEW-01')),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(session.confirmedOrders.first.id),
         findsWidgets,
