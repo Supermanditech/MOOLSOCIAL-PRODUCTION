@@ -1675,7 +1675,7 @@
       "ticketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
       "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
       "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-      "manifestSha256": "0301C1B6FA0F427FF6E734E54F5BE5F516CF64A9247F004807FDA03E328F1951",
+      "manifestSha256": "11E8F7D030DCF3319C889AE7B7ECADF006A325F998333FAE80BD00B2C7FD5B5B",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
@@ -1727,7 +1727,7 @@
       ],
       "timelineImpactDays": 2,
       "within60To75DayLock": true,
-      "implementationState": "REL_PREAPK_01_CHILD_08_selected_five_function_Social_source_live_revision_and_client_compatibility_map_no_build_deploy_device_Play_secret_or_excluded_surface_action",
+      "implementationState": "REL_PREAPK_01_CHILD_09_selected_two_function_Social_backend_deployment_execution_and_rollback_gate_no_build_deploy_device_Play_secret_or_excluded_surface_action",
       "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
     },
     "priorC34ISelectedTicketAssessment": {

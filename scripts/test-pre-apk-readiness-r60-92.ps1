@@ -74,6 +74,11 @@ try {
   New-Item -ItemType Directory -Path (
     Join-Path $fixtureRoot 'config\runtime'
   ) -Force | Out-Null
+  Copy-Item -LiteralPath (
+    Join-Path $root 'config\social-runtime-deployment-map-r60-92.json'
+  ) -Destination (
+    Join-Path $fixtureRoot 'config\social-runtime-deployment-map-r60-92.json'
+  )
   New-Item -ItemType Directory -Path (
     Join-Path $fixtureRoot (
       'artifacts\quality\uaw-r60-92-social-runtime-consolidated-apk-20260826-01'
@@ -101,6 +106,11 @@ try {
       param($state)
       $state.candidate.packageName = 'com.example.moolsocial'
     }
+  Assert-Rejected -Label 'Social deployment map hash drift' `
+    -FixtureState $fixtureState -FixtureRoot $fixtureRoot -Mutate {
+      param($state)
+      $state.socialDeployment.mapSha256 = ('B' * 64)
+    }
 
   $readyState = Get-Content -Raw -LiteralPath $liveState | ConvertFrom-Json
   $readyState.state = 'preauthorization_ready'
@@ -120,7 +130,6 @@ try {
   $readyState.dependencyGate.wrapperQualified = $true
   $readyState.dependencyGate.postBuildPluginIntegrityQualified = $true
   $readyState.socialDeployment.state = 'passed_deploy_map_held'
-  $readyState.socialDeployment.mapSha256 = ('B' * 64)
   foreach ($gateState in @($readyState.preBuildGates)) {
     $gateState.state = 'passed'
   }
@@ -173,5 +182,5 @@ try {
 
 Write-Output (
   'R60.92 pre-APK gate self-test passed: ' +
-  'live=1; preauthorization=1; buildAuthorization=1; negative=5.'
+  'live=1; preauthorization=1; buildAuthorization=1; negative=6.'
 )

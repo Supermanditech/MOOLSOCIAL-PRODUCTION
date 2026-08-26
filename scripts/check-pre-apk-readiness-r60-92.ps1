@@ -48,6 +48,28 @@ function Get-RelativeOwner([string]$Path) {
   return $resolved.Substring($rootPrefix.Length).Replace('\', '/')
 }
 
+function Get-CanonicalTextSha256([string]$Path) {
+  $text = [IO.File]::ReadAllText($Path)
+  $canonical = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString(
+      $sha.ComputeHash([Text.UTF8Encoding]::new($false).GetBytes($canonical))
+    )).Replace('-', '')
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Assert-ExactStringSet($Actual, [string[]]$Expected, [string]$Label) {
+  $actualValues = @($Actual | ForEach-Object { [string]$_ })
+  Assert-PreApk (
+    $actualValues.Count -eq $Expected.Count -and
+    (@($actualValues | Sort-Object) -join '|') -ceq
+      (@($Expected | Sort-Object) -join '|')
+  ) "$Label changed."
+}
+
 Assert-PreApk (
   $stateFile.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase) -and
   (Test-Path -LiteralPath $stateFile -PathType Leaf)
@@ -67,6 +89,36 @@ Assert-PreApk (
   [string]$state.contractId -ceq 'MOOLSOCIAL-PRE-APK-READINESS-001' -and
   -not [bool]$state.privateValuesEmitted
 ) 'candidate state identity or privacy boundary changed.'
+
+$socialDeployment = $state.socialDeployment
+Assert-ExactNames $socialDeployment @(
+  'state','mapPath','mapSha256','mapHashMode','eligibleDeployments',
+  'preservedFunctions','coordinatedWindowFunctions',
+  'actualDeploymentAuthorized','privateValuesEmitted'
+) 'Social deployment'
+$socialMapPath = [IO.Path]::GetFullPath(
+  (Join-Path $root ([string]$socialDeployment.mapPath))
+)
+Assert-PreApk (
+  [string]$socialDeployment.mapPath -ceq
+    'config/social-runtime-deployment-map-r60-92.json' -and
+  $socialMapPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase) -and
+  (Test-Path -LiteralPath $socialMapPath -PathType Leaf) -and
+  [string]$socialDeployment.mapHashMode -ceq 'canonical_utf8_lf_sha256' -and
+  [string]$socialDeployment.mapSha256 -ceq
+    (Get-CanonicalTextSha256 $socialMapPath) -and
+  -not [bool]$socialDeployment.actualDeploymentAuthorized -and
+  -not [bool]$socialDeployment.privateValuesEmitted
+) 'Social deployment map path, hash mode, hash or authority changed.'
+Assert-ExactStringSet $socialDeployment.eligibleDeployments @(
+  'youtubeProvider','youtubeOAuthCallback'
+) 'eligible Social deployments'
+Assert-ExactStringSet $socialDeployment.preservedFunctions @(
+  'moolSocialPublicAuth','moolSocialChat','moolSocialContent'
+) 'preserved Social functions'
+Assert-ExactStringSet $socialDeployment.coordinatedWindowFunctions @(
+  'youtubeProvider','youtubeOAuthCallback'
+) 'coordinated-window Social functions'
 
 $candidate = $state.candidate
 Assert-ExactNames $candidate @(

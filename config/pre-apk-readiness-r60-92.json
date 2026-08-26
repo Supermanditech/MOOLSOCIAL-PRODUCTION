@@ -81,12 +81,13 @@
     "postBuildPluginIntegrityQualified": true
   },
   "socialDeployment": {
-    "state": "mapping_in_progress",
+    "state": "passed_deploy_map_held",
     "mapPath": "config/social-runtime-deployment-map-r60-92.json",
-    "mapSha256": "",
-    "eligibleDeployments": [],
-    "preservedFunctions": [],
-    "coordinatedWindowFunctions": [],
+    "mapSha256": "E36906CB0E78BCCF0B44B29B19DFA3E438FC6BDA0379DE4D1D30F3D88877D5FC",
+    "mapHashMode": "canonical_utf8_lf_sha256",
+    "eligibleDeployments": ["youtubeProvider", "youtubeOAuthCallback"],
+    "preservedFunctions": ["moolSocialPublicAuth", "moolSocialChat", "moolSocialContent"],
+    "coordinatedWindowFunctions": ["youtubeProvider", "youtubeOAuthCallback"],
     "actualDeploymentAuthorized": false,
     "privateValuesEmitted": false
   },
@@ -94,11 +95,11 @@
     {"id": "candidate-version", "state": "passed", "evidence": ["config/pre-apk-readiness-r60-92.json"]},
     {"id": "final-integration", "state": "pending", "evidence": []},
     {"id": "source-manifest", "state": "pending", "evidence": []},
-    {"id": "format-analysis", "state": "pending", "evidence": []},
-    {"id": "focused-tests", "state": "pending", "evidence": []},
+    {"id": "format-analysis", "state": "passed", "evidence": ["scripts/invoke-flutter-with-clean-support.ps1"]},
+    {"id": "focused-tests", "state": "passed", "evidence": ["backend/functions/src/youtube/provider_service.test.ts", "backend/functions/src/youtube/shared_catalogue.test.ts", "backend/functions/src/youtube/quota.test.ts"]},
     {"id": "full-regression-cycle-1", "state": "pending", "evidence": []},
     {"id": "full-regression-cycle-2", "state": "pending", "evidence": []},
-    {"id": "backend-functions", "state": "pending", "evidence": []},
+    {"id": "backend-functions", "state": "passed", "evidence": ["scripts/invoke-backend-node22-verify-r60-92.ps1"]},
     {"id": "hosting", "state": "pending", "evidence": []},
     {"id": "approved-locks", "state": "pending", "evidence": []},
     {"id": "protected-boundaries", "state": "pending", "evidence": []},
@@ -107,7 +108,7 @@
     {"id": "native-plugin-source-integrity", "state": "passed", "evidence": ["apps/mobile/android/app/build.gradle.kts", "scripts/check-apk-production-plugin-integrity.ps1", "scripts/check-aab-production-plugin-integrity.ps1", "scripts/test-release-production-plugin-integrity.ps1"]},
     {"id": "android-static-release-readiness", "state": "pending", "evidence": []},
     {"id": "runtime-define-sanitized-binding", "state": "pending", "evidence": []},
-    {"id": "social-deployment-map", "state": "pending", "evidence": []},
+    {"id": "social-deployment-map", "state": "passed", "evidence": ["config/social-runtime-deployment-map-r60-92.json", "scripts/check-social-runtime-deployment-map-r60-92.ps1", "scripts/test-social-runtime-deployment-map-r60-92.ps1"]},
     {"id": "secret-scan", "state": "pending", "evidence": []},
     {"id": "clean-remote-readback", "state": "pending", "evidence": []},
     {"id": "wrapper-self-test", "state": "passed", "evidence": ["scripts/test-public-auth-sideload-build-controls.ps1", "scripts/test-release-production-plugin-integrity.ps1"]}
@@ -134,7 +135,7 @@
     "final_integration_pending",
     "source_seal_and_two_cycles_pending",
     "runtime_define_sanitized_binding_pending",
-    "social_backend_deployment_map_pending",
+    "social_backend_two_function_deployment_pending_final_integration_and_founder_authority",
     "one_build_authority_founder_held"
   ],
   "privateValuesEmitted": false

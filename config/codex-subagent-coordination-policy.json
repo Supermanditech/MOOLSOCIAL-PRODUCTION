@@ -160,6 +160,7 @@
         "config/codex-subagent-coordination-policy.json",
         "config/mvp-scope-gate-state.json",
         "config/pre-apk-readiness-r60-92.json",
+        "config/social-runtime-deployment-map-r60-92.json",
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "apps/mobile/pubspec.yaml",
         "apps/mobile/pubspec.lock",
@@ -177,6 +178,7 @@
         "backend/functions/src/youtube/quota.test.ts",
         "backend/functions/src/youtube/shared_catalogue.test.ts",
         "scripts/build-buy-device-review.ps1",
+        "scripts/audit-deployed-social-function-source-r60-92.ps1",
         "scripts/check-approved-ui-locks.ps1",
         "scripts/check-aab-production-plugin-integrity.ps1",
         "scripts/check-android-plugin-manifest-namespace-readiness.ps1",
@@ -185,9 +187,12 @@
         "scripts/check-apk-production-plugin-integrity.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/check-pre-apk-readiness-r60-92.ps1",
+        "scripts/check-social-runtime-deployment-map-r60-92.ps1",
+        "scripts/invoke-backend-node22-verify-r60-92.ps1",
         "scripts/test-pre-apk-readiness-r60-92.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
-        "scripts/test-release-production-plugin-integrity.ps1"
+        "scripts/test-release-production-plugin-integrity.ps1",
+        "scripts/test-social-runtime-deployment-map-r60-92.ps1"
       ]
     },
     {
