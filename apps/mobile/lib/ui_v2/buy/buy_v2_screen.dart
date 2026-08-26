@@ -91,8 +91,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   int _shopChatMotionSequence = 0;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
-  final BuyV2CheckoutBillingController _checkoutBilling =
-      BuyV2CheckoutBillingController();
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -140,15 +138,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       widget.session.openTracking(orderId);
     } else if (widget.initialView == BuyV2View.cart) {
       widget.session.destination = widget.initialDestination;
-      final cartScope = widget.initialCartScope == BuyV2CartScope.all
-          ? switch (widget.initialDestination) {
-              BuyV2Destination.shop => BuyV2CartScope.shop,
-              BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
-              BuyV2Destination.medicine => BuyV2CartScope.medicine,
-              BuyV2Destination.orders => BuyV2CartScope.shop,
-            }
-          : widget.initialCartScope;
-      widget.session.openCart(scope: cartScope);
+      widget.session.openCart(scope: widget.initialCartScope);
     } else if (widget.initialView == BuyV2View.checkout) {
       widget.session.destination = widget.initialDestination;
       widget.session.openCheckout();
@@ -232,7 +222,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     _cartAcknowledgementTimer?.cancel();
     widget.session.removeListener(_sessionChanged);
     _searchController.dispose();
-    _checkoutBilling.dispose();
     super.dispose();
   }
 
@@ -359,10 +348,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                             ),
                           ),
                           if (!_shopChatActive && _showsMiniCart(session))
-                            _BuyMiniCartBar(
-                              session: session,
-                              offersActive: _offersActive,
-                            ),
+                            _BuyMiniCartBar(session: session),
                         ],
                       ),
                     ),
@@ -801,10 +787,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           _openBuyDestination(destination);
         },
       ),
-      BuyV2View.checkout => BuyV2CheckoutView(
-        session: session,
-        billingController: _checkoutBilling,
-      ),
+      BuyV2View.checkout => BuyV2CheckoutView(session: session),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
         invoiceDownloader: widget.invoiceDownloader,
@@ -1272,44 +1255,21 @@ String _buyAccountInitials(String label) {
 }
 
 class _BuyMiniCartBar extends StatelessWidget {
-  const _BuyMiniCartBar({required this.session, required this.offersActive});
+  const _BuyMiniCartBar({required this.session});
 
   final BuyV2Session session;
-  final bool offersActive;
 
   @override
   Widget build(BuildContext context) {
-    final offerScope =
-        session.countForDestination(BuyV2Destination.shop) == 0 &&
-            session.countForDestination(BuyV2Destination.wholesale) > 0
-        ? BuyV2CartScope.wholesale
-        : BuyV2CartScope.shop;
-    final cartScope = offersActive
-        ? offerScope
-        : switch (session.destination) {
-            BuyV2Destination.shop => BuyV2CartScope.shop,
-            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
-            BuyV2Destination.medicine => BuyV2CartScope.medicine,
-            BuyV2Destination.orders => BuyV2CartScope.all,
-          };
-    final cartDestination = switch (cartScope) {
-      BuyV2CartScope.shop || BuyV2CartScope.all => BuyV2Destination.shop,
-      BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
-      BuyV2CartScope.medicine => BuyV2Destination.medicine,
-    };
-    final itemCount = session.destination == BuyV2Destination.orders
-        ? session.itemCount
-        : session.countForDestination(cartDestination);
-    final total = session.destination == BuyV2Destination.orders
-        ? session.cartTotal
-        : session.totalForDestination(cartDestination);
+    final itemCount = session.itemCount;
+    final total = session.cartTotal;
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final cartMessage =
         session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
     const title = 'Cart';
     void activate() {
       HapticFeedback.selectionClick();
-      session.openCart(scope: cartScope);
+      session.openCart();
     }
 
     return Semantics(
