@@ -28,6 +28,8 @@ param(
   [ValidateNotNullOrEmpty()]
   [string]$MachineStatePath,
 
+  [string]$RuntimeStatePath,
+
   [ValidateSet(
     'EmulatorDeviceReview',
     'YouTubePublicDevReview',
@@ -63,6 +65,18 @@ $machineStateFile = Resolve-ReleaseArtifactRepositoryDescendant `
   -RepositoryRoot $repositoryRoot `
   -Path $MachineStatePath `
   -Label 'APK regression machine-state file'
+$runtimeStateFile = if ($CandidateId -ceq
+    'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+  if ([string]::IsNullOrWhiteSpace($RuntimeStatePath)) {
+    throw 'R60.92 runtime-definition state path is missing.'
+  }
+  Resolve-ReleaseArtifactRepositoryDescendant `
+    -RepositoryRoot $repositoryRoot `
+    -Path $RuntimeStatePath `
+    -Label 'R60.92 runtime-definition state file'
+} else {
+  $machineStateFile
+}
 $runtimeDefineFile = $null
 
 $branch = git -C $repositoryRoot branch --show-current
@@ -385,7 +399,7 @@ function Get-PublicAuthSideloadRuntimeValues {
   return $values
 }
 
-$machineState = Get-Content -Raw -LiteralPath $machineStateFile |
+$machineState = Get-Content -Raw -LiteralPath $runtimeStateFile |
   ConvertFrom-Json
 if (
   [string]$machineState.requiredRuntimeDefines.
@@ -617,6 +631,7 @@ $runtimeSummary = if ($RuntimeProfile -ceq 'YouTubePublicDevReview') {
   "VersionCode=$BuildNumber",
   "BuildMode=$BuildMode",
   "MachineState=$machineStateFile",
+  "RuntimeState=$runtimeStateFile",
   "Branch=$($branch.Trim())",
   "HEAD=$($head.Trim())",
   "SourceFingerprint=$SourceFingerprint",
