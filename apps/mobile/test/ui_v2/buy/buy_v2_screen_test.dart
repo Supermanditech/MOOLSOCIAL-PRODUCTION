@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -26,6 +27,25 @@ final class _FixedOffersSource implements BuyV2PublishedOffersSource {
 
   @override
   final List<BuyV2PublishedOffer> publishedOffers;
+}
+
+final class _FixedDeliveryPromiseFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _FixedDeliveryPromiseFactsAdapter(this.deliveryPromise);
+
+  final String deliveryPromise;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: deliveryPromise,
+          orderabilityLabel: 'Available to add',
+          sourceId: 'b01-t02-server-assignment',
+          stale: false,
+        );
+  }
 }
 
 void main() {
@@ -1463,11 +1483,11 @@ void main() {
       PageStorageKey('buy-product-${product.id}'),
     );
     await tester.scrollUntilVisible(
-      find.text('Pack, delivery and seller'),
+      find.text('Price, pack and delivery'),
       220,
       scrollable: productScrollable,
     );
-    expect(find.text('Pack, delivery and seller'), findsOneWidget);
+    expect(find.text('Price, pack and delivery'), findsOneWidget);
     final wholesaleTerms = find.text('Wholesale terms', skipOffstage: false);
     expect(wholesaleTerms, findsOneWidget);
     await tester.ensureVisible(wholesaleTerms);
@@ -1506,7 +1526,7 @@ void main() {
   });
 
   testWidgets(
-    'product detail uses packshot partner role reviews and reporting',
+    'product detail uses automatic fulfilment reviews and reporting',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       final product = BuyV2Catalogue.products.firstWhere(
@@ -1525,11 +1545,12 @@ void main() {
         PageStorageKey('buy-product-${product.id}'),
       );
       await tester.scrollUntilVisible(
-        find.text('Mool Retail Partner'),
+        find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
         220,
         scrollable: productScrollable,
       );
-      expect(find.text('Mool Retail Partner'), findsOneWidget);
+      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+      expect(find.text(product.seller), findsNothing);
       expect(find.textContaining('Verified'), findsNothing);
 
       final reviews = find.byKey(ValueKey('buy-product-reviews-${product.id}'));
@@ -1573,6 +1594,99 @@ void main() {
       expect(find.text('Reported'), findsOneWidget);
       expect(session.hasReportedProduct(product.id), isTrue);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'B01 T02 keeps one product while server promises 3 5 and 10 minutes',
+    (tester) async {
+      for (final testCase in const [
+        (productId: 's-oil', destination: BuyV2Destination.shop, minutes: 3),
+        (productId: 's-tomato', destination: BuyV2Destination.shop, minutes: 5),
+        (
+          productId: 'w-oil',
+          destination: BuyV2Destination.wholesale,
+          minutes: 10,
+        ),
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          productFactsAdapter: _FixedDeliveryPromiseFactsAdapter(
+            'within ${testCase.minutes} min',
+          ),
+        );
+        final product = session.product(testCase.productId);
+
+        await tester.pumpWidget(app(session));
+        await tester.pumpAndSettle();
+        session.openDestination(testCase.destination);
+        session.openProduct(product.id);
+        await tester.pumpAndSettle();
+        final productScrollable = scrollableWithin(
+          PageStorageKey('buy-product-${product.id}'),
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+          220,
+          scrollable: productScrollable,
+        );
+
+        expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
+        expect(
+          find.text('Automatically assigned Mool Partner'),
+          findsOneWidget,
+        );
+        expect(find.text(product.seller), findsNothing);
+        expect(
+          find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
+          findsNothing,
+        );
+
+        expect(session.addProduct(product.id), isTrue);
+        session.openCart();
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Delivered in ${testCase.minutes} min'),
+          findsOneWidget,
+        );
+        expect(find.text(product.seller), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+    },
+  );
+
+  test(
+    'B01 T02 promise copy fails closed for checking stale and unavailable',
+    () {
+      final product = BuyV2Catalogue.products;
+      final base = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+        product.first,
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(
+          base.copyWith(orderabilityLabel: 'Checking serviceability'),
+        ),
+        'Checking delivery time',
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(base.copyWith(stale: true)),
+        'Delivery time needs review',
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(
+          base.copyWith(orderabilityLabel: 'Currently unavailable'),
+        ),
+        'Currently unavailable',
+      );
     },
   );
 
@@ -1888,13 +2002,16 @@ void main() {
           final productScrollable = scrollableWithin(
             PageStorageKey('buy-product-${product.id}'),
           );
+          final decisionOwner = destination == BuyV2Destination.medicine
+              ? find.text(product.partnerRole)
+              : find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}'));
           await tester.scrollUntilVisible(
-            find.text(product.partnerRole),
+            decisionOwner,
             140,
             scrollable: productScrollable,
           );
           expect(
-            find.text(product.partnerRole),
+            decisionOwner,
             findsOneWidget,
             reason: '$destination at $viewport',
           );
@@ -2756,7 +2873,7 @@ void main() {
   });
 
   testWidgets(
-    'featured card exposes seller context and a stable purchase action',
+    'featured card exposes automatic delivery and a stable purchase action',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
@@ -2764,13 +2881,19 @@ void main() {
       final product = session.visibleProducts.first;
       final card = find.byKey(ValueKey('buy-product-${product.id}'));
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
-      final seller = find.textContaining(product.seller);
+      final promise = find.descendant(
+        of: card,
+        matching: find.text(
+          buyV2BuyerDeliveryPromise(session.productFactsFor(product)),
+        ),
+      );
 
       expect(add, findsOneWidget);
-      expect(seller, findsWidgets);
+      expect(promise, findsOneWidget);
+      expect(find.textContaining(product.seller), findsNothing);
       final cardRect = tester.getRect(card);
       expect(cardRect.contains(tester.getCenter(add)), isTrue);
-      expect(cardRect.contains(tester.getCenter(seller.last)), isTrue);
+      expect(cardRect.contains(tester.getCenter(promise)), isTrue);
       expect(tester.getSize(add), const Size(44, 44));
     },
   );

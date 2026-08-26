@@ -46,36 +46,16 @@ class BuyV2ProductView extends StatelessWidget {
     }
     final quantity = session.quantityFor(product.id);
     final review = session.customerReviewFor(product.id);
-    final partnerProducts = product.destination == BuyV2Destination.wholesale
-        ? session.supplierContinuationsFor(product)
-        : session.sellerContinuationsFor(product);
-    final partnerActionKey = switch (product.destination) {
-      BuyV2Destination.shop => 'buy-shop-seller-action-${product.id}',
-      BuyV2Destination.wholesale =>
-        'buy-wholesale-supplier-action-${product.id}',
-      BuyV2Destination.medicine => 'buy-medicine-pharmacy-action-${product.id}',
-      BuyV2Destination.orders => 'buy-order-partner-action-${product.id}',
-    };
-    final partnerActionDetail = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        '${partnerProducts.length} other current '
-            '${partnerProducts.length == 1 ? 'pack' : 'packs'}',
-      BuyV2Destination.medicine =>
-        '${partnerProducts.length} other current products · Not medical advice',
-      _ => '${partnerProducts.length} other current products',
-    };
-    final partnerSemanticLabel = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        'View ${partnerProducts.length} more '
-            '${partnerProducts.length == 1 ? 'product' : 'products'} '
-            'from ${product.seller} in the current Wholesale catalogue',
-      BuyV2Destination.medicine =>
-        'View ${partnerProducts.length} more products from ${product.seller} '
-            'in the current Medicine catalogue. Not medical advice',
-      _ =>
-        'View ${partnerProducts.length} more products from ${product.seller} '
-            'in the current Shop catalogue',
-    };
+    final facts = session.productFactsFor(product);
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final buyerPromise = automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : facts.deliveryPromise;
+    final partnerProducts = product.destination == BuyV2Destination.medicine
+        ? session.sellerContinuationsFor(product)
+        : const <BuyV2Product>[];
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
@@ -174,7 +154,9 @@ class BuyV2ProductView extends StatelessWidget {
                   ),
                   _ProductTrustPill(
                     icon: Icons.schedule_rounded,
-                    label: 'Delivery promise shown',
+                    label: automaticFulfilment
+                        ? buyerPromise
+                        : 'Delivery promise shown',
                     color: BuyV2Colors.green,
                   ),
                   if (product.regulatoryTrustFact case final fact?)
@@ -187,8 +169,17 @@ class BuyV2ProductView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _DecisionPanel(
-                title: 'Pack, delivery and seller',
+                key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+                title: automaticFulfilment
+                    ? 'Price, pack and delivery'
+                    : 'Pack, delivery and pharmacy',
                 children: [
+                  if (automaticFulfilment)
+                    _DecisionRow(
+                      icon: Icons.currency_rupee_rounded,
+                      label: 'Price',
+                      value: '${buyV2Money(facts.price)} · MoolSocial price',
+                    ),
                   _DecisionRow(
                     icon: Icons.inventory_2_outlined,
                     label: 'Pack',
@@ -197,23 +188,34 @@ class BuyV2ProductView extends StatelessWidget {
                   _DecisionRow(
                     icon: Icons.schedule_rounded,
                     label: 'Delivery',
-                    value: product.deliveryPromise,
+                    value: buyerPromise,
                     valueColor: BuyV2Colors.green,
                   ),
-                  if (partnerProducts.isEmpty)
+                  if (automaticFulfilment)
                     _DecisionRow(
                       icon: Icons.storefront_outlined,
+                      label: 'Fulfilment',
+                      value: buyV2AutomaticFulfilmentLabel(product.destination),
+                    )
+                  else if (partnerProducts.isEmpty)
+                    _DecisionRow(
+                      icon: Icons.local_pharmacy_outlined,
                       label: product.partnerRole,
                       value: product.seller,
                     )
                   else
                     _DecisionActionRow(
-                      key: ValueKey(partnerActionKey),
-                      icon: Icons.storefront_outlined,
+                      key: ValueKey(
+                        'buy-medicine-pharmacy-action-${product.id}',
+                      ),
+                      icon: Icons.local_pharmacy_outlined,
                       label: product.partnerRole,
                       value: product.seller,
-                      detail: partnerActionDetail,
-                      semanticLabel: partnerSemanticLabel,
+                      detail:
+                          '${partnerProducts.length} other current products · Not medical advice',
+                      semanticLabel:
+                          'View ${partnerProducts.length} more products from ${product.seller} '
+                          'in the current Medicine catalogue. Not medical advice',
                       onTap: () => _showPartnerProductsSheet(
                         context,
                         session,
@@ -221,16 +223,31 @@ class BuyV2ProductView extends StatelessWidget {
                         partnerProducts,
                       ),
                     ),
-                  _DecisionRow(
-                    icon: Icons.route_outlined,
-                    label: 'Delivery path',
-                    value: product.origin,
-                  ),
-                  _DecisionRow(
-                    icon: Icons.event_available_outlined,
-                    label: 'Price checked',
-                    value: product.confirmedOn,
-                  ),
+                  if (automaticFulfilment) ...[
+                    _DecisionRow(
+                      icon: Icons.location_on_outlined,
+                      label: 'Deliver to',
+                      value:
+                          session.selectedAddressOrNull?.shortLine ??
+                          'Choose a delivery address',
+                    ),
+                    const _DecisionRow(
+                      icon: Icons.verified_outlined,
+                      label: 'Price source',
+                      value: 'Published by MoolSocial',
+                    ),
+                  ] else ...[
+                    _DecisionRow(
+                      icon: Icons.route_outlined,
+                      label: 'Delivery path',
+                      value: product.origin,
+                    ),
+                    _DecisionRow(
+                      icon: Icons.event_available_outlined,
+                      label: 'Price checked',
+                      value: product.confirmedOn,
+                    ),
+                  ],
                   if (product.destination == BuyV2Destination.shop)
                     _DecisionRow(
                       icon: Icons.assignment_return_outlined,
@@ -324,11 +341,20 @@ class BuyV2ProductView extends StatelessWidget {
                     label: 'Pack size',
                     value: product.pack,
                   ),
-                  _DecisionRow(
-                    icon: Icons.route_outlined,
-                    label: 'Source route',
-                    value: product.origin,
-                  ),
+                  if (automaticFulfilment)
+                    _DecisionRow(
+                      icon: Icons.location_on_outlined,
+                      label: 'Service area',
+                      value:
+                          session.selectedAddressOrNull?.shortLine ??
+                          'Based on your delivery address',
+                    )
+                  else
+                    _DecisionRow(
+                      icon: Icons.route_outlined,
+                      label: 'Source route',
+                      value: product.origin,
+                    ),
                   if (product.returnPolicy case final returnPolicy?)
                     _DecisionRow(
                       icon: Icons.assignment_return_outlined,
@@ -5945,7 +5971,11 @@ class _ReturnAffordance extends StatelessWidget {
 }
 
 class _DecisionPanel extends StatelessWidget {
-  const _DecisionPanel({required this.title, required this.children});
+  const _DecisionPanel({
+    super.key,
+    required this.title,
+    required this.children,
+  });
 
   final String title;
   final List<Widget> children;
@@ -8063,6 +8093,13 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = line.product;
+    final facts = session.productFactsFor(product);
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final buyerPromise = automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : product.deliveryPromise;
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
@@ -8125,7 +8162,9 @@ class _CartLine extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  '${product.deliveryPromise} · ${product.seller}',
+                                  automaticFulfilment
+                                      ? '$buyerPromise · MoolSocial price'
+                                      : '${product.deliveryPromise} · ${product.seller}',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(

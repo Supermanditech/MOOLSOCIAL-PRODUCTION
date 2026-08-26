@@ -3412,6 +3412,12 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final session = widget.session;
     final product = widget.product;
     final facts = session.productFactsFor(product);
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final buyerPromise = automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : facts.deliveryPromise;
     final quantity = session.quantityFor(product.id);
     final rxBlocked =
         product.requiresPrescription &&
@@ -3427,7 +3433,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         child: Semantics(
           label:
               '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
-              '${facts.deliveryPromise}, fulfilled by ${facts.partner}',
+              '$buyerPromise${automaticFulfilment ? ', MoolSocial price' : ', fulfilled by ${facts.partner}'}',
           button: true,
           child: Material(
             color: Colors.transparent,
@@ -3518,8 +3524,10 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 const SizedBox(width: 5),
                                 Expanded(
                                   child: Text(
-                                    '${facts.partner} · '
-                                    '${_compactDeliveryPromise(facts.deliveryPromise)}',
+                                    automaticFulfilment
+                                        ? buyerPromise
+                                        : '${facts.partner} · '
+                                              '${_compactDeliveryPromise(facts.deliveryPromise)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.end,
@@ -3708,6 +3716,12 @@ class BuyV2ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = session.productFactsFor(product);
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final buyerPromise = automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : facts.deliveryPromise;
     final quantity = session.quantityFor(product.id);
     final rxBlocked =
         product.requiresPrescription &&
@@ -3718,7 +3732,7 @@ class BuyV2ProductCard extends StatelessWidget {
       child: Semantics(
         label:
             '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
-            '${facts.deliveryPromise}, fulfilled by ${facts.partner}',
+            '$buyerPromise${automaticFulfilment ? ', MoolSocial price' : ', fulfilled by ${facts.partner}'}',
         button: true,
         child: InkWell(
           key: ValueKey('buy-product-${product.id}'),
@@ -3862,9 +3876,11 @@ class BuyV2ProductCard extends StatelessWidget {
                                       Expanded(
                                         child: Text(
                                           compact
-                                              ? '${facts.partner} · '
-                                                    '${_compactDeliveryPromise(facts.deliveryPromise)}'
-                                              : facts.deliveryPromise,
+                                              ? automaticFulfilment
+                                                    ? buyerPromise
+                                                    : '${facts.partner} · '
+                                                          '${_compactDeliveryPromise(facts.deliveryPromise)}'
+                                              : buyerPromise,
                                           maxLines: compact ? 1 : 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -3880,7 +3896,9 @@ class BuyV2ProductCard extends StatelessWidget {
                                   if (!compact) ...[
                                     const SizedBox(height: 2),
                                     Text(
-                                      facts.partner,
+                                      automaticFulfilment
+                                          ? 'MoolSocial price'
+                                          : facts.partner,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -3892,7 +3910,11 @@ class BuyV2ProductCard extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${product.origin} · ${product.confirmedOn}',
+                                      automaticFulfilment
+                                          ? buyV2AutomaticFulfilmentLabel(
+                                              product.destination,
+                                            )
+                                          : '${product.origin} · ${product.confirmedOn}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
