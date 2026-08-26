@@ -88,12 +88,27 @@ foreach ($token in @(
 foreach ($forbidden in @(
   'com.moolsocial.app/google_identity',
   'GoogleSignInOptions',
-  'startActivityForResult',
-  'onActivityResult(',
   'GoogleSignIn.getSignedInAccountFromIntent'
 )) {
   Assert-Bridge (-not $activity.Contains($forbidden)) `
     "legacy native bridge token is present: $forbidden"
+}
+$activityResultTokens = @(
+  'startActivityForResult',
+  'onActivityResult('
+)
+if (@($activityResultTokens | Where-Object { $activity.Contains($_) }).Count -gt 0) {
+  foreach ($token in @(
+    'private val invoiceChannel = "com.moolsocial.app/invoice"',
+    'private val createInvoiceRequestCode = 6108',
+    'Intent.ACTION_CREATE_DOCUMENT',
+    'startActivityForResult(intent, createInvoiceRequestCode)',
+    'override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?)',
+    'if (requestCode != createInvoiceRequestCode)'
+  )) {
+    Assert-ContainsOnce $activity $token `
+      "non-Google document-result boundary changed: $token"
+  }
 }
 foreach ($token in @(
   'GoogleSignIn.instance.initialize(',

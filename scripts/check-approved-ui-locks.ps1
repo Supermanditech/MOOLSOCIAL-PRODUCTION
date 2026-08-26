@@ -261,6 +261,14 @@ function Assert-ProductionHash {
         current = '725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1'
       }
     }
+    'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt' {
+      @{
+        expected = @(
+          '5dceb1482f366c2a4dc1ecf0a2a85c5aef73ae341d18d1e977e46bee76f8298c'
+        )
+        current = '3f3e2fe25930b133de38693179deae19f738e34f681a0f779836117ec0426178'
+      }
+    }
     default { $null }
   }
   if ($null -ne $acceptedCurrent) {
