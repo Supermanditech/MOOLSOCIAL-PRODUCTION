@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([string]$RepositoryRoot)
+param(
+  [string]$RepositoryRoot,
+  [switch]$PackagingOnly
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -22,6 +25,25 @@ function Assert-Test([bool]$Condition, [string]$Message) {
   if (-not $Condition) {
     throw "Social runtime deployment execution test failed: $Message"
   }
+}
+
+$firebaseConfig = Get-Content -LiteralPath (Join-Path $root 'firebase.json') `
+  -Raw | ConvertFrom-Json -Depth 100
+$providerFunctionsConfig = @($firebaseConfig.functions | Where-Object {
+  $_.codebase -ceq 'provider' -and $_.source -ceq 'backend/functions'
+})
+Assert-Test ($providerFunctionsConfig.Count -eq 1) `
+  'provider Functions packaging config is missing or ambiguous.'
+Assert-Test (
+  @($providerFunctionsConfig[0].ignore | Where-Object { $_ -ceq '.env*' }).Count `
+    -eq 1
+) 'provider Functions package does not exclude every dotenv file.'
+if ($PackagingOnly) {
+  Write-Output (
+    'Social runtime deployment packaging test passed: dotenvExcluded=true; ' +
+    'dryRuns=0; deploys=0; cloudWrites=0.'
+  )
+  return
 }
 
 function Write-Fixture($State) {
