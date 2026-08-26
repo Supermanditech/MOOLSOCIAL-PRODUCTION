@@ -453,18 +453,28 @@ if ($RuntimeProfile -ceq 'PublicAuthSideloadPreflight') {
 
 Push-Location $mobileRoot
 try {
-  $gateScript = Join-Path $repositoryRoot (
-    'scripts\check-apk-regression-gate-state.ps1'
-  )
-  & $gateScript `
-    -StatePath $machineStateFile `
-    -CandidateId $CandidateId `
-    -BuildName $BuildName `
-    -BuildNumber $BuildNumber `
-    -BuildMode $BuildMode `
-    -SourceFingerprint $SourceFingerprint `
-    -RuntimeDefine $runtimeDefines
-  $apkMachineGatePassed = $?
+  if ($CandidateId -ceq
+      'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+    & (Join-Path $repositoryRoot `
+      'scripts\check-pre-apk-readiness-r60-92.ps1') `
+      -RepositoryRoot $repositoryRoot `
+      -StatePath $machineStateFile `
+      -Phase BuildAuthorized
+    $apkMachineGatePassed = $?
+  } else {
+    $gateScript = Join-Path $repositoryRoot (
+      'scripts\check-apk-regression-gate-state.ps1'
+    )
+    & $gateScript `
+      -StatePath $machineStateFile `
+      -CandidateId $CandidateId `
+      -BuildName $BuildName `
+      -BuildNumber $BuildNumber `
+      -BuildMode $BuildMode `
+      -SourceFingerprint $SourceFingerprint `
+      -RuntimeDefine $runtimeDefines
+    $apkMachineGatePassed = $?
+  }
   if (-not $apkMachineGatePassed) {
     throw 'APK regression pre-build machine gate failed.'
   }
