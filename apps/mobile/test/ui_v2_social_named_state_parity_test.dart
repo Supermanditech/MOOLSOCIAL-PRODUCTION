@@ -10,6 +10,8 @@ import 'package:moolsocial/ui_v2/social/social_v2_creator.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_plans_promotion.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_connect.dart';
 
+import 'support/review_social_content_gateway.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -80,6 +82,7 @@ void main() {
     expect(find.text('YouTube Shorts are unavailable'), findsOneWidget);
 
     await _pump(tester, owners.consumer(sub: 'feed'));
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
       findsOneWidget,
@@ -368,7 +371,9 @@ class _Owners {
   final journey = JourneySession();
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();
-  final shared = SharedSession();
+  final shared = SharedSession(
+    socialContentGateway: ReviewSocialContentGateway(),
+  );
 
   SocialUniversalV2 consumer({String? sub, String? state}) => SocialUniversalV2(
     session: journey,

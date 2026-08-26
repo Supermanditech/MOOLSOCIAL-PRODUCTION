@@ -583,7 +583,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     } else if (_tab != SocialV2Tab.create) {
       _createView = 'home';
     }
-    if (widget.initialState != null) {
+    if (_tab == SocialV2Tab.feed && widget.initialState != null) {
       _feedState = _feedStateFor(widget.initialState);
     }
     _feedLinkContextActive =
@@ -733,7 +733,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       } else if (_tab != SocialV2Tab.create) {
         _createView = 'home';
       }
-      _feedState = _feedStateFor(widget.initialState);
+      if (_tab == SocialV2Tab.feed) {
+        _feedState = _feedStateFor(widget.initialState);
+      }
       _feedLinkContextActive =
           _tab == SocialV2Tab.feed &&
           (widget.initialItem?.trim().isNotEmpty ?? false);
