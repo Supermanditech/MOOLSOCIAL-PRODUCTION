@@ -298,6 +298,27 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_pre_apk_r60_92_readiness_20260826",
+        "state": "founder_authorized_2026_08_26",
+        "lane": "codex_auth",
+        "role": "primary",
+        "task": "/root/codex_auth_social_share_runtime_20260826",
+        "workId": "social-share-runtime-20260826",
+        "ticketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-social-share-runtime-20260826",
+        "branch": "work/codex-auth/social-share-runtime-20260826",
+        "baselineHead": "dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
+        "bootstrapCommitSubject": "coordination(social-share-runtime-20260826): bind r60.92 pre-APK readiness",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "config/mvp-scope-gate-state.json",
+          "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
       }
     ],
     "workspaceIsolation": {
