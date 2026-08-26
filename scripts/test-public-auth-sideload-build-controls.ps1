@@ -726,6 +726,10 @@ Assert-SideloadControl (
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
   $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
+  $wrapper.Contains(
+    "'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'"
+  ) -and
+  $wrapper.Contains('-Phase BuildAuthorized') -and
   $wrapper.Contains('$successorBuildFoundationPassed = $?') -and
   $wrapper.Contains('Mandatory successor APK build-foundation gate failed.') -and
   $aabWrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and

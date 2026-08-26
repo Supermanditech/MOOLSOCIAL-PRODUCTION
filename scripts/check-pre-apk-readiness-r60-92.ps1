@@ -113,15 +113,31 @@ Assert-PreApk (
     'config/social-runtime-deployment-execution-r60-92.json' -and
   [string]$socialDeployment.executionStateHashMode -ceq
     'canonical_utf8_lf_sha256' -and
-  [string]$socialDeployment.executionPhase -cin @(
-    'Prepared','RemoteReady','Completed','Contained'
-  ) -and
+  [string]$socialDeployment.executionPhase -ceq 'CompletedForward' -and
   [string]$socialDeployment.executionStateSha256 -cmatch '^[0-9A-F]{64}$' -and
   [bool]$socialDeployment.executionPrepared -and
-  -not [bool]$socialDeployment.actualDeploymentCompleted -and
+  [bool]$socialDeployment.actualDeploymentCompleted -and
   -not [bool]$socialDeployment.actualDeploymentAuthorized -and
   -not [bool]$socialDeployment.privateValuesEmitted
 ) 'Social deployment map path, hash mode, hash or authority changed.'
+$forwardReceiptPath = Join-Path $root `
+  'backend\functions\.env.social-runtime-redeploy-after-spec-repair-r60-92-attempt.local'
+Assert-PreApk (Test-Path -LiteralPath $forwardReceiptPath -PathType Leaf) `
+  'completed forward Social deployment receipt is missing.'
+$forwardReceipt = Get-Content -LiteralPath $forwardReceiptPath -Raw |
+  ConvertFrom-Json -Depth 50
+Assert-PreApk (
+  [string]$forwardReceipt.state -ceq 'completed' -and
+  [string]$forwardReceipt.newProviderRevision -ceq
+    'youtubeprovider-00061-nin' -and
+  [string]$forwardReceipt.newProviderGeneration -ceq '1787737119270703' -and
+  [string]$forwardReceipt.newCallbackRevision -ceq
+    'youtubeoauthcallback-00050-rub' -and
+  [string]$forwardReceipt.newCallbackGeneration -ceq '1787737192710630' -and
+  [int]$forwardReceipt.preservedFunctionCount -eq 3 -and
+  [int]$forwardReceipt.boundedRuntimeSmokeCount -eq 2 -and
+  -not [bool]$forwardReceipt.privateValuesEmitted
+) 'completed forward Social deployment receipt changed.'
 $socialExecutionPath = [IO.Path]::GetFullPath((Join-Path $root `
   ([string]$socialDeployment.executionStatePath)))
 Assert-PreApk (
@@ -316,8 +332,10 @@ if ($Phase -cin @('PreauthorizationReady', 'BuildAuthorized')) {
     [string]$state.dependencyGate.state -ceq 'passed' -and
     [bool]$state.dependencyGate.wrapperQualified -and
     [bool]$state.dependencyGate.postBuildPluginIntegrityQualified -and
-    [string]$state.socialDeployment.state -ceq 'passed_deploy_map_held' -and
+    [string]$state.socialDeployment.state -ceq
+      'passed_forward_runtime_verified' -and
     [string]$state.socialDeployment.mapSha256 -cmatch '^[0-9A-F]{64}$' -and
+    [bool]$state.socialDeployment.actualDeploymentCompleted -and
     -not [bool]$state.socialDeployment.actualDeploymentAuthorized -and
     -not [bool]$state.socialDeployment.privateValuesEmitted
   ) 'sealed integration, source, runtime, dependency or Social deployment proof is incomplete.'
