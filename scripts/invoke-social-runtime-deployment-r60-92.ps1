@@ -4,7 +4,8 @@ param(
   [string]$Mode = 'Validate',
   [string]$RepositoryRoot,
   [string]$StatePath,
-  [string]$Confirmation = ''
+  [string]$Confirmation = '',
+  [switch]$ValidateReceiptFixture
 )
 
 Set-StrictMode -Version Latest
@@ -45,6 +46,25 @@ function Get-TextSha256([string]$Text) {
 function Get-CanonicalFileSha256([string]$Path) {
   $text = [IO.File]::ReadAllText($Path)
   return Get-TextSha256 ($text.Replace("`r`n", "`n").Replace("`r", "`n"))
+}
+
+function ConvertTo-DeployTimestamp($Value) {
+  if ($Value -is [DateTimeOffset]) {
+    return ([DateTimeOffset]$Value).ToUniversalTime()
+  }
+  if ($Value -is [DateTime]) {
+    return [DateTimeOffset]::new(([DateTime]$Value).ToUniversalTime())
+  }
+  $parsed = [DateTimeOffset]::MinValue
+  $valid = [DateTimeOffset]::TryParseExact(
+    [string]$Value,
+    'yyyy-MM-ddTHH:mm:ss.fffZ',
+    [Globalization.CultureInfo]::InvariantCulture,
+    [Globalization.DateTimeStyles]::AssumeUniversal,
+    [ref]$parsed
+  )
+  Assert-Deploy $valid 'attempt receipt timestamp is invalid.'
+  return $parsed
 }
 
 function Invoke-Checked([scriptblock]$Action, [string]$Message) {
@@ -144,7 +164,8 @@ function Get-LiveFingerprint($Snapshot, [bool]$TupleRequired) {
   $runState = $Snapshot.Run
   $traffic = @($runState.status.traffic)
   $tagCount = @($traffic | Where-Object {
-    -not [string]::IsNullOrEmpty([string]$_.tag)
+    $null -ne $_.PSObject.Properties['tag'] -and
+      -not [string]::IsNullOrEmpty([string]$_.tag)
   }).Count
   $secretDetails = Get-SecretBindingDetails $functionState
   $serviceAccountHash = Get-TextSha256 `
@@ -292,6 +313,57 @@ function Assert-LocalRuntimeFile {
   return [IO.File]::ReadAllBytes($path)
 }
 
+function Add-FirebaseAnalysisInputs {
+  $runtimePath = Join-Path $root 'backend\functions\.env.moolsocial-dev-503018'
+  $privateSource = (
+    'C:\GUARANTEED OUTCOME\' +
+    'MOOLSOCIAL-WORKTREE-CODEX-youtube-connect-prebuild-20260824-v2\' +
+    'backend\functions\.env.moolsocial-dev-503018'
+  )
+  Assert-Deploy (Test-Path -LiteralPath $privateSource -PathType Leaf) `
+    'private Firebase analysis input source is missing.'
+  $runtimeText = [IO.File]::ReadAllText($runtimePath).
+    Replace("`r`n", "`n").Replace("`r", "`n")
+  $privateText = [Text.UTF8Encoding]::new($false, $true).
+    GetString([IO.File]::ReadAllBytes($privateSource)).
+    Replace("`r`n", "`n").Replace("`r", "`n").TrimStart([char]0xFEFF)
+  $values = @{}
+  foreach ($line in @(($runtimeText + "`n" + $privateText) -split "`n" |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+    Assert-Deploy ($line -cmatch '^([A-Z][A-Z0-9_]*)=(.*)$') `
+      'Firebase analysis input contains a malformed row.'
+    $key = [string]$Matches[1]
+    $value = [string]$Matches[2]
+    Assert-Deploy (
+      -not $values.ContainsKey($key) -and
+      -not [string]::IsNullOrWhiteSpace($value)
+    ) 'Firebase analysis input contains a duplicate or empty value.'
+    $values[$key] = $value
+  }
+  $analysisKeys = @(
+    'X_PUBLIC_CLIENT_ID',
+    'X_REDIRECT_URI',
+    'INSTAGRAM_PUBLIC_CLIENT_ID',
+    'INSTAGRAM_REDIRECT_URI'
+  )
+  Assert-Deploy (
+    $values.Count -eq 8 -and
+    @($analysisKeys | Where-Object { $values.ContainsKey($_) }).Count -eq 4 -and
+    @($expectedRuntimeTuple.Keys | Where-Object {
+      $values.ContainsKey([string]$_) -and
+      $values[[string]$_] -ceq [string]$expectedRuntimeTuple[[string]$_]
+    }).Count -eq 4
+  ) 'Firebase analysis input inventory differs from the bounded contract.'
+  $materialized = @($values.Keys | Sort-Object | ForEach-Object {
+    "$_=$($values[$_])"
+  }) -join "`n"
+  [IO.File]::WriteAllText(
+    $runtimePath,
+    $materialized + "`n",
+    [Text.UTF8Encoding]::new($false)
+  )
+}
+
 function Assert-CliAccountBinding($State) {
   $firebaseVersion = (& firebase --version 2>$null | Out-String).Trim()
   $gcloudVersionRows = @(& gcloud version 2>$null)
@@ -406,7 +478,11 @@ function Write-ReceiptReplace($Receipt, [string]$Path) {
 }
 
 function Assert-Receipt($Receipt, $State) {
-  $names = @($Receipt.PSObject.Properties.Name)
+  $names = if ($Receipt -is [Collections.IDictionary]) {
+    @($Receipt.Keys | ForEach-Object { [string]$_ })
+  } else {
+    @($Receipt.PSObject.Properties.Name)
+  }
   $expectedNames = @(
     'schema','state','projectId','region','integrationHead',
     'executionStateSha256','confirmationSha256','onlyTargetSha256',
@@ -427,26 +503,16 @@ function Assert-Receipt($Receipt, $State) {
     (@($names | Sort-Object) -join '|') -ceq
       (@($expectedNames | Sort-Object) -join '|')
   ) 'attempt receipt schema changed.'
-  $issued = [DateTimeOffset]::MinValue
-  $expires = [DateTimeOffset]::MinValue
-  $issuedValid = [DateTimeOffset]::TryParseExact(
-    [string]$Receipt.issuedAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$issued
-  )
-  $expiresValid = [DateTimeOffset]::TryParseExact(
-    [string]$Receipt.expiresAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$expires
-  )
-  $provider = @($State.predecessors | Where-Object function -eq
-    'youtubeProvider')[0]
-  $callback = @($State.predecessors | Where-Object function -eq
-    'youtubeOAuthCallback')[0]
+  $issued = ConvertTo-DeployTimestamp $Receipt.issuedAtUtc
+  $expires = ConvertTo-DeployTimestamp $Receipt.expiresAtUtc
+  $issuedValid = $true
+  $expiresValid = $true
+  $provider = @($State.predecessors | Where-Object {
+    $_.function -ceq 'youtubeProvider'
+  })[0]
+  $callback = @($State.predecessors | Where-Object {
+    $_.function -ceq 'youtubeOAuthCallback'
+  })[0]
   Assert-Deploy (
     $Receipt.schema -ceq 'moolsocial_social_runtime_deploy_attempt_v1' -and
     $Receipt.projectId -ceq $project -and $Receipt.region -ceq $region -and
@@ -505,7 +571,9 @@ function Assert-Receipt($Receipt, $State) {
 
 function Invoke-InvokerPostureRestoration($State, $Receipt, [string]$ReceiptPath) {
   $errors = @()
-  foreach ($record in @($State.predecessors | Where-Object deployTarget)) {
+  foreach ($record in @($State.predecessors | Where-Object {
+      [bool]$_.deployTarget
+    })) {
     $claimName = if ($record.function -ceq 'youtubeProvider') {
       'providerMetadataRestoreClaimed'
     } else {
@@ -540,7 +608,9 @@ function Invoke-TrafficContainment($State, $Receipt, [string]$ReceiptPath) {
   $errors = @()
   try { Invoke-InvokerPostureRestoration $State $Receipt $ReceiptPath }
   catch { $errors += $_.Exception.Message }
-  foreach ($record in @($State.predecessors | Where-Object deployTarget)) {
+  foreach ($record in @($State.predecessors | Where-Object {
+      [bool]$_.deployTarget
+    })) {
     $claimName = if ($record.function -ceq 'youtubeProvider') {
       'providerTrafficRestoreClaimed'
     } else {
@@ -568,12 +638,15 @@ function Invoke-TrafficContainment($State, $Receipt, [string]$ReceiptPath) {
     } catch { $errors += $_.Exception.Message }
   }
   $fingerprints = @()
-  foreach ($record in @($State.predecessors | Where-Object deployTarget)) {
+  foreach ($record in @($State.predecessors | Where-Object {
+      [bool]$_.deployTarget
+    })) {
     try {
       $restored = Read-LiveFunction $record
       $traffic = @($restored.Run.status.traffic)
       $tagCount = @($traffic | Where-Object {
-        -not [string]::IsNullOrEmpty([string]$_.tag)
+        $null -ne $_.PSObject.Properties['tag'] -and
+          -not [string]::IsNullOrEmpty([string]$_.tag)
       }).Count
       Assert-Deploy (
         $traffic.Count -eq 1 -and [int]$traffic[0].percent -eq 100 -and
@@ -663,6 +736,23 @@ $checker = Join-Path $root `
 $receiptPath = [IO.Path]::GetFullPath((Join-Path $root `
   ([string]$state.authority.attemptReceiptPath)))
 
+if ($ValidateReceiptFixture) {
+  Assert-Deploy ($Mode -ceq 'Validate') `
+    'receipt fixtures are allowed only in Validate mode.'
+  Assert-Deploy (Test-Path -LiteralPath $receiptPath -PathType Leaf) `
+    'receipt fixture is missing.'
+  $fixtureJson = Get-Content -LiteralPath $receiptPath -Raw
+  $fixtureObject = $fixtureJson | ConvertFrom-Json -Depth 100
+  $fixtureDictionary = $fixtureJson | ConvertFrom-Json -AsHashtable -Depth 100
+  Assert-Receipt $fixtureObject $state
+  Assert-Receipt $fixtureDictionary $state
+  Write-Output (
+    'Social runtime receipt fixture passed: jsonObject=true; ' +
+    'orderedDictionary=true; cloudWrites=0.'
+  )
+  return
+}
+
 if ($Mode -ceq 'Recover') {
   & $checker -RepositoryRoot $root -StatePath $statePathFull -Phase Recovery |
     Out-Null
@@ -727,6 +817,7 @@ $cleanupFailures = @()
 try {
   $env:PATH = [string]$nodeRuntime.NodeRoot + [IO.Path]::PathSeparator +
     $previousPath
+  Add-FirebaseAnalysisInputs
   Push-Location (Join-Path $root 'backend\functions')
   try {
     Invoke-Checked { & npm.cmd ci --ignore-scripts --no-audit --fund=false } `
@@ -774,10 +865,14 @@ try {
     providerTrafficRestoreClaimed = $false
     callbackTrafficRestoreClaimed = $false
     predecessorProviderRevision = [string](
-      @($state.predecessors | Where-Object function -eq 'youtubeProvider')[0].revision
+      @($state.predecessors | Where-Object {
+        $_.function -ceq 'youtubeProvider'
+      })[0].revision
     )
     predecessorCallbackRevision = [string](
-      @($state.predecessors | Where-Object function -eq 'youtubeOAuthCallback')[0].revision
+      @($state.predecessors | Where-Object {
+        $_.function -ceq 'youtubeOAuthCallback'
+      })[0].revision
     )
     newProviderRevision = ''
     newProviderSourceGeneration = ''
@@ -855,7 +950,9 @@ try {
       Join-Path $root 'config\social-runtime-deployment-map-r60-92.json'
     ) -Raw | ConvertFrom-Json -Depth 100
     foreach ($name in @('youtubeProvider','youtubeOAuthCallback')) {
-      $function = @($dynamicMap.functions | Where-Object name -eq $name)[0]
+      $function = @($dynamicMap.functions | Where-Object {
+        $_.name -ceq $name
+      })[0]
       $snapshot = $after[$name]
       $function.source.generation = [string]$snapshot.Function.buildConfig.source.storageSource.generation
       $function.latestReadyRevision = [string]$snapshot.Run.status.latestReadyRevisionName

@@ -54,6 +54,25 @@ function Get-CanonicalTextSha256([string]$Path) {
   }
 }
 
+function ConvertTo-ExecutionTimestamp($Value) {
+  if ($Value -is [DateTimeOffset]) {
+    return ([DateTimeOffset]$Value).ToUniversalTime()
+  }
+  if ($Value -is [DateTime]) {
+    return [DateTimeOffset]::new(([DateTime]$Value).ToUniversalTime())
+  }
+  $parsed = [DateTimeOffset]::MinValue
+  $valid = [DateTimeOffset]::TryParseExact(
+    [string]$Value,
+    'yyyy-MM-ddTHH:mm:ss.fffZ',
+    [Globalization.CultureInfo]::InvariantCulture,
+    [Globalization.DateTimeStyles]::AssumeUniversal,
+    [ref]$parsed
+  )
+  Assert-Execution $valid 'execution timestamp is invalid.'
+  return $parsed
+}
+
 function Get-RemoteBranchHead([string]$Branch) {
   Assert-Execution (
     $Branch -cmatch '^integration/moolsocial/[a-z0-9][a-z0-9-]{2,64}$'
@@ -354,30 +373,12 @@ function Get-ValidatedReceipt {
     'attempt receipt is missing.'
   $receipt = Get-Content -LiteralPath $receiptPath -Raw |
     ConvertFrom-Json -Depth 100
-  $issued = [DateTimeOffset]::MinValue
-  $expires = [DateTimeOffset]::MinValue
-  $updated = [DateTimeOffset]::MinValue
-  $issuedValid = [DateTimeOffset]::TryParseExact(
-    [string]$receipt.issuedAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$issued
-  )
-  $expiresValid = [DateTimeOffset]::TryParseExact(
-    [string]$receipt.expiresAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$expires
-  )
-  $updatedValid = [DateTimeOffset]::TryParseExact(
-    [string]$receipt.updatedAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$updated
-  )
+  $issued = ConvertTo-ExecutionTimestamp $receipt.issuedAtUtc
+  $expires = ConvertTo-ExecutionTimestamp $receipt.expiresAtUtc
+  $updated = ConvertTo-ExecutionTimestamp $receipt.updatedAtUtc
+  $issuedValid = $true
+  $expiresValid = $true
+  $updatedValid = $true
   $names = @($receipt.PSObject.Properties.Name)
   $expectedNames = @(
     'schema','state','projectId','region','integrationHead',
@@ -425,11 +426,13 @@ function Get-ValidatedReceipt {
       [int]$receipt.rollbackTrafficCommandCount
     ) -and
     $receipt.predecessorProviderRevision -ceq
-      [string](@($state.predecessors | Where-Object function -eq
-        'youtubeProvider')[0].revision) -and
+      [string](@($state.predecessors | Where-Object {
+        $_.function -ceq 'youtubeProvider'
+      })[0].revision) -and
     $receipt.predecessorCallbackRevision -ceq
-      [string](@($state.predecessors | Where-Object function -eq
-        'youtubeOAuthCallback')[0].revision) -and
+      [string](@($state.predecessors | Where-Object {
+        $_.function -ceq 'youtubeOAuthCallback'
+      })[0].revision) -and
     $receipt.privateValuesEmitted -eq $false
   ) 'attempt receipt binding, schema, privacy or counts changed.'
   $metadataClaims = @(
@@ -548,14 +551,9 @@ if ($Phase -eq 'Prepared') {
   $integrationTree = @(& git -C $root rev-parse (
       [string]$source.finalIntegrationHead + ':backend/functions'
     ) 2>$null)
-  $observedAt = [DateTimeOffset]::MinValue
-  $observedValid = [DateTimeOffset]::TryParseExact(
-    [string]$state.predeployReadback.observedAtUtc,
-    'yyyy-MM-ddTHH:mm:ss.fffZ',
-    [Globalization.CultureInfo]::InvariantCulture,
-    [Globalization.DateTimeStyles]::AssumeUniversal,
-    [ref]$observedAt
-  )
+  $observedAt = ConvertTo-ExecutionTimestamp `
+    $state.predeployReadback.observedAtUtc
+  $observedValid = $true
   $readbackAge = [DateTimeOffset]::UtcNow - $observedAt.ToUniversalTime()
   $sourceSealPath = [IO.Path]::GetFullPath((Join-Path $root `
     ([string]$source.sourceSealPath)))
