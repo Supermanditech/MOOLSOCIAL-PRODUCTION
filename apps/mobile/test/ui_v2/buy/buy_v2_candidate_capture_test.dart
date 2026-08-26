@@ -872,6 +872,70 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'B01 T01A corrected Wholesale Cart founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.medicine,
+      ]) {
+        final product = BuyV2Catalogue.products.firstWhere(
+          (item) =>
+              item.destination == destination && !item.requiresPrescription,
+        );
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openDestination(BuyV2Destination.wholesale);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              viewPadding: const EdgeInsets.symmetric(vertical: 24),
+              disableAnimations: true,
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.wholesale,
+            initialView: BuyV2View.cart,
+            initialCartScope: BuyV2CartScope.wholesale,
+            scannerLauncher: (_) async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shop'), findsWidgets);
+      expect(find.text('Wholesale'), findsWidgets);
+      expect(find.textContaining('Medicine'), findsNothing);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-b01-t01a-cart-boundary-360x800.png',
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    // Founder-review evidence only; run explicitly with --run-skipped.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {

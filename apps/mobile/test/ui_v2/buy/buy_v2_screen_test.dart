@@ -2181,7 +2181,7 @@ void main() {
   });
 
   testWidgets(
-    'Cart stays aggregate across Shop Wholesale Medicine and Orders',
+    'Shop and Wholesale cart entries stay separate from Care Medicine',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       final shop = BuyV2Catalogue.products.firstWhere(
@@ -2202,40 +2202,58 @@ void main() {
       await tester.pumpWidget(app(session, textScale: 1.4));
       await tester.pumpAndSettle();
 
+      expect(
+        find.byKey(const ValueKey('buy-compact-cart-indicator')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-compact-cart-indicator')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.cartScope, BuyV2CartScope.shop);
+      expect(session.cartLines, hasLength(1));
+      expect(
+        session.cartLines.single.product.destination,
+        BuyV2Destination.shop,
+      );
+      expect(find.textContaining('Medicine'), findsNothing);
+
       session.openDestination(BuyV2Destination.wholesale);
       await tester.pumpAndSettle();
       expect(find.text('Cart'), findsOneWidget);
       expect(
-        find.text(
-          '${session.itemCount} '
-          '${session.itemCount == 1 ? 'item' : 'items'} ready',
-        ),
+        find.byKey(const ValueKey('buy-compact-cart-indicator')),
         findsOneWidget,
       );
-      expect(find.text(buyV2Money(session.cartTotal)), findsOneWidget);
       await tester.tap(
         find.byKey(const ValueKey('buy-compact-cart-indicator')),
       );
       await tester.pumpAndSettle();
-      expect(session.cartScope, BuyV2CartScope.all);
-      expect(session.cartLines, hasLength(3));
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.cartLines, hasLength(1));
+      expect(
+        session.cartLines.single.product.destination,
+        BuyV2Destination.wholesale,
+      );
+      expect(find.textContaining('Medicine'), findsNothing);
 
-      session.openDestination(BuyV2Destination.orders);
+      session.openDestination(BuyV2Destination.medicine);
       await tester.pumpAndSettle();
       expect(find.text('Cart'), findsOneWidget);
       expect(
-        find.text(
-          '${session.itemCount} '
-          '${session.itemCount == 1 ? 'item' : 'items'} ready',
-        ),
+        find.byKey(const ValueKey('buy-compact-cart-indicator')),
         findsOneWidget,
       );
       await tester.tap(
         find.byKey(const ValueKey('buy-compact-cart-indicator')),
       );
       await tester.pumpAndSettle();
-      expect(session.cartScope, BuyV2CartScope.all);
-      expect(session.cartLines, hasLength(3));
+      expect(session.cartScope, BuyV2CartScope.medicine);
+      expect(session.cartLines, hasLength(1));
+      expect(
+        session.cartLines.single.product.destination,
+        BuyV2Destination.medicine,
+      );
       expect(tester.takeException(), isNull);
     },
   );
