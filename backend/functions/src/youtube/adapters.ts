@@ -11,32 +11,16 @@ export class YouTubeQuotaGovernorAdapter implements YouTubeQuotaPort {
   constructor(private readonly governor: YouTubeQuotaGovernor) {}
 
   async reserve(reservation: QuotaReservation): Promise<void> {
-    try {
-      await this.governor.reserve(
-        reservation.bucket,
-        reservation.amount,
-      );
-    } catch (error) {
-      await this.governor.recordMeasurement({
-        principal: reservation.principal,
-        bucket: reservation.bucket,
-        units: reservation.amount,
-        operation: reservation.operation,
-        requestId: reservation.requestId,
-        accepted: false,
-        local: true,
-      });
-      throw error;
-    }
-    await this.governor.recordMeasurement({
+    await this.governor.reserveMeasured(
+      reservation.bucket,
+      reservation.amount,
+      {
       principal: reservation.principal,
-      bucket: reservation.bucket,
-      units: reservation.amount,
       operation: reservation.operation,
       requestId: reservation.requestId,
-      accepted: true,
       local: true,
-    });
+      },
+    );
   }
 }
 

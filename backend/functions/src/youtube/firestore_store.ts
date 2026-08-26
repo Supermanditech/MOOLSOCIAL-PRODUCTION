@@ -16,6 +16,7 @@ import type {
   YouTubePublicationStore,
 } from "./ports.js";
 import type {
+  YouTubeQuotaMeasuredReserveRequest,
   YouTubeQuotaMeasurementRequest,
   YouTubeQuotaMeasurementStore,
   YouTubeQuotaReserveRequest,
@@ -395,6 +396,16 @@ function quotaMeasurementCounter(
     throw new Error(`${field} is invalid.`);
   }
   return Number(value);
+}
+
+function incrementQuotaMeasurementCounter(
+  value: number,
+  field: string,
+): number {
+  if (value >= Number.MAX_SAFE_INTEGER) {
+    throw new Error(`${field} cannot be incremented safely.`);
+  }
+  return value + 1;
 }
 
 function assertQuotaMeasurementRequest(
@@ -874,51 +885,99 @@ export class FirestoreYouTubeQuotaStore
     });
   }
 
-  async recordMeasurement(
-    request: YouTubeQuotaMeasurementRequest,
-  ): Promise<void> {
-    assertQuotaMeasurementRequest(request);
-    await this.database.runTransaction(async (transaction) => {
-      const path = quotaMeasurementPath(
+  async reserveMeasured(
+    request: YouTubeQuotaMeasuredReserveRequest,
+  ): Promise<YouTubeQuotaReserveResult> {
+    assertQuotaRequest(request);
+    assertQuotaMeasurementRequest({
+      principal: request.principal,
+      bucket: request.bucket,
+      units: request.units,
+      operation: request.operation,
+      requestId: request.requestId,
+      accepted: false,
+      local: request.local,
+      windowId: request.windowId,
+      occurredAt: request.occurredAt,
+    });
+    return this.database.runTransaction(async (transaction) => {
+      const usagePath = quotaPath(request.windowId, request.bucket);
+      const measurementPath = quotaMeasurementPath(
         request.windowId,
         request.operation,
       );
-      const existing = await transaction.get(path);
+      const usage = await transaction.get(usagePath);
+      const measurement = await transaction.get(measurementPath);
+      let current = 0;
+      if (usage !== undefined) {
+        if (
+          usage.provider !== "YOUTUBE" ||
+          usage.windowId !== request.windowId ||
+          usage.bucket !== request.bucket ||
+          !Number.isSafeInteger(usage.used) ||
+          Number(usage.used) < 0
+        ) {
+          throw new Error("YouTube quota record is invalid.");
+        }
+        current = Number(usage.used);
+      }
+      const allowed = current + request.units <= request.limit;
+      const used = allowed ? current + request.units : current;
       let acceptedReservations = 0;
       let rejectedReservations = 0;
       let acceptedLocalReservations = 0;
-      if (existing !== undefined) {
+      if (measurement !== undefined) {
         if (
-          existing.provider !== "YOUTUBE" ||
-          existing.operation !== request.operation ||
-          existing.bucket !== request.bucket ||
-          existing.windowId !== request.windowId
+          measurement.provider !== "YOUTUBE" ||
+          measurement.operation !== request.operation ||
+          measurement.bucket !== request.bucket ||
+          measurement.windowId !== request.windowId
         ) {
           throw new Error("YouTube quota measurement identity is invalid.");
         }
         acceptedReservations = quotaMeasurementCounter(
-          existing,
+          measurement,
           "acceptedReservations",
         );
         rejectedReservations = quotaMeasurementCounter(
-          existing,
+          measurement,
           "rejectedReservations",
         );
         acceptedLocalReservations = quotaMeasurementCounter(
-          existing,
+          measurement,
           "acceptedLocalReservations",
         );
         if (acceptedLocalReservations > acceptedReservations) {
           throw new Error("acceptedLocalReservations is invalid.");
         }
       }
-      if (request.accepted) {
-        acceptedReservations += 1;
-        if (request.local) acceptedLocalReservations += 1;
+      if (allowed) {
+        acceptedReservations = incrementQuotaMeasurementCounter(
+          acceptedReservations,
+          "acceptedReservations",
+        );
+        if (request.local) {
+          acceptedLocalReservations = incrementQuotaMeasurementCounter(
+            acceptedLocalReservations,
+            "acceptedLocalReservations",
+          );
+        }
+        transaction.set(usagePath, {
+          provider: "YOUTUBE",
+          bucket: request.bucket,
+          windowId: request.windowId,
+          used,
+          hardCap: request.limit,
+          resetAt: request.resetAt,
+          updatedAt: request.occurredAt,
+        });
       } else {
-        rejectedReservations += 1;
+        rejectedReservations = incrementQuotaMeasurementCounter(
+          rejectedReservations,
+          "rejectedReservations",
+        );
       }
-      transaction.set(path, {
+      transaction.set(measurementPath, {
         provider: "YOUTUBE",
         operation: request.operation,
         bucket: request.bucket,
@@ -928,6 +987,15 @@ export class FirestoreYouTubeQuotaStore
         acceptedLocalReservations,
         updatedAt: request.occurredAt,
       });
+      return {
+        allowed,
+        bucket: request.bucket,
+        windowId: request.windowId,
+        resetAt: request.resetAt,
+        used,
+        remaining: Math.max(0, request.limit - used),
+        limit: request.limit,
+      };
     });
   }
 }
