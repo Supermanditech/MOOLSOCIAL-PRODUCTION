@@ -6587,12 +6587,13 @@ class _CartScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopes = const [
-      BuyV2CartScope.all,
-      BuyV2CartScope.shop,
-      BuyV2CartScope.wholesale,
-      BuyV2CartScope.medicine,
-    ];
+    final scopes = session.cartScope == BuyV2CartScope.medicine
+        ? const [BuyV2CartScope.medicine]
+        : const [
+            BuyV2CartScope.all,
+            BuyV2CartScope.shop,
+            BuyV2CartScope.wholesale,
+          ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Container(
