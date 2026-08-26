@@ -148,6 +148,56 @@ void main() {
     );
   });
 
+  testWidgets('T01B adds optional GST details without buyer categories', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = mixedSession();
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(find.text('Add GST details'), findsOneWidget);
+    expect(find.textContaining('Personal'), findsNothing);
+    expect(find.textContaining('Business purchase'), findsNothing);
+    expect(find.text('Place order'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add GST details'), findsWidgets);
+    expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+      'Shree Balaji Retail',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+      '08ABCDE1234F1Z5',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+      '12 Market Road, Jodhpur 342003',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shree Balaji Retail'), findsWidgets);
+    expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
+    expect(find.text('Place order'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
     tester,
   ) async {

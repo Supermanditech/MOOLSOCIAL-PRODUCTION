@@ -935,6 +935,76 @@ void main() {
     // Founder-review evidence only; run explicitly with --run-skipped.
     skip: true,
   );
+
+  testWidgets(
+    'B01 T01B optional GST invoice founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.wholesale &&
+            !item.requiresPrescription,
+      );
+      session.addProduct(product.id);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.wholesale,
+            initialView: BuyV2View.checkout,
+            initialCartScope: BuyV2CartScope.wholesale,
+            scannerLauncher: (_) async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Personal'), findsNothing);
+      expect(find.textContaining('Business purchase'), findsNothing);
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-b01-t01b-optional-gst-invoice-390x844.png',
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    // Founder-review evidence only; run explicitly with --run-skipped.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {

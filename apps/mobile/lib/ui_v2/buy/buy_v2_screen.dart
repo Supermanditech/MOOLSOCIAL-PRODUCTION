@@ -81,6 +81,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   int _shopChatMotionSequence = 0;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
+  final BuyV2GstInvoiceController _gstInvoiceController =
+      BuyV2GstInvoiceController();
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -210,6 +212,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     _cartAcknowledgementTimer?.cancel();
     widget.session.removeListener(_sessionChanged);
     _searchController.dispose();
+    _gstInvoiceController.dispose();
     super.dispose();
   }
 
@@ -705,7 +708,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           _openBuyDestination(destination);
         },
       ),
-      BuyV2View.checkout => BuyV2CheckoutView(session: session),
+      BuyV2View.checkout => BuyV2CheckoutView(
+        session: session,
+        gstInvoiceController: _gstInvoiceController,
+      ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
         invoiceDownloader: widget.invoiceDownloader,

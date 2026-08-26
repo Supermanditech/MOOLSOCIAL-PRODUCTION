@@ -32,6 +32,86 @@ String _destinationSummary(Set<BuyV2Destination> destinations) {
       .join(' + ');
 }
 
+@immutable
+class BuyV2GstInvoiceDetails {
+  const BuyV2GstInvoiceDetails({
+    required this.id,
+    required this.legalName,
+    required this.gstin,
+    required this.billingAddress,
+  });
+
+  final String id;
+  final String legalName;
+  final String gstin;
+  final String billingAddress;
+}
+
+class BuyV2GstInvoiceController extends ChangeNotifier {
+  final Map<BuyV2Destination, bool> _requested = {
+    BuyV2Destination.shop: false,
+    BuyV2Destination.wholesale: false,
+  };
+  final Map<BuyV2Destination, BuyV2GstInvoiceDetails> _selected = {};
+  final List<BuyV2GstInvoiceDetails> _savedProfiles = [];
+  int _nextId = 1;
+
+  bool requestedFor(BuyV2Destination destination) =>
+      _requested[destination] ?? false;
+
+  BuyV2GstInvoiceDetails? detailsFor(BuyV2Destination destination) =>
+      _selected[destination];
+
+  List<BuyV2GstInvoiceDetails> get savedProfiles =>
+      List.unmodifiable(_savedProfiles);
+
+  void setRequested(BuyV2Destination destination, bool requested) {
+    if (destination != BuyV2Destination.shop &&
+        destination != BuyV2Destination.wholesale) {
+      return;
+    }
+    if (_requested[destination] == requested) return;
+    _requested[destination] = requested;
+    notifyListeners();
+  }
+
+  void selectSaved(
+    BuyV2Destination destination,
+    BuyV2GstInvoiceDetails details,
+  ) {
+    _requested[destination] = true;
+    _selected[destination] = details;
+    notifyListeners();
+  }
+
+  void save({
+    required BuyV2Destination destination,
+    required String legalName,
+    required String gstin,
+    required String billingAddress,
+    required bool remember,
+  }) {
+    final current = _selected[destination];
+    final details = BuyV2GstInvoiceDetails(
+      id: current?.id ?? 'gst-profile-${_nextId++}',
+      legalName: legalName.trim(),
+      gstin: gstin.trim().toUpperCase(),
+      billingAddress: billingAddress.trim(),
+    );
+    _requested[destination] = true;
+    _selected[destination] = details;
+    if (remember) {
+      final index = _savedProfiles.indexWhere((item) => item.id == details.id);
+      if (index == -1) {
+        _savedProfiles.add(details);
+      } else {
+        _savedProfiles[index] = details;
+      }
+    }
+    notifyListeners();
+  }
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({super.key, required this.session, this.returnLabel});
 
@@ -2235,10 +2315,303 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   }
 }
 
+class _GstInvoiceCard extends StatelessWidget {
+  const _GstInvoiceCard({required this.destination, required this.controller});
+
+  final BuyV2Destination destination;
+  final BuyV2GstInvoiceController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final requested = controller.requestedFor(destination);
+    final details = controller.detailsFor(destination);
+    return Container(
+      key: ValueKey('buy-gst-invoice-${destination.name}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.softBlue,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Add GST details', style: context.buyBody),
+                    Text(
+                      'GST applies as required. Add GSTIN only for recipient details on the invoice.',
+                      style: context.buyMeta.copyWith(fontSize: 8),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                key: ValueKey('buy-gst-request-${destination.name}'),
+                value: requested,
+                onChanged: (value) =>
+                    controller.setRequested(destination, value),
+              ),
+            ],
+          ),
+          if (requested) ...[
+            const SizedBox(height: 9),
+            if (controller.savedProfiles.isNotEmpty) ...[
+              Text('Saved GST details', style: context.buyMeta),
+              const SizedBox(height: 5),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final profile in controller.savedProfiles)
+                    ChoiceChip(
+                      key: ValueKey('buy-gst-profile-${profile.id}'),
+                      label: Text(profile.legalName),
+                      selected: details?.id == profile.id,
+                      onSelected: (_) =>
+                          controller.selectSaved(destination, profile),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 7),
+            ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: details == null
+                    ? BuyV2Colors.softOrange
+                    : BuyV2Colors.softGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          details?.legalName ?? 'GST invoice details required',
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        Text(
+                          details == null
+                              ? 'Add GSTIN, legal name and billing address.'
+                              : '${details.gstin} · ${details.billingAddress}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: ValueKey(
+                      'buy-gst-${details == null ? 'add' : 'edit'}-'
+                      '${destination.name}',
+                    ),
+                    onPressed: () => showBuyV2GstInvoiceSheet(
+                      context,
+                      controller: controller,
+                      destination: destination,
+                    ),
+                    child: Text(details == null ? 'Add' : 'Edit'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Recipient and delivery details are recorded where GST invoice rules require them.',
+              style: context.buyMeta.copyWith(fontSize: 8),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> showBuyV2GstInvoiceSheet(
+  BuildContext context, {
+  required BuyV2GstInvoiceController controller,
+  required BuyV2Destination destination,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  routeSettings: const RouteSettings(name: 'buy-gst-invoice-details'),
+  builder: (context) =>
+      _BuyV2GstInvoiceSheet(controller: controller, destination: destination),
+);
+
+class _BuyV2GstInvoiceSheet extends StatefulWidget {
+  const _BuyV2GstInvoiceSheet({
+    required this.controller,
+    required this.destination,
+  });
+
+  final BuyV2GstInvoiceController controller;
+  final BuyV2Destination destination;
+
+  @override
+  State<_BuyV2GstInvoiceSheet> createState() => _BuyV2GstInvoiceSheetState();
+}
+
+class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
+  late final TextEditingController _legalName;
+  late final TextEditingController _gstin;
+  late final TextEditingController _billingAddress;
+  bool _remember = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.controller.detailsFor(widget.destination);
+    _legalName = TextEditingController(text: current?.legalName);
+    _gstin = TextEditingController(text: current?.gstin);
+    _billingAddress = TextEditingController(text: current?.billingAddress);
+  }
+
+  @override
+  void dispose() {
+    _legalName.dispose();
+    _gstin.dispose();
+    _billingAddress.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final legalName = _legalName.text.trim();
+    final gstin = _gstin.text.trim().toUpperCase();
+    final address = _billingAddress.text.trim();
+    final gstinPattern = RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$',
+    );
+    if (legalName.length < 3 || address.length < 8) {
+      setState(() => _error = 'Add the legal name and billing address.');
+      return;
+    }
+    if (!gstinPattern.hasMatch(gstin)) {
+      setState(() => _error = 'Check the 15-character GSTIN format.');
+      return;
+    }
+    widget.controller.save(
+      destination: widget.destination,
+      legalName: legalName,
+      gstin: gstin,
+      billingAddress: address,
+      remember: _remember,
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: const ValueKey('buy-gst-invoice-sheet'),
+    padding: EdgeInsets.fromLTRB(
+      16,
+      12,
+      16,
+      16 + MediaQuery.viewInsetsOf(context).bottom,
+    ),
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'GST invoice details',
+            style: context.buyTitle.copyWith(fontSize: 20),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'These details affect the invoice only. GST applies as required.',
+            style: context.buyMeta,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('buy-gst-legal-name'),
+            controller: _legalName,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Legal name'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('buy-gst-gstin'),
+            controller: _gstin,
+            maxLength: 15,
+            textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'GSTIN'),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            key: const ValueKey('buy-gst-billing-address'),
+            controller: _billingAddress,
+            minLines: 2,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'Billing address'),
+          ),
+          SwitchListTile.adaptive(
+            key: const ValueKey('buy-gst-remember'),
+            contentPadding: EdgeInsets.zero,
+            value: _remember,
+            onChanged: (value) => setState(() => _remember = value),
+            title: const Text('Remember these GST details'),
+            subtitle: const Text('Reuse them on a later invoice.'),
+          ),
+          if (_error case final error?) ...[
+            Text(
+              error,
+              key: const ValueKey('buy-gst-error'),
+              style: const TextStyle(
+                color: Color(0xFFB42318),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              key: const ValueKey('buy-gst-save'),
+              onPressed: _save,
+              child: const Text('Use GST details'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class BuyV2CheckoutView extends StatelessWidget {
-  const BuyV2CheckoutView({super.key, required this.session});
+  const BuyV2CheckoutView({
+    super.key,
+    required this.session,
+    required this.gstInvoiceController,
+  });
 
   final BuyV2Session session;
+  final BuyV2GstInvoiceController gstInvoiceController;
 
   @override
   Widget build(BuildContext context) {
@@ -2251,139 +2624,174 @@ class BuyV2CheckoutView extends StatelessWidget {
             'Your Cart is unchanged. Select or add an address before placing the order.',
       );
     }
-    final destinations = session.checkoutDestinations;
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            key: const PageStorageKey('buy-checkout'),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-            children: [
-              _ReturnAffordance(
-                label: 'Cart',
-                onTap: () => session.openCart(scope: session.checkoutScope),
-                tightHitOwner: true,
-                hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
-                minimumHeight: 44,
-              ),
-              const SizedBox(height: 7),
-              Text(
-                'Review order',
-                style: context.buyTitle.copyWith(fontSize: 19),
-              ),
-              const SizedBox(height: 8),
-              _SavedAddressReminder(
-                address: address,
-                onEdit: () => showBuyV2AddressSheet(context, session),
-              ),
-              const SizedBox(height: 9),
-              for (final group in session.checkoutFulfilmentGroups) ...[
-                _CheckoutCard(
-                  icon: switch (group.destination) {
-                    BuyV2Destination.shop => Icons.storefront_outlined,
-                    BuyV2Destination.wholesale => Icons.inventory_2_outlined,
-                    BuyV2Destination.medicine => Icons.medication_outlined,
-                    BuyV2Destination.orders => Icons.receipt_long_outlined,
-                  },
-                  title:
-                      '${group.destination.label} fulfilment · ${group.partner}',
-                  detail: [
-                    '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
-                    group.promise,
-                    if (session.selectedDeliveryInstructionFor(
-                          group.destination,
-                        )
-                        case final instruction?)
-                      '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
-                    if (session.tipForGroup(group) > 0)
-                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
-                  ].join('\n'),
-                ),
-                const SizedBox(height: 7),
-              ],
-              for (final benefit in session.selectedCartBenefitsFor(
-                destinations,
-              )) ...[
-                _CheckoutCard(
-                  key: ValueKey(
-                    'buy-checkout-benefit-${benefit.destination.name}-'
-                    '${benefit.kind.name}',
+    return AnimatedBuilder(
+      animation: gstInvoiceController,
+      builder: (context, _) {
+        final destinations = session.checkoutDestinations;
+        final invoiceDestinations = destinations
+            .where(
+              (destination) =>
+                  destination == BuyV2Destination.shop ||
+                  destination == BuyV2Destination.wholesale,
+            )
+            .toList(growable: false);
+        final missingDetails = invoiceDestinations.where(
+          (destination) =>
+              gstInvoiceController.requestedFor(destination) &&
+              gstInvoiceController.detailsFor(destination) == null,
+        );
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                key: const PageStorageKey('buy-checkout'),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                children: [
+                  _ReturnAffordance(
+                    label: 'Cart',
+                    onTap: () => session.openCart(scope: session.checkoutScope),
+                    tightHitOwner: true,
+                    hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
+                    minimumHeight: 44,
                   ),
-                  icon: benefit.kind == BuyV2CartBenefitKind.coupon
-                      ? Icons.local_offer_outlined
-                      : Icons.account_balance_wallet_outlined,
-                  title:
-                      '${benefit.destination.label} '
-                      '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
-                  detail:
-                      '${benefit.title}\nEligibility and any saving will be '
-                      'confirmed before payment. No amount has been deducted '
-                      'from this review total.',
-                  action: 'Review',
-                  onTap: () => _openCartBenefitsPage(
-                    context,
-                    session: session,
-                    kind: benefit.kind,
-                    destination: benefit.destination,
+                  const SizedBox(height: 7),
+                  Text(
+                    'Review order',
+                    style: context.buyTitle.copyWith(fontSize: 19),
                   ),
-                ),
-                const SizedBox(height: 7),
-              ],
-              const SizedBox(height: 11),
-              _CheckoutCard(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Payment · ${session.selectedPayment}',
-                detail: destinations.contains(BuyV2Destination.wholesale)
-                    ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
-                    : 'Selected payment method for this order.',
-                action: 'Change',
-                onTap: () => showBuyV2PaymentSheet(context, session),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-        Container(
-          key: const ValueKey('buy-checkout-action-bar'),
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _productCountLabel(session.checkoutItemCount),
-                      style: context.buyMeta.copyWith(fontSize: 8),
+                  const SizedBox(height: 8),
+                  _SavedAddressReminder(
+                    address: address,
+                    onEdit: () => showBuyV2AddressSheet(context, session),
+                  ),
+                  const SizedBox(height: 9),
+                  for (final destination in invoiceDestinations) ...[
+                    _GstInvoiceCard(
+                      destination: destination,
+                      controller: gstInvoiceController,
                     ),
-                    Text(
-                      buyV2Money(session.checkoutPayableTotal),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 19,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
+                    const SizedBox(height: 7),
+                  ],
+                  for (final group in session.checkoutFulfilmentGroups) ...[
+                    _CheckoutCard(
+                      icon: switch (group.destination) {
+                        BuyV2Destination.shop => Icons.storefront_outlined,
+                        BuyV2Destination.wholesale =>
+                          Icons.inventory_2_outlined,
+                        BuyV2Destination.medicine => Icons.medication_outlined,
+                        BuyV2Destination.orders => Icons.receipt_long_outlined,
+                      },
+                      title:
+                          '${group.destination.label} fulfilment · ${group.partner}',
+                      detail: [
+                        '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
+                        group.promise,
+                        if (session.selectedDeliveryInstructionFor(
+                              group.destination,
+                            )
+                            case final instruction?)
+                          '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
+                        if (session.tipForGroup(group) > 0)
+                          'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
+                      ].join('\n'),
+                    ),
+                    const SizedBox(height: 7),
+                  ],
+                  for (final benefit in session.selectedCartBenefitsFor(
+                    destinations,
+                  )) ...[
+                    _CheckoutCard(
+                      key: ValueKey(
+                        'buy-checkout-benefit-${benefit.destination.name}-'
+                        '${benefit.kind.name}',
+                      ),
+                      icon: benefit.kind == BuyV2CartBenefitKind.coupon
+                          ? Icons.local_offer_outlined
+                          : Icons.account_balance_wallet_outlined,
+                      title:
+                          '${benefit.destination.label} '
+                          '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
+                      detail:
+                          '${benefit.title}\nEligibility and any saving will be '
+                          'confirmed before payment. No amount has been deducted '
+                          'from this review total.',
+                      action: 'Review',
+                      onTap: () => _openCartBenefitsPage(
+                        context,
+                        session: session,
+                        kind: benefit.kind,
+                        destination: benefit.destination,
                       ),
                     ),
+                    const SizedBox(height: 7),
                   ],
-                ),
+                  const SizedBox(height: 11),
+                  _CheckoutCard(
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'Payment · ${session.selectedPayment}',
+                    detail: destinations.contains(BuyV2Destination.wholesale)
+                        ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
+                        : 'Selected payment method for this order.',
+                    action: 'Change',
+                    onTap: () => showBuyV2PaymentSheet(context, session),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              SizedBox(
-                width: 176,
-                height: 44,
-                child: FilledButton(
-                  onPressed: session.confirmOrder,
-                  child: const Text('Place order'),
-                ),
+            ),
+            Container(
+              key: const ValueKey('buy-checkout-action-bar'),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: BuyV2Colors.line)),
               ),
-            ],
-          ),
-        ),
-      ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _productCountLabel(session.checkoutItemCount),
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        Text(
+                          buyV2Money(session.checkoutPayableTotal),
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 19,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    height: 44,
+                    child: FilledButton(
+                      onPressed: missingDetails.isEmpty
+                          ? session.confirmOrder
+                          : () => showBuyV2GstInvoiceSheet(
+                              context,
+                              controller: gstInvoiceController,
+                              destination: missingDetails.first,
+                            ),
+                      child: Text(
+                        missingDetails.isEmpty
+                            ? 'Place order'
+                            : 'Add GST details',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
