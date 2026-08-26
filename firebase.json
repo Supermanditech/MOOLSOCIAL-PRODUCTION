@@ -19,9 +19,10 @@
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ],
       "ignore": [
-        ".git",
-        ".runtimeconfig.json",
-        "firebase-debug.log",
+      ".git",
+      ".runtimeconfig.json",
+      ".env*",
+      "firebase-debug.log",
         "firebase-debug.*.log",
         "node_modules",
         "lib/**/*.test.js",
