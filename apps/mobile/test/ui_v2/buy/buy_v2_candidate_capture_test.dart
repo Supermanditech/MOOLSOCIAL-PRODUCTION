@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
@@ -872,6 +873,73 @@ void main() {
     // Run explicitly with --run-skipped --update-goldens for review evidence.
     skip: true,
   );
+
+  testWidgets(
+    'B01 T02 automatic fulfilment founder capture',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: const _CaptureAutomaticFulfilmentFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.openDestination(BuyV2Destination.shop);
+      session.openProduct('s-tomato');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 47, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            ),
+            child: child!,
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.shop,
+            initialView: BuyV2View.product,
+            productId: 's-tomato',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final automatic = find.byKey(
+        const ValueKey('buy-automatic-fulfilment-s-tomato'),
+      );
+      await tester.scrollUntilVisible(
+        automatic,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 230));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivered in 5 min'), findsWidgets);
+      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+      expect(find.text('Shree Balaji Fresh'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-shop-seller-action-s-tomato')),
+        findsNothing,
+      );
+      await expectLater(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        matchesGoldenFile(
+          'candidate_captures/'
+          'buy-v2-b01-t02-auto-fulfilment-founder-390x844.png',
+        ),
+      );
+    },
+    // Run explicitly with --run-skipped --update-goldens for review evidence.
+    skip: true,
+  );
 }
 
 Future<void> _capture(WidgetTester tester, String state) async {
@@ -981,6 +1049,21 @@ Future<void> _captureResponsiveOverlay(
       'candidate_captures/buy-v2-r33-search-media-chat-local-$state-$viewport.png',
     ),
   );
+}
+
+final class _CaptureAutomaticFulfilmentFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _CaptureAutomaticFulfilmentFactsAdapter();
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: 'within 5 min',
+          sourceId: 'b01-t02-founder-capture',
+        );
+  }
 }
 
 Future<void> _captureR34SearchSuggestions(
