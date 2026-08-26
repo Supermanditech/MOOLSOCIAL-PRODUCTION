@@ -575,14 +575,13 @@ void main() {
     expect(attributionStart, greaterThanOrEqualTo(0));
     expect(attributionEnd, greaterThan(attributionStart));
     final attribution = source.substring(attributionStart, attributionEnd);
-    expect(
-      attribution,
-      contains(
-        'const _YouTubeAttribution({this.onDark = true, required this.onTap})',
-      ),
-    );
-    expect(attribution, contains('final VoidCallback onTap'));
-    expect(attribution, isNot(contains('final VoidCallback? onTap')));
+    expect(attribution, contains('const _YouTubeAttribution();'));
+    expect(attribution, contains("label: 'YouTube content source'"));
+    expect(attribution, isNot(contains('VoidCallback onTap')));
+    expect(attribution, isNot(contains('button: true')));
+    expect(attribution, isNot(contains('link: true')));
+    expect(attribution, isNot(contains('Icons.open_in_new_rounded')));
+    expect(attribution, isNot(contains('InkWell(')));
     expect(attribution, isNot(contains("Uri.https('www.youtube.com', '/'),")));
     expect(source, isNot(contains('Comment posted on MoolSocial')));
     expect(source, isNot(contains('class _VideoWatchScreen')));
