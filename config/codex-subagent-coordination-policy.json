@@ -169,10 +169,12 @@
         "apps/mobile/test/social_v2_create_publication_test.dart",
         "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_action_truth_accessibility_c29o_test.dart",
+        "scripts/build-buy-device-review.ps1",
         "scripts/check-approved-ui-locks.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/check-pre-apk-readiness-r60-92.ps1",
-        "scripts/test-pre-apk-readiness-r60-92.ps1"
+        "scripts/test-pre-apk-readiness-r60-92.ps1",
+        "scripts/test-public-auth-sideload-build-controls.ps1"
       ]
     },
     {

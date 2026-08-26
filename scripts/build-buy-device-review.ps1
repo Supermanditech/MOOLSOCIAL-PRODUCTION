@@ -89,7 +89,8 @@ $successorBuildFoundationGate = Join-Path `
   $PSScriptRoot `
   'test-public-auth-sideload-build-controls.ps1'
 & $successorBuildFoundationGate `
-  -RepositoryRoot $repositoryRoot | Out-Null
+  -RepositoryRoot $repositoryRoot `
+  -PreApkStatePath $machineStateFile | Out-Null
 $successorBuildFoundationPassed = $?
 if (-not $successorBuildFoundationPassed) {
   throw 'Mandatory successor APK build-foundation gate failed.'
@@ -512,6 +513,10 @@ try {
   $flutterExit = Invoke-MoolSocialFlutterWithCleanSupport `
     -RepositoryRoot $repositoryRoot `
     -Invocation {
+      & flutter pub get --enforce-lockfile
+      if ($LASTEXITCODE -ne 0) {
+        throw 'Locked Flutter dependency resolution failed before APK build.'
+      }
       & flutter @buildArguments
     }
   if ($flutterExit -ne 0) {

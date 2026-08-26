@@ -72,12 +72,12 @@
     "privateValuesEmitted": false
   },
   "dependencyGate": {
-    "state": "gap_found",
+    "state": "plugin_integrity_gap",
     "lockfile": "apps/mobile/pubspec.lock",
     "newNativePlugin": "share_plus",
     "newNativePluginVersion": "13.3.0",
     "sameGuardedPubGetAndBuildRequired": true,
-    "wrapperQualified": false,
+    "wrapperQualified": true,
     "postBuildPluginIntegrityQualified": false
   },
   "socialDeployment": {

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+  [string]$PreApkStatePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,9 +27,6 @@ $regressionMemoryGate = Join-Path `
 $coordinationGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-codex-subagent-coordination-policy.ps1'
-$coordinationState = Get-Content -Raw -LiteralPath (
-  Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
-) | ConvertFrom-Json
 & $regressionMemoryGate `
   -Phase build `
   -BuildMode release `
@@ -36,20 +34,56 @@ $coordinationState = Get-Content -Raw -LiteralPath (
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
-& $coordinationGate `
-  -AgentRole primary `
-  -AgentTask '/root' `
-  -UseRecordedClaim `
-  -ExpectedRegistryEntryCount (
-    [int]$coordinationState.registryBinding.entryCount
-  ) `
-  -ExpectedRegistrySha256 (
-    [string]$coordinationState.registryBinding.sha256
-  ) `
-  -RepositoryRoot $RepositoryRoot | Out-Null
-$coordinationPassed = $?
-Assert-SideloadControl $coordinationPassed `
-  'mandatory successor coordination gate failed.'
+if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
+  $resolvedPreApkState = [IO.Path]::GetFullPath($PreApkStatePath)
+  $rootPrefix = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  Assert-SideloadControl (
+    $resolvedPreApkState.StartsWith(
+      $rootPrefix,
+      [StringComparison]::OrdinalIgnoreCase
+    ) -and
+    (Test-Path -LiteralPath $resolvedPreApkState -PathType Leaf)
+  ) 'candidate-specific pre-APK state is missing or outside the repository.'
+  $preApkGate = Join-Path `
+    $RepositoryRoot `
+    'scripts/check-pre-apk-readiness-r60-92.ps1'
+  Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
+    'candidate-specific pre-APK gate is missing.'
+  $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
+    ConvertFrom-Json
+  $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
+    'BuildAuthorized'
+  } else {
+    'CandidateReservation'
+  }
+  & $preApkGate `
+    -RepositoryRoot $RepositoryRoot `
+    -StatePath $resolvedPreApkState `
+    -Phase $preApkPhase | Out-Null
+  $preApkPassed = $?
+  Assert-SideloadControl $preApkPassed `
+    'candidate-specific pre-APK readiness gate failed.'
+} else {
+  $coordinationState = Get-Content -Raw -LiteralPath (
+    Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
+  ) | ConvertFrom-Json
+  & $coordinationGate `
+    -AgentRole primary `
+    -AgentTask '/root' `
+    -UseRecordedClaim `
+    -ExpectedRegistryEntryCount (
+      [int]$coordinationState.registryBinding.entryCount
+    ) `
+    -ExpectedRegistrySha256 (
+      [string]$coordinationState.registryBinding.sha256
+    ) `
+    -RepositoryRoot $RepositoryRoot | Out-Null
+  $coordinationPassed = $?
+  Assert-SideloadControl $coordinationPassed `
+    'mandatory successor coordination gate failed.'
+}
 $approvedUiLockGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-approved-ui-locks.ps1'
@@ -189,6 +223,34 @@ $apkGate = Get-Content -Raw -LiteralPath (
 $apkMachineState = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot 'config/apk-regression-gate-state.json'
 )
+$candidatePreApkState = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  Get-Content -Raw -LiteralPath ([IO.Path]::GetFullPath($PreApkStatePath))
+} else {
+  ''
+}
+$candidateRuntimeStateBound = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  $candidatePreApkState.Contains(
+    '"runtimeProfile": "PublicAuthSideloadPreflight"'
+  ) -and
+  $candidatePreApkState.Contains(
+    '"state": "pending_sanitized_binding"'
+  ) -and
+  $candidatePreApkState.Contains('"privateValuesEmitted": false')
+} else {
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
+  )
+}
 $postBuildPluginGate = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot `
     'scripts/check-apk-production-plugin-integrity.ps1'
@@ -341,15 +403,7 @@ Assert-SideloadControl (
   $apkGate.Contains('$fullSocialRequiredFacts') -and
   $apkGate.Contains('MOOLSOCIAL_CHAT_URL') -and
   $apkGate.Contains('full-social runtime cohort is partial') -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
-  ) -and
+  $candidateRuntimeStateBound -and
   $wrapper.Contains('check-full-social-founder-dev-readiness.ps1') -and
   $wrapper.Contains('$fullSocialRuntimeRequired') -and
   $wrapper.Contains('$facebookRuntimeRequired') -and
@@ -523,7 +577,7 @@ $requiredAuthStageCodes = @(
   'auth-google-firebase-credential-timeout',
   'email-link-bridge-failure',
   'email-link-firebase-unclassified',
-  'email-link-provider-internal',
+  'internal-error',
   'email-link-send-started',
   'email-link-firebase-credential-complete',
   'email-link-session-ready'
@@ -628,6 +682,7 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
+  $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
   $wrapper.Contains('$successorBuildFoundationPassed = $?') -and
   $wrapper.Contains('Mandatory successor APK build-foundation gate failed.') -and
   $aabWrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
@@ -637,6 +692,28 @@ Assert-SideloadControl (
   $wrapper.Contains('$googleReadinessPassed = $?') -and
   $wrapper.Contains('$apkMachineGatePassed = $?')
 ) 'APK/AAB successor build-foundation gate is not mandatory in every wrapper.'
+
+$guardedFlutterIndex = $wrapper.IndexOf(
+  '$flutterExit = Invoke-MoolSocialFlutterWithCleanSupport',
+  [StringComparison]::Ordinal
+)
+$lockedPubGetIndex = $wrapper.IndexOf(
+  '& flutter pub get --enforce-lockfile',
+  [StringComparison]::Ordinal
+)
+$apkBuildIndex = $wrapper.IndexOf(
+  '& flutter @buildArguments',
+  [StringComparison]::Ordinal
+)
+Assert-SideloadControl (
+  $guardedFlutterIndex -ge 0 -and
+  $lockedPubGetIndex -gt $guardedFlutterIndex -and
+  $apkBuildIndex -gt $lockedPubGetIndex -and
+  $wrapper.Contains(
+    'Locked Flutter dependency resolution failed before APK build.'
+  ) -and
+  $wrapper.Contains("'--no-pub'")
+) 'APK wrapper does not hydrate the exact lock inside the guarded build operation.'
 
 Assert-SideloadControl (
   $androidAppBuild.Contains('buildFeatures {') -and
