@@ -38,9 +38,25 @@ Assert-Test (
   @($providerFunctionsConfig[0].ignore | Where-Object { $_ -ceq '.env*' }).Count `
     -eq 1
 ) 'provider Functions package does not exclude every dotenv file.'
+$sourceAuditPath = Join-Path $root `
+  'scripts\audit-deployed-social-function-source-r60-92.ps1'
+Assert-Test (Test-Path -LiteralPath $sourceAuditPath -PathType Leaf) `
+  'deployed Social source audit is missing.'
+$sourceAuditText = [IO.File]::ReadAllText($sourceAuditPath).
+  Replace("`r`n", "`n")
+Assert-Test (
+  $sourceAuditText.Contains('$privateCredentialEntryCount -eq 0') -and
+  $sourceAuditText.Contains('$riskyEntryCount -eq 0') -and
+  $sourceAuditText.Contains('$dotenvEntryCount -eq 0') -and
+  -not $sourceAuditText.Contains('$dotenvEntryCount -in @(1, 2)') -and
+  $sourceAuditText.Contains('[switch]$AllowReadyNotServing') -and
+  $sourceAuditText.Contains('$baseIdentityMatches') -and
+  $sourceAuditText.Contains('$readyCondition.Count -eq 1')
+) 'deployed Social source audit does not require zero dotenv and risky entries.'
 if ($PackagingOnly) {
   Write-Output (
     'Social runtime deployment packaging test passed: dotenvExcluded=true; ' +
+    'archiveRiskyEntriesRequired=0; ' +
     'dryRuns=0; deploys=0; cloudWrites=0.'
   )
   return

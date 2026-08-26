@@ -3,7 +3,8 @@ param(
   [string]$RepositoryRoot,
   [string]$DeploymentMapPath,
   [ValidatePattern('^[A-Za-z][A-Za-z0-9]{2,63}$')]
-  [string]$FunctionName
+  [string]$FunctionName,
+  [switch]$AllowReadyNotServing
 )
 
 Set-StrictMode -Version Latest
@@ -290,8 +291,8 @@ try {
       }
       Assert-SourceAudit (
         $privateCredentialEntryCount -eq 0 -and
-        $riskyEntryCount -eq $dotenvEntryCount -and
-        $dotenvEntryCount -in @(1, 2)
+        $riskyEntryCount -eq 0 -and
+        $dotenvEntryCount -eq 0
       ) "$name source archive has an unsanctioned risky entry class."
 
       $indexKey = 'lib/index.js'
@@ -418,21 +419,44 @@ try {
         "$name Cloud Run revision readback failed."
       $run = ($runRaw | Out-String) | ConvertFrom-Json -Depth 30
       $traffic = @($run.status.traffic)
-      $liveIdentityMatches = (
+      $baseIdentityMatches = (
         [string]$runtime.state -ceq [string]$function.liveState -and
         [string]$runtime.buildConfig.runtime -ceq [string]$function.runtime -and
         [string]$runtime.buildConfig.source.storageSource.bucket -ceq $bucket -and
         [string]$runtime.buildConfig.source.storageSource.object -ceq $object -and
         [string]$runtime.buildConfig.source.storageSource.generation -ceq $generation -and
         [string]$run.status.latestCreatedRevisionName -ceq
-          [string]$function.latestReadyRevision -and
-        [string]$run.status.latestReadyRevisionName -ceq
-          [string]$function.latestReadyRevision -and
-        $traffic.Count -eq 1 -and
-        [int]$traffic[0].percent -eq 100 -and
-        [string]$traffic[0].revisionName -ceq
           [string]$function.latestReadyRevision
       )
+      if ($AllowReadyNotServing) {
+        $revisionRaw = @(
+          & gcloud run revisions describe `
+            ([string]$function.latestReadyRevision) `
+            --region=asia-south1 --project=moolsocial-dev-503018 `
+            --format='json(status.conditions)' 2>$null
+        )
+        Assert-SourceAudit ($LASTEXITCODE -eq 0) `
+          "$name Ready revision readback failed."
+        $revision = ($revisionRaw | Out-String) | ConvertFrom-Json -Depth 30
+        $readyCondition = @($revision.status.conditions | Where-Object {
+          [string]$_.type -ceq 'Ready'
+        })
+        $liveIdentityMatches = (
+          $baseIdentityMatches -and
+          $readyCondition.Count -eq 1 -and
+          [string]$readyCondition[0].status -ceq 'True'
+        )
+      } else {
+        $liveIdentityMatches = (
+          $baseIdentityMatches -and
+          [string]$run.status.latestReadyRevisionName -ceq
+            [string]$function.latestReadyRevision -and
+          $traffic.Count -eq 1 -and
+          [int]$traffic[0].percent -eq 100 -and
+          [string]$traffic[0].revisionName -ceq
+            [string]$function.latestReadyRevision
+        )
+      }
       Assert-SourceAudit $liveIdentityMatches `
         "$name mapped generation is no longer the 100-percent ready runtime."
       $runtimeExpectation = $function.runtimeConfigurationAudit
