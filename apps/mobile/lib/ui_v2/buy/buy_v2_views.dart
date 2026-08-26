@@ -2063,21 +2063,6 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           (destination) =>
               lines.any((line) => line.product.destination == destination),
         );
-    final visibleDestinations = destinations.toSet();
-    final visibleItemCount = lines.fold<int>(
-      0,
-      (total, line) => total + line.quantity,
-    );
-    final visibleTotal = lines.fold<int>(
-      0,
-      (total, line) => total + line.total,
-    );
-    void clearVisibleCart() {
-      for (final line in List<BuyV2CartLine>.of(lines)) {
-        session.remove(line.product.id);
-      }
-    }
-
     return Column(
       children: [
         Padding(
@@ -2111,9 +2096,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final summary =
-                              '${_productCountLabel(visibleItemCount)} · '
-                              '${_destinationSummary(visibleDestinations)} · '
-                              '${buyV2Money(visibleTotal)}';
+                              '${_productCountLabel(session.itemCount)} · '
+                              '${_destinationSummary(session.cartDestinations)} · '
+                              '${buyV2Money(session.cartTotal)}';
                           return BuyV2FiniteValueTransition(
                             key: const ValueKey('buy-cart-header-value-motion'),
                             stateKey: summary,
@@ -2128,7 +2113,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   ),
                 ),
                 TextButton(
-                  onPressed: clearVisibleCart,
+                  onPressed: session.clearCart,
                   child: const Text(
                     'Clear',
                     style: TextStyle(color: Color(0xFFB42318), fontSize: 10),
@@ -6373,7 +6358,11 @@ class _CartScopeBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scopes = session.cartScope == BuyV2CartScope.medicine
         ? const [BuyV2CartScope.medicine]
-        : const [BuyV2CartScope.shop, BuyV2CartScope.wholesale];
+        : const [
+            BuyV2CartScope.all,
+            BuyV2CartScope.shop,
+            BuyV2CartScope.wholesale,
+          ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Container(

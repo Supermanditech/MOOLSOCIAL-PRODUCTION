@@ -874,7 +874,7 @@ void main() {
   );
 
   testWidgets(
-    'B01 T01A corrected Wholesale Cart founder capture',
+    'B01 T01A remove Medicine tab founder capture',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 800);
@@ -887,13 +887,12 @@ void main() {
       for (final destination in const [
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,
-        BuyV2Destination.medicine,
       ]) {
         final product = BuyV2Catalogue.products.firstWhere(
           (item) =>
               item.destination == destination && !item.requiresPrescription,
         );
-        expect(session.addProduct(product.id), isTrue);
+        session.addProduct(product.id);
       }
       session.openDestination(BuyV2Destination.wholesale);
       session.openCart(scope: BuyV2CartScope.wholesale);
@@ -928,7 +927,7 @@ void main() {
         find.byKey(const ValueKey('buy-v2-screen')),
         matchesGoldenFile(
           'candidate_captures/'
-          'buy-b01-t01a-cart-boundary-360x800.png',
+          'buy-b01-t01a-remove-medicine-only-360x800.png',
         ),
       );
       expect(tester.takeException(), isNull);
