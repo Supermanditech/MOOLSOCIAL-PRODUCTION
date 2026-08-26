@@ -101,6 +101,59 @@ try {
       param($state)
       $state.candidate.packageName = 'com.example.moolsocial'
     }
+
+  $readyState = Get-Content -Raw -LiteralPath $liveState | ConvertFrom-Json
+  $readyState.state = 'preauthorization_ready'
+  $readyState.candidate.finalIntegrationHead = '1111111111111111111111111111111111111111'
+  $readyState.integrationGate.state = 'passed'
+  $readyState.sourceSeal.state = 'passed'
+  $readyState.sourceSeal.manifestPath = 'artifacts/quality/source-manifest.txt'
+  $readyState.sourceSeal.manifestSha256 = ('A' * 64)
+  $readyState.sourceSeal.fileCount = 1
+  $readyState.sourceSeal.cycle1 = 'passed'
+  $readyState.sourceSeal.cycle2 = 'passed'
+  $readyState.runtimeConfiguration.state = 'passed_sanitized_binding'
+  $readyState.runtimeConfiguration.exactNonSecretDefinesBound = $true
+  $readyState.runtimeConfiguration.requiredPrivateDefineNamesBoundWithoutValues = $true
+  $readyState.runtimeConfiguration.mixedClientServerContractPrevented = $true
+  $readyState.dependencyGate.state = 'passed'
+  $readyState.dependencyGate.wrapperQualified = $true
+  $readyState.dependencyGate.postBuildPluginIntegrityQualified = $true
+  $readyState.socialDeployment.state = 'passed_deploy_map_held'
+  $readyState.socialDeployment.mapSha256 = ('B' * 64)
+  foreach ($gateState in @($readyState.preBuildGates)) {
+    $gateState.state = 'passed'
+  }
+  $readyState.blockers = @('one_build_authority_founder_held')
+  Write-Utf8Json $readyState $fixtureState
+  Write-Utf8Json ([ordered]@{
+      candidateId = [string]$readyState.candidate.id
+      versionName = [string]$readyState.candidate.versionName
+      versionCode = [string]$readyState.candidate.versionCode
+    }) (Join-Path $fixtureRoot (
+      'config\runtime\moolsocial-production-runtime-tickets-20260825.json'
+    ))
+  & $gate -RepositoryRoot $fixtureRoot -StatePath $fixtureState `
+    -Phase PreauthorizationReady | Out-Null
+
+  $readyState.state = 'one_build_authorized'
+  $readyState.authority.buildAuthorized = $true
+  $readyState.blockers = @()
+  Write-Utf8Json $readyState $fixtureState
+  & $gate -RepositoryRoot $fixtureRoot -StatePath $fixtureState `
+    -Phase BuildAuthorized | Out-Null
+
+  $readyState.preBuildGates[0].state = 'pending'
+  Write-Utf8Json $readyState $fixtureState
+  $buildWithoutReadinessRejected = $false
+  try {
+    & $gate -RepositoryRoot $fixtureRoot -StatePath $fixtureState `
+      -Phase BuildAuthorized | Out-Null
+  } catch {
+    $buildWithoutReadinessRejected = $true
+  }
+  Assert-Test $buildWithoutReadinessRejected `
+    'BuildAuthorized accepted one pending pre-build gate.'
 } finally {
   if (Test-Path -LiteralPath $fixtureRoot -PathType Container) {
     $resolvedFixture = [IO.Path]::GetFullPath($fixtureRoot)
@@ -118,4 +171,7 @@ try {
   }
 }
 
-Write-Output 'R60.92 pre-APK gate self-test passed: live=1; negative=4.'
+Write-Output (
+  'R60.92 pre-APK gate self-test passed: ' +
+  'live=1; preauthorization=1; buildAuthorization=1; negative=5.'
+)

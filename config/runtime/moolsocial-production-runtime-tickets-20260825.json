@@ -15,10 +15,10 @@
     "cursorUiExcluded": true,
     "cursorIntegrationRequiredBeforeSuccessorApk": true,
     "totalCodexAtomicEngineeringTicketCount": 130,
-    "implementedAtomicTicketCount": 123,
-    "pendingConfirmedImplementationCount": 7,
+    "implementedAtomicTicketCount": 124,
+    "pendingConfirmedImplementationCount": 6,
     "pendingClassificationCount": 0,
-    "remainingCodexEngineeringQueueCount": 7,
+    "remainingCodexEngineeringQueueCount": 6,
     "lifecycleStates": ["PENDING", "IMPLEMENTED", "TESTED", "RUNTIME_PROVEN", "AUDITED", "CLOSED", "CLOSED_CURRENT_ROUND_REOPEN_ON_APK_DEFECT", "GAP_FOUND"],
     "apkDeferredClosureRule": "APK-dependent tickets that pass implementation, focused tests, affected regressions, analysis and independent audit are closed for the current source round. Final integrated APK/OPPO acceptance may reopen the causal ticket or create a new atomic child when a runtime defect is found.",
     "gapLifecycle": ["GAP_FOUND", "CHILD_ATOMIC_TICKET", "FIX", "RETEST", "RE_AUDIT", "CLOSED"],
@@ -146,11 +146,11 @@
       ,{"id":"REL-PREAPK-01-CHILD-05-GAP-03","state":"CLOSED","implementation":"Kotlin readiness accepts 20 release plugins while preserving exactly the same three reviewed legacy Kotlin-plugin warnings.","runtime":"Guarded live inventory and full build-foundation suite pass."}
       ,{"id":"REL-PREAPK-01-CHILD-05-GAP-04","state":"CLOSED","implementation":"Dependency-sensitive namespace, Kotlin and resource gates run after locked pub get inside the same byte-restoring preflight/build operation.","runtime":"Wrapper AST/order assertions and candidate-specific build-foundation suite pass; no APK was built."}
       ,{"id":"REL-PREAPK-01-CHILD-05","state":"closed_current_round_reopen_on_apk_defect","implementation":"Release sanitizer and APK/AAB integrity gates require dev.fluttercommunity.plus.share.SharePlusPlugin alongside Firebase Core and forbid integration_test.","runtime":"APK/AAB positive fixtures and seven negative plugin fixtures pass; actual authorized APK inspection remains postbuild pending and may reopen."}
+      ,{"id":"REL-PREAPK-01-CHILD-03","state":"CLOSED","implementation":"CandidateReservation, PreauthorizationReady and BuildAuthorized are distinct fail-closed phases; build authority remains false in live preparation state.","runtime":"Live reservation, preauthorization/build fixtures and five negative authority/version/postbuild fixtures pass with zero action counts."}
     ],
     "pendingConfirmedImplementation": [
       {"id":"REL-PREAPK-01","state":"PENDING","implementation":"Prepare one fail-closed incremental successor APK gate set from the final integrated Social runtime without building, installing or deploying.","runtime":"Gate inventory and candidate preparation pending."},
       {"id":"REL-PREAPK-01-CHILD-02","state":"PENDING","implementation":"Require a final integration branch containing closed v4 and the exact remote Social-share tip only through automatic no-edit merges.","runtime":"Final integration admission and remote closure pending."},
-      {"id":"REL-PREAPK-01-CHILD-03","state":"PENDING","implementation":"Separate pre-APK readiness from one-build authorization so preparation can pass while APK/AAB build authority remains closed.","runtime":"Preauthorization gate/state pending."},
       {"id":"REL-PREAPK-01-CHILD-06","state":"PENDING","implementation":"Create an immutable product-source manifest and run two complete deterministic source regression cycles from final integration.","runtime":"Source seal and cycles pending."},
       {"id":"REL-PREAPK-01-CHILD-07","state":"PENDING","implementation":"Register every mandatory prebuild gate as evidence-bound passed and every postbuild/install/OPPO gate as pending before build authority can open.","runtime":"Candidate machine-state matrix pending."},
       {"id":"REL-PREAPK-01-CHILD-08","state":"PENDING","implementation":"Map all five Social Cloud Functions from repository source to retained/live revisions and classify deploy, preserve or coordinated-window action.","runtime":"Source/evidence mapping pending; live CLI readback blocked by founder reauthentication."},
@@ -181,12 +181,12 @@
       "select_the_next_atomic_ticket"
     ],
     "nextTicketBlockedUntilActiveClosed": true,
-    "activeTicket": "REL-PREAPK-01-CHILD-03",
+    "activeTicket": "REL-PREAPK-01-CHILD-08",
     "activeTicketPhase": "PENDING",
     "activeTicketChildGaps": [],
-    "lastClosedTicket": "REL-PREAPK-01-CHILD-05",
+    "lastClosedTicket": "REL-PREAPK-01-CHILD-03",
     "lastPreApkClosedTicket": "RT-11",
-    "nextTicket": "REL-PREAPK-01-CHILD-03"
+    "nextTicket": "REL-PREAPK-01-CHILD-08"
   },
   "tickets": [
     {"id":"META-WORKTREE-01","area":"coordination","microScope":"codex_worktree","layers":["deployment"],"outcome":"Use only the founder-specified Codex worktree.","owner":"codex_runtime","state":"verified_pass","evidence":"Exact worktree resolved and remained clean at authorization.","blocker":"none","dependencies":[]},
@@ -454,7 +454,7 @@
     {"id":"REL-PREAPK-01","area":"release_preparation","microScope":"incremental_successor_pre_apk_parent","layers":["mobile","backend","deployment","apk","oppo","testing"],"outcome":"Make the exact next incremental APK candidate fully gate-ready before the founder grants one-build authority.","owner":"codex_runtime","state":"PENDING","evidence":"Founder requested complete mandatory pre-APK gate preparation on 2026-08-26.","blocker":"children 01 through 09 pending; no APK or deployment authorized","dependencies":["RT-11","REL-SUCCESSOR-01"]},
     {"id":"REL-PREAPK-01-CHILD-01","area":"apk","microScope":"candidate_version_monotonicity","layers":["apk","deployment","testing"],"outcome":"Reserve one unique candidate/version tuple strictly newer than installed r60.91 without consuming build authority.","owner":"codex_runtime","state":"verified_pass","evidence":"Candidate reservation gate passes live plus four negative fixtures for non-monotonic code, premature build authority, premature postbuild pass and package drift.","blocker":"none","dependencies":["APK-BASE-01","APK-BASE-03"]},
     {"id":"REL-PREAPK-01-CHILD-02","area":"integration","microScope":"final_source_graph_admission","layers":["wiring","deployment","testing"],"outcome":"Build only from a clean remote-exact integration graph that automatically merges closed v4 and the exact Social-share feature tip.","owner":"primary_integration","state":"PENDING","evidence":"Social-share tip dba3c05bfb392eac11d46fc36cdaa42c39ae859d is clean and remote-exact; final integration not yet created.","blocker":"integration worktree/branch and no-edit merge verification pending","dependencies":["REL-PREAPK-01-CHILD-01"]},
-    {"id":"REL-PREAPK-01-CHILD-03","area":"release_authority","microScope":"preauthorization_readiness_separation","layers":["deployment","apk","testing"],"outcome":"Pass all non-build gates while buildAuthorization, install, Play, deployment and device authority remain closed.","owner":"primary_release_coordinator","state":"PENDING","evidence":"Current MVP state keeps buildAuthorized=false and deviceInstallAuthorized=false.","blocker":"dedicated readiness gate/state pending","dependencies":["REL-PREAPK-01-CHILD-02"]},
+    {"id":"REL-PREAPK-01-CHILD-03","area":"release_authority","microScope":"preauthorization_readiness_separation","layers":["deployment","apk","testing"],"outcome":"Pass all non-build gates while buildAuthorization, install, Play, deployment and device authority remain closed.","owner":"primary_release_coordinator","state":"verified_pass","evidence":"Live CandidateReservation plus preauthorization/build positive fixtures and five fail-closed negatives pass; all live action counts remain zero.","blocker":"none; actual one-build authority remains founder-held by design","dependencies":["REL-PREAPK-01-CHILD-02"]},
     {"id":"REL-PREAPK-01-CHILD-04","area":"dependency_preflight","microScope":"same_operation_pub_get_and_apk_build","layers":["mobile","apk","testing"],"outcome":"Hydrate pubspec.lock and generated plugin metadata inside the same guarded future build operation before --no-pub compilation.","owner":"codex_runtime","state":"verified_pass","evidence":"Wrapper AST and build-foundation order assertions prove --enforce-lockfile runs inside the same byte guard before the future --no-pub build; no APK was built.","blocker":"none","dependencies":["REL-BUILD-CLEAN-01","RT-11-01-GAP-01"]},
     {"id":"REL-PREAPK-01-CHILD-05","area":"plugin_integrity","microScope":"share_plus_native_registration","layers":["mobile","apk","testing"],"outcome":"Fail prebuild/postbuild qualification unless share_plus is locked and its Android plugin is registered in the built artifact with all existing production plugins.","owner":"codex_runtime","state":"closed_current_round_reopen_on_apk_defect","evidence":"Guarded inventories, release sanitizer, full build-foundation controls and APK/AAB plugin positive/seven-negative fixtures pass.","blocker":"actual authorized APK class inspection remains postbuild pending and may reopen","dependencies":["REL-PREAPK-01-CHILD-04"]},
     {"id":"REL-PREAPK-01-CHILD-06","area":"source_seal","microScope":"two_cycle_final_integration_regression","layers":["mobile","backend","testing","deployment"],"outcome":"Seal the final product owner hashes and pass two complete deterministic source cycles before build authority.","owner":"primary_integration","state":"PENDING","evidence":"Prior Social-share focused/final tests pass, but candidate-specific final integration cycles are not yet sealed.","blocker":"final integration required first","dependencies":["REL-PREAPK-01-CHILD-02","REL-PREAPK-01-CHILD-05"]},

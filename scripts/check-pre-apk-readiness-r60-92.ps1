@@ -181,12 +181,15 @@ Assert-PreApk (
   -not [bool]$authority.secretValueAccessAuthorized
 ) 'pre-APK authority counts or held actions changed.'
 
-if ($Phase -ceq 'BuildAuthorized') {
-  Assert-PreApk ([bool]$authority.buildAuthorized) `
-    'one-build founder authorization is not recorded.'
-} else {
+if ($Phase -cin @('CandidateReservation', 'PreauthorizationReady')) {
   Assert-PreApk (-not [bool]$authority.buildAuthorized) `
     'build authority must remain closed during preparation.'
+} else {
+  Assert-PreApk (
+    [bool]$authority.buildAuthorized -and
+    -not [bool]$authority.oneBuildAuthorizationConsumed -and
+    [int]$authority.buildCount -eq 0
+  ) 'one unused founder-authorized build is not recorded.'
 }
 
 $artifactPath = [IO.Path]::GetFullPath(
@@ -197,25 +200,26 @@ $artifactPath = [IO.Path]::GetFullPath(
 Assert-PreApk (
   $artifactPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)
 ) 'reserved APK path escaped the repository.'
-if ($Phase -cne 'BuildAuthorized') {
-  Assert-PreApk (-not (Test-Path -LiteralPath $artifactPath)) `
-    'reserved APK already exists before build authorization.'
-}
+Assert-PreApk (-not (Test-Path -LiteralPath $artifactPath)) `
+  'reserved APK already exists before the single authorized build.'
 
 $postBuildIds = @($state.postBuildGates | ForEach-Object { [string]$_.id })
 Assert-PreApk (
   $postBuildIds.Count -eq 16 -and
   @($postBuildIds | Select-Object -Unique).Count -eq $postBuildIds.Count
 ) 'post-build gate inventory is incomplete or duplicated.'
-if ($Phase -cin @('CandidateReservation','PreauthorizationReady')) {
-  Assert-PreApk (
-    @($state.postBuildGates | Where-Object { [string]$_.state -cne 'pending' }).Count -eq 0
-  ) 'post-build evidence cannot pass before an authorized APK exists.'
-}
+Assert-PreApk (
+  @($state.postBuildGates | Where-Object { [string]$_.state -cne 'pending' }).Count -eq 0
+) 'post-build evidence cannot pass before an authorized APK exists.'
 
-if ($Phase -ceq 'PreauthorizationReady') {
-  Assert-PreApk ([string]$state.state -ceq 'preauthorization_ready') `
-    'candidate is not sealed preauthorization-ready.'
+if ($Phase -cin @('PreauthorizationReady', 'BuildAuthorized')) {
+  $expectedState = if ($Phase -ceq 'BuildAuthorized') {
+    'one_build_authorized'
+  } else {
+    'preauthorization_ready'
+  }
+  Assert-PreApk ([string]$state.state -ceq $expectedState) `
+    "candidate state is not '$expectedState'."
   $pendingPreBuild = @($state.preBuildGates | Where-Object {
     [string]$_.state -cne 'passed'
   })
@@ -242,10 +246,15 @@ if ($Phase -ceq 'PreauthorizationReady') {
     -not [bool]$state.socialDeployment.actualDeploymentAuthorized -and
     -not [bool]$state.socialDeployment.privateValuesEmitted
   ) 'sealed integration, source, runtime, dependency or Social deployment proof is incomplete.'
-  Assert-PreApk (
-    @($state.blockers).Count -eq 1 -and
-    [string]$state.blockers[0] -ceq 'one_build_authority_founder_held'
-  ) 'preauthorization readiness has an unresolved blocker beyond founder build authority.'
+  if ($Phase -ceq 'PreauthorizationReady') {
+    Assert-PreApk (
+      @($state.blockers).Count -eq 1 -and
+      [string]$state.blockers[0] -ceq 'one_build_authority_founder_held'
+    ) 'preauthorization readiness has an unresolved blocker beyond founder build authority.'
+  } else {
+    Assert-PreApk (@($state.blockers).Count -eq 0) `
+      'one-build authorization cannot retain a preparation blocker.'
+  }
 }
 
 Write-Output (
