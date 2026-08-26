@@ -105,7 +105,7 @@ $reviewedLegacyKotlinPlugins = @(
 $actualLegacyKotlinPlugins = @($legacyKotlinPlugins | Sort-Object)
 $expectedLegacyKotlinPlugins = @($reviewedLegacyKotlinPlugins | Sort-Object)
 $baselineMatches = (
-  $releaseAndroidPlugins.Count -eq 19 -and
+  $releaseAndroidPlugins.Count -eq 20 -and
   ($resolvedAndroidPlugins.Count - $releaseAndroidPlugins.Count) -eq 1 -and
   $actualLegacyKotlinPlugins.Count -eq $expectedLegacyKotlinPlugins.Count -and
   ($actualLegacyKotlinPlugins -join '|') -ceq

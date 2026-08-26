@@ -72,13 +72,13 @@
     "privateValuesEmitted": false
   },
   "dependencyGate": {
-    "state": "plugin_integrity_gap",
+    "state": "passed",
     "lockfile": "apps/mobile/pubspec.lock",
     "newNativePlugin": "share_plus",
     "newNativePluginVersion": "13.3.0",
     "sameGuardedPubGetAndBuildRequired": true,
     "wrapperQualified": true,
-    "postBuildPluginIntegrityQualified": false
+    "postBuildPluginIntegrityQualified": true
   },
   "socialDeployment": {
     "state": "mapping_in_progress",
@@ -103,14 +103,14 @@
     {"id": "approved-locks", "state": "pending", "evidence": []},
     {"id": "protected-boundaries", "state": "pending", "evidence": []},
     {"id": "brand-copy-interactions", "state": "pending", "evidence": []},
-    {"id": "dependency-integrity", "state": "pending", "evidence": []},
-    {"id": "native-plugin-source-integrity", "state": "pending", "evidence": []},
+    {"id": "dependency-integrity", "state": "passed", "evidence": ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock", "scripts/build-buy-device-review.ps1"]},
+    {"id": "native-plugin-source-integrity", "state": "passed", "evidence": ["apps/mobile/android/app/build.gradle.kts", "scripts/check-apk-production-plugin-integrity.ps1", "scripts/check-aab-production-plugin-integrity.ps1", "scripts/test-release-production-plugin-integrity.ps1"]},
     {"id": "android-static-release-readiness", "state": "pending", "evidence": []},
     {"id": "runtime-define-sanitized-binding", "state": "pending", "evidence": []},
     {"id": "social-deployment-map", "state": "pending", "evidence": []},
     {"id": "secret-scan", "state": "pending", "evidence": []},
     {"id": "clean-remote-readback", "state": "pending", "evidence": []},
-    {"id": "wrapper-self-test", "state": "pending", "evidence": []}
+    {"id": "wrapper-self-test", "state": "passed", "evidence": ["scripts/test-public-auth-sideload-build-controls.ps1", "scripts/test-release-production-plugin-integrity.ps1"]}
   ],
   "postBuildGates": [
     {"id": "apk-exists-once", "state": "pending"},
@@ -132,8 +132,6 @@
   ],
   "blockers": [
     "final_integration_pending",
-    "dependency_wrapper_gap",
-    "share_plus_plugin_integrity_gap",
     "source_seal_and_two_cycles_pending",
     "runtime_define_sanitized_binding_pending",
     "social_backend_deployment_map_pending",
