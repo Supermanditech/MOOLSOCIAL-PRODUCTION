@@ -23,6 +23,34 @@ class _BuyV2CartBenefitSelectionRef {
   final String sourceId;
 }
 
+@immutable
+class _BuyV2DeliveryPromiseQuote {
+  const _BuyV2DeliveryPromiseQuote({
+    required this.promise,
+    this.promisedByLabel,
+  });
+
+  final String promise;
+  final String? promisedByLabel;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _BuyV2DeliveryPromiseQuote &&
+      other.promise == promise &&
+      other.promisedByLabel == promisedByLabel;
+
+  @override
+  int get hashCode => Object.hash(promise, promisedByLabel);
+}
+
+typedef BuyV2DeliveryPromiseChange = ({
+  String groupKey,
+  String previousPromise,
+  String? previousPromisedByLabel,
+  String currentPromise,
+  String? currentPromisedByLabel,
+});
+
 typedef _BuyV2NavigationSurfaceIdentity = ({
   BuyV2Destination destination,
   BuyV2View view,
@@ -213,9 +241,14 @@ class BuyV2Session extends ChangeNotifier {
   int _savedProductsMutationRevision = 0;
   Set<BuyV2Destination> _confirmedDestinations = {};
   List<BuyV2Order> _confirmedOrders = [];
+  Map<String, _BuyV2DeliveryPromiseQuote> _checkoutPromiseSnapshot = {};
+  Map<String, _BuyV2DeliveryPromiseQuote>? _pendingCheckoutPromiseSnapshot;
+  List<BuyV2DeliveryPromiseChange> _checkoutDeliveryPromiseChanges = [];
+  String? _confirmedPurchaseId;
   int _confirmedItemCount = 0;
   int _confirmedTotal = 0;
   int _orderSequence = 1;
+  int _purchaseSequence = 1;
 
   final List<BuyV2Address> _addresses = [
     const BuyV2Address(
@@ -635,19 +668,54 @@ class BuyV2Session extends ChangeNotifier {
       grouped.putIfAbsent(key, () => []).add(line);
     }
     return grouped.values
-        .map(
-          (lines) => BuyV2FulfilmentGroup(
+        .map((lines) {
+          final facts = lines
+              .map((line) => productFactsFor(line.product))
+              .toList(growable: false);
+          final promisedByLabels = facts
+              .map((fact) => fact.promisedByLabel?.trim())
+              .whereType<String>()
+              .where((label) => label.isNotEmpty)
+              .toSet();
+          return BuyV2FulfilmentGroup(
             destination: lines.first.product.destination,
             partner: lines.first.product.seller,
             partnerType: lines.first.product.partnerRole,
-            promise: lines
-                .map((line) => line.product.deliveryPromise)
+            promise: facts
+                .map((fact) => fact.deliveryPromise)
                 .toSet()
                 .join(' · '),
+            promisedByLabel: promisedByLabels.isEmpty
+                ? null
+                : promisedByLabels.join(' · '),
             lines: List.unmodifiable(lines),
-          ),
-        )
+          );
+        })
         .toList(growable: false);
+  }
+
+  Map<String, _BuyV2DeliveryPromiseQuote> _deliveryPromiseSnapshotFor(
+    List<BuyV2FulfilmentGroup> groups,
+  ) => {
+    for (final group in groups)
+      group.key: _BuyV2DeliveryPromiseQuote(
+        promise: group.promise,
+        promisedByLabel: group.promisedByLabel,
+      ),
+  };
+
+  void _captureCheckoutPromiseSnapshot() {
+    _checkoutPromiseSnapshot = _deliveryPromiseSnapshotFor(
+      checkoutFulfilmentGroups,
+    );
+    _pendingCheckoutPromiseSnapshot = null;
+    _checkoutDeliveryPromiseChanges = [];
+  }
+
+  void _clearCheckoutPromiseSnapshot() {
+    _checkoutPromiseSnapshot = {};
+    _pendingCheckoutPromiseSnapshot = null;
+    _checkoutDeliveryPromiseChanges = [];
   }
 
   int tipForGroup(BuyV2FulfilmentGroup group) =>
@@ -1004,6 +1072,14 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2Order> get confirmedOrders => List.unmodifiable(_confirmedOrders);
 
+  String? get confirmedPurchaseId => _confirmedPurchaseId;
+
+  bool get checkoutPromiseReviewRequired =>
+      _pendingCheckoutPromiseSnapshot != null;
+
+  List<BuyV2DeliveryPromiseChange> get checkoutDeliveryPromiseChanges =>
+      List.unmodifiable(_checkoutDeliveryPromiseChanges);
+
   int get confirmedItemCount => _confirmedItemCount;
 
   int get confirmedTotal => _confirmedTotal;
@@ -1260,6 +1336,7 @@ class BuyV2Session extends ChangeNotifier {
   bool openCheckout() {
     final previous = _navigationSurfaceIdentity;
     if (cartLines.isEmpty) {
+      _clearCheckoutPromiseSnapshot();
       view = BuyV2View.catalogue;
       notice = 'Choose a product to continue.';
       _notifyNavigationIfChanged(
@@ -1269,6 +1346,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (selectedAddressOrNull == null) {
+      _clearCheckoutPromiseSnapshot();
       view = BuyV2View.cart;
       notice = 'Choose a delivery address to continue.';
       _notifyNavigationIfChanged(
@@ -1280,6 +1358,7 @@ class BuyV2Session extends ChangeNotifier {
       checkoutScope = cartScope;
       view = BuyV2View.checkout;
       notice = null;
+      _captureCheckoutPromiseSnapshot();
     }
     _notifyNavigationIfChanged(
       previous,
@@ -1885,9 +1964,52 @@ class BuyV2Session extends ChangeNotifier {
       );
       return false;
     }
+    if (checkoutPromiseReviewRequired) {
+      notice = 'Review and accept the updated delivery times to continue.';
+      notifyListeners();
+      return false;
+    }
+    for (final product in lines.map((line) => line.product).toSet()) {
+      final next = productFactsAdapter.snapshotFor(product);
+      if (!_validProductFacts(product, next)) {
+        notice = 'Delivery times could not be confirmed. Try again.';
+        notifyListeners();
+        return false;
+      }
+      _productFacts[product.id] = next;
+    }
     final groups = checkoutFulfilmentGroups;
+    final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
+    if (_checkoutPromiseSnapshot.isEmpty) {
+      _checkoutPromiseSnapshot = refreshedSnapshot;
+    }
+    if (!mapEquals(_checkoutPromiseSnapshot, refreshedSnapshot)) {
+      final changedKeys = {
+        ..._checkoutPromiseSnapshot.keys,
+        ...refreshedSnapshot.keys,
+      }.where((key) => _checkoutPromiseSnapshot[key] != refreshedSnapshot[key]);
+      _checkoutDeliveryPromiseChanges = [
+        for (final key in changedKeys)
+          (
+            groupKey: key,
+            previousPromise:
+                _checkoutPromiseSnapshot[key]?.promise ?? 'Not quoted',
+            previousPromisedByLabel:
+                _checkoutPromiseSnapshot[key]?.promisedByLabel,
+            currentPromise: refreshedSnapshot[key]?.promise ?? 'Unavailable',
+            currentPromisedByLabel: refreshedSnapshot[key]?.promisedByLabel,
+          ),
+      ];
+      _pendingCheckoutPromiseSnapshot = refreshedSnapshot;
+      notice = 'Delivery times changed. Review the updated plan.';
+      notifyListeners();
+      return false;
+    }
+    final purchaseId =
+        'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
+    _confirmedPurchaseId = purchaseId;
     _confirmedOrders = groups
-        .map((group) => _createOrderForGroup(group, address))
+        .map((group) => _createOrderForGroup(group, address, purchaseId))
         .toList(growable: false);
     _orders.insertAll(0, _confirmedOrders);
     _confirmedDestinations = _confirmedOrders
@@ -1904,6 +2026,7 @@ class BuyV2Session extends ChangeNotifier {
     destination = BuyV2Destination.orders;
     view = BuyV2View.confirmation;
     notice = null;
+    _clearCheckoutPromiseSnapshot();
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
@@ -1914,6 +2037,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2Order _createOrderForGroup(
     BuyV2FulfilmentGroup group,
     BuyV2Address address,
+    String purchaseId,
   ) {
     final sequence = _orderSequence++;
     final prefix = switch (group.destination) {
@@ -1946,6 +2070,8 @@ class BuyV2Session extends ChangeNotifier {
       destinationLabel: address.shortLine,
       progress: status == BuyV2OrderStatus.confirmed ? .34 : .2,
       status: status,
+      purchaseId: purchaseId,
+      promisedByLabel: group.promisedByLabel,
       productIds: group.productIds,
       lines: List.unmodifiable(group.lines),
       paymentMethod: selectedPayment,
@@ -1956,6 +2082,17 @@ class BuyV2Session extends ChangeNotifier {
       )?.label,
       tip: tipForGroup(group),
     );
+  }
+
+  bool acceptCheckoutPromiseChanges() {
+    final pending = _pendingCheckoutPromiseSnapshot;
+    if (pending == null) return false;
+    _checkoutPromiseSnapshot = Map.unmodifiable(pending);
+    _pendingCheckoutPromiseSnapshot = null;
+    _checkoutDeliveryPromiseChanges = [];
+    notice = null;
+    notifyListeners();
+    return true;
   }
 
   void _pruneCartSelections() {

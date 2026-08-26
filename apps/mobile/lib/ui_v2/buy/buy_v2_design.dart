@@ -29,14 +29,38 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
     return 'Currently unavailable';
   }
 
-  final source = facts.deliveryPromise.trim();
+  return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
+}
+
+String buyV2BuyerDeliveryPromiseSource(String value) {
+  final source = value.trim();
   if (source.toLowerCase().startsWith('delivered ')) return source;
   final minutes = RegExp(
     r'(\d+)\s*(?:min|minute)s?',
     caseSensitive: false,
   ).firstMatch(source);
   if (minutes != null) return 'Delivered in ${minutes.group(1)} min';
+  final longerDuration = RegExp(
+    r'(\d+)\s*(hour|day)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (longerDuration != null) {
+    final amount = longerDuration.group(1)!;
+    final unit = longerDuration.group(2)!.toLowerCase();
+    return 'Delivered in $amount $unit${amount == '1' ? '' : 's'}';
+  }
   return 'Delivery $source';
+}
+
+String buyV2DeliveryPromiseSummary({
+  required String promise,
+  String? promisedByLabel,
+}) {
+  final relative = buyV2BuyerDeliveryPromiseSource(promise);
+  final deadline = promisedByLabel?.trim();
+  return deadline == null || deadline.isEmpty
+      ? relative
+      : '$relative · $deadline';
 }
 
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>

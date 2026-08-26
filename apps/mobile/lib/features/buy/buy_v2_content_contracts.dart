@@ -11,6 +11,7 @@ class BuyV2ProductFactsSnapshot {
     required this.partner,
     required this.orderabilityLabel,
     required this.sourceId,
+    this.promisedByLabel,
     this.observedAt,
     this.stale = false,
   }) : assert(
@@ -24,6 +25,7 @@ class BuyV2ProductFactsSnapshot {
   final String partner;
   final String orderabilityLabel;
   final String sourceId;
+  final String? promisedByLabel;
   final DateTime? observedAt;
   final bool stale;
 
@@ -35,6 +37,7 @@ class BuyV2ProductFactsSnapshot {
     String? partner,
     String? orderabilityLabel,
     String? sourceId,
+    String? promisedByLabel,
     DateTime? observedAt,
     bool? stale,
   }) {
@@ -45,6 +48,7 @@ class BuyV2ProductFactsSnapshot {
       partner: partner ?? this.partner,
       orderabilityLabel: orderabilityLabel ?? this.orderabilityLabel,
       sourceId: sourceId ?? this.sourceId,
+      promisedByLabel: promisedByLabel ?? this.promisedByLabel,
       observedAt: observedAt ?? this.observedAt,
       stale: stale ?? this.stale,
     );
@@ -59,6 +63,7 @@ class BuyV2ProductFactsSnapshot {
         other.partner == partner &&
         other.orderabilityLabel == orderabilityLabel &&
         other.sourceId == sourceId &&
+        other.promisedByLabel == promisedByLabel &&
         other.observedAt == observedAt &&
         other.stale == stale;
   }
@@ -71,6 +76,7 @@ class BuyV2ProductFactsSnapshot {
     partner,
     orderabilityLabel,
     sourceId,
+    promisedByLabel,
     observedAt,
     stale,
   );

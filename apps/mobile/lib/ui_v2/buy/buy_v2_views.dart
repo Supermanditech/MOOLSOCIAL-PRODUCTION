@@ -32,6 +32,34 @@ String _destinationSummary(Set<BuyV2Destination> destinations) {
       .join(' + ');
 }
 
+String _fulfilmentPromiseSummary(BuyV2FulfilmentGroup group) =>
+    buyV2DeliveryPromiseSummary(
+      promise: group.promise,
+      promisedByLabel: group.promisedByLabel,
+    );
+
+String _orderPromiseSummary(BuyV2Order order) => buyV2DeliveryPromiseSummary(
+  promise: order.promise,
+  promisedByLabel: order.promisedByLabel,
+);
+
+typedef _BuyV2PurchaseGroup = ({String? purchaseId, List<BuyV2Order> orders});
+
+List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
+  final grouped = <String, List<BuyV2Order>>{};
+  for (final order in orders) {
+    final key = order.purchaseId ?? 'order:${order.id}';
+    grouped.putIfAbsent(key, () => []).add(order);
+  }
+  return [
+    for (final entry in grouped.entries)
+      (
+        purchaseId: entry.value.first.purchaseId,
+        orders: List.unmodifiable(entry.value),
+      ),
+  ];
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({super.key, required this.session, this.returnLabel});
 
@@ -2278,6 +2306,7 @@ class BuyV2CheckoutView extends StatelessWidget {
       );
     }
     final destinations = session.checkoutDestinations;
+    final deliveryGroups = session.checkoutFulfilmentGroups;
     return Column(
       children: [
         Expanded(
@@ -2303,26 +2332,47 @@ class BuyV2CheckoutView extends StatelessWidget {
                 onEdit: () => showBuyV2AddressSheet(context, session),
               ),
               const SizedBox(height: 9),
-              for (final group in session.checkoutFulfilmentGroups) ...[
+              if (session.checkoutPromiseReviewRequired) ...[
+                _CheckoutPromiseChangeReview(session: session),
+                const SizedBox(height: 9),
+              ],
+              Semantics(
+                header: true,
+                child: Text(
+                  'Delivery plan',
+                  style: context.buyTitle.copyWith(fontSize: 16),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Place this purchase once. Each promise below is retained for its delivery.',
+                style: context.buyMeta.copyWith(fontSize: 8.5),
+              ),
+              const SizedBox(height: 7),
+              for (var index = 0; index < deliveryGroups.length; index++) ...[
                 _CheckoutCard(
-                  icon: switch (group.destination) {
+                  key: ValueKey(
+                    'buy-checkout-delivery-plan-${deliveryGroups[index].key}',
+                  ),
+                  icon: switch (deliveryGroups[index].destination) {
                     BuyV2Destination.shop => Icons.storefront_outlined,
                     BuyV2Destination.wholesale => Icons.inventory_2_outlined,
                     BuyV2Destination.medicine => Icons.medication_outlined,
                     BuyV2Destination.orders => Icons.receipt_long_outlined,
                   },
                   title:
-                      '${group.destination.label} fulfilment · ${group.partner}',
+                      'Delivery ${index + 1} · ${_productCountLabel(deliveryGroups[index].itemCount)}',
                   detail: [
-                    '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
-                    group.promise,
+                    _fulfilmentPromiseSummary(deliveryGroups[index]),
+                    '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
+                    'Fulfiller assigned automatically after placement',
                     if (session.selectedDeliveryInstructionFor(
-                          group.destination,
+                          deliveryGroups[index].destination,
                         )
                         case final instruction?)
-                      '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
-                    if (session.tipForGroup(group) > 0)
-                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
+                      '${_deliveryInstructionOwner(deliveryGroups[index].destination)} · ${instruction.label}',
+                    if (session.tipForGroup(deliveryGroups[index]) > 0)
+                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(deliveryGroups[index]))}',
                   ].join('\n'),
                 ),
                 const SizedBox(height: 7),
@@ -2360,8 +2410,8 @@ class BuyV2CheckoutView extends StatelessWidget {
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'Payment · ${session.selectedPayment}',
                 detail: destinations.contains(BuyV2Destination.wholesale)
-                    ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
-                    : 'Selected payment method for this order.',
+                    ? 'One payment selection for this purchase. Supplier invoices remain attached to their deliveries.'
+                    : 'Selected payment method for this purchase.',
                 action: 'Change',
                 onTap: () => showBuyV2PaymentSheet(context, session),
               ),
@@ -2402,7 +2452,9 @@ class BuyV2CheckoutView extends StatelessWidget {
                 width: 176,
                 height: 44,
                 child: FilledButton(
-                  onPressed: session.confirmOrder,
+                  onPressed: session.checkoutPromiseReviewRequired
+                      ? null
+                      : session.confirmOrder,
                   child: const Text('Place order'),
                 ),
               ),
@@ -2410,6 +2462,65 @@ class BuyV2CheckoutView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CheckoutPromiseChangeReview extends StatelessWidget {
+  const _CheckoutPromiseChangeReview({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final changes = session.checkoutDeliveryPromiseChanges;
+    return Container(
+      key: const ValueKey('buy-checkout-promise-change-review'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: BuyV2Colors.softOrange,
+        border: const Color(0x44FF9933),
+        radius: 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Delivery times changed',
+            style: context.buyTitle.copyWith(fontSize: 15),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Nothing has been placed. Review the new promises before continuing.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          for (final change in changes) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Previous · ${buyV2DeliveryPromiseSummary(promise: change.previousPromise, promisedByLabel: change.previousPromisedByLabel)}',
+              style: context.buyMeta.copyWith(fontSize: 8.5),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Updated · ${buyV2DeliveryPromiseSummary(promise: change.currentPromise, promisedByLabel: change.currentPromisedByLabel)}',
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontSize: 10,
+              ),
+            ),
+          ],
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: FilledButton(
+              key: const ValueKey('buy-accept-updated-delivery-times'),
+              onPressed: session.acceptCheckoutPromiseChanges,
+              child: const Text('Accept updated times'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2454,6 +2565,13 @@ class BuyV2ConfirmationView extends StatelessWidget {
                 '${_productCountLabel(session.confirmedItemCount)} · ${buyV2Money(session.confirmedTotal)}',
                 style: context.buyBody,
               ),
+              if (session.confirmedPurchaseId case final purchaseId?) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Purchase $purchaseId',
+                  style: context.buyMeta.copyWith(fontSize: 8.5),
+                ),
+              ],
               const SizedBox(height: 3),
               Text(
                 address == null
@@ -2469,14 +2587,21 @@ class BuyV2ConfirmationView extends StatelessWidget {
         Semantics(
           header: true,
           child: Text(
-            'What you placed',
+            'Your deliveries',
             style: context.buyTitle.copyWith(fontSize: 16),
           ),
         ),
+        const SizedBox(height: 2),
+        Text(
+          'Each delivery keeps the promise accepted at Checkout.',
+          style: context.buyMeta.copyWith(fontSize: 8.5),
+        ),
         const SizedBox(height: 7),
-        for (final order in session.confirmedOrders) ...[
+        for (final (index, order) in session.confirmedOrders.indexed) ...[
           _PlacedOrderCard(
             order: order,
+            deliveryIndex: index,
+            deliveryCount: session.confirmedOrders.length,
             onViewInvoice: () => showBuyV2InvoicePage(
               context,
               order: order,
@@ -2489,7 +2614,7 @@ class BuyV2ConfirmationView extends StatelessWidget {
         FilledButton(
           key: const ValueKey('buy-confirmation-orders'),
           onPressed: session.openOrders,
-          child: const Text('View orders'),
+          child: const Text('View purchase in Orders'),
         ),
         const SizedBox(height: 8),
         OutlinedButton(
@@ -2504,11 +2629,15 @@ class BuyV2ConfirmationView extends StatelessWidget {
 class _PlacedOrderCard extends StatelessWidget {
   const _PlacedOrderCard({
     required this.order,
+    required this.deliveryIndex,
+    required this.deliveryCount,
     required this.onViewInvoice,
     required this.onTrackOrder,
   });
 
   final BuyV2Order order;
+  final int deliveryIndex;
+  final int deliveryCount;
   final VoidCallback onViewInvoice;
   final VoidCallback onTrackOrder;
 
@@ -2547,11 +2676,11 @@ class _PlacedOrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${order.destination.label} order confirmed',
+                      'Delivery ${deliveryIndex + 1} of $deliveryCount',
                       style: context.buyBody.copyWith(fontSize: 12),
                     ),
                     Text(
-                      order.id,
+                      '${order.destination.label} · ${order.id}',
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                   ],
@@ -2622,7 +2751,21 @@ class _PlacedOrderCard extends StatelessWidget {
             style: context.buyMeta.copyWith(fontSize: 8.5),
           ),
           const SizedBox(height: 2),
-          Text(order.promise, style: context.buyBody.copyWith(fontSize: 10)),
+          Text(
+            'Promised at Checkout · ${_orderPromiseSummary(order)}',
+            style: context.buyBody.copyWith(fontSize: 10),
+          ),
+          if (order.updatedDeliveryEstimate case final estimate?) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Delayed · new estimate $estimate',
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.orange,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
           if (order.deliveryInstruction case final instruction?) ...[
             const SizedBox(height: 2),
             Text(
@@ -2652,7 +2795,7 @@ class _PlacedOrderCard extends StatelessWidget {
                     key: ValueKey('buy-confirmation-track-${order.id}'),
                     onPressed: onTrackOrder,
                     icon: const Icon(Icons.local_shipping_outlined, size: 18),
-                    label: const Text('Track order'),
+                    label: const Text('Track delivery'),
                   ),
                 ),
               ),
@@ -2775,6 +2918,8 @@ class BuyV2OrdersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleOrders = session.visibleOrders;
+    final purchaseGroups = _purchaseGroupsFor(visibleOrders);
     return ListView(
       key: const PageStorageKey('buy-orders'),
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
@@ -2866,21 +3011,66 @@ class BuyV2OrdersView extends StatelessWidget {
         const SizedBox(height: 7),
         BuyV2FiniteIncomingTransition(
           stateKey: session.ordersTab,
-          child: session.visibleOrders.isEmpty
+          child: visibleOrders.isEmpty
               ? _OrdersEmptyState(query: session.query, tab: session.ordersTab)
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final order in session.visibleOrders)
-                      Padding(
-                        key: ValueKey('buy-order-row-${order.id}'),
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _OrderCard(
-                          session: session,
-                          order: order,
-                          invoiceDownloader: invoiceDownloader,
+                    for (final group in purchaseGroups) ...[
+                      if (group.purchaseId case final purchaseId?) ...[
+                        Container(
+                          key: ValueKey('buy-purchase-group-$purchaseId'),
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: buyV2CardDecoration(
+                            color: BuyV2Colors.softBlue,
+                            radius: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.receipt_long_outlined,
+                                color: BuyV2Colors.navy,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Purchase $purchaseId',
+                                      style: context.buyBody.copyWith(
+                                        fontSize: 10.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${group.orders.length} ${group.orders.length == 1 ? 'delivery' : 'deliveries'} · ${buyV2Money(group.orders.fold<int>(0, (total, order) => total + order.total))}',
+                                      style: context.buyMeta.copyWith(
+                                        fontSize: 8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
+                      for (final order in group.orders)
+                        Padding(
+                          key: ValueKey('buy-order-row-${order.id}'),
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _OrderCard(
+                            session: session,
+                            order: order,
+                            invoiceDownloader: invoiceDownloader,
+                          ),
+                        ),
+                    ],
                   ],
                 ),
         ),
@@ -3303,7 +3493,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                     _OrderDeliveryFact(
                       icon: Icons.schedule_outlined,
                       label: 'Delivery window',
-                      value: order.promise,
+                      value: _orderPromiseSummary(order),
                     ),
                     _OrderDeliveryFact(
                       icon: Icons.assignment_turned_in_outlined,
@@ -3498,13 +3688,24 @@ class BuyV2TrackingView extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                order.promise,
+                _orderPromiseSummary(order),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              if (order.updatedDeliveryEstimate case final estimate?) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Delayed · new estimate $estimate',
+                  style: const TextStyle(
+                    color: BuyV2Colors.orange,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               const SizedBox(height: 7),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -3930,7 +4131,7 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
                               style: context.buyBody.copyWith(fontSize: 11),
                             ),
                             Text(
-                              '${order.id} · ${order.promise}',
+                              '${order.id} · ${_orderPromiseSummary(order)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: context.buyMeta.copyWith(fontSize: 8),
@@ -8507,13 +8708,22 @@ class _OrderCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  order.promise,
+                  _orderPromiseSummary(order),
                   style: const TextStyle(
                     color: BuyV2Colors.ink,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (order.updatedDeliveryEstimate case final estimate?)
+                  Text(
+                    'Delayed · new estimate $estimate',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.orange,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(5),
