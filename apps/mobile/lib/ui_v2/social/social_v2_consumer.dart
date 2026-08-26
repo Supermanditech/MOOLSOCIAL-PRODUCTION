@@ -2675,7 +2675,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 onOpenChannel: () =>
                     _openYouTubeChannel(video.providerChannelId),
                 onDetails: () => _openVideoDetails(video),
-                onShare: () => _copyYouTubeLink(video),
+                onShare: () => _shareYouTubeVideo(video),
                 onOpenProvider: _openYouTubeVideo,
                 onSelectVideo: (next) {
                   final origin = _returnToYouTubeSearchAfterVideo
@@ -3350,7 +3350,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         sharePositionOrigin: _sharePositionOrigin(),
       ),
     );
-    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) return;
+    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) {
+      return;
+    }
     showSocialV2Message(
       context,
       'Sharing is unavailable right now. You can copy the link instead.',
@@ -3487,7 +3489,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  Future<void> _copyYouTubeLink(_VideoData video) async {
+  Future<void> _shareYouTubeVideo(_VideoData video) async {
     final videoId = video.providerVideoId?.trim();
     if (videoId == null || videoId.isEmpty) {
       showSocialV2Message(context, 'This YouTube link is unavailable');
@@ -3496,18 +3498,21 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     final url = Uri.https('www.youtube.com', '/watch', <String, String>{
       'v': videoId,
     });
-    try {
-      await Clipboard.setData(ClipboardData(text: url.toString()));
-    } on Object {
-      if (mounted) {
-        showSocialV2Message(
-          context,
-          'YouTube link could not be copied. Try again.',
-        );
-      }
+    final outcome = await _shareGateway.share(
+      SocialV2ShareRequest(
+        uri: url,
+        title: 'Share YouTube video',
+        subject: 'YouTube video',
+        sharePositionOrigin: _sharePositionOrigin(),
+      ),
+    );
+    if (!mounted || outcome != SocialV2ShareOutcome.unavailable) {
       return;
     }
-    if (mounted) showSocialV2Message(context, 'YouTube link copied');
+    showSocialV2Message(
+      context,
+      'Sharing is unavailable right now. You can open this video on YouTube instead.',
+    );
   }
 
   Future<void> _openYouTubeShort(_ShortData short) {

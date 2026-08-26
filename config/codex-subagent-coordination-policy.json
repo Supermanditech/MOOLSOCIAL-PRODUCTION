@@ -168,6 +168,7 @@
         "apps/mobile/test/social_v2_create_publication_test.dart",
         "apps/mobile/test/social_v2_youtube_public_runtime_test.dart",
         "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_action_truth_accessibility_c29o_test.dart",
+        "scripts/check-approved-ui-locks.ps1",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     },
