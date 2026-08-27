@@ -31,6 +31,7 @@ function Test-CursorUiReviewWrapperSource {
     $Source.Contains('Cursor UI Review permits debug APK builds only.') -and
     $Source.Contains('AndroidDebugPackage=cursorreview;Promotable=false') -and
     $Source.Contains("if (`$RuntimeProfile -cne 'CursorUiReview' -and (") -and
+    $Source.Contains("if (`$BuildMode -ceq 'release') {") -and
     $Source.Contains('-CandidateId $CandidateId')
   )
 }
