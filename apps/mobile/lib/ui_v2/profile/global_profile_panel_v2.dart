@@ -286,12 +286,39 @@ class _ProfileAccessCard extends StatelessWidget {
             accent: _profileGreen,
             onTap: () => onOpenRoute('/app/account/identity'),
           ),
-          const SizedBox(height: MoolSpacing.xs),
+          const SizedBox(height: MoolSpacing.md),
+          const Row(
+            children: [
+              Icon(Icons.trending_up_rounded, color: _profileNavy, size: 21),
+              SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Grow with MoolSocial',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            'Choose the professional path that matches your work.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
           _AccessRoleTile(
             keyName: 'global-profile-creator-workspace',
             icon: Icons.auto_awesome_outlined,
-            title: 'Creator workspace',
-            detail: 'Apply to create, publish, measure and earn',
+            title: 'Create and earn',
+            detail: 'Apply for a Creator workspace',
             accent: _profileSaffron,
             onTap: () => onOpenRoute('/app/account/workspaces?type=creator'),
           ),
@@ -299,10 +326,51 @@ class _ProfileAccessCard extends StatelessWidget {
           _AccessRoleTile(
             keyName: 'global-profile-workspaces',
             icon: Icons.storefront_outlined,
-            title: 'Business and Commerce workspaces',
-            detail: 'Apply to sell, trade or fulfil orders',
+            title: 'Build your business',
+            detail: 'Apply for a Business or Commerce workspace',
             accent: _profileNavy,
             onTap: () => onOpenRoute('/app/account/workspaces?type=partner'),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          _AccessRoleTile(
+            keyName: 'global-profile-work-access',
+            icon: Icons.delivery_dining_outlined,
+            title: 'Deliver and complete work',
+            detail: 'Apply for an Earn or Delivery workspace',
+            accent: const Color(0xFF2563EB),
+            onTap: () => onOpenRoute('/app/account/workspaces?type=work'),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const Key('global-profile-explore-workspaces'),
+              onPressed: () => onOpenRoute('/app/account/workspaces'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _profileNavy,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                ),
+              ),
+              icon: const Icon(Icons.grid_view_rounded, size: 19),
+              label: const Text(
+                'Explore workspaces',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'Your personal account remains active during application and approval.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 10,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
