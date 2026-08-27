@@ -48,6 +48,12 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/app/account/workspaces',
+          builder: (context, state) => const Scaffold(
+            body: Text('Workspaces', key: Key('global-workspaces-destination')),
+          ),
+        ),
+        GoRoute(
           path: '/app/chat/inbox',
           builder: (context, state) =>
               const Scaffold(body: Text('Chat review')),
@@ -133,8 +139,14 @@ void main() {
     expect(find.text('MoolSocial account'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsOne);
     expect(find.text('Personal account'), findsWidgets);
-    expect(find.text('Creator workspace'), findsOne);
-    expect(find.text('Business and Commerce workspaces'), findsOne);
+    expect(find.text('Grow with MoolSocial'), findsOne);
+    expect(find.text('Create and earn'), findsOne);
+    expect(find.text('Build your business'), findsOne);
+    expect(find.text('Deliver and complete work'), findsOne);
+    expect(
+      find.byKey(const Key('global-profile-explore-workspaces')),
+      findsOne,
+    );
     expect(
       find.descendant(
         of: find.byKey(const Key('global-profile-panel-v2')),
@@ -149,10 +161,20 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.byKey(const Key('global-profile-identity')), findsOne);
-    await tester.tap(find.byKey(const Key('global-profile-identity')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('global-profile-explore-workspaces')),
+      240,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('global-profile-panel-v2')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('global-profile-destination')), findsOne);
+    await tester.tap(
+      find.byKey(const Key('global-profile-explore-workspaces')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-workspaces-destination')), findsOne);
   });
 
   testWidgets('Work choices open their exact destinations', (tester) async {
