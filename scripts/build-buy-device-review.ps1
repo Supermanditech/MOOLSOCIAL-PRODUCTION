@@ -611,6 +611,11 @@ try {
       'build\app\outputs\mapping\release'
     $pluginIntegrityArguments.RequireMappingAware = $true
   }
+  if ($RuntimeProfile -ceq 'CursorUiReview') {
+    $pluginIntegrityArguments.ExpectedApplicationId = `
+      'com.moolsocial.app.cursorreview'
+    $pluginIntegrityArguments.AllowDebugTestPlugin = $true
+  }
   & $pluginIntegrityGate @pluginIntegrityArguments
   if (-not $?) {
     throw 'APK production plugin integrity gate failed.'
