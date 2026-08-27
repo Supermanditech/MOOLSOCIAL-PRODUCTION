@@ -81,6 +81,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     final media = MediaQuery.of(context);
     final effectiveScale = media.textScaler.scale(1).clamp(.9, 1.15);
     final width = math.min(media.size.width * .8, 340.0);
+    final height = math.min(media.size.height * .78, 680.0);
     return MediaQuery(
       data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
       child: SafeArea(
@@ -95,7 +96,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
           ),
           child: SizedBox(
             width: width,
-            height: double.infinity,
+            height: height,
             child: Column(
               children: [
                 _ProfileHeader(
