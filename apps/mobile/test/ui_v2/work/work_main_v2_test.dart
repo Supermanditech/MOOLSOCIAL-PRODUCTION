@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/features/journey01/journey_router.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
@@ -54,12 +55,6 @@ void main() {
               'Choose workspace',
               key: Key('workspace-application-destination'),
             ),
-          ),
-        ),
-        GoRoute(
-          path: '/app/pay/home',
-          builder: (context, state) => const Scaffold(
-            body: Text('Payments', key: Key('profile-payments-destination')),
           ),
         ),
         GoRoute(
@@ -152,8 +147,14 @@ void main() {
     expect(find.text('Personal account'), findsOne);
     expect(find.text('Your account'), findsOne);
     expect(find.text('Privacy and preferences'), findsOne);
-    expect(find.text('Your essentials'), findsOne);
-    expect(find.text('Grow with MoolSocial'), findsOne);
+    expect(find.text('Become a MoolSocial Partner'), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
+    expect(
+      find.byKey(const Key('global-profile-active-workspace')),
+      findsNothing,
+    );
+    expect(find.text('Orders'), findsNothing);
+    expect(find.text('Payments'), findsNothing);
     expect(
       find.byKey(const Key('global-profile-explore-workspaces')),
       findsOne,
@@ -192,26 +193,72 @@ void main() {
     );
   });
 
-  testWidgets('profile quick access opens the existing payments route', (
+  testWidgets('workspace controls appear only after live activation', (
     tester,
   ) async {
-    final session = WorkSession();
+    final session = WorkSession()..seedVerifiedWorkspace();
+    session.reviewStage = WorkReviewStage.live;
     addTearDown(session.dispose);
     await pumpWorkMain(tester, session);
 
     await tester.tap(find.byKey(const Key('work-main-global-profile')));
     await tester.pumpAndSettle();
+    final activeWorkspace = find.byKey(
+      const Key('global-profile-active-workspace'),
+    );
+    expect(activeWorkspace, findsOne);
+    expect(
+      find.descendant(
+        of: activeWorkspace,
+        matching: find.text('Mahadev Fresh Mart'),
+      ),
+      findsOne,
+    );
+    expect(
+      find.descendant(
+        of: activeWorkspace,
+        matching: find.textContaining('Grocery / Kirana Shop'),
+      ),
+      findsOne,
+    );
+    expect(find.text('Workspace access'), findsOne);
     expect(find.byKey(const Key('global-profile-quick-actions')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-orders')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-payments')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-operations')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-activity')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-documents')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-plans')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-support')), findsOne);
-    await tester.tap(find.byKey(const Key('global-profile-quick-payments')));
+    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
+    await tester.tap(find.byKey(const Key('global-profile-quick-operations')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('profile-payments-destination')), findsOne);
+    expect(find.byKey(const Key('workspace-destination')), findsOne);
+  });
+
+  testWidgets('pending application keeps partner controls locked', (
+    tester,
+  ) async {
+    final session = WorkSession()
+      ..reviewCaseId = 'WP-PENDING'
+      ..reviewStage = WorkReviewStage.gstPending;
+    addTearDown(session.dispose);
+    await pumpWorkMain(tester, session);
+
+    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.pumpAndSettle();
+    expect(find.text('Workspace application'), findsOne);
+    expect(find.text('View application'), findsOne);
+    expect(
+      find.byKey(const Key('global-profile-active-workspace')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('global-profile-explore-workspaces')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workspace-destination')), findsOne);
   });
 
   testWidgets('Work choices open their exact destinations', (tester) async {

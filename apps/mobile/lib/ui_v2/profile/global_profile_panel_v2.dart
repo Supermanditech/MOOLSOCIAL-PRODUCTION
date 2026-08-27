@@ -9,9 +9,23 @@ const _profileNavy = Color(0xFF000080);
 const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
 
+class GlobalProfileWorkspaceContext {
+  const GlobalProfileWorkspaceContext({
+    required this.name,
+    required this.roleLabel,
+    required this.area,
+  });
+
+  final String name;
+  final String roleLabel;
+  final String area;
+}
+
 Future<void> showGlobalProfilePanelV2(
   BuildContext context, {
   required ValueChanged<String> onOpenRoute,
+  GlobalProfileWorkspaceContext? activeWorkspace,
+  bool applicationInProgress = false,
 }) async {
   await showGeneralDialog<void>(
     context: context,
@@ -22,6 +36,8 @@ Future<void> showGlobalProfilePanelV2(
     pageBuilder: (dialogContext, _, _) => Align(
       alignment: Alignment.centerRight,
       child: GlobalProfilePanelV2(
+        activeWorkspace: activeWorkspace,
+        applicationInProgress: applicationInProgress,
         onClose: () => Navigator.pop(dialogContext),
         onOpenRoute: (route) {
           Navigator.pop(dialogContext);
@@ -50,11 +66,15 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   const GlobalProfilePanelV2({
     required this.onClose,
     required this.onOpenRoute,
+    this.activeWorkspace,
+    this.applicationInProgress = false,
     super.key,
   });
 
   final VoidCallback onClose;
   final ValueChanged<String> onOpenRoute;
+  final GlobalProfileWorkspaceContext? activeWorkspace;
+  final bool applicationInProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +94,10 @@ class GlobalProfilePanelV2 extends StatelessWidget {
           height: double.infinity,
           child: Column(
             children: [
-              _ProfileHeader(onClose: onClose),
+              _ProfileHeader(
+                onClose: onClose,
+                workspaceRoleLabel: activeWorkspace?.roleLabel,
+              ),
               Expanded(
                 child: ListView(
                   key: const Key('global-profile-panel-content'),
@@ -85,37 +108,26 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     MoolSpacing.xxl,
                   ),
                   children: [
-                    _ProfileSection(
-                      title: 'Your account',
-                      items: [
-                        _ProfileDestination(
-                          id: 'identity',
-                          title: 'Personal profile',
-                          detail: 'Identity and contact',
-                          icon: Icons.badge_outlined,
-                          route: '/app/account/identity',
-                        ),
-                        _ProfileDestination(
-                          id: 'preferences',
-                          title: 'Privacy and preferences',
-                          detail: 'Data and notifications',
-                          icon: Icons.privacy_tip_outlined,
-                          route: '/app/account/workspaces/preferences',
-                        ),
-                        _ProfileDestination(
-                          id: 'security',
-                          title: 'Security',
-                          detail: 'Sign-in and recovery',
-                          icon: Icons.shield_outlined,
-                          route: '/app/account/security',
-                        ),
-                      ],
-                      onOpenRoute: onOpenRoute,
-                    ),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileQuickActions(onOpenRoute: onOpenRoute),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileAccessCard(onOpenRoute: onOpenRoute),
+                    if (activeWorkspace case final workspace?) ...[
+                      _ActiveWorkspaceCard(workspace: workspace),
+                      const SizedBox(height: MoolSpacing.lg),
+                      _ProfileQuickActions(onOpenRoute: onOpenRoute),
+                      const SizedBox(height: MoolSpacing.lg),
+                      _PersonalAccountSection(
+                        includeSupport: false,
+                        onOpenRoute: onOpenRoute,
+                      ),
+                    ] else ...[
+                      _PersonalAccountSection(
+                        includeSupport: true,
+                        onOpenRoute: onOpenRoute,
+                      ),
+                      const SizedBox(height: MoolSpacing.lg),
+                      _ProfileAccessCard(
+                        applicationInProgress: applicationInProgress,
+                        onOpenRoute: onOpenRoute,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -128,9 +140,13 @@ class GlobalProfilePanelV2 extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.onClose});
+  const _ProfileHeader({
+    required this.onClose,
+    required this.workspaceRoleLabel,
+  });
 
   final VoidCallback onClose;
+  final String? workspaceRoleLabel;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -211,6 +227,17 @@ class _ProfileHeader extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (workspaceRoleLabel != null)
+                    Text(
+                      workspaceRoleLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -250,9 +277,144 @@ class _ProfileHeader extends StatelessWidget {
   );
 }
 
-class _ProfileAccessCard extends StatelessWidget {
-  const _ProfileAccessCard({required this.onOpenRoute});
+class _PersonalAccountSection extends StatelessWidget {
+  const _PersonalAccountSection({
+    required this.includeSupport,
+    required this.onOpenRoute,
+  });
 
+  final bool includeSupport;
+  final ValueChanged<String> onOpenRoute;
+
+  @override
+  Widget build(BuildContext context) => _ProfileSection(
+    title: includeSupport ? 'Your account' : 'Personal account',
+    items: [
+      const _ProfileDestination(
+        id: 'identity',
+        title: 'Personal profile',
+        detail: 'Identity and contact',
+        icon: Icons.badge_outlined,
+        route: '/app/account/identity',
+      ),
+      const _ProfileDestination(
+        id: 'preferences',
+        title: 'Privacy and preferences',
+        detail: 'Data and notifications',
+        icon: Icons.privacy_tip_outlined,
+        route: '/app/account/workspaces/preferences',
+      ),
+      const _ProfileDestination(
+        id: 'security',
+        title: 'Security',
+        detail: 'Sign-in and recovery',
+        icon: Icons.shield_outlined,
+        route: '/app/account/security',
+      ),
+      if (includeSupport)
+        const _ProfileDestination(
+          id: 'ask',
+          title: 'Help and support',
+          detail: 'Account assistance',
+          icon: Icons.support_agent_outlined,
+          route: '/app/ask',
+        ),
+    ],
+    onOpenRoute: onOpenRoute,
+  );
+}
+
+class _ActiveWorkspaceCard extends StatelessWidget {
+  const _ActiveWorkspaceCard({required this.workspace});
+
+  final GlobalProfileWorkspaceContext workspace;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    key: const Key('global-profile-active-workspace'),
+    color: Colors.white,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(MoolRadii.floating),
+      side: const BorderSide(color: Color(0xFFE4E7EC)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _profileGreen.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.verified_user_outlined,
+              color: _profileGreen,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  workspace.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${workspace.roleLabel} · ${workspace.area}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: MoolSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _profileGreen.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'Active',
+              style: TextStyle(
+                color: _profileGreen,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ProfileAccessCard extends StatelessWidget {
+  const _ProfileAccessCard({
+    required this.applicationInProgress,
+    required this.onOpenRoute,
+  });
+
+  final bool applicationInProgress;
   final ValueChanged<String> onOpenRoute;
 
   @override
@@ -280,29 +442,35 @@ class _ProfileAccessCard extends StatelessWidget {
                   color: _profileSaffron.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Icon(
-                  Icons.trending_up_rounded,
+                child: Icon(
+                  applicationInProgress
+                      ? Icons.hourglass_top_rounded
+                      : Icons.trending_up_rounded,
                   color: _profileSaffron,
                   size: 21,
                 ),
               ),
               const SizedBox(width: MoolSpacing.sm),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Grow with MoolSocial',
-                      style: TextStyle(
+                      applicationInProgress
+                          ? 'Workspace application'
+                          : 'Become a MoolSocial Partner',
+                      style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Create, build a business, deliver or complete professional work.',
-                      style: TextStyle(
+                      applicationInProgress
+                          ? 'Partner controls stay locked until approval and activation.'
+                          : 'Choose how you work and submit one workspace application.',
+                      style: const TextStyle(
                         color: MoolColors.muted,
                         fontSize: 10,
                         height: 1.3,
@@ -319,7 +487,11 @@ class _ProfileAccessCard extends StatelessWidget {
             width: double.infinity,
             child: FilledButton(
               key: const Key('global-profile-explore-workspaces'),
-              onPressed: () => onOpenRoute('/app/work/workspace/choose'),
+              onPressed: () => onOpenRoute(
+                applicationInProgress
+                    ? '/app/work/my-work'
+                    : '/app/work/workspace/choose',
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: _profileNavy,
                 foregroundColor: Colors.white,
@@ -328,8 +500,10 @@ class _ProfileAccessCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(MoolRadii.control),
                 ),
               ),
-              child: const Text(
-                'Explore workspaces',
+              child: Text(
+                applicationInProgress
+                    ? 'View application'
+                    : 'Explore workspaces',
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
@@ -350,18 +524,11 @@ class _ProfileQuickActions extends StatelessWidget {
 
   static const _actions = <_ProfileQuickAction>[
     _ProfileQuickAction(
-      id: 'orders',
-      label: 'Orders',
-      icon: Icons.receipt_long_outlined,
-      route: '/app/buy?sub=orders',
+      id: 'operations',
+      label: 'Operations',
+      icon: Icons.dashboard_customize_outlined,
+      route: '/app/work/my-work',
       accent: Color(0xFF4D46A8),
-    ),
-    _ProfileQuickAction(
-      id: 'payments',
-      label: 'Payments',
-      icon: Icons.account_balance_wallet_outlined,
-      route: '/app/pay/home',
-      accent: Color(0xFF138808),
     ),
     _ProfileQuickAction(
       id: 'activity',
@@ -401,7 +568,7 @@ class _ProfileQuickActions extends StatelessWidget {
       const Padding(
         padding: EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
         child: Text(
-          'Your essentials',
+          'Workspace access',
           style: TextStyle(
             color: MoolColors.ink,
             fontSize: 14,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_service_home.dart';
 import '../../core/design/mool_theme.dart';
+import '../../features/work/work_models.dart';
 import '../../features/work/widgets/work_widgets.dart';
 import '../../features/work/work_session.dart';
 import '../profile/global_profile_panel_v2.dart';
@@ -33,6 +34,18 @@ class WorkMainV2 extends StatelessWidget {
           tooltip: 'MoolSocial account',
           onPressed: () => showGlobalProfilePanelV2(
             context,
+            activeWorkspace:
+                session.reviewStage == WorkReviewStage.live &&
+                    session.activeWorkspace != null
+                ? GlobalProfileWorkspaceContext(
+                    name: session.activeWorkspace!.name,
+                    roleLabel: session.activeWorkspace!.profileLabel,
+                    area: session.activeWorkspace!.area,
+                  )
+                : null,
+            applicationInProgress:
+                session.reviewCaseId != null &&
+                session.reviewStage != WorkReviewStage.live,
             onOpenRoute: (route) {
               if (route.startsWith('/app/work/workspace/choose')) {
                 session.startAnotherWork();
