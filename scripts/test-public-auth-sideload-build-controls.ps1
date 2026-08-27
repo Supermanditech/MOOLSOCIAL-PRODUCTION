@@ -730,8 +730,14 @@ Assert-SideloadControl (
   $wrapper.Contains('Resolve-ReleaseArtifactRepositoryDescendant') -and
   $wrapper.Contains('test-release-artifact-path-containment.ps1') -and
   $wrapper.Contains('test-release-production-plugin-integrity.ps1') -and
-  $wrapper.Contains('-ProguardFolderPath') -and
-  $wrapper.Contains('-RequireMappingAware') -and
+  (
+    $wrapper.Contains('-ProguardFolderPath') -or
+    $wrapper.Contains('$pluginIntegrityArguments.ProguardFolderPath')
+  ) -and
+  (
+    $wrapper.Contains('-RequireMappingAware') -or
+    $wrapper.Contains('$pluginIntegrityArguments.RequireMappingAware')
+  ) -and
   $wrapper.Contains(
     "MOOLSOCIAL_SOCIAL_CONTENT_URL = 'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent'"
   ) -and
