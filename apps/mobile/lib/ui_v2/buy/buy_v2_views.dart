@@ -2577,84 +2577,115 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    key: const ValueKey('buy-gst-invoice-sheet'),
-    padding: EdgeInsets.fromLTRB(
-      16,
-      12,
-      16,
-      16 + MediaQuery.viewInsetsOf(context).bottom,
-    ),
-    child: SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'GST invoice details',
-            style: context.buyTitle.copyWith(fontSize: 20),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'These details affect the invoice only. GST applies as required.',
-            style: context.buyMeta,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('buy-gst-legal-name'),
-            controller: _legalName,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Legal name'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            key: const ValueKey('buy-gst-gstin'),
-            controller: _gstin,
-            maxLength: 15,
-            textCapitalization: TextCapitalization.characters,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'GSTIN'),
-          ),
-          const SizedBox(height: 4),
-          TextField(
-            key: const ValueKey('buy-gst-billing-address'),
-            controller: _billingAddress,
-            minLines: 2,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Billing address'),
-          ),
-          SwitchListTile.adaptive(
-            key: const ValueKey('buy-gst-remember'),
-            contentPadding: EdgeInsets.zero,
-            value: _remember,
-            onChanged: (value) => setState(() => _remember = value),
-            title: const Text('Remember these GST details'),
-            subtitle: const Text('Reuse them on a later invoice.'),
-          ),
-          if (_error case final error?) ...[
-            Text(
-              error,
-              key: const ValueKey('buy-gst-error'),
-              style: const TextStyle(
-                color: Color(0xFFB42318),
-                fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return AnimatedPadding(
+      key: const ValueKey('buy-gst-invoice-sheet'),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: media.size.height * .9),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: SingleChildScrollView(
+                  key: const ValueKey('buy-gst-form-scroll'),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'GST invoice details',
+                        style: context.buyTitle.copyWith(fontSize: 20),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'These details affect the invoice only. GST applies as required.',
+                        style: context.buyMeta,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('buy-gst-legal-name'),
+                        controller: _legalName,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Legal name',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        key: const ValueKey('buy-gst-gstin'),
+                        controller: _gstin,
+                        maxLength: 15,
+                        textCapitalization: TextCapitalization.characters,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'GSTIN'),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        key: const ValueKey('buy-gst-billing-address'),
+                        controller: _billingAddress,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Billing address',
+                        ),
+                      ),
+                      SwitchListTile.adaptive(
+                        key: const ValueKey('buy-gst-remember'),
+                        contentPadding: EdgeInsets.zero,
+                        value: _remember,
+                        onChanged: (value) => setState(() => _remember = value),
+                        title: const Text('Remember these GST details'),
+                        subtitle: const Text('Reuse them on a later invoice.'),
+                      ),
+                      if (_error case final error?) ...[
+                        Text(
+                          error,
+                          key: const ValueKey('buy-gst-error'),
+                          style: const TextStyle(
+                            color: Color(0xFFB42318),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton(
-              key: const ValueKey('buy-gst-save'),
-              onPressed: _save,
-              child: const Text('Use GST details'),
-            ),
+              DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      key: const ValueKey('buy-gst-save'),
+                      onPressed: _save,
+                      child: const Text('Use GST details'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class BuyV2CheckoutView extends StatelessWidget {

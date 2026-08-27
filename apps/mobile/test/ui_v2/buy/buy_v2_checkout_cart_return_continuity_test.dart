@@ -16,6 +16,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    EdgeInsets viewInsets = EdgeInsets.zero,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -25,6 +26,7 @@ void main() {
           size: size,
           padding: safeArea,
           viewPadding: safeArea,
+          viewInsets: viewInsets,
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
@@ -196,6 +198,118 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('T01B GST action stays reachable across Android and iOS insets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const viewports = [
+      (
+        label: 'Redmi navigation',
+        size: Size(360, 800),
+        safeArea: EdgeInsets.only(top: 34, bottom: 81),
+        viewInsets: EdgeInsets.zero,
+        textScale: 1.0,
+      ),
+      (
+        label: 'compact Android keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 24, bottom: 24),
+        viewInsets: EdgeInsets.only(bottom: 260),
+        textScale: 1.4,
+      ),
+      (
+        label: 'modern iOS keyboard',
+        size: Size(390, 844),
+        safeArea: EdgeInsets.only(top: 47, bottom: 34),
+        viewInsets: EdgeInsets.only(bottom: 336),
+        textScale: 1.2,
+      ),
+      (
+        label: 'compact iOS keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 20),
+        viewInsets: EdgeInsets.only(bottom: 216),
+        textScale: 1.0,
+      ),
+    ];
+
+    for (final viewport in viewports) {
+      tester.view.physicalSize = viewport.size;
+      final session = mixedSession();
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue, reason: viewport.label);
+
+      await tester.pumpWidget(
+        app(
+          session,
+          size: viewport.size,
+          safeArea: viewport.safeArea,
+          viewInsets: viewport.viewInsets,
+          textScale: viewport.textScale,
+          reducedMotion: true,
+        ),
+      );
+      await tester.pump();
+      final request = find.byKey(const ValueKey('buy-gst-request-wholesale'));
+      await tester.ensureVisible(request);
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('buy-gst-add-wholesale'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+
+      final save = find.byKey(const ValueKey('buy-gst-save'));
+      expect(save, findsOneWidget, reason: viewport.label);
+      final saveRect = tester.getRect(save);
+      final usableBottom =
+          viewport.size.height -
+          viewport.safeArea.bottom -
+          viewport.viewInsets.bottom;
+      expect(
+        saveRect.bottom,
+        lessThanOrEqualTo(usableBottom + 1),
+        reason: '${viewport.label} bottom-safe action',
+      );
+      expect(
+        saveRect.height,
+        greaterThanOrEqualTo(44),
+        reason: '${viewport.label} action height',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-gst-form-scroll')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      session.dispose();
+    }
   });
 
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
