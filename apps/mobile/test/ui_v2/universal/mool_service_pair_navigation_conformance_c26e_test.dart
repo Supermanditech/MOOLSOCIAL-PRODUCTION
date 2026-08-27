@@ -73,6 +73,34 @@ void main() {
     expect(find.byKey(const Key('ride-global-chat')), findsOneWidget);
     expect(find.byKey(const Key('ride-global-profile')), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('ride-global-profile')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('global-profile-context-travel-bus-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-travel-bus-discovery'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bus-booking-home')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('travel-global-profile')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('global-profile-context-travel-cab-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-travel-cab-discovery'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ride-local-navigation')), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();

@@ -11,6 +11,44 @@ import '../ride_session.dart';
 
 String rideMoney(int value) => '₹$value';
 
+GlobalProfileContextAction _travelProfileContext(
+  RideSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final trip = session.trip;
+  if (trip != null && !session.rideCancelled) {
+    final stageLabel = switch (session.stage) {
+      RideTripStage.captainArriving => 'Captain is arriving',
+      RideTripStage.liveTrip => 'Ride in progress',
+      RideTripStage.paymentApproval => 'Fare ready for approval',
+      RideTripStage.receipt => 'Ride completed',
+    };
+    return GlobalProfileContextAction(
+      id: 'travel-active-ride',
+      title: 'Your ${trip.package.name} ride',
+      detail: '$stageLabel · ${trip.drop}',
+      actionLabel: session.stage == RideTripStage.receipt
+          ? 'View receipt'
+          : 'Open ride',
+      icon: Icons.local_taxi_outlined,
+      accentColor: const Color(0xFF0284C7),
+      gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+      onPressed: () => onOpenRoute('/app/ride/trip/${trip.id}'),
+    );
+  }
+
+  return GlobalProfileContextAction(
+    id: 'travel-bus-discovery',
+    title: 'Plan a bus journey',
+    detail: 'Compare routes, timings, seats and fares before checkout.',
+    actionLabel: 'Search buses',
+    icon: Icons.directions_bus_filled_outlined,
+    accentColor: const Color(0xFF0284C7),
+    gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+    onPressed: () => onOpenRoute('/app/book/bus'),
+  );
+}
+
 class RidePageScaffold extends StatelessWidget {
   const RidePageScaffold({
     required this.session,
@@ -207,6 +245,7 @@ class RidePageScaffold extends StatelessWidget {
                   keyName: 'ride-global-profile',
                   onPressed: () => showGlobalProfilePanelV2(
                     context,
+                    contextAction: _travelProfileContext(session, openGlobal),
                     onOpenRoute: openGlobal,
                   ),
                 ),

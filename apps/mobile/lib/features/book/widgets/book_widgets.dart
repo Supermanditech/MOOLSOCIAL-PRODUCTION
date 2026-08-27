@@ -9,6 +9,27 @@ import '../book_session.dart';
 
 String bookMoney(int value) => '₹$value';
 
+GlobalProfileContextAction _busTravelProfileContext(
+  BookSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final selected = session.selectedBus;
+  return GlobalProfileContextAction(
+    id: selected == null
+        ? 'travel-cab-discovery'
+        : 'travel-selected-bus-alternative',
+    title: selected == null ? 'Travel by cab' : 'Compare another option',
+    detail: selected == null
+        ? 'Review pickup time, vehicle and fare before you book.'
+        : '${selected.from} → ${selected.to} remains selected while you compare.',
+    actionLabel: 'Compare a cab',
+    icon: Icons.local_taxi_outlined,
+    accentColor: const Color(0xFF0284C7),
+    gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+    onPressed: () => onOpenRoute('/app/ride/book?type=cab'),
+  );
+}
+
 class BookPageScaffold extends StatelessWidget {
   const BookPageScaffold({
     required this.session,
@@ -184,6 +205,9 @@ class BookPageScaffold extends StatelessWidget {
                       : 'care-global-profile',
                   onPressed: () => showGlobalProfilePanelV2(
                     context,
+                    contextAction: travelNavigation
+                        ? _busTravelProfileContext(session, openGlobal)
+                        : null,
                     onOpenRoute: openGlobal,
                   ),
                 ),
