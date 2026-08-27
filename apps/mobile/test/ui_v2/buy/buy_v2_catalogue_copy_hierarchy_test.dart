@@ -41,7 +41,7 @@ void main() {
 
       await tester.pumpWidget(app(session, size: const Size(360, 800)));
       await tester.pumpAndSettle();
-      expect(find.text('Search products or brands'), findsOneWidget);
+      expect(find.text('Search products'), findsOneWidget);
       expect(
         find.bySemanticsLabel(RegExp('Search products, brands and codes')),
         findsOneWidget,

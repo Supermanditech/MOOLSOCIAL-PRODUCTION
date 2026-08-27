@@ -971,7 +971,7 @@ class _BuySearchBand extends StatelessWidget {
             BuyV2Destination.wholesale => 'Search bulk products',
             BuyV2Destination.medicine => 'Search medicines',
             BuyV2Destination.orders => 'Search orders or ID',
-            _ => 'Search products or brands',
+            _ => 'Search products',
           };
     final showScanner = session.destination != BuyV2Destination.orders;
     final longQuery = open && controller.text.trim().length > 38;
