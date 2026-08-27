@@ -9,6 +9,26 @@ const _profileNavy = Color(0xFF000080);
 const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
 
+enum GlobalProfileSurfaceTone { light, socialDark }
+
+class GlobalProfileContextAction {
+  const GlobalProfileContextAction({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.actionLabel,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final String actionLabel;
+  final IconData icon;
+  final VoidCallback onPressed;
+}
+
 class GlobalProfileWorkspaceContext {
   const GlobalProfileWorkspaceContext({
     required this.name,
@@ -26,6 +46,8 @@ Future<void> showGlobalProfilePanelV2(
   required ValueChanged<String> onOpenRoute,
   GlobalProfileWorkspaceContext? activeWorkspace,
   bool applicationInProgress = false,
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+  GlobalProfileContextAction? contextAction,
 }) async {
   await showGeneralDialog<void>(
     context: context,
@@ -38,6 +60,8 @@ Future<void> showGlobalProfilePanelV2(
       child: GlobalProfilePanelV2(
         activeWorkspace: activeWorkspace,
         applicationInProgress: applicationInProgress,
+        surfaceTone: surfaceTone,
+        contextAction: contextAction,
         onClose: () => Navigator.pop(dialogContext),
         onOpenRoute: (route) {
           Navigator.pop(dialogContext);
@@ -71,31 +95,42 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
   const MoolGlobalProfileShortcutV2({
     required this.keyName,
     required this.onPressed,
+    this.surfaceTone = GlobalProfileSurfaceTone.light,
     super.key,
   });
 
   final String keyName;
   final VoidCallback onPressed;
+  final GlobalProfileSurfaceTone surfaceTone;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    key: ValueKey(keyName),
-    container: true,
-    button: true,
-    label: 'Open your MoolSocial profile',
-    child: IconButton(
-      tooltip: 'Your MoolSocial profile',
-      onPressed: onPressed,
-      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-      style: IconButton.styleFrom(
-        foregroundColor: _profileNavy,
-        backgroundColor: Colors.white.withValues(alpha: .72),
-        side: BorderSide(color: _profileNavy.withValues(alpha: .14)),
-        shape: const CircleBorder(),
+  Widget build(BuildContext context) {
+    final dark = surfaceTone == GlobalProfileSurfaceTone.socialDark;
+    return Semantics(
+      key: ValueKey(keyName),
+      container: true,
+      button: true,
+      label: 'Open your MoolSocial profile',
+      child: IconButton(
+        tooltip: 'Your MoolSocial profile',
+        onPressed: onPressed,
+        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+        style: IconButton.styleFrom(
+          foregroundColor: dark ? Colors.white : _profileNavy,
+          backgroundColor: dark
+              ? Colors.white.withValues(alpha: .10)
+              : Colors.white.withValues(alpha: .72),
+          side: BorderSide(
+            color: dark
+                ? Colors.white.withValues(alpha: .24)
+                : _profileNavy.withValues(alpha: .14),
+          ),
+          shape: const CircleBorder(),
+        ),
+        icon: const Icon(Icons.account_circle_outlined, size: 22),
       ),
-      icon: const Icon(Icons.account_circle_outlined, size: 22),
-    ),
-  );
+    );
+  }
 }
 
 class GlobalProfilePanelV2 extends StatelessWidget {
@@ -104,6 +139,8 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     required this.onOpenRoute,
     this.activeWorkspace,
     this.applicationInProgress = false,
+    this.surfaceTone = GlobalProfileSurfaceTone.light,
+    this.contextAction,
     super.key,
   });
 
@@ -111,98 +148,171 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   final ValueChanged<String> onOpenRoute;
   final GlobalProfileWorkspaceContext? activeWorkspace;
   final bool applicationInProgress;
+  final GlobalProfileSurfaceTone surfaceTone;
+  final GlobalProfileContextAction? contextAction;
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final effectiveScale = media.textScaler.scale(1).clamp(.9, 1.15);
     final width = math.min(media.size.width * .74, 320.0);
-    return MediaQuery(
-      data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
-      child: SafeArea(
-        minimum: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
-        child: Material(
-          key: const Key('global-profile-panel-v2'),
-          color: MoolColors.canvas,
-          elevation: 24,
-          clipBehavior: Clip.antiAlias,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.horizontal(left: Radius.circular(28)),
-          ),
-          child: SizedBox(
-            width: width,
-            height: double.infinity,
-            child: Column(
-              children: [
-                _ProfileHeader(
-                  onClose: onClose,
-                  workspaceRoleLabel: activeWorkspace?.roleLabel,
-                ),
-                Expanded(
-                  child: CustomScrollView(
-                    key: const Key('global-profile-panel-content'),
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(
-                          MoolSpacing.sm,
-                          MoolSpacing.sm,
-                          MoolSpacing.sm,
-                          0,
-                        ),
-                        sliver: SliverToBoxAdapter(
-                          child: switch (activeWorkspace) {
-                            final workspace? => Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _ActiveWorkspaceCard(workspace: workspace),
-                                const SizedBox(height: MoolSpacing.md),
-                                _ProfileQuickActions(onOpenRoute: onOpenRoute),
-                              ],
-                            ),
-                            null => _PersonalAccountSection(
-                              includeSupport: true,
-                              onOpenRoute: onOpenRoute,
-                            ),
-                          },
-                        ),
-                      ),
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Padding(
+    final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
+    return _GlobalProfilePaletteScope(
+      palette: palette,
+      child: MediaQuery(
+        data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
+        child: SafeArea(
+          minimum: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
+          child: Material(
+            key: const Key('global-profile-panel-v2'),
+            color: palette.canvas,
+            elevation: 24,
+            clipBehavior: Clip.antiAlias,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(28)),
+            ),
+            child: SizedBox(
+              width: width,
+              height: double.infinity,
+              child: Column(
+                children: [
+                  _ProfileHeader(
+                    onClose: onClose,
+                    workspaceRoleLabel: activeWorkspace?.roleLabel,
+                  ),
+                  Expanded(
+                    child: CustomScrollView(
+                      key: const Key('global-profile-panel-content'),
+                      slivers: [
+                        SliverPadding(
                           padding: const EdgeInsets.fromLTRB(
                             MoolSpacing.sm,
-                            MoolSpacing.md,
                             MoolSpacing.sm,
-                            MoolSpacing.md,
+                            MoolSpacing.sm,
+                            0,
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (activeWorkspace != null)
-                                _PersonalAccountSection(
-                                  includeSupport: false,
-                                  onOpenRoute: onOpenRoute,
-                                )
-                              else
-                                _ProfileAccessCard(
-                                  applicationInProgress: applicationInProgress,
-                                  onOpenRoute: onOpenRoute,
-                                ),
-                            ],
+                          sliver: SliverToBoxAdapter(
+                            child: switch (activeWorkspace) {
+                              final workspace? => Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _ActiveWorkspaceCard(workspace: workspace),
+                                  const SizedBox(height: MoolSpacing.md),
+                                  _ProfileQuickActions(
+                                    onOpenRoute: onOpenRoute,
+                                  ),
+                                ],
+                              ),
+                              null => _PersonalAccountSection(
+                                includeSupport: true,
+                                onOpenRoute: onOpenRoute,
+                              ),
+                            },
                           ),
                         ),
-                      ),
-                    ],
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolSpacing.sm,
+                              MoolSpacing.md,
+                              MoolSpacing.sm,
+                              MoolSpacing.md,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (activeWorkspace != null)
+                                  _PersonalAccountSection(
+                                    includeSupport: false,
+                                    onOpenRoute: onOpenRoute,
+                                  )
+                                else if (contextAction case final action?)
+                                  _GlobalProfileContextCard(
+                                    action: action,
+                                    onPressed: () {
+                                      onClose();
+                                      action.onPressed();
+                                    },
+                                  )
+                                else
+                                  _ProfileAccessCard(
+                                    applicationInProgress:
+                                        applicationInProgress,
+                                    onOpenRoute: onOpenRoute,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class GlobalProfileSurfacePalette {
+  const GlobalProfileSurfacePalette({
+    required this.canvas,
+    required this.card,
+    required this.border,
+    required this.ink,
+    required this.muted,
+    required this.control,
+  });
+
+  final Color canvas;
+  final Color card;
+  final Color border;
+  final Color ink;
+  final Color muted;
+  final Color control;
+
+  static GlobalProfileSurfacePalette forTone(GlobalProfileSurfaceTone tone) =>
+      switch (tone) {
+        GlobalProfileSurfaceTone.light => const GlobalProfileSurfacePalette(
+          canvas: MoolColors.canvas,
+          card: Colors.white,
+          border: Color(0xFFE4E7EC),
+          ink: MoolColors.ink,
+          muted: MoolColors.muted,
+          control: Color(0xFFF4F5FA),
+        ),
+        GlobalProfileSurfaceTone.socialDark =>
+          const GlobalProfileSurfacePalette(
+            canvas: Color(0xFF0F0F0F),
+            card: Color(0xFF1A1A1A),
+            border: Color(0xFF343434),
+            ink: Colors.white,
+            muted: Color(0xFFB8B8B8),
+            control: Color(0xFF242424),
+          ),
+      };
+}
+
+class _GlobalProfilePaletteScope extends InheritedWidget {
+  const _GlobalProfilePaletteScope({
+    required this.palette,
+    required super.child,
+  });
+
+  final GlobalProfileSurfacePalette palette;
+
+  static GlobalProfileSurfacePalette of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_GlobalProfilePaletteScope>()!
+      .palette;
+
+  @override
+  bool updateShouldNotify(_GlobalProfilePaletteScope oldWidget) =>
+      palette != oldWidget.palette;
 }
 
 class _ProfileHeader extends StatelessWidget {
@@ -215,135 +325,138 @@ class _ProfileHeader extends StatelessWidget {
   final String? workspaceRoleLabel;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(
-      MoolSpacing.sm,
-      MoolSpacing.xs,
-      MoolSpacing.xs,
-      MoolSpacing.xs,
-    ),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(bottom: BorderSide(color: Color(0xFFE4E7EC))),
-    ),
-    child: Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [_profileNavy, Color(0xFF4D46A8)],
-                ),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.person_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-            Positioned(
-              right: -1,
-              bottom: -1,
-              child: Container(
-                width: 11,
-                height: 11,
-                decoration: BoxDecoration(
-                  color: _profileGreen,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: MoolSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final palette = _GlobalProfilePaletteScope.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.sm,
+        MoolSpacing.xs,
+        MoolSpacing.xs,
+        MoolSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: palette.card,
+        border: Border(bottom: BorderSide(color: palette.border)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              const Text(
-                'Your MoolSocial profile',
-                maxLines: 2,
-                style: TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 14,
-                  height: 1.05,
-                  fontWeight: FontWeight.w900,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_profileNavy, Color(0xFF4D46A8)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                  size: 18,
                 ),
               ),
-              const SizedBox(height: 2),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 7,
-                runSpacing: 2,
-                children: [
-                  const Text(
-                    'Personal account',
-                    style: TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: _profileGreen,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  if (workspaceRoleLabel != null)
-                    Text(
-                      workspaceRoleLabel!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: const BoxDecoration(
-                          color: _profileGreen,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'Active',
-                        style: TextStyle(
-                          color: _profileGreen,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ],
           ),
-        ),
-        IconButton.filledTonal(
-          key: const Key('global-profile-close'),
-          tooltip: 'Collapse profile',
-          onPressed: onClose,
-          style: IconButton.styleFrom(
-            backgroundColor: _profileNavy.withValues(alpha: .06),
-            foregroundColor: _profileNavy,
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your MoolSocial profile',
+                  maxLines: 2,
+                  style: TextStyle(
+                    color: palette.ink,
+                    fontSize: 14,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 7,
+                  runSpacing: 2,
+                  children: [
+                    Text(
+                      'Personal account',
+                      style: TextStyle(
+                        color: palette.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (workspaceRoleLabel != null)
+                      Text(
+                        workspaceRoleLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.muted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: const BoxDecoration(
+                            color: _profileGreen,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Active',
+                          style: TextStyle(
+                            color: _profileGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          icon: const Icon(Icons.chevron_right_rounded, size: 22),
-        ),
-      ],
-    ),
-  );
+          IconButton.filledTonal(
+            key: const Key('global-profile-close'),
+            tooltip: 'Collapse profile',
+            onPressed: onClose,
+            style: IconButton.styleFrom(
+              backgroundColor: palette.control,
+              foregroundColor: palette.ink,
+            ),
+            icon: const Icon(Icons.chevron_right_rounded, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PersonalAccountSection extends StatelessWidget {
@@ -475,6 +588,121 @@ class _ActiveWorkspaceCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _GlobalProfileContextCard extends StatelessWidget {
+  const _GlobalProfileContextCard({
+    required this.action,
+    required this.onPressed,
+  });
+
+  final GlobalProfileContextAction action;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = _GlobalProfilePaletteScope.of(context);
+    return Material(
+      key: Key('global-profile-context-${action.id}'),
+      color: palette.card,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(MoolRadii.floating),
+        side: BorderSide(color: palette.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(MoolSpacing.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0033).withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(
+                    action.icon,
+                    color: const Color(0xFFFF3355),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: MoolSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        action.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        action.detail,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.muted,
+                          fontSize: 9,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Color(0xFF8F001F), Color(0xFFFF0033)],
+                ),
+                borderRadius: BorderRadius.circular(MoolRadii.control),
+              ),
+              child: FilledButton.icon(
+                key: Key('global-profile-context-action-${action.id}'),
+                onPressed: onPressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  minimumSize: const Size.fromHeight(42),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                icon: Icon(action.icon, size: 17),
+                label: Text(
+                  action.actionLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProfileAccessCard extends StatelessWidget {
@@ -788,42 +1016,45 @@ class _ProfileSection extends StatelessWidget {
   final ValueChanged<String> onOpenRoute;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: MoolColors.ink,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) {
+    final palette = _GlobalProfilePaletteScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: palette.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
-      ),
-      Material(
-        color: Colors.white,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(MoolRadii.card),
-          side: const BorderSide(color: Color(0xFFE4E7EC)),
-        ),
-        child: Column(
-          children: [
-            for (var index = 0; index < items.length; index++) ...[
-              _ProfileDestinationTile(
-                item: items[index],
-                onTap: () => onOpenRoute(items[index].route),
-              ),
-              if (index != items.length - 1)
-                const Divider(height: 1, indent: 60),
+        Material(
+          color: palette.card,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MoolRadii.card),
+            side: BorderSide(color: palette.border),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                _ProfileDestinationTile(
+                  item: items[index],
+                  onTap: () => onOpenRoute(items[index].route),
+                ),
+                if (index != items.length - 1)
+                  Divider(height: 1, indent: 60, color: palette.border),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class _ProfileDestinationTile extends StatelessWidget {
@@ -833,42 +1064,45 @@ class _ProfileDestinationTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    key: Key('global-profile-${item.id}'),
-    contentPadding: const EdgeInsets.symmetric(horizontal: MoolSpacing.xs),
-    minVerticalPadding: 6,
-    visualDensity: const VisualDensity(vertical: -1),
-    leading: Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: _profileNavy.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(MoolRadii.control),
+  Widget build(BuildContext context) {
+    final palette = _GlobalProfilePaletteScope.of(context);
+    return ListTile(
+      key: Key('global-profile-${item.id}'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: MoolSpacing.xs),
+      minVerticalPadding: 6,
+      visualDensity: const VisualDensity(vertical: -1),
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: palette.control,
+          borderRadius: BorderRadius.circular(MoolRadii.control),
+        ),
+        child: Icon(item.icon, color: _profileNavy, size: 18),
       ),
-      child: Icon(item.icon, color: _profileNavy, size: 18),
-    ),
-    title: Text(
-      item.title,
-      style: const TextStyle(
-        color: MoolColors.ink,
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
+      title: Text(
+        item.title,
+        style: TextStyle(
+          color: palette.ink,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
-    ),
-    subtitle: Text(
-      item.detail,
-      style: const TextStyle(
-        color: MoolColors.muted,
-        fontSize: 9.5,
-        height: 1.3,
-        fontWeight: FontWeight.w600,
+      subtitle: Text(
+        item.detail,
+        style: TextStyle(
+          color: palette.muted,
+          fontSize: 9.5,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-    ),
-    trailing: const Icon(
-      Icons.chevron_right_rounded,
-      color: _profileNavy,
-      size: 19,
-    ),
-    onTap: onTap,
-  );
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: _profileNavy,
+        size: 19,
+      ),
+      onTap: onTap,
+    );
+  }
 }

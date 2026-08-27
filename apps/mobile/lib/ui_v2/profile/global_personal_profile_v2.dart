@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
-import '../../core/design/mool_theme.dart';
 import '../../features/journey01/journey_session.dart';
+import 'global_profile_panel_v2.dart';
 
 const _profileNavy = Color(0xFF000080);
 const _profileViolet = Color(0xFF4D46A8);
 const _profileGreen = Color(0xFF138808);
 
 class GlobalPersonalProfileV2 extends StatelessWidget {
-  const GlobalPersonalProfileV2({required this.session, super.key});
+  const GlobalPersonalProfileV2({
+    required this.session,
+    this.surfaceTone = GlobalProfileSurfaceTone.light,
+    super.key,
+  });
 
   final JourneySession session;
+  final GlobalProfileSurfaceTone surfaceTone;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -35,136 +40,146 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
           displayName ?? identity?.primaryLabel ?? 'MoolSocial member';
       final heroDetail = identity?.detailLabel ?? 'Personal account';
       final methods = identity?.signInMethods ?? const <String>[];
+      final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
 
-      return Scaffold(
-        key: const Key('global-personal-profile-v2'),
-        backgroundColor: MoolColors.canvas,
-        appBar: AppBar(
-          backgroundColor: MoolColors.canvas,
-          surfaceTintColor: Colors.transparent,
-          toolbarHeight: 64,
-          leadingWidth: 60,
-          leading: Padding(
-            padding: const EdgeInsets.only(left: MoolSpacing.sm),
-            child: IconButton.outlined(
-              key: const Key('global-personal-profile-back'),
-              tooltip: 'Back',
-              onPressed: () => _leave(context),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+      return _PersonalProfilePaletteScope(
+        palette: palette,
+        child: Scaffold(
+          key: const Key('global-personal-profile-v2'),
+          backgroundColor: palette.canvas,
+          appBar: AppBar(
+            backgroundColor: palette.canvas,
+            surfaceTintColor: Colors.transparent,
+            toolbarHeight: 64,
+            leadingWidth: 60,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: MoolSpacing.sm),
+              child: IconButton.outlined(
+                key: const Key('global-personal-profile-back'),
+                tooltip: 'Back',
+                onPressed: () => _leave(context),
+                style: IconButton.styleFrom(
+                  foregroundColor: palette.ink,
+                  backgroundColor: palette.card,
+                  side: BorderSide(color: palette.border),
+                ),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              ),
+            ),
+            titleSpacing: MoolSpacing.xs,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Personal profile',
+                  style: TextStyle(
+                    color: palette.ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.2,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'Your MoolSocial identity',
+                  style: TextStyle(
+                    color: palette.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-          titleSpacing: MoolSpacing.xs,
-          title: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Personal profile',
-                style: TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.2,
+          body: SafeArea(
+            top: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: ListView(
+                  key: const Key('global-personal-profile-content'),
+                  padding: const EdgeInsets.fromLTRB(
+                    MoolSpacing.md,
+                    MoolSpacing.xs,
+                    MoolSpacing.md,
+                    MoolSpacing.xl,
+                  ),
+                  children: [
+                    _ProfileHero(
+                      name: heroName,
+                      detail: heroDetail,
+                      completed: completed,
+                      dark: surfaceTone == GlobalProfileSurfaceTone.socialDark,
+                    ),
+                    const SizedBox(height: MoolSpacing.md),
+                    _ProfileSection(
+                      title: 'Personal details',
+                      children: [
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-name',
+                          icon: Icons.person_outline_rounded,
+                          label: 'Display name',
+                          value: displayName ?? 'Not added',
+                        ),
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-email',
+                          icon: Icons.alternate_email_rounded,
+                          label: 'Email address',
+                          value: email ?? 'Not added',
+                        ),
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-phone',
+                          icon: Icons.phone_outlined,
+                          label: 'Mobile number',
+                          value: phone ?? 'Not added',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: MoolSpacing.md),
+                    _ProfileSection(
+                      title: 'Preferences',
+                      children: [
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-language',
+                          icon: Icons.language_rounded,
+                          label: 'Language',
+                          value: session.languageCode == 'hi'
+                              ? 'हिन्दी'
+                              : 'English',
+                        ),
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-area',
+                          icon: Icons.location_on_outlined,
+                          label: 'Service area',
+                          value: area,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: MoolSpacing.md),
+                    _ProfileSection(
+                      title: 'Account access',
+                      children: [
+                        const _ProfileDetail(
+                          keyName: 'global-personal-profile-status',
+                          icon: Icons.verified_user_outlined,
+                          label: 'Account status',
+                          value: 'Active',
+                          valueColor: _profileGreen,
+                        ),
+                        _ProfileDetail(
+                          keyName: 'global-personal-profile-methods',
+                          icon: Icons.key_outlined,
+                          label: 'Sign-in methods',
+                          value: methods.isEmpty
+                              ? 'MoolSocial sign-in'
+                              : methods.join(' · '),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              SizedBox(height: 1),
-              Text(
-                'Your MoolSocial identity',
-                style: TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        body: SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: ListView(
-                key: const Key('global-personal-profile-content'),
-                padding: const EdgeInsets.fromLTRB(
-                  MoolSpacing.md,
-                  MoolSpacing.xs,
-                  MoolSpacing.md,
-                  MoolSpacing.xl,
-                ),
-                children: [
-                  _ProfileHero(
-                    name: heroName,
-                    detail: heroDetail,
-                    completed: completed,
-                  ),
-                  const SizedBox(height: MoolSpacing.md),
-                  _ProfileSection(
-                    title: 'Personal details',
-                    children: [
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-name',
-                        icon: Icons.person_outline_rounded,
-                        label: 'Display name',
-                        value: displayName ?? 'Not added',
-                      ),
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-email',
-                        icon: Icons.alternate_email_rounded,
-                        label: 'Email address',
-                        value: email ?? 'Not added',
-                      ),
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-phone',
-                        icon: Icons.phone_outlined,
-                        label: 'Mobile number',
-                        value: phone ?? 'Not added',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: MoolSpacing.md),
-                  _ProfileSection(
-                    title: 'Preferences',
-                    children: [
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-language',
-                        icon: Icons.language_rounded,
-                        label: 'Language',
-                        value: session.languageCode == 'hi'
-                            ? 'हिन्दी'
-                            : 'English',
-                      ),
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-area',
-                        icon: Icons.location_on_outlined,
-                        label: 'Service area',
-                        value: area,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: MoolSpacing.md),
-                  _ProfileSection(
-                    title: 'Account access',
-                    children: [
-                      const _ProfileDetail(
-                        keyName: 'global-personal-profile-status',
-                        icon: Icons.verified_user_outlined,
-                        label: 'Account status',
-                        value: 'Active',
-                        valueColor: _profileGreen,
-                      ),
-                      _ProfileDetail(
-                        keyName: 'global-personal-profile-methods',
-                        icon: Icons.key_outlined,
-                        label: 'Sign-in methods',
-                        value: methods.isEmpty
-                            ? 'MoolSocial sign-in'
-                            : methods.join(' · '),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
           ),
@@ -187,16 +202,35 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
   }
 }
 
+class _PersonalProfilePaletteScope extends InheritedWidget {
+  const _PersonalProfilePaletteScope({
+    required this.palette,
+    required super.child,
+  });
+
+  final GlobalProfileSurfacePalette palette;
+
+  static GlobalProfileSurfacePalette of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_PersonalProfilePaletteScope>()!
+      .palette;
+
+  @override
+  bool updateShouldNotify(_PersonalProfilePaletteScope oldWidget) =>
+      palette != oldWidget.palette;
+}
+
 class _ProfileHero extends StatelessWidget {
   const _ProfileHero({
     required this.name,
     required this.detail,
     required this.completed,
+    required this.dark,
   });
 
   final String name;
   final String detail;
   final int completed;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
@@ -205,10 +239,12 @@ class _ProfileHero extends StatelessWidget {
       key: const Key('global-personal-profile-hero'),
       padding: const EdgeInsets.all(MoolSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_profileNavy, _profileViolet],
+          colors: dark
+              ? const [Color(0xFF151515), Color(0xFF292929)]
+              : const [_profileNavy, _profileViolet],
         ),
         borderRadius: BorderRadius.circular(MoolRadii.floating),
         boxShadow: const [
@@ -343,39 +379,42 @@ class _ProfileSection extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: MoolColors.ink,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) {
+    final palette = _PersonalProfilePaletteScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: palette.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
-      ),
-      Material(
-        color: Colors.white,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(MoolRadii.card),
-          side: const BorderSide(color: Color(0xFFE4E7EC)),
-        ),
-        child: Column(
-          children: [
-            for (var index = 0; index < children.length; index++) ...[
-              children[index],
-              if (index != children.length - 1)
-                const Divider(height: 1, indent: 52),
+        Material(
+          color: palette.card,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MoolRadii.card),
+            side: BorderSide(color: palette.border),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index != children.length - 1)
+                  Divider(height: 1, indent: 52, color: palette.border),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class _ProfileDetail extends StatelessWidget {
@@ -394,53 +433,56 @@ class _ProfileDetail extends StatelessWidget {
   final Color? valueColor;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    key: ValueKey(keyName),
-    padding: const EdgeInsets.symmetric(
-      horizontal: MoolSpacing.sm,
-      vertical: MoolSpacing.xs,
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _profileNavy.withValues(alpha: .06),
-            borderRadius: BorderRadius.circular(11),
+  Widget build(BuildContext context) {
+    final palette = _PersonalProfilePaletteScope.of(context);
+    return Padding(
+      key: ValueKey(keyName),
+      padding: const EdgeInsets.symmetric(
+        horizontal: MoolSpacing.sm,
+        vertical: MoolSpacing.xs,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: palette.control,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: palette.ink, size: 17),
           ),
-          child: Icon(icon, color: _profileNavy, size: 17),
-        ),
-        const SizedBox(width: MoolSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: palette.muted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: valueColor ?? MoolColors.ink,
-                  fontSize: 12,
-                  height: 1.2,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: valueColor ?? palette.ink,
+                    fontSize: 12,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_personal_profile_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 
 void main() {
   Future<GoRouter> pumpProfile(
@@ -11,6 +12,7 @@ void main() {
     JourneySession session, {
     Size size = const Size(390, 844),
     double textScale = 1,
+    GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -32,8 +34,10 @@ void main() {
         ),
         GoRoute(
           path: '/app/account/identity',
-          builder: (context, state) =>
-              GlobalPersonalProfileV2(session: session),
+          builder: (context, state) => GlobalPersonalProfileV2(
+            session: session,
+            surfaceTone: surfaceTone,
+          ),
         ),
       ],
     );
@@ -104,9 +108,16 @@ void main() {
       session,
       size: const Size(320, 700),
       textScale: 1.3,
+      surfaceTone: GlobalProfileSurfaceTone.socialDark,
     );
 
     expect(find.byKey(const Key('global-personal-profile-v2')), findsOne);
+    expect(
+      tester
+          .widget<Scaffold>(find.byKey(const Key('global-personal-profile-v2')))
+          .backgroundColor,
+      const Color(0xFF0F0F0F),
+    );
     await tester.scrollUntilVisible(
       find.byKey(const Key('global-personal-profile-methods')),
       240,

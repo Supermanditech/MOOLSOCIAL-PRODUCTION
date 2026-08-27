@@ -2113,9 +2113,36 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openAccount() {
+    final authenticated = widget.session.isAuthenticated;
+    final socialContext = _world == 'social';
     showGlobalProfilePanelV2(
       context,
-      onOpenRoute: (route) => context.push(route),
+      surfaceTone: socialContext
+          ? GlobalProfileSurfaceTone.socialDark
+          : GlobalProfileSurfaceTone.light,
+      contextAction: socialContext
+          ? GlobalProfileContextAction(
+              id: 'youtube',
+              title: authenticated
+                  ? 'Your YouTube channel'
+                  : 'Connect your YouTube channel',
+              detail: authenticated
+                  ? 'Review connection, permissions and eligible channel videos.'
+                  : 'Sign in to MoolSocial, then choose the Google account that owns your channel.',
+              actionLabel: authenticated
+                  ? 'Open channel status'
+                  : 'Connect channel',
+              icon: Icons.ondemand_video_outlined,
+              onPressed: () {
+                unawaited(_openYouTubeChannelStatus());
+              },
+            )
+          : null,
+      onOpenRoute: (route) => context.push(
+        socialContext && route == '/app/account/identity'
+            ? '$route?surface=social'
+            : route,
+      ),
     );
   }
 
@@ -4209,6 +4236,7 @@ class _YouTubeHomeHeader extends StatelessWidget {
               ),
               MoolGlobalProfileShortcutV2(
                 keyName: 'screen04-youtube-home-account',
+                surfaceTone: GlobalProfileSurfaceTone.socialDark,
                 onPressed: onAccount,
               ),
             ],
