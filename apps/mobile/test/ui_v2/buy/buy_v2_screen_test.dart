@@ -2244,6 +2244,34 @@ void main() {
     },
   );
 
+  testWidgets('T01A Cart hides Medicine in Shop and preserves Care Medicine', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    for (final destination in const [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+      BuyV2Destination.medicine,
+    ]) {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == destination && !item.requiresPrescription,
+      );
+      session.addProduct(product.id);
+    }
+    session.openDestination(BuyV2Destination.wholesale);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Medicine'), findsNothing);
+
+    session.openDestination(BuyV2Destination.medicine);
+    session.openCart(scope: BuyV2CartScope.medicine);
+    await tester.pumpAndSettle();
+    expect(find.text('Medicine'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'compact Buy surface and Cart total remain whole at 320 and 140 percent',
     (tester) async {
