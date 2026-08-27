@@ -1827,7 +1827,7 @@ void main() {
   );
 
   testWidgets(
-    'featured products lead with a dominant photo and keep dense filtered grids',
+    'featured products lead with a dominant photo and readable filtered cards',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 800);
@@ -1856,7 +1856,7 @@ void main() {
         ValueKey('buy-grid-packshot-${product.id}'),
       );
       expect(densePhoto, findsOneWidget);
-      expect(tester.getSize(densePhoto), const Size(86, 64));
+      expect(tester.getSize(densePhoto), const Size(86, 78));
       expect(find.byType(BuyV2ProductCard), findsWidgets);
       expect(tester.takeException(), isNull);
     },

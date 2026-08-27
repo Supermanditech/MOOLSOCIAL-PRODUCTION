@@ -712,18 +712,10 @@ class _SearchProductResults extends StatelessWidget {
       builder: (context, constraints) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
-        final columns = accessibleText && constraints.maxWidth < 460
-            ? 2
-            : constraints.maxWidth >= 320
-            ? 3
-            : 2;
-        final tileHeight = accessibleText
-            ? 254.0
-            : columns == 3
-            ? 188.0
-            : 260.0;
-        final width =
-            (constraints.maxWidth - 16 - ((columns - 1) * 7)) / columns;
+        final layout = _resolveCompactProductGridLayout(
+          constraints: constraints,
+          accessibleText: accessibleText,
+        );
         return CustomScrollView(
           key: PageStorageKey('buy-search-${session.destination.name}-$query'),
           slivers: [
@@ -753,8 +745,8 @@ class _SearchProductResults extends StatelessWidget {
               child: _HorizontalProductGrid(
                 session: session,
                 products: products,
-                cardWidth: width,
-                tileHeight: tileHeight,
+                cardWidth: layout.cardWidth,
+                tileHeight: layout.tileHeight,
                 storageKey:
                     'buy-search-horizontal-${session.destination.name}-$query',
               ),
@@ -2459,15 +2451,11 @@ class _ProductGrid extends StatelessWidget {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
         const compactCards = true;
-        final columns = savedOnly
-            ? constraints.maxWidth >= 320
-                  ? 2
-                  : 1
-            : accessibleText && constraints.maxWidth < 460
-            ? 2
-            : constraints.maxWidth >= 320
-            ? 3
-            : 2;
+        final layout = _resolveCompactProductGridLayout(
+          constraints: constraints,
+          accessibleText: accessibleText,
+          savedOnly: savedOnly,
+        );
         final featuredProducts = showPromotions
             ? products.take(6).toList(growable: false)
             : const <BuyV2Product>[];
@@ -2478,17 +2466,6 @@ class _ProductGrid extends StatelessWidget {
         final gridProducts = showPromotions
             ? products.skip(featuredProducts.length).toList(growable: false)
             : products;
-        final tileHeight = savedOnly
-            ? accessibleText
-                  ? 270.0
-                  : 260.0
-            : accessibleText
-            ? 254.0
-            : columns == 3
-            ? 188.0
-            : 260.0;
-        final width =
-            (constraints.maxWidth - 12 - ((columns - 1) * 5)) / columns;
         return CustomScrollView(
           key: PageStorageKey(
             'buy-${session.destination.name}-${session.selectedCategoryId}'
@@ -2536,8 +2513,8 @@ class _ProductGrid extends StatelessWidget {
                 child: _HorizontalProductGrid(
                   session: session,
                   products: gridProducts,
-                  cardWidth: width,
-                  tileHeight: tileHeight,
+                  cardWidth: layout.cardWidth,
+                  tileHeight: layout.tileHeight,
                   storageKey:
                       'buy-products-horizontal-${session.destination.name}-'
                       '${session.selectedCategoryId}-${savedOnly ? 'saved' : 'all'}',
@@ -2877,23 +2854,15 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
       builder: (context, constraints) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
-        final columns = accessibleText && constraints.maxWidth < 460
-            ? 2
-            : constraints.maxWidth >= 320
-            ? 3
-            : 2;
-        final width =
-            (constraints.maxWidth - 12 - ((columns - 1) * 5)) / columns;
-        final tileHeight = accessibleText
-            ? 254.0
-            : columns == 3
-            ? 188.0
-            : 260.0;
+        final layout = _resolveCompactProductGridLayout(
+          constraints: constraints,
+          accessibleText: accessibleText,
+        );
         return _HorizontalProductGrid(
           session: session,
           products: products,
-          cardWidth: width,
-          tileHeight: tileHeight,
+          cardWidth: layout.cardWidth,
+          tileHeight: layout.tileHeight,
           storageKey: storageKey,
           compact: true,
           laneCount: laneCount,
@@ -2903,6 +2872,43 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
       },
     );
   }
+}
+
+({int columns, double cardWidth, double tileHeight})
+_resolveCompactProductGridLayout({
+  required BoxConstraints constraints,
+  required bool accessibleText,
+  bool savedOnly = false,
+}) {
+  // Product facts stop being decision-useful when a phone squeezes three
+  // cards into one row. Keep two complete cards on compact screens and admit
+  // a third only when each card retains a readable commerce width.
+  final columns = savedOnly
+      ? constraints.maxWidth >= 320
+            ? 2
+            : 1
+      : constraints.maxWidth >= 480
+      ? 3
+      : 2;
+  const horizontalInsets = 20.0;
+  const cardGap = 7.0;
+  final cardWidth =
+      (constraints.maxWidth - horizontalInsets - ((columns - 1) * cardGap)) /
+      columns;
+  final tileHeight = savedOnly
+      ? accessibleText
+            ? constraints.maxWidth < 360
+                  ? 276.0
+                  : 270.0
+            : 260.0
+      : accessibleText
+      ? constraints.maxWidth < 360
+            ? 276.0
+            : 260.0
+      : columns == 3
+      ? 211.0
+      : 226.0;
+  return (columns: columns, cardWidth: cardWidth, tileHeight: tileHeight);
 }
 
 class _HorizontalProductGrid extends StatefulWidget {
@@ -3766,10 +3772,10 @@ class BuyV2ProductCard extends StatelessWidget {
         child: InkWell(
           key: ValueKey('buy-product-${product.id}'),
           onTap: () => session.openProduct(product.id),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(BuyV2Metrics.compactRadius),
           child: Container(
             clipBehavior: Clip.antiAlias,
-            decoration: buyV2CardDecoration(radius: 14),
+            decoration: buyV2CardDecoration(radius: BuyV2Metrics.compactRadius),
             child: Stack(
               children: [
                 Column(
@@ -3806,8 +3812,8 @@ class BuyV2ProductCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: BuyV2Colors.ink,
-                                fontSize: compact ? 9 : 12,
-                                height: compact ? 1 : 1.08,
+                                fontSize: compact ? 10.5 : 12,
+                                height: compact ? 1.05 : 1.08,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -3831,7 +3837,7 @@ class BuyV2ProductCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: context.buyMeta.copyWith(
-                                fontSize: compact ? 8 : 8,
+                                fontSize: compact ? 9.5 : 8,
                               ),
                             ),
                             if (compact)
@@ -3850,7 +3856,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                         buyV2Money(facts.price),
                                         style: TextStyle(
                                           color: BuyV2Colors.navy,
-                                          fontSize: compact ? 13 : 18,
+                                          fontSize: compact ? 15 : 18,
                                           height: 1,
                                           fontWeight: FontWeight.w900,
                                         ),
@@ -3916,8 +3922,8 @@ class BuyV2ProductCard extends StatelessWidget {
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: BuyV2Colors.green,
-                                            fontSize: compact ? 7.5 : 8,
-                                            height: 1.05,
+                                            fontSize: compact ? 9 : 8,
+                                            height: compact ? 1.1 : 1.05,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
@@ -4294,7 +4300,7 @@ class _ProductVisual extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = _productVisualColors(product);
     return SizedBox(
-      height: compact ? 72 : 110,
+      height: compact ? 86 : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -4313,7 +4319,7 @@ class _ProductVisual extends StatelessWidget {
             child: SizedBox(
               key: ValueKey('buy-grid-packshot-${product.id}'),
               width: compact ? 86 : 96,
-              height: compact ? 64 : 86,
+              height: compact ? 78 : 86,
               child: BuyV2ProductPackshot(
                 product: product,
                 borderRadius: compact ? 8 : 12,
@@ -4327,7 +4333,7 @@ class _ProductVisual extends StatelessWidget {
             child: Align(
               alignment: Alignment.topLeft,
               child: Container(
-                constraints: BoxConstraints(maxWidth: compact ? 58 : 120),
+                constraints: BoxConstraints(maxWidth: compact ? 96 : 120),
                 padding: EdgeInsets.symmetric(
                   horizontal: compact ? 4 : 6,
                   vertical: compact ? 2 : 4,
@@ -4344,7 +4350,7 @@ class _ProductVisual extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: compact ? 7 : 8,
+                    fontSize: compact ? 8 : 8,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
