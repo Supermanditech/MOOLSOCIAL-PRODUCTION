@@ -80,12 +80,8 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     MoolSpacing.xxl,
                   ),
                   children: [
-                    _ProfileAccessCard(onOpenRoute: onOpenRoute),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileQuickActions(onOpenRoute: onOpenRoute),
-                    const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
-                      title: 'Account details',
+                      title: 'Your account',
                       items: [
                         _ProfileDestination(
                           id: 'identity',
@@ -94,13 +90,14 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                           icon: Icons.badge_outlined,
                           route: '/app/account/identity',
                         ),
-                      ],
-                      onOpenRoute: onOpenRoute,
-                    ),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileSection(
-                      title: 'Privacy and preferences',
-                      items: [
+                        _ProfileDestination(
+                          id: 'preferences',
+                          title: 'Privacy and preferences',
+                          detail:
+                              'Data controls, language, location and notifications',
+                          icon: Icons.privacy_tip_outlined,
+                          route: '/app/account/workspaces/preferences',
+                        ),
                         _ProfileDestination(
                           id: 'security',
                           title: 'Security',
@@ -108,16 +105,13 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                           icon: Icons.shield_outlined,
                           route: '/app/account/security',
                         ),
-                        _ProfileDestination(
-                          id: 'preferences',
-                          title: 'Preferences',
-                          detail: 'Language, location and notifications',
-                          icon: Icons.tune_rounded,
-                          route: '/app/account/workspaces/preferences',
-                        ),
                       ],
                       onOpenRoute: onOpenRoute,
                     ),
+                    const SizedBox(height: MoolSpacing.lg),
+                    _ProfileQuickActions(onOpenRoute: onOpenRoute),
+                    const SizedBox(height: MoolSpacing.lg),
+                    _ProfileAccessCard(onOpenRoute: onOpenRoute),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
                       title: 'Plans',
@@ -503,7 +497,7 @@ class _ProfileQuickActions extends StatelessWidget {
       const Padding(
         padding: EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
         child: Text(
-          'Quick access',
+          'Your essentials',
           style: TextStyle(
             color: MoolColors.ink,
             fontSize: 14,
