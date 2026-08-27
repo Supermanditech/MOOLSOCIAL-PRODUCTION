@@ -28,18 +28,12 @@ class WorkMainV2 extends StatelessWidget {
         showBack: false,
         showHeaderChat: false,
         activeLocalAction: 'home',
-        leadingAction: IconButton.outlined(
+        trailing: IconButton(
           key: const Key('work-main-global-profile'),
-          tooltip: 'Open profile',
+          tooltip: 'MoolSocial account',
           onPressed: () =>
               showGlobalProfilePanelV2(context, onOpenRoute: context.push),
-          icon: const Icon(Icons.person_outline_rounded),
-        ),
-        trailing: IconButton.outlined(
-          key: const Key('work-main-readiness'),
-          tooltip: 'Work readiness',
-          onPressed: () => _showWorkReadiness(context, session),
-          icon: const Icon(Icons.fact_check_outlined),
+          icon: const Icon(Icons.account_circle_outlined, size: 24),
         ),
         body: ListView(
           key: const Key('work-main-v2'),
@@ -366,62 +360,6 @@ class _WorkActionCard extends StatelessWidget {
         ),
         Icon(Icons.arrow_forward_rounded, color: accent),
       ],
-    ),
-  );
-}
-
-Future<void> _showWorkReadiness(
-  BuildContext context,
-  WorkSession session,
-) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    useSafeArea: true,
-    builder: (sheetContext) => Padding(
-      key: const Key('work-readiness-sheet'),
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.xs,
-        MoolSpacing.lg,
-        MoolSpacing.xxl,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Work readiness',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          const Text(
-            'Opportunities show eligibility and terms before application. Provider workspaces become active after document approval.',
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 13,
-              height: 1.4,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          WorkPrimaryButton(
-            keyName: 'work-readiness-open-workspace',
-            label: session.activeWorkspace == null
-                ? 'Review Workspace setup'
-                : 'Open active Workspace',
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              context.go('/app/work/my-work');
-            },
-            icon: Icons.dashboard_customize_outlined,
-          ),
-        ],
-      ),
     ),
   );
 }

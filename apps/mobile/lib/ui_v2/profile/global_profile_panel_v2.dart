@@ -20,7 +20,7 @@ Future<void> showGlobalProfilePanelV2(
     barrierColor: Colors.black.withValues(alpha: .38),
     transitionDuration: MoolMotion.standard,
     pageBuilder: (dialogContext, _, _) => Align(
-      alignment: Alignment.centerLeft,
+      alignment: Alignment.centerRight,
       child: GlobalProfilePanelV2(
         onClose: () => Navigator.pop(dialogContext),
         onOpenRoute: (route) {
@@ -37,7 +37,7 @@ Future<void> showGlobalProfilePanelV2(
       );
       return SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(-1, 0),
+          begin: const Offset(1, 0),
           end: Offset.zero,
         ).animate(curved),
         child: FadeTransition(opacity: curved, child: child),
@@ -58,7 +58,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = math.min(MediaQuery.sizeOf(context).width * .92, 420.0);
+    final width = math.min(MediaQuery.sizeOf(context).width * .88, 400.0);
     return Material(
       key: const Key('global-profile-panel-v2'),
       color: MoolColors.canvas,

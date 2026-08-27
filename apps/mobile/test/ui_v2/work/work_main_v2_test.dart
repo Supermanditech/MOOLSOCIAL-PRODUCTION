@@ -117,9 +117,19 @@ void main() {
     expect(find.byKey(const Key('work-global-chat')), findsNothing);
     expect(find.byKey(const Key('mool-global-chat')), findsOne);
 
+    final profileButton = tester.getRect(
+      find.byKey(const Key('work-main-global-profile')),
+    );
+    expect(profileButton.center.dx, greaterThan(300));
+
     await tester.tap(find.byKey(const Key('work-main-global-profile')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('global-profile-panel-v2')), findsOne);
+    final panel = tester.getRect(
+      find.byKey(const Key('global-profile-panel-v2')),
+    );
+    expect(panel.right, closeTo(390, 1));
+    expect(panel.left, greaterThan(0));
     expect(find.text('Your profile'), findsOne);
     expect(find.byKey(const Key('global-profile-progressive-card')), findsOne);
     expect(find.byKey(const Key('global-profile-identity')), findsOne);
