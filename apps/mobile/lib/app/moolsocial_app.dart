@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/design/moolsocial_brand_motion.dart';
 import '../core/design/mool_theme.dart';
@@ -133,7 +134,9 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
   Future<void> _authenticationBoundaryTail = Future<void>.value();
-  late final _router = createJourneyRouter(
+  late GoRouter _router = _createRouter(widget.initialLocation);
+
+  GoRouter _createRouter(String initialLocation) => createJourneyRouter(
     _session,
     _bookSession,
     _buySession,
@@ -150,7 +153,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     _workSession,
     launchPresentationGate: _launchPresentationGate,
     launchInterruptionGuard: _launchInterruptionGuard,
-    initialLocation: widget.initialLocation,
+    initialLocation: initialLocation,
     legacyPresentationForTestsOnly: widget.legacyPresentationForTestsOnly,
   );
 
@@ -222,6 +225,19 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       case AppLifecycleState.inactive:
         break;
     }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    assert(() {
+      final location = _router.routeInformationProvider.value.uri.toString();
+      final previousRouter = _router;
+      _router = _createRouter(location);
+      previousRouter.dispose();
+      setState(() {});
+      return true;
+    }());
   }
 
   @override
