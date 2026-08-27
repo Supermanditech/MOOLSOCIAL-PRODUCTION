@@ -515,29 +515,59 @@ class _ProfileAccessCard extends StatelessWidget {
           const SizedBox(height: MoolSpacing.sm),
           SizedBox(
             width: double.infinity,
-            child: FilledButton(
-              key: const Key('global-profile-explore-workspaces'),
-              onPressed: () => onOpenRoute(
-                applicationInProgress
-                    ? '/app/work/my-work'
-                    : '/app/work/workspace/choose',
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: _profileNavy,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(MoolRadii.control),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [_profileNavy, Color(0xFF4D46A8), Color(0xFF6D4BC3)],
                 ),
+                borderRadius: BorderRadius.circular(MoolRadii.control),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22000080),
+                    blurRadius: 12,
+                    offset: Offset(0, 5),
+                  ),
+                ],
               ),
-              child: Text(
-                applicationInProgress
-                    ? 'View application'
-                    : 'Explore workspaces',
-                maxLines: 2,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+              child: FilledButton(
+                key: const Key('global-profile-explore-workspaces'),
+                onPressed: () => onOpenRoute(
+                  applicationInProgress
+                      ? '/app/work/my-work'
+                      : '/app/work/workspace/choose',
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        applicationInProgress
+                            ? 'View application'
+                            : 'Explore workspaces',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: MoolSpacing.xs),
+                    const Icon(Icons.arrow_forward_rounded, size: 17),
+                  ],
+                ),
               ),
             ),
           ),
