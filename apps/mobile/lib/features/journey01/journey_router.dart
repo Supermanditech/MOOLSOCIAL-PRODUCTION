@@ -92,6 +92,7 @@ import '../../ui_v2/launch/launch_presentation_gate.dart';
 import '../../ui_v2/profile/global_personal_profile_v2.dart';
 import '../../ui_v2/profile/global_privacy_preferences_v2.dart';
 import '../../ui_v2/profile/global_profile_panel_v2.dart';
+import '../../ui_v2/profile/global_help_support_v2.dart';
 import '../../ui_v2/profile/global_security_v2.dart';
 import '../../ui_v2/work/work_main_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
@@ -1373,8 +1374,12 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/ask',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 159),
+        builder: (context, state) => GlobalHelpSupportV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
+        ),
       ),
       GoRoute(
         path: '/app/files',
