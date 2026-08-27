@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
+  "baselineTag": "moolsocial-shared-development-baseline-v4-incremental-gate-20260827",
+  "uiFounderReview": {
+    "state": "pending",
+    "acceptedScopes": [],
+    "reachableBuyDestinations": [
+      "shop",
+      "wholesale",
+      "orders",
+      "offers"
+    ],
+    "blockedBackendScopes": [
+      "buy.product_seller",
+      "buy.search",
+      "buy.medicine"
+    ],
+    "medicineOwner": "care"
+  },
+  "lanes": [
+    {
+      "id": "cursor_ui",
+      "branchPrefix": "work/cursor-ui/",
+      "packageId": "com.moolsocial.app.cursorreview",
+      "deviceSerial": "TG8HCYTGGQT885OF",
+      "minimumVersionCodeExclusive": 2026082797
+    },
+    {
+      "id": "codex_ui",
+      "branchPrefix": "work/codex-ui/",
+      "packageId": "com.moolsocial.app.runtime",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026082796
+    },
+    {
+      "id": "codex_backend",
+      "branchPrefix": "work/codex-backend/",
+      "packageId": "com.moolsocial.app.runtime",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026082796
+    },
+    {
+      "id": "integration",
+      "branchPrefix": "integration/moolsocial/",
+      "packageId": "com.moolsocial.app",
+      "deviceSerial": "2b3e0f71",
+      "minimumVersionCodeExclusive": 2026082795
+    }
+  ],
+  "rules": {
+    "oneOpenTicketPerLane": true,
+    "oneOpenTicketPerPackage": true,
+    "ticketStartMustEqualBaseline": true,
+    "laterPhasesMustDescendFromBaseline": true,
+    "baselineTagMustBeAnnotatedAndRemoteExact": true,
+    "candidateVersionMustIncrease": true,
+    "backendRequiresFounderAcceptedUiScope": true,
+    "handoffRequiresCleanWorktree": true,
+    "acceptedTicketBecomesNextBaseline": true
+  }
+}

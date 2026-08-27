@@ -313,6 +313,20 @@ prefixes, duplicate tasks, overlapping owner claims, primary-only subagent
 claims, stale registry generation, missing mandatory reads and branch/HEAD
 drift. These requirements apply to every future task, not only C34L.
 
+## Mandatory incremental ticket baseline gate
+
+- Before any Cursor/Codex UI, backend, runtime or integration edit, test,
+  build or handoff, run
+  `scripts/check-cross-agent-incremental-ticket-gate.ps1` with the exact lane,
+  ticket, UI scope, package and candidate version.
+- Every ticket starts clean at the annotated remote-exact tag recorded in
+  `config/cross-agent-incremental-ticket-gate.json`; later work must descend
+  from it. Candidate version codes increase for every ticket and package.
+- Backend work is blocked until the exact UI scope, commit and contract hash
+  are founder accepted. Unreachable or blocked UI cannot create backend scope.
+- One ticket is open per lane and package. A clean accepted ticket becomes the
+  next tagged baseline before another ticket starts.
+
 For `docs/quality/ACTIVE-CODEX-HANDOFF.md`, discover only the first two `^## `
 heading line numbers without emitting content. The current checkpoint is lines
 1 through one-before-the-second-heading; read only that range in independent
