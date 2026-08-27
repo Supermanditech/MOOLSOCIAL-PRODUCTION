@@ -104,6 +104,25 @@ void main() {
     );
   });
 
+  test('UI review-only bootstrap reaches Buy without Firebase runtime', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final reviewStart = mainSource.indexOf('void _runUiReviewOnlyApp()');
+    final reviewEnd = mainSource.indexOf('Future<void> main()', reviewStart);
+    final reviewBranch = mainSource.indexOf('if (_uiReviewOnlyMode)');
+    final firebaseBootstrap = mainSource.indexOf('Firebase.initializeApp');
+
+    expect(mainSource, contains('MOOLSOCIAL_UI_REVIEW_ONLY'));
+    expect(reviewStart, greaterThanOrEqualTo(0));
+    expect(reviewEnd, greaterThan(reviewStart));
+    expect(reviewBranch, greaterThanOrEqualTo(0));
+    expect(reviewBranch, lessThan(firebaseBootstrap));
+    final reviewSource = mainSource.substring(reviewStart, reviewEnd);
+    expect(reviewSource, isNot(contains('Firebase')));
+    expect(reviewSource, contains('ChatSession()'));
+    expect(reviewSource, contains("initialLocation: '/app/buy'"));
+    expect(reviewSource, contains('allowGuestReady: true'));
+  });
+
   test('profile device-review builds retain candidate provenance markers', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final journeySource = File(

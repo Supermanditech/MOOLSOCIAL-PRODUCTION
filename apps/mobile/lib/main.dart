@@ -54,6 +54,7 @@ const _useEmulators = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+const _uiReviewOnlyMode = bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
 const _youtubePublicReviewMode = bool.fromEnvironment(
   'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW',
 );
@@ -348,6 +349,32 @@ void _showReleaseBootstrapFailure(String stage) {
   runApp(const ReleaseConfigurationFailureApp());
 }
 
+void _runUiReviewOnlyApp() {
+  final session = JourneySession(
+    store: MemoryJourneyStore(
+      snapshot: const JourneySnapshot(
+        languageCode: 'en',
+        areaMode: 'current',
+        areaLabel: 'Jodhpur, Rajasthan',
+        currentAreaLabel: 'Jodhpur, Rajasthan',
+        setupComplete: true,
+        pendingRoute: '/app/buy',
+        lastReadyRoute: '/app/buy',
+      ),
+    ),
+    allowGuestReady: true,
+  );
+  runApp(
+    MoolSocialApp(
+      session: session,
+      chatSession: ChatSession(),
+      disposeSession: true,
+      disposeChatSession: true,
+      initialLocation: '/app/buy',
+    ),
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await configureMoolSystemUiViewport();
@@ -377,6 +404,12 @@ Future<void> main() async {
     return;
   }
   _recordReleaseBootstrapStage('first_flutter_frame', 'passed');
+  if (_uiReviewOnlyMode) {
+    _recordReleaseBootstrapStage('ui_review_runtime', 'begin');
+    _runUiReviewOnlyApp();
+    _recordReleaseBootstrapStage('ui_review_runtime', 'passed');
+    return;
+  }
   final firebaseOptions = _firebaseOptions();
   _recordReleaseBootstrapStage('firebase_initialize', 'begin');
   try {
@@ -1021,7 +1054,17 @@ Future<void> main() async {
 }
 
 bool _runtimeModeIsValid() {
-  return isQualifiedDeviceReviewRuntimeMode(
+  return isQualifiedUiReviewOnlyRuntimeMode(
+        uiReviewOnly: _uiReviewOnlyMode,
+        isDebugMode: kDebugMode,
+        deviceReview: _deviceReviewMode,
+        useEmulators: _useEmulators,
+        youtubePublicReview: _youtubePublicReviewMode,
+        youtubePrivateDevProof: youtubePrivateDevProofEnabled,
+        sideloadPreflightEnabled: _sideloadPreflightEnabled,
+        globalSocialLoginAudit: _globalSocialLoginAuditMode,
+      ) &&
+      isQualifiedDeviceReviewRuntimeMode(
         deviceReview: _deviceReviewMode,
         useEmulators: _useEmulators,
         youtubePublicReview: _youtubePublicReviewMode,

@@ -20,6 +20,26 @@ bool shouldUseNativeAndroidFirebaseConfiguration({
   required bool useEmulators,
 }) => isAndroid && !useEmulators;
 
+bool isQualifiedUiReviewOnlyRuntimeMode({
+  required bool uiReviewOnly,
+  required bool isDebugMode,
+  required bool deviceReview,
+  required bool useEmulators,
+  required bool youtubePublicReview,
+  required bool youtubePrivateDevProof,
+  required bool sideloadPreflightEnabled,
+  required bool globalSocialLoginAudit,
+}) {
+  if (!uiReviewOnly) return true;
+  return isDebugMode &&
+      deviceReview &&
+      useEmulators &&
+      !youtubePublicReview &&
+      !youtubePrivateDevProof &&
+      !sideloadPreflightEnabled &&
+      !globalSocialLoginAudit;
+}
+
 bool isQualifiedDeviceReviewRuntimeMode({
   required bool deviceReview,
   required bool useEmulators,

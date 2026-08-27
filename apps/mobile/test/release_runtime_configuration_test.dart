@@ -91,6 +91,38 @@ void main() {
     );
   });
 
+  test('UI review-only mode is debug, isolated, and provider-free', () {
+    bool qualifies({
+      bool uiReviewOnly = true,
+      bool isDebugMode = true,
+      bool deviceReview = true,
+      bool useEmulators = true,
+      bool youtubePublicReview = false,
+      bool youtubePrivateDevProof = false,
+      bool sideloadPreflightEnabled = false,
+      bool globalSocialLoginAudit = false,
+    }) => isQualifiedUiReviewOnlyRuntimeMode(
+      uiReviewOnly: uiReviewOnly,
+      isDebugMode: isDebugMode,
+      deviceReview: deviceReview,
+      useEmulators: useEmulators,
+      youtubePublicReview: youtubePublicReview,
+      youtubePrivateDevProof: youtubePrivateDevProof,
+      sideloadPreflightEnabled: sideloadPreflightEnabled,
+      globalSocialLoginAudit: globalSocialLoginAudit,
+    );
+
+    expect(qualifies(), isTrue);
+    expect(qualifies(uiReviewOnly: false, isDebugMode: false), isTrue);
+    expect(qualifies(isDebugMode: false), isFalse);
+    expect(qualifies(deviceReview: false), isFalse);
+    expect(qualifies(useEmulators: false), isFalse);
+    expect(qualifies(youtubePublicReview: true), isFalse);
+    expect(qualifies(youtubePrivateDevProof: true), isFalse);
+    expect(qualifies(sideloadPreflightEnabled: true), isFalse);
+    expect(qualifies(globalSocialLoginAudit: true), isFalse);
+  });
+
   test('live device review accepts only exact qualified profiles', () {
     expect(
       isQualifiedDeviceReviewRuntimeMode(
