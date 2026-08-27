@@ -73,6 +73,39 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Care profile resumes the active doctor appointment', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final book = BookSession(gateway: ReviewBookGateway(latency: Duration.zero))
+      ..setMedicalConsent(true);
+    expect(await book.confirmDoctorDetails(), isTrue);
+    addTearDown(journey.dispose);
+    addTearDown(book.dispose);
+    await mount(
+      tester,
+      route: '/app/book/doctor',
+      journey: journey,
+      book: book,
+    );
+
+    await tapVisible(tester, const Key('care-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-care-doctor-appointment')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-care-salon-discovery')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-care-doctor-appointment'),
+    );
+    expect(find.byKey(const Key('medical-consent')), findsOneWidget);
+  });
+
   testWidgets(
     'doctor completes care, patient, consent, invite and follow-up controls',
     (tester) async {
