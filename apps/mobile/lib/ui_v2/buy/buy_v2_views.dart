@@ -3721,6 +3721,13 @@ class BuyV2CheckoutView extends StatelessWidget {
                           'Optional delivery tip · ${buyV2Money(session.tipForGroup(deliveryGroups[index]))}',
                       ].join('\n'),
                     ),
+                    if (deliveryGroups[index].destination ==
+                        BuyV2Destination.wholesale) ...[
+                      const SizedBox(height: 5),
+                      _WholesaleCheckoutReceivingLines(
+                        group: deliveryGroups[index],
+                      ),
+                    ],
                     const SizedBox(height: 7),
                   ],
                   for (final benefit in session.selectedCartBenefitsFor(
@@ -3820,6 +3827,149 @@ class BuyV2CheckoutView extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLines extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLines({required this.group});
+
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-lines-${group.key}'),
+      container: true,
+      explicitChildNodes: true,
+      label:
+          'Products in this Wholesale delivery. '
+          '${_productCountLabel(group.lines.length)}. '
+          '${_packCountLabel(group.itemCount)}.',
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .55),
+          border: const Color(0x24000080),
+          radius: 14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Products and trade packs',
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (var index = 0; index < group.lines.length; index++) ...[
+              _WholesaleCheckoutReceivingLine(line: group.lines[index]),
+              if (index != group.lines.length - 1)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, color: BuyV2Colors.line),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLine extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLine({required this.line});
+
+  final BuyV2CartLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = line.product;
+    final quantityLabel = _packCountLabel(line.quantity);
+    final semanticLabel =
+        '${product.title}. $quantityLabel. ${product.pack}. '
+        'Minimum order ${product.minimumOrder} packs. '
+        '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+        'Line subtotal ${buyV2Money(line.total)}.';
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),
+      container: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked =
+              constraints.maxWidth < 290 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.2;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                product.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyBody.copyWith(fontSize: 10),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$quantityLabel · ${product.pack}',
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'MOQ ${product.minimumOrder} · '
+                '${buyV2Money(product.price)} per pack · ${product.unitPrice}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+            ],
+          );
+          final subtotal = Column(
+            crossAxisAlignment: stacked
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Line subtotal',
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                buyV2Money(line.total),
+                style: const TextStyle(
+                  color: BuyV2Colors.navy,
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [details, const SizedBox(height: 6), subtotal],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: details),
+              const SizedBox(width: 10),
+              subtotal,
+            ],
+          );
+        },
+      ),
     );
   }
 }
