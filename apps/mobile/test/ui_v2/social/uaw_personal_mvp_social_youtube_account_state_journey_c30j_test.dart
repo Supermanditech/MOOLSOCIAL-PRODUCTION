@@ -8,6 +8,7 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/ui_v2/profile/global_personal_profile_v2.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -39,6 +40,10 @@ void main() {
               ),
             ),
           ),
+          GoRoute(
+            path: '/app/account/identity',
+            builder: (_, _) => GlobalPersonalProfileV2(session: owners.journey),
+          ),
         ],
       );
       addTearDown(router.dispose);
@@ -54,7 +59,7 @@ void main() {
 
       expect(find.text('Public provider video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsOneWidget);
+      expect(find.byTooltip('Your MoolSocial profile'), findsOneWidget);
       expect(
         find.byKey(const Key('c30j-youtube-status-destination')),
         findsNothing,
@@ -65,13 +70,23 @@ void main() {
       await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Your MoolSocial account'), findsOneWidget);
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      expect(find.text('Your MoolSocial profile'), findsOneWidget);
       expect(
         find.byKey(const Key('youtube-connect-auth-explanation')),
         findsNothing,
       );
-      await tester.tapAt(const Offset(8, 8));
+      await tester.tap(find.byKey(const Key('global-profile-identity')));
       await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('global-personal-profile-v2')),
+        findsOneWidget,
+      );
+      expect(find.text('Personal profile'), findsWidgets);
+      await tester.tap(find.byKey(const Key('global-personal-profile-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('Public provider video'), findsOneWidget);
 
       await tester.tap(
         find.byKey(const Key('screen04-youtube-home-channel-status')),
@@ -121,8 +136,7 @@ void main() {
     final header = source.substring(headerStart, nextOwner);
 
     expect(header, contains("tooltip: 'YouTube channel status'"));
-    expect(header, contains("tooltip: 'MoolSocial account'"));
-    expect(header, contains('Icons.account_circle_outlined'));
+    expect(header, contains('MoolGlobalProfileShortcutV2('));
     expect(header, contains('Icons.ondemand_video_outlined'));
     expect(header, isNot(contains('CircleAvatar')));
     const statusSignature = 'Future<void> _openYouTubeChannelStatus() async {';

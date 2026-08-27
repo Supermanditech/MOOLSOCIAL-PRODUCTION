@@ -89,6 +89,7 @@ import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
+import '../../ui_v2/profile/global_personal_profile_v2.dart';
 import '../../ui_v2/work/work_main_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
@@ -1360,8 +1361,7 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/identity',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 158),
+        builder: (context, state) => GlobalPersonalProfileV2(session: session),
       ),
       GoRoute(
         path: '/app/ask',

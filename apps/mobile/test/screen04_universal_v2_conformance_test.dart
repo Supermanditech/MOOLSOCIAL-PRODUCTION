@@ -1081,15 +1081,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('screen04-profile')));
     await tester.pumpAndSettle();
-    expect(find.text('Your MoolSocial account'), findsOneWidget);
-    expect(
-      find.byKey(const Key('screen04-account-youtube-connection')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('screen04-account-sign-out')), findsOneWidget);
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(find.text('Your MoolSocial profile'), findsOneWidget);
+    expect(find.text('Personal profile'), findsOneWidget);
     expect(find.text('Creator workspace'), findsNothing);
-    expect(find.textContaining('Minimum read-only access'), findsOneWidget);
-    await tester.tap(find.byTooltip('Close'));
+    expect(find.textContaining('Minimum read-only access'), findsNothing);
+    await tester.tap(find.byKey(const Key('global-profile-close')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('screen04-search')));
@@ -1111,7 +1108,7 @@ void main() {
     _expectCustomerCopy(tester, 'header actions');
   });
 
-  testWidgets('authenticated account shows identity and switching action', (
+  testWidgets('authenticated account uses the one global profile surface', (
     tester,
   ) async {
     final owners = _AuthenticatedOwners();
@@ -1133,13 +1130,14 @@ void main() {
     await tester.tap(find.byKey(const Key('screen04-profile')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(find.text('Your MoolSocial profile'), findsOneWidget);
+    expect(find.text('Personal profile'), findsOneWidget);
     expect(
       find.byKey(const Key('screen04-account-authenticated-identity')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Test Member'), findsOneWidget);
-    expect(find.text('member@example.com'), findsOneWidget);
-    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('Sign out or switch account'), findsNothing);
   });
 }
 
