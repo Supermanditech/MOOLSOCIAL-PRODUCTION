@@ -92,6 +92,7 @@ import '../../ui_v2/launch/launch_presentation_gate.dart';
 import '../../ui_v2/profile/global_personal_profile_v2.dart';
 import '../../ui_v2/profile/global_privacy_preferences_v2.dart';
 import '../../ui_v2/profile/global_profile_panel_v2.dart';
+import '../../ui_v2/profile/global_security_v2.dart';
 import '../../ui_v2/work/work_main_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
@@ -1382,25 +1383,11 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/security',
-        builder: (context, state) => SharedHubScreen(
-          session: sharedSession,
-          screen: 161,
-          onSignOut: () async {
-            final signedOut = await session.signOut();
-            if (!context.mounted) return;
-            if (signedOut || !session.isAuthenticated) {
-              context.go('/sign-in');
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    session.errorMessage ??
-                        'Sign-out could not be completed. Please try again.',
-                  ),
-                ),
-              );
-            }
-          },
+        builder: (context, state) => GlobalSecurityV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
         ),
       ),
       GoRoute(
