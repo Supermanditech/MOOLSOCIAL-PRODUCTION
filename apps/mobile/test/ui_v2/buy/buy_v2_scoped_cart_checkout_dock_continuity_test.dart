@@ -70,14 +70,32 @@ void main() {
   ) {
     expect(session.activeDockDestination, expected);
     expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
-    final owner = find.byKey(const Key('buy-scoped-purchase-owner'));
-    expect(owner, findsOneWidget);
-    final stage = session.view == BuyV2View.checkout ? 'Review order' : 'Cart';
-    expect(
-      tester.getSemantics(owner).label,
-      contains('${expected.label} $stage'),
-    );
+    expect(find.byKey(const Key('buy-scoped-purchase-owner')), findsNothing);
+    if (expected == BuyV2Destination.medicine) {
+      expect(
+        find.byKey(const Key('care-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'care-local-tab-doctor',
+        'care-local-tab-medicine',
+        'care-local-tab-salon',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    } else {
+      expect(
+        find.byKey(const Key('buy-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'buy-local-tab-wholesale',
+        'buy-local-tab-orders',
+        'buy-local-tab-offers',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    }
   }
 
   const cases = [
@@ -131,7 +149,7 @@ void main() {
     },
   );
 
-  testWidgets('scoped Cart and Checkout retain one truthful connected owner', (
+  testWidgets('scoped Cart and Checkout retain every established rail action', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
