@@ -822,7 +822,10 @@ Assert-SideloadControl (
   (Test-Path -LiteralPath $staleRegistrant -PathType Leaf) -and
   $trackedRegistrantPassed -and
   $registrantSource.Contains('FlutterFirebaseCorePlugin') -and
-  $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -and
+  (
+    $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -or
+    $androidAppBuild.Contains('sanitizeProductionGeneratedPluginRegistrant')
+  ) -and
   $androidAppBuild.Contains('IntegrationTestPlugin') -and
   $androidAppBuild.Contains('FlutterFirebaseCorePlugin') -and
   $androidAppBuild.Contains('dev.fluttercommunity.plus.share.SharePlusPlugin') -and
