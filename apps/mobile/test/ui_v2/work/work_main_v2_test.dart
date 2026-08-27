@@ -144,7 +144,9 @@ void main() {
       find.byKey(const Key('global-profile-panel-v2')),
     );
     expect(panel.right, closeTo(390, 1));
-    expect(panel.left, greaterThan(0));
+    expect(panel.left, greaterThan(50));
+    expect(panel.top, greaterThanOrEqualTo(8));
+    expect(panel.bottom, lessThanOrEqualTo(836));
     expect(find.text('Your MoolSocial profile'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsOne);
     expect(find.text('Personal account'), findsOne);
@@ -152,9 +154,6 @@ void main() {
     expect(find.text('Privacy and preferences'), findsOne);
     expect(find.text('Your essentials'), findsOne);
     expect(find.text('Grow with MoolSocial'), findsOne);
-    expect(find.text('Create and earn'), findsOne);
-    expect(find.text('Build your business'), findsOne);
-    expect(find.text('Delivery and field work'), findsOne);
     expect(
       find.byKey(const Key('global-profile-explore-workspaces')),
       findsOne,
@@ -207,6 +206,8 @@ void main() {
     expect(find.byKey(const Key('global-profile-quick-payments')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-activity')), findsOne);
     expect(find.byKey(const Key('global-profile-quick-documents')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-plans')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-support')), findsOne);
     await tester.tap(find.byKey(const Key('global-profile-quick-payments')));
     await tester.pumpAndSettle();
 

@@ -58,12 +58,17 @@ class GlobalProfilePanelV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = math.min(MediaQuery.sizeOf(context).width * .88, 400.0);
-    return Material(
-      key: const Key('global-profile-panel-v2'),
-      color: MoolColors.canvas,
-      elevation: 24,
-      child: SafeArea(
+    final width = math.min(MediaQuery.sizeOf(context).width * .84, 360.0);
+    return SafeArea(
+      minimum: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
+      child: Material(
+        key: const Key('global-profile-panel-v2'),
+        color: MoolColors.canvas,
+        elevation: 24,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(left: Radius.circular(28)),
+        ),
         child: SizedBox(
           width: width,
           height: double.infinity,
@@ -112,34 +117,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     _ProfileQuickActions(onOpenRoute: onOpenRoute),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileAccessCard(onOpenRoute: onOpenRoute),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileSection(
-                      title: 'Plans',
-                      items: [
-                        _ProfileDestination(
-                          id: 'plans',
-                          title: 'Plans and access',
-                          detail: 'Personal, Creator, Business and Commerce',
-                          icon: Icons.workspace_premium_outlined,
-                          route: '/app/account/plans',
-                        ),
-                      ],
-                      onOpenRoute: onOpenRoute,
-                    ),
-                    const SizedBox(height: MoolSpacing.lg),
-                    _ProfileSection(
-                      title: 'Help and support',
-                      items: [
-                        _ProfileDestination(
-                          id: 'ask',
-                          title: 'Ask MoolSocial',
-                          detail: 'Support for your account and workspaces',
-                          icon: Icons.support_agent_outlined,
-                          route: '/app/ask',
-                        ),
-                      ],
-                      onOpenRoute: onOpenRoute,
-                    ),
                   ],
                 ),
               ),
@@ -293,51 +270,50 @@ class _ProfileAccessCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Grow with MoolSocial',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Choose how you want to work. Your personal account stays active.',
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 10,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          _AccessRoleTile(
-            keyName: 'global-profile-creator-workspace',
-            icon: Icons.auto_awesome_outlined,
-            title: 'Create and earn',
-            detail: 'Apply for a Creator workspace',
-            accent: _profileSaffron,
-            onTap: () => onOpenRoute('/app/work/workspace/choose?path=creator'),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          _AccessRoleTile(
-            keyName: 'global-profile-workspaces',
-            icon: Icons.storefront_outlined,
-            title: 'Build your business',
-            detail: 'Apply for a Business or Commerce workspace',
-            accent: _profileNavy,
-            onTap: () =>
-                onOpenRoute('/app/work/workspace/choose?path=business'),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          _AccessRoleTile(
-            keyName: 'global-profile-work-access',
-            icon: Icons.delivery_dining_outlined,
-            title: 'Delivery and field work',
-            detail: 'Apply for an Earn or Delivery workspace',
-            accent: const Color(0xFF2563EB),
-            onTap: () => onOpenRoute('/app/work/workspace/choose?path=work'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _profileSaffron.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.trending_up_rounded,
+                  color: _profileSaffron,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.sm),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Grow with MoolSocial',
+                      style: TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Create, build a business, deliver or complete professional work.',
+                      style: TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: MoolSpacing.sm),
           SizedBox(
@@ -363,91 +339,6 @@ class _ProfileAccessCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    ),
-  );
-}
-
-class _AccessRoleTile extends StatelessWidget {
-  const _AccessRoleTile({
-    required this.keyName,
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final String keyName;
-  final IconData icon;
-  final String title;
-  final String detail;
-  final Color accent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    key: Key(keyName),
-    color: accent.withValues(alpha: .07),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(MoolRadii.control),
-    ),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(MoolRadii.control),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: MoolSpacing.sm,
-          vertical: MoolSpacing.xs,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: accent, size: 18),
-            ),
-            const SizedBox(width: MoolSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: MoolColors.ink,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    detail,
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 10,
-                      height: 1.3,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, color: accent, size: 20),
-          ],
-        ),
       ),
     ),
   );
@@ -486,6 +377,20 @@ class _ProfileQuickActions extends StatelessWidget {
       icon: Icons.folder_outlined,
       route: '/app/files',
       accent: Color(0xFF2563EB),
+    ),
+    _ProfileQuickAction(
+      id: 'plans',
+      label: 'Plans',
+      icon: Icons.workspace_premium_outlined,
+      route: '/app/account/plans',
+      accent: Color(0xFF7C3AED),
+    ),
+    _ProfileQuickAction(
+      id: 'support',
+      label: 'Support',
+      icon: Icons.support_agent_outlined,
+      route: '/app/ask',
+      accent: Color(0xFF0F766E),
     ),
   ];
 
