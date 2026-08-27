@@ -71,6 +71,99 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Mool Fulfilment Partner',
     };
 
+const buyV2ProductOfferDecisionContractVersion =
+    'buy-product-offer-decision-v1';
+
+enum BuyV2ProductOfferDecisionState {
+  ready,
+  checking,
+  stale,
+  unavailable,
+  changedPrice,
+  missingFulfilment,
+}
+
+@immutable
+class BuyV2ProductOfferDecision {
+  const BuyV2ProductOfferDecision({
+    required this.state,
+    required this.statusLabel,
+    required this.detail,
+  });
+
+  final BuyV2ProductOfferDecisionState state;
+  final String statusLabel;
+  final String detail;
+
+  bool get canAdd => state == BuyV2ProductOfferDecisionState.ready;
+}
+
+BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
+  required BuyV2Product product,
+  required BuyV2ProductFactsSnapshot facts,
+}) {
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  final partner = facts.partner.trim().toLowerCase();
+  final automaticFulfilment =
+      product.destination == BuyV2Destination.shop ||
+      product.destination == BuyV2Destination.wholesale;
+
+  if (facts.stale) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.stale,
+      statusLabel: 'Offer needs review',
+      detail:
+          'Price, availability or delivery information may be out of date. Retry before adding to Cart.',
+    );
+  }
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available') ||
+      orderability.contains('out of stock')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Currently unavailable',
+      detail:
+          'This product cannot be added to Cart right now. Retry or choose another product.',
+    );
+  }
+  if (orderability.contains('checking') ||
+      orderability.contains('loading') ||
+      orderability.contains('pending review')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.checking,
+      statusLabel: 'Checking availability',
+      detail:
+          'Current stock and delivery must be confirmed before adding to Cart.',
+    );
+  }
+  if (facts.price != product.price) {
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.changedPrice,
+      statusLabel: 'Price changed',
+      detail:
+          'The delivered price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Retry or choose another product.',
+    );
+  }
+  if (automaticFulfilment &&
+      (facts.deliveryPromise.trim().isEmpty ||
+          partner.isEmpty ||
+          partner.contains('assignment pending') ||
+          partner.contains('not assigned') ||
+          partner.contains('missing'))) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.missingFulfilment,
+      statusLabel: 'Fulfilment unavailable',
+      detail:
+          'A delivery promise and automatic fulfilment path must be confirmed before adding to Cart.',
+    );
+  }
+  return const BuyV2ProductOfferDecision(
+    state: BuyV2ProductOfferDecisionState.ready,
+    statusLabel: 'Ready to add',
+    detail: 'Current price, stock and delivery are confirmed.',
+  );
+}
+
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);
   static const royal = Color(0xFF1515B8);

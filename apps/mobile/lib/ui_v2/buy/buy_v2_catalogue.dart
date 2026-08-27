@@ -3418,6 +3418,9 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : facts.deliveryPromise;
+    final offerDecision = automaticFulfilment
+        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        : null;
     final quantity = session.quantityFor(product.id);
     final rxBlocked =
         product.requiresPrescription &&
@@ -3433,7 +3436,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         child: Semantics(
           label:
               '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
-              '$buyerPromise${automaticFulfilment ? ', MoolSocial price' : ', fulfilled by ${facts.partner}'}',
+              '$buyerPromise${automaticFulfilment ? ', MoolSocial price, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
           button: true,
           child: Material(
             color: Colors.transparent,
@@ -3478,6 +3481,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                               product: product,
                               quantity: quantity,
                               rxBlocked: rxBlocked,
+                              offerDecision: offerDecision,
                             ),
                           ),
                         ],
@@ -3619,15 +3623,18 @@ class _FeaturedProductAction extends StatelessWidget {
     required this.product,
     required this.quantity,
     required this.rxBlocked,
+    required this.offerDecision,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final int quantity;
   final bool rxBlocked;
+  final BuyV2ProductOfferDecision? offerDecision;
 
   @override
   Widget build(BuildContext context) {
+    final requiresOfferReview = offerDecision?.canAdd == false;
     return AnimatedSwitcher(
       duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
       switchInCurve: Curves.easeOutBack,
@@ -3652,19 +3659,33 @@ class _FeaturedProductAction extends StatelessWidget {
               ),
             )
           : Semantics(
-              label: rxBlocked
+              label: requiresOfferReview
+                  ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                  : rxBlocked
                   ? 'Use prescription for ${product.title}'
                   : 'Add ${product.title} to cart',
               button: true,
               child: Material(
-                key: ValueKey('buy-add-${product.id}'),
-                color: rxBlocked ? BuyV2Colors.navy : Colors.white,
+                key: ValueKey(
+                  requiresOfferReview
+                      ? 'buy-review-offer-${product.id}'
+                      : 'buy-add-${product.id}',
+                ),
+                color: requiresOfferReview
+                    ? BuyV2Colors.softOrange
+                    : rxBlocked
+                    ? BuyV2Colors.navy
+                    : Colors.white,
                 elevation: 3,
                 shadowColor: const Color(0x33000040),
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   onTap: () {
                     HapticFeedback.selectionClick();
+                    if (requiresOfferReview) {
+                      session.openProduct(product.id);
+                      return;
+                    }
                     final added = session.addProduct(product.id);
                     if (!added &&
                         session.pendingPrescriptionProductId == product.id) {
@@ -3685,9 +3706,13 @@ class _FeaturedProductAction extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                               ),
                             )
-                          : const Icon(
-                              Icons.add_rounded,
-                              color: BuyV2Colors.navy,
+                          : Icon(
+                              requiresOfferReview
+                                  ? Icons.info_outline_rounded
+                                  : Icons.add_rounded,
+                              color: requiresOfferReview
+                                  ? BuyV2Colors.orange
+                                  : BuyV2Colors.navy,
                               size: 23,
                             ),
                     ),
@@ -3722,6 +3747,10 @@ class BuyV2ProductCard extends StatelessWidget {
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : facts.deliveryPromise;
+    final offerDecision = automaticFulfilment
+        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        : null;
+    final requiresOfferReview = offerDecision?.canAdd == false;
     final quantity = session.quantityFor(product.id);
     final rxBlocked =
         product.requiresPrescription &&
@@ -3732,7 +3761,7 @@ class BuyV2ProductCard extends StatelessWidget {
       child: Semantics(
         label:
             '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
-            '$buyerPromise${automaticFulfilment ? ', MoolSocial price' : ', fulfilled by ${facts.partner}'}',
+            '$buyerPromise${automaticFulfilment ? ', MoolSocial price, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
         button: true,
         child: InkWell(
           key: ValueKey('buy-product-${product.id}'),
@@ -3851,7 +3880,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 vertical: compact ? 2 : 4,
                               ),
                               decoration: BoxDecoration(
-                                color: facts.stale
+                                color: requiresOfferReview
                                     ? BuyV2Colors.softOrange
                                     : BuyV2Colors.softGreen,
                                 borderRadius: BorderRadius.circular(10),
@@ -3862,13 +3891,13 @@ class BuyV2ProductCard extends StatelessWidget {
                                   Row(
                                     children: [
                                       Icon(
-                                        facts.stale
+                                        requiresOfferReview
                                             ? Icons.sync_problem_rounded
                                             : facts.isLive
                                             ? Icons.bolt_rounded
                                             : Icons.schedule_rounded,
                                         size: 11,
-                                        color: facts.stale
+                                        color: requiresOfferReview
                                             ? BuyV2Colors.orange
                                             : BuyV2Colors.green,
                                       ),
@@ -3876,7 +3905,9 @@ class BuyV2ProductCard extends StatelessWidget {
                                       Expanded(
                                         child: Text(
                                           compact
-                                              ? automaticFulfilment
+                                              ? requiresOfferReview
+                                                    ? offerDecision!.statusLabel
+                                                    : automaticFulfilment
                                                     ? buyerPromise
                                                     : '${facts.partner} · '
                                                           '${_compactDeliveryPromise(facts.deliveryPromise)}'
@@ -3955,19 +3986,27 @@ class BuyV2ProductCard extends StatelessWidget {
                                       width: double.infinity,
                                       height: BuyV2Metrics.minimumTap,
                                       child: Semantics(
-                                        label: rxBlocked
+                                        label: requiresOfferReview
+                                            ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                                            : rxBlocked
                                             ? 'Use prescription for '
                                                   '${product.title}'
                                             : 'Add ${product.title} to cart',
                                         button: true,
                                         child: Material(
                                           key: ValueKey(
-                                            'buy-add-${product.id}',
+                                            requiresOfferReview
+                                                ? 'buy-review-offer-${product.id}'
+                                                : 'buy-add-${product.id}',
                                           ),
                                           color: Colors.transparent,
                                           child: InkWell(
                                             onTap: () {
                                               HapticFeedback.selectionClick();
+                                              if (requiresOfferReview) {
+                                                session.openProduct(product.id);
+                                                return;
+                                              }
                                               final added = session.addProduct(
                                                 product.id,
                                               );
@@ -3988,20 +4027,32 @@ class BuyV2ProductCard extends StatelessWidget {
                                                 height: 32,
                                                 alignment: Alignment.center,
                                                 decoration: BoxDecoration(
-                                                  color: rxBlocked
+                                                  color: requiresOfferReview
+                                                      ? BuyV2Colors.softOrange
+                                                      : rxBlocked
                                                       ? BuyV2Colors.navy
                                                       : Colors.white,
                                                   borderRadius:
                                                       BorderRadius.circular(10),
                                                   border: Border.all(
-                                                    color: rxBlocked
+                                                    color: requiresOfferReview
+                                                        ? BuyV2Colors.orange
+                                                        : rxBlocked
                                                         ? BuyV2Colors.navy
                                                         : const Color(
                                                             0x66000080,
                                                           ),
                                                   ),
                                                 ),
-                                                child: rxBlocked
+                                                child: requiresOfferReview
+                                                    ? const Icon(
+                                                        Icons
+                                                            .info_outline_rounded,
+                                                        color:
+                                                            BuyV2Colors.orange,
+                                                        size: 20,
+                                                      )
+                                                    : rxBlocked
                                                     ? const Text(
                                                         'Use Rx',
                                                         style: TextStyle(

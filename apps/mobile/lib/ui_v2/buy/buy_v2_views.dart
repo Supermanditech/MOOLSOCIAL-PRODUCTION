@@ -161,6 +161,9 @@ class BuyV2ProductView extends StatelessWidget {
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : facts.deliveryPromise;
+    final offerDecision = automaticFulfilment
+        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        : null;
     final partnerProducts = product.destination == BuyV2Destination.medicine
         ? session.sellerContinuationsFor(product)
         : const <BuyV2Product>[];
@@ -235,16 +238,20 @@ class BuyV2ProductView extends StatelessWidget {
                       product.pack,
                       style: context.buyMeta.copyWith(fontSize: 9),
                     ),
-                    const SizedBox(height: 8),
-                    _ProductOwnedActionPanel(
-                      key: ValueKey('buy-product-inline-action-${product.id}'),
-                      product: product,
-                      quantity: quantity,
-                      rxBlocked: rxBlocked,
-                      onAdd: addProduct,
-                      onDecrease: () => session.decrease(product.id),
-                      onIncrease: () => session.increase(product.id),
-                    ),
+                    if (!automaticFulfilment) ...[
+                      const SizedBox(height: 8),
+                      _ProductOwnedActionPanel(
+                        key: ValueKey(
+                          'buy-product-inline-action-${product.id}',
+                        ),
+                        product: product,
+                        quantity: quantity,
+                        rxBlocked: rxBlocked,
+                        onAdd: addProduct,
+                        onDecrease: () => session.decrease(product.id),
+                        onIncrease: () => session.increase(product.id),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -276,75 +283,59 @@ class BuyV2ProductView extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              _DecisionPanel(
-                key: ValueKey('buy-automatic-fulfilment-${product.id}'),
-                title: automaticFulfilment
-                    ? 'Price, pack and delivery'
-                    : 'Pack, delivery and pharmacy',
-                children: [
-                  if (automaticFulfilment)
+              if (automaticFulfilment)
+                _ProductOfferDecisionPanel(
+                  session: session,
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                  quantity: quantity,
+                  onAdd: addProduct,
+                  onDecrease: () => session.decrease(product.id),
+                  onIncrease: () => session.increase(product.id),
+                )
+              else
+                _DecisionPanel(
+                  title: 'Pack, delivery and pharmacy',
+                  children: [
                     _DecisionRow(
-                      icon: Icons.currency_rupee_rounded,
-                      label: 'Price',
-                      value: '${buyV2Money(facts.price)} · MoolSocial price',
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Pack',
+                      value: product.pack,
                     ),
-                  _DecisionRow(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Pack',
-                    value: product.pack,
-                  ),
-                  _DecisionRow(
-                    icon: Icons.schedule_rounded,
-                    label: 'Delivery',
-                    value: buyerPromise,
-                    valueColor: BuyV2Colors.green,
-                  ),
-                  if (automaticFulfilment)
                     _DecisionRow(
-                      icon: Icons.storefront_outlined,
-                      label: 'Fulfilment',
-                      value: buyV2AutomaticFulfilmentLabel(product.destination),
-                    )
-                  else if (partnerProducts.isEmpty)
-                    _DecisionRow(
-                      icon: Icons.local_pharmacy_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                    )
-                  else
-                    _DecisionActionRow(
-                      key: ValueKey(
-                        'buy-medicine-pharmacy-action-${product.id}',
+                      icon: Icons.schedule_rounded,
+                      label: 'Delivery',
+                      value: buyerPromise,
+                      valueColor: BuyV2Colors.green,
+                    ),
+                    if (partnerProducts.isEmpty)
+                      _DecisionRow(
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                      )
+                    else
+                      _DecisionActionRow(
+                        key: ValueKey(
+                          'buy-medicine-pharmacy-action-${product.id}',
+                        ),
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                        detail:
+                            '${partnerProducts.length} other current products · Not medical advice',
+                        semanticLabel:
+                            'View ${partnerProducts.length} more products from ${product.seller} '
+                            'in the current Medicine catalogue. Not medical advice',
+                        onTap: () => _showPartnerProductsSheet(
+                          context,
+                          session,
+                          product,
+                          partnerProducts,
+                        ),
                       ),
-                      icon: Icons.local_pharmacy_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                      detail:
-                          '${partnerProducts.length} other current products · Not medical advice',
-                      semanticLabel:
-                          'View ${partnerProducts.length} more products from ${product.seller} '
-                          'in the current Medicine catalogue. Not medical advice',
-                      onTap: () => _showPartnerProductsSheet(
-                        context,
-                        session,
-                        product,
-                        partnerProducts,
-                      ),
-                    ),
-                  if (automaticFulfilment) ...[
-                    _DecisionRow(
-                      icon: Icons.location_on_outlined,
-                      label: 'Deliver to',
-                      value:
-                          session.selectedAddressOrNull?.shortLine ??
-                          'Choose a delivery address',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.verified_outlined,
-                      label: 'Price source',
-                      value: 'Published by MoolSocial',
-                    ),
-                  ] else ...[
                     _DecisionRow(
                       icon: Icons.route_outlined,
                       label: 'Delivery path',
@@ -356,16 +347,7 @@ class BuyV2ProductView extends StatelessWidget {
                       value: product.confirmedOn,
                     ),
                   ],
-                  if (product.destination == BuyV2Destination.shop)
-                    _DecisionRow(
-                      icon: Icons.assignment_return_outlined,
-                      label: 'Return or replacement',
-                      value:
-                          product.returnPolicy ??
-                          'Damaged or incorrect packs are reviewed at delivery',
-                    ),
-                ],
-              ),
+                ),
               if (product.destination == BuyV2Destination.wholesale) ...[
                 const SizedBox(height: 10),
                 _DecisionPanel(
@@ -488,6 +470,195 @@ class BuyV2ProductView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProductOfferDecisionPanel extends StatelessWidget {
+  const _ProductOfferDecisionPanel({
+    required this.session,
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+    required this.quantity,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final mrp = product.mrp;
+    final savings = mrp == null || mrp <= facts.price
+        ? null
+        : mrp - facts.price;
+    return Semantics(
+      key: ValueKey('buy-product-offer-decision-${product.id}'),
+      container: true,
+      label:
+          '${product.title}. ${product.variant}. ${product.pack}. '
+          '${buyV2Money(facts.price)} delivered price. '
+          '${facts.orderabilityLabel}. $buyerPromise. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
+          '${decision.statusLabel}. ${decision.detail}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DecisionPanel(
+            key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+            title: 'Price, pack and delivery',
+            children: [
+              _DecisionRow(
+                icon: decision.canAdd
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.info_outline_rounded,
+                label: 'Decision',
+                value: decision.statusLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.tune_rounded,
+                label: 'Pack and variant',
+                value: '${product.pack} · ${product.variant}',
+              ),
+              _DecisionRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Delivered price',
+                value: '${buyV2Money(facts.price)} · MoolSocial price',
+              ),
+              if (mrp != null && mrp > facts.price)
+                _DecisionRow(
+                  icon: Icons.savings_outlined,
+                  label: 'Price components',
+                  value:
+                      'List price ${buyV2Money(mrp)} · Save ${buyV2Money(savings!)}',
+                )
+              else
+                _DecisionRow(
+                  icon: Icons.calculate_outlined,
+                  label: 'Price components',
+                  value: product.unitPrice,
+                ),
+              _DecisionRow(
+                icon: Icons.inventory_outlined,
+                label: 'Stock',
+                value: facts.orderabilityLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.schedule_rounded,
+                label: 'Delivery',
+                value: buyerPromise,
+                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Fulfilment',
+                value: buyV2AutomaticFulfilmentLabel(product.destination),
+              ),
+              _DecisionRow(
+                icon: Icons.location_on_outlined,
+                label: 'Deliver to',
+                value:
+                    session.selectedAddressOrNull?.shortLine ??
+                    'Choose a delivery address',
+              ),
+              const _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Price source',
+                value: 'Published by MoolSocial',
+              ),
+              if (product.destination == BuyV2Destination.shop)
+                _DecisionRow(
+                  icon: Icons.assignment_return_outlined,
+                  label: 'Return or replacement',
+                  value:
+                      product.returnPolicy ??
+                      'Damaged or incorrect packs are reviewed at delivery',
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (decision.canAdd)
+            _ProductOwnedActionPanel(
+              key: ValueKey('buy-product-inline-action-${product.id}'),
+              product: product,
+              quantity: quantity,
+              rxBlocked: false,
+              onAdd: onAdd,
+              onDecrease: onDecrease,
+              onIncrease: onIncrease,
+            )
+          else
+            Container(
+              key: ValueKey('buy-product-offer-recovery-${product.id}'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softOrange,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: BuyV2Colors.orange.withValues(alpha: .34),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    decision.statusLabel,
+                    style: context.buyBody.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(decision.detail, style: context.buyMeta),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: ValueKey('buy-offer-retry-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          session.refreshProductFacts(product.id);
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry offer'),
+                      ),
+                      FilledButton.icon(
+                        key: ValueKey('buy-offer-change-product-${product.id}'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: session.closeProduct,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Change product'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
