@@ -139,18 +139,18 @@ void main() {
     );
     expect(panel.right, closeTo(390, 1));
     expect(panel.left, greaterThan(0));
-    expect(find.text('MoolSocial account'), findsOne);
+    expect(find.text('Your MoolSocial profile'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsOne);
     expect(find.text('Personal account'), findsWidgets);
     expect(find.text('Grow with MoolSocial'), findsOne);
     expect(find.text('Create and earn'), findsOne);
     expect(find.text('Build your business'), findsOne);
-    expect(find.text('Deliver and complete work'), findsOne);
+    expect(find.text('Delivery and field work'), findsOne);
     expect(
       find.byKey(const Key('global-profile-explore-workspaces')),
       findsOne,
     );
-    expect(find.text('Explore professional workspaces'), findsOne);
+    expect(find.text('Explore workspaces'), findsOne);
     expect(
       find.descendant(
         of: find.byKey(const Key('global-profile-panel-v2')),
