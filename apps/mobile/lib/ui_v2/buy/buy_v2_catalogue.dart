@@ -2880,14 +2880,16 @@ _resolveCompactProductGridLayout({
   required bool accessibleText,
   bool savedOnly = false,
 }) {
-  // Product facts stop being decision-useful when a phone squeezes three
-  // cards into one row. Keep two complete cards on compact screens and admit
-  // a third only when each card retains a readable commerce width.
+  // The founder-approved Shop and Wholesale rhythm keeps three products
+  // visible at normal text scale. Enlarged accessibility text uses two cards
+  // so type and actions can grow without clipping.
   final columns = savedOnly
       ? constraints.maxWidth >= 320
             ? 2
             : 1
-      : constraints.maxWidth >= 480
+      : accessibleText && constraints.maxWidth < 460
+      ? 2
+      : constraints.maxWidth >= 320
       ? 3
       : 2;
   const horizontalInsets = 20.0;

@@ -34,56 +34,72 @@ void main() {
     );
   }
 
-  testWidgets('phone widths keep two complete decision-useful product cards', (
-    tester,
-  ) async {
-    for (final size in const [Size(320, 700), Size(360, 800), Size(430, 932)]) {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = size;
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      final products = BuyV2Catalogue.products
-          .where((product) => product.destination == BuyV2Destination.shop)
-          .take(6)
-          .toList(growable: false);
+  testWidgets(
+    'phone widths keep three complete founder-approved product cards',
+    (tester) async {
+      for (final size in const [
+        Size(320, 700),
+        Size(360, 800),
+        Size(430, 932),
+      ]) {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final products = BuyV2Catalogue.products
+            .where((product) => product.destination == BuyV2Destination.shop)
+            .take(6)
+            .toList(growable: false);
 
-      await tester.pumpWidget(
-        app(session: session, products: products, size: size, textScale: 1),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          app(session: session, products: products, size: size, textScale: 1),
+        );
+        await tester.pumpAndSettle();
 
-      final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
-      final secondCard = find.byKey(ValueKey('buy-product-${products[2].id}'));
-      expect(firstCard, findsOneWidget, reason: '$size first card');
-      expect(secondCard, findsOneWidget, reason: '$size second card');
-      final firstRect = tester.getRect(firstCard);
-      final secondRect = tester.getRect(secondCard);
-      expect(firstRect.width, greaterThanOrEqualTo(146), reason: '$size width');
-      expect(secondRect.right, lessThanOrEqualTo(size.width - 12));
-      expect(firstRect.height, inInclusiveRange(222, 226));
+        final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
+        expect(firstCard, findsOneWidget, reason: '$size first card');
+        final firstRect = tester.getRect(firstCard);
+        expect(
+          firstRect.width,
+          greaterThanOrEqualTo(95),
+          reason: '$size width',
+        );
+        for (final index in const [0, 2, 4]) {
+          final card = find.byKey(
+            ValueKey('buy-product-${products[index].id}'),
+          );
+          expect(card, findsOneWidget, reason: '$size product $index');
+          expect(
+            tester.getRect(card).right,
+            lessThanOrEqualTo(size.width - 12),
+            reason: '$size product $index fully visible',
+          );
+        }
+        expect(firstRect.height, inInclusiveRange(207, 211));
 
-      final title = tester.widget<Text>(
-        find
-            .descendant(of: firstCard, matching: find.text(products[0].title))
-            .first,
-      );
-      final pack = tester.widget<Text>(
-        find
-            .descendant(of: firstCard, matching: find.text(products[0].pack))
-            .first,
-      );
-      expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
-      expect(title.maxLines, 2);
-      expect(pack.style?.fontSize, greaterThanOrEqualTo(9.5));
-      expect(tester.takeException(), isNull, reason: '$size overflow');
+        final title = tester.widget<Text>(
+          find
+              .descendant(of: firstCard, matching: find.text(products[0].title))
+              .first,
+        );
+        final pack = tester.widget<Text>(
+          find
+              .descendant(of: firstCard, matching: find.text(products[0].pack))
+              .first,
+        );
+        expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
+        expect(title.maxLines, 2);
+        expect(pack.style?.fontSize, greaterThanOrEqualTo(9.5));
+        expect(tester.takeException(), isNull, reason: '$size overflow');
 
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      session.dispose();
-      core.dispose();
-    }
-    tester.view.reset();
-  });
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+      tester.view.reset();
+    },
+  );
 
   testWidgets('large text retains two lanes and complete minimum tap actions', (
     tester,
