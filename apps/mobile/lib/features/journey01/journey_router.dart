@@ -89,6 +89,7 @@ import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
+import '../../ui_v2/workspace/retailer_workspace_onboarding_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
@@ -1445,6 +1446,11 @@ GoRouter createJourneyRouter(
         path: '/app/work/workspace/choose',
         builder: (context, state) =>
             WorkChooseActivityScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/workspace/retailer',
+        builder: (context, state) =>
+            RetailerWorkspaceOnboardingV2(session: workSession),
       ),
       GoRoute(
         path: '/app/work/workspace/proof',
