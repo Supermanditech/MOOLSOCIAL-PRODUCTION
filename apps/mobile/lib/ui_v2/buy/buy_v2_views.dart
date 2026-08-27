@@ -3626,6 +3626,11 @@ class BuyV2CheckoutView extends StatelessWidget {
       animation: gstInvoiceController,
       builder: (context, _) {
         final destinations = session.checkoutDestinations;
+        final wholesaleReceiving =
+            destinations.isNotEmpty &&
+            destinations.every(
+              (destination) => destination == BuyV2Destination.wholesale,
+            );
         final deliveryGroups = session.checkoutFulfilmentGroups;
         final invoiceDestinations = destinations
             .where(
@@ -3661,6 +3666,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                   const SizedBox(height: 8),
                   _SavedAddressReminder(
                     address: address,
+                    wholesaleReceiving: wholesaleReceiving,
                     onEdit: () => showBuyV2AddressSheet(context, session),
                   ),
                   const SizedBox(height: 9),
@@ -10067,13 +10073,21 @@ class _CartLine extends StatelessWidget {
 }
 
 class _SavedAddressReminder extends StatelessWidget {
-  const _SavedAddressReminder({required this.address, required this.onEdit});
+  const _SavedAddressReminder({
+    required this.address,
+    required this.onEdit,
+    this.wholesaleReceiving = false,
+  });
 
   final BuyV2Address address;
   final VoidCallback onEdit;
+  final bool wholesaleReceiving;
 
   @override
   Widget build(BuildContext context) {
+    final title = wholesaleReceiving
+        ? 'Receiving location · ${address.label}'
+        : 'Delivering to ${address.label}';
     return Container(
       key: const ValueKey('buy-saved-address-reminder'),
       constraints: const BoxConstraints(minHeight: 54),
@@ -10096,9 +10110,18 @@ class _SavedAddressReminder extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'Delivering to ${address.label}',
-                  style: context.buyBody.copyWith(fontSize: 10),
+                Semantics(
+                  key: ValueKey(
+                    wholesaleReceiving
+                        ? 'buy-wholesale-checkout-receiving-location'
+                        : 'buy-checkout-delivery-location',
+                  ),
+                  label: title,
+                  excludeSemantics: true,
+                  child: Text(
+                    title,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(

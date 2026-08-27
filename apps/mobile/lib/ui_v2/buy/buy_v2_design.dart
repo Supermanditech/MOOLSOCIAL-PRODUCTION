@@ -93,6 +93,9 @@ const buyV2WholesaleCheckoutPackCountContractVersion =
 const buyV2WholesaleCheckoutReceivingLinesContractVersion =
     'buy-wholesale-checkout-receiving-lines-v1';
 
+const buyV2WholesaleCheckoutReceivingLocationContractVersion =
+    'buy-wholesale-checkout-receiving-location-v1';
+
 enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
 
 @immutable
