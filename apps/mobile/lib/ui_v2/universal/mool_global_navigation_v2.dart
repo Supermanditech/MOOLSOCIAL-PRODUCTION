@@ -243,7 +243,7 @@ const moolActionFamilies = <MoolActionFamilySpec>[
     id: 'work',
     label: 'Work',
     icon: Icons.work_outline_rounded,
-    route: '/app/work/earn',
+    route: '/app/work/home',
     actions: [
       MoolDirectActionSpec(
         id: 'earn',
