@@ -14,6 +14,63 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Converts the server-owned delivery fact into one compact buyer promise.
+///
+/// Google route duration is only one upstream input. This presentation helper
+/// never calculates or guesses an ETA; it renders the complete promise already
+/// supplied through [BuyV2ProductFactsSnapshot].
+String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
+  if (facts.stale) return 'Delivery time needs review';
+
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  if (orderability.contains('checking')) return 'Checking delivery time';
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available')) {
+    return 'Currently unavailable';
+  }
+
+  return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
+}
+
+String buyV2BuyerDeliveryPromiseSource(String value) {
+  final source = value.trim();
+  if (source.toLowerCase().startsWith('delivered ')) return source;
+  final minutes = RegExp(
+    r'(\d+)\s*(?:min|minute)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (minutes != null) return 'Delivered in ${minutes.group(1)} min';
+  final longerDuration = RegExp(
+    r'(\d+)\s*(hour|day)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (longerDuration != null) {
+    final amount = longerDuration.group(1)!;
+    final unit = longerDuration.group(2)!.toLowerCase();
+    return 'Delivered in $amount $unit${amount == '1' ? '' : 's'}';
+  }
+  return 'Delivery $source';
+}
+
+String buyV2DeliveryPromiseSummary({
+  required String promise,
+  String? promisedByLabel,
+}) {
+  final relative = buyV2BuyerDeliveryPromiseSource(promise);
+  final deadline = promisedByLabel?.trim();
+  return deadline == null || deadline.isEmpty
+      ? relative
+      : '$relative · $deadline';
+}
+
+String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop ||
+      BuyV2Destination.wholesale => 'Automatically assigned Mool Partner',
+      BuyV2Destination.medicine => 'Mool Pharmacy Partner',
+      BuyV2Destination.orders => 'Mool Fulfilment Partner',
+    };
+
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);
   static const royal = Color(0xFF1515B8);

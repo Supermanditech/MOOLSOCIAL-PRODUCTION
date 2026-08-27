@@ -197,7 +197,12 @@ void main() {
             final confirmedDestinations = session.checkoutDestinations;
             final itemCountBefore = session.itemCount;
 
-            session.confirmOrder();
+            expect(
+              session.confirmOrder(),
+              isTrue,
+              reason:
+                  'step $step confirmation must complete: ${session.notice}',
+            );
 
             confirmations += 1;
             expect(

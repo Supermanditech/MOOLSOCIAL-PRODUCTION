@@ -228,8 +228,20 @@ void main() {
     );
     expect(semanticNode.rect.width, lessThan(150));
     expect(semanticNode.rect.height, greaterThanOrEqualTo(44));
-    expect(find.textContaining('Medicine fulfilment ·'), findsOneWidget);
-    expect(find.textContaining('Shop fulfilment ·'), findsNothing);
+    expect(find.text('Delivery plan'), findsOneWidget);
+    expect(session.checkoutFulfilmentGroups, hasLength(1));
+    expect(
+      session.checkoutFulfilmentGroups.single.destination,
+      BuyV2Destination.medicine,
+    );
+    expect(
+      find.byKey(
+        ValueKey(
+          'buy-checkout-delivery-plan-${session.checkoutFulfilmentGroups.single.key}',
+        ),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
