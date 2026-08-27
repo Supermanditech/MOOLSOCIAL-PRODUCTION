@@ -48,9 +48,12 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/app/account/workspaces',
+          path: '/app/work/workspace/choose',
           builder: (context, state) => const Scaffold(
-            body: Text('Workspaces', key: Key('global-workspaces-destination')),
+            body: Text(
+              'Choose workspace',
+              key: Key('workspace-application-destination'),
+            ),
           ),
         ),
         GoRoute(
@@ -175,7 +178,10 @@ void main() {
       find.byKey(const Key('global-profile-explore-workspaces')),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('global-workspaces-destination')), findsOne);
+    expect(
+      find.byKey(const Key('workspace-application-destination')),
+      findsOne,
+    );
   });
 
   testWidgets('Work choices open their exact destinations', (tester) async {

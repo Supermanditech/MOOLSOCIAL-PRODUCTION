@@ -210,15 +210,15 @@ class _NewWorkState extends StatelessWidget {
         const SizedBox(height: MoolSpacing.md),
         const MoolServiceCard(
           key: Key('my-work-account-context'),
-          title: 'Verified account contact',
+          title: 'Personal account',
           subtitle:
-              'Your personal account stays active while Workspace setup is reviewed.',
+              'Your personal account stays active during application and approval.',
           icon: Icons.verified_user_outlined,
           accent: MoolColors.success,
           metadata: [
             MoolServiceMeta(
-              icon: Icons.phone_android_rounded,
-              label: '+91 98••• ••321',
+              icon: Icons.visibility_off_outlined,
+              label: 'Private until approved',
             ),
             MoolServiceMeta(
               icon: Icons.lock_outline_rounded,
@@ -474,7 +474,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                             ),
                           ),
                           Text(
-                            '+91 98••• ••321 · identity verified',
+                            'Personal account remains active',
                             style: TextStyle(
                               color: MoolColors.muted,
                               fontSize: 11,
@@ -483,7 +483,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                         ],
                       ),
                     ),
-                    WorkPill(label: 'Verified'),
+                    WorkPill(label: 'Active'),
                   ],
                 ),
               ),

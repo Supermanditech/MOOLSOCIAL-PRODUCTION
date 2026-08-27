@@ -320,7 +320,7 @@ class _ProfileAccessCard extends StatelessWidget {
             title: 'Create and earn',
             detail: 'Apply for a Creator workspace',
             accent: _profileSaffron,
-            onTap: () => onOpenRoute('/app/account/workspaces?type=creator'),
+            onTap: () => onOpenRoute('/app/work/workspace/choose?path=creator'),
           ),
           const SizedBox(height: MoolSpacing.xs),
           _AccessRoleTile(
@@ -329,7 +329,8 @@ class _ProfileAccessCard extends StatelessWidget {
             title: 'Build your business',
             detail: 'Apply for a Business or Commerce workspace',
             accent: _profileNavy,
-            onTap: () => onOpenRoute('/app/account/workspaces?type=partner'),
+            onTap: () =>
+                onOpenRoute('/app/work/workspace/choose?path=business'),
           ),
           const SizedBox(height: MoolSpacing.xs),
           _AccessRoleTile(
@@ -338,14 +339,14 @@ class _ProfileAccessCard extends StatelessWidget {
             title: 'Deliver and complete work',
             detail: 'Apply for an Earn or Delivery workspace',
             accent: const Color(0xFF2563EB),
-            onTap: () => onOpenRoute('/app/account/workspaces?type=work'),
+            onTap: () => onOpenRoute('/app/work/workspace/choose?path=work'),
           ),
           const SizedBox(height: MoolSpacing.sm),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               key: const Key('global-profile-explore-workspaces'),
-              onPressed: () => onOpenRoute('/app/account/workspaces'),
+              onPressed: () => onOpenRoute('/app/work/workspace/choose'),
               style: FilledButton.styleFrom(
                 backgroundColor: _profileNavy,
                 foregroundColor: Colors.white,
