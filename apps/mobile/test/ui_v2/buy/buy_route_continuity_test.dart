@@ -272,7 +272,7 @@ void main() {
       );
       expect(visibleState.uri.path, '/app/buy');
       expect(visibleState.uri.queryParameters['sub'], 'medicine');
-      expect(find.text('Search medicines and wellness'), findsOneWidget);
+      expect(find.text('Search medicines'), findsOneWidget);
     },
   );
 
@@ -304,7 +304,7 @@ void main() {
       initialLocation: '/app/buy?sub=medicine',
     );
     addTearDown(session.dispose);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
@@ -315,7 +315,7 @@ void main() {
     expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
     expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -324,7 +324,7 @@ void main() {
       findsNothing,
     );
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
   });
 
   testWidgets('stored Medicine route cannot replace Social cold launch', (
