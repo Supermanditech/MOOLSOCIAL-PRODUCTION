@@ -4,8 +4,36 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+
+final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
+  final promises = <BuyV2Destination, (String, String)>{
+    BuyV2Destination.shop: ('within 5 min', 'by 6:35 PM'),
+    BuyV2Destination.wholesale: ('within 1 day', 'by tomorrow 4:00 PM'),
+  };
+
+  void update(
+    BuyV2Destination destination, {
+    required String promise,
+    required String promisedBy,
+  }) {
+    promises[destination] = (promise, promisedBy);
+  }
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final quote = promises[product.destination];
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: quote?.$1 ?? product.deliveryPromise,
+          promisedByLabel: quote?.$2,
+          sourceId: 'b01-t01c-delivery-quote',
+        );
+  }
+}
 
 void main() {
   group('BuyV2Session approved contract', () {
@@ -563,6 +591,92 @@ void main() {
         }
       },
     );
+
+    test(
+      'T01C preserves one purchase and exact accepted delivery promises',
+      () {
+        final adapter = _T01CDeliveryFactsAdapter();
+        final quoted = BuyV2Session(
+          core: BuySession(),
+          productFactsAdapter: adapter,
+        );
+        addTearDown(quoted.dispose);
+        final shop = quoted.product('s-tomato');
+        final wholesale = quoted.product('w-oil');
+        expect(quoted.addProduct(shop.id), isTrue);
+        expect(quoted.addProduct(wholesale.id), isTrue);
+        quoted.openCart();
+        expect(quoted.openCheckout(), isTrue);
+
+        final checkout = quoted.checkoutFulfilmentGroups;
+        expect(checkout, hasLength(2));
+        expect(
+          checkout.singleWhere((group) => group.destination == .shop).promise,
+          'within 5 min',
+        );
+        expect(
+          checkout
+              .singleWhere((group) => group.destination == .wholesale)
+              .promisedByLabel,
+          'by tomorrow 4:00 PM',
+        );
+
+        expect(quoted.confirmOrder(), isTrue);
+        expect(quoted.confirmedPurchaseId, 'BUY-NEW-01');
+        expect(quoted.confirmedOrders, hasLength(2));
+        expect(
+          quoted.confirmedOrders.map((order) => order.purchaseId).toSet(),
+          {'BUY-NEW-01'},
+        );
+        expect(
+          quoted.confirmedOrders
+              .singleWhere((order) => order.destination == .shop)
+              .promise,
+          'within 5 min',
+        );
+        expect(
+          quoted.confirmedOrders
+              .singleWhere((order) => order.destination == .wholesale)
+              .promisedByLabel,
+          'by tomorrow 4:00 PM',
+        );
+      },
+    );
+
+    test('T01C blocks a changed promise until the buyer accepts it', () {
+      final adapter = _T01CDeliveryFactsAdapter();
+      final quoted = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: adapter,
+      );
+      addTearDown(quoted.dispose);
+      final shop = quoted.product('s-tomato');
+      expect(quoted.addProduct(shop.id), isTrue);
+      quoted.openCart();
+      expect(quoted.openCheckout(), isTrue);
+
+      adapter.update(
+        BuyV2Destination.shop,
+        promise: 'within 10 min',
+        promisedBy: 'by 6:40 PM',
+      );
+      expect(quoted.confirmOrder(), isFalse);
+      expect(quoted.checkoutPromiseReviewRequired, isTrue);
+      expect(quoted.itemCount, 1);
+      expect(quoted.confirmedOrders, isEmpty);
+      expect(quoted.checkoutDeliveryPromiseChanges, hasLength(1));
+      final change = quoted.checkoutDeliveryPromiseChanges.single;
+      expect(change.previousPromise, 'within 5 min');
+      expect(change.currentPromise, 'within 10 min');
+      expect(change.previousPromisedByLabel, 'by 6:35 PM');
+      expect(change.currentPromisedByLabel, 'by 6:40 PM');
+
+      expect(quoted.acceptCheckoutPromiseChanges(), isTrue);
+      expect(quoted.checkoutPromiseReviewRequired, isFalse);
+      expect(quoted.confirmOrder(), isTrue);
+      expect(quoted.confirmedOrders.single.promise, 'within 10 min');
+      expect(quoted.confirmedOrders.single.promisedByLabel, 'by 6:40 PM');
+    });
 
     test('confirmation creates traceable orders and exact reorder lines', () {
       final shop = BuyV2Catalogue.products.firstWhere(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -26,6 +27,49 @@ final class _FixedOffersSource implements BuyV2PublishedOffersSource {
 
   @override
   final List<BuyV2PublishedOffer> publishedOffers;
+}
+
+final class _FixedDeliveryPromiseFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  const _FixedDeliveryPromiseFactsAdapter(this.deliveryPromise);
+
+  final String deliveryPromise;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: deliveryPromise,
+          orderabilityLabel: 'Available to add',
+          sourceId: 'b01-t02-server-assignment',
+          stale: false,
+        );
+  }
+}
+
+final class _T01CMutableDeliveryFactsAdapter
+    implements BuyV2ProductFactsAdapter {
+  final promises = <BuyV2Destination, (String, String)>{
+    BuyV2Destination.shop: ('within 5 min', 'by 6:35 PM'),
+    BuyV2Destination.wholesale: ('within 1 day', 'by tomorrow 4:00 PM'),
+  };
+
+  void updateShop({required String promise, required String promisedBy}) {
+    promises[BuyV2Destination.shop] = (promise, promisedBy);
+  }
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final quote = promises[product.destination];
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: quote?.$1 ?? product.deliveryPromise,
+          promisedByLabel: quote?.$2,
+          sourceId: 'b01-t01c-ui-quote',
+        );
+  }
 }
 
 void main() {
@@ -1002,11 +1046,8 @@ void main() {
 
     expect(find.text('Runtime Member'), findsOneWidget);
     expect(find.text('member@example.com'), findsOneWidget);
-    expect(find.text('Account & security'), findsOneWidget);
-    expect(
-      find.text('Manage sign-in methods, privacy and sign out'),
-      findsOneWidget,
-    );
+    expect(find.text('Sign out or switch account'), findsOneWidget);
+    expect(find.text('Account security and provider access'), findsOneWidget);
     expect(find.text('Dharmendra Choudhary'), findsNothing);
   });
 
@@ -1467,11 +1508,11 @@ void main() {
       PageStorageKey('buy-product-${product.id}'),
     );
     await tester.scrollUntilVisible(
-      find.text('Pack, delivery and seller'),
+      find.text('Price, pack and delivery'),
       220,
       scrollable: productScrollable,
     );
-    expect(find.text('Pack, delivery and seller'), findsOneWidget);
+    expect(find.text('Price, pack and delivery'), findsOneWidget);
     final wholesaleTerms = find.text('Wholesale terms', skipOffstage: false);
     expect(wholesaleTerms, findsOneWidget);
     await tester.ensureVisible(wholesaleTerms);
@@ -1510,7 +1551,7 @@ void main() {
   });
 
   testWidgets(
-    'product detail uses packshot partner role reviews and reporting',
+    'product detail uses automatic fulfilment reviews and reporting',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       final product = BuyV2Catalogue.products.firstWhere(
@@ -1529,11 +1570,12 @@ void main() {
         PageStorageKey('buy-product-${product.id}'),
       );
       await tester.scrollUntilVisible(
-        find.text('Mool Retail Partner'),
+        find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
         220,
         scrollable: productScrollable,
       );
-      expect(find.text('Mool Retail Partner'), findsOneWidget);
+      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+      expect(find.text(product.seller), findsNothing);
       expect(find.textContaining('Verified'), findsNothing);
 
       final reviews = find.byKey(ValueKey('buy-product-reviews-${product.id}'));
@@ -1577,6 +1619,99 @@ void main() {
       expect(find.text('Reported'), findsOneWidget);
       expect(session.hasReportedProduct(product.id), isTrue);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'B01 T02 keeps one product while server promises 3 5 and 10 minutes',
+    (tester) async {
+      for (final testCase in const [
+        (productId: 's-oil', destination: BuyV2Destination.shop, minutes: 3),
+        (productId: 's-tomato', destination: BuyV2Destination.shop, minutes: 5),
+        (
+          productId: 'w-oil',
+          destination: BuyV2Destination.wholesale,
+          minutes: 10,
+        ),
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          productFactsAdapter: _FixedDeliveryPromiseFactsAdapter(
+            'within ${testCase.minutes} min',
+          ),
+        );
+        final product = session.product(testCase.productId);
+
+        await tester.pumpWidget(app(session));
+        await tester.pumpAndSettle();
+        session.openDestination(testCase.destination);
+        session.openProduct(product.id);
+        await tester.pumpAndSettle();
+        final productScrollable = scrollableWithin(
+          PageStorageKey('buy-product-${product.id}'),
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+          220,
+          scrollable: productScrollable,
+        );
+
+        expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
+        expect(
+          find.text('Automatically assigned Mool Partner'),
+          findsOneWidget,
+        );
+        expect(find.text(product.seller), findsNothing);
+        expect(
+          find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
+          findsNothing,
+        );
+
+        expect(session.addProduct(product.id), isTrue);
+        session.openCart();
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Delivered in ${testCase.minutes} min'),
+          findsOneWidget,
+        );
+        expect(find.text(product.seller), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        session.dispose();
+        core.dispose();
+      }
+    },
+  );
+
+  test(
+    'B01 T02 promise copy fails closed for checking stale and unavailable',
+    () {
+      final product = BuyV2Catalogue.products;
+      final base = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+        product.first,
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(
+          base.copyWith(orderabilityLabel: 'Checking serviceability'),
+        ),
+        'Checking delivery time',
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(base.copyWith(stale: true)),
+        'Delivery time needs review',
+      );
+      expect(
+        buyV2BuyerDeliveryPromise(
+          base.copyWith(orderabilityLabel: 'Currently unavailable'),
+        ),
+        'Currently unavailable',
+      );
     },
   );
 
@@ -1892,13 +2027,16 @@ void main() {
           final productScrollable = scrollableWithin(
             PageStorageKey('buy-product-${product.id}'),
           );
+          final decisionOwner = destination == BuyV2Destination.medicine
+              ? find.text(product.partnerRole)
+              : find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}'));
           await tester.scrollUntilVisible(
-            find.text(product.partnerRole),
+            decisionOwner,
             140,
             scrollable: productScrollable,
           );
           expect(
-            find.text(product.partnerRole),
+            decisionOwner,
             findsOneWidget,
             reason: '$destination at $viewport',
           );
@@ -2788,7 +2926,7 @@ void main() {
   });
 
   testWidgets(
-    'featured card exposes seller context and a stable purchase action',
+    'featured card exposes automatic delivery and a stable purchase action',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
@@ -2796,13 +2934,19 @@ void main() {
       final product = session.visibleProducts.first;
       final card = find.byKey(ValueKey('buy-product-${product.id}'));
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
-      final seller = find.textContaining(product.seller);
+      final promise = find.descendant(
+        of: card,
+        matching: find.text(
+          buyV2BuyerDeliveryPromise(session.productFactsFor(product)),
+        ),
+      );
 
       expect(add, findsOneWidget);
-      expect(seller, findsWidgets);
+      expect(promise, findsOneWidget);
+      expect(find.textContaining(product.seller), findsNothing);
       final cardRect = tester.getRect(card);
       expect(cardRect.contains(tester.getCenter(add)), isTrue);
-      expect(cardRect.contains(tester.getCenter(seller.last)), isTrue);
+      expect(cardRect.contains(tester.getCenter(promise)), isTrue);
       expect(tester.getSize(add), const Size(44, 44));
     },
   );
@@ -2821,9 +2965,134 @@ void main() {
     session.openCheckout();
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Shop fulfilment ·'), findsOneWidget);
-    expect(find.textContaining('Wholesale fulfilment ·'), findsNothing);
-    expect(find.textContaining('Medicine fulfilment ·'), findsNothing);
+    expect(find.text('Delivery plan'), findsOneWidget);
+    expect(find.textContaining('Delivery 1 ·'), findsOneWidget);
+    expect(session.checkoutDestinations, {BuyV2Destination.shop});
+    expect(session.checkoutFulfilmentGroups, hasLength(1));
+    expect(
+      find.byKey(
+        ValueKey(
+          'buy-checkout-delivery-plan-${session.checkoutFulfilmentGroups.single.key}',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'T01C carries exact mixed delivery promises through one purchase',
+    (tester) async {
+      final adapter = _T01CMutableDeliveryFactsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: adapter,
+      );
+      final shop = session.product('s-tomato');
+      final wholesale = session.product('w-oil');
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct(wholesale.id), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery plan'), findsOneWidget);
+      expect(
+        find.textContaining('Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Delivered in 1 day · by tomorrow 4:00 PM'),
+        findsOneWidget,
+      );
+      expect(find.text(shop.seller), findsNothing);
+      expect(find.text(wholesale.seller), findsNothing);
+      expect(find.text('Place order'), findsOneWidget);
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Order placed'), findsOneWidget);
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      expect(
+        find.text('Promised at Checkout · Delivered in 5 min · by 6:35 PM'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Promised at Checkout · Delivered in 1 day · by tomorrow 4:00 PM',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining(shop.seller), findsWidgets);
+      expect(find.textContaining(wholesale.seller), findsWidgets);
+      expect(session.confirmedPurchaseId, 'BUY-NEW-01');
+      expect(session.confirmedOrders.map((order) => order.purchaseId).toSet(), {
+        'BUY-NEW-01',
+      });
+    },
+  );
+
+  testWidgets('T01C blocks and explains a changed pre-commit promise', (
+    tester,
+  ) async {
+    final adapter = _T01CMutableDeliveryFactsAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: adapter,
+    );
+    final shop = session.product('s-tomato');
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.addProduct(shop.id), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await tester.pumpAndSettle();
+
+    adapter.updateShop(promise: 'within 10 min', promisedBy: 'by 6:40 PM');
+    await tester.tap(find.text('Place order'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-checkout-promise-change-review')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Previous · Delivered in 5 min · by 6:35 PM'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Updated · Delivered in 10 min · by 6:40 PM'),
+      findsOneWidget,
+    );
+    expect(session.confirmedOrders, isEmpty);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Place order'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('buy-accept-updated-delivery-times')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-promise-change-review')),
+      findsNothing,
+    );
+    await tester.tap(find.text('Place order'));
+    await tester.pumpAndSettle();
+    expect(find.text('Order placed'), findsOneWidget);
+    expect(
+      find.text('Promised at Checkout · Delivered in 10 min · by 6:40 PM'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -2854,9 +3123,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
-      expect(find.text('Shop order confirmed'), findsOneWidget);
-      expect(find.text('Wholesale order confirmed'), findsOneWidget);
-      expect(find.text('Medicine order confirmed'), findsNothing);
+      expect(find.text('Your deliveries'), findsOneWidget);
+      expect(find.text('Delivery 1 of 2'), findsOneWidget);
+      expect(find.text('Delivery 2 of 2'), findsOneWidget);
+      expect(find.text('Delivery 3 of 3'), findsNothing);
+      expect(find.textContaining('Promised at Checkout'), findsNWidgets(2));
+      expect(find.textContaining('Purchase BUY-NEW-01'), findsOneWidget);
       expect(
         find.textContaining(session.confirmedOrders.first.partner),
         findsWidgets,
@@ -2898,6 +3170,10 @@ void main() {
       await tester.tap(ordersAction);
       await tester.pumpAndSettle();
       expect(find.text('PURCHASES'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-purchase-group-BUY-NEW-01')),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(session.confirmedOrders.first.id),
         findsWidgets,
