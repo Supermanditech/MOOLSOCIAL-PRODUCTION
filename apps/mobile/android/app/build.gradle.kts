@@ -26,6 +26,21 @@ val facebookAppId = providers.environmentVariable(
 val facebookClientToken = providers.environmentVariable(
     "MOOLSOCIAL_FACEBOOK_CLIENT_TOKEN",
 ).orNull?.trim()?.takeIf { it.isNotEmpty() }
+val androidDebugPackage = providers.environmentVariable(
+    "MOOLSOCIAL_ANDROID_DEBUG_PACKAGE",
+).orNull?.trim()?.takeIf { it.isNotEmpty() } ?: "runtime"
+if (androidDebugPackage !in setOf("runtime", "cursorreview")) {
+    throw GradleException(
+        "Android debug package must be runtime or cursorreview.",
+    )
+}
+val debugApplicationIdSuffix = ".$androidDebugPackage"
+val debugVersionNameSuffix = "-$androidDebugPackage"
+val debugAppName = if (androidDebugPackage == "cursorreview") {
+    "MoolSocial Cursor Review"
+} else {
+    "MoolSocial Runtime"
+}
 if ((facebookAppId == null) != (facebookClientToken == null)) {
     throw GradleException(
         "Facebook Login requires both founder-controlled Android configuration values.",
@@ -204,14 +219,14 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".runtime"
-            versionNameSuffix = "-runtime"
-            resValue("string", "app_name", "MoolSocial Runtime")
+            applicationIdSuffix = debugApplicationIdSuffix
+            versionNameSuffix = debugVersionNameSuffix
+            resValue("string", "app_name", debugAppName)
         }
         getByName("profile") {
-            applicationIdSuffix = ".runtime"
-            versionNameSuffix = "-runtime"
-            resValue("string", "app_name", "MoolSocial Runtime")
+            applicationIdSuffix = debugApplicationIdSuffix
+            versionNameSuffix = debugVersionNameSuffix
+            resValue("string", "app_name", debugAppName)
         }
         release {
             signingConfig = signingConfigs.findByName("release")

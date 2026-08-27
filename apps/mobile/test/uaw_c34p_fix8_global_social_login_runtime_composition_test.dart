@@ -108,20 +108,29 @@ void main() {
     expect(manifest, contains('@bool/facebook_auto_init_enabled'));
   });
 
-  test('debug and profile APKs cannot overwrite the production package', () {
+  test('debug and profile APKs isolate Codex and Cursor packages', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
 
+    expect(gradle, contains('"MOOLSOCIAL_ANDROID_DEBUG_PACKAGE"'));
+    expect(gradle, contains('setOf("runtime", "cursorreview")'));
+    expect(gradle, contains('?: "runtime"'));
+    expect(gradle, contains('"MoolSocial Cursor Review"'));
+    expect(gradle, contains('"MoolSocial Runtime"'));
     expect(
-      RegExp(r'applicationIdSuffix = "\.runtime"').allMatches(gradle).length,
-      2,
-    );
-    expect(
-      RegExp(r'versionNameSuffix = "-runtime"').allMatches(gradle).length,
+      RegExp(
+        r'applicationIdSuffix = debugApplicationIdSuffix',
+      ).allMatches(gradle).length,
       2,
     );
     expect(
       RegExp(
-        r'resValue\("string", "app_name", "MoolSocial Runtime"\)',
+        r'versionNameSuffix = debugVersionNameSuffix',
+      ).allMatches(gradle).length,
+      2,
+    );
+    expect(
+      RegExp(
+        r'resValue\("string", "app_name", debugAppName\)',
       ).allMatches(gradle).length,
       2,
     );
