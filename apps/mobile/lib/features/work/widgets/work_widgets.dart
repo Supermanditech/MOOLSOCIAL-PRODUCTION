@@ -17,6 +17,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.showBack = true,
     this.activeLocalAction = 'earn',
     this.showHeaderChat = true,
+    this.leadingAction,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -30,12 +31,14 @@ class WorkPageScaffold extends StatelessWidget {
   final bool showBack;
   final String activeLocalAction;
   final bool showHeaderChat;
+  final Widget? leadingAction;
   final Widget? trailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
+    final hasLeadingAction = showBack || leadingAction != null;
     void leaveContentDepth() {
       session.clearMessages();
       if (context.canPop()) {
@@ -84,7 +87,7 @@ class WorkPageScaffold extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: false,
           toolbarHeight: 72,
-          leadingWidth: showBack ? 64 : 16,
+          leadingWidth: hasLeadingAction ? 64 : 16,
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
@@ -98,8 +101,13 @@ class WorkPageScaffold extends StatelessWidget {
                     ),
                   ),
                 )
-              : null,
-          titleSpacing: showBack ? 4 : MoolSpacing.md,
+              : leadingAction == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(left: MoolSpacing.sm),
+                  child: leadingAction,
+                ),
+          titleSpacing: hasLeadingAction ? 4 : MoolSpacing.md,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,

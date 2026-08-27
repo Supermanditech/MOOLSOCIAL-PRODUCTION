@@ -6,6 +6,7 @@ import '../../core/design/mool_service_home.dart';
 import '../../core/design/mool_theme.dart';
 import '../../features/work/widgets/work_widgets.dart';
 import '../../features/work/work_session.dart';
+import '../profile/global_profile_panel_v2.dart';
 
 const _workNavy = Color(0xFF000080);
 const _workViolet = Color(0xFF4D46A8);
@@ -22,16 +23,23 @@ class WorkMainV2 extends StatelessWidget {
       builder: (context, _) => WorkPageScaffold(
         session: session,
         title: 'Work',
-        subtitle: 'Earn, operate and grow in one place',
+        subtitle: 'Opportunities and provider workspaces',
         fallbackBackRoute: '/app/mool?from=work',
         showBack: false,
         showHeaderChat: false,
         activeLocalAction: 'home',
-        trailing: IconButton.outlined(
+        leadingAction: IconButton.outlined(
           key: const Key('work-main-global-profile'),
-          tooltip: 'Global profile',
-          onPressed: () => _showGlobalProfile(context, session),
-          icon: const Icon(Icons.account_circle_outlined),
+          tooltip: 'Open profile',
+          onPressed: () =>
+              showGlobalProfilePanelV2(context, onOpenRoute: context.push),
+          icon: const Icon(Icons.person_outline_rounded),
+        ),
+        trailing: IconButton.outlined(
+          key: const Key('work-main-readiness'),
+          tooltip: 'Work readiness',
+          onPressed: () => _showWorkReadiness(context, session),
+          icon: const Icon(Icons.fact_check_outlined),
         ),
         body: ListView(
           key: const Key('work-main-v2'),
@@ -45,9 +53,8 @@ class WorkMainV2 extends StatelessWidget {
             _WorkHero(session: session),
             const SizedBox(height: MoolSpacing.lg),
             const WorkSectionTitle(
-              title: 'Choose what you need today',
-              detail:
-                  'Earning and operating stay separate and easy to return to',
+              title: 'Choose your next action',
+              detail: 'Review opportunities or manage provider access',
             ),
             const SizedBox(height: MoolSpacing.sm),
             _WorkActionCard(
@@ -68,7 +75,7 @@ class WorkMainV2 extends StatelessWidget {
                   ? 'Create a provider workspace'
                   : session.activeWorkspace!.name,
               detail: session.activeWorkspace == null
-                  ? 'Choose your exact provider type, add its required documents and keep your personal profile separate.'
+                  ? 'Choose your provider type and submit the required information for review.'
                   : '${session.activeWorkspace!.profileLabel} · ${session.activeWorkspace!.area}',
               actionLabel: session.activeWorkspace == null
                   ? 'Start Workspace setup'
@@ -141,7 +148,7 @@ class WorkMainV2 extends StatelessWidget {
                   ),
                   SizedBox(height: MoolSpacing.sm),
                   Text(
-                    'One profile, separate provider workspaces',
+                    'Clear terms and protected access',
                     style: TextStyle(
                       color: MoolColors.ink,
                       fontSize: 16,
@@ -150,7 +157,7 @@ class WorkMainV2 extends StatelessWidget {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Workspace setup, document review and basic activation are free. Optional paid capabilities appear only after approval.',
+                    'Review pay and eligibility before applying. Provider workspaces remain private until approval.',
                     style: TextStyle(
                       color: MoolColors.muted,
                       fontSize: 12,
@@ -204,7 +211,7 @@ class _WorkHero extends StatelessWidget {
           ),
           const SizedBox(height: MoolSpacing.md),
           const Text(
-            'Your next earning or business step starts here',
+            'Earn, provide services and grow your business',
             style: TextStyle(
               color: Colors.white,
               fontSize: 24,
@@ -215,7 +222,7 @@ class _WorkHero extends StatelessWidget {
           ),
           const SizedBox(height: MoolSpacing.sm),
           const Text(
-            'Use one global Work home, then move into opportunities or your operating workspace.',
+            'Review paid opportunities or manage a verified provider workspace.',
             style: TextStyle(
               color: Color(0xFFE7E7FF),
               fontSize: 13,
@@ -363,7 +370,7 @@ class _WorkActionCard extends StatelessWidget {
   );
 }
 
-Future<void> _showGlobalProfile(
+Future<void> _showWorkReadiness(
   BuildContext context,
   WorkSession session,
 ) async {
@@ -372,7 +379,7 @@ Future<void> _showGlobalProfile(
     showDragHandle: true,
     useSafeArea: true,
     builder: (sheetContext) => Padding(
-      key: const Key('work-global-profile-sheet'),
+      key: const Key('work-readiness-sheet'),
       padding: const EdgeInsets.fromLTRB(
         MoolSpacing.lg,
         MoolSpacing.xs,
@@ -384,7 +391,7 @@ Future<void> _showGlobalProfile(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Your global MoolSocial profile',
+            'Work readiness',
             style: TextStyle(
               color: MoolColors.ink,
               fontSize: 20,
@@ -393,7 +400,7 @@ Future<void> _showGlobalProfile(
           ),
           const SizedBox(height: MoolSpacing.sm),
           const Text(
-            'One signed-in profile follows you across Social and every main action. Provider workspaces are added separately and become active only after document review.',
+            'Opportunities show eligibility and terms before application. Provider workspaces become active after document approval.',
             style: TextStyle(
               color: MoolColors.muted,
               fontSize: 13,
@@ -403,13 +410,15 @@ Future<void> _showGlobalProfile(
           ),
           const SizedBox(height: MoolSpacing.md),
           WorkPrimaryButton(
-            keyName: 'work-global-profile-open',
-            label: 'Open global profile',
+            keyName: 'work-readiness-open-workspace',
+            label: session.activeWorkspace == null
+                ? 'Review Workspace setup'
+                : 'Open active Workspace',
             onPressed: () {
               Navigator.pop(sheetContext);
-              context.go('/app/account/identity');
+              context.go('/app/work/my-work');
             },
-            icon: Icons.account_circle_outlined,
+            icon: Icons.dashboard_customize_outlined,
           ),
         ],
       ),

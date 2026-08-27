@@ -119,9 +119,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('work-main-global-profile')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-global-profile-sheet')), findsOne);
-    expect(find.text('Your global MoolSocial profile'), findsOne);
-    await tester.tap(find.byKey(const Key('work-global-profile-open')));
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOne);
+    expect(find.text('Your profile'), findsOne);
+    expect(find.byKey(const Key('global-profile-progressive-card')), findsOne);
+    expect(find.byKey(const Key('global-profile-identity')), findsOne);
+    await tester.tap(find.byKey(const Key('global-profile-identity')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('global-profile-destination')), findsOne);
   });
@@ -167,6 +169,9 @@ void main() {
 
     expect(find.byKey(const Key('work-main-v2')), findsOne);
     expect(find.byKey(const Key('mool-global-chat')), findsOne);
+    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOne);
     expect(tester.takeException(), isNull);
   });
 }
