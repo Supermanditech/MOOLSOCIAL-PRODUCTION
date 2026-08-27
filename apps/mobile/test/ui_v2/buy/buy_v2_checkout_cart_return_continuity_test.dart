@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    EdgeInsets viewInsets = EdgeInsets.zero,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -25,6 +28,7 @@ void main() {
           size: size,
           padding: safeArea,
           viewPadding: safeArea,
+          viewInsets: viewInsets,
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
@@ -196,6 +200,195 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('T01B GST action stays reachable across Android and iOS insets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const viewports = [
+      (
+        label: 'Redmi navigation',
+        size: Size(360, 800),
+        safeArea: EdgeInsets.only(top: 34, bottom: 81),
+        viewInsets: EdgeInsets.zero,
+        textScale: 1.0,
+      ),
+      (
+        label: 'compact Android keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 24, bottom: 24),
+        viewInsets: EdgeInsets.only(bottom: 260),
+        textScale: 1.4,
+      ),
+      (
+        label: 'modern iOS keyboard',
+        size: Size(390, 844),
+        safeArea: EdgeInsets.only(top: 47, bottom: 34),
+        viewInsets: EdgeInsets.only(bottom: 336),
+        textScale: 1.2,
+      ),
+      (
+        label: 'compact iOS keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 20),
+        viewInsets: EdgeInsets.only(bottom: 216),
+        textScale: 1.0,
+      ),
+    ];
+
+    for (final viewport in viewports) {
+      tester.view.physicalSize = viewport.size;
+      final session = mixedSession();
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue, reason: viewport.label);
+
+      await tester.pumpWidget(
+        app(
+          session,
+          size: viewport.size,
+          safeArea: viewport.safeArea,
+          viewInsets: viewport.viewInsets,
+          textScale: viewport.textScale,
+          reducedMotion: true,
+        ),
+      );
+      await tester.pump();
+      final request = find.byKey(const ValueKey('buy-gst-request-wholesale'));
+      await tester.ensureVisible(request);
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('buy-gst-add-wholesale'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+
+      final save = find.byKey(const ValueKey('buy-gst-save'));
+      expect(save, findsOneWidget, reason: viewport.label);
+      final saveRect = tester.getRect(save);
+      final usableBottom =
+          viewport.size.height -
+          viewport.safeArea.bottom -
+          viewport.viewInsets.bottom;
+      expect(
+        saveRect.bottom,
+        lessThanOrEqualTo(usableBottom + 1),
+        reason: '${viewport.label} bottom-safe action',
+      );
+      expect(
+        saveRect.height,
+        greaterThanOrEqualTo(44),
+        reason: '${viewport.label} action height',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-gst-form-scroll')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      session.dispose();
+    }
+  });
+
+  testWidgets('T01B GST fields are named and follow keyboard order', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final session = mixedSession();
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+
+    await tester.pumpWidget(app(session, reducedMotion: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
+    await tester.pumpAndSettle();
+
+    for (final target in const [
+      (key: 'buy-gst-legal-name', label: 'Legal name'),
+      (key: 'buy-gst-gstin', label: 'GSTIN'),
+      (key: 'buy-gst-billing-address', label: 'Billing address'),
+    ]) {
+      final field = find.byKey(ValueKey(target.key));
+      expect(field, findsOneWidget, reason: target.label);
+      final data = tester.getSemantics(field).getSemanticsData();
+      expect(data.label, contains(target.label), reason: target.label);
+      expect(data.flagsCollection.isTextField, isTrue, reason: target.label);
+      expect(data.hasAction(SemanticsAction.tap), isTrue, reason: target.label);
+      expect(
+        data.hasAction(SemanticsAction.focus),
+        isTrue,
+        reason: target.label,
+      );
+    }
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('buy-gst-gstin')))
+          .getSemanticsData()
+          .maxValueLength,
+      15,
+    );
+
+    final legalName = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+    );
+    final gstin = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+    );
+    final billingAddress = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('buy-gst-legal-name')));
+    await tester.pump();
+    expect(legalName.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(gstin.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isFalse);
+
+    final save = find.bySemanticsLabel('Use GST details');
+    expect(save, findsOneWidget);
+    final saveData = tester.getSemantics(save).getSemanticsData();
+    expect(saveData.flagsCollection.isButton, isTrue);
+    expect(saveData.flagsCollection.isEnabled, Tristate.isTrue);
+    expect(tester.getSize(save).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
