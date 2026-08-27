@@ -139,10 +139,10 @@ void main() {
       find.byKey(const Key('global-profile-panel-v2')),
     );
     expect(panel.right, closeTo(390, 1));
-    expect(panel.left, greaterThan(60));
+    expect(panel.left, greaterThan(90));
     expect(panel.top, greaterThanOrEqualTo(8));
     expect(panel.bottom, lessThanOrEqualTo(836));
-    expect(panel.height, lessThan(700));
+    expect(panel.height, greaterThan(800));
     expect(find.text('Your MoolSocial profile'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsOne);
     expect(find.text('Personal account'), findsOne);
