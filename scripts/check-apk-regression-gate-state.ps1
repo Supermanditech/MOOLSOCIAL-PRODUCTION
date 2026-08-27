@@ -116,11 +116,15 @@ $fullSocialCohortNames = @(
   'MOOLSOCIAL_FACEBOOK_REVOCATION_QUALIFIED',
   'MOOLSOCIAL_FACEBOOK_DATA_DELETION_QUALIFIED'
 )
-$fullSocialRequested = @(
-  $fullSocialCohortNames | Where-Object {
-    [string]$state.requiredRuntimeDefines.$_ -ceq 'true'
-  }
-).Count -gt 0
+$fullSocialRequested = if ($cursorUiReview) {
+  $false
+} else {
+  @(
+    $fullSocialCohortNames | Where-Object {
+      [string]$state.requiredRuntimeDefines.$_ -ceq 'true'
+    }
+  ).Count -gt 0
+}
 if ($fullSocialRequested) {
   foreach ($name in $fullSocialCohortNames) {
     Assert-Gate -Condition (
