@@ -22,6 +22,18 @@ String _productCountLabel(int count) =>
 
 String _packCountLabel(int count) => '$count ${count == 1 ? 'pack' : 'packs'}';
 
+String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
+    group.destination == BuyV2Destination.wholesale
+    ? '${_productCountLabel(group.lines.length)} · '
+          '${_packCountLabel(group.itemCount)}'
+    : _productCountLabel(group.itemCount);
+
+String _checkoutDockCountLabel(BuyV2Session session) =>
+    session.checkoutScope == BuyV2CartScope.wholesale
+    ? '${_productCountLabel(session.checkoutLines.length)} · '
+          '${_packCountLabel(session.checkoutItemCount)}'
+    : _productCountLabel(session.checkoutItemCount);
+
 String _cartHeaderSummary(BuyV2Session session) {
   final lines = session.cartLines;
   final destinations = lines.map((line) => line.product.destination).toSet();
@@ -3684,7 +3696,8 @@ class BuyV2CheckoutView extends StatelessWidget {
                         BuyV2Destination.orders => Icons.receipt_long_outlined,
                       },
                       title:
-                          'Delivery ${index + 1} · ${_productCountLabel(deliveryGroups[index].itemCount)}',
+                          'Delivery ${index + 1} · '
+                          '${_checkoutFulfilmentCountLabel(deliveryGroups[index])}',
                       detail: [
                         '${deliveryGroups[index].destination.label} fulfilment · '
                             '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
@@ -3757,7 +3770,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _productCountLabel(session.checkoutItemCount),
+                          _checkoutDockCountLabel(session),
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         Text(

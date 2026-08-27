@@ -87,6 +87,9 @@ const buyV2WholesaleTradeDecisionContractVersion =
 const buyV2WholesaleCartTradeSummaryContractVersion =
     'buy-wholesale-cart-trade-summary-v1';
 
+const buyV2WholesaleCheckoutPackCountContractVersion =
+    'buy-wholesale-checkout-pack-count-v1';
+
 enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
 
 @immutable
