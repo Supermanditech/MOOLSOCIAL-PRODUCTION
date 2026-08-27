@@ -16,6 +16,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
     this.activeLocalAction = 'earn',
+    this.showHeaderChat = true,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -28,6 +29,7 @@ class WorkPageScaffold extends StatelessWidget {
   final String fallbackBackRoute;
   final bool showBack;
   final String activeLocalAction;
+  final bool showHeaderChat;
   final Widget? trailing;
   final Widget? bottomAction;
 
@@ -127,11 +129,13 @@ class WorkPageScaffold extends StatelessWidget {
             ],
           ),
           actions: [
-            MoolGlobalChatShortcut(
-              keyName: 'work-global-chat',
-              onPressed: openChat,
-            ),
-            const SizedBox(width: 4),
+            if (showHeaderChat) ...[
+              MoolGlobalChatShortcut(
+                keyName: 'work-global-chat',
+                onPressed: openChat,
+              ),
+              const SizedBox(width: 4),
+            ],
             Padding(
               padding: const EdgeInsets.only(right: MoolSpacing.sm),
               child:
@@ -443,12 +447,16 @@ class WorkPill extends StatelessWidget {
             Icon(icon, size: 13, color: color),
             const SizedBox(width: 3),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
