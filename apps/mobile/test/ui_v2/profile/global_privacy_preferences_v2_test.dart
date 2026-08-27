@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -177,6 +179,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(notificationCalls, 1);
     expect(privacyCalls, 1);
+  });
+
+  test('debug hot reload reconstructs the router at its current location', () {
+    final source = File('lib/app/moolsocial_app.dart').readAsStringSync();
+    expect(source, contains('late GoRouter _router = _createRouter'));
+    expect(source, contains('void reassemble()'));
+    expect(
+      source,
+      contains('_router.routeInformationProvider.value.uri.toString()'),
+    );
+    expect(source, contains('_router = _createRouter(location)'));
+    expect(source, contains('previousRouter.dispose()'));
   });
 
   testWidgets('compact preferences stay proportional without overflow', (
