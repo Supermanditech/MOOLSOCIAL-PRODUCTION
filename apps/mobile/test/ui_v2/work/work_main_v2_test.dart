@@ -40,7 +40,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/app/account/identity',
+          path: '/app/account/profile',
           builder: (context, state) => const Scaffold(
             body: Text(
               'Global profile',
@@ -234,6 +234,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('workspace-destination')), findsOne);
+  });
+
+  testWidgets('Personal profile opens the exact global profile route', (
+    tester,
+  ) async {
+    final session = WorkSession();
+    addTearDown(session.dispose);
+    await pumpWorkMain(tester, session);
+
+    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-identity')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('global-profile-destination')), findsOne);
   });
 
   testWidgets('pending application keeps partner controls locked', (

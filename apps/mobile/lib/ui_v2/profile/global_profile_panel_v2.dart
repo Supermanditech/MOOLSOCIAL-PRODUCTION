@@ -328,7 +328,7 @@ class _PersonalAccountSection extends StatelessWidget {
         title: 'Personal profile',
         detail: 'Identity and contact',
         icon: Icons.badge_outlined,
-        route: '/app/account/identity',
+        route: '/app/account/profile',
       ),
       const _ProfileDestination(
         id: 'preferences',
