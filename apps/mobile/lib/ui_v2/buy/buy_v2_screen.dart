@@ -545,11 +545,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openGlobalAction(PersonalMoolActionSpec action) {
-    if (action.id == 'buy' && (_offersActive || _shopChatActive)) {
-      setState(() {
-        _offersActive = false;
-        _shopChatActive = false;
-      });
+    if (action.id == 'buy') {
+      _openBuyDestination(BuyV2Destination.shop);
+      return;
     }
     final onOpenMainAction = widget.onOpenMainAction;
     if (onOpenMainAction != null) {
