@@ -1497,10 +1497,11 @@ void main() {
 
     expect(find.text(product.title), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
-        matching: find.byKey(ValueKey('buy-product-primary-${product.id}')),
-      ),
+      find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(ValueKey('buy-wholesale-action-dock-${product.id}')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('buy-product-action-bar')), findsNothing);
@@ -1508,42 +1509,29 @@ void main() {
       PageStorageKey('buy-product-${product.id}'),
     );
     await tester.scrollUntilVisible(
-      find.text('Price, pack and delivery'),
+      find.byKey(ValueKey('buy-wholesale-trade-decision-${product.id}')),
       220,
       scrollable: productScrollable,
     );
-    expect(find.text('Price, pack and delivery'), findsOneWidget);
-    final wholesaleTerms = find.text('Wholesale terms', skipOffstage: false);
-    expect(wholesaleTerms, findsOneWidget);
-    await tester.ensureVisible(wholesaleTerms);
-    await tester.pumpAndSettle();
-    expect(find.text('Wholesale terms'), findsOneWidget);
-    final primary = find.byKey(
-      ValueKey('buy-product-primary-${product.id}'),
-      skipOffstage: false,
-    );
+    expect(find.text('WHOLESALE PRICE'), findsOneWidget);
+    expect(find.text('Trade decision'), findsOneWidget);
+    final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(primary, findsOneWidget);
     expect(
       find.descendant(
         of: primary,
-        matching: find.byIcon(Icons.add_rounded, skipOffstage: false),
-        skipOffstage: false,
+        matching: find.byIcon(Icons.add_shopping_cart_rounded),
       ),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: primary,
-        matching: find.text(product.title, skipOffstage: false),
-        skipOffstage: false,
-      ),
+      find.descendant(of: primary, matching: find.text(product.title)),
       findsNothing,
     );
     expect(
       find.descendant(
         of: primary,
-        matching: find.text('Add', skipOffstage: false),
-        skipOffstage: false,
+        matching: find.text('Add ${product.minimumOrder} packs'),
       ),
       findsOneWidget,
     );
@@ -2246,6 +2234,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
+    await tester.ensureVisible(primary);
+    await tester.pumpAndSettle();
     await tester.tap(primary);
     await tester.pumpAndSettle();
     expect(
