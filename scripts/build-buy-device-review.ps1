@@ -600,14 +600,18 @@ try {
   $pluginIntegrityGate = Join-Path $repositoryRoot (
     'scripts\check-apk-production-plugin-integrity.ps1'
   )
-  & $pluginIntegrityGate `
-    -ApkPath $generatedApk `
-    -CandidateId $CandidateId `
-    -RepositoryRoot $repositoryRoot `
-    -ProguardFolderPath (
-      Join-Path $mobileRoot 'build\app\outputs\mapping\release'
-    ) `
-    -RequireMappingAware
+  $pluginIntegrityArguments = @{
+    ApkPath = $generatedApk
+    CandidateId = $CandidateId
+    RepositoryRoot = $repositoryRoot
+  }
+  if ($BuildMode -ceq 'release') {
+    $pluginIntegrityArguments.ProguardFolderPath = Join-Path `
+      $mobileRoot `
+      'build\app\outputs\mapping\release'
+    $pluginIntegrityArguments.RequireMappingAware = $true
+  }
+  & $pluginIntegrityGate @pluginIntegrityArguments
   if (-not $?) {
     throw 'APK production plugin integrity gate failed.'
   }
