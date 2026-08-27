@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -310,6 +312,83 @@ void main() {
       await tester.pump();
       session.dispose();
     }
+  });
+
+  testWidgets('T01B GST fields are named and follow keyboard order', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final session = mixedSession();
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+
+    await tester.pumpWidget(app(session, reducedMotion: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
+    await tester.pumpAndSettle();
+
+    for (final target in const [
+      (key: 'buy-gst-legal-name', label: 'Legal name'),
+      (key: 'buy-gst-gstin', label: 'GSTIN'),
+      (key: 'buy-gst-billing-address', label: 'Billing address'),
+    ]) {
+      final field = find.byKey(ValueKey(target.key));
+      expect(field, findsOneWidget, reason: target.label);
+      final data = tester.getSemantics(field).getSemanticsData();
+      expect(data.label, contains(target.label), reason: target.label);
+      expect(data.flagsCollection.isTextField, isTrue, reason: target.label);
+      expect(data.hasAction(SemanticsAction.tap), isTrue, reason: target.label);
+      expect(
+        data.hasAction(SemanticsAction.focus),
+        isTrue,
+        reason: target.label,
+      );
+    }
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('buy-gst-gstin')))
+          .getSemanticsData()
+          .maxValueLength,
+      15,
+    );
+
+    final legalName = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+    );
+    final gstin = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+    );
+    final billingAddress = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('buy-gst-legal-name')));
+    await tester.pump();
+    expect(legalName.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(gstin.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isFalse);
+
+    final save = find.bySemanticsLabel('Use GST details');
+    expect(save, findsOneWidget);
+    final saveData = tester.getSemantics(save).getSemanticsData();
+    expect(saveData.flagsCollection.isButton, isTrue);
+    expect(saveData.flagsCollection.isEnabled, Tristate.isTrue);
+    expect(tester.getSize(save).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
