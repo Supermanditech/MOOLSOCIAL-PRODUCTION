@@ -3636,9 +3636,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                 textInputAction: TextInputAction.next,
                                 onSubmitted: (_) => _gstinFocus.requestFocus(),
                                 decoration: const InputDecoration(
-                                  label: ExcludeSemantics(
-                                    child: Text('Legal name'),
-                                  ),
+                                  labelText: 'Legal name',
                                 ),
                               ),
                             ),
@@ -3663,7 +3661,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                 onSubmitted: (_) =>
                                     _billingAddressFocus.requestFocus(),
                                 decoration: const InputDecoration(
-                                  label: ExcludeSemantics(child: Text('GSTIN')),
+                                  labelText: 'GSTIN',
                                   semanticCounterText: '15 characters maximum',
                                 ),
                               ),
@@ -3686,9 +3684,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                 onSubmitted: (_) =>
                                     _billingAddressFocus.unfocus(),
                                 decoration: const InputDecoration(
-                                  label: ExcludeSemantics(
-                                    child: Text('Billing address'),
-                                  ),
+                                  labelText: 'Billing address',
                                 ),
                               ),
                             ),
