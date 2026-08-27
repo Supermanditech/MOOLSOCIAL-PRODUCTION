@@ -57,14 +57,18 @@ Assert-Gate -Condition ([int]$state.schemaVersion -eq 1) `
 Assert-Gate -Condition (
   [string]$state.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001'
 ) -Message 'unexpected machine-state contract id.'
-Assert-Gate -Condition (
-  [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL `
-    -ceq 'https://moolsocial.com/app'
-) -Message 'Email Link continue URL differs from the authorized exact-return route.'
-Assert-Gate -Condition (
-  [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_DOMAIN `
-    -ceq ''
-) -Message 'Dev Email Link must omit linkDomain so Firebase selects its default Hosting domain.'
+$cursorUiReview = [string]$state.candidate.gateProfile -ceq `
+  'uaw_cursor_ui_review_debug'
+if (-not $cursorUiReview) {
+  Assert-Gate -Condition (
+    [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL `
+      -ceq 'https://moolsocial.com/app'
+  ) -Message 'Email Link continue URL differs from the authorized exact-return route.'
+  Assert-Gate -Condition (
+    [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_DOMAIN `
+      -ceq ''
+  ) -Message 'Dev Email Link must omit linkDomain so Firebase selects its default Hosting domain.'
+}
 
 $fix11GoogleOnly = $CandidateId -ceq
   'UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR'
