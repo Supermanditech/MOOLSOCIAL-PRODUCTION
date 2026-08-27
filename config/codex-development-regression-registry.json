@@ -43033,6 +43033,26 @@
       "prevention": "After refreshed memory, project only those allowlisted scalar facts from policy and fixture source, update the single stale expectation, then rerun the focused graph fixture before any commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/test-codex-integration-repair-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260827-3777-HOT-RELOAD-NEW-GOROUTER-PATH-PAGE-NOT-FOUND",
+      "status": "registered_reuse_initialized_route_or_exact_review_relaunch_required",
+      "appliesTo": ["primary", "mobile", "testing", "device_review", "oppo"],
+      "mistake": "A new /app/account/profile GoRouter path was hot-reloaded into the OPPO UI-review process and then opened before the already-instantiated route table contained it, producing Page Not Found.",
+      "rootCause": "Flutter hot reload updates source methods but does not reconstruct a GoRouter route table that was instantiated before the new route existed.",
+      "prevention": "For live UI-review iteration, reuse an already-registered route and preserve the former owner at a successor path. If a genuinely new route is necessary, do not navigate to it until the app is relaunched through the exact UI-review build/run contract; focused router and first-tap tests must pass before device replay.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/journey01/journey_router.dart", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260827-3778-FLUTTER-ATTACH-HOT-RESTART-DROPPED-UI-REVIEW-DEFINES",
+      "status": "registered_hot_reload_only_or_exact_define_preserving_relaunch_required",
+      "appliesTo": ["primary", "mobile", "testing", "device_review", "oppo", "android"],
+      "mistake": "After attaching to the installed OPPO UI-review APK, a Flutter hot restart recompiled the process without its original UI-review Dart defines and exposed the false MoolSocial needs an update recovery screen.",
+      "rootCause": "flutter attach can hot reload an existing debug isolate, but hot restart does not reconstruct the installed artifact's original MOOLSOCIAL_UI_REVIEW_ONLY, MOOLSOCIAL_DEVICE_REVIEW, MOOLSOCIAL_USE_EMULATORS and candidate define contract.",
+      "prevention": "Never use hot restart in an attached MoolSocial UI-review session. Use hot reload only for compatible source edits. When bootstrap or router reconstruction is required, end the attach session and relaunch through the exact define-preserving UI-review wrapper/run invocation; verify the ui_review_runtime passed startup receipt before any screen judgment.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/main.dart", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart"]
     }
   ]
 }

@@ -1360,14 +1360,14 @@ GoRouter createJourneyRouter(
             SharedHubScreen(session: sharedSession, screen: 157),
       ),
       GoRoute(
-        path: '/app/account/profile',
+        path: '/app/account/identity',
         builder: (context, state) => GlobalPersonalProfileV2(
           identity: session.accountIdentity,
           isAuthenticated: session.isAuthenticated,
         ),
       ),
       GoRoute(
-        path: '/app/account/identity',
+        path: '/app/account/identity/records',
         builder: (context, state) =>
             SharedHubScreen(session: sharedSession, screen: 158),
       ),

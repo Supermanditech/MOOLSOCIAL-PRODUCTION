@@ -155,7 +155,7 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                   onPressed: () => context.push(
                     isAuthenticated
                         ? '/app/account/security'
-                        : '/sign-in?return=/app/account/profile',
+                        : '/sign-in?return=/app/account/identity',
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),

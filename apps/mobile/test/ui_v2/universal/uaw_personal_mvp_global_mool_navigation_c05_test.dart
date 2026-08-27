@@ -151,7 +151,7 @@ void main() {
 
   const sharedRoutes = <int, String>{
     157: '/app/activity',
-    158: '/app/account/identity',
+    158: '/app/account/identity/records',
     159: '/app/ask',
     160: '/app/files',
     161: '/app/account/security',
