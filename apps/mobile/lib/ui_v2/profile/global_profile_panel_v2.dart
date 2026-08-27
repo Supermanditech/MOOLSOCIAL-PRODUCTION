@@ -80,15 +80,15 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     MoolSpacing.xxl,
                   ),
                   children: [
-                    const _ProgressiveProfileCard(),
+                    _ProfileAccessCard(onOpenRoute: onOpenRoute),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
-                      title: 'Profile details',
+                      title: 'Account details',
                       items: [
                         _ProfileDestination(
                           id: 'identity',
-                          title: 'Personal identity',
-                          detail: 'Name, contact and account identity',
+                          title: 'Personal profile',
+                          detail: 'Identity, contact details and profile',
                           icon: Icons.badge_outlined,
                           route: '/app/account/identity',
                         ),
@@ -101,8 +101,8 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                         ),
                         _ProfileDestination(
                           id: 'files',
-                          title: 'Files and proofs',
-                          detail: 'Identity and workspace documents',
+                          title: 'Documents',
+                          detail: 'Identity and workspace records',
                           icon: Icons.folder_outlined,
                           route: '/app/files',
                         ),
@@ -111,11 +111,11 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
-                      title: 'Access and safety',
+                      title: 'Privacy and preferences',
                       items: [
                         _ProfileDestination(
                           id: 'security',
-                          title: 'Sign-in and security',
+                          title: 'Security',
                           detail: 'Sign-in, recovery and active sessions',
                           icon: Icons.shield_outlined,
                           route: '/app/account/security',
@@ -132,20 +132,12 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
-                      title: 'Provider workspaces',
+                      title: 'Plans',
                       items: [
                         _ProfileDestination(
-                          id: 'workspaces',
-                          title: 'Your workspaces',
-                          detail: 'Product and service-provider access',
-                          icon: Icons.dashboard_customize_outlined,
-                          route: '/app/account/workspaces',
-                        ),
-                        _ProfileDestination(
                           id: 'plans',
-                          title: 'Plans and capabilities',
-                          detail:
-                              'Free profile access and approved workspace capabilities',
+                          title: 'Plans and access',
+                          detail: 'Personal, Creator, Business and Commerce',
                           icon: Icons.workspace_premium_outlined,
                           route: '/app/account/plans',
                         ),
@@ -154,12 +146,12 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
-                      title: 'Help',
+                      title: 'Help and support',
                       items: [
                         _ProfileDestination(
                           id: 'ask',
                           title: 'Ask MoolSocial',
-                          detail: 'Account and workspace support',
+                          detail: 'Support for your account and workspaces',
                           icon: Icons.support_agent_outlined,
                           route: '/app/ask',
                         ),
@@ -186,22 +178,26 @@ class _ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.fromLTRB(
       MoolSpacing.md,
-      MoolSpacing.sm,
+      MoolSpacing.md,
       MoolSpacing.xs,
-      MoolSpacing.sm,
+      MoolSpacing.md,
     ),
     decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(bottom: BorderSide(color: Color(0xFFE4E7EC))),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [_profileNavy, Color(0xFF34348F)],
+      ),
     ),
     child: Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
-            color: _profileNavy,
-            borderRadius: BorderRadius.circular(18),
+            color: Colors.white.withValues(alpha: .16),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: .38)),
           ),
           alignment: Alignment.center,
           child: const Icon(Icons.person_rounded, color: Colors.white),
@@ -212,20 +208,20 @@ class _ProfileHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Your profile',
+                'MoolSocial account',
                 style: TextStyle(
-                  color: MoolColors.ink,
+                  color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               SizedBox(height: 2),
               Text(
-                'Personal access across MoolSocial',
+                'Personal account',
                 style: TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFD6D6F5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -235,6 +231,7 @@ class _ProfileHeader extends StatelessWidget {
           key: const Key('global-profile-close'),
           tooltip: 'Close global profile',
           onPressed: onClose,
+          color: Colors.white,
           icon: const Icon(Icons.close_rounded),
         ),
       ],
@@ -242,127 +239,179 @@ class _ProfileHeader extends StatelessWidget {
   );
 }
 
-class _ProgressiveProfileCard extends StatelessWidget {
-  const _ProgressiveProfileCard();
+class _ProfileAccessCard extends StatelessWidget {
+  const _ProfileAccessCard({required this.onOpenRoute});
+
+  final ValueChanged<String> onOpenRoute;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('global-profile-progressive-card'),
-    padding: const EdgeInsets.all(MoolSpacing.md),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [_profileNavy, Color(0xFF34348F)],
-      ),
+  Widget build(BuildContext context) => Material(
+    key: const Key('global-profile-access-card'),
+    color: Colors.white,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(MoolRadii.floating),
+      side: const BorderSide(color: Color(0xFFE4E7EC)),
     ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Profile and workspace access',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
+    child: Padding(
+      padding: const EdgeInsets.all(MoolSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Your MoolSocial access',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-        SizedBox(height: MoolSpacing.sm),
-        _ProfileStep(
-          number: '1',
-          title: 'Personal profile',
-          detail: 'Active personal access',
-          color: _profileGreen,
-        ),
-        _ProfileStep(
-          number: '2',
-          title: 'Provider workspace',
-          detail: 'Documents and approval required',
-          color: _profileSaffron,
-        ),
-        _ProfileStep(
-          number: '3',
-          title: 'Workspace capabilities',
-          detail: 'Available after activation',
-          color: Color(0xFF8CC8FF),
-          showConnector: false,
-        ),
-      ],
+          const SizedBox(height: 3),
+          const Text(
+            'One personal account can hold verified workspaces.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          _AccessRoleTile(
+            keyName: 'global-profile-personal-account',
+            icon: Icons.person_outline_rounded,
+            title: 'Personal account',
+            detail: 'MoolSocial services and personal activity',
+            status: 'Active',
+            accent: _profileGreen,
+            onTap: () => onOpenRoute('/app/account/identity'),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          _AccessRoleTile(
+            keyName: 'global-profile-creator-workspace',
+            icon: Icons.auto_awesome_outlined,
+            title: 'Creator workspace',
+            detail: 'Apply to create, publish, measure and earn',
+            accent: _profileSaffron,
+            onTap: () => onOpenRoute('/app/account/workspaces?type=creator'),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          _AccessRoleTile(
+            keyName: 'global-profile-workspaces',
+            icon: Icons.storefront_outlined,
+            title: 'Business and Commerce workspaces',
+            detail: 'Apply to sell, trade or fulfil orders',
+            accent: _profileNavy,
+            onTap: () => onOpenRoute('/app/account/workspaces?type=partner'),
+          ),
+        ],
+      ),
     ),
   );
 }
 
-class _ProfileStep extends StatelessWidget {
-  const _ProfileStep({
-    required this.number,
+class _AccessRoleTile extends StatelessWidget {
+  const _AccessRoleTile({
+    required this.keyName,
+    required this.icon,
     required this.title,
     required this.detail,
-    required this.color,
-    this.showConnector = true,
+    required this.accent,
+    required this.onTap,
+    this.status,
   });
 
-  final String number;
+  final String keyName;
+  final IconData icon;
   final String title;
   final String detail;
-  final Color color;
-  final bool showConnector;
+  final Color accent;
+  final VoidCallback onTap;
+  final String? status;
 
   @override
-  Widget build(BuildContext context) => IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
+  Widget build(BuildContext context) => Material(
+    key: Key(keyName),
+    color: accent.withValues(alpha: .07),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: MoolSpacing.sm,
+          vertical: MoolSpacing.sm,
+        ),
+        child: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+              ),
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Text(
-                number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
+              child: Icon(icon, color: accent, size: 20),
+            ),
+            const SizedBox(width: MoolSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      if (status != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _profileGreen.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            status!,
+                            style: const TextStyle(
+                              color: _profileGreen,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 11,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (showConnector)
-              Expanded(child: Container(width: 2, color: Color(0x55FFFFFF))),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, color: accent, size: 22),
           ],
         ),
-        const SizedBox(width: MoolSpacing.sm),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: MoolSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  detail,
-                  style: const TextStyle(
-                    color: Color(0xFFD6D6F5),
-                    fontSize: 11,
-                    height: 1.3,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     ),
   );
 }

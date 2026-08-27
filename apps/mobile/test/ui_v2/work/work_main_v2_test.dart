@@ -130,8 +130,25 @@ void main() {
     );
     expect(panel.right, closeTo(390, 1));
     expect(panel.left, greaterThan(0));
-    expect(find.text('Your profile'), findsOne);
-    expect(find.byKey(const Key('global-profile-progressive-card')), findsOne);
+    expect(find.text('MoolSocial account'), findsOne);
+    expect(find.byKey(const Key('global-profile-access-card')), findsOne);
+    expect(find.text('Personal account'), findsWidgets);
+    expect(find.text('Creator workspace'), findsOne);
+    expect(find.text('Business and Commerce workspaces'), findsOne);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('global-profile-panel-v2')),
+        matching: find.textContaining('Mool Partner'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('global-profile-panel-v2')),
+        matching: find.textContaining(RegExp('provider', caseSensitive: false)),
+      ),
+      findsNothing,
+    );
     expect(find.byKey(const Key('global-profile-identity')), findsOne);
     await tester.tap(find.byKey(const Key('global-profile-identity')));
     await tester.pumpAndSettle();
