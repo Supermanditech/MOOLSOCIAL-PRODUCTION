@@ -3144,6 +3144,9 @@ class _CataloguePromotionRail extends StatelessWidget {
       key: const ValueKey('buy-catalogue-promotions'),
       height: accessibleText ? 118 : 98,
       child: ListView.separated(
+        key: PageStorageKey(
+          'buy-catalogue-promotions-${session.destination.name}',
+        ),
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
