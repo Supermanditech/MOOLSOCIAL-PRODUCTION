@@ -1084,6 +1084,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
             'Add minimum order of ${product.minimumOrder} packs of '
             '${product.title} to Cart for ${buyV2Money(orderTotal)}',
         button: true,
+        onTap: onAdd,
         excludeSemantics: true,
         child: FilledButton.icon(
           key: ValueKey('buy-product-primary-${product.id}'),

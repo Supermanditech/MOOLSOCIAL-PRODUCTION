@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -115,16 +116,24 @@ void main() {
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(50));
-    expect(
-      find.bySemanticsLabel(
+    final actionLabel =
         'Add minimum order of ${product.minimumOrder} packs of '
         '${product.title} to Cart for '
-        '${buyV2Money(product.price * product.minimumOrder)}',
-      ),
-      findsOneWidget,
+        '${buyV2Money(product.price * product.minimumOrder)}';
+    final actionSemantics = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.label == actionLabel,
+      description: 'Wholesale minimum-order action semantics',
+    );
+    expect(actionSemantics, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(actionSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
     );
 
-    await tester.tap(add);
+    tester.semantics.tap(find.semantics.byLabel(actionLabel));
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder);
     expect(find.text('${product.minimumOrder} packs in Cart'), findsOneWidget);
