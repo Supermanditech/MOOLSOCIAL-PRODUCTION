@@ -22,6 +22,12 @@ String _productCountLabel(int count) =>
 
 String _packCountLabel(int count) => '$count ${count == 1 ? 'pack' : 'packs'}';
 
+bool _containsOnlyWholesaleLines(List<BuyV2CartLine> lines) =>
+    lines.isNotEmpty &&
+    lines.every(
+      (line) => line.product.destination == BuyV2Destination.wholesale,
+    );
+
 String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
     group.destination == BuyV2Destination.wholesale
     ? '${_productCountLabel(group.lines.length)} · '
@@ -29,7 +35,8 @@ String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
     : _productCountLabel(group.itemCount);
 
 String _checkoutDockCountLabel(BuyV2Session session) =>
-    session.checkoutScope == BuyV2CartScope.wholesale
+    session.checkoutScope == BuyV2CartScope.wholesale ||
+        _containsOnlyWholesaleLines(session.checkoutLines)
     ? '${_productCountLabel(session.checkoutLines.length)} · '
           '${_packCountLabel(session.checkoutItemCount)}'
     : _productCountLabel(session.checkoutItemCount);
@@ -37,7 +44,9 @@ String _checkoutDockCountLabel(BuyV2Session session) =>
 String _cartHeaderSummary(BuyV2Session session) {
   final lines = session.cartLines;
   final destinations = lines.map((line) => line.product.destination).toSet();
-  final quantityLabel = session.cartScope == BuyV2CartScope.wholesale
+  final quantityLabel =
+      session.cartScope == BuyV2CartScope.wholesale ||
+          _containsOnlyWholesaleLines(lines)
       ? _packCountLabel(session.scopedItemCount)
       : '${session.scopedItemCount} '
             '${session.scopedItemCount == 1 ? 'item' : 'items'}';

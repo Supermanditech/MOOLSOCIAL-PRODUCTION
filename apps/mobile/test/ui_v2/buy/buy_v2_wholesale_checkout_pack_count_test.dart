@@ -132,6 +132,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('all scope uses pack wording when every line is Wholesale', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    expect(session.addProduct('w-onion'), isTrue);
+    session.openCart();
+    expect(session.cartScope, BuyV2CartScope.all);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('1 product · 2 packs · Wholesale · ₹1,550'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Review order'));
+    await tester.pumpAndSettle();
+    expect(session.checkoutScope, BuyV2CartScope.all);
+    expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
+    expect(find.text('1 product · 2 packs'), findsOneWidget);
+    expect(find.textContaining('2 products'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mixed all scope retains generic item wording', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('w-onion'), isTrue);
+    session.openCart();
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('2 products · 3 items · Shop + Wholesale · ₹1,587'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('3 packs'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Back and compact insets retain exact Wholesale count', (
     tester,
   ) async {
