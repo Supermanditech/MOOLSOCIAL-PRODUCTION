@@ -398,6 +398,14 @@ void main() {
     expect(source, contains("pendingRoute: '/app/social?sub=videos'"));
     expect(publicReviewComposition, contains('allowGuestReady: false'));
     expect(publicReviewComposition, isNot(contains('allowGuestReady: true')));
+    expect(
+      publicReviewComposition,
+      contains('accountBootstrapGateway: firebaseSessionBootstrap'),
+    );
+    expect(
+      publicReviewComposition,
+      isNot(contains('DataConnectAccountBootstrapGateway(')),
+    );
     expect(source, contains('youtubeConnectReturnLocation('));
     expect(
       source,

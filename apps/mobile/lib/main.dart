@@ -897,9 +897,7 @@ Future<void> main() async {
           emailLinkAvailable:
               publicAuthRuntimeConfiguration.passwordlessEmailAvailable,
           mobileOtpAvailable: publicAuthRuntimeConfiguration.mobileOtpAvailable,
-          accountBootstrapGateway: DataConnectAccountBootstrapGateway(
-            principalGateway: firebaseSessionBootstrap,
-          ),
+          accountBootstrapGateway: firebaseSessionBootstrap,
           verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
           accountIdentityGateway: accountIdentityGateway,
           locationGateway: DeviceLocationPermissionGateway(),
