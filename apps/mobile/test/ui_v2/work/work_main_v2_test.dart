@@ -57,6 +57,12 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/app/pay/home',
+          builder: (context, state) => const Scaffold(
+            body: Text('Payments', key: Key('profile-payments-destination')),
+          ),
+        ),
+        GoRoute(
           path: '/app/chat/inbox',
           builder: (context, state) =>
               const Scaffold(body: Text('Chat review')),
@@ -141,7 +147,7 @@ void main() {
     expect(panel.left, greaterThan(0));
     expect(find.text('Your MoolSocial profile'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsOne);
-    expect(find.text('Personal account'), findsWidgets);
+    expect(find.text('Personal account'), findsOne);
     expect(find.text('Grow with MoolSocial'), findsOne);
     expect(find.text('Create and earn'), findsOne);
     expect(find.text('Build your business'), findsOne);
@@ -182,6 +188,34 @@ void main() {
       find.byKey(const Key('workspace-application-destination')),
       findsOne,
     );
+  });
+
+  testWidgets('profile quick access opens the existing payments route', (
+    tester,
+  ) async {
+    final session = WorkSession();
+    addTearDown(session.dispose);
+    await pumpWorkMain(tester, session);
+
+    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.pumpAndSettle();
+    final panelScroll = find.descendant(
+      of: find.byKey(const Key('global-profile-panel-v2')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.drag(panelScroll, const Offset(0, -560));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-profile-quick-actions')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-orders')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-payments')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-activity')), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-documents')), findsOne);
+    await tester.drag(panelScroll, const Offset(0, 180));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-quick-payments')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('profile-payments-destination')), findsOne);
   });
 
   testWidgets('Work choices open their exact destinations', (tester) async {
