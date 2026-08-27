@@ -5,9 +5,84 @@ import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
+import '../eat_models.dart';
 import '../eat_session.dart';
 
 String eatMoney(int value) => '₹$value';
+
+GlobalProfileContextAction _foodProfileContext(
+  EatSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final order = session.orderReceipt;
+  if (order != null &&
+      !session.foodOrderCancelled &&
+      session.orderStage != EatOrderStage.delivered) {
+    return GlobalProfileContextAction(
+      id: 'food-order',
+      title: 'Your food order',
+      detail: '${session.orderStage.title} · ${order.restaurant.name}',
+      actionLabel: 'Track order',
+      icon: Icons.delivery_dining_outlined,
+      accentColor: const Color(0xFFF97316),
+      gradientColors: const [Color(0xFFE65100), Color(0xFFFF8A00)],
+      onPressed: () => onOpenRoute('/app/eat/order/${order.id}'),
+    );
+  }
+
+  final table = session.tableReceipt;
+  if (table != null && !session.tableBookingCancelled) {
+    return GlobalProfileContextAction(
+      id: 'food-table',
+      title: 'Your table booking',
+      detail:
+          '${table.restaurant.name} · ${table.people} people · ${table.time}',
+      actionLabel: 'View booking',
+      icon: Icons.table_restaurant_outlined,
+      accentColor: const Color(0xFF7C3AED),
+      gradientColors: const [Color(0xFF5B21B6), Color(0xFF8B5CF6)],
+      onPressed: () => onOpenRoute('/app/eat/table/${table.id}'),
+    );
+  }
+
+  final tiffin = session.tiffinReceipt;
+  if (tiffin != null && !session.tiffinCancelled) {
+    return GlobalProfileContextAction(
+      id: 'food-tiffin',
+      title: 'Your tiffin plan',
+      detail: '${tiffin.kitchen.name} · ${tiffin.plan.label}',
+      actionLabel: 'Manage plan',
+      icon: Icons.lunch_dining_outlined,
+      accentColor: const Color(0xFF0F766E),
+      gradientColors: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
+      onPressed: () => onOpenRoute('/app/eat/tiffin/${tiffin.id}'),
+    );
+  }
+
+  if (session.itemCount > 0) {
+    return GlobalProfileContextAction(
+      id: 'food-basket',
+      title: 'Your food basket',
+      detail: '${session.itemCount} items · ${eatMoney(session.orderTotal)}',
+      actionLabel: 'Open basket',
+      icon: Icons.shopping_basket_outlined,
+      accentColor: const Color(0xFFF97316),
+      gradientColors: const [Color(0xFFE65100), Color(0xFFFF8A00)],
+      onPressed: () => onOpenRoute('/app/eat/basket'),
+    );
+  }
+
+  return GlobalProfileContextAction(
+    id: 'food-table-discovery',
+    title: 'Reserve a table',
+    detail: 'Choose a restaurant and review timing before you confirm.',
+    actionLabel: 'Book a table',
+    icon: Icons.table_restaurant_outlined,
+    accentColor: const Color(0xFFF97316),
+    gradientColors: const [Color(0xFFE65100), Color(0xFFFF8A00)],
+    onPressed: () => onOpenRoute('/app/eat/table'),
+  );
+}
 
 class EatPageScaffold extends StatelessWidget {
   const EatPageScaffold({
@@ -146,6 +221,7 @@ class EatPageScaffold extends StatelessWidget {
                   keyName: 'eat-global-profile',
                   onPressed: () => showGlobalProfilePanelV2(
                     context,
+                    contextAction: _foodProfileContext(session, openGlobal),
                     onOpenRoute: openGlobal,
                   ),
                 ),

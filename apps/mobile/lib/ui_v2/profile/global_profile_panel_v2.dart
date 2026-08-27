@@ -19,7 +19,9 @@ class GlobalProfileContextAction {
     required this.actionLabel,
     required this.icon,
     required this.onPressed,
-  });
+    this.accentColor = const Color(0xFFFF3355),
+    this.gradientColors = const [Color(0xFF8F001F), Color(0xFFFF0033)],
+  }) : assert(gradientColors.length >= 2);
 
   final String id;
   final String title;
@@ -27,6 +29,8 @@ class GlobalProfileContextAction {
   final String actionLabel;
   final IconData icon;
   final VoidCallback onPressed;
+  final Color accentColor;
+  final List<Color> gradientColors;
 }
 
 class GlobalProfileWorkspaceContext {
@@ -623,14 +627,10 @@ class _GlobalProfileContextCard extends StatelessWidget {
                   height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF0033).withValues(alpha: .14),
+                    color: action.accentColor.withValues(alpha: .14),
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(
-                    action.icon,
-                    color: const Color(0xFFFF3355),
-                    size: 20,
-                  ),
+                  child: Icon(action.icon, color: action.accentColor, size: 20),
                 ),
                 const SizedBox(width: MoolSpacing.sm),
                 Expanded(
@@ -667,10 +667,10 @@ class _GlobalProfileContextCard extends StatelessWidget {
             const SizedBox(height: MoolSpacing.sm),
             DecoratedBox(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xFF8F001F), Color(0xFFFF0033)],
+                  colors: action.gradientColors,
                 ),
                 borderRadius: BorderRadius.circular(MoolRadii.control),
               ),

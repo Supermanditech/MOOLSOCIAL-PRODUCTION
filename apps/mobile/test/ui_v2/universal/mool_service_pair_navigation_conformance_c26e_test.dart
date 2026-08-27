@@ -49,8 +49,20 @@ void main() {
     await tester.tap(find.byKey(const Key('eat-global-profile')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('global-profile-close')));
+    expect(
+      find.byKey(const Key('global-profile-context-food-table-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-food-table-discovery'),
+      ),
+    );
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
 
     await _openFamily(tester, 'ride');
     _expectFixedRail(tester);
