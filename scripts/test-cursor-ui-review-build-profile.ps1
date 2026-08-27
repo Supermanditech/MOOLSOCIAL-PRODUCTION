@@ -38,12 +38,16 @@ $builderPath = Join-Path $RepositoryRoot 'scripts/build-buy-device-review.ps1'
 $foundationPath = Join-Path `
   $RepositoryRoot `
   'scripts/test-public-auth-sideload-build-controls.ps1'
+$apkGatePath = Join-Path `
+  $RepositoryRoot `
+  'scripts/check-apk-regression-gate-state.ps1'
 $gradlePath = Join-Path `
   $RepositoryRoot `
   'apps/mobile/android/app/build.gradle.kts'
 
 $builder = Get-Content -Raw -LiteralPath $builderPath
 $foundation = Get-Content -Raw -LiteralPath $foundationPath
+$apkGate = Get-Content -Raw -LiteralPath $apkGatePath
 $gradle = Get-Content -Raw -LiteralPath $gradlePath
 
 Assert-CursorUiReviewControl `
@@ -91,5 +95,11 @@ Assert-CursorUiReviewControl (
   $gradle.Contains('debugApplicationIdSuffix = ".$androidDebugPackage"') -and
   $gradle.Contains('"MoolSocial Cursor Review"')
 ) 'Android cursorreview package isolation is incomplete.'
+
+Assert-CursorUiReviewControl (
+  $apkGate.Contains("'uaw_cursor_ui_review_debug'") -and
+  $apkGate.Contains("'package-isolation'") -and
+  $apkGate.Contains("'MOOLSOCIAL_UI_REVIEW_ONLY'")
+) 'generic APK gate does not recognize the Cursor UI Review profile.'
 
 Write-Output 'CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED'
