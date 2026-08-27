@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
-  "baselineTag": "moolsocial-shared-development-baseline-v4-incremental-gate-20260827",
+  "baselineTag": "moolsocial-shared-development-baseline-v6-gst-review-ready-20260827",
   "uiFounderReview": {
     "state": "pending",
     "acceptedScopes": [],
@@ -24,7 +24,7 @@
       "branchPrefix": "work/cursor-ui/",
       "packageId": "com.moolsocial.app.cursorreview",
       "deviceSerial": "TG8HCYTGGQT885OF",
-      "minimumVersionCodeExclusive": 2026082797
+      "minimumVersionCodeExclusive": 2026082798
     },
     {
       "id": "codex_ui",
@@ -45,7 +45,7 @@
       "branchPrefix": "integration/moolsocial/",
       "packageId": "com.moolsocial.app",
       "deviceSerial": "2b3e0f71",
-      "minimumVersionCodeExclusive": 2026082795
+      "minimumVersionCodeExclusive": 2026082798
     }
   ],
   "rules": {

@@ -136,7 +136,7 @@ try {
     -TicketId 'UAW-FIXTURE-CURSOR-UI-001' `
     -UiScope 'buy.consumer_cart' `
     -CandidateVersionName '1.0.0-r60.96' `
-    -CandidateVersionCode 2026082798 `
+    -CandidateVersionCode 2026082799 `
     -PackageId 'com.moolsocial.app.cursorreview' `
     -RepositoryRoot $fixtureRoot)
   Assert-Fixture ($cursorPositive.Count -eq 1) `
