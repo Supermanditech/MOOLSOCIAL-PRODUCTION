@@ -51,7 +51,7 @@ void main() {
 
   final screens = <(String, String, String)>[
     ('Activity 157', '/app/activity', 'shared-157-activity'),
-    ('Identity 158', '/app/account/identity', 'shared-158-identity'),
+    ('Identity 158', '/app/account/identity/records', 'shared-158-identity'),
     ('Ask 159', '/app/ask', 'shared-159-ask'),
     ('Files 160', '/app/files', 'shared-160-files'),
     ('Security 161', '/app/account/security', 'shared-161-security'),

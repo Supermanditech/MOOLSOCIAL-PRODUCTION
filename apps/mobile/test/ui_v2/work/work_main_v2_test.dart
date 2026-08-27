@@ -40,7 +40,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/app/account/profile',
+          path: '/app/account/identity',
           builder: (context, state) => const Scaffold(
             body: Text(
               'Global profile',

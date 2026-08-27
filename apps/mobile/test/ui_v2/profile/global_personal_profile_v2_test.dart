@@ -16,10 +16,10 @@ void main() {
     tester.view.physicalSize = size;
     addTearDown(tester.view.reset);
     final router = GoRouter(
-      initialLocation: '/app/account/profile',
+      initialLocation: '/app/account/identity',
       routes: [
         GoRoute(
-          path: '/app/account/profile',
+          path: '/app/account/identity',
           builder: (context, state) => GlobalPersonalProfileV2(
             identity: identity,
             isAuthenticated: isAuthenticated,
