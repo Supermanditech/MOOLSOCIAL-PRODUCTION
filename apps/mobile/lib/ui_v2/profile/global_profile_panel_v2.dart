@@ -356,7 +356,7 @@ class _ProfileAccessCard extends StatelessWidget {
               ),
               icon: const Icon(Icons.grid_view_rounded, size: 19),
               label: const Text(
-                'Explore workspaces',
+                'Explore professional workspaces',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
