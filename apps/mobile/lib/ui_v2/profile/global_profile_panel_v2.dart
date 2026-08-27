@@ -91,22 +91,21 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                         _ProfileDestination(
                           id: 'identity',
                           title: 'Personal profile',
-                          detail: 'Identity, contact details and profile',
+                          detail: 'Identity and contact',
                           icon: Icons.badge_outlined,
                           route: '/app/account/identity',
                         ),
                         _ProfileDestination(
                           id: 'preferences',
                           title: 'Privacy and preferences',
-                          detail:
-                              'Data controls, language, location and notifications',
+                          detail: 'Data and notifications',
                           icon: Icons.privacy_tip_outlined,
                           route: '/app/account/workspaces/preferences',
                         ),
                         _ProfileDestination(
                           id: 'security',
                           title: 'Security',
-                          detail: 'Sign-in, recovery and active sessions',
+                          detail: 'Sign-in and recovery',
                           icon: Icons.shield_outlined,
                           route: '/app/account/security',
                         ),
