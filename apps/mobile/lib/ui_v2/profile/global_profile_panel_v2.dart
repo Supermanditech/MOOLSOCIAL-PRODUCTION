@@ -62,6 +62,42 @@ Future<void> showGlobalProfilePanelV2(
   );
 }
 
+/// The one account launcher used by every top-level MoolSocial destination.
+///
+/// Destinations own only placement and route handling. The profile surface
+/// itself remains [GlobalProfilePanelV2], so adding a launcher never creates a
+/// module-specific account screen.
+class MoolGlobalProfileShortcutV2 extends StatelessWidget {
+  const MoolGlobalProfileShortcutV2({
+    required this.keyName,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String keyName;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    key: ValueKey(keyName),
+    container: true,
+    button: true,
+    label: 'Open your MoolSocial profile',
+    child: IconButton(
+      tooltip: 'Your MoolSocial profile',
+      onPressed: onPressed,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      style: IconButton.styleFrom(
+        foregroundColor: _profileNavy,
+        backgroundColor: Colors.white.withValues(alpha: .72),
+        side: BorderSide(color: _profileNavy.withValues(alpha: .14)),
+        shape: const CircleBorder(),
+      ),
+      icon: const Icon(Icons.account_circle_outlined, size: 22),
+    ),
+  );
+}
+
 class GlobalProfilePanelV2 extends StatelessWidget {
   const GlobalProfilePanelV2({
     required this.onClose,
