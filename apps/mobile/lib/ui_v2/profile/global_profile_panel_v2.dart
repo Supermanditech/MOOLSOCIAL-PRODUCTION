@@ -527,7 +527,7 @@ class _PersonalAccountSection extends StatelessWidget {
         title: 'Privacy and preferences',
         detail: 'Data and notifications',
         icon: Icons.privacy_tip_outlined,
-        route: '/app/account/preferences',
+        route: '/app/account/workspaces/preferences',
       ),
       const _ProfileDestination(
         id: 'security',

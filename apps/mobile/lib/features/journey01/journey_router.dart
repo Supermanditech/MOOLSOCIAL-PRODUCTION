@@ -1371,15 +1371,6 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
-        path: '/app/account/preferences',
-        builder: (context, state) => GlobalPrivacyPreferencesV2(
-          session: session,
-          surfaceTone: state.uri.queryParameters['surface'] == 'social'
-              ? GlobalProfileSurfaceTone.socialDark
-              : GlobalProfileSurfaceTone.light,
-        ),
-      ),
-      GoRoute(
         path: '/app/ask',
         builder: (context, state) =>
             SharedHubScreen(session: sharedSession, screen: 159),
@@ -1419,10 +1410,11 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/workspaces/preferences',
-        builder: (context, state) => SharedHubScreen(
-          session: sharedSession,
-          screen: 165,
-          initialItemId: state.uri.queryParameters['item'],
+        builder: (context, state) => GlobalPrivacyPreferencesV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
         ),
       ),
       GoRoute(

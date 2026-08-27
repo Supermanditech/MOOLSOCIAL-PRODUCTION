@@ -28,7 +28,7 @@ void main() {
           builder: (context, state) => WorkMainV2(session: work),
         ),
         GoRoute(
-          path: '/app/account/preferences',
+          path: '/app/account/workspaces/preferences',
           builder: (context, state) => GlobalPrivacyPreferencesV2(
             session: journey,
             openNotificationSettings: openNotifications,
