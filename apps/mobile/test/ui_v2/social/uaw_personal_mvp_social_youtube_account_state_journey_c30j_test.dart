@@ -83,6 +83,17 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Connect your YouTube channel'), findsOneWidget);
+      final identityIcons = tester
+          .widgetList<Icon>(
+            find.descendant(
+              of: find.byKey(const Key('global-profile-identity')),
+              matching: find.byType(Icon),
+            ),
+          )
+          .map((icon) => icon.color)
+          .toList(growable: false);
+      expect(identityIcons, contains(const Color(0xFFFF3355)));
+      expect(identityIcons, isNot(contains(const Color(0xFF000080))));
       expect(
         tester
             .widget<Material>(find.byKey(const Key('global-profile-panel-v2')))

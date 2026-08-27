@@ -271,6 +271,8 @@ class GlobalProfileSurfacePalette {
     required this.ink,
     required this.muted,
     required this.control,
+    required this.accent,
+    required this.accentSecondary,
   });
 
   final Color canvas;
@@ -279,6 +281,8 @@ class GlobalProfileSurfacePalette {
   final Color ink;
   final Color muted;
   final Color control;
+  final Color accent;
+  final Color accentSecondary;
 
   static GlobalProfileSurfacePalette forTone(GlobalProfileSurfaceTone tone) =>
       switch (tone) {
@@ -289,6 +293,8 @@ class GlobalProfileSurfacePalette {
           ink: MoolColors.ink,
           muted: MoolColors.muted,
           control: Color(0xFFF4F5FA),
+          accent: _profileNavy,
+          accentSecondary: Color(0xFF4D46A8),
         ),
         GlobalProfileSurfaceTone.socialDark =>
           const GlobalProfileSurfacePalette(
@@ -298,6 +304,8 @@ class GlobalProfileSurfacePalette {
             ink: Colors.white,
             muted: Color(0xFFB8B8B8),
             control: Color(0xFF242424),
+            accent: Color(0xFFFF3355),
+            accentSecondary: Color(0xFF8F001F),
           ),
       };
 }
@@ -350,11 +358,11 @@ class _ProfileHeader extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [_profileNavy, Color(0xFF4D46A8)],
+                    colors: [palette.accent, palette.accentSecondary],
                   ),
                   shape: BoxShape.circle,
                 ),
@@ -1078,7 +1086,7 @@ class _ProfileDestinationTile extends StatelessWidget {
           color: palette.control,
           borderRadius: BorderRadius.circular(MoolRadii.control),
         ),
-        child: Icon(item.icon, color: _profileNavy, size: 18),
+        child: Icon(item.icon, color: palette.accent, size: 18),
       ),
       title: Text(
         item.title,
@@ -1097,9 +1105,9 @@ class _ProfileDestinationTile extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right_rounded,
-        color: _profileNavy,
+        color: palette.accent,
         size: 19,
       ),
       onTap: onTap,
