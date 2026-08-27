@@ -299,6 +299,15 @@ class BuyV2ProductView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (automaticFulfilment && !wholesale) ...[
+                const SizedBox(height: 7),
+                _ProductDecisionGlance(
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                ),
+              ],
               if (!wholesale) ...[
                 const SizedBox(height: 7),
                 Wrap(
@@ -312,13 +321,12 @@ class BuyV2ProductView extends StatelessWidget {
                           : '${review.rating}.0 · Your review',
                       color: BuyV2Colors.orange,
                     ),
-                    _ProductTrustPill(
-                      icon: Icons.schedule_rounded,
-                      label: automaticFulfilment
-                          ? buyerPromise
-                          : 'Delivery promise shown',
-                      color: BuyV2Colors.green,
-                    ),
+                    if (!automaticFulfilment)
+                      const _ProductTrustPill(
+                        icon: Icons.schedule_rounded,
+                        label: 'Delivery promise shown',
+                        color: BuyV2Colors.green,
+                      ),
                     if (product.regulatoryTrustFact case final fact?)
                       _ProductTrustPill(
                         icon: Icons.local_pharmacy_outlined,
@@ -506,6 +514,149 @@ class BuyV2ProductView extends StatelessWidget {
             onRetryOffer: () => session.refreshProductFacts(product.id),
           ),
       ],
+    );
+  }
+}
+
+class _ProductDecisionGlance extends StatelessWidget {
+  const _ProductDecisionGlance({
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final surfaceColor = decision.canAdd
+        ? BuyV2Colors.softGreen
+        : BuyV2Colors.softOrange;
+    return Semantics(
+      key: ValueKey('buy-product-decision-glance-${product.id}'),
+      container: true,
+      label:
+          '${buyV2Money(facts.price)} delivered price. '
+          '${product.pack}. ${decision.statusLabel}. $buyerPromise. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}.',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(BuyV2Metrics.radius),
+          border: Border.all(color: statusColor.withValues(alpha: .28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DELIVERED PRICE',
+                        style: context.buyEyebrow.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        buyV2Money(facts.price),
+                        style: const TextStyle(
+                          color: BuyV2Colors.navy,
+                          fontSize: 22,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .9),
+                    borderRadius: BorderRadius.circular(
+                      BuyV2Metrics.compactRadius,
+                    ),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: .34),
+                    ),
+                  ),
+                  child: Text(
+                    decision.statusLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta.copyWith(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${product.pack} · $buyerPromise',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                const Icon(
+                  Icons.storefront_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Automatic Mool Partner assignment',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
