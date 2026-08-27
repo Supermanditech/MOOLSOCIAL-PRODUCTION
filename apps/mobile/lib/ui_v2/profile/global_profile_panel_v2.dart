@@ -80,8 +80,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final effectiveScale = media.textScaler.scale(1).clamp(.9, 1.15);
-    final width = math.min(media.size.width * .8, 340.0);
-    final height = math.min(media.size.height * .78, 680.0);
+    final width = math.min(media.size.width * .74, 320.0);
     return MediaQuery(
       data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
       child: SafeArea(
@@ -96,7 +95,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
           ),
           child: SizedBox(
             width: width,
-            height: height,
+            height: double.infinity,
             child: Column(
               children: [
                 _ProfileHeader(
@@ -104,35 +103,60 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                   workspaceRoleLabel: activeWorkspace?.roleLabel,
                 ),
                 Expanded(
-                  child: ListView(
+                  child: CustomScrollView(
                     key: const Key('global-profile-panel-content'),
-                    padding: const EdgeInsets.fromLTRB(
-                      MoolSpacing.sm,
-                      MoolSpacing.sm,
-                      MoolSpacing.sm,
-                      MoolSpacing.md,
-                    ),
-                    children: [
-                      if (activeWorkspace case final workspace?) ...[
-                        _ActiveWorkspaceCard(workspace: workspace),
-                        const SizedBox(height: MoolSpacing.md),
-                        _ProfileQuickActions(onOpenRoute: onOpenRoute),
-                        const SizedBox(height: MoolSpacing.md),
-                        _PersonalAccountSection(
-                          includeSupport: false,
-                          onOpenRoute: onOpenRoute,
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          MoolSpacing.sm,
+                          MoolSpacing.sm,
+                          MoolSpacing.sm,
+                          0,
                         ),
-                      ] else ...[
-                        _PersonalAccountSection(
-                          includeSupport: true,
-                          onOpenRoute: onOpenRoute,
+                        sliver: SliverToBoxAdapter(
+                          child: switch (activeWorkspace) {
+                            final workspace? => Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _ActiveWorkspaceCard(workspace: workspace),
+                                const SizedBox(height: MoolSpacing.md),
+                                _ProfileQuickActions(onOpenRoute: onOpenRoute),
+                              ],
+                            ),
+                            null => _PersonalAccountSection(
+                              includeSupport: true,
+                              onOpenRoute: onOpenRoute,
+                            ),
+                          },
                         ),
-                        const SizedBox(height: MoolSpacing.md),
-                        _ProfileAccessCard(
-                          applicationInProgress: applicationInProgress,
-                          onOpenRoute: onOpenRoute,
+                      ),
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            MoolSpacing.sm,
+                            MoolSpacing.md,
+                            MoolSpacing.sm,
+                            MoolSpacing.md,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (activeWorkspace != null)
+                                _PersonalAccountSection(
+                                  includeSupport: false,
+                                  onOpenRoute: onOpenRoute,
+                                )
+                              else
+                                _ProfileAccessCard(
+                                  applicationInProgress: applicationInProgress,
+                                  onOpenRoute: onOpenRoute,
+                                ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
