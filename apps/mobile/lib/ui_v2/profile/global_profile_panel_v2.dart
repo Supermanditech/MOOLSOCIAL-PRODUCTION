@@ -82,6 +82,8 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                   children: [
                     _ProfileAccessCard(onOpenRoute: onOpenRoute),
                     const SizedBox(height: MoolSpacing.lg),
+                    _ProfileQuickActions(onOpenRoute: onOpenRoute),
+                    const SizedBox(height: MoolSpacing.lg),
                     _ProfileSection(
                       title: 'Account details',
                       items: [
@@ -91,20 +93,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                           detail: 'Identity, contact details and profile',
                           icon: Icons.badge_outlined,
                           route: '/app/account/identity',
-                        ),
-                        _ProfileDestination(
-                          id: 'activity',
-                          title: 'Activity',
-                          detail: 'Account and workspace updates',
-                          icon: Icons.notifications_none_rounded,
-                          route: '/app/activity',
-                        ),
-                        _ProfileDestination(
-                          id: 'files',
-                          title: 'Documents',
-                          detail: 'Identity and workspace records',
-                          icon: Icons.folder_outlined,
-                          route: '/app/files',
                         ),
                       ],
                       onOpenRoute: onOpenRoute,
@@ -312,7 +300,7 @@ class _ProfileAccessCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Account and workspaces',
+            'Grow with MoolSocial',
             style: TextStyle(
               color: MoolColors.ink,
               fontSize: 15,
@@ -321,44 +309,7 @@ class _ProfileAccessCard extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           const Text(
-            'Personal access stays separate from verified workspaces.',
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 10,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          _AccessRoleTile(
-            keyName: 'global-profile-personal-account',
-            icon: Icons.person_outline_rounded,
-            title: 'Personal account',
-            detail: 'MoolSocial services and personal activity',
-            status: 'Active',
-            accent: _profileGreen,
-            onTap: () => onOpenRoute('/app/account/identity'),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          const Row(
-            children: [
-              Icon(Icons.trending_up_rounded, color: _profileNavy, size: 18),
-              SizedBox(width: MoolSpacing.xs),
-              Expanded(
-                child: Text(
-                  'Grow with MoolSocial',
-                  style: TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Choose how you want to work.',
+            'Choose how you want to work. Your personal account stays active.',
             style: TextStyle(
               color: MoolColors.muted,
               fontSize: 10,
@@ -417,17 +368,6 @@ class _ProfileAccessCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text(
-            'Your personal account remains active during application and approval.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 9,
-              height: 1.3,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ],
       ),
     ),
@@ -442,7 +382,6 @@ class _AccessRoleTile extends StatelessWidget {
     required this.detail,
     required this.accent,
     required this.onTap,
-    this.status,
   });
 
   final String keyName;
@@ -451,7 +390,6 @@ class _AccessRoleTile extends StatelessWidget {
   final String detail;
   final Color accent;
   final VoidCallback onTap;
-  final String? status;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -497,25 +435,6 @@ class _AccessRoleTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (status != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _profileGreen.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            status!,
-                            style: const TextStyle(
-                              color: _profileGreen,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -538,6 +457,143 @@ class _AccessRoleTile extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _ProfileQuickActions extends StatelessWidget {
+  const _ProfileQuickActions({required this.onOpenRoute});
+
+  final ValueChanged<String> onOpenRoute;
+
+  static const _actions = <_ProfileQuickAction>[
+    _ProfileQuickAction(
+      id: 'orders',
+      label: 'Orders',
+      icon: Icons.receipt_long_outlined,
+      route: '/app/buy?sub=orders',
+      accent: Color(0xFF4D46A8),
+    ),
+    _ProfileQuickAction(
+      id: 'payments',
+      label: 'Payments',
+      icon: Icons.account_balance_wallet_outlined,
+      route: '/app/pay/home',
+      accent: Color(0xFF138808),
+    ),
+    _ProfileQuickAction(
+      id: 'activity',
+      label: 'Activity',
+      icon: Icons.notifications_none_rounded,
+      route: '/app/activity',
+      accent: Color(0xFFFF9933),
+    ),
+    _ProfileQuickAction(
+      id: 'documents',
+      label: 'Documents',
+      icon: Icons.folder_outlined,
+      route: '/app/files',
+      accent: Color(0xFF2563EB),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const Key('global-profile-quick-actions'),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.only(left: 2, bottom: MoolSpacing.xs),
+        child: Text(
+          'Quick access',
+          style: TextStyle(
+            color: MoolColors.ink,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = MoolSpacing.xs;
+          final tileWidth = (constraints.maxWidth - gap) / 2;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final action in _actions)
+                SizedBox(
+                  width: tileWidth,
+                  child: Material(
+                    key: Key('global-profile-quick-${action.id}'),
+                    color: Colors.white,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(MoolRadii.control),
+                      side: const BorderSide(color: Color(0xFFE4E7EC)),
+                    ),
+                    child: InkWell(
+                      onTap: () => onOpenRoute(action.route),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: MoolSpacing.xs,
+                          vertical: MoolSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: action.accent.withValues(alpha: .1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                action.icon,
+                                color: action.accent,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: MoolSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                action.label,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoolColors.ink,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    ],
+  );
+}
+
+class _ProfileQuickAction {
+  const _ProfileQuickAction({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.route,
+    required this.accent,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final String route;
+  final Color accent;
 }
 
 class _ProfileDestination {
