@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [string]$PreApkStatePath
+  [string]$PreApkStatePath,
+  [string]$CandidateId = 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -46,25 +47,32 @@ if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
     ) -and
     (Test-Path -LiteralPath $resolvedPreApkState -PathType Leaf)
   ) 'candidate-specific pre-APK state is missing or outside the repository.'
-  $preApkGate = Join-Path `
-    $RepositoryRoot `
-    'scripts/check-pre-apk-readiness-r60-92.ps1'
-  Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
-    'candidate-specific pre-APK gate is missing.'
   $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
     ConvertFrom-Json
-  $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
-    'BuildAuthorized'
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+    $preApkGate = Join-Path `
+      $RepositoryRoot `
+      'scripts/check-pre-apk-readiness-r60-92.ps1'
+    Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
+      'candidate-specific pre-APK gate is missing.'
+    $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
+      'BuildAuthorized'
+    } else {
+      'CandidateReservation'
+    }
+    & $preApkGate `
+      -RepositoryRoot $RepositoryRoot `
+      -StatePath $resolvedPreApkState `
+      -Phase $preApkPhase | Out-Null
+    $preApkPassed = $?
+    Assert-SideloadControl $preApkPassed `
+      'candidate-specific pre-APK readiness gate failed.'
   } else {
-    'CandidateReservation'
+    Assert-SideloadControl (
+      [string]$preApkState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+      [string]$preApkState.candidate.id -ceq $CandidateId
+    ) 'generic candidate APK state is not bound to the exact candidate.'
   }
-  & $preApkGate `
-    -RepositoryRoot $RepositoryRoot `
-    -StatePath $resolvedPreApkState `
-    -Phase $preApkPhase | Out-Null
-  $preApkPassed = $?
-  Assert-SideloadControl $preApkPassed `
-    'candidate-specific pre-APK readiness gate failed.'
 } else {
   $coordinationState = Get-Content -Raw -LiteralPath (
     Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
@@ -267,18 +275,24 @@ $candidatePreApkState = if (
 $candidateRuntimeStateBound = if (
   -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
 ) {
-  $candidatePreApkState.Contains(
-    '"runtimeProfile": "PublicAuthSideloadPreflight"'
-  ) -and
-  (
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
     $candidatePreApkState.Contains(
-      '"state": "pending_sanitized_binding"'
-    ) -or
-    $candidatePreApkState.Contains(
-      '"state": "passed_sanitized_binding"'
-    )
-  ) -and
-  $candidatePreApkState.Contains('"privateValuesEmitted": false')
+      '"runtimeProfile": "PublicAuthSideloadPreflight"'
+    ) -and
+    (
+      $candidatePreApkState.Contains(
+        '"state": "pending_sanitized_binding"'
+      ) -or
+      $candidatePreApkState.Contains(
+        '"state": "passed_sanitized_binding"'
+      )
+    ) -and
+    $candidatePreApkState.Contains('"privateValuesEmitted": false')
+  } else {
+    $candidateState = $candidatePreApkState | ConvertFrom-Json
+    [string]$candidateState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+    [string]$candidateState.candidate.id -ceq $CandidateId
+  }
 } else {
   $apkMachineState.Contains(
     '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
@@ -730,6 +744,7 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
+  $wrapper.Contains('-CandidateId $CandidateId') -and
   $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
   $wrapper.Contains(
     "'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'"
