@@ -32,6 +32,8 @@ function Test-CursorUiReviewWrapperSource {
     $Source.Contains('AndroidDebugPackage=cursorreview;Promotable=false') -and
     $Source.Contains("if (`$RuntimeProfile -cne 'CursorUiReview' -and (") -and
     $Source.Contains("if (`$BuildMode -ceq 'release') {") -and
+    $Source.Contains("'com.moolsocial.app.cursorreview'") -and
+    $Source.Contains('AllowDebugTestPlugin = $true') -and
     $Source.Contains('-CandidateId $CandidateId')
   )
 }
@@ -43,6 +45,9 @@ $foundationPath = Join-Path `
 $apkGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-apk-regression-gate-state.ps1'
+$pluginGatePath = Join-Path `
+  $RepositoryRoot `
+  'scripts/check-apk-production-plugin-integrity.ps1'
 $gradlePath = Join-Path `
   $RepositoryRoot `
   'apps/mobile/android/app/build.gradle.kts'
@@ -50,6 +55,7 @@ $gradlePath = Join-Path `
 $builder = Get-Content -Raw -LiteralPath $builderPath
 $foundation = Get-Content -Raw -LiteralPath $foundationPath
 $apkGate = Get-Content -Raw -LiteralPath $apkGatePath
+$pluginGate = Get-Content -Raw -LiteralPath $pluginGatePath
 $gradle = Get-Content -Raw -LiteralPath $gradlePath
 
 Assert-CursorUiReviewControl `
@@ -108,5 +114,11 @@ Assert-CursorUiReviewControl (
   $apkGate.Contains('if (-not $cursorUiReview)') -and
   $apkGate.Contains('$fullSocialRequested = if ($cursorUiReview)')
 ) 'generic APK gate does not recognize the Cursor UI Review profile.'
+
+Assert-CursorUiReviewControl (
+  $pluginGate.Contains("`$ExpectedApplicationId = 'com.moolsocial.app'") -and
+  $pluginGate.Contains('[switch]$AllowDebugTestPlugin') -and
+  $pluginGate.Contains('if (-not $AllowDebugTestPlugin)')
+) 'plugin integrity gate does not preserve release defaults and debug isolation.'
 
 Write-Output 'CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED'
