@@ -231,11 +231,11 @@ class _ProfileHeader extends StatelessWidget {
             children: [
               const Text(
                 'Your MoolSocial profile',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
                 style: TextStyle(
                   color: MoolColors.ink,
                   fontSize: 16,
+                  height: 1.05,
                   fontWeight: FontWeight.w900,
                 ),
               ),
