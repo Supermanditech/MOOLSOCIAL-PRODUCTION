@@ -151,11 +151,15 @@ void main() {
     expect(panel.bottom, lessThanOrEqualTo(836));
     expect(panel.height, greaterThan(800));
     expect(find.text('Your MoolSocial profile'), findsOne);
-    expect(find.byKey(const Key('global-profile-access-card')), findsOne);
+    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
+    expect(
+      find.byKey(const Key('global-profile-context-work-workspace-create')),
+      findsOne,
+    );
     expect(find.text('Personal account'), findsOne);
     expect(find.text('Your account'), findsOne);
     expect(find.text('Privacy and preferences'), findsOne);
-    expect(find.text('Become a MoolSocial Partner'), findsOne);
+    expect(find.text('Create a provider workspace'), findsWidgets);
     expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
     expect(
       find.byKey(const Key('global-profile-active-workspace')),
@@ -164,26 +168,16 @@ void main() {
     expect(find.text('Orders'), findsNothing);
     expect(find.text('Payments'), findsNothing);
     expect(
-      find.byKey(const Key('global-profile-explore-workspaces')),
-      findsOne,
-    );
-    expect(find.text('Explore workspaces'), findsOne);
-    expect(
       find.descendant(
         of: find.byKey(const Key('global-profile-panel-v2')),
         matching: find.textContaining('Mool Partner'),
       ),
       findsNothing,
     );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('global-profile-panel-v2')),
-        matching: find.textContaining(RegExp('provider', caseSensitive: false)),
-      ),
-      findsNothing,
-    );
     await tester.scrollUntilVisible(
-      find.byKey(const Key('global-profile-explore-workspaces')),
+      find.byKey(
+        const Key('global-profile-context-action-work-workspace-create'),
+      ),
       240,
       scrollable: find.descendant(
         of: find.byKey(const Key('global-profile-panel-v2')),
@@ -192,7 +186,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('global-profile-explore-workspaces')),
+      find.byKey(
+        const Key('global-profile-context-action-work-workspace-create'),
+      ),
     );
     await tester.pumpAndSettle();
     expect(
@@ -211,33 +207,37 @@ void main() {
 
     await tester.tap(find.byKey(const Key('work-main-global-profile')));
     await tester.pumpAndSettle();
-    final activeWorkspace = find.byKey(
-      const Key('global-profile-active-workspace'),
+    expect(
+      find.byKey(const Key('global-profile-active-workspace')),
+      findsNothing,
     );
-    expect(activeWorkspace, findsOne);
     expect(
       find.descendant(
-        of: activeWorkspace,
+        of: find.byKey(
+          const Key('global-profile-context-work-workspace-active'),
+        ),
         matching: find.text('Mahadev Fresh Mart'),
       ),
       findsOne,
     );
     expect(
       find.descendant(
-        of: activeWorkspace,
+        of: find.byKey(
+          const Key('global-profile-context-work-workspace-active'),
+        ),
         matching: find.textContaining('Grocery / Kirana Shop'),
       ),
       findsOne,
     );
-    expect(find.text('Workspace access'), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-actions')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-operations')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-activity')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-documents')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-plans')), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-support')), findsOne);
+    expect(find.text('Your account'), findsOne);
+    expect(find.text('Personal profile'), findsOne);
+    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
     expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
-    await tester.tap(find.byKey(const Key('global-profile-quick-operations')));
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-work-workspace-active'),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('workspace-destination')), findsOne);
@@ -257,13 +257,22 @@ void main() {
     expect(find.text('Workspace application'), findsOne);
     expect(find.text('View application'), findsOne);
     expect(
+      find.byKey(
+        const Key('global-profile-context-work-workspace-application'),
+      ),
+      findsOne,
+    );
+    expect(
       find.byKey(const Key('global-profile-active-workspace')),
       findsNothing,
     );
     expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
+    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
 
     await tester.tap(
-      find.byKey(const Key('global-profile-explore-workspaces')),
+      find.byKey(
+        const Key('global-profile-context-action-work-workspace-application'),
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('workspace-destination')), findsOne);
