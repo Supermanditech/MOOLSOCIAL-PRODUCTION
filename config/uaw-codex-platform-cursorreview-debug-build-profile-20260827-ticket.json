@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "UAW-CODEX-PLATFORM-CURSORREVIEW-DEBUG-BUILD-PROFILE-20260827",
+  "customerOutcome": "Cursor receives one package-isolated, non-promotable UI review APK for founder review on Redmi without changing Codex runtime, production or backend state.",
+  "classification": "mvp_required",
+  "minimumCompleteScope": [
+    "add_fail_closed_CursorUiReview_builder_profile",
+    "bind_exact_cursor_source_candidate_version_package_and_runtime_defines",
+    "route_generic_candidate_state_away_from_r60_92_only_gate",
+    "build_once_through_the_authorized_wrapper",
+    "verify_package_version_code_debug_signer_and_SHA256"
+  ],
+  "explicitExclusions": [
+    "no_device_install_or_mutation",
+    "no_backend_Firebase_cloud_or_Play_action",
+    "no_runtime_or_production_package",
+    "no_release_or_promotable_artifact",
+    "no_product_merge"
+  ],
+  "dependenciesAndApprovals": [
+    "founder_exact_platform_ticket_authority_20260827",
+    "cursor_source_17bfeb29624d33576d5ba9c9cc721a460c1b7f9f",
+    "cursor_performs_separate_Redmi_install_and_review"
+  ],
+  "testAndEvidencePlan": [
+    "positive_and_negative_wrapper_profile_tests",
+    "source_manifest_binding",
+    "focused_wholesale_checkout_tests_and_analysis",
+    "Buy_regressions_UI_locks_and_package_isolation",
+    "postbuild_manifest_package_version_code_signer_and_hash_readback"
+  ]
+}

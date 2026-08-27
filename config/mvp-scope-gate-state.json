@@ -13,7 +13,7 @@
     "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
     "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
     "state": "selected_ticket_assessed",
-    "currentTicketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
+    "currentTicketId": "UAW-CODEX-PLATFORM-CURSORREVIEW-DEBUG-BUILD-PROFILE-20260827",
     "priorC33LFix2SelectedTicketAssessment": {
       "ticketId": "UAW-C33L-FIX2-FIX1-GATE-PARENT-REPLAY-COMPATIBILITY",
       "customerOutcome": "The qualified Screen 04 safe-boot regression prevention remains enforceable after the release parent is reselected, so every C33L cycle can prove the repair without weakening MVP scope selection.",
@@ -1672,63 +1672,52 @@
       "evidencePath": "docs/quality/UAW-C34P-BLOCKER-RESOLUTION-ROBUSTNESS-REUSE-ASSESSMENT-20260818.md"
     },
     "selectedTicketAssessment": {
-      "ticketId": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
-      "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
-      "manifestPath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
-      "manifestSha256": "11E8F7D030DCF3319C889AE7B7ECADF006A325F998333FAE80BD00B2C7FD5B5B",
+      "ticketId": "UAW-CODEX-PLATFORM-CURSORREVIEW-DEBUG-BUILD-PROFILE-20260827",
+      "customerOutcome": "Cursor receives one package-isolated, non-promotable UI review APK for founder review on Redmi without changing Codex runtime, production or backend state.",
+      "manifestPath": "config/uaw-codex-platform-cursorreview-debug-build-profile-20260827-ticket.json",
+      "manifestSha256": "BD43D3DB38F07B5A440124E8BB2EC04A9EA886140F3614731CF36A6E31497CFB",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
-      "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+      "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance"],
       "sharedImplementationOwners": [
+        "apps/mobile/android/app/build.gradle.kts",
         "scripts/build-buy-device-review.ps1",
         "scripts/check-apk-regression-gate-state.ps1",
-        "scripts/check-apk-production-plugin-integrity.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
-        "scripts/test-release-production-plugin-integrity.ps1",
-        "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "config/mvp-scope-gate-state.json"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "The legacy generic APK state is an immutable consumed r58 candidate, the current wrapper cannot hydrate the newly locked share_plus dependency inside its guarded --no-pub build operation, and no consolidated Social-only deployment allowlist or preauthorization readiness state exists.",
+      "necessityProof": "The existing Android package isolation and single device-review wrapper are reused; one fail-closed profile and candidate-scoped foundation branch are the smallest complete changes.",
       "robustnessCoverage": [
-        "strict_r60_91_to_r60_92_version_monotonicity",
-        "clean_remote_exact_final_integration_graph",
-        "preauthorization_ready_with_build_install_Play_and_deploy_closed",
-        "same_operation_locked_dependency_hydration_and_build",
-        "share_plus_source_and_postbuild_plugin_integrity",
-        "two_complete_source_regression_cycles",
-        "complete_prebuild_and_pending_postbuild_matrix",
-        "five_function_Social_source_live_revision_and_client_compatibility_map",
-        "end_to_end_qualified_deployment_allowlist_and_rollback"
+        "exact_cursor_source_and_version_binding",
+        "cursorreview_package_isolation",
+        "four_exact_UI_review_runtime_defines",
+        "generic_candidate_state_not_r60_92_state",
+        "non_promotable_debug_signer_and_artifact_readback"
       ],
       "adjustments": [
-        "add_candidate_specific_pre_APK_readiness_state_and_gate",
-        "harden_supported_wrapper_for_new_locked_dependencies",
-        "extend_plugin_integrity_for_native_share",
-        "create_final_integration_and_source_seal",
-        "create_Social_only_backend_deployment_map_and_gate"
+        "add_CursorUiReview_to_existing_wrapper",
+        "route_generic_APK_state_away_from_r60_92_only_gate",
+        "retain_Cursor_install_and_device_review_as_separate_authority"
       ],
       "explicitExclusions": [
-        "no_APK_AAB_build_or_one_build_authority_consumption",
-        "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
-        "no_cloud_backend_Hosting_provider_or_Firebase_write",
-        "no_secret_credential_token_OTP_cookie_or_account_output",
-        "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+        "no_device_install_or_mutation",
+        "no_backend_Firebase_cloud_or_Play_action",
+        "no_runtime_or_production_package",
+        "no_release_or_promotable_artifact",
+        "no_product_merge"
       ],
       "dependenciesAndApprovals": [
-        "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
-        "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
-        "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
-        "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
-        "installed_predecessor_r60_91_versionCode_2026082591_preserved",
-        "actual_APK_build_and_cloud_deployment_require_later_exact_founder_authority"
+        "founder_exact_platform_ticket_authority_20260827",
+        "cursor_source_17bfeb29624d33576d5ba9c9cc721a460c1b7f9f",
+        "cursor_performs_separate_Redmi_install_and_review"
       ],
-      "timelineImpactDays": 2,
+      "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "REL_PREAPK_01_CHILD_09_selected_two_function_Social_backend_deployment_execution_and_rollback_gate_no_build_deploy_device_Play_secret_or_excluded_surface_action",
-      "evidencePath": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+      "implementationState": "platform_profile_qualified_one_debug_build_authorized_no_device_action",
+      "evidencePath": "config/uaw-codex-platform-cursorreview-debug-build-profile-20260827-ticket.json"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",
@@ -5048,45 +5037,36 @@
     ]
   },
   "ticket": {
-    "id": "UAW-CODEX-PRE-APK-R60-92-READINESS-20260826",
-    "parentTicketId": "UAW-CODEX-SOCIAL-RUNTIME-CONTINUATION-20260825",
-    "customerOutcome": "The next higher-version MoolSocial APK cannot build until final integration, source, dependency, plugin, Social backend and complete regression gates are proven while one-build authority remains founder-held.",
+    "id": "UAW-CODEX-PLATFORM-CURSORREVIEW-DEBUG-BUILD-PROFILE-20260827",
+    "parentTicketId": "UAW-CURSOR-UI-BUY-WHOLESALE-CHECKOUT-PACK-COUNT-20260827",
+    "customerOutcome": "Cursor receives one package-isolated, non-promotable UI review APK for founder review on Redmi without changing Codex runtime, production or backend state.",
     "classification": "mvp_required",
-    "classificationReason": "Installed r60.91 predates accepted source fixes, while launch safety requires a uniquely versioned successor with reproducible native dependencies, exact Social backend sequencing and a complete fail-closed gate matrix.",
+    "classificationReason": "Package-isolated founder review is required to qualify the accepted Buy UI correction without colliding with runtime or production packages.",
     "minimumCompleteScope": [
-      "reserve_unique_r60_92_version_and_candidate_identity",
-      "create_and_remote_close_final_integration_from_exact_approved_tips",
-      "separate_preauthorization_readiness_from_one_build_authority",
-      "hydrate_locked_dependencies_inside_the_same_guarded_future_build",
-      "require_share_plus_native_plugin_integrity",
-      "seal_source_and_pass_two_complete_regression_cycles",
-      "register_all_prebuild_passed_and_postbuild_device_gates_pending",
-      "map_and_gate_only_end_to_end_preflight_qualified_Social_backend_deployments"
+      "add_fail_closed_CursorUiReview_builder_profile",
+      "bind_exact_cursor_source_candidate_version_package_and_runtime_defines",
+      "route_generic_candidate_state_away_from_r60_92_only_gate",
+      "build_once_through_the_authorized_wrapper",
+      "verify_package_version_code_debug_signer_and_SHA256"
     ],
     "explicitExclusions": [
-      "no_APK_AAB_build_or_one_build_authority_consumption",
-      "no_install_uninstall_data_clear_downgrade_Play_or_OPPO_mutation",
-      "no_cloud_backend_Hosting_provider_or_Firebase_write",
-      "no_secret_credential_token_OTP_cookie_or_account_output",
-      "no_Buy_Travel_Work_Care_or_unimplemented_backend_deployment"
+      "no_device_install_or_mutation",
+      "no_backend_Firebase_cloud_or_Play_action",
+      "no_runtime_or_production_package",
+      "no_release_or_promotable_artifact",
+      "no_product_merge"
     ],
     "dependenciesAndApprovals": [
-      "founder_requested_complete_version_incremented_pre_APK_gate_preparation_2026_08_26",
-      "founder_added_Social_only_backend_cloud_deployment_mapping_for_end_to_end_preflight_qualified_runtime_2026_08_26",
-      "closed_v4_integration_0a40f68dc7697ae226aef469604761fa8b3d1301",
-      "closed_remote_Social_share_tip_dba3c05bfb392eac11d46fc36cdaa42c39ae859d",
-      "installed_predecessor_r60_91_versionCode_2026082591_preserved",
-      "later_exact_founder_authority_required_for_build_and_deployment"
+      "founder_exact_platform_ticket_authority_20260827",
+      "cursor_source_17bfeb29624d33576d5ba9c9cc721a460c1b7f9f",
+      "cursor_performs_separate_Redmi_install_and_review"
     ],
     "testAndEvidencePlan": [
-      "candidate_version_and_retained_history_negative_tests",
-      "integration_graph_tree_remote_and_secret_verification",
-      "wrapper_dependency_hydration_fixture_without_APK",
-      "plugin_integrity_positive_and_negative fixtures",
-      "two_complete_mobile_backend_hosting_and_release_gate cycles",
-      "source_manifest_checksum_and_clean_remote_readback",
-      "five_function_Social_deployment_map_and_allowlist_negative tests",
-      "candidate_preauthorization_gate_with_build_deploy_install_Play_held"
+      "positive_and_negative_wrapper_profile_tests",
+      "source_manifest_binding",
+      "focused_wholesale_checkout_tests_and_analysis",
+      "Buy_regressions_UI_locks_and_package_isolation",
+      "postbuild_manifest_package_version_code_signer_and_hash_readback"
     ]
   },
   "priorC33NFix1Ticket": {
@@ -5346,22 +5326,22 @@
   },
   "founderDisclosure": {
     "state": "presented_before_execution",
-    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json"
+    "evidence": "config/uaw-codex-platform-cursorreview-debug-build-profile-20260827-ticket.json"
   },
   "authorization": {
     "state": "founder_acknowledged_mvp_scope",
-    "evidence": "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
+    "evidence": "config/uaw-codex-platform-cursorreview-debug-build-profile-20260827-ticket.json",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "complete_version_incremented_pre_APK_mandatory_gate_preparation_plus_Social_only_end_to_end_preflight_qualified_backend_cloud_deployment_mapping_no_APK_or_deployment_yet_2026_08_26"
+    "founderAcceptance": "one_exact_non_promotable_cursorreview_debug_APK_build_no_install_device_backend_Firebase_Play_or_release_action_2026_08_27"
   },
   "execution": {
     "referenceWriteAuthorized": false,
     "runtimeWriteAuthorized": true,
     "testOrGateWriteAuthorized": true,
     "backendWriteAuthorized": false,
-    "buildAuthorized": false,
+    "buildAuthorized": true,
     "deviceInstallAuthorized": false,
-    "buildAuthorizationScope": "pre_APK_preparation_only_one_build_authority_remains_closed_until_later_exact_founder_authorization",
+    "buildAuthorizationScope": "one_non_promotable_CursorUiReview_debug_APK_only_version_1_0_0_r61_1_code_2026082803",
     "deviceInstallAuthorizationScope": "no_install_uninstall_downgrade_data_clear_or_other_device_mutation_authorized_during_pre_APK_preparation",
     "oppoUninstallExistingAppDataAuthorizedOnce": false,
     "oppoUninstallAuthorizationConsumed": true,
