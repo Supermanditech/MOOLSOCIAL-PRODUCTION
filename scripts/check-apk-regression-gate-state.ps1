@@ -289,6 +289,14 @@ if ($CandidateId.StartsWith('BUY-', [StringComparison]::Ordinal)) {
       'clean-state-regression',
       'wrapper-self-test'
     )
+  } elseif ($gateProfile -ceq 'uaw_cursor_ui_review_debug') {
+    $requiredGateIds += @(
+      'buy-regression-1',
+      'buy-regression-2',
+      'clean-state-regression',
+      'wrapper-self-test',
+      'package-isolation'
+    )
   } elseif (
     $gateProfile -ceq 'uaw_public_auth_sideload_preflight' -or
     $gateProfile -ceq 'uaw_fix11_google_only_sideload_preflight'
@@ -410,6 +418,7 @@ $allowedDefineNames = @(
   'MOOLSOCIAL_CANDIDATE_ID',
   'MOOLSOCIAL_DEVICE_REVIEW',
   'MOOLSOCIAL_USE_EMULATORS',
+  'MOOLSOCIAL_UI_REVIEW_ONLY',
   'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW',
   'MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF',
   'MOOLSOCIAL_YOUTUBE_PROVIDER_URL',
