@@ -71,6 +71,13 @@ void main() {
     expect(session.activeDockDestination, expected);
     expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
     expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
+    final owner = find.byKey(const Key('buy-scoped-purchase-owner'));
+    expect(owner, findsOneWidget);
+    final stage = session.view == BuyV2View.checkout ? 'Review order' : 'Cart';
+    expect(
+      tester.getSemantics(owner).label,
+      contains('${expected.label} $stage'),
+    );
   }
 
   const cases = [
@@ -183,6 +190,48 @@ void main() {
     expect(session.destination, BuyV2Destination.shop);
     semantics.dispose();
   });
+
+  testWidgets(
+    'compact Mool launcher opens and Back closes the menu without losing Cart',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+      final session = mixedSession();
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.shop);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      final cartIds = session.cartLines.map((line) => line.product.id).toList();
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      final launcher = find.byKey(const Key('mool-home-launcher'));
+      expect(launcher, findsOneWidget);
+      expect(tester.getSemantics(launcher).label, 'Open MoolSocial main menu');
+
+      await tester.tap(launcher);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(launcher).label, 'Close MoolSocial main menu');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsNothing,
+      );
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(
+        session.cartLines.map((line) => line.product.id),
+        orderedEquals(cartIds),
+      );
+      semantics.dispose();
+    },
+  );
 
   testWidgets('320px 140% reduced motion is immediate and semantically exact', (
     tester,

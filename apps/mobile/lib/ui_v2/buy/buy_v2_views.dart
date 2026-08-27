@@ -3664,7 +3664,8 @@ class BuyV2CheckoutView extends StatelessWidget {
                       title:
                           'Delivery ${index + 1} · ${_productCountLabel(deliveryGroups[index].itemCount)}',
                       detail: [
-                        _fulfilmentPromiseSummary(deliveryGroups[index]),
+                        '${deliveryGroups[index].destination.label} fulfilment · '
+                            '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
                         '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
                         'Fulfiller assigned automatically after placement',
                         if (session.selectedDeliveryInstructionFor(

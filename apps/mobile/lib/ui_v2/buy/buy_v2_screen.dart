@@ -79,6 +79,8 @@ class BuyV2Screen extends StatefulWidget {
 
 class _BuyV2ScreenState extends State<BuyV2Screen> {
   final GlobalKey<BuyV2ShopChatViewState> _shopChatViewKey = GlobalKey();
+  final MoolGlobalNavigationController _moolNavigationController =
+      MoolGlobalNavigationController();
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
   bool _scannerBusy = false;
@@ -236,6 +238,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final session = widget.session;
     final careNavigation =
         session.activeDockDestination == BuyV2Destination.medicine;
+    final scopedPurchaseOwner =
+        session.view == BuyV2View.cart || session.view == BuyV2View.checkout;
     final surfaceTheme = _shopChatActive
         ? BuyV2ThemeSpec.resolve(BuyV2Destination.shop, BuyV2View.catalogue)
         : BuyV2ThemeSpec.resolve(session.destination, session.view);
@@ -246,7 +250,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
             HapticFeedback.selectionClick();
-            if (_shopChatActive) {
+            if (_moolNavigationController.isOpen) {
+              unawaited(_moolNavigationController.close());
+            } else if (_shopChatActive) {
               _handleShopChatBack();
             } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
@@ -368,7 +374,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               : MoolDestinationNavigationV2(
                   activeId: careNavigation ? 'book' : 'buy',
                   destinationLabel: careNavigation ? 'Care' : 'Shop',
-                  selectedLocalIndex: careNavigation
+                  selectedLocalIndex: scopedPurchaseOwner
+                      ? 0
+                      : careNavigation
                       ? 1
                       : _offersActive
                       ? 2
@@ -376,16 +384,91 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                           BuyV2Destination.orders => 1,
                           _ => 0,
                         },
-                  localActionCount: 3,
-                  localNavigation: careNavigation
+                  localActionCount: scopedPurchaseOwner ? 1 : 3,
+                  localNavigation: scopedPurchaseOwner
+                      ? _buildScopedPurchaseOwner(session)
+                      : careNavigation
                       ? _buildCareLocalNavigation()
                       : _buildBuyLocalNavigation(session),
                   onOpenMool: _openGlobalMool,
                   onOpenAction: _openGlobalAction,
                   onOpenChat: _openShopChat,
-                  onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-                  onNextLocalAction: () => _moveBuyLocal(session, 1),
+                  moolNavigationController: _moolNavigationController,
+                  onPreviousLocalAction: scopedPurchaseOwner
+                      ? null
+                      : () => _moveBuyLocal(session, -1),
+                  onNextLocalAction: scopedPurchaseOwner
+                      ? null
+                      : () => _moveBuyLocal(session, 1),
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScopedPurchaseOwner(BuyV2Session session) {
+    final destination = session.activeDockDestination;
+    final destinationLabel = switch (destination) {
+      BuyV2Destination.shop => 'Shop',
+      BuyV2Destination.wholesale => 'Wholesale',
+      BuyV2Destination.medicine => 'Medicine',
+      BuyV2Destination.orders => 'Orders',
+    };
+    final stageLabel = session.view == BuyV2View.checkout
+        ? 'Review order'
+        : 'Cart';
+    final icon = session.view == BuyV2View.checkout
+        ? Icons.receipt_long_outlined
+        : Icons.shopping_bag_outlined;
+    return Semantics(
+      key: const ValueKey('buy-scoped-purchase-owner'),
+      container: true,
+      label:
+          '$destinationLabel $stageLabel. Purchase context retained while you review this order.',
+      child: ExcludeSemantics(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 19, color: BuyV2Colors.navy),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        destinationLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: BuyV2Colors.navy,
+                          fontSize: 10,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        stageLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: BuyV2Colors.muted,
+                          fontSize: 8,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

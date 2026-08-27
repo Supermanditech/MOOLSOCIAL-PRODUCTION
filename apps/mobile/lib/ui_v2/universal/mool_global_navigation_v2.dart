@@ -382,6 +382,30 @@ class MoolGlobalChatShortcut extends StatelessWidget {
   }
 }
 
+class MoolGlobalNavigationController {
+  bool get isOpen => _isOpen;
+
+  bool _isOpen = false;
+  Future<void> Function()? _close;
+
+  Future<void> close() async {
+    await _close?.call();
+  }
+
+  void _attach(Future<void> Function() close) {
+    _close = close;
+  }
+
+  void _detach() {
+    _close = null;
+    _isOpen = false;
+  }
+
+  void _setOpen(bool value) {
+    _isOpen = value;
+  }
+}
+
 class MoolDestinationNavigationV2 extends StatefulWidget {
   const MoolDestinationNavigationV2({
     required this.activeId,
@@ -392,6 +416,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
+    this.moolNavigationController,
     this.onPreviousLocalAction,
     this.onNextLocalAction,
     super.key,
@@ -407,6 +432,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
+  final MoolGlobalNavigationController? moolNavigationController;
   final VoidCallback? onPreviousLocalAction;
   final VoidCallback? onNextLocalAction;
 
@@ -465,6 +491,7 @@ class _MoolDestinationNavigationV2State
                       onOpenMool: widget.onOpenMool,
                       onOpenAction: widget.onOpenAction,
                       onOpenChat: widget.onOpenChat,
+                      controller: widget.moolNavigationController,
                       compact: true,
                     ),
                     const SizedBox(width: 2),
@@ -1352,6 +1379,7 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
+    this.controller,
     this.selectedMainActionAnchorKey,
     this.localNavigationExpanded,
     this.onToggleLocalNavigation,
@@ -1366,6 +1394,7 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
+  final MoolGlobalNavigationController? controller;
   final GlobalKey? selectedMainActionAnchorKey;
   final bool? localNavigationExpanded;
   final VoidCallback? onToggleLocalNavigation;
@@ -1394,6 +1423,17 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
       vsync: this,
       duration: MoolLocalNavigationTokens.selectionDuration,
     );
+    widget.controller?._attach(_closeConnectedNavigator);
+  }
+
+  @override
+  void didUpdateWidget(covariant MoolGlobalNavigationV2 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach();
+      widget.controller?._attach(_closeConnectedNavigator);
+      widget.controller?._setOpen(_isOpen);
+    }
   }
 
   @override
@@ -1412,6 +1452,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
   @override
   void dispose() {
     _removeLocalHistoryEntry();
+    widget.controller?._detach();
     _switcherController.dispose();
     super.dispose();
   }
@@ -1449,6 +1490,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
   void _openConnectedNavigator() {
     if (_isOpen) return;
     setState(() => _isOpen = true);
+    widget.controller?._setOpen(true);
     _overlayController.show();
     _registerLocalHistoryEntry();
     if (_reduceMotion) {
@@ -1470,6 +1512,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     }
     if (!mounted || !_isOpen) return;
     _overlayController.hide();
+    widget.controller?._setOpen(false);
     setState(() => _isOpen = false);
   }
 
@@ -1485,6 +1528,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     _removeLocalHistoryEntry();
     _switcherController.value = 0;
     _overlayController.hide();
+    widget.controller?._setOpen(false);
     setState(() => _isOpen = false);
     widget.onOpenAction(
       PersonalMoolActionSpec(
@@ -1747,6 +1791,7 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
             MediaQuery.sizeOf(context).width,
           );
       return Semantics(
+        key: const Key('mool-home-launcher'),
         container: true,
         button: true,
         expanded: widget.expanded,
