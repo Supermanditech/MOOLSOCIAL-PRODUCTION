@@ -295,12 +295,15 @@ class _ProfileHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
+        IconButton.filledTonal(
           key: const Key('global-profile-close'),
-          tooltip: 'Close global profile',
+          tooltip: 'Collapse profile',
           onPressed: onClose,
-          color: MoolColors.ink,
-          icon: const Icon(Icons.close_rounded, size: 22),
+          style: IconButton.styleFrom(
+            backgroundColor: _profileNavy.withValues(alpha: .06),
+            foregroundColor: _profileNavy,
+          ),
+          icon: const Icon(Icons.chevron_right_rounded, size: 22),
         ),
       ],
     ),
