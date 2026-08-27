@@ -207,8 +207,19 @@ void main() {
     expect(find.textContaining('Wholesale fulfilment ·'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-scoped-purchase-owner')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
       findsOneWidget,
     );
+    for (final key in const [
+      'buy-local-tab-wholesale',
+      'buy-local-tab-orders',
+      'buy-local-tab-offers',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+    }
     expect(tester.takeException(), isNull);
   });
 
