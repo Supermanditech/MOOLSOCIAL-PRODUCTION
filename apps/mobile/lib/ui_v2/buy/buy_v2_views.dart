@@ -20,6 +20,20 @@ import 'buy_v2_supplier_sheet_motion.dart';
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
 
+String _packCountLabel(int count) => '$count ${count == 1 ? 'pack' : 'packs'}';
+
+String _cartHeaderSummary(BuyV2Session session) {
+  final lines = session.cartLines;
+  final destinations = lines.map((line) => line.product.destination).toSet();
+  final quantityLabel = session.cartScope == BuyV2CartScope.wholesale
+      ? _packCountLabel(session.scopedItemCount)
+      : '${session.scopedItemCount} '
+            '${session.scopedItemCount == 1 ? 'item' : 'items'}';
+  return '${_productCountLabel(lines.length)} · $quantityLabel · '
+      '${_destinationSummary(destinations)} · '
+      '${buyV2Money(session.scopedCartTotal)}';
+}
+
 String _destinationSummary(Set<BuyV2Destination> destinations) {
   const order = [
     BuyV2Destination.shop,
@@ -3035,10 +3049,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       ),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final summary =
-                              '${_productCountLabel(session.itemCount)} · '
-                              '${_destinationSummary(session.cartDestinations)} · '
-                              '${buyV2Money(session.cartTotal)}';
+                          final summary = _cartHeaderSummary(session);
                           return BuyV2FiniteValueTransition(
                             key: const ValueKey('buy-cart-header-value-motion'),
                             stateKey: summary,
@@ -3132,7 +3143,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          session.scopedTipTotal > 0
+                          session.cartScope == BuyV2CartScope.wholesale
+                              ? session.scopedTipTotal > 0
+                                    ? 'Landed total + delivery tip'
+                                    : 'Landed cart total'
+                              : session.scopedTipTotal > 0
                               ? 'Items + delivery tip'
                               : 'Cart total',
                           style: context.buyMeta,
@@ -3149,6 +3164,13 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (session.cartScope == BuyV2CartScope.wholesale)
+                          Text(
+                            'Freight included · GST invoice at checkout',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.buyMeta.copyWith(fontSize: 7.5),
+                          ),
                       ],
                     ),
                   ),
@@ -9610,179 +9632,263 @@ class _CartLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final product = line.product;
     final facts = session.productFactsFor(product);
+    final wholesale = product.destination == BuyV2Destination.wholesale;
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : product.deliveryPromise;
+    final productDetailsLabel = 'View ${product.title} product details';
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
     }
 
+    final productDetails = BuyV2IntentDepth(
+      key: ValueKey('buy-cart-product-depth-${product.id}'),
+      spatial: true,
+      child: Semantics(
+        key: ValueKey('buy-cart-product-summary-${product.id}'),
+        container: true,
+        button: true,
+        label: productDetailsLabel,
+        excludeSemantics: true,
+        onTap: openProductDetails,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          child: InkWell(
+            key: ValueKey('buy-cart-product-details-${product.id}'),
+            onTap: openProductDetails,
+            borderRadius: BorderRadius.circular(11),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 60),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    key: ValueKey('buy-cart-packshot-${product.id}'),
+                    width: 60,
+                    height: 60,
+                    child: BuyV2ProductPackshot(
+                      product: product,
+                      borderRadius: 11,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyBody,
+                        ),
+                        Text(
+                          '${product.variant} · ${product.pack}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          automaticFulfilment
+                              ? '$buyerPromise · MoolSocial price'
+                              : '${product.deliveryPromise} · ${product.seller}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: BuyV2Colors.green,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20, right: 2),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tradeFacts = wholesale
+        ? Semantics(
+            key: ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
+            container: true,
+            label:
+                'Minimum order ${product.minimumOrder} packs. '
+                '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+                '${product.freightIncluded ? 'Freight included in landed price.' : 'Freight confirmed before payment.'}',
+            excludeSemantics: true,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MOQ ${product.minimumOrder} packs · '
+                    '${buyV2Money(product.price)} per pack',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${product.unitPrice} · '
+                    '${product.freightIncluded ? 'Freight included' : 'Freight confirmed later'}',
+                    style: context.buyMeta.copyWith(fontSize: 7.5),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : null;
+
+    final productBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        productDetails,
+        if (tradeFacts != null) ...[const SizedBox(height: 5), tradeFacts],
+      ],
+    );
+
+    final price = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (wholesale)
+          Text(
+            'Landed subtotal',
+            style: context.buyMeta.copyWith(fontSize: 7.5),
+          ),
+        BuyV2FiniteValueTransition(
+          key: ValueKey('buy-cart-line-total-motion-${product.id}'),
+          stateKey: line.total,
+          text: buyV2Money(line.total),
+          ownerSize: const Size(78, 22),
+          textAlign: TextAlign.end,
+          style: const TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (product.mrp != null && product.mrp! > product.price)
+          Text(
+            buyV2Money(product.mrp! * line.quantity),
+            style: context.buyMeta.copyWith(
+              fontSize: 8,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+      ],
+    );
+
+    final quantityControl = Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: BuyV2Colors.softBlue,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: wholesale
+                ? line.quantity <= product.minimumOrder
+                      ? 'Remove ${product.title} from Cart'
+                      : 'Remove one trade pack'
+                : 'Remove one',
+            onPressed: () => session.decrease(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.remove, size: 15),
+          ),
+          BuyV2FiniteValueTransition(
+            key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
+            stateKey: line.quantity,
+            text: '${line.quantity}',
+            ownerSize: const Size(24, 28),
+            style: const TextStyle(
+              color: BuyV2Colors.navy,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          IconButton(
+            tooltip: wholesale ? 'Add one trade pack' : 'Add one',
+            onPressed: () => session.increase(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.add, size: 15),
+          ),
+        ],
+      ),
+    );
+
     return Container(
       key: ValueKey('buy-cart-line-${product.id}'),
       padding: const EdgeInsets.fromLTRB(10, 9, 9, 9),
       decoration: buyV2CardDecoration(radius: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: BuyV2IntentDepth(
-              key: ValueKey('buy-cart-product-depth-${product.id}'),
-              spatial: true,
-              child: Semantics(
-                container: true,
-                button: true,
-                label: 'View ${product.title} product details',
-                excludeSemantics: true,
-                onTap: openProductDetails,
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(11),
-                  child: InkWell(
-                    key: ValueKey('buy-cart-product-details-${product.id}'),
-                    onTap: openProductDetails,
-                    borderRadius: BorderRadius.circular(11),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 60),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            key: ValueKey('buy-cart-packshot-${product.id}'),
-                            width: 60,
-                            height: 60,
-                            child: BuyV2ProductPackshot(
-                              product: product,
-                              borderRadius: 11,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyBody,
-                                ),
-                                Text(
-                                  '${product.variant} · ${product.pack}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyMeta.copyWith(fontSize: 8),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  automaticFulfilment
-                                      ? '$buyerPromise · MoolSocial price'
-                                      : '${product.deliveryPromise} · ${product.seller}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.green,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 20, right: 2),
-                            child: Icon(
-                              Icons.chevron_right_rounded,
-                              size: 18,
-                              color: BuyV2Colors.navy,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactWholesale =
+              wholesale &&
+              (constraints.maxWidth < 340 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.2);
+          if (compactWholesale) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                productBody,
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.only(top: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                  ),
+                  child: Row(
+                    children: [price, const Spacer(), quantityControl],
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BuyV2FiniteValueTransition(
-                key: ValueKey('buy-cart-line-total-motion-${product.id}'),
-                stateKey: line.total,
-                text: buyV2Money(line.total),
-                ownerSize: const Size(78, 22),
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (product.mrp != null && product.mrp! > product.price)
-                Text(
-                  buyV2Money(product.mrp! * line.quantity),
-                  style: context.buyMeta.copyWith(
-                    fontSize: 8,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-              const SizedBox(height: 5),
-              Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softBlue,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Remove one',
-                      onPressed: () => session.decrease(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.remove, size: 15),
-                    ),
-                    BuyV2FiniteValueTransition(
-                      key: ValueKey(
-                        'buy-cart-line-quantity-motion-${product.id}',
-                      ),
-                      stateKey: line.quantity,
-                      text: '${line.quantity}',
-                      ownerSize: const Size(24, 28),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Add one',
-                      onPressed: () => session.increase(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.add, size: 15),
-                    ),
-                  ],
-                ),
+              Expanded(child: productBody),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [price, const SizedBox(height: 5), quantityControl],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
