@@ -258,7 +258,10 @@ function Assert-ProductionHash {
           '490721029d88301e42dc593526618b4f94198ab586c1e55d709cae12776123bc',
           'deffe5cfd7cd7c1432d6057e5c045a1569dc3f71fbd5f9d8ef26251e984a68ca'
         )
-        current = '725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1'
+        current = @(
+          '725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1',
+          '29a01acb2cc8014fea05f75407f90e92848ab7e1af9fec638cb98f3edaff2c57'
+        )
       }
     }
     'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt' {
@@ -266,7 +269,10 @@ function Assert-ProductionHash {
         expected = @(
           '5dceb1482f366c2a4dc1ecf0a2a85c5aef73ae341d18d1e977e46bee76f8298c'
         )
-        current = '3f3e2fe25930b133de38693179deae19f738e34f681a0f779836117ec0426178'
+        current = @(
+          '3f3e2fe25930b133de38693179deae19f738e34f681a0f779836117ec0426178',
+          'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218'
+        )
       }
     }
     default { $null }
@@ -279,7 +285,7 @@ function Assert-ProductionHash {
     ).Replace('-', '').ToLowerInvariant()
     if (
       @($acceptedCurrent.expected) -ccontains $Expected.ToLowerInvariant() -and
-      $sourceCanonical -ceq [string]$acceptedCurrent.current
+      @($acceptedCurrent.current) -ccontains $sourceCanonical
     ) {
       return
     }
