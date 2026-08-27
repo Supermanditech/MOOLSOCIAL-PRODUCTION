@@ -147,6 +147,7 @@ void main() {
       find.byKey(const Key('global-profile-explore-workspaces')),
       findsOne,
     );
+    expect(find.text('Explore professional workspaces'), findsOne);
     expect(
       find.descendant(
         of: find.byKey(const Key('global-profile-panel-v2')),
