@@ -3310,7 +3310,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
-    expect(find.text('Search orders, sellers or ID'), findsOneWidget);
+    expect(find.text('Search orders or ID'), findsOneWidget);
     expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('buy-search-control')));
