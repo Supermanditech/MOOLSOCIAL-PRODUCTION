@@ -74,6 +74,81 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
 const buyV2ProductOfferDecisionContractVersion =
     'buy-product-offer-decision-v1';
 
+/// UI/API handoff for optional, workspace-authorized Wholesale trade context.
+///
+/// The genuine runtime adapter must resolve the authenticated retailer
+/// workspace outside this presentation layer. It receives only the stable
+/// product IDs and the customer-visible delivery locality, and returns a
+/// timestamped signal that must never override price, stock, delivery or Cart
+/// authorization from [BuyV2ProductFactsSnapshot].
+const buyV2WholesaleTradeDecisionContractVersion =
+    'buy-wholesale-trade-decision-v1';
+
+enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
+
+@immutable
+class BuyV2WholesaleTradeSignal {
+  const BuyV2WholesaleTradeSignal({
+    required this.productId,
+    required this.state,
+    required this.localityLabel,
+    required this.headline,
+    required this.detail,
+    required this.sourceLabel,
+    required this.updatedLabel,
+    this.priceValidUntilLabel,
+  });
+
+  const BuyV2WholesaleTradeSignal.unavailable({required this.productId})
+    : state = BuyV2WholesaleTradeSignalState.unavailable,
+      localityLabel = '',
+      headline = 'Local trade signal unavailable',
+      detail =
+          'You can still decide using the current price, stock and delivery promise.',
+      sourceLabel = '',
+      updatedLabel = '',
+      priceValidUntilLabel = null;
+
+  final String productId;
+  final BuyV2WholesaleTradeSignalState state;
+  final String localityLabel;
+  final String headline;
+  final String detail;
+  final String sourceLabel;
+  final String updatedLabel;
+  final String? priceValidUntilLabel;
+
+  bool get hasCurrentSignal =>
+      state == BuyV2WholesaleTradeSignalState.ready &&
+      localityLabel.trim().isNotEmpty &&
+      headline.trim().isNotEmpty &&
+      detail.trim().isNotEmpty &&
+      sourceLabel.trim().isNotEmpty &&
+      updatedLabel.trim().isNotEmpty;
+}
+
+abstract interface class BuyV2WholesaleTradeDecisionAdapter {
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  });
+}
+
+/// Production-safe default. Tests inject contract-conforming fixtures; the
+/// application never manufactures local demand, popularity or price validity.
+final class BuyV2UnavailableWholesaleTradeDecisionAdapter
+    implements BuyV2WholesaleTradeDecisionAdapter {
+  const BuyV2UnavailableWholesaleTradeDecisionAdapter();
+
+  @override
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  }) async => BuyV2WholesaleTradeSignal.unavailable(productId: productId);
+}
+
 enum BuyV2ProductOfferDecisionState {
   ready,
   checking,

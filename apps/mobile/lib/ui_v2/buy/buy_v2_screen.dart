@@ -45,6 +45,8 @@ class BuyV2Screen extends StatefulWidget {
     this.shopChatSource = const BuyV2SessionShopChatProvisioningSource(),
     this.contextualChatSource =
         const MoolDefaultContextualChatProvisioningSource(),
+    this.wholesaleTradeDecisionAdapter =
+        const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
 
   final BuyV2Session session;
@@ -69,6 +71,7 @@ class BuyV2Screen extends StatefulWidget {
   final BuyV2PublishedOffersSource offersSource;
   final BuyV2ShopChatProvisioningSource shopChatSource;
   final MoolContextualChatProvisioningSource contextualChatSource;
+  final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
@@ -774,6 +777,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.product => BuyV2ProductView(
         session: session,
         returnLabel: _offersActive ? 'Offers' : null,
+        wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
