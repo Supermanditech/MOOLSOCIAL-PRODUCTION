@@ -208,6 +208,32 @@ class _NewWorkState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: MoolSpacing.md),
+        WorkCard(
+          keyName: 'my-work-start-retailer',
+          color: const Color(0xFFF3F1FF),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const MoolServiceSectionHeader(
+                title: 'Sell products through MoolSocial',
+                subtitle:
+                    'Set up a verified retail workspace for stock, Buy orders, fulfilment and offers.',
+              ),
+              const SizedBox(height: MoolSpacing.md),
+              WorkPrimaryButton(
+                keyName: 'my-work-start-retailer-action',
+                label: 'Start retailer setup',
+                onPressed: () {
+                  session.startMyWork();
+                  session.selectFamily('products-trade');
+                  context.go('/app/work/workspace/retailer');
+                },
+                icon: Icons.storefront_rounded,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.md),
         const MoolServiceCard(
           key: Key('my-work-account-context'),
           title: 'Verified account contact',
