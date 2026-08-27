@@ -31,8 +31,15 @@ class WorkMainV2 extends StatelessWidget {
         trailing: IconButton(
           key: const Key('work-main-global-profile'),
           tooltip: 'MoolSocial account',
-          onPressed: () =>
-              showGlobalProfilePanelV2(context, onOpenRoute: context.push),
+          onPressed: () => showGlobalProfilePanelV2(
+            context,
+            onOpenRoute: (route) {
+              if (route.startsWith('/app/work/workspace/choose')) {
+                session.startAnotherWork();
+              }
+              context.push(route);
+            },
+          ),
           icon: const Icon(Icons.account_circle_outlined, size: 24),
         ),
         body: ListView(
