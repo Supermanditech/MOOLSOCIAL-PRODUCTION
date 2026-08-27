@@ -406,12 +406,12 @@ function Get-PublicAuthSideloadRuntimeValues {
 
 $machineState = Get-Content -Raw -LiteralPath $runtimeStateFile |
   ConvertFrom-Json
-if (
+if ($RuntimeProfile -cne 'CursorUiReview' -and (
   [string]$machineState.requiredRuntimeDefines.
     MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL -cne 'https://moolsocial.com/app' -or
   [string]$machineState.requiredRuntimeDefines.
     MOOLSOCIAL_EMAIL_LINK_DOMAIN -cne ''
-) {
+)) {
   throw 'Public-auth sideload Email Link Hosting configuration is not qualified.'
 }
 $facebookRuntimeRequiredForBuild =

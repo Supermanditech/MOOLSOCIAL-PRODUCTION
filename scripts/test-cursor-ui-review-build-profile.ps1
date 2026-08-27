@@ -30,6 +30,7 @@ function Test-CursorUiReviewWrapperSource {
     $Source.Contains("'cursorreview'") -and
     $Source.Contains('Cursor UI Review permits debug APK builds only.') -and
     $Source.Contains('AndroidDebugPackage=cursorreview;Promotable=false') -and
+    $Source.Contains("if (`$RuntimeProfile -cne 'CursorUiReview' -and (") -and
     $Source.Contains('-CandidateId $CandidateId')
   )
 }
