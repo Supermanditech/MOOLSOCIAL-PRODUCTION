@@ -115,10 +115,47 @@ void main() {
     expect(find.textContaining('Orders'), findsNothing);
     expect(find.textContaining('Payments'), findsNothing);
     expect(find.textContaining('Workspace'), findsNothing);
+    expect(find.text('Sign out'), findsOne);
+    expect(find.text('Sign in'), findsNothing);
 
     await tester.tap(find.byKey(const Key('global-security-device-settings')));
     await tester.pumpAndSettle();
     expect(settingsCalls, 1);
+  });
+
+  testWidgets('signed-out Security exposes one sign-in action in context', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    final work = WorkSession();
+    addTearDown(journey.dispose);
+    addTearDown(work.dispose);
+    final router = await pumpFromWork(
+      tester,
+      journey: journey,
+      work: work,
+      signOut: () async => true,
+      openSettings: () async => true,
+    );
+
+    expect(find.text('Sign in'), findsOne);
+    expect(find.text('Sign out'), findsNothing);
+    expect(find.byKey(const Key('global-security-methods')), findsNothing);
+    expect(find.byKey(const Key('global-security-recovery')), findsNothing);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('global-security-sign-in'))).dy,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const Key('global-security-device-settings')),
+            )
+            .dy,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('global-security-sign-in')));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/sign-in');
   });
 
   testWidgets('sign-out cancellation is safe and confirmation exits once', (

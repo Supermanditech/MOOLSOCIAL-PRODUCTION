@@ -107,34 +107,41 @@ class GlobalSecurityV2 extends StatelessWidget {
                       title: 'Account access',
                       palette: palette,
                       children: [
-                        _SecurityDetail(
-                          keyName: 'global-security-status',
-                          icon: Icons.verified_user_outlined,
-                          label: 'Account status',
-                          value: session.isAuthenticated
-                              ? 'Signed in'
-                              : 'Sign-in required',
-                          valueColor: session.isAuthenticated
-                              ? const Color(0xFF138808)
-                              : const Color(0xFFB45309),
-                          palette: palette,
-                        ),
-                        _SecurityDetail(
-                          keyName: 'global-security-methods',
-                          icon: Icons.key_outlined,
-                          label: 'Sign-in methods',
-                          value: methods.isEmpty
-                              ? 'MoolSocial sign-in'
-                              : methods.join(' · '),
-                          palette: palette,
-                        ),
-                        _SecurityDetail(
-                          keyName: 'global-security-recovery',
-                          icon: Icons.contact_mail_outlined,
-                          label: 'Recovery contact',
-                          value: recovery,
-                          palette: palette,
-                        ),
+                        if (session.isAuthenticated) ...[
+                          _SecurityDetail(
+                            keyName: 'global-security-status',
+                            icon: Icons.verified_user_outlined,
+                            label: 'Account status',
+                            value: 'Signed in',
+                            valueColor: const Color(0xFF138808),
+                            palette: palette,
+                          ),
+                          _SecurityDetail(
+                            keyName: 'global-security-methods',
+                            icon: Icons.key_outlined,
+                            label: 'Sign-in methods',
+                            value: methods.isEmpty
+                                ? 'MoolSocial sign-in'
+                                : methods.join(' · '),
+                            palette: palette,
+                          ),
+                          _SecurityDetail(
+                            keyName: 'global-security-recovery',
+                            icon: Icons.contact_mail_outlined,
+                            label: 'Recovery contact',
+                            value: recovery,
+                            palette: palette,
+                          ),
+                        ] else
+                          _SecurityAction(
+                            keyName: 'global-security-sign-in',
+                            icon: Icons.login_rounded,
+                            title: 'Sign in',
+                            detail:
+                                'Manage account recovery and access methods',
+                            palette: palette,
+                            onTap: () => context.go('/sign-in'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: MoolSpacing.md),
@@ -165,16 +172,6 @@ class GlobalSecurityV2 extends StatelessWidget {
                         ),
                         icon: const Icon(Icons.logout_rounded, size: 18),
                         label: const Text('Sign out'),
-                      )
-                    else
-                      FilledButton.icon(
-                        key: const Key('global-security-sign-in'),
-                        onPressed: () => context.go('/sign-in'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                        ),
-                        icon: const Icon(Icons.login_rounded, size: 18),
-                        label: const Text('Sign in'),
                       ),
                   ],
                 ),
@@ -204,7 +201,7 @@ class GlobalSecurityV2 extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         key: const Key('global-security-sign-out-dialog'),
         backgroundColor: palette.card,
-        title: Text('Sign out?', style: TextStyle(color: palette.ink)),
+        title: Text('End this session?', style: TextStyle(color: palette.ink)),
         content: Text(
           'Your language and service area remain saved on this device.',
           style: TextStyle(color: palette.muted),
@@ -218,7 +215,7 @@ class GlobalSecurityV2 extends StatelessWidget {
           FilledButton(
             key: const Key('global-security-sign-out-confirm'),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Sign out'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -306,7 +303,7 @@ class _SecurityHero extends StatelessWidget {
               Text(
                 authenticated
                     ? 'Your account session is active.'
-                    : 'Sign in to manage account security.',
+                    : 'Account access is required for recovery controls.',
                 style: const TextStyle(
                   color: Color(0xFFDADAF3),
                   fontSize: 10,
