@@ -45,6 +45,18 @@ class GlobalProfileWorkspaceContext {
   final String area;
 }
 
+class _GlobalProfilePanelResult {
+  const _GlobalProfilePanelResult.route(this.route)
+    : contextActionSelected = false;
+
+  const _GlobalProfilePanelResult.contextAction()
+    : route = null,
+      contextActionSelected = true;
+
+  final String? route;
+  final bool contextActionSelected;
+}
+
 Future<void> showGlobalProfilePanelV2(
   BuildContext context, {
   required ValueChanged<String> onOpenRoute,
@@ -53,12 +65,12 @@ Future<void> showGlobalProfilePanelV2(
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   GlobalProfileContextAction? contextAction,
 }) async {
-  await showGeneralDialog<void>(
+  final result = await showGeneralDialog<_GlobalProfilePanelResult>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close global profile',
     barrierColor: Colors.black.withValues(alpha: .38),
-    transitionDuration: MoolMotion.standard,
+    transitionDuration: MoolMotion.quick,
     pageBuilder: (dialogContext, _, _) => Align(
       alignment: Alignment.centerRight,
       child: GlobalProfilePanelV2(
@@ -67,10 +79,16 @@ Future<void> showGlobalProfilePanelV2(
         surfaceTone: surfaceTone,
         contextAction: contextAction,
         onClose: () => Navigator.pop(dialogContext),
-        onOpenRoute: (route) {
-          Navigator.pop(dialogContext);
-          onOpenRoute(route);
-        },
+        onOpenRoute: (route) => Navigator.pop(
+          dialogContext,
+          _GlobalProfilePanelResult.route(route),
+        ),
+        onContextAction: contextAction == null
+            ? null
+            : () => Navigator.pop(
+                dialogContext,
+                const _GlobalProfilePanelResult.contextAction(),
+              ),
       ),
     ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -88,6 +106,12 @@ Future<void> showGlobalProfilePanelV2(
       );
     },
   );
+  if (!context.mounted || result == null) return;
+  if (result.route case final route?) {
+    onOpenRoute(route);
+  } else if (result.contextActionSelected) {
+    contextAction?.onPressed();
+  }
 }
 
 /// The one account launcher used by every top-level MoolSocial destination.
@@ -129,6 +153,9 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
                 ? Colors.white.withValues(alpha: .24)
                 : _profileNavy.withValues(alpha: .14),
           ),
+          overlayColor: dark
+              ? Colors.white.withValues(alpha: .10)
+              : _profileNavy.withValues(alpha: .08),
           shape: const CircleBorder(),
         ),
         icon: const Icon(Icons.account_circle_outlined, size: 22),
@@ -145,6 +172,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     this.applicationInProgress = false,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     this.contextAction,
+    this.onContextAction,
     super.key,
   });
 
@@ -154,6 +182,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   final bool applicationInProgress;
   final GlobalProfileSurfaceTone surfaceTone;
   final GlobalProfileContextAction? contextAction;
+  final VoidCallback? onContextAction;
 
   @override
   Widget build(BuildContext context) {
@@ -235,10 +264,12 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                                 else if (contextAction case final action?)
                                   _GlobalProfileContextCard(
                                     action: action,
-                                    onPressed: () {
-                                      onClose();
-                                      action.onPressed();
-                                    },
+                                    onPressed:
+                                        onContextAction ??
+                                        () {
+                                          onClose();
+                                          action.onPressed();
+                                        },
                                   )
                                 else
                                   _ProfileAccessCard(
@@ -496,7 +527,7 @@ class _PersonalAccountSection extends StatelessWidget {
         title: 'Privacy and preferences',
         detail: 'Data and notifications',
         icon: Icons.privacy_tip_outlined,
-        route: '/app/account/workspaces/preferences',
+        route: '/app/account/preferences',
       ),
       const _ProfileDestination(
         id: 'security',
@@ -1110,6 +1141,8 @@ class _ProfileDestinationTile extends StatelessWidget {
         color: palette.accent,
         size: 19,
       ),
+      splashColor: palette.accent.withValues(alpha: .08),
+      hoverColor: palette.accent.withValues(alpha: .04),
       onTap: onTap,
     );
   }
