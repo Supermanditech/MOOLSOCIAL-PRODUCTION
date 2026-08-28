@@ -35,6 +35,8 @@ class ChatPageScaffold extends StatelessWidget {
     this.backTooltip = 'Back to conversations',
     this.showMessageBanner = true,
     this.prominentTitle = false,
+    this.titleIcon,
+    this.titleAccent,
     this.messageThreadId,
     this.trailing,
     this.bottom,
@@ -52,6 +54,8 @@ class ChatPageScaffold extends StatelessWidget {
   final String backTooltip;
   final bool showMessageBanner;
   final bool prominentTitle;
+  final IconData? titleIcon;
+  final Color? titleAccent;
   final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
@@ -88,34 +92,60 @@ class ChatPageScaffold extends StatelessWidget {
             titleSpacing: showContentBack ? 0 : MoolSpacing.md,
             title: Semantics(
               header: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: prominentTitle ? 28 : 20,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: prominentTitle ? -.7 : -.35,
-                    ),
-                  ),
-                  if (subtitle.trim().isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  if (titleIcon != null) ...[
+                    Container(
+                      key: const Key('chat-context-icon'),
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: (titleAccent ?? MoolColors.navy).withValues(
+                          alpha: .10,
+                        ),
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                      ),
+                      child: Icon(
+                        titleIcon,
+                        size: 20,
+                        color: titleAccent ?? MoolColors.navy,
                       ),
                     ),
+                    const SizedBox(width: 10),
                   ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: prominentTitle ? 28 : 20,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: prominentTitle ? -.7 : -.35,
+                          ),
+                        ),
+                        if (subtitle.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

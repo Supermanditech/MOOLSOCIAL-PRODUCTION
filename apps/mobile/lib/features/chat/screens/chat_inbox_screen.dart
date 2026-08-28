@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../shared/shared_session.dart';
+import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_session.dart';
 import '../widgets/chat_widgets.dart';
@@ -43,10 +44,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   String? _peopleDirectoryError;
   ChatHomeSection _section = ChatHomeSection.chats;
 
-  bool get _socialContext => widget.returnRoute.startsWith('/app/social');
+  ChatEntryContext get _entryContext =>
+      ChatEntryContext.resolve(widget.returnRoute);
 
   ChatThreadType? get _effectiveInitialFilter =>
-      widget.initialFilter ?? (_socialContext ? ChatThreadType.people : null);
+      widget.initialFilter ?? _entryContext.defaultFilter;
 
   @override
   void initState() {
@@ -294,6 +296,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     return AnimatedBuilder(
       animation: Listenable.merge(listeners),
       builder: (context, _) {
+        final entryContext = _entryContext;
         final threads = widget.session.visibleThreads(_searchController.text);
         final people = _visiblePeople();
         final sectionMotion = MoolMotion.accessible(
@@ -307,36 +310,38 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         return ChatPageScaffold(
           key: const Key('chat-inbox-screen'),
           session: widget.session,
-          title: 'MoolSocial Chat',
-          subtitle: '',
+          title: entryContext.title,
+          subtitle: entryContext.subtitle,
           returnRoute: widget.returnRoute,
-          prominentTitle: true,
+          titleIcon: entryContext.icon,
+          titleAccent: entryContext.accent,
           showMessageBanner: false,
           trailing: PopupMenuButton<String>(
             key: const Key('chat-more'),
             tooltip: 'More Chat options',
             onSelected: (value) => unawaited(_handleMoreAction(value)),
-            itemBuilder: (_) => const [
-              PopupMenuItem(
+            itemBuilder: (_) => [
+              const PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(
                   leading: Icon(Icons.refresh_rounded),
                   title: Text('Refresh'),
                 ),
               ),
-              PopupMenuItem(
-                value: 'feed',
-                child: ListTile(
-                  leading: Icon(Icons.dynamic_feed_outlined),
-                  title: Text('Open public Feed'),
+              if (entryContext.id == ChatEntryContextId.social)
+                const PopupMenuItem(
+                  value: 'feed',
+                  child: ListTile(
+                    leading: Icon(Icons.dynamic_feed_outlined),
+                    title: Text('Open public Feed'),
+                  ),
                 ),
-              ),
             ],
             icon: const Icon(Icons.more_vert_rounded),
           ),
           floatingActionButton: FloatingActionButton(
             key: const Key('chat-new'),
-            tooltip: 'Add MoolSocial people',
+            tooltip: 'Start a conversation',
             onPressed: () => _showNewChat(
               context,
               onDiscover: () => _selectSection(ChatHomeSection.discover),
@@ -453,7 +458,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
-              if (!_socialContext) ...[
+              if (_entryContext.showThreadFilters) ...[
                 _FilterStrip(session: widget.session),
                 const SizedBox(height: MoolSpacing.sm),
               ],
@@ -466,13 +471,14 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             child: _EmptyInbox(
               hasQuery:
                   _searchController.text.trim().isNotEmpty ||
-                  (!_socialContext && widget.session.selectedFilter != null) ||
+                  (_entryContext.showThreadFilters &&
+                      widget.session.selectedFilter != null) ||
                   widget.session.unreadOnly,
-              socialOnly: _socialContext,
+              socialOnly: _entryContext.id == ChatEntryContextId.social,
               onReset: () {
                 _searchController.clear();
-                if (_socialContext) {
-                  widget.session.chooseFilter(ChatThreadType.people);
+                if (_entryContext.defaultFilter case final filter?) {
+                  widget.session.chooseFilter(filter);
                 } else {
                   widget.session.chooseAll();
                 }
