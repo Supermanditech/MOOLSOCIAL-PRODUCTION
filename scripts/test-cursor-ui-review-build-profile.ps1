@@ -132,7 +132,8 @@ Assert-CursorUiReviewControl (
   $apkGate.Contains("'uaw_runtime_ui_review_debug'") -and
   $apkGate.Contains('runtime device review permits debug APK builds only.') -and
   $apkGate.Contains('runtime UI review permits debug APK builds only.') -and
-  $apkGate.Contains('runtime debug review must remain non-promotable.')
+  $apkGate.Contains('if (-not $isolatedDebugReview)') -and
+  $apkGate.Contains('isolated debug review must remain non-promotable.')
 ) 'runtime debug review is not package-isolated, debug-only and non-promotable.'
 
 $ellipsisOwnerSegments = @('apps/admin/app/admin/[[...section]]/page.tsx'.Split('/'))
