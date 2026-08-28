@@ -43773,6 +43773,16 @@
       "prevention": "Enumerate workspace repositories, parse each exact regression registry JSON, and calculate count and maximum numeric ID without optional rg calls.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD3-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3859-SHOP-ADDRESS-EVIDENCE-COPY-FOREACH-PIPE-RECURRENCE",
+      "status": "registered_no_direct_pipeline_after_foreach_required",
+      "appliesTo": ["primary", "coordination", "tooling", "evidence"],
+      "mistake": "The first Child 3 evidence-copy command again piped directly after foreach, so Windows PowerShell rejected it before any file was copied.",
+      "rootCause": "The command was composed with the prohibited foreach-to-pipeline form immediately after REG3857 documented the same parser class.",
+      "prevention": "Every remaining loop stores rows in an explicit System.Collections.Generic.List object and formats the list only in a later independent statement.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD4-20260828.md"]
     }
   ]
 }
