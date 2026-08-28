@@ -1,0 +1,15 @@
+{
+  "schema": "shop_redmi_install_result_v1",
+  "device": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r61.5-cursorreview",
+  "versionCode": "2026082807",
+  "apkBytes": 206411291,
+  "builtSha256": "A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4",
+  "installedSha256": "A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4",
+  "checksumMatched": true,
+  "coldLaunch": "passed",
+  "coldLaunchMilliseconds": 9617,
+  "oppoTouched": false,
+  "runtimePackageTouched": false
+}

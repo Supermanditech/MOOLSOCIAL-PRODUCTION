@@ -1,6 +1,6 @@
 # UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828
 
-State: `prebuild_repairs_passed_commit_pending`
+State: `redmi_qualified_founder_approved_with_successor`
 
 - Work ID: `shop-v2-r61-5-cursor-review-build-20260828`.
 - Branch:
@@ -55,3 +55,9 @@ commands and the integrity gate concatenated all lines. The preserved APK is
 `com.moolsocial.app.cursorreview` and passes the corrected, fixture-tested
 integrity gate, but remains rejected because its wrapper transaction did not
 complete. Attempt 3 requires a new source manifest and fresh authorization.
+
+Attempt 3 completed the wrapper successfully. The exact APK was installed only
+on Redmi `TG8HCYTGGQT885OF`; installed bytes and SHA-256 match the built APK.
+Cold launch, Shop landing, shared profile Shop CTA and exact Back recovery
+passed. The founder approves all reviewed behavior except the separately
+bounded location/address journey and Shop selected/pressed feedback successor.

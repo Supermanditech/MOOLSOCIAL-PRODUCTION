@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3811,
-    "sha256": "BA65C61813D0F33892934ADE7FD541433E56CBFA309A0A28E6E1F8FC2ACC5054"
+    "entryCount": 3812,
+    "sha256": "9DF8D3836E38B52062677AE119616916560DF2D2600CC927F763D2EEF30505FD"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -143,7 +143,22 @@
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt2.md",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-package-identity-rejected-debug.apk",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt3.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/plugin-integrity-attempt3.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head-attempt3.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt3.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt3.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt3.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-v2-r61.5-cursor-ui-review-20260828-device-review-debug.apk",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-v2-r61.5-cursor-ui-review-20260828-build-provenance.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-cold-launch.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-cold-launch-ui.xml",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-profile.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-back-recovery.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-installed-base.apk",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-install-result.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md"
       ]
     },
     {

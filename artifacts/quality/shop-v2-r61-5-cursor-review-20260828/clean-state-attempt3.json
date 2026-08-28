@@ -1,0 +1,10 @@
+{
+  "schema": "shop_clean_state_v1",
+  "attempt": 3,
+  "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+  "head": "6958d34479f8cab6ae3a24c52035f845a436a0d5",
+  "trackedStatusBytes": 0,
+  "trackedStatusSha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+  "trackedClean": true,
+  "recordedAt": "2026-08-28T23:21:52.6788503+05:30"
+}

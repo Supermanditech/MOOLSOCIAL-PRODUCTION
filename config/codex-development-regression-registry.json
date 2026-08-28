@@ -43673,6 +43673,16 @@
       "prevention": "Select exactly one trimmed output line matching an Android application-id pattern, reject zero or multiple candidates, add an echoed-batch fixture, and rerun integrity against the preserved APK before any fresh build authorization.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-production-plugin-integrity.ps1", "scripts/test-release-production-plugin-integrity.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-package-identity-rejected-debug.apk", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3849-ATTEMPT3-EVIDENCE-CLAIM-PATCH-LIST-ORDER-MISMATCH",
+      "status": "registered_literal_policy_list_anchor_required",
+      "appliesTo": ["primary", "coordination", "tooling", "build", "evidence"],
+      "mistake": "The first attempt-3 evidence claim patch assumed a different ordering of the existing attempt-2 artifact owners, and apply_patch rejected the hunk without changing policy.",
+      "rootCause": "The active claim list was reconstructed rather than anchored to the current literal adjacent entries.",
+      "prevention": "Read the exact line order and append the six attempt-3 evidence paths after the literal attempt2-manifest entry; never reorder preserved evidence owners during a build retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
     }
   ]
 }

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "build_failed",
-  "buildAuthorization": "consumed_failed",
+  "machineState": "founder_approved_with_successor_issues",
+  "buildAuthorization": "consumed_passed",
   "preBuildValidation": {
     "state": "passed",
-    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt2.md",
-    "negativeSelfTest": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md"
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt3.md",
+    "negativeSelfTest": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md"
   },
   "candidate": {
     "id": "UAW-SHOP-V2-R61.5-CURSOR-UI-REVIEW-20260828",
@@ -15,11 +15,11 @@
     "buildMode": "debug",
     "gateProfile": "uaw_cursor_ui_review_debug",
     "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
-    "head": "9a05a49a5979671e4d7a21f4fb572b57dfb0b847"
+    "head": "6958d34479f8cab6ae3a24c52035f845a436a0d5"
   },
   "source": {
-    "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
-    "manifestSha256": "6F339A05D63B13F09C3B09F29795FC61E4713FC9A784F536D3C16183680D5E52",
+    "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt3.txt",
+    "manifestSha256": "AB8B3459934451659A066E481F54297C0FA40E0D482393FA4058E0A9A3E8A2A1",
     "fileCount": 636
   },
   "requiredRuntimeDefines": {
@@ -44,8 +44,8 @@
       "id": "source-manifest",
       "state": "passed",
       "evidence": [
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2-final.json"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt3.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt3.json"
       ]
     },
     {
@@ -69,7 +69,8 @@
       "evidence": [
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/positive-release-gates.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-pass.log"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-pass.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/plugin-integrity-attempt3.log"
       ]
     },
     {
@@ -114,7 +115,7 @@
       "id": "clean-state-regression",
       "state": "passed",
       "evidence": [
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt2.json"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt3.json"
       ]
     },
     {
@@ -163,10 +164,17 @@
     "runtimePackageForbidden": true
   },
   "qualificationResult": {
-    "state": "attempt2_false_integrity_gate_rejection"
+    "state": "attempt3_device_qualified_founder_approved_with_successor"
   },
   "buildResult": {
-    "state": "failed_attempt2_false_integrity_gate",
+    "state": "passed",
+    "wrapper": "scripts/build-buy-device-review.ps1",
+    "attempt": 3,
+    "apkPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-v2-r61.5-cursor-ui-review-20260828-device-review-debug.apk",
+    "apkBytes": 206411291,
+    "apkSha256": "A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4",
+    "head": "6958d34479f8cab6ae3a24c52035f845a436a0d5",
+    "sourceFingerprint": "AB8B3459934451659A066E481F54297C0FA40E0D482393FA4058E0A9A3E8A2A1",
     "failedAttempts": [
       {
         "attempt": 1,
@@ -191,31 +199,51 @@
     ]
   },
   "installResult": {
-    "state": "pending_redmi_only"
+    "state": "passed_checksum_matched",
+    "device": "Redmi TG8HCYTGGQT885OF",
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r61.5-cursorreview",
+    "versionCode": "2026082807",
+    "installedBytes": 206411291,
+    "installedSha256": "A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4",
+    "coldLaunch": "passed",
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-install-result.json"
   },
   "founderApproval": {
-    "state": "pending_visual_review"
+    "state": "approved_except_successor_location_and_navigation_issues",
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md"
   },
   "postBuildGates": [
     {
       "id": "post-build-source-identity",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt3.json"
+      ]
     },
     {
       "id": "apk-signature-badging-install-pull",
-      "state": "pending",
-      "evidence": []
+      "state": "passed_checksum_matched",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-install-result.json"
+      ]
     },
     {
       "id": "cold-process-and-shop-journey",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-cold-launch.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-profile.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-back-recovery.png"
+      ]
     },
     {
       "id": "technical-qualification",
-      "state": "pending",
-      "evidence": []
+      "state": "passed_founder_approved_with_successor",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md"
+      ]
     }
   ]
 }

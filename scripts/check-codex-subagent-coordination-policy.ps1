@@ -1625,6 +1625,21 @@ if ($ProductionLane -ceq 'baseline') {
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2-final.json',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2.json',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt3.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/plugin-integrity-attempt3.log',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head-attempt3.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt3.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt3.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt3.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-v2-r61.5-cursor-ui-review-20260828-device-review-debug.apk',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-v2-r61.5-cursor-ui-review-20260828-build-provenance.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-cold-launch.png',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-cold-launch-ui.xml',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-profile.png',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-back-recovery.png',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-installed-base.apk',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-install-result.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md',
             'scripts/check-codex-subagent-coordination-policy.ps1'
           ) | ForEach-Object { $_.ToLowerInvariant() }
           $shopRepairExistingSubjects = @(& git -C $root log --format=%s `
@@ -1645,6 +1660,16 @@ if ($ProductionLane -ceq 'baseline') {
               [string]$shopRepairExistingSubjects[0] -ceq
                 'repair(shop-v2-r61-5-cursor-review-build-20260828): seal Cursor-only Google Services exclusion' -and
               [string]$shopRepairExistingSubjects[1] -ceq
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): authorize one Redmi review build'
+            ) -or
+            (
+              $existingCoordinationCommits.Count -eq 3 -and
+              $shopRepairExistingSubjects.Count -eq 3 -and
+              [string]$shopRepairExistingSubjects[0] -ceq
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): fix Windows APK identity inspection' -and
+              [string]$shopRepairExistingSubjects[1] -ceq
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): seal Cursor-only Google Services exclusion' -and
+              [string]$shopRepairExistingSubjects[2] -ceq
                 'repair(shop-v2-r61-5-cursor-review-build-20260828): authorize one Redmi review build'
             )
           )
