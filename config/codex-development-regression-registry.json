@@ -43583,6 +43583,56 @@
       "prevention": "Format only the claimed test file, read back the diff, rerun no-change format plus focused analysis, rerun its complete test, and regenerate a new unique source manifest before machine-state authorization.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/format-analysis.log", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3840-BUILD-FOUNDATION-RG-NO-MATCH-NOT-NORMALIZED",
+      "status": "registered_expected_no_match_exit_handling_required",
+      "appliesTo": ["primary", "coordination", "tooling", "build"],
+      "mistake": "A read-only search for Cursor-specific tokens in test-public-auth-sideload-build-controls.ps1 returned the expected rg no-match exit one and was exposed as a failed command.",
+      "rootCause": "The diagnostic repeated REG3826 by not accepting exit one for an optional token inventory.",
+      "prevention": "For every optional build-script search, capture rg output and accept exit zero or one explicitly; inspect the wrapper's actual execution path rather than assuming candidate-specific tokens must exist.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3841-CURSOR-UI-REVIEW-BUILD-REQUIRED-MISSING-GOOGLE-SERVICES",
+      "status": "registered_failed_build_authorization_consumed_profile_gate_repair_required",
+      "appliesTo": ["primary", "coordination", "build", "android", "firebase_boundary"],
+      "mistake": "The single authorized CursorUiReview debug build reached Gradle but failed at :app:processDebugGoogleServices because google-services.json is absent; no APK or provenance artifact was created.",
+      "rootCause": "The UI-only build profile correctly bypasses Firebase runtime startup but still allows the Google Services Gradle task to execute, making an intentionally absent Firebase configuration a compile-time requirement.",
+      "prevention": "Mark the authorization consumed_failed, retain the failed attempt, verify zero APK output, and change only the existing CursorUiReview Gradle/profile condition so its debug variant skips Google Services processing without copying Firebase config or changing production/runtime variants; require a fresh one-build authorization for retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/build-buy-device-review.ps1", "scripts/test-cursor-ui-review-build-profile.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/apk-regression-gate-state.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3842-PRIOR-CURSORREVIEW-GOOGLE-SERVICES-EXISTENCE-CHECK-PARSER-FAILURE",
+      "status": "registered_expanded_read_only_existence_check_required",
+      "appliesTo": ["primary", "coordination", "tooling", "build", "firebase_boundary"],
+      "mistake": "The first read-only prior-worktree google-services.json existence/track/ignore check failed PowerShell parsing because an inline if expression embedded a semicolon-delimited native command inside a hashtable value.",
+      "rootCause": "Several scalar checks were overcompressed into one parser-sensitive expression.",
+      "prevention": "Run existence, tracked and ignored checks as expanded independent statements and project only booleans; never read or copy the configuration contents.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3843-CURSORREVIEW-ANDROID-OWNER-EXCEPTION-PATCH-CONTEXT-MISSED",
+      "status": "registered_literal_checker_range_required",
+      "appliesTo": ["primary", "coordination", "tooling", "build", "android"],
+      "mistake": "The first exact-owner coordination exception patch for the newly authorized CursorReview Gradle file missed the checker's current whitespace/context and apply_patch rejected it without changing the file.",
+      "rootCause": "The hunk reused an earlier remembered range after subsequent checker edits instead of reading the literal current block.",
+      "prevention": "Read the exact owner-allowlist block and patch only the literal continuation-bound Android-owner exception while preserving every other lane and forbidden root.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3844-CURSORREVIEW-GRADLE-OWNER-DUPLICATED-ACTIVE-AUTH-CLAIM",
+      "status": "registered_exact_owner_transfer_required",
+      "appliesTo": ["primary", "coordination", "build", "android", "git_discipline"],
+      "mistake": "The first post-authorization coordination gate rejected apps/mobile/android/app/build.gradle.kts because the Shop build task claimed it while the active Codex Desktop Social auth task still retained the same owner.",
+      "rootCause": "The exact newly authorized Android owner was added without first inventorying and removing its prior active claim.",
+      "prevention": "Transfer only build.gradle.kts from the Social auth claim to the Shop build claim, leave every other Codex Desktop owner unchanged, and require the overlap gate to pass before any test or retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/android/app/build.gradle.kts", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
     }
   ]
 }

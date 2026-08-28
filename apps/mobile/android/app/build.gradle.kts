@@ -119,6 +119,11 @@ if (androidDebugPackage == "cursorreview") {
     tasks.matching { it.name == "compileDebugJavaWithJavac" }.configureEach {
         dependsOn(sanitizeProductionGeneratedPluginRegistrant)
     }
+    tasks.matching { it.name == "processDebugGoogleServices" }.configureEach {
+        // Cursor review is a non-promotable UI-only package. It intentionally
+        // has no Firebase client configuration and must not process one.
+        enabled = false
+    }
 }
 
 val localPropertiesFile = rootProject.file("local.properties")

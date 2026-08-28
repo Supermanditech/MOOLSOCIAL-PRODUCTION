@@ -1432,6 +1432,12 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $shopCursorReviewAndroidOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'integration_repair_shop_v2_r61_5_cursor_review_build_20260828' -and
+        $effectiveOwner -ceq 'apps/mobile/android/app/build.gradle.kts'
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1439,10 +1445,14 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
+      if ($shopCursorReviewAndroidOwner) {
+        $allowedOwner = $true
+      }
       Assert-Coordination $allowedOwner `
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
+          $shopCursorReviewAndroidOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -1590,8 +1600,19 @@ if ($ProductionLane -ceq 'baseline') {
             'docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md',
             'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md',
             'config/apk-regression-gate-state.json',
+            'apps/mobile/android/app/build.gradle.kts',
             'docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
             'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
+            'scripts/test-cursor-ui-review-build-profile.ps1',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/branch.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/protected-boundary-disposition.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/rejected-candidate-preserved.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/startup-config-regression-registered.md',
             'scripts/check-codex-subagent-coordination-policy.ps1'
           ) | ForEach-Object { $_.ToLowerInvariant() }
           $shopRepairExistingSubjects = @(& git -C $root log --format=%s `

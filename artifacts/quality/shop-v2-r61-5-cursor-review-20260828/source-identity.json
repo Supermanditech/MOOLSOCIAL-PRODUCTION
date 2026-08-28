@@ -1,0 +1,9 @@
+{
+  "schema": "shop_source_identity_v1",
+  "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+  "head": "a582ea950e056ff49c69ac0553984f2a2903cc18",
+  "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-final.txt",
+  "manifestSha256": "8512355AD08E1CC45731B7D8B97772AE9CE45360811D1FF68D9F496E28CF64E8",
+  "fileCount": 636,
+  "recordedAt": "2026-08-28T22:13:03.5608251+05:30"
+}

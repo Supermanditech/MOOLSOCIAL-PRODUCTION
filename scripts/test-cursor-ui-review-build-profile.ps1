@@ -105,7 +105,10 @@ Assert-CursorUiReviewControl (
   $gradle.Contains('"MoolSocial Cursor Review"') -and
   $gradle.Contains('if (androidDebugPackage == "cursorreview")') -and
   $gradle.Contains('compileDebugJavaWithJavac') -and
-  $gradle.Contains('sanitizeProductionGeneratedPluginRegistrant')
+  $gradle.Contains('sanitizeProductionGeneratedPluginRegistrant') -and
+  $gradle.Contains('it.name == "processDebugGoogleServices"') -and
+  $gradle.Contains('enabled = false') -and
+  -not $gradle.Contains('processReleaseGoogleServices')
 ) 'Android cursorreview package isolation is incomplete.'
 
 Assert-CursorUiReviewControl (

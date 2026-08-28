@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3802,
-    "sha256": "DDD5148B50341B58D8EE5743D2CA67FCADFC88FEA0A046DA908B6A7DFFCBB6CC"
+    "entryCount": 3807,
+    "sha256": "BD683EEAC2237ED6E8619DC269A05EFB6944351E6827EE6183976C2407DA11D2"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -108,6 +108,8 @@
         "scripts/new-shop-v2-r61-5-source-manifest.ps1",
         "scripts/check-buy-backend-contract-boundary.ps1",
         "scripts/check-buy-data-egress-boundary.ps1",
+        "scripts/test-cursor-ui-review-build-profile.ps1",
+        "apps/mobile/android/app/build.gradle.kts",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-failure.log",
@@ -120,7 +122,16 @@
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/positive-release-gates.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-final.txt",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest.txt",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/wrapper-self-test.log"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/wrapper-self-test.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/branch.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/protected-boundary-disposition.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/rejected-candidate-preserved.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/startup-config-regression-registered.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md"
       ]
     },
     {
@@ -252,7 +263,6 @@
         "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
         "apps/mobile/pubspec.yaml",
         "apps/mobile/pubspec.lock",
-        "apps/mobile/android/app/build.gradle.kts",
         "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
         "apps/mobile/test/c30t_social_auth_and_feed_gateway_test.dart",
         "apps/mobile/test/screen04_universal_v2_conformance_test.dart",
