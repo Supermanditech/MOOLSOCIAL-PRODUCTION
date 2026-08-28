@@ -44053,6 +44053,16 @@
       "prevention": "Compute empty/non-empty status hash in an independent statement, then construct the digest object; do not rerun the malformed projection.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
+    },
+    {
+      "id": "REG-20260829-3887-SHOP-R61-6-CLEAN-STATUS-NULL-DIGEST-INPUT",
+      "status": "registered_explicit_empty_status_string_required",
+      "appliesTo": ["primary", "coordination", "closure", "tooling"],
+      "mistake": "After the evidence commit, git status produced no records and Windows PowerShell returned null; the digest command passed null to UTF8.GetBytes and regex Matches.",
+      "rootCause": "The clean-tree path did not normalize absent pipeline output to an explicit empty string.",
+      "prevention": "Initialize statusText to an empty string, assign joined status output only when records exist, and report zero bytes and zero records without hashing null.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
     }
   ]
 }
