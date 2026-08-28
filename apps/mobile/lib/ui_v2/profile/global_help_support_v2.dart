@@ -104,7 +104,7 @@ class GlobalHelpSupportV2 extends StatelessWidget {
                 const SizedBox(height: MoolSpacing.md),
                 _SupportCard(
                   palette: palette,
-                  onPressed: () => context.push(_supportLocation()),
+                  onPressed: () => context.push(_supportLocation(context)),
                 ),
               ],
             ),
@@ -114,16 +114,24 @@ class GlobalHelpSupportV2 extends StatelessWidget {
     );
   }
 
-  String _supportLocation() => Uri(
+  String _supportLocation(BuildContext context) => Uri(
     path: '/app/chat',
-    queryParameters: const {'type': 'support', 'return': '/app/ask'},
+    queryParameters: {
+      'type': 'support',
+      'return': GoRouterState.of(context).uri.toString(),
+    },
   ).toString();
 
   void _leave(BuildContext context) {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/home');
+      final returnLocation = GoRouterState.of(
+        context,
+      ).uri.queryParameters['return'];
+      context.go(
+        globalProfileSafeReturnLocation(returnLocation) ?? '/app/mool',
+      );
     }
   }
 }

@@ -5,6 +5,7 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
@@ -150,7 +151,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('support-chat-destination')), findsOne);
     expect(find.text('support'), findsOne);
-    expect(find.text('/app/ask'), findsOne);
+    final helpReturn = tester
+        .widget<Text>(find.byKey(const Key('support-chat-return')))
+        .data!;
+    final helpUri = Uri.parse(helpReturn);
+    expect(helpUri.path, '/app/ask');
+    expect(helpUri.queryParameters['return'], '/app/work/home');
   });
 
   testWidgets('compact Help remains proportional without overflow', (
@@ -168,6 +174,95 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('direct Help restore returns to its exact safe origin', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    addTearDown(journey.dispose);
+    final router = GoRouter(
+      initialLocation: Uri(
+        path: '/app/ask',
+        queryParameters: const {'return': '/app/eat/home?cuisine=cafe'},
+      ).toString(),
+      routes: [
+        GoRoute(
+          path: '/app/ask',
+          builder: (context, state) => GlobalHelpSupportV2(session: journey),
+        ),
+        GoRoute(
+          path: '/app/eat/home',
+          builder: (context, state) =>
+              const Scaffold(key: Key('eat-origin-return')),
+        ),
+        GoRoute(
+          path: '/app/mool',
+          builder: (context, state) =>
+              const Scaffold(key: Key('global-safe-return')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-help-back')));
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/app/eat/home?cuisine=cafe',
+    );
+    expect(find.byKey(const Key('eat-origin-return')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('Social Help keeps its surface and exact return together', () {
+    final uri = Uri.parse(
+      globalHelpLocationForReturn(
+        '/app/social?sub=videos',
+        surfaceTone: GlobalProfileSurfaceTone.socialDark,
+      ),
+    );
+
+    expect(uri.path, '/app/ask');
+    expect(uri.queryParameters['return'], '/app/social?sub=videos');
+    expect(uri.queryParameters['surface'], 'social');
+  });
+
+  testWidgets('unsafe Help return uses the neutral Mool destination', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    addTearDown(journey.dispose);
+    final router = GoRouter(
+      initialLocation: Uri(
+        path: '/app/ask',
+        queryParameters: const {'return': 'https://example.com/account'},
+      ).toString(),
+      routes: [
+        GoRoute(
+          path: '/app/ask',
+          builder: (context, state) => GlobalHelpSupportV2(session: journey),
+        ),
+        GoRoute(
+          path: '/app/mool',
+          builder: (context, state) =>
+              const Scaffold(key: Key('global-safe-return')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-help-back')));
+    await tester.pumpAndSettle();
+
+    expect(router.routeInformationProvider.value.uri.path, '/app/mool');
+    expect(find.byKey(const Key('global-safe-return')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

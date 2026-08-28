@@ -12,6 +12,7 @@ const _profileGreen = Color(0xFF138808);
 const _globalPersonalProfileRoute = '/app/account/identity';
 const _globalPreferencesRoute = '/app/account/workspaces/preferences';
 const _globalSecurityRoute = '/app/account/security';
+const _globalHelpRoute = '/app/ask';
 const _safeGlobalProfileReturnRoots = <String>[
   '/app/social',
   '/app/buy',
@@ -134,6 +135,10 @@ Future<void> showGlobalProfilePanelV2(
         returnLocation,
         surfaceTone: surfaceTone,
       ),
+      _globalHelpRoute => globalHelpLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
       _ => route,
     });
   } else if (result.contextActionSelected) {
@@ -162,6 +167,17 @@ String globalSecurityLocationForReturn(
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
 }) => Uri(
   path: _globalSecurityRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
+String globalHelpLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalHelpRoute,
   queryParameters: {
     'return': returnLocation,
     if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
