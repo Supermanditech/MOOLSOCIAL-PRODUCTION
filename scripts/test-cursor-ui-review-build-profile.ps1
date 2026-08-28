@@ -30,7 +30,8 @@ function Test-CursorUiReviewWrapperSource {
     $Source.Contains("'cursorreview'") -and
     $Source.Contains('Cursor UI Review permits debug APK builds only.') -and
     $Source.Contains('AndroidDebugPackage=cursorreview;Promotable=false') -and
-    $Source.Contains("if (`$RuntimeProfile -cne 'CursorUiReview' -and (") -and
+    $Source.Contains('$isolatedDebugReview = (') -and
+    $Source.Contains('if (-not $isolatedDebugReview -and (') -and
     $Source.Contains("if (`$BuildMode -ceq 'release') {") -and
     $Source.Contains("'com.moolsocial.app.cursorreview'") -and
     $Source.Contains('AllowDebugTestPlugin = $true') -and
@@ -111,7 +112,7 @@ Assert-CursorUiReviewControl (
   $apkGate.Contains("'uaw_cursor_ui_review_debug'") -and
   $apkGate.Contains("'package-isolation'") -and
   $apkGate.Contains("'MOOLSOCIAL_UI_REVIEW_ONLY'") -and
-  $apkGate.Contains('if (-not $cursorUiReview)') -and
+  $apkGate.Contains('if (-not $isolatedDebugReview)') -and
   $apkGate.Contains('$fullSocialRequested = if ($cursorUiReview)')
 ) 'generic APK gate does not recognize the Cursor UI Review profile.'
 
@@ -120,5 +121,13 @@ Assert-CursorUiReviewControl (
   $pluginGate.Contains('[switch]$AllowDebugTestPlugin') -and
   $pluginGate.Contains('if (-not $AllowDebugTestPlugin)')
 ) 'plugin integrity gate does not preserve release defaults and debug isolation.'
+
+Assert-CursorUiReviewControl (
+  $builder.Contains("'com.moolsocial.app.runtime'") -and
+  $builder.Contains("if (`$BuildMode -cne 'debug') {") -and
+  $apkGate.Contains("'uaw_runtime_debug_review'") -and
+  $apkGate.Contains('runtime device review permits debug APK builds only.') -and
+  $apkGate.Contains('runtime debug review must remain non-promotable.')
+) 'runtime debug review is not package-isolated, debug-only and non-promotable.'
 
 Write-Output 'CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED'

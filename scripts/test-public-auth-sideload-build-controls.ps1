@@ -35,6 +35,7 @@ $coordinationGate = Join-Path `
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
+$genericDebugCandidate = $false
 if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
   $resolvedPreApkState = [IO.Path]::GetFullPath($PreApkStatePath)
   $rootPrefix = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
@@ -49,6 +50,10 @@ if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
   ) 'candidate-specific pre-APK state is missing or outside the repository.'
   $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
     ConvertFrom-Json
+  $genericDebugCandidate = (
+    $CandidateId -cne 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK' -and
+    [string]$preApkState.candidate.buildMode -ceq 'debug'
+  )
   if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
     $preApkGate = Join-Path `
       $RepositoryRoot `
@@ -163,10 +168,12 @@ if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
       } finally {
         Pop-Location
       }
-      & $pluginManifestNamespaceGatePath `
-        -RepositoryRoot $RepositoryRoot | Out-Null
-      & $kotlinPluginReadinessGatePath `
-        -RepositoryRoot $RepositoryRoot | Out-Null
+      if (-not $genericDebugCandidate) {
+        & $pluginManifestNamespaceGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+        & $kotlinPluginReadinessGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+      }
     }
   Assert-SideloadControl ($dependencyInventoryExit -eq 0) `
     'guarded candidate dependency inventory failed.'

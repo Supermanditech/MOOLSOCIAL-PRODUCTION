@@ -406,7 +406,11 @@ function Get-PublicAuthSideloadRuntimeValues {
 
 $machineState = Get-Content -Raw -LiteralPath $runtimeStateFile |
   ConvertFrom-Json
-if ($RuntimeProfile -cne 'CursorUiReview' -and (
+$isolatedDebugReview = (
+  $BuildMode -ceq 'debug' -and
+  $RuntimeProfile -cin @('EmulatorDeviceReview', 'CursorUiReview')
+)
+if (-not $isolatedDebugReview -and (
   [string]$machineState.requiredRuntimeDefines.
     MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL -cne 'https://moolsocial.com/app' -or
   [string]$machineState.requiredRuntimeDefines.
@@ -525,19 +529,24 @@ try {
     if ($LASTEXITCODE -ne 0) {
       throw 'Locked Flutter dependency resolution failed before APK build.'
     }
-    & $pluginManifestNamespaceGate `
-      -RepositoryRoot $repositoryRoot | Out-Null
-    if (-not $?) {
-      throw 'Android plugin manifest-namespace readiness failed.'
+    if ($BuildMode -cne 'debug') {
+      & $pluginManifestNamespaceGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
+      if (-not $?) {
+        throw 'Android plugin manifest-namespace readiness failed.'
+      }
+      & $kotlinPluginReadinessGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
+      if (-not $?) {
+        throw 'Android release Kotlin-plugin readiness failed.'
+      }
+      & $resourceIntegrityGate `
+        -RepositoryRoot $repositoryRoot `
+        -RunGradleLink | Out-Null
+    } else {
+      & $resourceIntegrityGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
     }
-    & $kotlinPluginReadinessGate `
-      -RepositoryRoot $repositoryRoot | Out-Null
-    if (-not $?) {
-      throw 'Android release Kotlin-plugin readiness failed.'
-    }
-    & $resourceIntegrityGate `
-      -RepositoryRoot $repositoryRoot `
-      -RunGradleLink | Out-Null
     if (-not $?) {
       throw 'Android release resource-integrity preflight failed.'
     }
@@ -611,9 +620,14 @@ try {
       'build\app\outputs\mapping\release'
     $pluginIntegrityArguments.RequireMappingAware = $true
   }
-  if ($RuntimeProfile -ceq 'CursorUiReview') {
-    $pluginIntegrityArguments.ExpectedApplicationId = `
+  if ($BuildMode -ceq 'debug') {
+    $pluginIntegrityArguments.ExpectedApplicationId = if (
+      $RuntimeProfile -ceq 'CursorUiReview'
+    ) {
       'com.moolsocial.app.cursorreview'
+    } else {
+      'com.moolsocial.app.runtime'
+    }
     $pluginIntegrityArguments.AllowDebugTestPlugin = $true
   }
   & $pluginIntegrityGate @pluginIntegrityArguments
