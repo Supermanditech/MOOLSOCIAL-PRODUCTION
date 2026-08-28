@@ -43213,6 +43213,16 @@
       "prevention": "Constrain the shared shortcut's outer child with SizedBox.square(44), zero IconButton padding, shrink-wrap tap target and exact constraints; retain at least 44-by-44 semantics and replay Shop plus existing shared-profile destination tests.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3803-SHOP-PROFILE-ORDERS-CTA-TEST-GUESSED-ABSENT-BUY-ORDERS-KEY",
+      "status": "registered_exact_visible_orders_owner_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy"],
+      "mistake": "The corrected Shop profile CTA test reached Orders with destination orders and view catalogue, then failed because it asserted guessed key buy-orders, which is not an existing visible owner.",
+      "rootCause": "The assertion copied the destination label into a widget-key convention instead of resolving the exact Orders view key from the claimed production source.",
+      "prevention": "Read the claimed Orders view declaration, copy its exact key, assert session destination/view plus that visible owner and rerun the focused CTA test before broader suites.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828.md"]
     }
   ]
 }

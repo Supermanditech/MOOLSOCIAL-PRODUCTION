@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3765,
-    "sha256": "9B33595FE94D279A1640F5E72883F7C20AF32B5F1ED84FF0EE22DA62D956C7EB"
+    "entryCount": 3766,
+    "sha256": "931D2B5B220852A1D1F0A1A7CEBE76182704BF63A528692C571047AC6FDD6EAE"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_v2_child4_profile_geometry_20260828",
+      "task": "/root/cursor_shop_v2_child5_orders_owner_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
@@ -167,7 +167,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828.md"
       ]
     },
     {
@@ -538,6 +539,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_v2_child5_orders_owner_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_v2_child5_orders_owner_20260828",
+        "workId": "shop-v2-child5-orders-owner-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-SHOP-V2-CHILD5-ORDERS-OWNER-20260828",
+        "branch": "work/cursor-ui/shop-v2-child5-orders-owner-20260828",
+        "baselineHead": "58a04f2329b658c7b7296ad7055fda43be2a1022",
+        "bootstrapCommitSubject": "coordination(shop-v2-child5-orders-owner-20260828): bind exact Orders owner correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
