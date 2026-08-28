@@ -209,6 +209,50 @@ void main() {
     expect(find.byKey(const Key('chat-back')), findsOneWidget);
     expect(find.text('5 members'), findsOneWidget);
     expect(find.byKey(const Key('chat-composer-surface')), findsOneWidget);
+    expect(find.byKey(const Key('chat-thread-video')), findsOneWidget);
+    expect(find.byKey(const Key('chat-thread-call')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attach')), findsOneWidget);
+    expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+    expect(find.byKey(const Key('chat-voice-message')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chat-thread-video')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-video-recovery')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chat-thread-call')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-call-recovery')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chat-attach')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-document')), findsOneWidget);
+    expect(find.byKey(const Key('chat-gallery')), findsOneWidget);
+    expect(find.byKey(const Key('chat-camera')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-document')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-document-recovery')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chat-composer-camera')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-photo-recovery')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chat-voice-message')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-voice-message-recovery')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('chat-message-actions')), findsNothing);
     await tester.longPress(find.byKey(const Key('chat-message-m1')));
     await tester.pumpAndSettle();

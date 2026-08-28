@@ -551,6 +551,7 @@ void main() {
       find.byKey(const Key('chat-message-field')),
       'Old recipient draft',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('chat-send')));
     await tester.pump();
     expect(session.busy, isTrue);

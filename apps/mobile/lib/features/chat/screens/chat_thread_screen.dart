@@ -188,6 +188,39 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           titleIcon: _threadIconFor(thread.type),
           titleAccent: entryContext.accent,
           backgroundColor: const Color(0xFFF1F2F6),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                key: const Key('chat-thread-video'),
+                tooltip: 'Video call',
+                onPressed: () => unawaited(
+                  _showUnavailableCapability(
+                    context,
+                    keyName: 'chat-video-recovery',
+                    title: 'Video calling unavailable',
+                    message:
+                        'Video calling is not available right now. You can continue this conversation in Chat.',
+                  ),
+                ),
+                icon: const Icon(Icons.videocam_outlined),
+              ),
+              IconButton(
+                key: const Key('chat-thread-call'),
+                tooltip: 'Voice call',
+                onPressed: () => unawaited(
+                  _showUnavailableCapability(
+                    context,
+                    keyName: 'chat-call-recovery',
+                    title: 'Voice calling unavailable',
+                    message:
+                        'Voice calling is not available right now. You can continue this conversation in Chat.',
+                  ),
+                ),
+                icon: const Icon(Icons.call_outlined),
+              ),
+            ],
+          ),
           messageThreadId: thread.id,
           body:
               widget.session.loadingMessageThreads.contains(thread.id) &&
@@ -620,6 +653,51 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
+Future<void> _showUnavailableCapability(
+  BuildContext context, {
+  required String keyName,
+  required String title,
+  required String message,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        key: Key(keyName),
+        padding: const EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          MoolSpacing.xs,
+          MoolSpacing.lg,
+          MoolSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+            Text(message, style: const TextStyle(color: MoolColors.muted)),
+            const SizedBox(height: MoolSpacing.md),
+            FilledButton(
+              key: const Key('chat-capability-continue'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Continue in Chat'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> _showMessageActions(
   BuildContext context, {
   required ChatSession session,
@@ -786,6 +864,8 @@ Future<void> _chooseForwardTarget(
   }
 }
 
+enum _ChatAttachmentChoice { document, gallery, camera }
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.session,
@@ -801,8 +881,8 @@ class _Composer extends StatelessWidget {
   final Future<void> Function() onSend;
   final Future<void> Function() onSendPhoto;
 
-  Future<void> _choosePhoto(BuildContext context) async {
-    final source = await showModalBottomSheet<ChatPhotoSource>(
+  Future<void> _chooseAttachment(BuildContext context) async {
+    final choice = await showModalBottomSheet<_ChatAttachmentChoice>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
@@ -812,34 +892,75 @@ class _Composer extends StatelessWidget {
           children: [
             const ListTile(
               title: Text(
-                'Share a photo',
+                'Share a file',
                 style: TextStyle(
                   color: MoolColors.navy,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              subtitle: Text('JPEG, PNG or WebP up to 4 MB.'),
+              subtitle: Text('Choose what you want to share.'),
+            ),
+            ListTile(
+              key: const Key('chat-document'),
+              leading: const Icon(Icons.insert_drive_file_outlined),
+              title: const Text('Document'),
+              onTap: () => Navigator.of(
+                sheetContext,
+              ).pop(_ChatAttachmentChoice.document),
             ),
             ListTile(
               key: const Key('chat-gallery'),
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from gallery'),
+              title: const Text('Photos'),
               onTap: () =>
-                  Navigator.of(sheetContext).pop(ChatPhotoSource.gallery),
+                  Navigator.of(sheetContext).pop(_ChatAttachmentChoice.gallery),
             ),
             ListTile(
               key: const Key('chat-camera'),
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Take a photo'),
+              title: const Text('Camera'),
               onTap: () =>
-                  Navigator.of(sheetContext).pop(ChatPhotoSource.camera),
+                  Navigator.of(sheetContext).pop(_ChatAttachmentChoice.camera),
             ),
           ],
         ),
       ),
     );
-    if (source == null || !context.mounted) return;
+    if (choice == null || !context.mounted) return;
+    switch (choice) {
+      case _ChatAttachmentChoice.document:
+        await _showUnavailableCapability(
+          context,
+          keyName: 'chat-document-recovery',
+          title: 'Document sharing unavailable',
+          message:
+              'Document sharing is not available right now. You can share a photo or continue with a message.',
+        );
+        return;
+      case _ChatAttachmentChoice.gallery:
+        await _selectPhoto(context, ChatPhotoSource.gallery);
+        return;
+      case _ChatAttachmentChoice.camera:
+        await _selectPhoto(context, ChatPhotoSource.camera);
+        return;
+    }
+  }
+
+  Future<void> _selectPhoto(
+    BuildContext context,
+    ChatPhotoSource source,
+  ) async {
+    if (!session.photoSharingAvailable) {
+      await _showUnavailableCapability(
+        context,
+        keyName: 'chat-photo-recovery',
+        title: 'Photo sharing unavailable',
+        message:
+            'Photo sharing is not available right now. You can continue with a message.',
+      );
+      return;
+    }
     await session.selectPhoto(threadId, source);
   }
 
@@ -998,15 +1119,6 @@ class _Composer extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          if (session.photoSharingAvailable)
-                            IconButton(
-                              key: const Key('chat-attach'),
-                              tooltip: 'Share a photo',
-                              onPressed: session.busy
-                                  ? null
-                                  : () => unawaited(_choosePhoto(context)),
-                              icon: const Icon(Icons.attach_file_rounded),
-                            ),
                           Expanded(
                             child: TextField(
                               key: const Key('chat-message-field'),
@@ -1028,35 +1140,88 @@ class _Composer extends StatelessWidget {
                               ),
                             ),
                           ),
+                          IconButton(
+                            key: const Key('chat-attach'),
+                            tooltip: 'Attach a file',
+                            onPressed: session.busy
+                                ? null
+                                : () => unawaited(_chooseAttachment(context)),
+                            icon: const Icon(Icons.attach_file_rounded),
+                          ),
+                          IconButton(
+                            key: const Key('chat-composer-camera'),
+                            tooltip: 'Camera',
+                            onPressed: session.busy
+                                ? null
+                                : () => unawaited(
+                                    _selectPhoto(
+                                      context,
+                                      ChatPhotoSource.camera,
+                                    ),
+                                  ),
+                            icon: const Icon(Icons.photo_camera_outlined),
+                          ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: MoolSpacing.xs),
-                  SizedBox.square(
-                    dimension: 48,
-                    child: IconButton.filled(
-                      key: Key(photo == null ? 'chat-send' : 'chat-send-photo'),
-                      tooltip: photo == null ? 'Send message' : 'Send photo',
-                      style: IconButton.styleFrom(
-                        backgroundColor: MoolColors.navy,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: session.busy
-                          ? null
-                          : () => unawaited(
-                              photo == null ? onSend() : onSendPhoto(),
-                            ),
-                      icon: session.busy
-                          ? const SizedBox.square(
-                              dimension: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded),
-                    ),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final hasMessage = value.text.trim().isNotEmpty;
+                      final sendsContent = photo != null || hasMessage;
+                      return SizedBox.square(
+                        dimension: 48,
+                        child: IconButton.filled(
+                          key: Key(
+                            photo != null
+                                ? 'chat-send-photo'
+                                : hasMessage
+                                ? 'chat-send'
+                                : 'chat-voice-message',
+                          ),
+                          tooltip: photo != null
+                              ? 'Send photo'
+                              : hasMessage
+                              ? 'Send message'
+                              : 'Voice message',
+                          style: IconButton.styleFrom(
+                            backgroundColor: MoolColors.navy,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: session.busy
+                              ? null
+                              : () => unawaited(
+                                  sendsContent
+                                      ? photo == null
+                                            ? onSend()
+                                            : onSendPhoto()
+                                      : _showUnavailableCapability(
+                                          context,
+                                          keyName:
+                                              'chat-voice-message-recovery',
+                                          title: 'Voice messages unavailable',
+                                          message:
+                                              'Voice messages are not available right now. You can type a message instead.',
+                                        ),
+                                ),
+                          icon: session.busy
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  sendsContent
+                                      ? Icons.send_rounded
+                                      : Icons.mic_rounded,
+                                ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

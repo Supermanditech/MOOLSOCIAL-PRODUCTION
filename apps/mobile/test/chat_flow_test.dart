@@ -367,10 +367,7 @@ void main() {
 
       for (final key in const [
         Key('chat-like-m1'),
-        Key('chat-attach'),
         Key('chat-camera'),
-        Key('chat-thread-call'),
-        Key('chat-thread-video'),
         Key('chat-thread-more'),
         Key('chat-mode-media'),
         Key('chat-mode-poll'),
@@ -379,6 +376,11 @@ void main() {
       ]) {
         expect(find.byKey(key), findsNothing, reason: '$key');
       }
+      expect(find.byKey(const Key('chat-attach')), findsOneWidget);
+      expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-call')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-video')), findsOneWidget);
+      expect(find.byKey(const Key('chat-voice-message')), findsOneWidget);
 
       await tester.longPress(find.byKey(const Key('chat-message-m1')));
       await tester.pumpAndSettle();
@@ -421,8 +423,12 @@ void main() {
         findsNothing,
       );
 
-      await tapVisible(tester, const Key('chat-send'));
-      expect(find.text('Write a message.'), findsOneWidget);
+      await tapVisible(tester, const Key('chat-voice-message'));
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('chat-capability-continue'));
       expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
       expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
@@ -535,7 +541,7 @@ void main() {
       size: const Size(360, 800),
     );
 
-    for (final key in const [Key('chat-back'), Key('chat-send')]) {
+    for (final key in const [Key('chat-back'), Key('chat-voice-message')]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
@@ -573,7 +579,7 @@ void main() {
     final safeBottom = media.size.height - media.viewPadding.bottom;
     expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
     expect(
-      tester.getBottomRight(find.byKey(const Key('chat-send'))).dy,
+      tester.getBottomRight(find.byKey(const Key('chat-voice-message'))).dy,
       lessThanOrEqualTo(safeBottom),
     );
     expect(tester.takeException(), isNull);
