@@ -44033,6 +44033,16 @@
       "prevention": "Remove exactly that Android owner, bind Build Child 9, retain every other allowed owner, pass the gate, and make no Android source change.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3885-SHOP-R61-6-PREFLIGHT-MISSING-IGNORED-GOLDEN-EVIDENCE",
+      "status": "registered_complete_registry_build_evidence_restore_required",
+      "appliesTo": ["primary", "coordination", "build", "preflight", "evidence"],
+      "mistake": "The first r61.6 wrapper preflight stopped before build because regression memory referenced apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json and the fresh worktree restored only six other ignored build-evidence files.",
+      "rootCause": "The ignored build evidence was copied from a remembered subset rather than derived from every current registry evidence path.",
+      "prevention": "Parse all registry evidence paths under apps/mobile/build, restore every missing byte from the preserved qualified r61.5 worktree with hash verification, refresh candidate HEAD, and rerun preflight only once.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"]
     }
   ]
 }
