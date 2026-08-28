@@ -43833,6 +43833,26 @@
       "prevention": "Preserve the recovered worktree without retry, bind the next child to its exact Git-resolved head, and allow one hundred twenty seconds while yielding progress in intervals under sixty seconds.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD8-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3865-SHOP-LOCATION-CHILD8-WORKTREE-CHECKOUT-DISK-FULL",
+      "status": "registered_workspace_capacity_recovery_before_retry_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling", "storage"],
+      "mistake": "Child 8 worktree checkout failed around forty-three percent because C: had only 0.76 GiB free and Git could not write tracked review artifacts and backend source.",
+      "rootCause": "Multiple preserved full recovery worktrees duplicated large tracked artifacts until the workspace volume was exhausted.",
+      "prevention": "Convert unused clean recovery worktrees to Git sparse checkouts, verify they remain clean, confirm adequate free capacity, then create one final child with a one-hundred-twenty-second allowance.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD9-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3866-SHOP-LOCATION-RECOVERY-BUILD-DELETE-COMMAND-POLICY-BLOCKED",
+      "status": "registered_sparse_checkout_only_recovery_required",
+      "appliesTo": ["primary", "coordination", "tooling", "storage"],
+      "mistake": "A combined generated-build deletion and sparse-checkout command was blocked by the execution policy before it ran.",
+      "rootCause": "The recovery unnecessarily included direct Remove-Item deletion when sparse checkout alone could reclaim the dominant tracked-artifact space.",
+      "prevention": "Use only non-destructive Git sparse-checkout commands on verified-clean unused recovery worktrees and leave ignored evidence directories untouched.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD9-20260828.md"]
     }
   ]
 }
