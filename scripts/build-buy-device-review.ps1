@@ -32,6 +32,7 @@ param(
 
   [ValidateSet(
     'EmulatorDeviceReview',
+    'RuntimeUiReview',
     'CursorUiReview',
     'YouTubePublicDevReview',
     'PublicAuthSideloadPreflight'
@@ -89,6 +90,9 @@ if ($branch.Trim() -eq 'main') {
 }
 if ($RuntimeProfile -ceq 'CursorUiReview' -and $BuildMode -cne 'debug') {
   throw 'Cursor UI Review permits debug APK builds only.'
+}
+if ($RuntimeProfile -ceq 'RuntimeUiReview' -and $BuildMode -cne 'debug') {
+  throw 'Runtime UI Review permits debug APK builds only.'
 }
 
 if ($CandidateId -ceq
@@ -408,7 +412,11 @@ $machineState = Get-Content -Raw -LiteralPath $runtimeStateFile |
   ConvertFrom-Json
 $isolatedDebugReview = (
   $BuildMode -ceq 'debug' -and
-  $RuntimeProfile -cin @('EmulatorDeviceReview', 'CursorUiReview')
+  $RuntimeProfile -cin @(
+    'EmulatorDeviceReview',
+    'RuntimeUiReview',
+    'CursorUiReview'
+  )
 )
 if (-not $isolatedDebugReview -and (
   [string]$machineState.requiredRuntimeDefines.
@@ -444,7 +452,7 @@ $runtimeValues = if ($RuntimeProfile -ceq 'YouTubePublicDevReview') {
   Get-YouTubePublicDevRuntimeValues -MachineState $machineState
 } elseif ($RuntimeProfile -ceq 'PublicAuthSideloadPreflight') {
   Get-PublicAuthSideloadRuntimeValues -MachineState $machineState
-} elseif ($RuntimeProfile -ceq 'CursorUiReview') {
+} elseif ($RuntimeProfile -cin @('RuntimeUiReview', 'CursorUiReview')) {
   [ordered]@{
     MOOLSOCIAL_UI_REVIEW_ONLY = 'true'
     MOOLSOCIAL_DEVICE_REVIEW = 'true'
@@ -462,7 +470,7 @@ $runtimeDefines = @(
   $runtimeValues.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
 )
 
-if ($RuntimeProfile -cne 'CursorUiReview') {
+if ($RuntimeProfile -cnotin @('RuntimeUiReview', 'CursorUiReview')) {
   & (Join-Path $PSScriptRoot `
     'check-google-android-identity-bridge-readiness.ps1') `
     -RepositoryRoot $repositoryRoot
@@ -677,6 +685,11 @@ $runtimeSummary = if ($RuntimeProfile -ceq 'YouTubePublicDevReview') {
   'MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;' +
   "MOOLSOCIAL_CANDIDATE_ID=$CandidateId;" +
   'AndroidDebugPackage=cursorreview;Promotable=false'
+} elseif ($RuntimeProfile -ceq 'RuntimeUiReview') {
+  'RuntimeUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;' +
+  'MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;' +
+  "MOOLSOCIAL_CANDIDATE_ID=$CandidateId;" +
+  'AndroidDebugPackage=runtime;Promotable=false'
 } else {
   'MOOLSOCIAL_DEVICE_REVIEW=true;' +
   'MOOLSOCIAL_USE_EMULATORS=true;' +

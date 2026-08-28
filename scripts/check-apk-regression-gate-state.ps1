@@ -59,8 +59,10 @@ Assert-Gate -Condition (
 ) -Message 'unexpected machine-state contract id.'
 $cursorUiReview = [string]$state.candidate.gateProfile -ceq `
   'uaw_cursor_ui_review_debug'
-$runtimeDebugReview = [string]$state.candidate.gateProfile -ceq `
-  'uaw_runtime_debug_review'
+$runtimeDebugReview = [string]$state.candidate.gateProfile -cin @(
+  'uaw_runtime_debug_review',
+  'uaw_runtime_ui_review_debug'
+)
 $isolatedDebugReview = $cursorUiReview -or $runtimeDebugReview
 if (-not $isolatedDebugReview) {
   Assert-Gate -Condition (
@@ -319,6 +321,16 @@ if ($CandidateId.StartsWith('BUY-', [StringComparison]::Ordinal)) {
   } elseif ($gateProfile -ceq 'uaw_runtime_debug_review') {
     Assert-Gate -Condition ($BuildMode -ceq 'debug') `
       -Message 'runtime device review permits debug APK builds only.'
+    $requiredGateIds += @(
+      'buy-regression-1',
+      'buy-regression-2',
+      'clean-state-regression',
+      'wrapper-self-test',
+      'package-isolation'
+    )
+  } elseif ($gateProfile -ceq 'uaw_runtime_ui_review_debug') {
+    Assert-Gate -Condition ($BuildMode -ceq 'debug') `
+      -Message 'runtime UI review permits debug APK builds only.'
     $requiredGateIds += @(
       'buy-regression-1',
       'buy-regression-2',
