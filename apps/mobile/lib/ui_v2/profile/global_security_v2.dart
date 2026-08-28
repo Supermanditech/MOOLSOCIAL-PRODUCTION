@@ -235,7 +235,12 @@ class GlobalSecurityV2 extends StatelessWidget {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/home');
+      final returnLocation = GoRouterState.of(
+        context,
+      ).uri.queryParameters['return'];
+      context.go(
+        globalProfileSafeReturnLocation(returnLocation) ?? '/app/mool',
+      );
     }
   }
 

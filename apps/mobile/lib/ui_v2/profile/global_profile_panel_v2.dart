@@ -11,6 +11,7 @@ const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
 const _globalPersonalProfileRoute = '/app/account/identity';
 const _globalPreferencesRoute = '/app/account/workspaces/preferences';
+const _globalSecurityRoute = '/app/account/security';
 const _safeGlobalProfileReturnRoots = <String>[
   '/app/social',
   '/app/buy',
@@ -129,6 +130,10 @@ Future<void> showGlobalProfilePanelV2(
       _globalPreferencesRoute => globalPreferencesLocationForReturn(
         returnLocation,
       ),
+      _globalSecurityRoute => globalSecurityLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
       _ => route,
     });
   } else if (result.contextActionSelected) {
@@ -150,6 +155,17 @@ String globalPersonalProfileLocationForReturn(
 String globalPreferencesLocationForReturn(String returnLocation) => Uri(
   path: _globalPreferencesRoute,
   queryParameters: {'return': returnLocation},
+).toString();
+
+String globalSecurityLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalSecurityRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
 ).toString();
 
 String? globalProfileSafeReturnLocation(String? raw) {
