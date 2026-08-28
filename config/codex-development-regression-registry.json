@@ -43683,6 +43683,16 @@
       "prevention": "Read the exact line order and append the six attempt-3 evidence paths after the literal attempt2-manifest entry; never reorder preserved evidence owners during a build retry.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3850-SHOP-LOCATION-NAVIGATION-CLASS-RG-NO-MATCH-NOT-NORMALIZED",
+      "status": "registered_exact_symbol-search-with-no-match-handling-required",
+      "appliesTo": ["primary", "coordination", "tooling", "implementation", "buy"],
+      "mistake": "The first Shop navigation audit searched for MoolLocalNavigationRail class declarations under ui_v2, returned the expected no-match exit one, and exposed it as a failed command.",
+      "rootCause": "The audit repeated the optional rg no-match handling error instead of searching the known imported symbol or accepting exit one.",
+      "prevention": "Use exact symbol references with explicit exit-zero-or-one normalization and inspect the imported owner resolved from the source before any navigation edit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
     }
   ]
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3812,
-    "sha256": "9DF8D3836E38B52062677AE119616916560DF2D2600CC927F763D2EEF30505FD"
+    "entryCount": 3813,
+    "sha256": "30B0CCDE8FA6FD027EC37FEBD2CD1BCFB4F77A759DEFC2AE81DC18B3D8A539A7"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -805,12 +805,11 @@
         "ticketId": "UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828",
         "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-location-address-v1-20260828",
         "branch": "work/cursor-ui/shop-location-address-v1-20260828",
-        "baselineHead": "9d5b31765e65f72d501945b8f32cc37a407b67f5",
-        "bootstrapCommitSubject": "coordination(shop-location-address-v1-20260828): bind complete Shop address journey",
+        "baselineHead": "20393f91e7b015c7ead26f4001c949eb0cb15d00",
+        "bootstrapCommitSubject": "coordination(shop-location-address-audit-20260828): bind exact audit recovery",
         "bootstrapOwners": [
-          "config/codex-subagent-coordination-policy.json",
-          "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
