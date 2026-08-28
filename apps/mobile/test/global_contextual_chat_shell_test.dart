@@ -59,7 +59,7 @@ void main() {
         '/app/book/doctor',
         ChatEntryContextId.care,
         'Care Chat',
-        ChatThreadType.support,
+        ChatThreadType.business,
       ),
       (
         '/app/work/earn',
@@ -91,6 +91,9 @@ void main() {
       ChatEntryContext.resolve('/app/ride/book?type=cab').allowedThreadIds,
       {'ride-support'},
     );
+    expect(ChatEntryContext.resolve('/app/book/doctor').allowedThreadIds, {
+      'clinic-care',
+    });
   });
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
@@ -118,7 +121,7 @@ void main() {
       '/app/book/doctor',
       'Care Chat',
       'Appointments and care',
-      ChatThreadType.support,
+      ChatThreadType.business,
     ),
     ('/app/work/earn', 'Work Chat', 'Opportunities', ChatThreadType.business),
   ]) {
@@ -186,6 +189,20 @@ void main() {
         );
         expect(
           find.byKey(const Key('chat-open-thread-order-support')),
+          findsNothing,
+        );
+      }
+      if (entry.$2 == 'Care Chat') {
+        expect(
+          find.byKey(const Key('chat-open-thread-clinic-care')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('chat-open-thread-order-support')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('chat-open-thread-ride-support')),
           findsNothing,
         );
       }

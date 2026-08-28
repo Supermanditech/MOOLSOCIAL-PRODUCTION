@@ -109,7 +109,8 @@ class ChatEntryContext {
     subtitle: 'Appointments and care',
     icon: Icons.health_and_safety_outlined,
     accent: Color(0xFF00757B),
-    defaultFilter: ChatThreadType.support,
+    defaultFilter: ChatThreadType.business,
+    allowedThreadIds: {'clinic-care'},
   );
 
   static const work = ChatEntryContext(
