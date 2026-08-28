@@ -43813,6 +43813,16 @@
       "prevention": "Never retry an ambiguous worktree creation; inspect target, Git registration, branch and HEAD read-only, then use a sixty-second allowance for the next clean child creation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD6-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3863-SHOP-ADDRESS-SESSION-ADD-METHOD-STALE-ANCHOR",
+      "status": "registered_literal_method_body_anchor_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy"],
+      "mistake": "The first clean session update hunk expected addAddress to write selectedAddressId and an address-added notice, while the baseline uses _selectedAddressId and a Delivering to notice; apply_patch changed nothing.",
+      "rootCause": "The replay anchor was taken from the failed Child 2 diff context instead of the clean baseline method readback.",
+      "prevention": "In clean Child 7, anchor updateAddress after the exact baseline addAddress body and read back the complete adjacent methods before editing the next owner.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/buy/buy_v2_session.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD7-20260828.md"]
     }
   ]
 }
