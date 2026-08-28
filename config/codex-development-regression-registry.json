@@ -43923,6 +43923,16 @@
       "prevention": "Bind Child 16 directly to the preserved Child 15 bootstrap commit and let its sole bootstrap delta contain only the registry, policy, checker and Child 16 ticket document declared in its owner set.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD16-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3874-SHOP-ADDRESS-FINAL-COMBINED-TEST-OUTPUT-TRUNCATED",
+      "status": "registered_large_output_budget_evidence_rerun_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "evidence"],
+      "mistake": "The final committed-head combined run passed 142 tests with three intentional skips, but the mailbox clipped the middle of the verbose result after a five-thousand-token wait budget.",
+      "rootCause": "Five Flutter test files emitted more progress lines than the selected wait output allowance despite semantic completion being visible.",
+      "prevention": "Bind evidence-only Child 17 to exact committed head 73a68c81, change no product or test source, and rerun the same five files with at least twelve thousand output tokens retained.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD17-20260828.md"]
     }
   ]
 }
