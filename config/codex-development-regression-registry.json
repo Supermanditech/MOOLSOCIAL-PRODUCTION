@@ -43263,6 +43263,26 @@
       "prevention": "Every future cache cleanup must parse all registry evidence paths first, exclude every referenced file and its required ancestor directory, and delete only unreferenced generated content. Restore the exact problems report from a preserved worktree before replaying memory.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3808-SHOP-R61-5-FULL-BUY-CYCLE-ONE-TWO-FAILURES-COMPACT-NAMES-TRUNCATED",
+      "status": "registered_json_failure_inventory_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "build", "buy"],
+      "mistake": "Full Buy cycle 1 ended with 461 passes, 28 intentional skips and two failures, but compact output truncated both failed test identities; cycle 2 did not start.",
+      "rootCause": "The complete directory suite used a live compact reporter without an immutable JSON event log and bounded failed-name parser.",
+      "prevention": "Rerun cycle 1 once through clean-support with complete JSON stdout retained, parse testDone failures against testStart names and URLs, fix only exact causes, then restart two fresh full cycles from zero.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3809-REGISTRY-MAX-HELPER-OVERCOMPRESSED-FOREACH-PARSER-FAILURE",
+      "status": "registered_expanded_powershell_loop_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The read-only cross-worktree registry-max helper failed parsing because compressed foreach syntax omitted required whitespace around the in keyword, returning no generation evidence.",
+      "rootCause": "A previously valid expanded PowerShell inventory was manually compressed into parser-sensitive one-line syntax.",
+      "prevention": "Use the proven expanded loop form with explicit whitespace and statements; never compress PowerShell control-flow syntax for registry allocation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
     }
   ]
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3770,
-    "sha256": "5DF2C48E8B84C170CA4567F2B29ABF18FADA81F5DA4879AC4EEF1AD25B481DFC"
+    "entryCount": 3772,
+    "sha256": "EA06BD6938C71E4C96E2D602E97610A05A965B4F8A1B6296DC5E4AB717BD529D"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -45,6 +45,7 @@
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
         "scripts/check-brand-integrity.ps1",
         "scripts/check-buy-protected-baseline.ps1",
@@ -630,6 +631,27 @@
           "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "scripts/new-shop-v2-r61-5-source-manifest.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_shop_v2_r61_5_buy_regression_fix_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "codex_auth",
+        "role": "primary",
+        "task": "/root/codex_auth_shop_v2_r61_5_buy_regression_fix_20260828",
+        "workId": "shop-v2-r61-5-buy-regression-fix-20260828",
+        "ticketId": "UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-shop-v2-r61-5-buy-regression-fix-20260828",
+        "branch": "work/codex-auth/shop-v2-r61-5-buy-regression-fix-20260828",
+        "baselineHead": "43ab53e35e8cedf0c8d604aa0ee3f60b4a86467e",
+        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-buy-regression-fix-20260828): bind exact Buy failure inventory",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
