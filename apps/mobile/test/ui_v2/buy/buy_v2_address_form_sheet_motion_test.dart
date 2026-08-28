@@ -101,30 +101,27 @@ void main() {
   }
 
   Future<void> enterCompleteAddress(WidgetTester tester) async {
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-recipient')),
-      'Meera Sharma',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-phone')),
-      '9876543210',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-line')),
-      '12 Market Road',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-pin')),
-      '342001',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-area')),
-      'Jodhpur',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-landmark')),
-      'Near market gate',
-    );
+    Future<void> enter(ValueKey<String> key, String value) async {
+      final list = find.byKey(const ValueKey('buy-address-add-form-list'));
+      final field = find.byKey(key);
+      for (
+        var attempt = 0;
+        attempt < 10 && field.evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(list, const Offset(0, -220));
+        await tester.pumpAndSettle();
+      }
+      expect(field, findsOneWidget);
+      await tester.enterText(field, value);
+    }
+
+    await enter(const ValueKey('buy-address-add-recipient'), 'Meera Sharma');
+    await enter(const ValueKey('buy-address-add-phone'), '9876543210');
+    await enter(const ValueKey('buy-address-add-line'), '12 Market Road');
+    await enter(const ValueKey('buy-address-add-area'), 'Jodhpur');
+    await enter(const ValueKey('buy-address-add-pin'), '342001');
+    await enter(const ValueKey('buy-address-add-landmark'), 'Near market gate');
   }
 
   Future<Finder> revealInForm(

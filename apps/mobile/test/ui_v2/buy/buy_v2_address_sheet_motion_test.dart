@@ -314,7 +314,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-address-request')));
     await tester.pumpAndSettle();
-    expect(find.text('Request an address'), findsOne);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-address-request-form-route')),
+        matching: find.text('Request an address'),
+      ),
+      findsOne,
+    );
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
     expect(session.selectedAddressId, 'home');
   });
