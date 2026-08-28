@@ -62,6 +62,8 @@ class ChatPeopleDirectory extends StatelessWidget {
     required this.onChat,
     required this.onDiscover,
     required this.onOpenFeed,
+    required this.publicFeedOpened,
+    required this.onBackToChats,
     this.error,
     super.key,
   });
@@ -77,6 +79,8 @@ class ChatPeopleDirectory extends StatelessWidget {
   final ValueChanged<ChatPersonEntry> onChat;
   final VoidCallback onDiscover;
   final VoidCallback onOpenFeed;
+  final bool publicFeedOpened;
+  final VoidCallback onBackToChats;
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +147,8 @@ class ChatPeopleDirectory extends StatelessWidget {
                             Text(
                               connectedOnly
                                   ? 'Your MoolSocial people'
+                                  : publicFeedOpened
+                                  ? 'Public Feed'
                                   : 'Discover from the public Feed',
                               style: const TextStyle(
                                 color: MoolColors.ink,
@@ -153,6 +159,8 @@ class ChatPeopleDirectory extends StatelessWidget {
                             Text(
                               connectedOnly
                                   ? 'People you connected with stay separate from shops, orders and support.'
+                                  : publicFeedOpened
+                                  ? 'Public profiles and conversations appear here when Feed is available.'
                                   : 'Connect with a public profile before continuing privately in Chat.',
                               style: const TextStyle(
                                 color: MoolColors.muted,
@@ -214,6 +222,8 @@ class ChatPeopleDirectory extends StatelessWidget {
                 hasQuery: searchController.text.trim().isNotEmpty,
                 onDiscover: onDiscover,
                 onOpenFeed: onOpenFeed,
+                publicFeedOpened: publicFeedOpened,
+                onBackToChats: onBackToChats,
               ),
             )
           else
@@ -425,12 +435,16 @@ class _PeopleEmpty extends StatelessWidget {
     required this.hasQuery,
     required this.onDiscover,
     required this.onOpenFeed,
+    required this.publicFeedOpened,
+    required this.onBackToChats,
   });
 
   final bool connectedOnly;
   final bool hasQuery;
   final VoidCallback onDiscover;
   final VoidCallback onOpenFeed;
+  final bool publicFeedOpened;
+  final VoidCallback onBackToChats;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -452,6 +466,8 @@ class _PeopleEmpty extends StatelessWidget {
                 ? 'No matching people'
                 : connectedOnly
                 ? 'No connected people yet'
+                : publicFeedOpened
+                ? 'Public Feed unavailable'
                 : 'No public people to show yet',
             textAlign: TextAlign.center,
             style: const TextStyle(
@@ -464,24 +480,40 @@ class _PeopleEmpty extends StatelessWidget {
           Text(
             connectedOnly
                 ? 'Discover a public MoolSocial profile, connect, then continue privately in Chat.'
+                : publicFeedOpened
+                ? 'Public profiles could not load. Try again or return to conversations.'
                 : 'Open Feed to discover public profiles and conversations.',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: MoolSpacing.md),
-          FilledButton.icon(
-            key: Key(
-              connectedOnly
-                  ? 'chat-people-open-discover'
-                  : 'chat-discover-open-feed',
+          if (publicFeedOpened) ...[
+            FilledButton.icon(
+              key: const Key('chat-feed-retry'),
+              onPressed: onOpenFeed,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
             ),
-            onPressed: connectedOnly ? onDiscover : onOpenFeed,
-            icon: Icon(
-              connectedOnly
-                  ? Icons.person_search_outlined
-                  : Icons.dynamic_feed_outlined,
+            const SizedBox(height: MoolSpacing.xs),
+            TextButton(
+              key: const Key('chat-feed-back-to-chats'),
+              onPressed: onBackToChats,
+              child: const Text('Back to Chats'),
             ),
-            label: Text(connectedOnly ? 'Discover people' : 'Open Feed'),
-          ),
+          ] else
+            FilledButton.icon(
+              key: Key(
+                connectedOnly
+                    ? 'chat-people-open-discover'
+                    : 'chat-discover-open-feed',
+              ),
+              onPressed: connectedOnly ? onDiscover : onOpenFeed,
+              icon: Icon(
+                connectedOnly
+                    ? Icons.person_search_outlined
+                    : Icons.dynamic_feed_outlined,
+              ),
+              label: Text(connectedOnly ? 'Discover people' : 'Open Feed'),
+            ),
         ],
       ),
     ),

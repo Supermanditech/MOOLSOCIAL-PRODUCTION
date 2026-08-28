@@ -191,6 +191,7 @@ void main() {
       find.byKey(const ValueKey('chat-section-body-discover')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('chat-new')), findsNothing);
     await tapVisible(tester, const Key('chat-discover-open-feed'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
@@ -198,8 +199,17 @@ void main() {
       find.byKey(const ValueKey('chat-section-body-discover')),
       findsOneWidget,
     );
-    expect(find.text('Discover from the public Feed'), findsOneWidget);
+    expect(find.text('Public Feed unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-retry')), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-back-to-chats')), findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
     expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
+    await tapVisible(tester, const Key('chat-feed-back-to-chats'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-chats')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-new')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -43,6 +43,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   bool _loadingPeopleDirectory = false;
   String? _peopleDirectoryError;
   ChatHomeSection _section = ChatHomeSection.chats;
+  bool _publicFeedOpened = false;
 
   ChatEntryContext get _entryContext =>
       ChatEntryContext.resolve(widget.returnRoute);
@@ -213,6 +214,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 
   Future<void> _openPublicFeedDiscovery() async {
+    if (mounted) setState(() => _publicFeedOpened = true);
     _selectSection(ChatHomeSection.discover);
     await _ensurePeopleDirectory(refresh: true);
   }
@@ -354,14 +356,16 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ],
             icon: const Icon(Icons.more_vert_rounded),
           ),
-          floatingActionButton: FloatingActionButton(
-            key: const Key('chat-new'),
-            tooltip: 'Start a conversation',
-            onPressed: () => _selectSection(ChatHomeSection.discover),
-            backgroundColor: MoolColors.navy,
-            foregroundColor: Colors.white,
-            child: const Icon(Icons.person_add_alt_1_rounded),
-          ),
+          floatingActionButton: _section == ChatHomeSection.chats
+              ? FloatingActionButton(
+                  key: const Key('chat-new'),
+                  tooltip: 'Start a conversation',
+                  onPressed: () => _selectSection(ChatHomeSection.discover),
+                  backgroundColor: MoolColors.navy,
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.person_add_alt_1_rounded),
+                )
+              : null,
           bottom: NavigationBar(
             key: const Key('chat-native-navigation'),
             height: 72,
@@ -424,6 +428,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 onChat: (person) => unawaited(_startPersonChat(person)),
                 onDiscover: () => _selectSection(ChatHomeSection.discover),
                 onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
+                publicFeedOpened:
+                    _section == ChatHomeSection.discover && _publicFeedOpened,
+                onBackToChats: () => _selectSection(ChatHomeSection.chats),
               ),
             },
           ),
