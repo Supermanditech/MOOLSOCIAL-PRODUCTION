@@ -130,4 +130,12 @@ Assert-CursorUiReviewControl (
   $apkGate.Contains('runtime debug review must remain non-promotable.')
 ) 'runtime debug review is not package-isolated, debug-only and non-promotable.'
 
+$ellipsisOwnerSegments = @('apps/admin/app/admin/[[...section]]/page.tsx'.Split('/'))
+$traversalOwnerSegments = @('apps/mobile/../secret.txt'.Split('/'))
+Assert-CursorUiReviewControl (
+  -not ($ellipsisOwnerSegments -ccontains '..') -and
+  ($traversalOwnerSegments -ccontains '..') -and
+  $apkGate.Contains("-not (`$ownerSegments -ccontains '..')")
+) 'source-manifest path validation does not distinguish route ellipsis from traversal.'
+
 Write-Output 'CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED'
