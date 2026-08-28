@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../book_session.dart';
 
@@ -174,6 +175,19 @@ class BookPageScaffold extends StatelessWidget {
                     icon: const Icon(Icons.support_agent_rounded),
                   ),
             ),
+            if (!showBack)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child: MoolGlobalProfileShortcutV2(
+                  keyName: travelNavigation
+                      ? 'travel-global-profile'
+                      : 'care-global-profile',
+                  onPressed: () => showGlobalProfilePanelV2(
+                    context,
+                    onOpenRoute: openGlobal,
+                  ),
+                ),
+              ),
           ],
         ),
         body: SafeArea(

@@ -26,11 +26,11 @@ import '../../features/shared/youtube_public_search_state_repository.dart';
 import '../../features/shared/youtube_public_short_state_repository.dart';
 import '../../features/shared/youtube_public_watch_state_repository.dart';
 import '../buy/buy_v2_shop_chat.dart';
+import '../profile/global_profile_panel_v2.dart';
 import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'social_v2_create_workbench.dart';
 import 'social_v2_design.dart';
-import 'social_v2_plans_promotion.dart';
 import 'social_v2_public_content.dart';
 import 'social_v2_youtube_public_runtime.dart';
 import 'screen04_universal_components.dart';
@@ -2113,94 +2113,36 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openAccount() {
-    showSocialV2Sheet(
+    final authenticated = widget.session.isAuthenticated;
+    final socialContext = _world == 'social';
+    showGlobalProfilePanelV2(
       context,
-      title: 'Your MoolSocial account',
-      subtitle: 'Profile, language and account safety',
-      children: [
-        if (widget.session.isAuthenticated)
-          SocialV2ListTile(
-            key: const Key('screen04-account-authenticated-identity'),
-            icon: Icons.account_circle_outlined,
-            title:
-                widget.session.accountIdentity?.primaryLabel ??
-                'MoolSocial member',
-            detail:
-                widget.session.accountIdentity?.detailLabel ??
-                'Signed in to MoolSocial',
-            onTap: () {
-              Navigator.of(context).pop();
-              context.push('/app/account/security');
-            },
-          ),
-        SocialV2ListTile(
-          icon: Icons.location_on_outlined,
-          title: 'Serviceable area',
-          detail:
-              widget.session.currentAreaLabel ??
-              widget.session.manualArea ??
-              'Choose where you want nearby services',
-          onTap: () {
-            Navigator.of(context).pop();
-            _openServiceableArea();
-          },
-        ),
-        SocialV2ListTile(
-          icon: Icons.language_rounded,
-          title: 'Language',
-          detail: 'English',
-          onTap: () {
-            Navigator.of(context).pop();
-            _openLanguage();
-          },
-        ),
-        SocialV2ListTile(
-          key: const Key('screen04-account-youtube-connection'),
-          icon: Icons.ondemand_video_outlined,
-          title: 'YouTube connection',
-          detail: 'Minimum read-only access, disconnect and Google permissions',
-          onTap: () {
-            Navigator.of(context).pop();
-            _openYouTubeChannelStatus();
-          },
-        ),
-        SocialV2ListTile(
-          icon: Icons.card_membership_outlined,
-          title: 'Plans & access',
-          detail: 'Features, launch access and billing',
-          onTap: () {
-            Navigator.of(context).pop();
-            _openPlans();
-          },
-        ),
-        SocialV2ListTile(
-          icon: Icons.shield_outlined,
-          title: 'Account and safety',
-          detail: 'Sign-in, privacy and support',
-          onTap: () {
-            Navigator.of(context).pop();
-            context.push('/app/account/security');
-          },
-        ),
-        OutlinedButton(
-          key: const Key('screen04-account-sign-out'),
-          onPressed: () async {
-            Navigator.of(context).pop();
-            final signedOut = await widget.session.signOut();
-            if (!mounted) return;
-            if (signedOut) {
-              context.go('/sign-in');
-            } else {
-              showSocialV2Message(
-                context,
-                widget.session.errorMessage ??
-                    'Sign-out could not be completed. Please try again.',
-              );
-            }
-          },
-          child: const Text('Sign out or switch account'),
-        ),
-      ],
+      surfaceTone: socialContext
+          ? GlobalProfileSurfaceTone.socialDark
+          : GlobalProfileSurfaceTone.light,
+      contextAction: socialContext
+          ? GlobalProfileContextAction(
+              id: 'youtube',
+              title: authenticated
+                  ? 'Your YouTube channel'
+                  : 'Connect your YouTube channel',
+              detail: authenticated
+                  ? 'Review connection, permissions and eligible channel videos.'
+                  : 'Sign in to MoolSocial, then choose the Google account that owns your channel.',
+              actionLabel: authenticated
+                  ? 'Open channel status'
+                  : 'Connect channel',
+              icon: Icons.ondemand_video_outlined,
+              onPressed: () {
+                unawaited(_openYouTubeChannelStatus());
+              },
+            )
+          : null,
+      onOpenRoute: (route) => context.push(
+        socialContext && route == '/app/account/identity'
+            ? '$route?surface=social'
+            : route,
+      ),
     );
   }
 
@@ -2345,38 +2287,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           ),
         ),
       ],
-    );
-  }
-
-  void _openLanguage() {
-    showSocialV2Sheet(
-      context,
-      title: 'Language',
-      subtitle: 'Choose your MoolSocial language',
-      children: ['English', 'हिन्दी', 'मराठी', 'ગુજરાતી']
-          .map(
-            (language) => SocialV2ListTile(
-              icon: language == 'English'
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
-              title: language,
-              detail: language == 'English' ? 'Selected' : 'Choose language',
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-
-  void _openPlans() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SocialPlansV2Screen(
-          sharedSession: widget.sharedSession,
-          retailerSession: widget.retailerSession,
-          creatorSession: widget.creatorSession,
-        ),
-      ),
     );
   }
 
@@ -4324,12 +4234,10 @@ class _YouTubeHomeHeader extends StatelessWidget {
                 color: Colors.white,
                 icon: const Icon(Icons.ondemand_video_outlined),
               ),
-              IconButton(
-                key: const Key('screen04-youtube-home-account'),
-                tooltip: 'MoolSocial account',
+              MoolGlobalProfileShortcutV2(
+                keyName: 'screen04-youtube-home-account',
+                surfaceTone: GlobalProfileSurfaceTone.socialDark,
                 onPressed: onAccount,
-                color: Colors.white,
-                icon: const Icon(Icons.account_circle_outlined),
               ),
             ],
           ),

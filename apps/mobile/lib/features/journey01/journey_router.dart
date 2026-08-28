@@ -89,6 +89,9 @@ import '../work/screens/work_onboarding_screens.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
+import '../../ui_v2/profile/global_personal_profile_v2.dart';
+import '../../ui_v2/profile/global_profile_panel_v2.dart';
+import '../../ui_v2/work/work_main_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
@@ -105,6 +108,15 @@ import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
 import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
 import 'screens/universal_shell.dart';
+
+bool journeyRouteRequiresAuthentication(
+  Uri uri, {
+  required bool allowGuestReady,
+}) {
+  if (allowGuestReady) return false;
+  return uri.path.startsWith('/app/chat') ||
+      (uri.path == '/app/social' && uri.queryParameters['sub'] == 'create');
+}
 
 GoRouter createJourneyRouter(
   JourneySession session,
@@ -161,10 +173,10 @@ GoRouter createJourneyRouter(
       final location = state.uri.path;
       final protected = location.startsWith('/app/');
       final returnLocation = state.uri.toString();
-      final authenticatedRoute =
-          location.startsWith('/app/chat') ||
-          (location == '/app/social' &&
-              state.uri.queryParameters['sub'] == 'create');
+      final authenticatedRoute = journeyRouteRequiresAuthentication(
+        state.uri,
+        allowGuestReady: session.allowGuestReady,
+      );
 
       if (protected &&
           session.isReady &&
@@ -1350,8 +1362,12 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/identity',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 158),
+        builder: (context, state) => GlobalPersonalProfileV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
+        ),
       ),
       GoRoute(
         path: '/app/ask',
@@ -1423,6 +1439,10 @@ GoRouter createJourneyRouter(
         },
       ),
       GoRoute(
+        path: '/app/work/home',
+        builder: (context, state) => WorkMainV2(session: workSession),
+      ),
+      GoRoute(
         path: '/app/work/earn',
         pageBuilder: (context, state) => moolMainDestinationPage(
           state: state,
@@ -1469,6 +1489,7 @@ GoRouter createJourneyRouter(
         redirect: (context, state) {
           if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
+          if (section == 'work') return '/app/work/home';
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
             return null;

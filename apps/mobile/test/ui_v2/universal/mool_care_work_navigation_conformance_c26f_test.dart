@@ -43,6 +43,13 @@ void main() {
     _expectActions(const ['doctor', 'medicine', 'salon']);
     expect(find.byKey(const Key('care-book-local-navigation')), findsOneWidget);
     expect(find.byKey(const Key('care-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('care-global-profile')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('care-global-profile')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('global-profile-close')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('care-local-medicine')));
     await tester.pumpAndSettle();
@@ -71,7 +78,9 @@ void main() {
     _expectActions(const ['earn', 'workspace']);
     expect(find.byKey(const Key('work-local-earn')), findsOneWidget);
     expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
-    expect(find.byKey(const Key('work-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('work-main-global-profile')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('work-local-workspace')));
     await tester.pumpAndSettle();
