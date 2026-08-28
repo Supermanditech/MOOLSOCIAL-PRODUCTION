@@ -43343,6 +43343,16 @@
       "prevention": "Run the Buy regression diagnosis in a fresh integration_repair worktree and continuation binding, whose lane allows Buy test/repair ownership without consuming the open codex_auth or cursor_ui ticket queues.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3816-SHOP-BUY-JSON-DIAGNOSTIC-PARSER-ASSUMED-EVERY-LINE-JSON",
+      "status": "registered_valid_protocol_event_filter_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy"],
+      "mistake": "The first parser read every physical stdout line with ConvertFrom-Json even though Flutter interleaved raw capture diagnostics, producing conversion errors after it identified two failing test IDs.",
+      "rootCause": "The retained reporter stream was treated as pure JSONL without first filtering valid protocol event records and accounting for raw diagnostic text.",
+      "prevention": "Reuse the retained run, accept only lines that begin with a JSON object marker and parse successfully, inventory non-protocol lines separately, then join testStart, testDone, error and print events without rerunning the suite.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md", "apps/mobile/build/shop-v2-r61-5-buy-cycle1-diagnostic-attempt1.json"]
     }
   ]
 }

@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3778,
-    "sha256": "B77C1E83A2DC2524A8E119166378A10B3B0224829C0FD9AB225B98BB4A61D977"
+    "entryCount": 3779,
+    "sha256": "929054EBA49DF7F1C852EDF7A1F79C7E11DEC00684AB27AC081A368E6400C45C"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -60,6 +60,7 @@
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"
       ]
@@ -188,7 +189,6 @@
       "task": "/root/codex_auth_social_share_runtime_20260826",
       "role": "primary",
       "owners": [
-        "config/codex-subagent-coordination-policy.json",
         "config/mvp-scope-gate-state.json",
         "config/pre-apk-readiness-r60-92.json",
         "config/social-runtime-deployment-map-r60-92.json",
@@ -673,13 +673,11 @@
         "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828",
         "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-buy-regression-fix-20260828",
         "branch": "work/integration-repair/shop-v2-r61-5-buy-regression-fix-20260828",
-        "baselineHead": "14fcd6b2be25cd9ebee0ca803606069f49dd74c3",
-        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-buy-regression-fix-20260828): bind independent Buy diagnosis",
+        "baselineHead": "e6ce7c98ceb2f792208cb4a1af5f019c5afce5e5",
+        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-buy-regression-parser-20260828): bind valid event parser",
         "bootstrapOwners": [
           "config/codex-development-regression-registry.json",
-          "config/codex-subagent-coordination-policy.json",
-          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "config/codex-subagent-coordination-policy.json"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
