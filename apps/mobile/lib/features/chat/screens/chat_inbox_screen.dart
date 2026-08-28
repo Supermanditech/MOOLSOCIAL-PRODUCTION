@@ -322,7 +322,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           subtitle: 'MoolSocial messaging',
           returnRoute: widget.returnRoute,
           titleAccent: entryContext.accent,
-          prominentTitle: true,
+          prominentTitle: entryContext.id != ChatEntryContextId.workspace,
           showContentBack: true,
           backKeyName: 'chat-inbox-back',
           showMessageBanner: false,

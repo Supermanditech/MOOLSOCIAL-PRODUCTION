@@ -39,12 +39,18 @@ class ChatEntryContext {
   final Set<String>? allowedThreadIds;
 
   static ChatEntryContext resolve(String returnRoute) {
-    final path = Uri.tryParse(returnRoute)?.path.toLowerCase() ?? '';
+    final uri = Uri.tryParse(returnRoute);
+    final path = uri?.path.toLowerCase() ?? '';
     if (path.startsWith('/app/social')) return social;
     if (path.startsWith('/app/buy')) return shop;
     if (path.startsWith('/app/eat')) return food;
     if (path.startsWith('/app/ride')) return travel;
     if (path.startsWith('/app/book')) return care;
+    if (_workspaceWorkPrefixes.any(path.startsWith) ||
+        (path == '/app/work' &&
+            uri?.queryParameters['sub']?.toLowerCase() == 'workspace')) {
+      return workspace;
+    }
     if (path.startsWith('/app/work')) return work;
     if (_workspacePrefixes.any(path.startsWith)) return workspace;
     if (path.startsWith('/app/pay')) return pay;
@@ -127,10 +133,11 @@ class ChatEntryContext {
     id: ChatEntryContextId.workspace,
     originLabel: 'Workspace',
     title: 'Workspace Chat',
-    subtitle: 'Customers and operations',
+    subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.business,
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'workspace-support'},
   );
 
   static const pay = ChatEntryContext(
@@ -149,5 +156,11 @@ class ChatEntryContext {
     '/app/creator',
     '/app/captain',
     '/app/operations',
+  ];
+
+  static const _workspaceWorkPrefixes = <String>[
+    '/app/work/my-work',
+    '/app/work/workspace',
+    '/app/work/status',
   ];
 }

@@ -68,10 +68,16 @@ void main() {
         ChatThreadType.business,
       ),
       (
+        '/app/work/my-work',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
         '/app/retailer/orders',
         ChatEntryContextId.workspace,
         'Workspace Chat',
-        ChatThreadType.business,
+        ChatThreadType.support,
       ),
       (
         '/app/pay/home',
@@ -93,6 +99,9 @@ void main() {
     );
     expect(ChatEntryContext.resolve('/app/book/doctor').allowedThreadIds, {
       'clinic-care',
+    });
+    expect(ChatEntryContext.resolve('/app/work/my-work').allowedThreadIds, {
+      'workspace-support',
     });
   });
 
@@ -124,6 +133,12 @@ void main() {
       ChatThreadType.business,
     ),
     ('/app/work/earn', 'Work Chat', 'Opportunities', ChatThreadType.business),
+    (
+      '/app/work/my-work',
+      'Workspace Chat',
+      'Setup and review support',
+      ChatThreadType.support,
+    ),
   ]) {
     testWidgets('${entry.$2} is compact, contextual and filter-correct', (
       tester,
@@ -195,6 +210,20 @@ void main() {
       if (entry.$2 == 'Care Chat') {
         expect(
           find.byKey(const Key('chat-open-thread-clinic-care')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('chat-open-thread-order-support')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('chat-open-thread-ride-support')),
+          findsNothing,
+        );
+      }
+      if (entry.$2 == 'Workspace Chat') {
+        expect(
+          find.byKey(const Key('chat-open-thread-workspace-support')),
           findsOneWidget,
         );
         expect(

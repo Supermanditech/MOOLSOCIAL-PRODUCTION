@@ -90,6 +90,16 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'workspace-support': [
+        const ChatMessage(
+          id: 'workspace-review-1',
+          sender: 'Workspace Review',
+          text:
+              'Choose one provider profile and complete only the requested details. Your personal account remains active during review.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
     });
   }
 
@@ -178,6 +188,15 @@ class ChatSession extends ChangeNotifier {
       preview: 'I can see the approved task instructions.',
       timeLabel: 'Now',
       type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'workspace-support',
+      title: 'Workspace Review',
+      subtitle: 'Setup and application support',
+      preview: 'Complete only the details requested for review.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
       verified: true,
     ),
   ];
