@@ -43953,6 +43953,16 @@
       "prevention": "Transition to the bounded integration build ticket, inspect only literal pages or parsed JSON projections, create a new non-overwriting candidate state, and run wrapper preflight before consuming a build authorization.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3877-SHOP-R61-6-BUILD-BINDING-WEAKENED-INTEGRATION-REQUIREMENT",
+      "status": "registered_true_integration_requirement_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "build", "git_discipline"],
+      "mistake": "The first r61.6 integration-build binding set integrationRequiredBeforeSuccessorApk false and the coordination gate rejected it as invalid or weakened before any build action.",
+      "rootCause": "The binding confused execution inside an integration worktree with permission to weaken the inherited successor-APK integration requirement.",
+      "prevention": "Restore the parent build binding field to true, bind clean Build Child 2 with the field true, pass the integration_repair implementation gate, and only then create candidate state or run preflight.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD2-20260828.md"]
     }
   ]
 }
