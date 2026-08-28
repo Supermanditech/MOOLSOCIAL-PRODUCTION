@@ -43713,6 +43713,26 @@
       "prevention": "Anchor every subsequent registry append to the exact current tail bytes and preserve existing status spelling unchanged.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3853-SHOP-ADDRESS-EDIT-CARD-PATCH-HIT-UNRELATED-CHOICE",
+      "status": "registered_clean_child_exact_class_anchor_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy"],
+      "mistake": "The first address-card edit-control patch matched an earlier generic selected-choice trailing icon and inserted address/onEdit references into an unrelated choice widget; source readback caught it before analysis or tests.",
+      "rootCause": "The hunk anchored only to a common selected icon pattern instead of the _BuyV2AddressChoice class and its exact key block.",
+      "prevention": "Replay in a clean Child 2, patch only inside _BuyV2AddressChoice using its class/key anchors, read back the complete class, and run analysis before any further UI patch.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3854-SHOP-LOCATION-CHILD2-REWROTE-PARENT-CONTINUATION",
+      "status": "registered_separate_immutable_child_binding_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "buy"],
+      "mistake": "The first Child 2 bootstrap rewrote the parent Shop location continuation path, branch and baseline, and the coordination gate rejected the binding as invalid or weakened.",
+      "rootCause": "A successor recovery child was modeled by mutating an existing founder-authorized continuation instead of appending a new immutable child binding.",
+      "prevention": "Restore the parent binding exactly, append a separate Child 2 binding and task, increment the binding fixture, and bootstrap the clean child from ddfc9a3 without weakening parent history.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD2-20260828.md"]
     }
   ]
 }
