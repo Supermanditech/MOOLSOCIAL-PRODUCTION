@@ -43353,6 +43353,156 @@
       "prevention": "Reuse the retained run, accept only lines that begin with a JSON object marker and parse successfully, inventory non-protocol lines separately, then join testStart, testDone, error and print events without rerunning the suite.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md", "apps/mobile/build/shop-v2-r61-5-buy-cycle1-diagnostic-attempt1.json"]
+    },
+    {
+      "id": "REG-20260828-3817-SHOP-BUY-GROUPED-GIT-HISTORY-DIAGNOSTIC-TIMED-OUT",
+      "status": "registered_independent_bounded_history_queries_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "git_discipline"],
+      "mistake": "Five concurrent c24f history searches shared short command timeouts; one exceeded the limit and the grouped result discarded otherwise completed read-only outputs.",
+      "rootCause": "Potentially expensive repository-wide text and follow-history queries were coupled in one all-or-nothing orchestration instead of being independently bounded.",
+      "prevention": "Run the exact c24f text search, each blame range and each file history as independent commands with proportionate timeouts; retain each scalar result before starting the next query.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3818-ACCEPTED-RUNTIME-C24F-GOLDEN-PATHS-HAD-NO-COMMITTED-CAPTURES",
+      "status": "registered_exact_existing_golden_reference_repair_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy", "protected_reference"],
+      "mistake": "Accepted runtime commit f105195b changed two responsive Buy tests to c24f-prefixed golden filenames, but no matching c24f images exist in any Git history; the complete non-c24f capture sets remain tracked.",
+      "rootCause": "Test reference names were version-prefixed without atomically renaming or adding the corresponding protected capture assets, so full Buy regression could never pass those two tests from a clean checkout.",
+      "prevention": "Restore only the two test references to their exact existing tracked capture filenames, preserve all PNGs byte-for-byte, run both focused tests, then restart two full Buy cycles through clean-support.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3819-SHOP-TWO-GOLDEN-TESTS-COMBINED-RUN-TIMED-OUT",
+      "status": "registered_independent_json_test_sessions_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy", "protected_reference"],
+      "mistake": "The two repaired responsive golden tests were run together with compact buffered output and exceeded the bounded ten-minute shell timeout, producing no complete native session result.",
+      "rootCause": "Two multi-viewport raster comparisons were coupled into one opaque command, so a slow or stalled test could not be isolated and wrapper cleanup could not be proven after the shell timeout.",
+      "prevention": "Inventory exact orphan processes first, then run each file and exact test name independently through clean-support with a unique JSON log, retained native exit metadata and a proportionate bounded timeout; never reuse the timed-out session as evidence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3820-SHOP-GOLDEN-TIMEOUT-LEFT-SCOPED-FLUTTER-TESTER-ORPHAN",
+      "status": "registered_exact_pid_tree_recovery_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "environment", "buy"],
+      "mistake": "After the bounded shell timeout, filtered process inventory found flutter_tester.exe PID 14968 still running with this exact repair worktree package-config and unit-test-assets paths.",
+      "rootCause": "The outer shell timeout terminated the clean-support orchestration before Flutter's child tester exited and before the wrapper could prove its restoration phase.",
+      "prevention": "Resolve the exact parent/child process tree, stop only verified PIDs tied to this worktree, prove zero scoped processes remain, restore and hash-check clean-support owners, then use independently bounded native sessions that terminate themselves before the outer timeout.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3821-GENERATED-SUPPORT-RESTORE-COMBINED-TEMP-RECURSIVE-CLEANUP-BLOCKED",
+      "status": "registered_one_owner_direct_blob_restore_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "environment", "git_discipline"],
+      "mistake": "The attempted generated-support recovery combined a temporary checkout-index tree, four copies and recursive temp removal in one command, so execution policy rejected it before any filesystem action.",
+      "rootCause": "A simple exact restore was overengineered into a computed multi-owner workflow containing recursive deletion.",
+      "prevention": "Restore one literal generated owner at a time directly from its exact indexed Git blob, immediately compare git hash-object to HEAD:path, and avoid temporary directories or recursive cleanup entirely.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3822-SHOP-R58-8-7-INDEPENDENT-GOLDEN-SESSION-CUTOFF-MISSING-SUMMARY",
+      "status": "registered_retained_log_liveness_inventory_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy", "protected_reference"],
+      "mistake": "The independently launched R58.8.7 capture test reached its 420-second cutoff; the shell returned after 429.6 seconds with exit zero but emitted no structured FlutterExit or log-size summary.",
+      "rootCause": "Stopping the Start-Process wrapper for flutter.bat did not provide a trustworthy child-tree exit contract, so the orchestration completed without semantic session metadata.",
+      "prevention": "Reject the session, inspect only its retained JSON tail and exact scoped process inventory, restore generated owners if required, then diagnose the last completed viewport before selecting a native per-test timeout strategy.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt2.json"]
+    },
+    {
+      "id": "REG-20260828-3823-SHOP-R58-8-7-CUTOFF-LEFT-FRONTEND-AND-TESTER-CHILDREN",
+      "status": "registered_verified_three_pid_tree_stop_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "environment", "buy"],
+      "mistake": "Scoped process inventory after the R58.8.7 cutoff found dartaotruntime.exe PID 14468 and flutter_tester.exe PID 9524 still running with repair-worktree paths, both reporting parent PID 13576.",
+      "rootCause": "Stopping only the flutter.bat process wrapper did not terminate the long-lived Flutter tool parent or its compiler/tester children on Windows.",
+      "prevention": "Resolve parent PID 13576, verify all three identities and worktree linkage, stop children then parent by literal PID, prove zero scoped processes, and avoid Start-Process batch-wrapper timeouts for the next liveness diagnostic.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3824-START-PROCESS-DROPPED-SPACED-PLAIN-NAME-ARGUMENT-BOUNDARY",
+      "status": "registered_direct-flutter-filter-or-escaped-argument-required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy"],
+      "mistake": "The R58.8.7 JSON log showed Flutter loading extra paths named responsive, and, candidate and captures after Start-Process split the spaced --plain-name value into separate command-line tokens.",
+      "rootCause": "PowerShell Start-Process joined the ArgumentList for a batch file without preserving the intended quoted argument boundary.",
+      "prevention": "Do not use Start-Process ArgumentList for spaced Flutter test filters. Invoke Flutter directly through clean-support with an exact file path and no plain-name filter, or use a separately verified escaped command line; retain JSON output and native exit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt2.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3825-SHOP-IMAGE-HELPER-SEARCH-INCLUDED-GUESSED-ABSENT-PATHS",
+      "status": "registered_discovered_test_paths_only_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy"],
+      "mistake": "The image-helper search included guessed apps/mobile/test/helpers and test_helpers paths that are absent, so rg returned exit one even though it found the unique precacheImage helper in the claimed test file.",
+      "rootCause": "Repository-relative helper directories were assumed instead of first enumerating the test tree with rg --files.",
+      "prevention": "Search only the confirmed apps/mobile/test root or exact rg --files results; retain the discovered unique helper result and do not retry guessed absent paths.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3826-SHOP-BUY-IMAGE-PROVIDER-RG-NO-MATCH-NOT-NORMALIZED",
+      "status": "registered_no_match_exit_normalization_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy"],
+      "mistake": "A read-only rg search for direct Image.network or NetworkImage usage returned the expected no-match exit one, but the command did not normalize that semantic result and was reported as a tool failure.",
+      "rootCause": "The diagnostic treated rg's no-match exit as an execution error even though absence was a valid inventory result.",
+      "prevention": "For searches where no match is acceptable, capture rg output and explicitly accept exit zero or one while rejecting higher exits; never expose expected no-match as a failed command.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3827-C24F-VERSIONED-R58-8-7-GOLDENS-MISSING-AND-ORIGINALS-STALE",
+      "status": "registered_new_versioned_golden_set_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy", "protected_reference"],
+      "mistake": "After the image-liveness repair, R58.8.7 completed and proved all five original non-c24f goldens differ from the cumulative UI by 63.16% to 86.12%; the intended c24f golden paths still have no committed files.",
+      "rootCause": "Accepted runtime f105195b versioned the test references to isolate the cumulative navigation/UI state but omitted the corresponding c24f capture generation and review transaction.",
+      "prevention": "Preserve every original PNG, restore both tests to their intended c24f paths, create new versioned files under exact claims, generate only the R58.8.7 c24f set after liveness is deterministic, visually inspect all new captures, and rerun both tests without update mode before full regressions.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt3.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3828-C24F-VERSIONED-R58-8-6-GOLDENS-ALSO-REQUIRED",
+      "status": "registered_complete_both_versioned_sets_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy", "protected_reference"],
+      "mistake": "A real no-update R58.8.6 file run disproved the earlier malformed Start-Process pass: the copied original 320x568 golden differs from the cumulative UI by 83.31%, and the test failed before accepting the copied c24f set.",
+      "rootCause": "The initial R58.8.6 result used the same unquoted spaced filter later registered in REG3824, so it was not valid evidence that originals matched the intended versioned UI.",
+      "prevention": "Generate all five R58.8.6 c24f files under their existing exact claims, visually inspect them, then verify both complete files without update mode; no copied original may remain as current c24f evidence unless its generated hash independently matches.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3829-SHOP-CHILD8-CLOSURE-RETAINED-STALE-GOLDEN-EXCLUSION",
+      "status": "registered_truthful_scope-record-correction-required",
+      "appliesTo": ["primary", "coordination", "evidence", "buy"],
+      "mistake": "The first Child 8 verification update retained an earlier sentence that excluded golden generation even though the final bounded repair generated only ten new c24f files.",
+      "rootCause": "The result section was appended without re-reading and reconciling the pre-diagnosis exclusions paragraph.",
+      "prevention": "Before sealing evidence, read the complete ticket document and align scope, exclusions and completed results; state that old protected PNG updates are excluded while new versioned c24f generation is the authorized repair.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3830-SHOP-CHILD8-PRECOMMIT-NOT-FULLY-STAGED",
+      "status": "registered_exact_remaining-owner-inventory-required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "buy"],
+      "mistake": "The first Child 8 pre-commit coordination gate rejected the worktree because the atomic change set was not fully staged.",
+      "rootCause": "The exact staged owner list was prepared before checking the gate's complete unstaged and untracked inventory, leaving at least one remaining repository owner outside the staged set.",
+      "prevention": "Inventory staged, unstaged and untracked paths independently, classify only task-owned evidence, stage every exact claimed change, require zero remaining non-ignored dirt, then rerun pre_commit with the refreshed registry generation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3831-SHOP-INTEGRATION-REPAIR-PRECOMMIT-USED-SOCIAL-CONFLICT-OWNER-SET",
+      "status": "registered_continuation_specific_repair_contract_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "integration_repair", "buy"],
+      "mistake": "After all 42 Child 8 owners were fully staged, integration_repair pre_commit rejected them because the checker applied the older Social conflict correction owner set to the independently bound Shop continuation.",
+      "rootCause": "The integration_repair lane phase logic has one global exactConflictOwners contract and does not select a continuation-specific repair owner contract by work ID and ticket ID.",
+      "prevention": "Add a fail-closed Shop continuation exception that accepts only this binding's exact active claim and staged changed owners while leaving every existing Social conflict assertion unchanged; self-test both paths before pre-commit retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     }
   ]
 }

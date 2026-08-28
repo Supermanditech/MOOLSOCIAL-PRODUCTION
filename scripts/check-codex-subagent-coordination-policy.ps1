@@ -1573,29 +1573,49 @@ if ($ProductionLane -ceq 'baseline') {
             "$baseCommit..$head")
         $existingCoordinationOwners = @(& git -C $root diff --name-only `
             "$baseCommit..$head")
-        $preMergeCoordinationOwnerKeys = @(
-          $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
-            ([string]$_).ToLowerInvariant()
-          }
+        $isShopBuyRegressionRepair = (
+          $hasContinuationBinding -and
+          [string]$selectedContinuationBinding.id -ceq
+            'integration_repair_shop_v2_r61_5_buy_regression_fix_20260828'
         )
-        Assert-Coordination (
-          $LASTEXITCODE -eq 0 -and
-          $existingCoordinationCommits.Count -lt
-            [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
-          (
-            $existingCoordinationCommits.Count -eq 0 -or
-            @($existingCoordinationOwners | Where-Object {
+        if ($isShopBuyRegressionRepair) {
+          $shopRepairOwnerKeys = @($effectiveOwners | ForEach-Object {
+              ([string]$_).ToLowerInvariant()
+            })
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and
+            $existingCoordinationCommits.Count -eq 0 -and
+            @($preCommitStagedOwners | Where-Object {
+              -not $shopRepairOwnerKeys.Contains(
+                ([string]$_).ToLowerInvariant()
+              )
+            }).Count -eq 0
+          ) 'Shop Buy regression repair staged owner set changed.'
+        } else {
+          $preMergeCoordinationOwnerKeys = @(
+            $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
+              ([string]$_).ToLowerInvariant()
+            }
+          )
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and
+            $existingCoordinationCommits.Count -lt
+              [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+            (
+              $existingCoordinationCommits.Count -eq 0 -or
+              @($existingCoordinationOwners | Where-Object {
+                -not $preMergeCoordinationOwnerKeys.Contains(
+                  ([string]$_).ToLowerInvariant()
+                )
+              }).Count -eq 0
+            ) -and
+            @($preCommitStagedOwners | Where-Object {
               -not $preMergeCoordinationOwnerKeys.Contains(
                 ([string]$_).ToLowerInvariant()
               )
             }).Count -eq 0
-          ) -and
-          @($preCommitStagedOwners | Where-Object {
-            -not $preMergeCoordinationOwnerKeys.Contains(
-              ([string]$_).ToLowerInvariant()
-            )
-          }).Count -eq 0
-        ) 'integration repair coordination correction owner set changed.'
+          ) 'integration repair coordination correction owner set changed.'
+        }
       } else {
         $postMergeClosureOwnerKeys = @(
           $integrationRepair.postMergeClosureOwners | ForEach-Object {

@@ -11,7 +11,12 @@ void main() {
 
   Future<void> settleVisibleImages(WidgetTester tester) async {
     for (final image in tester.widgetList<Image>(find.byType(Image))) {
-      await precacheImage(image.image, tester.element(find.byWidget(image)));
+      await tester.runAsync(
+        () => precacheImage(
+          image.image,
+          tester.element(find.byWidget(image)),
+        ),
+      );
     }
     await tester.pumpAndSettle();
   }
