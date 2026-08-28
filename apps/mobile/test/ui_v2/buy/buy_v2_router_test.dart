@@ -71,7 +71,7 @@ void main() {
     await mountRoute(tester, '/app/buy/medicine');
 
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
     expect(find.byKey(const Key('buy-medicine-screen')), findsNothing);
   });
 
@@ -79,7 +79,7 @@ void main() {
     tester,
   ) async {
     await mountRoute(tester, '/app/buy?sub=wholesale');
-    expect(find.text('Search bulk products and suppliers'), findsOneWidget);
+    expect(find.text('Search bulk products'), findsOneWidget);
 
     await tapConnectedAction(tester, 'buy', 'orders');
     expect(find.text('PURCHASES'), findsOneWidget);
@@ -96,7 +96,7 @@ void main() {
       find.byKey(const ValueKey('buy-offers-publisher-summary')),
       findsOneWidget,
     );
-    expect(find.text('Search offers, products and sellers'), findsOneWidget);
+    expect(find.text('Search current offers'), findsOneWidget);
   });
 
   testWidgets('Screen 04 Mool Buy action opens only the native Buy V2', (

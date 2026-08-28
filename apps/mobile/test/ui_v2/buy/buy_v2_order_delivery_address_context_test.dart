@@ -5,6 +5,7 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
@@ -75,7 +76,15 @@ void main() {
 
       expect(find.textContaining(id), findsWidgets);
       expect(find.text(order.destinationLabel), findsWidgets);
-      expect(find.text(order.promise), findsWidgets);
+      expect(
+        find.text(
+          buyV2DeliveryPromiseSummary(
+            promise: order.promise,
+            promisedByLabel: order.promisedByLabel,
+          ),
+        ),
+        findsWidgets,
+      );
       expect(
         find.text('No delivery instruction was recorded for this order.'),
         findsOneWidget,

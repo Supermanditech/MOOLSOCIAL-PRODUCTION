@@ -20,6 +20,41 @@ import 'buy_v2_supplier_sheet_motion.dart';
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
 
+String _packCountLabel(int count) => '$count ${count == 1 ? 'pack' : 'packs'}';
+
+bool _containsOnlyWholesaleLines(List<BuyV2CartLine> lines) =>
+    lines.isNotEmpty &&
+    lines.every(
+      (line) => line.product.destination == BuyV2Destination.wholesale,
+    );
+
+String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
+    group.destination == BuyV2Destination.wholesale
+    ? '${_productCountLabel(group.lines.length)} · '
+          '${_packCountLabel(group.itemCount)}'
+    : _productCountLabel(group.itemCount);
+
+String _checkoutDockCountLabel(BuyV2Session session) =>
+    session.checkoutScope == BuyV2CartScope.wholesale ||
+        _containsOnlyWholesaleLines(session.checkoutLines)
+    ? '${_productCountLabel(session.checkoutLines.length)} · '
+          '${_packCountLabel(session.checkoutItemCount)}'
+    : _productCountLabel(session.checkoutItemCount);
+
+String _cartHeaderSummary(BuyV2Session session) {
+  final lines = session.cartLines;
+  final destinations = lines.map((line) => line.product.destination).toSet();
+  final quantityLabel =
+      session.cartScope == BuyV2CartScope.wholesale ||
+          _containsOnlyWholesaleLines(lines)
+      ? _packCountLabel(session.scopedItemCount)
+      : '${session.scopedItemCount} '
+            '${session.scopedItemCount == 1 ? 'item' : 'items'}';
+  return '${_productCountLabel(lines.length)} · $quantityLabel · '
+      '${_destinationSummary(destinations)} · '
+      '${buyV2Money(session.scopedCartTotal)}';
+}
+
 String _destinationSummary(Set<BuyV2Destination> destinations) {
   const order = [
     BuyV2Destination.shop,
@@ -141,10 +176,17 @@ List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
 }
 
 class BuyV2ProductView extends StatelessWidget {
-  const BuyV2ProductView({super.key, required this.session, this.returnLabel});
+  const BuyV2ProductView({
+    super.key,
+    required this.session,
+    this.returnLabel,
+    this.wholesaleTradeDecisionAdapter =
+        const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
+  });
 
   final BuyV2Session session;
   final String? returnLabel;
+  final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
   Widget build(BuildContext context) {
@@ -158,9 +200,13 @@ class BuyV2ProductView extends StatelessWidget {
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
+    final wholesale = product.destination == BuyV2Destination.wholesale;
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : facts.deliveryPromise;
+    final offerDecision = automaticFulfilment
+        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        : null;
     final partnerProducts = product.destination == BuyV2Destination.medicine
         ? session.sellerContinuationsFor(product)
         : const <BuyV2Product>[];
@@ -193,6 +239,7 @@ class BuyV2ProductView extends StatelessWidget {
                 child: _BuyV2ProductGallery(
                   key: ValueKey('buy-product-packshot-${product.id}'),
                   product: product,
+                  compact: wholesale,
                   media: [
                     _BuyV2ProductMediaItem(
                       label: 'Product visual',
@@ -235,116 +282,123 @@ class BuyV2ProductView extends StatelessWidget {
                       product.pack,
                       style: context.buyMeta.copyWith(fontSize: 9),
                     ),
-                    const SizedBox(height: 8),
-                    _ProductOwnedActionPanel(
-                      key: ValueKey('buy-product-inline-action-${product.id}'),
-                      product: product,
-                      quantity: quantity,
-                      rxBlocked: rxBlocked,
-                      onAdd: addProduct,
-                      onDecrease: () => session.decrease(product.id),
-                      onIncrease: () => session.increase(product.id),
-                    ),
+                    if (!automaticFulfilment) ...[
+                      const SizedBox(height: 8),
+                      _ProductOwnedActionPanel(
+                        key: ValueKey(
+                          'buy-product-inline-action-${product.id}',
+                        ),
+                        product: product,
+                        quantity: quantity,
+                        rxBlocked: rxBlocked,
+                        onAdd: addProduct,
+                        onDecrease: () => session.decrease(product.id),
+                        onIncrease: () => session.increase(product.id),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 7),
-              Wrap(
-                spacing: 6,
-                runSpacing: 5,
-                children: [
-                  _ProductTrustPill(
-                    icon: Icons.star_rounded,
-                    label: review == null
-                        ? 'Be the first to review'
-                        : '${review.rating}.0 · Your review',
-                    color: BuyV2Colors.orange,
-                  ),
-                  _ProductTrustPill(
-                    icon: Icons.schedule_rounded,
-                    label: automaticFulfilment
-                        ? buyerPromise
-                        : 'Delivery promise shown',
-                    color: BuyV2Colors.green,
-                  ),
-                  if (product.regulatoryTrustFact case final fact?)
+              if (automaticFulfilment && !wholesale) ...[
+                const SizedBox(height: 7),
+                _ProductDecisionGlance(
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                ),
+              ],
+              if (!wholesale) ...[
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 5,
+                  children: [
                     _ProductTrustPill(
-                      icon: Icons.local_pharmacy_outlined,
-                      label: fact,
-                      color: BuyV2Colors.navy,
+                      icon: Icons.star_rounded,
+                      label: review == null
+                          ? 'Be the first to review'
+                          : '${review.rating}.0 · Your review',
+                      color: BuyV2Colors.orange,
                     ),
-                ],
-              ),
+                    if (!automaticFulfilment)
+                      const _ProductTrustPill(
+                        icon: Icons.schedule_rounded,
+                        label: 'Delivery promise shown',
+                        color: BuyV2Colors.green,
+                      ),
+                    if (product.regulatoryTrustFact case final fact?)
+                      _ProductTrustPill(
+                        icon: Icons.local_pharmacy_outlined,
+                        label: fact,
+                        color: BuyV2Colors.navy,
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
-              _DecisionPanel(
-                key: ValueKey('buy-automatic-fulfilment-${product.id}'),
-                title: automaticFulfilment
-                    ? 'Price, pack and delivery'
-                    : 'Pack, delivery and pharmacy',
-                children: [
-                  if (automaticFulfilment)
+              if (wholesale)
+                _WholesaleTradeDecisionPanel(
+                  session: session,
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                  adapter: wholesaleTradeDecisionAdapter,
+                )
+              else if (automaticFulfilment)
+                _ProductOfferDecisionPanel(
+                  session: session,
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                  quantity: quantity,
+                  onAdd: addProduct,
+                  onDecrease: () => session.decrease(product.id),
+                  onIncrease: () => session.increase(product.id),
+                )
+              else
+                _DecisionPanel(
+                  title: 'Pack, delivery and pharmacy',
+                  children: [
                     _DecisionRow(
-                      icon: Icons.currency_rupee_rounded,
-                      label: 'Price',
-                      value: '${buyV2Money(facts.price)} · MoolSocial price',
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Pack',
+                      value: product.pack,
                     ),
-                  _DecisionRow(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Pack',
-                    value: product.pack,
-                  ),
-                  _DecisionRow(
-                    icon: Icons.schedule_rounded,
-                    label: 'Delivery',
-                    value: buyerPromise,
-                    valueColor: BuyV2Colors.green,
-                  ),
-                  if (automaticFulfilment)
                     _DecisionRow(
-                      icon: Icons.storefront_outlined,
-                      label: 'Fulfilment',
-                      value: buyV2AutomaticFulfilmentLabel(product.destination),
-                    )
-                  else if (partnerProducts.isEmpty)
-                    _DecisionRow(
-                      icon: Icons.local_pharmacy_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                    )
-                  else
-                    _DecisionActionRow(
-                      key: ValueKey(
-                        'buy-medicine-pharmacy-action-${product.id}',
+                      icon: Icons.schedule_rounded,
+                      label: 'Delivery',
+                      value: buyerPromise,
+                      valueColor: BuyV2Colors.green,
+                    ),
+                    if (partnerProducts.isEmpty)
+                      _DecisionRow(
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                      )
+                    else
+                      _DecisionActionRow(
+                        key: ValueKey(
+                          'buy-medicine-pharmacy-action-${product.id}',
+                        ),
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                        detail:
+                            '${partnerProducts.length} other current products · Not medical advice',
+                        semanticLabel:
+                            'View ${partnerProducts.length} more products from ${product.seller} '
+                            'in the current Medicine catalogue. Not medical advice',
+                        onTap: () => _showPartnerProductsSheet(
+                          context,
+                          session,
+                          product,
+                          partnerProducts,
+                        ),
                       ),
-                      icon: Icons.local_pharmacy_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                      detail:
-                          '${partnerProducts.length} other current products · Not medical advice',
-                      semanticLabel:
-                          'View ${partnerProducts.length} more products from ${product.seller} '
-                          'in the current Medicine catalogue. Not medical advice',
-                      onTap: () => _showPartnerProductsSheet(
-                        context,
-                        session,
-                        product,
-                        partnerProducts,
-                      ),
-                    ),
-                  if (automaticFulfilment) ...[
-                    _DecisionRow(
-                      icon: Icons.location_on_outlined,
-                      label: 'Deliver to',
-                      value:
-                          session.selectedAddressOrNull?.shortLine ??
-                          'Choose a delivery address',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.verified_outlined,
-                      label: 'Price source',
-                      value: 'Published by MoolSocial',
-                    ),
-                  ] else ...[
                     _DecisionRow(
                       icon: Icons.route_outlined,
                       label: 'Delivery path',
@@ -356,46 +410,7 @@ class BuyV2ProductView extends StatelessWidget {
                       value: product.confirmedOn,
                     ),
                   ],
-                  if (product.destination == BuyV2Destination.shop)
-                    _DecisionRow(
-                      icon: Icons.assignment_return_outlined,
-                      label: 'Return or replacement',
-                      value:
-                          product.returnPolicy ??
-                          'Damaged or incorrect packs are reviewed at delivery',
-                    ),
-                ],
-              ),
-              if (product.destination == BuyV2Destination.wholesale) ...[
-                const SizedBox(height: 10),
-                _DecisionPanel(
-                  title: 'Wholesale terms',
-                  children: [
-                    _DecisionRow(
-                      icon: Icons.layers_outlined,
-                      label: 'Minimum order',
-                      value: 'MOQ ${product.minimumOrder} · case packs',
-                    ),
-                    _DecisionRow(
-                      icon: Icons.local_shipping_outlined,
-                      label: 'Freight',
-                      value: product.freightIncluded
-                          ? 'Included in landed price'
-                          : 'Confirmed before payment',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.payments_outlined,
-                      label: 'Payment',
-                      value: 'UPI or bank transfer',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.receipt_long_outlined,
-                      label: 'Tax',
-                      value: 'GST included · invoice provided',
-                    ),
-                  ],
                 ),
-              ],
               if (product.destination == BuyV2Destination.medicine) ...[
                 const SizedBox(height: 10),
                 _DecisionPanel(
@@ -487,7 +502,980 @@ class BuyV2ProductView extends StatelessWidget {
             ],
           ),
         ),
+        if (wholesale)
+          _WholesaleTradeActionDock(
+            product: product,
+            facts: facts,
+            decision: offerDecision!,
+            quantity: quantity,
+            onAdd: addProduct,
+            onDecrease: () => session.decrease(product.id),
+            onIncrease: () => session.increase(product.id),
+            onRetryOffer: () => session.refreshProductFacts(product.id),
+          ),
       ],
+    );
+  }
+}
+
+class _ProductDecisionGlance extends StatelessWidget {
+  const _ProductDecisionGlance({
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final surfaceColor = decision.canAdd
+        ? BuyV2Colors.softGreen
+        : BuyV2Colors.softOrange;
+    return Semantics(
+      key: ValueKey('buy-product-decision-glance-${product.id}'),
+      container: true,
+      label:
+          '${buyV2Money(facts.price)} delivered price. '
+          '${product.pack}. ${decision.statusLabel}. $buyerPromise. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}.',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(BuyV2Metrics.radius),
+          border: Border.all(color: statusColor.withValues(alpha: .28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DELIVERED PRICE',
+                        style: context.buyEyebrow.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        buyV2Money(facts.price),
+                        style: const TextStyle(
+                          color: BuyV2Colors.navy,
+                          fontSize: 22,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .9),
+                    borderRadius: BorderRadius.circular(
+                      BuyV2Metrics.compactRadius,
+                    ),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: .34),
+                    ),
+                  ),
+                  child: Text(
+                    decision.statusLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta.copyWith(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${product.pack} · $buyerPromise',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                const Icon(
+                  Icons.storefront_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Automatic Mool Partner assignment',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeDecisionPanel extends StatefulWidget {
+  const _WholesaleTradeDecisionPanel({
+    required this.session,
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+    required this.adapter,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+  final BuyV2WholesaleTradeDecisionAdapter adapter;
+
+  @override
+  State<_WholesaleTradeDecisionPanel> createState() =>
+      _WholesaleTradeDecisionPanelState();
+}
+
+class _WholesaleTradeDecisionPanelState
+    extends State<_WholesaleTradeDecisionPanel> {
+  BuyV2WholesaleTradeSignal? _signal;
+  Object? _failure;
+  String? _loadedDeliveryLocality;
+  var _loading = true;
+  var _requestSequence = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSignal();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WholesaleTradeDecisionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id ||
+        oldWidget.adapter != widget.adapter ||
+        _loadedDeliveryLocality !=
+            widget.session.selectedAddressOrNull?.shortLine) {
+      _loadSignal();
+    }
+  }
+
+  Future<void> _loadSignal() async {
+    final request = ++_requestSequence;
+    final deliveryLocality = widget.session.selectedAddressOrNull?.shortLine;
+    setState(() {
+      _loading = true;
+      _failure = null;
+      _signal = null;
+      _loadedDeliveryLocality = deliveryLocality;
+    });
+    try {
+      final signal = await widget.adapter.load(
+        productId: widget.product.id,
+        canonicalProductId: widget.product.canonicalId,
+        deliveryLocality: deliveryLocality,
+      );
+      if (!mounted || request != _requestSequence) return;
+      if (signal.productId != widget.product.id) {
+        setState(() {
+          _loading = false;
+          _failure = StateError('Trade signal product identity differs.');
+        });
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _signal = signal;
+      });
+    } catch (error) {
+      if (!mounted || request != _requestSequence) return;
+      setState(() {
+        _loading = false;
+        _failure = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final facts = widget.facts;
+    final decision = widget.decision;
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final minimumTotal = facts.price * product.minimumOrder;
+    final signalSummary = _loading
+        ? 'Checking local trade context.'
+        : _failure != null
+        ? 'Local trade context could not be loaded.'
+        : '${_signal!.headline}. ${_signal!.detail}';
+
+    return Semantics(
+      key: ValueKey('buy-wholesale-trade-decision-${product.id}'),
+      container: true,
+      label:
+          '${product.title}. ${product.pack}. Minimum order '
+          '${product.minimumOrder} packs. ${buyV2Money(facts.price)} per pack. '
+          '${buyV2Money(minimumTotal)} minimum order total. '
+          '${facts.orderabilityLabel}. ${widget.buyerPromise}. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
+          '${decision.statusLabel}. $signalSummary',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _WholesaleTradePriceSummary(
+            product: product,
+            facts: facts,
+            decision: decision,
+          ),
+          const SizedBox(height: 8),
+          _WholesaleTradeSignalCard(
+            loading: _loading,
+            signal: _signal,
+            failed: _failure != null,
+            onRetry: _loadSignal,
+          ),
+          const SizedBox(height: 8),
+          _DecisionPanel(
+            key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+            title: 'Trade decision',
+            children: [
+              _DecisionRow(
+                icon: decision.canAdd
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.info_outline_rounded,
+                label: 'Decision',
+                value: decision.statusLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Trade pack',
+                value: '${product.pack} · MOQ ${product.minimumOrder} packs',
+              ),
+              _DecisionRow(
+                icon: Icons.calculate_outlined,
+                label: 'Minimum total',
+                value:
+                    '${product.minimumOrder} × ${buyV2Money(facts.price)} = '
+                    '${buyV2Money(minimumTotal)}',
+              ),
+              _DecisionRow(
+                icon: Icons.straighten_rounded,
+                label: 'Unit economics',
+                value: product.unitPrice,
+              ),
+              _DecisionRow(
+                icon: Icons.inventory_outlined,
+                label: 'Stock',
+                value: facts.orderabilityLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.schedule_rounded,
+                label: 'Delivery',
+                value: widget.buyerPromise,
+                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Fulfilment',
+                value: buyV2AutomaticFulfilmentLabel(product.destination),
+              ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Freight',
+                value: product.freightIncluded
+                    ? 'Included in landed price'
+                    : 'Confirmed before payment',
+              ),
+              const _DecisionRow(
+                icon: Icons.receipt_long_outlined,
+                label: 'Tax invoice',
+                value: 'GST included · invoice provided',
+              ),
+              _DecisionRow(
+                icon: Icons.event_available_outlined,
+                label: 'Price checked',
+                value: _signal?.hasCurrentSignal == true
+                    ? _signal?.priceValidUntilLabel ?? product.confirmedOn
+                    : product.confirmedOn,
+              ),
+            ],
+          ),
+          if (!decision.canAdd) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: ValueKey('buy-product-offer-recovery-${product.id}'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softOrange,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: BuyV2Colors.orange.withValues(alpha: .34),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    decision.statusLabel,
+                    style: context.buyBody.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(decision.detail, style: context.buyMeta),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: ValueKey('buy-offer-retry-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          widget.session.refreshProductFacts(product.id);
+                          _loadSignal();
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry offer'),
+                      ),
+                      FilledButton.icon(
+                        key: ValueKey('buy-offer-change-product-${product.id}'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: widget.session.closeProduct,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Change product'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WholesaleTradePriceSummary extends StatelessWidget {
+  const _WholesaleTradePriceSummary({
+    required this.product,
+    required this.facts,
+    required this.decision,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+
+  @override
+  Widget build(BuildContext context) {
+    final minimumTotal = facts.price * product.minimumOrder;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    return Container(
+      key: ValueKey('buy-wholesale-price-summary-${product.id}'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF070773), BuyV2Colors.royal],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000080),
+            blurRadius: 18,
+            offset: Offset(0, 7),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = largeText || constraints.maxWidth < 300;
+          final price = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'WHOLESALE PRICE',
+                style: TextStyle(
+                  color: Color(0xFFBFC3FF),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .8,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                buyV2Money(facts.price),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${product.pack} · ${product.unitPrice} · MoolSocial price',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          );
+          final order = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: Colors.white.withValues(alpha: .18)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'MOQ ${product.minimumOrder} packs',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD29F),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${buyV2Money(minimumTotal)} minimum total',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  decision.statusLabel,
+                  style: TextStyle(
+                    color: decision.canAdd
+                        ? const Color(0xFFBDEBB8)
+                        : const Color(0xFFFFD29F),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [price, const SizedBox(height: 10), order],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: price),
+              const SizedBox(width: 10),
+              Flexible(child: order),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeSignalCard extends StatelessWidget {
+  const _WholesaleTradeSignalCard({
+    required this.loading,
+    required this.signal,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final BuyV2WholesaleTradeSignal? signal;
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = !loading && !failed && signal?.hasCurrentSignal == true;
+    final headline = loading
+        ? 'Checking local trade context'
+        : failed
+        ? 'Local trade context could not be loaded'
+        : signal!.headline;
+    final detail = loading
+        ? 'Current price, stock and delivery remain available while this loads.'
+        : failed
+        ? 'Retry the local signal or continue using the current trade facts.'
+        : signal!.detail;
+    return Semantics(
+      key: const ValueKey('buy-wholesale-local-trade-signal'),
+      container: true,
+      liveRegion: loading,
+      label: '$headline. $detail',
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: ready ? BuyV2Colors.softGreen : BuyV2Colors.softOrange,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: (ready ? BuyV2Colors.green : BuyV2Colors.orange).withValues(
+              alpha: .32,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  ready ? Icons.trending_up_rounded : Icons.insights_outlined,
+                  color: ready ? BuyV2Colors.green : BuyV2Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ready && signal!.localityLabel.isNotEmpty
+                            ? '${signal!.localityLabel} trade context'
+                            : 'Local trade context',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.muted,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        headline,
+                        style: context.buyBody.copyWith(
+                          color: BuyV2Colors.ink,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (loading)
+                  const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(detail, style: context.buyMeta.copyWith(height: 1.35)),
+            if (ready) ...[
+              const SizedBox(height: 7),
+              Text(
+                '${signal!.sourceLabel} · ${signal!.updatedLabel}',
+                key: const ValueKey('buy-wholesale-trade-signal-source'),
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.green,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ] else if (!loading) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('buy-wholesale-trade-signal-retry'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry local signal'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeActionDock extends StatelessWidget {
+  const _WholesaleTradeActionDock({
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.quantity,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.onRetryOffer,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+  final VoidCallback onRetryOffer;
+
+  @override
+  Widget build(BuildContext context) {
+    final orderQuantity = quantity > 0 ? quantity : product.minimumOrder;
+    final orderTotal = facts.price * orderQuantity;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          quantity > 0
+              ? '$quantity packs in Cart'
+              : 'Minimum ${product.minimumOrder} packs · ${product.pack} each',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyMeta.copyWith(
+            color: BuyV2Colors.ink,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          buyV2Money(orderTotal),
+          key: const ValueKey('buy-wholesale-dock-total'),
+          style: const TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: 18,
+            height: 1,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+
+    Widget action;
+    if (!decision.canAdd) {
+      action = FilledButton.icon(
+        key: ValueKey('buy-wholesale-retry-offer-${product.id}'),
+        onPressed: onRetryOffer,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Retry offer'),
+      );
+    } else if (quantity > 0) {
+      action = _CompactProductStepper(
+        key: ValueKey('buy-product-quantity-${product.id}'),
+        quantity: quantity,
+        onDecrease: onDecrease,
+        onIncrease: onIncrease,
+      );
+    } else {
+      action = Semantics(
+        label:
+            'Add minimum order of ${product.minimumOrder} packs of '
+            '${product.title} to Cart for ${buyV2Money(orderTotal)}',
+        button: true,
+        onTap: onAdd,
+        excludeSemantics: true,
+        child: FilledButton.icon(
+          key: ValueKey('buy-product-primary-${product.id}'),
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_shopping_cart_rounded),
+          label: Text('Add ${product.minimumOrder} packs'),
+        ),
+      );
+    }
+
+    return Material(
+      key: ValueKey('buy-wholesale-action-dock-${product.id}'),
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: const Color(0x26000080),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = largeText || constraints.maxWidth < 330;
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    summary,
+                    const SizedBox(height: 8),
+                    SizedBox(height: 50, child: action),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: summary),
+                  const SizedBox(width: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: 148,
+                      maxWidth: 190,
+                    ),
+                    child: action,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductOfferDecisionPanel extends StatelessWidget {
+  const _ProductOfferDecisionPanel({
+    required this.session,
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+    required this.quantity,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final mrp = product.mrp;
+    final savings = mrp == null || mrp <= facts.price
+        ? null
+        : mrp - facts.price;
+    return Semantics(
+      key: ValueKey('buy-product-offer-decision-${product.id}'),
+      container: true,
+      label:
+          '${product.title}. ${product.variant}. ${product.pack}. '
+          '${buyV2Money(facts.price)} delivered price. '
+          '${facts.orderabilityLabel}. $buyerPromise. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
+          '${decision.statusLabel}. ${decision.detail}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DecisionPanel(
+            key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+            title: 'Price, pack and delivery',
+            children: [
+              _DecisionRow(
+                icon: decision.canAdd
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.info_outline_rounded,
+                label: 'Decision',
+                value: decision.statusLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.tune_rounded,
+                label: 'Pack and variant',
+                value: '${product.pack} · ${product.variant}',
+              ),
+              _DecisionRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Delivered price',
+                value: '${buyV2Money(facts.price)} · MoolSocial price',
+              ),
+              if (mrp != null && mrp > facts.price)
+                _DecisionRow(
+                  icon: Icons.savings_outlined,
+                  label: 'Price components',
+                  value:
+                      'List price ${buyV2Money(mrp)} · Save ${buyV2Money(savings!)}',
+                )
+              else
+                _DecisionRow(
+                  icon: Icons.calculate_outlined,
+                  label: 'Price components',
+                  value: product.unitPrice,
+                ),
+              _DecisionRow(
+                icon: Icons.inventory_outlined,
+                label: 'Stock',
+                value: facts.orderabilityLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.schedule_rounded,
+                label: 'Delivery',
+                value: buyerPromise,
+                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Fulfilment',
+                value: buyV2AutomaticFulfilmentLabel(product.destination),
+              ),
+              _DecisionRow(
+                icon: Icons.location_on_outlined,
+                label: 'Deliver to',
+                value:
+                    session.selectedAddressOrNull?.shortLine ??
+                    'Choose a delivery address',
+              ),
+              const _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Price source',
+                value: 'Published by MoolSocial',
+              ),
+              if (product.destination == BuyV2Destination.shop)
+                _DecisionRow(
+                  icon: Icons.assignment_return_outlined,
+                  label: 'Return or replacement',
+                  value:
+                      product.returnPolicy ??
+                      'Damaged or incorrect packs are reviewed at delivery',
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (decision.canAdd)
+            _ProductOwnedActionPanel(
+              key: ValueKey('buy-product-inline-action-${product.id}'),
+              product: product,
+              quantity: quantity,
+              rxBlocked: false,
+              onAdd: onAdd,
+              onDecrease: onDecrease,
+              onIncrease: onIncrease,
+            )
+          else
+            Container(
+              key: ValueKey('buy-product-offer-recovery-${product.id}'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softOrange,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: BuyV2Colors.orange.withValues(alpha: .34),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    decision.statusLabel,
+                    style: context.buyBody.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(decision.detail, style: context.buyMeta),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: ValueKey('buy-offer-retry-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          session.refreshProductFacts(product.id);
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry offer'),
+                      ),
+                      FilledButton.icon(
+                        key: ValueKey('buy-offer-change-product-${product.id}'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: session.closeProduct,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Change product'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1065,10 +2053,12 @@ class _BuyV2ProductGallery extends StatefulWidget {
     super.key,
     required this.product,
     required this.media,
+    this.compact = false,
   }) : assert(media.length > 0);
 
   final BuyV2Product product;
   final List<_BuyV2ProductMediaItem> media;
+  final bool compact;
 
   @override
   State<_BuyV2ProductGallery> createState() => _BuyV2ProductGalleryState();
@@ -1105,10 +2095,13 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final hasMultipleMedia = widget.media.length > 1;
-    final galleryHeight = (MediaQuery.sizeOf(context).height * .38).clamp(
-      252.0,
-      320.0,
-    );
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final galleryHeight = widget.compact
+        ? viewportHeight < 650 || largeText
+              ? (viewportHeight * .23).clamp(128.0, 160.0)
+              : (viewportHeight * .29).clamp(174.0, 238.0)
+        : (viewportHeight * .38).clamp(252.0, 320.0);
     return Semantics(
       container: true,
       label: hasMultipleMedia
@@ -2229,10 +3222,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       ),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final summary =
-                              '${_productCountLabel(session.itemCount)} · '
-                              '${_destinationSummary(session.cartDestinations)} · '
-                              '${buyV2Money(session.cartTotal)}';
+                          final summary = _cartHeaderSummary(session);
                           return BuyV2FiniteValueTransition(
                             key: const ValueKey('buy-cart-header-value-motion'),
                             stateKey: summary,
@@ -2326,7 +3316,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          session.scopedTipTotal > 0
+                          session.cartScope == BuyV2CartScope.wholesale
+                              ? session.scopedTipTotal > 0
+                                    ? 'Landed total + delivery tip'
+                                    : 'Landed cart total'
+                              : session.scopedTipTotal > 0
                               ? 'Items + delivery tip'
                               : 'Cart total',
                           style: context.buyMeta,
@@ -2343,6 +3337,13 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (session.cartScope == BuyV2CartScope.wholesale)
+                          Text(
+                            'Freight included · GST invoice at checkout',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.buyMeta.copyWith(fontSize: 7.5),
+                          ),
                       ],
                     ),
                   ),
@@ -2777,6 +3778,11 @@ class BuyV2CheckoutView extends StatelessWidget {
       animation: gstInvoiceController,
       builder: (context, _) {
         final destinations = session.checkoutDestinations;
+        final wholesaleReceiving =
+            destinations.isNotEmpty &&
+            destinations.every(
+              (destination) => destination == BuyV2Destination.wholesale,
+            );
         final deliveryGroups = session.checkoutFulfilmentGroups;
         final invoiceDestinations = destinations
             .where(
@@ -2812,6 +3818,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                   const SizedBox(height: 8),
                   _SavedAddressReminder(
                     address: address,
+                    wholesaleReceiving: wholesaleReceiving,
                     onEdit: () => showBuyV2AddressSheet(context, session),
                   ),
                   const SizedBox(height: 9),
@@ -2856,9 +3863,11 @@ class BuyV2CheckoutView extends StatelessWidget {
                         BuyV2Destination.orders => Icons.receipt_long_outlined,
                       },
                       title:
-                          'Delivery ${index + 1} · ${_productCountLabel(deliveryGroups[index].itemCount)}',
+                          'Delivery ${index + 1} · '
+                          '${_checkoutFulfilmentCountLabel(deliveryGroups[index])}',
                       detail: [
-                        _fulfilmentPromiseSummary(deliveryGroups[index]),
+                        '${deliveryGroups[index].destination.label} fulfilment · '
+                            '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
                         '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
                         'Fulfiller assigned automatically after placement',
                         if (session.selectedDeliveryInstructionFor(
@@ -2870,6 +3879,13 @@ class BuyV2CheckoutView extends StatelessWidget {
                           'Optional delivery tip · ${buyV2Money(session.tipForGroup(deliveryGroups[index]))}',
                       ].join('\n'),
                     ),
+                    if (deliveryGroups[index].destination ==
+                        BuyV2Destination.wholesale) ...[
+                      const SizedBox(height: 5),
+                      _WholesaleCheckoutReceivingLines(
+                        group: deliveryGroups[index],
+                      ),
+                    ],
                     const SizedBox(height: 7),
                   ],
                   for (final benefit in session.selectedCartBenefitsFor(
@@ -2928,7 +3944,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _productCountLabel(session.checkoutItemCount),
+                          _checkoutDockCountLabel(session),
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         Text(
@@ -2969,6 +3985,149 @@ class BuyV2CheckoutView extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLines extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLines({required this.group});
+
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-lines-${group.key}'),
+      container: true,
+      explicitChildNodes: true,
+      label:
+          'Products in this Wholesale delivery. '
+          '${_productCountLabel(group.lines.length)}. '
+          '${_packCountLabel(group.itemCount)}.',
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .55),
+          border: const Color(0x24000080),
+          radius: 14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Products and trade packs',
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (var index = 0; index < group.lines.length; index++) ...[
+              _WholesaleCheckoutReceivingLine(line: group.lines[index]),
+              if (index != group.lines.length - 1)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, color: BuyV2Colors.line),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLine extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLine({required this.line});
+
+  final BuyV2CartLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = line.product;
+    final quantityLabel = _packCountLabel(line.quantity);
+    final semanticLabel =
+        '${product.title}. $quantityLabel. ${product.pack}. '
+        'Minimum order ${product.minimumOrder} packs. '
+        '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+        'Line subtotal ${buyV2Money(line.total)}.';
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),
+      container: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked =
+              constraints.maxWidth < 290 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.2;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                product.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyBody.copyWith(fontSize: 10),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$quantityLabel · ${product.pack}',
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'MOQ ${product.minimumOrder} · '
+                '${buyV2Money(product.price)} per pack · ${product.unitPrice}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+            ],
+          );
+          final subtotal = Column(
+            crossAxisAlignment: stacked
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Line subtotal',
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                buyV2Money(line.total),
+                style: const TextStyle(
+                  color: BuyV2Colors.navy,
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [details, const SizedBox(height: 6), subtotal],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: details),
+              const SizedBox(width: 10),
+              subtotal,
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -8803,192 +9962,284 @@ class _CartLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final product = line.product;
     final facts = session.productFactsFor(product);
+    final wholesale = product.destination == BuyV2Destination.wholesale;
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : product.deliveryPromise;
+    final productDetailsLabel = 'View ${product.title} product details';
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
     }
 
+    final productDetails = BuyV2IntentDepth(
+      key: ValueKey('buy-cart-product-depth-${product.id}'),
+      spatial: true,
+      child: Semantics(
+        key: ValueKey('buy-cart-product-summary-${product.id}'),
+        container: true,
+        button: true,
+        label: productDetailsLabel,
+        excludeSemantics: true,
+        onTap: openProductDetails,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          child: InkWell(
+            key: ValueKey('buy-cart-product-details-${product.id}'),
+            onTap: openProductDetails,
+            borderRadius: BorderRadius.circular(11),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 60),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    key: ValueKey('buy-cart-packshot-${product.id}'),
+                    width: 60,
+                    height: 60,
+                    child: BuyV2ProductPackshot(
+                      product: product,
+                      borderRadius: 11,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyBody,
+                        ),
+                        Text(
+                          '${product.variant} · ${product.pack}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          automaticFulfilment
+                              ? '$buyerPromise · MoolSocial price'
+                              : '${product.deliveryPromise} · ${product.seller}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: BuyV2Colors.green,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20, right: 2),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tradeFacts = wholesale
+        ? Semantics(
+            key: ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
+            container: true,
+            label:
+                'Minimum order ${product.minimumOrder} packs. '
+                '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+                '${product.freightIncluded ? 'Freight included in landed price.' : 'Freight confirmed before payment.'}',
+            excludeSemantics: true,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MOQ ${product.minimumOrder} packs · '
+                    '${buyV2Money(product.price)} per pack',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${product.unitPrice} · '
+                    '${product.freightIncluded ? 'Freight included' : 'Freight confirmed later'}',
+                    style: context.buyMeta.copyWith(fontSize: 7.5),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : null;
+
+    final productBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        productDetails,
+        if (tradeFacts != null) ...[const SizedBox(height: 5), tradeFacts],
+      ],
+    );
+
+    final price = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (wholesale)
+          Text(
+            'Landed subtotal',
+            style: context.buyMeta.copyWith(fontSize: 7.5),
+          ),
+        BuyV2FiniteValueTransition(
+          key: ValueKey('buy-cart-line-total-motion-${product.id}'),
+          stateKey: line.total,
+          text: buyV2Money(line.total),
+          ownerSize: const Size(78, 22),
+          textAlign: TextAlign.end,
+          style: const TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (product.mrp != null && product.mrp! > product.price)
+          Text(
+            buyV2Money(product.mrp! * line.quantity),
+            style: context.buyMeta.copyWith(
+              fontSize: 8,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+      ],
+    );
+
+    final quantityControl = Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: BuyV2Colors.softBlue,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: wholesale
+                ? line.quantity <= product.minimumOrder
+                      ? 'Remove ${product.title} from Cart'
+                      : 'Remove one trade pack'
+                : 'Remove one',
+            onPressed: () => session.decrease(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.remove, size: 15),
+          ),
+          BuyV2FiniteValueTransition(
+            key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
+            stateKey: line.quantity,
+            text: '${line.quantity}',
+            ownerSize: const Size(24, 28),
+            style: const TextStyle(
+              color: BuyV2Colors.navy,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          IconButton(
+            tooltip: wholesale ? 'Add one trade pack' : 'Add one',
+            onPressed: () => session.increase(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.add, size: 15),
+          ),
+        ],
+      ),
+    );
+
     return Container(
       key: ValueKey('buy-cart-line-${product.id}'),
       padding: const EdgeInsets.fromLTRB(10, 9, 9, 9),
       decoration: buyV2CardDecoration(radius: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: BuyV2IntentDepth(
-              key: ValueKey('buy-cart-product-depth-${product.id}'),
-              spatial: true,
-              child: Semantics(
-                container: true,
-                button: true,
-                label: 'View ${product.title} product details',
-                excludeSemantics: true,
-                onTap: openProductDetails,
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(11),
-                  child: InkWell(
-                    key: ValueKey('buy-cart-product-details-${product.id}'),
-                    onTap: openProductDetails,
-                    borderRadius: BorderRadius.circular(11),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 60),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            key: ValueKey('buy-cart-packshot-${product.id}'),
-                            width: 60,
-                            height: 60,
-                            child: BuyV2ProductPackshot(
-                              product: product,
-                              borderRadius: 11,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyBody,
-                                ),
-                                Text(
-                                  '${product.variant} · ${product.pack}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyMeta.copyWith(fontSize: 8),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  automaticFulfilment
-                                      ? '$buyerPromise · MoolSocial price'
-                                      : '${product.deliveryPromise} · ${product.seller}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.green,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 20, right: 2),
-                            child: Icon(
-                              Icons.chevron_right_rounded,
-                              size: 18,
-                              color: BuyV2Colors.navy,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactWholesale =
+              wholesale &&
+              (constraints.maxWidth < 340 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.2);
+          if (compactWholesale) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                productBody,
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.only(top: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                  ),
+                  child: Row(
+                    children: [price, const Spacer(), quantityControl],
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BuyV2FiniteValueTransition(
-                key: ValueKey('buy-cart-line-total-motion-${product.id}'),
-                stateKey: line.total,
-                text: buyV2Money(line.total),
-                ownerSize: const Size(78, 22),
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (product.mrp != null && product.mrp! > product.price)
-                Text(
-                  buyV2Money(product.mrp! * line.quantity),
-                  style: context.buyMeta.copyWith(
-                    fontSize: 8,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-              const SizedBox(height: 5),
-              Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softBlue,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Remove one',
-                      onPressed: () => session.decrease(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.remove, size: 15),
-                    ),
-                    BuyV2FiniteValueTransition(
-                      key: ValueKey(
-                        'buy-cart-line-quantity-motion-${product.id}',
-                      ),
-                      stateKey: line.quantity,
-                      text: '${line.quantity}',
-                      ownerSize: const Size(24, 28),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Add one',
-                      onPressed: () => session.increase(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.add, size: 15),
-                    ),
-                  ],
-                ),
+              Expanded(child: productBody),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [price, const SizedBox(height: 5), quantityControl],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
 class _SavedAddressReminder extends StatelessWidget {
-  const _SavedAddressReminder({required this.address, required this.onEdit});
+  const _SavedAddressReminder({
+    required this.address,
+    required this.onEdit,
+    this.wholesaleReceiving = false,
+  });
 
   final BuyV2Address address;
   final VoidCallback onEdit;
+  final bool wholesaleReceiving;
 
   @override
   Widget build(BuildContext context) {
+    final title = wholesaleReceiving
+        ? 'Receiving location · ${address.label}'
+        : 'Delivering to ${address.label}';
     return Container(
       key: const ValueKey('buy-saved-address-reminder'),
       constraints: const BoxConstraints(minHeight: 54),
@@ -9011,9 +10262,18 @@ class _SavedAddressReminder extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'Delivering to ${address.label}',
-                  style: context.buyBody.copyWith(fontSize: 10),
+                Semantics(
+                  key: ValueKey(
+                    wholesaleReceiving
+                        ? 'buy-wholesale-checkout-receiving-location'
+                        : 'buy-checkout-delivery-location',
+                  ),
+                  label: title,
+                  excludeSemantics: true,
+                  child: Text(
+                    title,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(

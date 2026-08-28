@@ -70,7 +70,32 @@ void main() {
   ) {
     expect(session.activeDockDestination, expected);
     expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
+    expect(find.byKey(const Key('buy-scoped-purchase-owner')), findsNothing);
+    if (expected == BuyV2Destination.medicine) {
+      expect(
+        find.byKey(const Key('care-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'care-local-tab-doctor',
+        'care-local-tab-medicine',
+        'care-local-tab-salon',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    } else {
+      expect(
+        find.byKey(const Key('buy-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'buy-local-tab-wholesale',
+        'buy-local-tab-orders',
+        'buy-local-tab-offers',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    }
   }
 
   const cases = [
@@ -124,7 +149,7 @@ void main() {
     },
   );
 
-  testWidgets('scoped Cart and Checkout retain one truthful connected owner', (
+  testWidgets('scoped Cart and Checkout retain every established rail action', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -183,6 +208,48 @@ void main() {
     expect(session.destination, BuyV2Destination.shop);
     semantics.dispose();
   });
+
+  testWidgets(
+    'compact Mool launcher opens and Back closes the menu without losing Cart',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+      final session = mixedSession();
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.shop);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      final cartIds = session.cartLines.map((line) => line.product.id).toList();
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      final launcher = find.byKey(const Key('mool-home-launcher'));
+      expect(launcher, findsOneWidget);
+      expect(tester.getSemantics(launcher).label, 'Open MoolSocial main menu');
+
+      await tester.tap(launcher);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(launcher).label, 'Close MoolSocial main menu');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsNothing,
+      );
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(
+        session.cartLines.map((line) => line.product.id),
+        orderedEquals(cartIds),
+      );
+      semantics.dispose();
+    },
+  );
 
   testWidgets('320px 140% reduced motion is immediate and semantically exact', (
     tester,

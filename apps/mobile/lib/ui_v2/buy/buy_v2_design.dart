@@ -71,6 +71,186 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Mool Fulfilment Partner',
     };
 
+const buyV2ProductOfferDecisionContractVersion =
+    'buy-product-offer-decision-v1';
+
+/// UI/API handoff for optional, workspace-authorized Wholesale trade context.
+///
+/// The genuine runtime adapter must resolve the authenticated retailer
+/// workspace outside this presentation layer. It receives only the stable
+/// product IDs and the customer-visible delivery locality, and returns a
+/// timestamped signal that must never override price, stock, delivery or Cart
+/// authorization from [BuyV2ProductFactsSnapshot].
+const buyV2WholesaleTradeDecisionContractVersion =
+    'buy-wholesale-trade-decision-v1';
+
+const buyV2WholesaleCartTradeSummaryContractVersion =
+    'buy-wholesale-cart-trade-summary-v1';
+
+const buyV2WholesaleCheckoutPackCountContractVersion =
+    'buy-wholesale-checkout-pack-count-v1';
+
+const buyV2WholesaleCheckoutReceivingLinesContractVersion =
+    'buy-wholesale-checkout-receiving-lines-v1';
+
+const buyV2WholesaleCheckoutReceivingLocationContractVersion =
+    'buy-wholesale-checkout-receiving-location-v1';
+
+enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
+
+@immutable
+class BuyV2WholesaleTradeSignal {
+  const BuyV2WholesaleTradeSignal({
+    required this.productId,
+    required this.state,
+    required this.localityLabel,
+    required this.headline,
+    required this.detail,
+    required this.sourceLabel,
+    required this.updatedLabel,
+    this.priceValidUntilLabel,
+  });
+
+  const BuyV2WholesaleTradeSignal.unavailable({required this.productId})
+    : state = BuyV2WholesaleTradeSignalState.unavailable,
+      localityLabel = '',
+      headline = 'Local trade signal unavailable',
+      detail =
+          'You can still decide using the current price, stock and delivery promise.',
+      sourceLabel = '',
+      updatedLabel = '',
+      priceValidUntilLabel = null;
+
+  final String productId;
+  final BuyV2WholesaleTradeSignalState state;
+  final String localityLabel;
+  final String headline;
+  final String detail;
+  final String sourceLabel;
+  final String updatedLabel;
+  final String? priceValidUntilLabel;
+
+  bool get hasCurrentSignal =>
+      state == BuyV2WholesaleTradeSignalState.ready &&
+      localityLabel.trim().isNotEmpty &&
+      headline.trim().isNotEmpty &&
+      detail.trim().isNotEmpty &&
+      sourceLabel.trim().isNotEmpty &&
+      updatedLabel.trim().isNotEmpty;
+}
+
+abstract interface class BuyV2WholesaleTradeDecisionAdapter {
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  });
+}
+
+/// Production-safe default. Tests inject contract-conforming fixtures; the
+/// application never manufactures local demand, popularity or price validity.
+final class BuyV2UnavailableWholesaleTradeDecisionAdapter
+    implements BuyV2WholesaleTradeDecisionAdapter {
+  const BuyV2UnavailableWholesaleTradeDecisionAdapter();
+
+  @override
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  }) async => BuyV2WholesaleTradeSignal.unavailable(productId: productId);
+}
+
+enum BuyV2ProductOfferDecisionState {
+  ready,
+  checking,
+  stale,
+  unavailable,
+  changedPrice,
+  missingFulfilment,
+}
+
+@immutable
+class BuyV2ProductOfferDecision {
+  const BuyV2ProductOfferDecision({
+    required this.state,
+    required this.statusLabel,
+    required this.detail,
+  });
+
+  final BuyV2ProductOfferDecisionState state;
+  final String statusLabel;
+  final String detail;
+
+  bool get canAdd => state == BuyV2ProductOfferDecisionState.ready;
+}
+
+BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
+  required BuyV2Product product,
+  required BuyV2ProductFactsSnapshot facts,
+}) {
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  final partner = facts.partner.trim().toLowerCase();
+  final automaticFulfilment =
+      product.destination == BuyV2Destination.shop ||
+      product.destination == BuyV2Destination.wholesale;
+
+  if (facts.stale) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.stale,
+      statusLabel: 'Offer needs review',
+      detail:
+          'Price, availability or delivery information may be out of date. Retry before adding to Cart.',
+    );
+  }
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available') ||
+      orderability.contains('out of stock')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Currently unavailable',
+      detail:
+          'This product cannot be added to Cart right now. Retry or choose another product.',
+    );
+  }
+  if (orderability.contains('checking') ||
+      orderability.contains('loading') ||
+      orderability.contains('pending review')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.checking,
+      statusLabel: 'Checking availability',
+      detail:
+          'Current stock and delivery must be confirmed before adding to Cart.',
+    );
+  }
+  if (facts.price != product.price) {
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.changedPrice,
+      statusLabel: 'Price changed',
+      detail:
+          'The delivered price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Retry or choose another product.',
+    );
+  }
+  if (automaticFulfilment &&
+      (facts.deliveryPromise.trim().isEmpty ||
+          partner.isEmpty ||
+          partner.contains('assignment pending') ||
+          partner.contains('not assigned') ||
+          partner.contains('missing'))) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.missingFulfilment,
+      statusLabel: 'Fulfilment unavailable',
+      detail:
+          'A delivery promise and automatic fulfilment path must be confirmed before adding to Cart.',
+    );
+  }
+  return const BuyV2ProductOfferDecision(
+    state: BuyV2ProductOfferDecisionState.ready,
+    statusLabel: 'Ready to add',
+    detail: 'Current price, stock and delivery are confirmed.',
+  );
+}
+
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);
   static const royal = Color(0xFF1515B8);
@@ -1211,11 +1391,12 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                   children: [
                                     Text(
                                       widget.title,
-                                      maxLines: 1,
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.ink,
-                                        fontSize: 11,
+                                        fontSize: 10.5,
+                                        height: 1.08,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
@@ -1226,8 +1407,8 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.muted,
-                                        fontSize: 8,
-                                        height: 1.15,
+                                        fontSize: 9.5,
+                                        height: 1.2,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

@@ -96,7 +96,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('care-local-destination-tabs')),
       findsOneWidget,
@@ -110,7 +110,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.medicine);
     expect(session.view, BuyV2View.catalogue);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('care-local-destination-tabs')),
       findsOneWidget,

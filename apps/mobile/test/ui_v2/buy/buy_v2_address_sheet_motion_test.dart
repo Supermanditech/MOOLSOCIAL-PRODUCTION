@@ -170,7 +170,12 @@ void main() {
     await tester.pumpWidget(
       app(
         session,
-        home: Scaffold(body: BuyV2CheckoutView(session: session)),
+        home: Scaffold(
+          body: BuyV2CheckoutView(
+            session: session,
+            gstInvoiceController: BuyV2GstInvoiceController(),
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();

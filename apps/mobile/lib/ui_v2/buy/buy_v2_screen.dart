@@ -45,6 +45,8 @@ class BuyV2Screen extends StatefulWidget {
     this.shopChatSource = const BuyV2SessionShopChatProvisioningSource(),
     this.contextualChatSource =
         const MoolDefaultContextualChatProvisioningSource(),
+    this.wholesaleTradeDecisionAdapter =
+        const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
 
   final BuyV2Session session;
@@ -69,6 +71,7 @@ class BuyV2Screen extends StatefulWidget {
   final BuyV2PublishedOffersSource offersSource;
   final BuyV2ShopChatProvisioningSource shopChatSource;
   final MoolContextualChatProvisioningSource contextualChatSource;
+  final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
@@ -76,6 +79,8 @@ class BuyV2Screen extends StatefulWidget {
 
 class _BuyV2ScreenState extends State<BuyV2Screen> {
   final GlobalKey<BuyV2ShopChatViewState> _shopChatViewKey = GlobalKey();
+  final MoolGlobalNavigationController _moolNavigationController =
+      MoolGlobalNavigationController();
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
   bool _scannerBusy = false;
@@ -243,7 +248,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
             HapticFeedback.selectionClick();
-            if (_shopChatActive) {
+            if (_moolNavigationController.isOpen) {
+              unawaited(_moolNavigationController.close());
+            } else if (_shopChatActive) {
               _handleShopChatBack();
             } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
@@ -380,6 +387,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                   onOpenMool: _openGlobalMool,
                   onOpenAction: _openGlobalAction,
                   onOpenChat: _openShopChat,
+                  moolNavigationController: _moolNavigationController,
                   onPreviousLocalAction: () => _moveBuyLocal(session, -1),
                   onNextLocalAction: () => _moveBuyLocal(session, 1),
                 ),
@@ -537,11 +545,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openGlobalAction(PersonalMoolActionSpec action) {
-    if (action.id == 'buy' && (_offersActive || _shopChatActive)) {
-      setState(() {
-        _offersActive = false;
-        _shopChatActive = false;
-      });
+    if (action.id == 'buy') {
+      _openBuyDestination(BuyV2Destination.shop);
+      return;
     }
     final onOpenMainAction = widget.onOpenMainAction;
     if (onOpenMainAction != null) {
@@ -774,6 +780,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.product => BuyV2ProductView(
         session: session,
         returnLabel: _offersActive ? 'Offers' : null,
+        wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
@@ -956,6 +963,14 @@ class _BuySearchBand extends StatelessWidget {
             BuyV2Destination.orders => 'Search orders, sellers or ID',
             _ => 'Search products, brands and codes',
           };
+    final compactHint = offersActive
+        ? 'Search current offers'
+        : switch (session.destination) {
+            BuyV2Destination.wholesale => 'Search bulk products',
+            BuyV2Destination.medicine => 'Search medicines',
+            BuyV2Destination.orders => 'Search orders or ID',
+            _ => 'Search products',
+          };
     final showScanner = session.destination != BuyV2Destination.orders;
     final longQuery = open && controller.text.trim().length > 38;
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
@@ -1061,7 +1076,7 @@ class _BuySearchBand extends StatelessWidget {
                                     Expanded(
                                       child: Text(
                                         session.query.isEmpty
-                                            ? hint
+                                            ? compactHint
                                             : session.query,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
