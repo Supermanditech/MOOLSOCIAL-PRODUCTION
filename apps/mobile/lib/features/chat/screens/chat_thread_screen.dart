@@ -155,6 +155,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     if (loaded) await session.markRead(threadId);
   }
 
+  Future<void> _openConversationInfo(
+    ChatThread thread,
+    ChatEntryContext entryContext,
+  ) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => _ConversationInfoScreen(
+          session: widget.session,
+          thread: thread,
+          entryContext: entryContext,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _threadLoadRequest += 1;
@@ -193,31 +208,52 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             children: [
               IconButton(
                 key: const Key('chat-thread-video'),
-                tooltip: 'Video call',
+                tooltip: widget.session.videoCallsAvailableForSession(thread.id)
+                    ? 'Video call'
+                    : 'Video calls paused',
                 onPressed: () => unawaited(
                   _showUnavailableCapability(
                     context,
                     keyName: 'chat-video-recovery',
-                    title: 'Video calling unavailable',
+                    title:
+                        widget.session.videoCallsAvailableForSession(thread.id)
+                        ? 'Video calling unavailable'
+                        : 'Video calls paused',
                     message:
-                        'Video calling is not available right now. You can continue this conversation in Chat.',
+                        widget.session.videoCallsAvailableForSession(thread.id)
+                        ? 'Video calling is not available right now. You can continue this conversation in Chat.'
+                        : 'Video calls are paused for this conversation until you turn them on in Conversation info.',
                   ),
                 ),
                 icon: const Icon(Icons.videocam_outlined),
               ),
               IconButton(
                 key: const Key('chat-thread-call'),
-                tooltip: 'Voice call',
+                tooltip: widget.session.voiceCallsAvailableForSession(thread.id)
+                    ? 'Voice call'
+                    : 'Voice calls paused',
                 onPressed: () => unawaited(
                   _showUnavailableCapability(
                     context,
                     keyName: 'chat-call-recovery',
-                    title: 'Voice calling unavailable',
+                    title:
+                        widget.session.voiceCallsAvailableForSession(thread.id)
+                        ? 'Voice calling unavailable'
+                        : 'Voice calls paused',
                     message:
-                        'Voice calling is not available right now. You can continue this conversation in Chat.',
+                        widget.session.voiceCallsAvailableForSession(thread.id)
+                        ? 'Voice calling is not available right now. You can continue this conversation in Chat.'
+                        : 'Voice calls are paused for this conversation until you turn them on in Conversation info.',
                   ),
                 ),
                 icon: const Icon(Icons.call_outlined),
+              ),
+              IconButton(
+                key: const Key('chat-conversation-info'),
+                tooltip: 'Conversation info',
+                onPressed: () =>
+                    unawaited(_openConversationInfo(thread, entryContext)),
+                icon: const Icon(Icons.info_outline_rounded),
               ),
             ],
           ),
@@ -234,15 +270,476 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                       widget.session.loadMessages(thread.id, refresh: true),
                 )
               : _ThreadBody(session: widget.session, thread: thread),
-          bottom: _Composer(
-            session: widget.session,
-            threadId: thread.id,
-            controller: _messageController,
-            onSend: _sendCurrentMessage,
-            onSendPhoto: _sendCurrentPhoto,
+          bottom: widget.session.chatAvailableForSession(thread.id)
+              ? _Composer(
+                  session: widget.session,
+                  threadId: thread.id,
+                  controller: _messageController,
+                  onSend: _sendCurrentMessage,
+                  onSendPhoto: _sendCurrentPhoto,
+                )
+              : _ChatPausedBar(
+                  onResume: () => widget.session.setChatAvailableForSession(
+                    thread.id,
+                    available: true,
+                  ),
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _ConversationInfoScreen extends StatefulWidget {
+  const _ConversationInfoScreen({
+    required this.session,
+    required this.thread,
+    required this.entryContext,
+  });
+
+  final ChatSession session;
+  final ChatThread thread;
+  final ChatEntryContext entryContext;
+
+  @override
+  State<_ConversationInfoScreen> createState() =>
+      _ConversationInfoScreenState();
+}
+
+class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
+  String? _statusMessage;
+
+  void _confirmLocalChange(String message) {
+    setState(() => _statusMessage = message);
+  }
+
+  void _showAccountSettingRecovery({
+    required String keyName,
+    required String title,
+  }) {
+    unawaited(
+      _showUnavailableCapability(
+        context,
+        keyName: keyName,
+        title: title,
+        message:
+            'This account setting cannot be updated right now. Your current choice stays unchanged. Try again later.',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.session,
+      builder: (context, _) {
+        final thread = widget.thread;
+        final session = widget.session;
+        final chatAvailable = session.chatAvailableForSession(thread.id);
+        return ChatPageScaffold(
+          key: const Key('chat-conversation-info-screen'),
+          session: session,
+          title: 'Conversation info',
+          subtitle: thread.title,
+          returnRoute: '/app/chat/thread/${thread.id}',
+          showContentBack: true,
+          backKeyName: 'chat-conversation-info-back',
+          titleIcon: Icons.manage_accounts_outlined,
+          titleAccent: widget.entryContext.accent,
+          showMessageBanner: false,
+          backgroundColor: const Color(0xFFF4F5F8),
+          body: ListView(
+            key: const Key('chat-conversation-info-list'),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+            children: [
+              _ConversationIdentityCard(
+                thread: thread,
+                chatAvailable: chatAvailable,
+                accent: widget.entryContext.accent,
+              ),
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 12),
+                _ConversationStatusNotice(message: _statusMessage!),
+              ],
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Availability',
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-chat-availability'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Chat in this app'),
+                      subtitle: const Text(
+                        'Pause or resume the composer for this conversation.',
+                      ),
+                      value: chatAvailable,
+                      onChanged: (available) {
+                        session.setChatAvailableForSession(
+                          thread.id,
+                          available: available,
+                        );
+                        _confirmLocalChange(
+                          available
+                              ? 'Chat resumed for this app session.'
+                              : 'Chat paused for this app session.',
+                        );
+                      },
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-voice-availability'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Voice calls in this app'),
+                      subtitle: const Text(
+                        'Control the voice-call action in this conversation.',
+                      ),
+                      value: session.voiceCallsAvailableForSession(thread.id),
+                      onChanged: (available) {
+                        session.setVoiceCallsAvailableForSession(
+                          thread.id,
+                          available: available,
+                        );
+                        _confirmLocalChange(
+                          available
+                              ? 'Voice calls turned on for this app session.'
+                              : 'Voice calls paused for this app session.',
+                        );
+                      },
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-video-availability'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Video calls in this app'),
+                      subtitle: const Text(
+                        'Control the video-call action in this conversation.',
+                      ),
+                      value: session.videoCallsAvailableForSession(thread.id),
+                      onChanged: (available) {
+                        session.setVideoCallsAvailableForSession(
+                          thread.id,
+                          available: available,
+                        );
+                        _confirmLocalChange(
+                          available
+                              ? 'Video calls turned on for this app session.'
+                              : 'Video calls paused for this app session.',
+                        );
+                      },
+                    ),
+                    const _ConversationScopeNote(
+                      'These choices apply until you close MoolSocial. They do not change account permissions or another person’s settings.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Privacy',
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-last-seen'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Share last seen'),
+                      subtitle: const Text(
+                        'Account setting · current choice stays unchanged.',
+                      ),
+                      value: true,
+                      onChanged: (_) => _showAccountSettingRecovery(
+                        keyName: 'chat-last-seen-recovery',
+                        title: 'Last seen setting unchanged',
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-read-receipts'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Read receipts'),
+                      subtitle: const Text(
+                        'Account setting · current choice stays unchanged.',
+                      ),
+                      value: true,
+                      onChanged: (_) => _showAccountSettingRecovery(
+                        keyName: 'chat-read-receipts-recovery',
+                        title: 'Read receipt setting unchanged',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Safety',
+                child: ListTile(
+                  key: const Key('chat-info-block-user'),
+                  minLeadingWidth: 28,
+                  leading: const Icon(Icons.block_outlined),
+                  title: const Text('Block this person'),
+                  subtitle: const Text('Nothing changes without confirmation.'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showAccountSettingRecovery(
+                    keyName: 'chat-block-user-recovery',
+                    title: 'Blocking unavailable',
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _ConversationIdentityCard extends StatelessWidget {
+  const _ConversationIdentityCard({
+    required this.thread,
+    required this.chatAvailable,
+    required this.accent,
+  });
+
+  final ChatThread thread;
+  final bool chatAvailable;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('chat-conversation-status'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: MoolColors.line.withValues(alpha: .7)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: .11),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(_threadIconFor(thread.type), color: accent, size: 25),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  thread.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  thread.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: chatAvailable
+                            ? const Color(0xFF1C9B62)
+                            : MoolColors.muted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: Text(
+                        chatAvailable
+                            ? 'Available in Chat'
+                            : 'Chat paused for this session',
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (thread.verified)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.verified_rounded, color: Color(0xFF1C73E8)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConversationSettingsSection extends StatelessWidget {
+  const _ConversationSettingsSection({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .4,
+            ),
+          ),
+        ),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+class _ConversationScopeNote extends StatelessWidget {
+  const _ConversationScopeNote(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      child: Text(
+        message,
+        style: const TextStyle(
+          color: MoolColors.muted,
+          fontSize: 11.5,
+          height: 1.35,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationStatusNotice extends StatelessWidget {
+  const _ConversationStatusNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('chat-info-local-status'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF6F0),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline_rounded, size: 19),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatPausedBar extends StatelessWidget {
+  const _ChatPausedBar({required this.onResume});
+
+  final VoidCallback onResume;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('chat-paused-bar'),
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Chat is paused for this app session.',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 96,
+                child: OutlinedButton(
+                  key: const Key('chat-resume'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(96, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onPressed: onResume,
+                  child: const Text('Resume'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

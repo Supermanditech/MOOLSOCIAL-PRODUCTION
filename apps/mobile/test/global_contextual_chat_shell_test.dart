@@ -324,6 +324,149 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'conversation info owns local availability and truthful account recovery',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/chat/thread/home-basket?return=/app/work/earn',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('chat-conversation-info')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-conversation-info')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('chat-conversation-info-screen')),
+        findsOneWidget,
+      );
+      expect(find.text('Conversation info'), findsOneWidget);
+      expect(find.byKey(const Key('chat-conversation-status')), findsOneWidget);
+      expect(find.text('Available in Chat'), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-info-chat-availability')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('chat-info-voice-availability')));
+      await tester.pump();
+      expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
+      expect(find.byKey(const Key('chat-info-local-status')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-info-video-availability')));
+      await tester.pump();
+      expect(chat.videoCallsAvailableForSession('home-basket'), isFalse);
+
+      final lastSeen = find.byKey(const Key('chat-info-last-seen'));
+      await tester.ensureVisible(lastSeen);
+      await tester.tap(lastSeen);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-last-seen-recovery')), findsOneWidget);
+      expect(find.text('Last seen setting unchanged'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
+
+      final readReceipts = find.byKey(const Key('chat-info-read-receipts'));
+      await tester.ensureVisible(readReceipts);
+      await tester.tap(readReceipts);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-read-receipts-recovery')),
+        findsOneWidget,
+      );
+      expect(tester.widget<SwitchListTile>(readReceipts).value, isTrue);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
+
+      final blockUser = find.byKey(const Key('chat-info-block-user'));
+      await tester.ensureVisible(blockUser);
+      await tester.tap(blockUser);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-block-user-recovery')), findsOneWidget);
+      expect(find.text('Blocking unavailable'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-conversation-info-screen')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const Key('chat-conversation-info')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-info-chat-availability')));
+      await tester.pump();
+      expect(chat.chatAvailableForSession('home-basket'), isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-paused-bar')), findsOneWidget);
+      expect(find.byKey(const Key('chat-composer-surface')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('chat-thread-call')));
+      await tester.pumpAndSettle();
+      expect(find.text('Voice calls paused'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('chat-resume')));
+      await tester.pump();
+      expect(chat.chatAvailableForSession('home-basket'), isTrue);
+      expect(find.byKey(const Key('chat-composer-surface')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('conversation info remains reachable on compact large text', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/care/home',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-conversation-info')));
+    await tester.pumpAndSettle();
+
+    final blockUser = find.byKey(const Key('chat-info-block-user'));
+    await tester.dragUntilVisible(
+      blockUser,
+      find.byKey(const Key('chat-conversation-info-list')),
+      const Offset(0, -180),
+    );
+    expect(blockUser, findsOneWidget);
+    expect(tester.getBottomRight(blockUser).dx, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('attachment list stays above an OPPO bottom system inset', (
     tester,
   ) async {

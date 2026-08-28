@@ -121,6 +121,9 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _forwardRetryKeys = {};
   final Map<String, ChatMessage> _replyTargets = {};
   final Map<String, _PendingChatPhoto> _pendingPhotos = {};
+  final Map<String, bool> _chatAvailableForSession = {};
+  final Map<String, bool> _voiceCallsAvailableForSession = {};
+  final Map<String, bool> _videoCallsAvailableForSession = {};
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -265,6 +268,39 @@ class ChatSession extends ChangeNotifier {
   String? threadActionNotice(String threadId) => _threadActionNotices[threadId];
 
   ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
+
+  bool chatAvailableForSession(String threadId) =>
+      _chatAvailableForSession[threadId] ?? true;
+
+  bool voiceCallsAvailableForSession(String threadId) =>
+      _voiceCallsAvailableForSession[threadId] ?? true;
+
+  bool videoCallsAvailableForSession(String threadId) =>
+      _videoCallsAvailableForSession[threadId] ?? true;
+
+  void setChatAvailableForSession(String threadId, {required bool available}) {
+    if (chatAvailableForSession(threadId) == available) return;
+    _chatAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVoiceCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (voiceCallsAvailableForSession(threadId) == available) return;
+    _voiceCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVideoCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (videoCallsAvailableForSession(threadId) == available) return;
+    _videoCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
 
   bool get photoSharingAvailable =>
       _gateway is ChatPhotoGateway && _photoPicker != null;
