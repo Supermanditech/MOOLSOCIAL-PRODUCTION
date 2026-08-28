@@ -43913,6 +43913,16 @@
       "prevention": "Preserve Child 14 read-only, bind Child 15 to the same exact product commit, and retain at least three thousand output tokens for the complete checkout result before bootstrap or test action.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD15-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3873-SHOP-ADDRESS-CHILD15-BOOTSTRAP-EXTRA-CHILD14-DOCUMENT-OWNER",
+      "status": "registered_exact_bootstrap_owner_set_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "The Child 15 coordination gate rejected its bootstrap because the commit created both Child 14 and Child 15 ticket documents while the Child 15 bootstrap owner set declared only its own document.",
+      "rootCause": "Direct bootstrap from the product commit carried an extra preserved predecessor ticket file without expanding the literal bootstrap owner declaration.",
+      "prevention": "Bind Child 16 directly to the preserved Child 15 bootstrap commit and let its sole bootstrap delta contain only the registry, policy, checker and Child 16 ticket document declared in its owner set.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD16-20260828.md"]
     }
   ]
 }
