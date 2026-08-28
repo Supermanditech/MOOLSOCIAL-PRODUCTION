@@ -43513,6 +43513,36 @@
       "prevention": "Read the exact current title and trailing ranges immediately before each bounded patch, change the scaffold callback and removed icon in separate verified hunks, then format again.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3825-R61-35-OPPO-CONVERSATION-ENTRY-BLANK-BLUE-SURFACE",
+      "status": "registered_focus_hierarchy_and_crash_classification_required",
+      "appliesTo": ["primary", "mobile", "device", "android", "navigation", "testing"],
+      "mistake": "The first r61.35 OPPO tap on Order MS-240782 produced a blank blue app surface with only system bars instead of the conversation thread.",
+      "rootCause": "The first retained frame does not yet classify whether the route lost its Flutter content, the app process failed, or the capture landed on a transient window.",
+      "prevention": "Do not repeat the tap; retain the screenshot and hierarchy, then inspect bounded activity focus, process presence, hierarchy ownership and sanitized fatal markers before choosing a source or device correction.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-chat-thread.png", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-chat-thread.xml", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3826-R61-34-OVERFLOW-ATTRIBUTED-TO-WRONG-CHAT-OWNER",
+      "status": "registered_visible_owner_identification_before_source_fix_required",
+      "appliesTo": ["primary", "mobile", "device", "ui_ux", "ownership", "testing"],
+      "mistake": "The r61.34 overflow was attributed to the new global Conversation Info icon, but the captured screen was Cursor's Shop-specific order conversation and never rendered that global Info action.",
+      "rootCause": "The device route was inferred from the shared Chat entry instead of identifying the visible screen's exact source owner and semantic contract before selecting a correction.",
+      "prevention": "Before a device defect changes source, prove the visible owner from route semantics and current source inventory; Shop remains Cursor-owned, while this ticket qualifies Conversation Info only through a non-Shop global Chat context such as Work.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/oppo-r61.34-chat-thread.png", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-chat-thread-settled-1.png", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3827-R61-35-CHAT-RECOVERY-BUTTON-EXPORTED-HEIGHT-CLIPPED",
+      "status": "registered_shared_android_semantics_clearance_required",
+      "appliesTo": ["primary", "mobile", "device", "accessibility", "android", "testing"],
+      "mistake": "The r61.35 Last Seen recovery visually rendered a full-height Continue in Chat button, but OPPO UIAutomator exported bounds [48,1380][672,1442], only about 31 logical pixels high.",
+      "rootCause": "The shared Chat bottom sheet protected the visual system inset but did not lift its final action above the app's additional Android exported-semantics clipping boundary.",
+      "prevention": "Apply the existing shared Android exported-semantics bottom clearance to Chat recovery sheets, retain the visual 48-pixel button and require OPPO exported clickable height of at least 44 logical pixels.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-last-seen-recovery.png", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-last-seen-recovery.xml", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }

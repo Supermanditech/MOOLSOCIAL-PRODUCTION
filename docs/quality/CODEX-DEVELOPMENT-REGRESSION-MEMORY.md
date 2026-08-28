@@ -3614,3 +3614,12 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3824 rejects header corrections based on pre-format source context. Read
   exact current title and trailing ranges, patch them independently and format
   only after both bounded changes are verified.
+- REG3825 rejects repeating a conversation tap after r61.35 first showed a
+  blank blue OPPO surface. Preserve the frame and classify activity focus,
+  process, hierarchy ownership and sanitized fatal markers before correction.
+- REG3826 rejects attributing a Shop-specific device defect to the global Chat
+  owner. Identify the visible route/source semantics first; keep Shop Cursor-owned
+  and qualify global Conversation Info from a non-Shop context such as Work.
+- REG3827 rejects a visually 48-pixel Chat recovery button whose OPPO exported
+  bounds are only about 31 logical pixels. Lift shared recovery sheets by the
+  existing Android semantics-clearance token and require at least 44 exported.
