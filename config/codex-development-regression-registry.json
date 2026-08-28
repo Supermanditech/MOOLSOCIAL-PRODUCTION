@@ -43543,6 +43543,26 @@
       "prevention": "Apply the existing shared Android exported-semantics bottom clearance to Chat recovery sheets, retain the visual 48-pixel button and require OPPO exported clickable height of at least 44 logical pixels.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-last-seen-recovery.png", "artifacts/review-runtime/r61-35-conversation-info-20260829/oppo-r61.35-last-seen-recovery.xml", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3828-R61-36-CLEARANCE-CALCULATED-AFTER-SAFEAREA-REMOVED-TOP-INSET",
+      "status": "registered_caller_owned_clearance_scalar_required",
+      "appliesTo": ["primary", "mobile", "device", "accessibility", "android", "testing"],
+      "mistake": "r61.36 still exported Continue in Chat at about 31 logical pixels because the semantics clearance was computed inside the modal route after useSafeArea removed the caller's top viewPadding.",
+      "rootCause": "The shared token was correct, but its input context no longer retained the Android system inset needed to calculate the lift.",
+      "prevention": "Compute exported-semantics clearance from the conversation context before showModalBottomSheet, pass the scalar into the safe-area wrapper and test that exact caller-to-sheet boundary.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-36-conversation-info-20260829/oppo-r61.36-last-seen-recovery.xml", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3829-CHAT-SHEET-CLEARANCE-CONSTRUCTOR-LEFT-TWO-CALLERS-INCOMPLETE",
+      "status": "registered_all_callers_update_before_analysis_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "accessibility", "analysis", "testing"],
+      "mistake": "The first caller-owned clearance change made the shared sheet parameter required but updated only the unavailable-capability caller, leaving two existing Chat sheet constructors uncompilable.",
+      "rootCause": "The constructor-consumer inventory was not completed before the API change was analyzed.",
+      "prevention": "Inventory every _ChatBottomSheetSafeArea constructor first, compute caller-owned clearance for each sheet launch and update all consumers in the same source wave before focused analysis.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }

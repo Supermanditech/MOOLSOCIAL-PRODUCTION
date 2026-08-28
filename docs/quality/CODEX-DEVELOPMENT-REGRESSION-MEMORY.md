@@ -3623,3 +3623,9 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3827 rejects a visually 48-pixel Chat recovery button whose OPPO exported
   bounds are only about 31 logical pixels. Lift shared recovery sheets by the
   existing Android semantics-clearance token and require at least 44 exported.
+- REG3828 rejects calculating that clearance inside a `useSafeArea` modal after
+  its top inset is removed. Compute from the caller context and pass the exact
+  scalar into the sheet wrapper.
+- REG3829 rejects changing a shared Chat sheet constructor before updating all
+  consumers. Inventory every call site and pass caller-owned clearance through
+  every sheet launch before focused analysis.
