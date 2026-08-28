@@ -156,6 +156,15 @@ void main() {
       );
       expect(title.didExceedMaxLines, isFalse);
       expect(subtitle.didExceedMaxLines, isFalse);
+      if (entry.$4 != null && entry.$1 != '/app/social?sub=feed') {
+        final activeFilter = find.byKey(
+          Key('chat-filter-${entry.$4!.label.toLowerCase()}'),
+        );
+        expect(activeFilter, findsOneWidget);
+        final filterRect = tester.getRect(activeFilter);
+        expect(filterRect.left, greaterThanOrEqualTo(0));
+        expect(filterRect.right, lessThanOrEqualTo(320));
+      }
       expect(tester.takeException(), isNull);
 
       await tester.binding.handlePopRoute();

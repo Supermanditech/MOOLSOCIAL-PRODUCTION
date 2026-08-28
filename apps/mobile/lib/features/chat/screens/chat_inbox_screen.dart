@@ -517,38 +517,79 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 }
 
-class _FilterStrip extends StatelessWidget {
+class _FilterStrip extends StatefulWidget {
   const _FilterStrip({required this.session});
 
   final ChatSession session;
+
+  @override
+  State<_FilterStrip> createState() => _FilterStripState();
+}
+
+class _FilterStripState extends State<_FilterStrip> {
+  final _anchors = List<GlobalKey>.generate(6, (_) => GlobalKey());
+  String? _revealedSelection;
+
+  String get _selection => widget.session.unreadOnly
+      ? 'Unread'
+      : widget.session.selectedFilter?.label ?? 'All';
+
+  void _scheduleSelectedReveal() {
+    final selection = _selection;
+    if (_revealedSelection == selection) return;
+    _revealedSelection = selection;
+    final index = switch (selection) {
+      'All' => 0,
+      'Unread' => 1,
+      _ =>
+        2 + ChatThreadType.values.indexWhere((type) => type.label == selection),
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || index < 0 || index >= _anchors.length) return;
+      final anchorContext = _anchors[index].currentContext;
+      if (anchorContext == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          anchorContext,
+          alignment: .88,
+          duration: MoolMotion.accessible(context, MoolMotion.quick),
+          curve: MoolMotion.enter,
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final values = <(String, bool, VoidCallback)>[
       (
         'All',
-        session.selectedFilter == null && !session.unreadOnly,
-        session.chooseAll,
+        widget.session.selectedFilter == null && !widget.session.unreadOnly,
+        widget.session.chooseAll,
       ),
-      ('Unread', session.unreadOnly, session.chooseUnread),
+      ('Unread', widget.session.unreadOnly, widget.session.chooseUnread),
       for (final type in ChatThreadType.values)
         (
           type.label,
-          session.selectedFilter == type,
-          () => session.chooseFilter(type),
+          widget.session.selectedFilter == type,
+          () => widget.session.chooseFilter(type),
         ),
     ];
+    _scheduleSelectedReveal();
     return SizedBox(
       height: MoolMetrics.minimumTapTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: values.length,
         separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
-        itemBuilder: (context, index) => ChoiceChip(
-          key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
-          label: Text(values[index].$1),
-          selected: values[index].$2,
-          onSelected: (_) => values[index].$3(),
+        itemBuilder: (context, index) => KeyedSubtree(
+          key: _anchors[index],
+          child: ChoiceChip(
+            key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
+            label: Text(values[index].$1),
+            selected: values[index].$2,
+            onSelected: (_) => values[index].$3(),
+          ),
         ),
       ),
     );
