@@ -1,6 +1,6 @@
 # UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828
 
-State: `founder_authorized_prebuild_assembly`
+State: `prebuild_repairs_passed_commit_pending`
 
 - Work ID: `shop-v2-r61-5-cursor-review-build-20260828`.
 - Branch:
@@ -28,3 +28,17 @@ source identity, protected Buy/Social/UI/brand gates, package isolation,
 wrapper self-test and the exact runtime-define allowlist. Post-build evidence
 must bind APK bytes and SHA-256 to the installed Redmi package before founder
 review.
+
+Prebuild qualification completed:
+
+- final source manifest: `636` files, SHA-256
+  `8512355AD08E1CC45731B7D8B97772AE9CE45360811D1FF68D9F496E28CF64E8`;
+- format verification and focused analysis passed;
+- R58.8.7 complete focused file passed with stderr `0` bytes;
+- wrapper cleanliness self-test and Cursor package isolation passed;
+- approved UI, Brand, protected Buy, protected Social, interaction, customer
+  copy, backend-boundary and data-egress gates passed;
+- the backend and clipboard allowances are restricted to exact accepted
+  ancestor commits and byte-identical owners on this literal build branch.
+
+No build authorization has yet been consumed.

@@ -69,7 +69,8 @@ function Test-SealedBuyEgressClipboardAction {
     'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
     'integration/moolsocial/social-runtime-chat-v2-20260825',
     'integration/moolsocial/social-runtime-chat-v3-20260826',
-    'integration/moolsocial/social-runtime-chat-v4-20260826'
+    'integration/moolsocial/social-runtime-chat-v4-20260826',
+    'work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828'
   )
   $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
   & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner

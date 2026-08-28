@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3798,
-    "sha256": "14B1CEE16B75EED3D8649015508F31D4EC2027695392A9D7D3C700ACC45DFD36"
+    "entryCount": 3802,
+    "sha256": "DDD5148B50341B58D8EE5743D2CA67FCADFC88FEA0A046DA908B6A7DFFCBB6CC"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -105,7 +105,22 @@
         "config/apk-regression-gate-state.json",
         "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
-        "scripts/new-shop-v2-r61-5-source-manifest.ps1"
+        "scripts/new-shop-v2-r61-5-source-manifest.ps1",
+        "scripts/check-buy-backend-contract-boundary.ps1",
+        "scripts/check-buy-data-egress-boundary.ps1",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-failure.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-pass.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/focused-tests-final.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/focused-tests-final.stderr.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/format-analysis-final.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/format-analysis.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/positive-release-gates.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-final.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/wrapper-self-test.log"
       ]
     },
     {
@@ -959,6 +974,7 @@
           "apps/mobile/lib/ui_v2/universal/",
           "apps/mobile/test/ui_v2/buy/",
           "apps/mobile/test/ui_v2/social/",
+          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/",
           "config/",
           "docs/quality/",
           "scripts/"

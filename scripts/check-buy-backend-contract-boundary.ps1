@@ -79,7 +79,8 @@ function Test-SealedBuyBackendOverlay {
     'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
     'integration/moolsocial/social-runtime-chat-v2-20260825',
     'integration/moolsocial/social-runtime-chat-v3-20260826',
-    'integration/moolsocial/social-runtime-chat-v4-20260826'
+    'integration/moolsocial/social-runtime-chat-v4-20260826',
+    'work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828'
   )
   $owner = $RelativePath.Replace('\', '/')
   if (-not $owner.StartsWith(
@@ -88,7 +89,13 @@ function Test-SealedBuyBackendOverlay {
     )) {
     return $false
   }
-  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  $overlayCommit = if (
+    $owner -ceq 'backend/functions/src/youtube/shared_catalogue.test.ts'
+  ) {
+    '62815b373edfe303fbc22491aeb0c3f6b74ae818'
+  } else {
+    'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  }
   $ownerSpec = '{0}:{1}' -f $overlayCommit,$owner
   & git -C $RepositoryRoot cat-file -e $ownerSpec 2>$null
   $ownerExists = $LASTEXITCODE -eq 0
