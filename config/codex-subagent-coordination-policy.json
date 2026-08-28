@@ -170,7 +170,15 @@
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-identity.json",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-device-review-debug.apk",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-build-provenance.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-installed-base.apk",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-cold-launch.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-ready.png",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-ready-ui.xml",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-install-result.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-founder-approval.json"
       ]
     },
     {
