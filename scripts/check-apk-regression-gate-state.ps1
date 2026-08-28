@@ -251,9 +251,11 @@ foreach ($line in $manifestLines) {
   ) -Message 'source manifest contains a malformed row.'
   $expectedOwnerHash = $Matches[1]
   $relativeOwner = $Matches[2]
+  $ownerSegments = @($relativeOwner.Replace('\\', '/').Split('/'))
   Assert-Gate -Condition (
     -not [IO.Path]::IsPathRooted($relativeOwner) -and
-    -not $relativeOwner.Contains('..', [StringComparison]::Ordinal)
+    -not ($ownerSegments -ccontains '.') -and
+    -not ($ownerSegments -ccontains '..')
   ) -Message "source manifest contains a non-canonical owner: $relativeOwner"
   $resolvedOwner = [IO.Path]::GetFullPath(
     (Join-Path $repositoryRoot $relativeOwner)
