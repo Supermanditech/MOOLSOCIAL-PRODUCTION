@@ -43863,6 +43863,16 @@
       "prevention": "Use an exact class declaration pattern or explicitly select index zero before line-number arithmetic; replay the verified product patches in clean Child 10.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD10-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3868-SHOP-ADDRESS-FOCUSED-TEST-OVERLAY-MATCH-AND-LAZY-FIELD-FAILURES",
+      "status": "registered_route_scoped_match_and_reveal_helper_required",
+      "appliesTo": ["primary", "coordination", "testing", "buy", "ui"],
+      "mistake": "The first combined chooser/form run passed 23 tests but failed one title assertion because both the underlying CTA and overlay title matched, and two add tests typed into the landmark before the longer form lazily built it.",
+      "rootCause": "The migrated tests retained a global text finder and an eager enterText helper from the shorter legacy form instead of scoping to the active route and revealing offscreen fields.",
+      "prevention": "Preserve the analyzed implementation as an intermediate commit, bind Child 11 to that exact commit, scope the title assertion to the request route, reveal each field before entering text, and rerun both focused files completely.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD11-20260828.md"]
     }
   ]
 }
