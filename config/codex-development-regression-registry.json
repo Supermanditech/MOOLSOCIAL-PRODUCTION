@@ -43153,6 +43153,46 @@
       "prevention": "All global-profile destination AppBars must use one shared 44-point transparent Back control with BackButtonIcon platform adaptation, no border or filled circle, and source tests that reject duplicated outlined or hard-coded chevron implementations.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/lib/ui_v2/profile/global_security_v2.dart", "apps/mobile/lib/ui_v2/profile/global_help_support_v2.dart"]
+    },
+    {
+      "id": "REG-20260828-3789-GLOBAL-TAP-FEEDBACK-TRICOLOUR-RING-AND-INK-SPARKLE",
+      "status": "registered_subtle_native_feedback_without_pointer_ring_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "motion", "testing"],
+      "mistake": "Buy displayed a custom animated orange, white and green circular pointer ring on every tap while the global theme also enabled InkSparkle, making feedback conspicuous, slow-feeling and inconsistent with professional native controls.",
+      "rootCause": "Tap acknowledgement was implemented as an app-wide pointer overlay instead of relying on each control's bounded highlight or restrained press scale; the global sparkle factory added another circular effect.",
+      "prevention": "Remove the Buy pointer overlay and tricolour painter, use NoSplash globally, retain only bounded low-opacity highlights and existing short press scales, and enforce source/widget tests that reject the ring, InkSparkle and semantic interception.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/design_system_test.dart", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_theme.dart", "apps/mobile/lib/ui_v2/motion/mool_buy_tap_acknowledgement.dart", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3790-TAP-FEEDBACK-TEST-CONST-SEMANTICS-COMPILE-ERROR",
+      "status": "registered_framework_constructor_constness_check_required",
+      "appliesTo": ["primary", "mobile", "testing", "tooling"],
+      "mistake": "The first tap-feedback test declared Semantics with const, but the pinned Flutter SDK exposes a non-const constructor, so the test failed before behavior execution.",
+      "rootCause": "The test assumed constructor constness instead of compiling against the repository-pinned Flutter API.",
+      "prevention": "Use const only for verified constructors in the pinned SDK and complete a focused compile before interpreting interaction behavior.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3791-TAP-FEEDBACK-TEST-GLOBAL-CUSTOMPAINT-FALSE-ORACLE",
+      "status": "registered_owner_specific_ring_oracle_required",
+      "appliesTo": ["primary", "mobile", "testing", "tooling"],
+      "mistake": "The first no-ring widget test rejected Material's unrelated internal CustomPaint even though the Buy tap-ring keys and painter source were absent.",
+      "rootCause": "The assertion searched the complete widget tree by a generic framework type instead of the removed overlay's owned keys and source symbol.",
+      "prevention": "Verify ring removal through exact mool-buy-tap keys and _MoolTapRingPainter source absence; never treat unrelated framework CustomPaint widgets as evidence of the custom ring.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3792-TAP-FEEDBACK-RAN-OBSOLETE-MOTION-GOLDEN-DIRECTORY",
+      "status": "registered_current_owner_and_active_buy_suite_only_required",
+      "appliesTo": ["primary", "mobile", "testing", "tooling"],
+      "mistake": "The first affected-suite command included the complete ui_v2/motion directory, which contains obsolete R51.3-R51.13 header experiments and historical goldens that fail against the accepted current Buy structure.",
+      "rootCause": "Directory-level selection treated historical review experiments as one current regression suite instead of selecting the active tap owner and current Buy screen tests.",
+      "prevention": "For this ticket run the exact tap-acknowledgement test, design-system test and active Buy screen suite; preserve historical golden failures without updating or using them as acceptance authority.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/design_system_test.dart", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"]
     }
   ]
 }

@@ -13,6 +13,7 @@ void main() {
     expect(MoolMetrics.compactTapTarget, greaterThanOrEqualTo(44));
     expect(MoolRadii.control, lessThan(MoolRadii.card));
     expect(MoolRadii.card, lessThan(MoolRadii.sheet));
+    expect(MoolTheme.light().splashFactory, same(NoSplash.splashFactory));
   });
 
   test('component typography keeps the production Inter family', () {
