@@ -43853,6 +43853,16 @@
       "prevention": "Use only non-destructive Git sparse-checkout commands on verified-clean unused recovery worktrees and leave ignored evidence directories untouched.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD9-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3867-SHOP-ADDRESS-REQUEST-CLASS-READBACK-MULTIPLE-MATCH-ARITHMETIC",
+      "status": "registered_indexed_symbol_match_required",
+      "appliesTo": ["primary", "coordination", "tooling", "implementation", "buy"],
+      "mistake": "A Child 9 source readback used a prefix pattern matching both _BuyV2AddressRequestForm and _BuyV2AddressRequestFormState, then attempted subtraction on the resulting object array and emitted InvalidOperation.",
+      "rootCause": "The readback assumed Select-String returned one match for a shared class-name prefix.",
+      "prevention": "Use an exact class declaration pattern or explicitly select index zero before line-number arithmetic; replay the verified product patches in clean Child 10.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD10-20260828.md"]
     }
   ]
 }
