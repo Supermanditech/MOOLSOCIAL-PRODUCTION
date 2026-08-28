@@ -43033,6 +43033,126 @@
       "prevention": "After refreshed memory, project only those allowlisted scalar facts from policy and fixture source, update the single stale expectation, then rerun the focused graph fixture before any commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/test-codex-integration-repair-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260828-3785-SHOP-LANDING-BOOTSTRAP-GUESSED-MISSING-BUY-MODELS-OWNER",
+      "status": "registered_coordination_bootstrap_owner_corrected_before_retry",
+      "appliesTo": ["primary", "coordination", "implementation", "tooling", "buy"],
+      "mistake": "The Shop landing coordination bootstrap gate rejected before implementation because the new Cursor claim guessed apps/mobile/lib/ui_v2/buy/buy_v2_models.dart, which does not exist in the exact v7.4 baseline.",
+      "rootCause": "The initial owner claim expanded from remembered Buy naming instead of accepting only paths returned by the bounded baseline filename inventory.",
+      "prevention": "Remove only the nonexistent owner, retain every existing claimed Shop/UI/test owner, verify all recorded owners resolve as repository leaves, refresh the registry count/SHA binding and replay regression memory before one coordination-bootstrap retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3786-SHOP-LANDING-INCREMENTAL-GATE-REJECTED-MANDATORY-BOOTSTRAP-COMMIT",
+      "status": "registered_successor_gate_order_contract_required",
+      "appliesTo": ["primary", "coordination", "implementation", "git_discipline", "tooling"],
+      "mistake": "After the clean Cursor coordination task-start passed, the cross-agent incremental ticket gate rejected because ticket_start required HEAD to equal the v7.4 tag while coordination required the exact authorized bootstrap commit to precede task start.",
+      "rootCause": "The newer incremental gate modeled a ticket as starting directly at the baseline but did not compose the repository's mandatory continuation-bootstrap contract.",
+      "prevention": "In the clean successor, allow ticket_start above the baseline only when the current branch has exactly one single-parent coordination bootstrap commit whose subject and changed-owner set exactly match the selected founder-authorized continuation binding; retain direct-baseline support and reject every extra or mismatched commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/cross-agent-incremental-ticket-gate.json", "scripts/check-cross-agent-incremental-ticket-gate.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3787-SHOP-LANDING-BOOTSTRAP-CHANGED-OWNER-SUMMARY-NESTED-ARRAY-COLLAPSE",
+      "status": "registered_read_only_projection_corrected_before_gate",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "A read-only successor-bootstrap summary wrapped tracked and untracked Git outputs in a nested PowerShell array, reported two records and collapsed five tracked owner paths into one displayed line.",
+      "rootCause": "The summary repeated the known nested-array shape hazard instead of materializing tracked and untracked path arrays independently before concatenation.",
+      "prevention": "Capture tracked and untracked owner arrays independently, concatenate the flat arrays explicitly, remove blank values, sort uniquely and require the exact six-owner bootstrap set before replaying memory or coordination.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3788-SHOP-LANDING-SUCCESSOR-WORKTREE-UNTRACKED-EXPANSION-AND-UNBOUNDED-PROJECTION",
+      "status": "registered_false_expansion_classification_corrected_before_bootstrap",
+      "appliesTo": ["primary", "coordination", "implementation", "git_discipline", "tooling"],
+      "mistake": "A successor-bootstrap owner summary temporarily reported hundreds of changed documentation, script, fixture and temporary paths and emitted that unbounded inventory until tool output truncated; the subsequent bounded classification proved only the new ticket document was untracked.",
+      "rootCause": "The diagnostic invoked git diff with a temporary core.autocrlf=false override, making existing CRLF worktree files appear modified against LF index blobs, then mislabeled the combined result as an unexpected untracked expansion.",
+      "prevention": "Never override repository line-ending policy for dirty-owner classification. Capture default git diff and git ls-files outputs independently with separate stdout/stderr, emit only count/digest first, and list paths only after the exact bounded claimed set is proven.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3789-SHOP-LANDING-LINE-ENDING-OVERRIDE-FALSE-DIRTY-EXPANSION",
+      "status": "registered_default_git_policy_required_for_owner_projection",
+      "appliesTo": ["primary", "coordination", "implementation", "git_discipline", "tooling"],
+      "mistake": "The diagnostic incorrectly classified 662 line-ending-sensitive tracked files as new worktree dirt and described them as an untracked expansion before the independent untracked count proved exactly one intended ticket document.",
+      "rootCause": "A command-local core.autocrlf=false override changed Git comparison semantics from the repository's checkout policy and its output was combined with the untracked array before classification.",
+      "prevention": "Use the repository's default Git configuration for all worktree-owner inventories, capture tracked and untracked streams separately, require the default six-owner bootstrap set, and never narrate the source of an expansion until those independent counts and hashes agree.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3790-SHOP-LANDING-SUCCESSOR-REGISTRY-REFERENCED-PARENT-ONLY-TICKET-DOCUMENT",
+      "status": "registered_existing_successor_evidence_binding_required",
+      "appliesTo": ["primary", "coordination", "implementation", "tooling"],
+      "mistake": "The successor regression-memory gate rejected REG3785 because its evidence array still referenced the parent ticket document that exists only in the preserved stopped parent worktree, not in the clean successor baseline.",
+      "rootCause": "The incident entry was mechanically carried into the successor registry without verifying every referenced evidence path against the successor's exact worktree before invoking memory.",
+      "prevention": "Bind inherited incident entries only to existing successor repository evidence, verify every registry evidence and gate path as a leaf before the memory gate, and preserve the parent branch independently without making its branch-only document a required successor owner.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3791-SHOP-LANDING-INCREMENTAL-CHECKER-BOOTSTRAP-OWNER-UNCLAIMED",
+      "status": "registered_primary_claim_alignment_required",
+      "appliesTo": ["primary", "coordination", "implementation", "git_discipline", "tooling"],
+      "mistake": "The successor coordination bootstrap gate rejected because scripts/check-cross-agent-incremental-ticket-gate.ps1 was correctly listed in the bootstrap owner manifest but was not assigned to any active primary claim.",
+      "rootCause": "The bootstrap manifest was expanded for the gate-order repair without updating the primary owner map that the coordination checker validates first.",
+      "prevention": "Assign the existing incremental checker to the /root primary claim, verify every bootstrap owner resolves to exactly one active task, refresh the registry binding and replay memory before one coordination-bootstrap retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-cross-agent-incremental-ticket-gate.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3792-SHOP-LANDING-DEFAULT-SOCIAL-PROTECTED-GATE-REPEATED-SEALED-INVENTORY-MISMATCH",
+      "status": "registered_supported_sealed_successor_mode_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "mobile", "buy"],
+      "mistake": "After all Shop task-start gates and immutable UI locks passed, the default historical Social protected-baseline gate was invoked and rejected the reconciled v7.4 source because it expected 119 protected files but found the already accepted 231-file sealed Social inventory.",
+      "rootCause": "The execution repeated the REG3761 historical-gate mismatch instead of first inspecting the gate's declared parameters and selecting only a repository-supported sealed-successor baseline mode for the reconciled tag.",
+      "prevention": "In the clean successor, inspect the exact Social gate parameter contract before execution, use only its existing immutable sealed-successor or explicit-baseline mode, preserve every Social owner and hash, and stop without resealing or source changes if no supported mode accepts the v7.4 baseline.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3793-SOCIAL-V74-SEALED-OVERLAY-PATCH-POWERSHELL-PARSER-REJECTION",
+      "status": "registered_bounded_parser_diagnosis_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "tooling"],
+      "mistake": "The first exact-v7.4 sealed-overlay gate patch produced two PowerShell parser errors before any gate execution or protected-owner inspection.",
+      "rootCause": "The new candidate-selection block was composed as a large patch and was parser-checked only after insertion instead of validating each new expression boundary while authoring.",
+      "prevention": "Retain the rejected patch as incident evidence, emit only the two bounded parser messages and line numbers, correct the exact syntax without changing the overlay contract, rerun parser validation, memory and coordination before functional gate execution.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3794-SOCIAL-V74-OVERLAY-PARSER-PARTIAL-CORRECTION-LEFT-ONE-ERROR",
+      "status": "registered_single_error_diagnosis_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "tooling"],
+      "mistake": "After correcting the missing if statement block opener, the Social v7.4 overlay script still reported one parser error and therefore remained non-executable.",
+      "rootCause": "The first correction addressed only the primary parser message without validating whether the closing-token error was fully resolved by that one edit.",
+      "prevention": "Register the partial correction, emit the one remaining line/column/message, inspect only its narrow source range and require parser_error_count=0 before memory, coordination or gate execution.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3795-SOCIAL-V74-OVERLAY-BROAD-PARENTHESIS-PATCH-MODIFIED-WRONG-MATCH",
+      "status": "registered_exact_unintended_brace_restoration_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "tooling"],
+      "mistake": "After the intended if block received its opening brace, one parser error remained because the earlier context-light replacement of a closing parenthesis had also modified a different matching line.",
+      "rootCause": "The first syntax correction used only the generic text of a closing parenthesis as patch context instead of the unique adjacent v7.4 condition lines.",
+      "prevention": "Locate the single remaining parser extent, read its exact narrow source range, restore only the unintended brace with unique surrounding context and require zero parser errors before any gate execution.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-social-protected-baseline.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3796-SOCIAL-GATE-TICKET-REPLAYED-KNOWN-STALE-BRAND-BUY-HEADER-ORACLE",
+      "status": "registered_separate_brand_gate_reconciliation_authority_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "mobile", "buy"],
+      "mistake": "After the exact v7.4 Social protected overlay and immutable UI locks passed, the App brand gate was replayed and rejected the already accepted Buy structure because it still requires exactly one canvas and one header integration.",
+      "rootCause": "The verification repeated the known REG3768 historical brand-oracle mismatch even though the current ticket was authorized only to reconcile Social protection and not to alter the separate Buy brand gate.",
+      "prevention": "Keep the successful Social gate repair isolated, do not weaken or modify Brand under this authorization, create no gate-ready tag while Brand or Buy protection is red, and require a separately authorized exact-v7.4 protected-gate bundle for Buy baseline and branch-limited brand-oracle reconciliation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-brand-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-brand-integrity.ps1", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md"]
     }
   ]
 }

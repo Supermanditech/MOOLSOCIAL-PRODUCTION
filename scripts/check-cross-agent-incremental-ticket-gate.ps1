@@ -137,8 +137,71 @@ Assert-IncrementalTicket ($LASTEXITCODE -eq 0) `
 $worktreeClean = $unstagedClean -and $stagedClean -and $untracked.Count -eq 0
 
 if ($Phase -ceq 'ticket_start') {
-  Assert-IncrementalTicket ($head -ceq $baselineCommit) `
-    'ticket did not start at the latest baseline commit.'
+  $ticketStartsAtBaseline = $head -ceq $baselineCommit
+  $ticketStartsAtAuthorizedBootstrap = $false
+  if (-not $ticketStartsAtBaseline) {
+    $coordinationPolicyPath = Join-Path $root `
+      'config\codex-subagent-coordination-policy.json'
+    Assert-IncrementalTicket (
+      Test-Path -LiteralPath $coordinationPolicyPath -PathType Leaf
+    ) 'coordination policy is unavailable for bootstrap verification.'
+    try {
+      $coordinationPolicy = Get-Content -Raw -LiteralPath `
+        $coordinationPolicyPath | ConvertFrom-Json -Depth 50
+    } catch {
+      throw 'Incremental ticket gate rejected: coordination policy is invalid JSON.'
+    }
+    $branchName = [string]$branch[0]
+    $bootstrapBindings = @(
+      $coordinationPolicy.productionGitDiscipline.continuationBindings |
+        Where-Object {
+          [string]$_.lane -ceq $Lane -and
+          [string]$_.ticketId -ceq $TicketId -and
+          [string]$_.branch -ceq $branchName -and
+          [string]$_.baselineHead -ceq $baselineCommit
+        }
+    )
+    Assert-IncrementalTicket ($bootstrapBindings.Count -eq 1) `
+      'ticket bootstrap has no exact founder-authorized continuation binding.'
+    $bootstrapBinding = $bootstrapBindings[0]
+    $bootstrapCommits = @(& git -C $root rev-list --first-parent `
+        --reverse "$baselineCommit..$head")
+    Assert-IncrementalTicket (
+      $LASTEXITCODE -eq 0 -and
+      $bootstrapCommits.Count -eq 1 -and
+      [string]$bootstrapCommits[0] -ceq $head
+    ) 'ticket start contains more than one post-baseline commit.'
+    $bootstrapParent = @(& git -C $root rev-list --parents -n 1 $head)
+    Assert-IncrementalTicket (
+      $LASTEXITCODE -eq 0 -and
+      $bootstrapParent.Count -eq 1 -and
+      [string]$bootstrapParent[0] -ceq ($head + ' ' + $baselineCommit)
+    ) 'ticket bootstrap is not a single-parent child of the baseline.'
+    $bootstrapSubject = @(& git -C $root show -s --format=%s $head)
+    Assert-IncrementalTicket (
+      $LASTEXITCODE -eq 0 -and
+      $bootstrapSubject.Count -eq 1 -and
+      [string]$bootstrapSubject[0] -ceq
+        [string]$bootstrapBinding.bootstrapCommitSubject
+    ) 'ticket bootstrap subject differs from its authorized binding.'
+    $bootstrapChangedOwners = @(& git -C $root diff --name-only `
+        --diff-filter=ACMRTUXBD "$baselineCommit..$head")
+    Assert-IncrementalTicket ($LASTEXITCODE -eq 0) `
+      'ticket bootstrap owner inventory failed.'
+    $expectedBootstrapOwners = @(
+      $bootstrapBinding.bootstrapOwners | ForEach-Object {
+        ([string]$_).Replace('\', '/').TrimStart('/')
+      }
+    )
+    Assert-IncrementalTicket (
+      (@($bootstrapChangedOwners | Sort-Object) -join '|') -ceq
+      (@($expectedBootstrapOwners | Sort-Object) -join '|')
+    ) 'ticket bootstrap changed an owner outside its authorized binding.'
+    $ticketStartsAtAuthorizedBootstrap = $true
+  }
+  Assert-IncrementalTicket (
+    $ticketStartsAtBaseline -or $ticketStartsAtAuthorizedBootstrap
+  ) 'ticket did not start at the latest baseline or its exact coordination bootstrap.'
   Assert-IncrementalTicket $worktreeClean `
     'ticket-start worktree is not clean.'
 }

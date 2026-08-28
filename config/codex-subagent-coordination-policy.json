@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3747,
-    "sha256": "79715247F9DFE1EDE5D063C1C3D17E566C8AC75C78C75E512996285626A459A8"
+    "entryCount": 3759,
+    "sha256": "61582508EB58EE548B9493FB65FE4D37146193E4BBFC1D1812C33504D7A72939"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -36,17 +36,21 @@
       "owners": [
         ".gitattributes",
         "AGENTS.md",
+        "config/cross-agent-incremental-ticket-gate.json",
         "config/codex-development-regression-registry.json",
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
+        "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
+        "scripts/check-social-protected-baseline.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },
     {
-      "task": "/root/cursor_shop_chat_ui_20260824",
+      "task": "/root/cursor_shop_landing_ui_fix2_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
@@ -62,6 +66,7 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_feedback_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_saved_clear_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_supplier_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
@@ -105,6 +110,7 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_selection_ownership_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_coverage_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_root_single_tap_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
@@ -150,7 +156,9 @@
         "apps/mobile/test/ui_v2/social/candidate_captures/moolsocial-context-chat-work-earn-today-inbox-390x844.png",
         "apps/mobile/test/ui_v2/social/candidate_captures/moolsocial-context-chat-work-earn-today-new-conversation-390x844.png",
         
-        "docs/quality/UAW-CURSOR-SHOP-CHAT-UI-20260824.md"
+        "docs/quality/UAW-CURSOR-SHOP-CHAT-UI-20260824.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md"
       ]
     },
     {
@@ -343,6 +351,56 @@
           "config/mvp-scope-gate-state.json",
           "config/runtime/moolsocial-production-runtime-tickets-20260825.json",
           "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_landing_ui_fix2_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_landing_ui_fix2_20260828",
+        "workId": "shop-landing-v1-fix2-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-SHOP-LANDING-V1-FIX2-20260828",
+        "branch": "work/cursor-ui/shop-landing-v1-fix2-20260828",
+        "baselineHead": "369bb45599366de8a8d95a9f0824c8cb961d0692",
+        "bootstrapCommitSubject": "coordination(shop-landing-v1-fix2-20260828): bind protected-baseline-safe Shop UI successor",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "config/cross-agent-incremental-ticket-gate.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/check-cross-agent-incremental-ticket-gate.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_social_protected_v74_gate_fix_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "codex_auth",
+        "role": "primary",
+        "task": "/root/codex_auth_social_protected_v74_gate_fix_20260828",
+        "workId": "social-protected-v74-gate-fix-20260828",
+        "ticketId": "UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-social-protected-v74-gate-fix-20260828",
+        "branch": "work/codex-auth/social-protected-v74-gate-fix-20260828",
+        "baselineHead": "369bb45599366de8a8d95a9f0824c8cb961d0692",
+        "bootstrapCommitSubject": "coordination(social-protected-v74-gate-fix-20260828): bind exact v7.4 Social protection",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "config/cross-agent-incremental-ticket-gate.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md",
+          "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+          "scripts/check-social-protected-baseline.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
