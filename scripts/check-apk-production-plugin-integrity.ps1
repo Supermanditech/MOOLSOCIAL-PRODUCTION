@@ -7,7 +7,9 @@ param(
   [string]$RepositoryRoot,
   [string]$ApkAnalyzerPath,
   [string]$ProguardFolderPath,
-  [switch]$RequireMappingAware
+  [switch]$RequireMappingAware,
+  [string]$ExpectedApplicationId = 'com.moolsocial.app',
+  [switch]$AllowDebugTestPlugin
 )
 
 Set-StrictMode -Version Latest
@@ -119,12 +121,14 @@ foreach ($className in $required) {
     throw "APK integrity gate rejected: required class is missing: $className"
   }
 }
-foreach ($forbidden in @(
-  'dev.flutter.plugins.integration_test.IntegrationTestPlugin',
-  'dev.flutter.plugins.integration_test'
-)) {
-  if ($packageText.Contains($forbidden)) {
-    throw "APK integrity gate rejected: test-only class is present: $forbidden"
+if (-not $AllowDebugTestPlugin) {
+  foreach ($forbidden in @(
+    'dev.flutter.plugins.integration_test.IntegrationTestPlugin',
+    'dev.flutter.plugins.integration_test'
+  )) {
+    if ($packageText.Contains($forbidden)) {
+      throw "APK integrity gate rejected: test-only class is present: $forbidden"
+    }
   }
 }
 
@@ -134,13 +138,18 @@ if ($applicationIdExit -ne 0) {
   throw 'APK integrity gate rejected: manifest identity inspection failed.'
 }
 $applicationId = ($applicationIdOutput -join '').Trim()
-if ($applicationId -cne 'com.moolsocial.app') {
+if ($applicationId -cne $ExpectedApplicationId) {
   throw 'APK integrity gate rejected: package identity changed.'
+}
+$integrationTestState = if ($AllowDebugTestPlugin) {
+  'allowed_debug_only'
+} else {
+  'absent'
 }
 
 Write-Output (
   'APK production plugin integrity passed: ' +
   "candidate=$CandidateId; package=$applicationId; " +
   "mappingAware=$($mappingAware.ToString().ToLowerInvariant()); " +
-  'registrant=true; firebaseCore=true; sharePlus=true; integrationTest=false.'
+  "registrant=true; firebaseCore=true; sharePlus=true; integrationTest=$integrationTestState."
 )

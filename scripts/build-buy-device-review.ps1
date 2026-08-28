@@ -32,6 +32,7 @@ param(
 
   [ValidateSet(
     'EmulatorDeviceReview',
+    'CursorUiReview',
     'YouTubePublicDevReview',
     'PublicAuthSideloadPreflight'
   )]
@@ -86,6 +87,9 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($branch)) {
 if ($branch.Trim() -eq 'main') {
   throw 'Device-review builds are forbidden on main.'
 }
+if ($RuntimeProfile -ceq 'CursorUiReview' -and $BuildMode -cne 'debug') {
+  throw 'Cursor UI Review permits debug APK builds only.'
+}
 
 if ($CandidateId -ceq
   'UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR') {
@@ -104,6 +108,7 @@ $successorBuildFoundationGate = Join-Path `
   'test-public-auth-sideload-build-controls.ps1'
 & $successorBuildFoundationGate `
   -RepositoryRoot $repositoryRoot `
+  -CandidateId $CandidateId `
   -PreApkStatePath $machineStateFile | Out-Null
 $successorBuildFoundationPassed = $?
 if (-not $successorBuildFoundationPassed) {
@@ -401,12 +406,16 @@ function Get-PublicAuthSideloadRuntimeValues {
 
 $machineState = Get-Content -Raw -LiteralPath $runtimeStateFile |
   ConvertFrom-Json
-if (
+$isolatedDebugReview = (
+  $BuildMode -ceq 'debug' -and
+  $RuntimeProfile -cin @('EmulatorDeviceReview', 'CursorUiReview')
+)
+if (-not $isolatedDebugReview -and (
   [string]$machineState.requiredRuntimeDefines.
     MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL -cne 'https://moolsocial.com/app' -or
   [string]$machineState.requiredRuntimeDefines.
     MOOLSOCIAL_EMAIL_LINK_DOMAIN -cne ''
-) {
+)) {
   throw 'Public-auth sideload Email Link Hosting configuration is not qualified.'
 }
 $facebookRuntimeRequiredForBuild =
@@ -435,6 +444,13 @@ $runtimeValues = if ($RuntimeProfile -ceq 'YouTubePublicDevReview') {
   Get-YouTubePublicDevRuntimeValues -MachineState $machineState
 } elseif ($RuntimeProfile -ceq 'PublicAuthSideloadPreflight') {
   Get-PublicAuthSideloadRuntimeValues -MachineState $machineState
+} elseif ($RuntimeProfile -ceq 'CursorUiReview') {
+  [ordered]@{
+    MOOLSOCIAL_UI_REVIEW_ONLY = 'true'
+    MOOLSOCIAL_DEVICE_REVIEW = 'true'
+    MOOLSOCIAL_USE_EMULATORS = 'true'
+    MOOLSOCIAL_CANDIDATE_ID = $CandidateId
+  }
 } else {
   [ordered]@{
     MOOLSOCIAL_DEVICE_REVIEW = 'true'
@@ -446,9 +462,11 @@ $runtimeDefines = @(
   $runtimeValues.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
 )
 
-& (Join-Path $PSScriptRoot `
-  'check-google-android-identity-bridge-readiness.ps1') `
-  -RepositoryRoot $repositoryRoot
+if ($RuntimeProfile -cne 'CursorUiReview') {
+  & (Join-Path $PSScriptRoot `
+    'check-google-android-identity-bridge-readiness.ps1') `
+    -RepositoryRoot $repositoryRoot
+}
 
 if ($RuntimeProfile -ceq 'PublicAuthSideloadPreflight') {
   & (Join-Path $PSScriptRoot `
@@ -465,8 +483,21 @@ if ($RuntimeProfile -ceq 'PublicAuthSideloadPreflight') {
   }
 }
 
+$previousAndroidDebugPackage = [Environment]::GetEnvironmentVariable(
+  'MOOLSOCIAL_ANDROID_DEBUG_PACKAGE',
+  'Process'
+)
 Push-Location $mobileRoot
 try {
+  [Environment]::SetEnvironmentVariable(
+    'MOOLSOCIAL_ANDROID_DEBUG_PACKAGE',
+    $(if ($RuntimeProfile -ceq 'CursorUiReview') {
+        'cursorreview'
+      } else {
+        'runtime'
+      }),
+    'Process'
+  )
   if ($CandidateId -ceq
       'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
     & (Join-Path $repositoryRoot `
@@ -498,19 +529,24 @@ try {
     if ($LASTEXITCODE -ne 0) {
       throw 'Locked Flutter dependency resolution failed before APK build.'
     }
-    & $pluginManifestNamespaceGate `
-      -RepositoryRoot $repositoryRoot | Out-Null
-    if (-not $?) {
-      throw 'Android plugin manifest-namespace readiness failed.'
+    if ($BuildMode -cne 'debug') {
+      & $pluginManifestNamespaceGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
+      if (-not $?) {
+        throw 'Android plugin manifest-namespace readiness failed.'
+      }
+      & $kotlinPluginReadinessGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
+      if (-not $?) {
+        throw 'Android release Kotlin-plugin readiness failed.'
+      }
+      & $resourceIntegrityGate `
+        -RepositoryRoot $repositoryRoot `
+        -RunGradleLink | Out-Null
+    } else {
+      & $resourceIntegrityGate `
+        -RepositoryRoot $repositoryRoot | Out-Null
     }
-    & $kotlinPluginReadinessGate `
-      -RepositoryRoot $repositoryRoot | Out-Null
-    if (-not $?) {
-      throw 'Android release Kotlin-plugin readiness failed.'
-    }
-    & $resourceIntegrityGate `
-      -RepositoryRoot $repositoryRoot `
-      -RunGradleLink | Out-Null
     if (-not $?) {
       throw 'Android release resource-integrity preflight failed.'
     }
@@ -573,14 +609,28 @@ try {
   $pluginIntegrityGate = Join-Path $repositoryRoot (
     'scripts\check-apk-production-plugin-integrity.ps1'
   )
-  & $pluginIntegrityGate `
-    -ApkPath $generatedApk `
-    -CandidateId $CandidateId `
-    -RepositoryRoot $repositoryRoot `
-    -ProguardFolderPath (
-      Join-Path $mobileRoot 'build\app\outputs\mapping\release'
-    ) `
-    -RequireMappingAware
+  $pluginIntegrityArguments = @{
+    ApkPath = $generatedApk
+    CandidateId = $CandidateId
+    RepositoryRoot = $repositoryRoot
+  }
+  if ($BuildMode -ceq 'release') {
+    $pluginIntegrityArguments.ProguardFolderPath = Join-Path `
+      $mobileRoot `
+      'build\app\outputs\mapping\release'
+    $pluginIntegrityArguments.RequireMappingAware = $true
+  }
+  if ($BuildMode -ceq 'debug') {
+    $pluginIntegrityArguments.ExpectedApplicationId = if (
+      $RuntimeProfile -ceq 'CursorUiReview'
+    ) {
+      'com.moolsocial.app.cursorreview'
+    } else {
+      'com.moolsocial.app.runtime'
+    }
+    $pluginIntegrityArguments.AllowDebugTestPlugin = $true
+  }
+  & $pluginIntegrityGate @pluginIntegrityArguments
   if (-not $?) {
     throw 'APK production plugin integrity gate failed.'
   }
@@ -592,6 +642,11 @@ try {
   }
   $runtimeValues = $null
   $runtimeDefines = $null
+  [Environment]::SetEnvironmentVariable(
+    'MOOLSOCIAL_ANDROID_DEBUG_PACKAGE',
+    $previousAndroidDebugPackage,
+    'Process'
+  )
   Pop-Location
 }
 
@@ -616,7 +671,12 @@ $runtimeSummary = if ($RuntimeProfile -ceq 'YouTubePublicDevReview') {
   'PublicAuthSideloadPreflight;FirebaseAndroidSdkConfig=present_not_logged;' +
   "SigningInputs=present_not_logged;$metaInputSummary;" +
   'PlaySigningQualified=false;' +
-  'AppleEnabled=false;MobileOtpAttestationQualified=false'
+    'AppleEnabled=false;MobileOtpAttestationQualified=false'
+} elseif ($RuntimeProfile -ceq 'CursorUiReview') {
+  'CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;' +
+  'MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;' +
+  "MOOLSOCIAL_CANDIDATE_ID=$CandidateId;" +
+  'AndroidDebugPackage=cursorreview;Promotable=false'
 } else {
   'MOOLSOCIAL_DEVICE_REVIEW=true;' +
   'MOOLSOCIAL_USE_EMULATORS=true;' +

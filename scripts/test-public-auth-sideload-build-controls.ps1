@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [string]$PreApkStatePath
+  [string]$PreApkStatePath,
+  [string]$CandidateId = 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,7 @@ $coordinationGate = Join-Path `
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
+$genericDebugCandidate = $false
 if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
   $resolvedPreApkState = [IO.Path]::GetFullPath($PreApkStatePath)
   $rootPrefix = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
@@ -46,25 +48,36 @@ if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
     ) -and
     (Test-Path -LiteralPath $resolvedPreApkState -PathType Leaf)
   ) 'candidate-specific pre-APK state is missing or outside the repository.'
-  $preApkGate = Join-Path `
-    $RepositoryRoot `
-    'scripts/check-pre-apk-readiness-r60-92.ps1'
-  Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
-    'candidate-specific pre-APK gate is missing.'
   $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
     ConvertFrom-Json
-  $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
-    'BuildAuthorized'
+  $genericDebugCandidate = (
+    $CandidateId -cne 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK' -and
+    [string]$preApkState.candidate.buildMode -ceq 'debug'
+  )
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+    $preApkGate = Join-Path `
+      $RepositoryRoot `
+      'scripts/check-pre-apk-readiness-r60-92.ps1'
+    Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
+      'candidate-specific pre-APK gate is missing.'
+    $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
+      'BuildAuthorized'
+    } else {
+      'CandidateReservation'
+    }
+    & $preApkGate `
+      -RepositoryRoot $RepositoryRoot `
+      -StatePath $resolvedPreApkState `
+      -Phase $preApkPhase | Out-Null
+    $preApkPassed = $?
+    Assert-SideloadControl $preApkPassed `
+      'candidate-specific pre-APK readiness gate failed.'
   } else {
-    'CandidateReservation'
+    Assert-SideloadControl (
+      [string]$preApkState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+      [string]$preApkState.candidate.id -ceq $CandidateId
+    ) 'generic candidate APK state is not bound to the exact candidate.'
   }
-  & $preApkGate `
-    -RepositoryRoot $RepositoryRoot `
-    -StatePath $resolvedPreApkState `
-    -Phase $preApkPhase | Out-Null
-  $preApkPassed = $?
-  Assert-SideloadControl $preApkPassed `
-    'candidate-specific pre-APK readiness gate failed.'
 } else {
   $coordinationState = Get-Content -Raw -LiteralPath (
     Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
@@ -155,10 +168,12 @@ if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
       } finally {
         Pop-Location
       }
-      & $pluginManifestNamespaceGatePath `
-        -RepositoryRoot $RepositoryRoot | Out-Null
-      & $kotlinPluginReadinessGatePath `
-        -RepositoryRoot $RepositoryRoot | Out-Null
+      if (-not $genericDebugCandidate) {
+        & $pluginManifestNamespaceGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+        & $kotlinPluginReadinessGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+      }
     }
   Assert-SideloadControl ($dependencyInventoryExit -eq 0) `
     'guarded candidate dependency inventory failed.'
@@ -267,18 +282,24 @@ $candidatePreApkState = if (
 $candidateRuntimeStateBound = if (
   -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
 ) {
-  $candidatePreApkState.Contains(
-    '"runtimeProfile": "PublicAuthSideloadPreflight"'
-  ) -and
-  (
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
     $candidatePreApkState.Contains(
-      '"state": "pending_sanitized_binding"'
-    ) -or
-    $candidatePreApkState.Contains(
-      '"state": "passed_sanitized_binding"'
-    )
-  ) -and
-  $candidatePreApkState.Contains('"privateValuesEmitted": false')
+      '"runtimeProfile": "PublicAuthSideloadPreflight"'
+    ) -and
+    (
+      $candidatePreApkState.Contains(
+        '"state": "pending_sanitized_binding"'
+      ) -or
+      $candidatePreApkState.Contains(
+        '"state": "passed_sanitized_binding"'
+      )
+    ) -and
+    $candidatePreApkState.Contains('"privateValuesEmitted": false')
+  } else {
+    $candidateState = $candidatePreApkState | ConvertFrom-Json
+    [string]$candidateState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+    [string]$candidateState.candidate.id -ceq $CandidateId
+  }
 } else {
   $apkMachineState.Contains(
     '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
@@ -716,8 +737,14 @@ Assert-SideloadControl (
   $wrapper.Contains('Resolve-ReleaseArtifactRepositoryDescendant') -and
   $wrapper.Contains('test-release-artifact-path-containment.ps1') -and
   $wrapper.Contains('test-release-production-plugin-integrity.ps1') -and
-  $wrapper.Contains('-ProguardFolderPath') -and
-  $wrapper.Contains('-RequireMappingAware') -and
+  (
+    $wrapper.Contains('-ProguardFolderPath') -or
+    $wrapper.Contains('$pluginIntegrityArguments.ProguardFolderPath')
+  ) -and
+  (
+    $wrapper.Contains('-RequireMappingAware') -or
+    $wrapper.Contains('$pluginIntegrityArguments.RequireMappingAware')
+  ) -and
   $wrapper.Contains(
     "MOOLSOCIAL_SOCIAL_CONTENT_URL = 'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent'"
   ) -and
@@ -730,6 +757,7 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
+  $wrapper.Contains('-CandidateId $CandidateId') -and
   $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
   $wrapper.Contains(
     "'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'"
@@ -801,7 +829,10 @@ Assert-SideloadControl (
   (Test-Path -LiteralPath $staleRegistrant -PathType Leaf) -and
   $trackedRegistrantPassed -and
   $registrantSource.Contains('FlutterFirebaseCorePlugin') -and
-  $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -and
+  (
+    $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -or
+    $androidAppBuild.Contains('sanitizeProductionGeneratedPluginRegistrant')
+  ) -and
   $androidAppBuild.Contains('IntegrationTestPlugin') -and
   $androidAppBuild.Contains('FlutterFirebaseCorePlugin') -and
   $androidAppBuild.Contains('dev.fluttercommunity.plus.share.SharePlusPlugin') -and

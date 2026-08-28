@@ -72,7 +72,7 @@ if (releasePackagingTaskRequested && !uploadSigningConfigured) {
 val generatedPluginRegistrant = file(
     "src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
 )
-val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
+val sanitizeProductionGeneratedPluginRegistrant by tasks.registering {
     doLast {
         if (!generatedPluginRegistrant.isFile) {
             throw GradleException(
@@ -113,7 +113,12 @@ val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
     }
 }
 tasks.matching { it.name == "compileReleaseJavaWithJavac" }.configureEach {
-    dependsOn(sanitizeReleaseGeneratedPluginRegistrant)
+    dependsOn(sanitizeProductionGeneratedPluginRegistrant)
+}
+if (androidDebugPackage == "cursorreview") {
+    tasks.matching { it.name == "compileDebugJavaWithJavac" }.configureEach {
+        dependsOn(sanitizeProductionGeneratedPluginRegistrant)
+    }
 }
 
 val localPropertiesFile = rootProject.file("local.properties")

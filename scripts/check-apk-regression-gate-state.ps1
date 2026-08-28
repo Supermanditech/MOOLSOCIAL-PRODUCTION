@@ -57,14 +57,21 @@ Assert-Gate -Condition ([int]$state.schemaVersion -eq 1) `
 Assert-Gate -Condition (
   [string]$state.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001'
 ) -Message 'unexpected machine-state contract id.'
-Assert-Gate -Condition (
-  [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL `
-    -ceq 'https://moolsocial.com/app'
-) -Message 'Email Link continue URL differs from the authorized exact-return route.'
-Assert-Gate -Condition (
-  [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_DOMAIN `
-    -ceq ''
-) -Message 'Dev Email Link must omit linkDomain so Firebase selects its default Hosting domain.'
+$cursorUiReview = [string]$state.candidate.gateProfile -ceq `
+  'uaw_cursor_ui_review_debug'
+$runtimeDebugReview = [string]$state.candidate.gateProfile -ceq `
+  'uaw_runtime_debug_review'
+$isolatedDebugReview = $cursorUiReview -or $runtimeDebugReview
+if (-not $isolatedDebugReview) {
+  Assert-Gate -Condition (
+    [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_CONTINUE_URL `
+      -ceq 'https://moolsocial.com/app'
+  ) -Message 'Email Link continue URL differs from the authorized exact-return route.'
+  Assert-Gate -Condition (
+    [string]$state.requiredRuntimeDefines.MOOLSOCIAL_EMAIL_LINK_DOMAIN `
+      -ceq ''
+  ) -Message 'Dev Email Link must omit linkDomain so Firebase selects its default Hosting domain.'
+}
 
 $fix11GoogleOnly = $CandidateId -ceq
   'UAW-C34P-FIX11-GOOGLE-SIGN-IN-OPPO-FORENSIC-REPAIR'
@@ -112,11 +119,15 @@ $fullSocialCohortNames = @(
   'MOOLSOCIAL_FACEBOOK_REVOCATION_QUALIFIED',
   'MOOLSOCIAL_FACEBOOK_DATA_DELETION_QUALIFIED'
 )
-$fullSocialRequested = @(
-  $fullSocialCohortNames | Where-Object {
-    [string]$state.requiredRuntimeDefines.$_ -ceq 'true'
-  }
-).Count -gt 0
+$fullSocialRequested = if ($cursorUiReview) {
+  $false
+} else {
+  @(
+    $fullSocialCohortNames | Where-Object {
+      [string]$state.requiredRuntimeDefines.$_ -ceq 'true'
+    }
+  ).Count -gt 0
+}
 if ($fullSocialRequested) {
   foreach ($name in $fullSocialCohortNames) {
     Assert-Gate -Condition (
@@ -152,11 +163,17 @@ Assert-Gate -Condition (
 $mvpScopeState = Join-Path `
   $repositoryRoot `
   'config/mvp-scope-gate-state.json'
-& $mvpScopeGate `
-  -StatePath $mvpScopeState `
-  -CandidateId $CandidateId `
-  -RequireExecutionAuthorized `
-  -RepositoryRoot $repositoryRoot
+if (-not $runtimeDebugReview) {
+  & $mvpScopeGate `
+    -StatePath $mvpScopeState `
+    -CandidateId $CandidateId `
+    -RequireExecutionAuthorized `
+    -RepositoryRoot $repositoryRoot
+} else {
+  Assert-Gate -Condition (
+    [string]$state.promotion.state -ceq 'forbidden_non_promotable'
+  ) -Message 'runtime debug review must remain non-promotable.'
+}
 
 $motionPolicyGate = Join-Path `
   $PSScriptRoot `
@@ -289,6 +306,24 @@ if ($CandidateId.StartsWith('BUY-', [StringComparison]::Ordinal)) {
       'clean-state-regression',
       'wrapper-self-test'
     )
+  } elseif ($gateProfile -ceq 'uaw_cursor_ui_review_debug') {
+    $requiredGateIds += @(
+      'buy-regression-1',
+      'buy-regression-2',
+      'clean-state-regression',
+      'wrapper-self-test',
+      'package-isolation'
+    )
+  } elseif ($gateProfile -ceq 'uaw_runtime_debug_review') {
+    Assert-Gate -Condition ($BuildMode -ceq 'debug') `
+      -Message 'runtime device review permits debug APK builds only.'
+    $requiredGateIds += @(
+      'buy-regression-1',
+      'buy-regression-2',
+      'clean-state-regression',
+      'wrapper-self-test',
+      'package-isolation'
+    )
   } elseif (
     $gateProfile -ceq 'uaw_public_auth_sideload_preflight' -or
     $gateProfile -ceq 'uaw_fix11_google_only_sideload_preflight'
@@ -410,6 +445,7 @@ $allowedDefineNames = @(
   'MOOLSOCIAL_CANDIDATE_ID',
   'MOOLSOCIAL_DEVICE_REVIEW',
   'MOOLSOCIAL_USE_EMULATORS',
+  'MOOLSOCIAL_UI_REVIEW_ONLY',
   'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW',
   'MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF',
   'MOOLSOCIAL_YOUTUBE_PROVIDER_URL',
