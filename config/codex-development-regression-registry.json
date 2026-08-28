@@ -43213,6 +43213,16 @@
       "prevention": "Before any sparse-worktree Android build, materialize the complete read set of the authorized wrapper and its self-tests, including backend/functions source and local mobile packages, then run the wrapper preflight before artifact generation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "backend/functions/src/index.ts", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/build-buy-device-review.ps1"]
+    },
+    {
+      "id": "REG-20260828-3795-RUNTIME-UI-REVIEW-FINAL-APK-COPY-EXHAUSTED-DISK",
+      "status": "registered_debug_build_output_headroom_required",
+      "appliesTo": ["primary", "mobile", "build", "android", "windows"],
+      "mistake": "The first fully hydrated r61.12 build assembled the raw debug APK but exhausted the Windows volume while Flutter copied it to outputs/flutter-apk, so the wrapper failed and no artifact was authorized.",
+      "rootCause": "Prebuild checked source and gates but did not reserve enough free space for Gradle intermediates plus both the assembled APK and Flutter's final output copy.",
+      "prevention": "Before retrying an Android review build, preserve any failed raw or partial APK as unpromotable evidence and require at least four GiB of free local space immediately before the wrapper; only the wrapper-copied artifact may be installed.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1"]
     }
   ]
 }
