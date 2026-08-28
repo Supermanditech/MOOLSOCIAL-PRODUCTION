@@ -3596,3 +3596,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3818 rejects passing raw Git reverse-diff range hunks into `apply_patch`.
   Restore generated text from independently read current and HEAD content using
   the patch tool’s native whole-file update shape.
+- REG3819 rejects grouped RuntimeUiReview build-control searches across scripts
+  and config. Read the exact wrapper and foundation checker independently, then
+  follow only their returned machine-state contract.

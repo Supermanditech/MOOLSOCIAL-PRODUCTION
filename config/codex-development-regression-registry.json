@@ -43453,6 +43453,16 @@
       "prevention": "For exact generated-text restoration, construct one apply_patch whole-file replacement from independently read current and HEAD content, or use formatter-owned regeneration; never pass raw git diff range headers.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/.dart_tool/package_config.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3819-GROUPED-RUNTIME-UI-BUILD-CONTROL-SEARCH-RETURNED-NO-PROJECTION",
+      "status": "registered_exact_build_owner_search_required",
+      "appliesTo": ["primary", "mobile", "build", "tooling", "windows"],
+      "mistake": "A grouped RuntimeUiReview build-control search across the complete scripts and config roots returned no usable projection, so it established no current machine-state path or build contract.",
+      "rootCause": "Several broad literal patterns and two roots were combined instead of reading the already-known wrapper and its exact foundation gate independently.",
+      "prevention": "Runtime UI build recovery reads one exact wrapper or checker owner per command, then inspects only the returned state-path contract; no combined scripts-plus-config search is used.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }
