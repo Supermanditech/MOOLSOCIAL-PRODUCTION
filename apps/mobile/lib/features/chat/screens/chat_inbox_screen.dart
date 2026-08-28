@@ -311,10 +311,12 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           key: const Key('chat-inbox-screen'),
           session: widget.session,
           title: entryContext.title,
-          subtitle: entryContext.subtitle,
+          subtitle: 'MoolSocial messaging',
           returnRoute: widget.returnRoute,
-          titleIcon: entryContext.icon,
           titleAccent: entryContext.accent,
+          prominentTitle: true,
+          showContentBack: true,
+          backKeyName: 'chat-inbox-back',
           showMessageBanner: false,
           trailing: PopupMenuButton<String>(
             key: const Key('chat-more'),
@@ -352,6 +354,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           ),
           bottom: NavigationBar(
             key: const Key('chat-native-navigation'),
+            height: 72,
+            elevation: 0,
+            backgroundColor: const Color(0xFFF6F6FA),
+            indicatorColor: MoolColors.navy.withValues(alpha: .10),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             selectedIndex: _sectionIndex,
             onDestinationSelected: (index) =>
                 _selectSection(ChatHomeSection.values[index]),
@@ -444,6 +451,19 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search conversations',
                   prefixIcon: const Icon(Icons.search_rounded),
+                  filled: true,
+                  fillColor: const Color(0xFFF0F1F5),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                    borderSide: const BorderSide(
+                      color: MoolColors.navy,
+                      width: 1.5,
+                    ),
+                  ),
                   suffixIcon: IconButton(
                     key: const Key('chat-voice-search'),
                     tooltip: 'Voice search',
@@ -499,7 +519,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             sliver: SliverList.separated(
               itemCount: threads.length,
               separatorBuilder: (_, _) =>
-                  const Divider(height: 1, indent: 68, color: MoolColors.line),
+                  const Divider(height: 1, indent: 61, color: MoolColors.line),
               itemBuilder: (context, index) => _ThreadCard(
                 thread: threads[index],
                 unread: widget.session.unreadFor(threads[index]),
@@ -580,6 +600,7 @@ class _FilterStripState extends State<_FilterStrip> {
       height: MoolMetrics.minimumTapTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(right: MoolSpacing.sm),
         itemCount: values.length,
         separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
         itemBuilder: (context, index) => KeyedSubtree(
@@ -588,6 +609,16 @@ class _FilterStripState extends State<_FilterStrip> {
             key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
             label: Text(values[index].$1),
             selected: values[index].$2,
+            showCheckmark: true,
+            checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
+            selectedColor: MoolColors.navy,
+            backgroundColor: const Color(0xFFF0F1F5),
+            side: BorderSide.none,
+            shape: const StadiumBorder(),
+            labelStyle: TextStyle(
+              color: values[index].$2 ? Colors.white : MoolColors.ink,
+              fontWeight: FontWeight.w700,
+            ),
             onSelected: (_) => values[index].$3(),
           ),
         ),
@@ -614,16 +645,23 @@ class _ThreadCard extends StatelessWidget {
       child: InkWell(
         key: Key('chat-open-thread-${thread.id}'),
         onTap: onTap,
+        overlayColor: WidgetStatePropertyAll(
+          MoolColors.navy.withValues(alpha: .06),
+        ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 7),
           child: Row(
             children: [
               CircleAvatar(
-                radius: 28,
+                radius: 25,
                 backgroundColor: _threadColor(thread.type),
-                child: Icon(_threadIcon(thread.type), color: MoolColors.navy),
+                child: Icon(
+                  _threadIcon(thread.type),
+                  size: 22,
+                  color: MoolColors.navy,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,8 +675,8 @@ class _ThreadCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: MoolColors.ink,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
@@ -671,7 +709,7 @@ class _ThreadCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: MoolColors.muted,
-                              fontSize: 14,
+                              fontSize: 13,
                             ),
                           ),
                         ),

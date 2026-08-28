@@ -31,12 +31,12 @@ class ChatPageScaffold extends StatelessWidget {
     required this.returnRoute,
     required this.body,
     this.showContentBack = false,
-    this.backKey = const Key('chat-back'),
-    this.backTooltip = 'Back to conversations',
+    this.backKeyName = 'chat-back',
     this.showMessageBanner = true,
     this.prominentTitle = false,
     this.titleIcon,
     this.titleAccent,
+    this.backgroundColor = MoolColors.canvas,
     this.messageThreadId,
     this.trailing,
     this.bottom,
@@ -50,12 +50,12 @@ class ChatPageScaffold extends StatelessWidget {
   final String returnRoute;
   final Widget body;
   final bool showContentBack;
-  final Key backKey;
-  final String backTooltip;
+  final String backKeyName;
   final bool showMessageBanner;
   final bool prominentTitle;
   final IconData? titleIcon;
   final Color? titleAccent;
+  final Color backgroundColor;
   final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
@@ -75,18 +75,17 @@ class ChatPageScaffold extends StatelessWidget {
       child: RepaintBoundary(
         key: const Key('chat-page-surface'),
         child: Scaffold(
+          backgroundColor: backgroundColor,
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            toolbarHeight: prominentTitle ? 80 : 64,
+            toolbarHeight: prominentTitle ? 76 : 64,
             backgroundColor: MoolColors.canvas,
             surfaceTintColor: Colors.transparent,
             leadingWidth: showContentBack ? 52 : 0,
             leading: showContentBack
-                ? IconButton(
-                    key: backKey,
-                    tooltip: backTooltip,
+                ? MoolNativeBackButton(
+                    keyName: backKeyName,
                     onPressed: () => chatGoBack(context, returnRoute),
-                    icon: const Icon(Icons.arrow_back_rounded),
                   )
                 : null,
             titleSpacing: showContentBack ? 0 : MoolSpacing.md,
@@ -125,9 +124,9 @@ class ChatPageScaffold extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: MoolColors.ink,
-                            fontSize: prominentTitle ? 28 : 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: prominentTitle ? -.7 : -.35,
+                            fontSize: prominentTitle ? 25 : 19,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: prominentTitle ? -.55 : -.25,
                           ),
                         ),
                         if (subtitle.trim().isNotEmpty) ...[
@@ -156,6 +155,15 @@ class ChatPageScaffold extends StatelessWidget {
                   child: trailing!,
                 ),
             ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(
+                key: const Key('chat-moolsocial-divider'),
+                height: 1,
+                thickness: 1,
+                color: (titleAccent ?? MoolColors.navy).withValues(alpha: .12),
+              ),
+            ),
           ),
           body: SafeArea(
             top: false,

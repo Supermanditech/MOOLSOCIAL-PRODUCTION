@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_services.dart';
 import '../chat_session.dart';
@@ -176,6 +177,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         final backRoute = returnsToChatThread
             ? widget.returnRoute
             : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
+        final entryContext = ChatEntryContext.resolve(widget.returnRoute);
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
           session: widget.session,
@@ -183,6 +185,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           subtitle: thread.subtitle,
           returnRoute: backRoute,
           showContentBack: true,
+          titleIcon: _threadIconFor(thread.type),
+          titleAccent: entryContext.accent,
+          backgroundColor: const Color(0xFFF1F2F6),
           messageThreadId: thread.id,
           body:
               widget.session.loadingMessageThreads.contains(thread.id) &&
@@ -304,331 +309,395 @@ class _MessageBubble extends StatelessWidget {
     final photo = message.photo;
     return Align(
       alignment: message.mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      child: GestureDetector(
         key: Key('chat-message-${message.id}'),
-        constraints: const BoxConstraints(maxWidth: 330),
-        margin: const EdgeInsets.only(bottom: 5),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: message.mine ? MoolColors.navy : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(MoolRadii.card),
-            topRight: const Radius.circular(MoolRadii.card),
-            bottomLeft: Radius.circular(
-              message.mine ? MoolRadii.card : MoolSpacing.xs,
+        onLongPress: message.isSettled && !session.busy
+            ? () => _showMessageActions(
+                context,
+                session: session,
+                threadId: threadId,
+                message: message,
+              )
+            : null,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 330),
+          margin: const EdgeInsets.only(bottom: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: message.mine ? MoolColors.navy : Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(15),
+              topRight: const Radius.circular(15),
+              bottomLeft: Radius.circular(message.mine ? 15 : MoolSpacing.xs),
+              bottomRight: Radius.circular(message.mine ? MoolSpacing.xs : 15),
             ),
-            bottomRight: Radius.circular(
-              message.mine ? MoolSpacing.xs : MoolRadii.card,
-            ),
+            border: failed ? Border.all(color: const Color(0xFFD3322F)) : null,
           ),
-          border: failed ? Border.all(color: const Color(0xFFD3322F)) : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!message.mine)
-              Text(
-                message.sender,
-                style: const TextStyle(
-                  color: MoolColors.success,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!message.mine)
+                Text(
+                  message.sender,
+                  style: const TextStyle(
+                    color: MoolColors.success,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            if (message.forwarded) ...[
-              const SizedBox(height: 3),
-              Semantics(
-                label: 'Forwarded message',
-                child: Row(
-                  key: Key('chat-forwarded-${message.id}'),
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.forward_rounded,
-                      size: 14,
-                      color: message.mine
-                          ? Colors.white.withValues(alpha: .78)
-                          : MoolColors.muted,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      'Forwarded',
-                      style: TextStyle(
+              if (message.forwarded) ...[
+                const SizedBox(height: 3),
+                Semantics(
+                  label: 'Forwarded message',
+                  child: Row(
+                    key: Key('chat-forwarded-${message.id}'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.forward_rounded,
+                        size: 14,
                         color: message.mine
                             ? Colors.white.withValues(alpha: .78)
                             : MoolColors.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (reply != null) ...[
-              const SizedBox(height: 3),
-              Semantics(
-                label: 'Reply to ${reply.sender}: ${reply.text}',
-                child: Container(
-                  key: Key('chat-reply-context-${message.id}'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(MoolSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: message.mine
-                        ? Colors.white.withValues(alpha: .12)
-                        : const Color(0xFFF0F1F8),
-                    borderRadius: BorderRadius.circular(MoolRadii.control),
-                    border: const Border(
-                      left: BorderSide(color: MoolColors.orange, width: 3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                      const SizedBox(width: 3),
                       Text(
-                        reply.sender,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: message.mine ? Colors.white : MoolColors.navy,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        reply.text,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        'Forwarded',
                         style: TextStyle(
                           color: message.mine
                               ? Colors.white.withValues(alpha: .78)
                               : MoolColors.muted,
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-            ],
-            if (photo != null) ...[
-              const SizedBox(height: 3),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(MoolRadii.control),
-                child: Semantics(
-                  label: 'Photo ${photo.name}',
-                  image: true,
-                  child: Image.network(
-                    photo.readUrl.toString(),
-                    key: Key('chat-photo-${message.id}'),
-                    width: 280,
-                    height: 210,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const SizedBox(
-                        width: 280,
-                        height: 210,
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => SizedBox(
+              ],
+              if (reply != null) ...[
+                const SizedBox(height: 3),
+                Semantics(
+                  label: 'Reply to ${reply.sender}: ${reply.text}',
+                  child: Container(
+                    key: Key('chat-reply-context-${message.id}'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(MoolSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: message.mine
+                          ? Colors.white.withValues(alpha: .12)
+                          : const Color(0xFFF0F1F8),
+                      borderRadius: BorderRadius.circular(MoolRadii.control),
+                      border: const Border(
+                        left: BorderSide(color: MoolColors.orange, width: 3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          reply.sender,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: message.mine
+                                ? Colors.white
+                                : MoolColors.navy,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          reply.text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: message.mine
+                                ? Colors.white.withValues(alpha: .78)
+                                : MoolColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              if (photo != null) ...[
+                const SizedBox(height: 3),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                  child: Semantics(
+                    label: 'Photo ${photo.name}',
+                    image: true,
+                    child: Image.network(
+                      photo.readUrl.toString(),
+                      key: Key('chat-photo-${message.id}'),
                       width: 280,
                       height: 210,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.broken_image_outlined,
-                              color: message.mine
-                                  ? Colors.white
-                                  : MoolColors.navy,
-                            ),
-                            const SizedBox(height: MoolSpacing.xs),
-                            Text(
-                              'Photo could not load.',
-                              style: TextStyle(
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const SizedBox(
+                          width: 280,
+                          height: 210,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) => SizedBox(
+                        width: 280,
+                        height: 210,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.broken_image_outlined,
                                 color: message.mine
-                                    ? Colors.white
-                                    : MoolColors.ink,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            TextButton(
-                              key: Key('chat-photo-refresh-${message.id}'),
-                              onPressed: session.busy
-                                  ? null
-                                  : () => unawaited(
-                                      session.loadMessages(
-                                        threadId,
-                                        refresh: true,
-                                      ),
-                                    ),
-                              style: TextButton.styleFrom(
-                                foregroundColor: message.mine
                                     ? Colors.white
                                     : MoolColors.navy,
                               ),
-                              child: const Text('Try again'),
-                            ),
-                          ],
+                              const SizedBox(height: MoolSpacing.xs),
+                              Text(
+                                'Photo could not load.',
+                                style: TextStyle(
+                                  color: message.mine
+                                      ? Colors.white
+                                      : MoolColors.ink,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextButton(
+                                key: Key('chat-photo-refresh-${message.id}'),
+                                onPressed: session.busy
+                                    ? null
+                                    : () => unawaited(
+                                        session.loadMessages(
+                                          threadId,
+                                          refresh: true,
+                                        ),
+                                      ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: message.mine
+                                      ? Colors.white
+                                      : MoolColors.navy,
+                                ),
+                                child: const Text('Try again'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-            ],
-            if (message.attachmentLabel != null) ...[
-              const SizedBox(height: 3),
-              Material(
-                color: message.mine
-                    ? Colors.white.withValues(alpha: .14)
-                    : const Color(0xFFF0F1F8),
-                borderRadius: BorderRadius.circular(MoolRadii.control),
-                child: ListTile(
-                  key: Key('chat-attachment-reference-${message.id}'),
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: MoolSpacing.xs,
-                  ),
-                  leading: Icon(
-                    Icons.description_outlined,
-                    color: message.mine ? Colors.white : MoolColors.navy,
-                  ),
-                  title: Text(
-                    message.attachmentLabel!,
-                    style: TextStyle(
-                      color: message.mine ? Colors.white : MoolColors.ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: const Text('Attachment reference'),
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-            ],
-            if (message.text.trim().isNotEmpty)
-              Text(
-                message.text,
-                style: TextStyle(
-                  color: message.mine ? Colors.white : MoolColors.ink,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            const SizedBox(height: MoolSpacing.xs),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  message.timeLabel,
-                  style: TextStyle(
-                    color: message.mine
-                        ? Colors.white.withValues(alpha: .72)
-                        : MoolColors.muted,
-                    fontSize: 10,
-                  ),
-                ),
-                if (message.mine) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: _deliveryLabel(message.deliveryState),
-                    child: Icon(
-                      _deliveryIcon(message.deliveryState),
-                      color: failed
-                          ? const Color(0xFFFFB4AB)
-                          : message.deliveryState == ChatDeliveryState.read
-                          ? MoolColors.orange
-                          : Colors.white.withValues(alpha: .82),
-                      size: 14,
-                    ),
-                  ),
-                ],
+                const SizedBox(height: MoolSpacing.xs),
               ],
-            ),
-            const SizedBox(height: 3),
-            if (failed)
-              TextButton(
-                key: Key('chat-retry-${message.id}'),
-                onPressed: session.busy
-                    ? null
-                    : () => session.retry(threadId, message.id),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFB4AB),
+              if (message.attachmentLabel != null) ...[
+                const SizedBox(height: 3),
+                Material(
+                  color: message.mine
+                      ? Colors.white.withValues(alpha: .14)
+                      : const Color(0xFFF0F1F8),
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                  child: ListTile(
+                    key: Key('chat-attachment-reference-${message.id}'),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: MoolSpacing.xs,
+                    ),
+                    leading: Icon(
+                      Icons.description_outlined,
+                      color: message.mine ? Colors.white : MoolColors.navy,
+                    ),
+                    title: Text(
+                      message.attachmentLabel!,
+                      style: TextStyle(
+                        color: message.mine ? Colors.white : MoolColors.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: const Text('Attachment reference'),
+                  ),
                 ),
-                child: const Text('Retry'),
-              ),
-            if (message.isSettled)
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              if (message.text.trim().isNotEmpty)
+                Text(
+                  message.text,
+                  style: TextStyle(
+                    color: message.mine ? Colors.white : MoolColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              const SizedBox(height: MoolSpacing.xs),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    key: Key('chat-reply-${message.id}'),
-                    tooltip: 'Reply',
-                    onPressed: session.busy
-                        ? null
-                        : () => session.startReply(threadId, message.id),
-                    visualDensity: VisualDensity.compact,
-                    color: message.mine ? Colors.white : MoolColors.navy,
-                    icon: const Icon(Icons.reply_rounded, size: 19),
+                  Text(
+                    message.timeLabel,
+                    style: TextStyle(
+                      color: message.mine
+                          ? Colors.white.withValues(alpha: .72)
+                          : MoolColors.muted,
+                      fontSize: 10,
+                    ),
                   ),
-                  IconButton(
-                    key: Key('chat-react-${message.id}'),
-                    tooltip: message.reactedByMe ? 'Remove reaction' : 'React',
-                    onPressed: session.busy
-                        ? null
-                        : () => unawaited(
-                            session.toggleReaction(threadId, message.id),
-                          ),
-                    visualDensity: VisualDensity.compact,
-                    color: message.mine ? Colors.white : MoolColors.navy,
-                    icon: Badge(
-                      isLabelVisible: message.reactionCount > 0,
-                      label: Text('${message.reactionCount}'),
-                      backgroundColor: MoolColors.orange,
-                      textColor: MoolColors.ink,
+                  if (message.mine) ...[
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: _deliveryLabel(message.deliveryState),
                       child: Icon(
+                        _deliveryIcon(message.deliveryState),
+                        color: failed
+                            ? const Color(0xFFFFB4AB)
+                            : message.deliveryState == ChatDeliveryState.read
+                            ? MoolColors.orange
+                            : Colors.white.withValues(alpha: .82),
+                        size: 14,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 3),
+              if (failed)
+                TextButton(
+                  key: Key('chat-retry-${message.id}'),
+                  onPressed: session.busy
+                      ? null
+                      : () => session.retry(threadId, message.id),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFB4AB),
+                  ),
+                  child: const Text('Retry'),
+                ),
+              if (message.reactionCount > 0)
+                Container(
+                  key: Key('chat-reaction-count-${message.id}'),
+                  margin: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: message.mine
+                        ? Colors.white.withValues(alpha: .14)
+                        : const Color(0xFFF0F1F5),
+                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
                         message.reactedByMe
                             ? Icons.thumb_up_rounded
                             : Icons.thumb_up_outlined,
-                        size: 19,
+                        size: 13,
+                        color: message.mine ? Colors.white : MoolColors.navy,
                       ),
-                    ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${message.reactionCount}',
+                        style: TextStyle(
+                          color: message.mine ? Colors.white : MoolColors.ink,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (message.photo == null &&
-                      message.attachmentLabel == null &&
-                      message.text.trim().isNotEmpty)
-                    IconButton(
-                      key: Key('chat-forward-${message.id}'),
-                      tooltip: 'Forward',
-                      onPressed:
-                          session.busy ||
-                              session.availableForwardTargets(threadId).isEmpty
-                          ? null
-                          : () => unawaited(
-                              _chooseForwardTarget(
-                                context,
-                                session,
-                                threadId,
-                                message,
-                              ),
-                            ),
-                      visualDensity: VisualDensity.compact,
-                      color: message.mine ? Colors.white : MoolColors.navy,
-                      icon: const Icon(Icons.forward_rounded, size: 19),
-                    ),
-                ],
-              ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+Future<void> _showMessageActions(
+  BuildContext context, {
+  required ChatSession session,
+  required String threadId,
+  required ChatMessage message,
+}) {
+  final forwardableContent =
+      message.photo == null &&
+      message.attachmentLabel == null &&
+      message.text.trim().isNotEmpty;
+  final canForward =
+      forwardableContent &&
+      session.availableForwardTargets(threadId).isNotEmpty;
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        key: const Key('chat-message-actions'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text(
+              'Message actions',
+              style: TextStyle(
+                color: MoolColors.navy,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          ListTile(
+            key: Key('chat-reply-${message.id}'),
+            leading: const Icon(Icons.reply_rounded),
+            title: const Text('Reply'),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              session.startReply(threadId, message.id);
+            },
+          ),
+          ListTile(
+            key: Key('chat-react-${message.id}'),
+            leading: Icon(
+              message.reactedByMe
+                  ? Icons.thumb_up_rounded
+                  : Icons.thumb_up_outlined,
+            ),
+            title: Text(message.reactedByMe ? 'Remove reaction' : 'React'),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              unawaited(session.toggleReaction(threadId, message.id));
+            },
+          ),
+          if (forwardableContent)
+            ListTile(
+              key: Key('chat-forward-${message.id}'),
+              leading: const Icon(Icons.forward_rounded),
+              title: const Text('Forward'),
+              enabled: canForward,
+              onTap: !canForward
+                  ? null
+                  : () async {
+                      Navigator.of(sheetContext).pop();
+                      await Future<void>.delayed(Duration.zero);
+                      if (!context.mounted) return;
+                      await _chooseForwardTarget(
+                        context,
+                        session,
+                        threadId,
+                        message,
+                      );
+                    },
+            ),
+          const SizedBox(height: MoolSpacing.xs),
+        ],
+      ),
+    ),
+  );
 }
 
 Future<void> _chooseForwardTarget(
@@ -782,8 +851,8 @@ class _Composer extends StatelessWidget {
       top: false,
       bottom: false,
       child: Material(
-        color: Colors.white,
-        elevation: 10,
+        color: const Color(0xFFF1F2F6),
+        elevation: 4,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.sm,
@@ -915,52 +984,79 @@ class _Composer extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (session.photoSharingAvailable) ...[
-                    IconButton(
-                      key: const Key('chat-attach'),
-                      tooltip: 'Share a photo',
-                      onPressed: session.busy
-                          ? null
-                          : () => unawaited(_choosePhoto(context)),
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                    ),
-                    const SizedBox(width: MoolSpacing.xs),
-                  ],
                   Expanded(
-                    child: TextField(
-                      key: const Key('chat-message-field'),
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: photo == null
-                            ? 'Message'
-                            : 'Add a caption (optional)',
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: MoolSpacing.sm,
-                          vertical: MoolSpacing.sm,
+                    child: Container(
+                      key: const Key('chat-composer-surface'),
+                      constraints: const BoxConstraints(minHeight: 48),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                        border: Border.all(
+                          color: MoolColors.navy.withValues(alpha: .10),
                         ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (session.photoSharingAvailable)
+                            IconButton(
+                              key: const Key('chat-attach'),
+                              tooltip: 'Share a photo',
+                              onPressed: session.busy
+                                  ? null
+                                  : () => unawaited(_choosePhoto(context)),
+                              icon: const Icon(Icons.attach_file_rounded),
+                            ),
+                          Expanded(
+                            child: TextField(
+                              key: const Key('chat-message-field'),
+                              controller: controller,
+                              minLines: 1,
+                              maxLines: 4,
+                              decoration: InputDecoration(
+                                hintText: photo == null
+                                    ? 'Message'
+                                    : 'Add a caption',
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: MoolSpacing.xs,
+                                  vertical: MoolSpacing.sm,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: MoolSpacing.xs),
-                  IconButton.filled(
-                    key: Key(photo == null ? 'chat-send' : 'chat-send-photo'),
-                    tooltip: photo == null ? 'Send message' : 'Send photo',
-                    onPressed: session.busy
-                        ? null
-                        : () => unawaited(
-                            photo == null ? onSend() : onSendPhoto(),
-                          ),
-                    icon: session.busy
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton.filled(
+                      key: Key(photo == null ? 'chat-send' : 'chat-send-photo'),
+                      tooltip: photo == null ? 'Send message' : 'Send photo',
+                      style: IconButton.styleFrom(
+                        backgroundColor: MoolColors.navy,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: session.busy
+                          ? null
+                          : () => unawaited(
+                              photo == null ? onSend() : onSendPhoto(),
                             ),
-                          )
-                        : const Icon(Icons.send_rounded),
+                      icon: session.busy
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
+                    ),
                   ),
                 ],
               ),
@@ -971,6 +1067,13 @@ class _Composer extends StatelessWidget {
     );
   }
 }
+
+IconData _threadIconFor(ChatThreadType type) => switch (type) {
+  ChatThreadType.people => Icons.person_outline_rounded,
+  ChatThreadType.business => Icons.storefront_outlined,
+  ChatThreadType.order => Icons.local_shipping_outlined,
+  ChatThreadType.support => Icons.support_agent_rounded,
+};
 
 IconData _deliveryIcon(ChatDeliveryState state) => switch (state) {
   ChatDeliveryState.sending => Icons.schedule_rounded,

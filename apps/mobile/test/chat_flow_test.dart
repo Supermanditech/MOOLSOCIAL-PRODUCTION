@@ -266,7 +266,7 @@ void main() {
     );
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
     expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
     final addPerson = find.byKey(const Key('chat-new'));
     expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
@@ -380,13 +380,20 @@ void main() {
         expect(find.byKey(key), findsNothing, reason: '$key');
       }
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 3);
       expect(chat.messages('home-basket').first.reactedByMe, isTrue);
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 2);
       expect(chat.messages('home-basket').first.reactedByMe, isFalse);
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-reply-m1'));
       expect(
         find.byKey(const Key('chat-composer-reply-context')),

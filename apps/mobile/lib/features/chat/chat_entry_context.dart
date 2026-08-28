@@ -18,6 +18,7 @@ enum ChatEntryContextId {
 class ChatEntryContext {
   const ChatEntryContext({
     required this.id,
+    required this.originLabel,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -27,6 +28,7 @@ class ChatEntryContext {
   });
 
   final ChatEntryContextId id;
+  final String originLabel;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -49,6 +51,7 @@ class ChatEntryContext {
 
   static const mool = ChatEntryContext(
     id: ChatEntryContextId.mool,
+    originLabel: 'MoolSocial',
     title: 'Chat',
     subtitle: 'All your conversations',
     icon: Icons.chat_bubble_outline_rounded,
@@ -57,6 +60,7 @@ class ChatEntryContext {
 
   static const social = ChatEntryContext(
     id: ChatEntryContextId.social,
+    originLabel: 'Social',
     title: 'Social Chat',
     subtitle: 'People and creators',
     icon: Icons.people_alt_outlined,
@@ -67,6 +71,7 @@ class ChatEntryContext {
 
   static const shop = ChatEntryContext(
     id: ChatEntryContextId.shop,
+    originLabel: 'Shop',
     title: 'Shop Chat',
     subtitle: 'Orders and products',
     icon: Icons.shopping_bag_outlined,
@@ -76,6 +81,7 @@ class ChatEntryContext {
 
   static const food = ChatEntryContext(
     id: ChatEntryContextId.food,
+    originLabel: 'Food',
     title: 'Food Chat',
     subtitle: 'Orders and tables',
     icon: Icons.restaurant_outlined,
@@ -85,6 +91,7 @@ class ChatEntryContext {
 
   static const travel = ChatEntryContext(
     id: ChatEntryContextId.travel,
+    originLabel: 'Travel',
     title: 'Travel Chat',
     subtitle: 'Trips and bookings',
     icon: Icons.route_outlined,
@@ -94,6 +101,7 @@ class ChatEntryContext {
 
   static const care = ChatEntryContext(
     id: ChatEntryContextId.care,
+    originLabel: 'Care',
     title: 'Care Chat',
     subtitle: 'Appointments and care',
     icon: Icons.health_and_safety_outlined,
@@ -103,6 +111,7 @@ class ChatEntryContext {
 
   static const work = ChatEntryContext(
     id: ChatEntryContextId.work,
+    originLabel: 'Work',
     title: 'Work Chat',
     subtitle: 'Opportunities',
     icon: Icons.work_outline_rounded,
@@ -112,6 +121,7 @@ class ChatEntryContext {
 
   static const workspace = ChatEntryContext(
     id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
     title: 'Workspace Chat',
     subtitle: 'Customers and operations',
     icon: Icons.storefront_outlined,
@@ -121,6 +131,7 @@ class ChatEntryContext {
 
   static const pay = ChatEntryContext(
     id: ChatEntryContextId.pay,
+    originLabel: 'Pay',
     title: 'Pay Chat',
     subtitle: 'Payments and support',
     icon: Icons.account_balance_wallet_outlined,

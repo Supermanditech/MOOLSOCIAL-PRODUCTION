@@ -60,7 +60,7 @@ void main() {
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(find.byKey(const Key('chat-back')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
     expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
     expect(find.byKey(const Key('chat-open-mool')), findsNothing);
     expect(find.byKey(const Key('chat-thread-mool')), findsNothing);
@@ -104,7 +104,7 @@ void main() {
       'Home Basket',
     );
     expect(find.byKey(const Key('chat-back')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
   });
 
   testWidgets('thread keeps native composer focus without a global dock', (

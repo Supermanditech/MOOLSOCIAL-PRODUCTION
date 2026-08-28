@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
@@ -145,14 +146,23 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-      expect(find.byKey(const Key('chat-context-icon')), findsOneWidget);
+      expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+      expect(find.byKey(const Key('chat-context-icon')), findsNothing);
       expect(find.text(entry.$2), findsOneWidget);
-      expect(find.text(entry.$3), findsOneWidget);
+      expect(find.text('MoolSocial messaging'), findsOneWidget);
       expect(find.text('MoolSocial Chat'), findsNothing);
       expect(chat.selectedFilter, entry.$4);
+      final backSize = tester.getSize(find.byKey(const Key('chat-inbox-back')));
+      expect(backSize.width, greaterThanOrEqualTo(44));
+      expect(backSize.height, greaterThanOrEqualTo(44));
+      final navigation = tester.widget<NavigationBar>(
+        find.byKey(const Key('chat-native-navigation')),
+      );
+      expect(navigation.height, 72);
+      expect(find.byKey(const Key('chat-moolsocial-divider')), findsOneWidget);
       final title = tester.renderObject<RenderParagraph>(find.text(entry.$2));
       final subtitle = tester.renderObject<RenderParagraph>(
-        find.text(entry.$3),
+        find.text('MoolSocial messaging'),
       );
       expect(title.didExceedMaxLines, isFalse);
       expect(subtitle.didExceedMaxLines, isFalse);
@@ -167,12 +177,46 @@ void main() {
       }
       expect(tester.takeException(), isNull);
 
-      await tester.binding.handlePopRoute();
+      await tester.tap(find.byKey(const Key('chat-inbox-back')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('conversation keeps familiar MoolSocial header and composer', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/work/earn',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-back')), findsOneWidget);
+    expect(find.text('5 members'), findsOneWidget);
+    expect(find.byKey(const Key('chat-composer-surface')), findsOneWidget);
+    expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+    await tester.longPress(find.byKey(const Key('chat-message-m1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
+    expect(find.byKey(const Key('chat-reply-m1')), findsOneWidget);
+    expect(find.byKey(const Key('chat-react-m1')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('an explicit Chat intent overrides the origin default filter', (
     tester,
