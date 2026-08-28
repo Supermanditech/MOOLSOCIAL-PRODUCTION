@@ -43133,6 +43133,16 @@
       "prevention": "In every fresh or sparse worktree, run flutter pub get --enforce-lockfile and the affected broad Flutter suite in one clean-support invocation; do not interpret missing-package compilation as a product regression.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/pubspec.lock", "scripts/invoke-flutter-with-clean-support.ps1"]
+    },
+    {
+      "id": "REG-20260828-3787-ORIGIN-RETURN-DEVICE-ORACLE-USED-COPY-CONJUNCTION",
+      "status": "registered_stable_return_identity_classification_required",
+      "appliesTo": ["primary", "mobile", "testing", "android", "device"],
+      "mistake": "The first OPPO origin-return replay rejected the post-Back hierarchy because it required both literal 'Order Food' and 'Search food' fragments, even though the captured hierarchy size matched the Food screen and had not yet been classified by stable identities.",
+      "rootCause": "The device assertion coupled navigation acceptance to mutable customer copy instead of a stable route-specific semantic owner, and combined two facts in one failure condition.",
+      "prevention": "Classify the retained returned hierarchy before retry, assert Food using stable semantic/action identities such as the Food global profile and search surface, and report each missing fact independently without changing the installed candidate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
     }
   ]
 }
