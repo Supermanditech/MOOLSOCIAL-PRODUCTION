@@ -229,20 +229,22 @@ void main() {
 
     await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
     expect(find.byKey(const Key('chat-document')), findsOneWidget);
     expect(find.byKey(const Key('chat-gallery')), findsOneWidget);
     expect(find.byKey(const Key('chat-camera')), findsOneWidget);
     await tester.tap(find.byKey(const Key('chat-document')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-document-recovery')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('chat-capability-continue')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
+    expect(find.textContaining('Document sharing'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-photo-recovery')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('chat-capability-continue')));
+    expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
+    expect(find.textContaining('Photo sharing'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
 
     await tester.tap(find.byKey(const Key('chat-voice-message')));
     await tester.pumpAndSettle();
@@ -287,6 +289,7 @@ void main() {
     await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
     final camera = find.byKey(const Key('chat-camera'));
     expect(camera, findsOneWidget);
     final rect = tester.getRect(camera);

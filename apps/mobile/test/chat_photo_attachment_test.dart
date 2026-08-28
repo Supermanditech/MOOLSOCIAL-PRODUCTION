@@ -298,7 +298,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-attach-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
     await tester.tap(find.byKey(const Key('chat-gallery')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-selected-photo')), findsOneWidget);

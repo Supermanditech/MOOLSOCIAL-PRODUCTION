@@ -654,15 +654,18 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _ChatBottomSheetSafeArea extends StatelessWidget {
-  const _ChatBottomSheetSafeArea({required this.child});
+  const _ChatBottomSheetSafeArea({
+    required this.bottomInset,
+    required this.child,
+  });
 
+  final double bottomInset;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final deviceInset = MediaQuery.viewPaddingOf(context).bottom;
-    final bottomPadding = deviceInset > MoolSpacing.md
-        ? deviceInset
+    final bottomPadding = bottomInset > MoolSpacing.md
+        ? bottomInset
         : MoolSpacing.md;
     return SafeArea(
       top: false,
@@ -681,12 +684,14 @@ Future<void> _showUnavailableCapability(
   required String title,
   required String message,
 }) {
+  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
       child: Padding(
         key: Key(keyName),
         padding: const EdgeInsets.fromLTRB(
@@ -735,12 +740,14 @@ Future<void> _showMessageActions(
   final canForward =
       forwardableContent &&
       session.availableForwardTargets(threadId).isNotEmpty;
+  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
       child: Column(
         key: const Key('chat-message-actions'),
         mainAxisSize: MainAxisSize.min,
@@ -812,12 +819,14 @@ Future<void> _chooseForwardTarget(
 ) async {
   final targets = session.availableForwardTargets(sourceThreadId);
   if (targets.isEmpty) return;
+  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
   final target = await showModalBottomSheet<ChatThread>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
       child: Column(
         key: const Key('chat-forward-picker'),
         mainAxisSize: MainAxisSize.min,
@@ -894,7 +903,54 @@ Future<void> _chooseForwardTarget(
 
 enum _ChatAttachmentChoice { document, gallery, camera }
 
-class _Composer extends StatelessWidget {
+class _ChatAttachmentAction extends StatelessWidget {
+  const _ChatAttachmentAction({
+    required this.keyName,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String keyName;
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    key: Key(keyName),
+    onTap: onPressed,
+    borderRadius: BorderRadius.circular(MoolRadii.control),
+    overlayColor: WidgetStatePropertyAll(
+      MoolColors.navy.withValues(alpha: .06),
+    ),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 64),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: MoolColors.navy, size: 23),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _Composer extends StatefulWidget {
   const _Composer({
     required this.session,
     required this.threadId,
@@ -909,64 +965,37 @@ class _Composer extends StatelessWidget {
   final Future<void> Function() onSend;
   final Future<void> Function() onSendPhoto;
 
-  Future<void> _chooseAttachment(BuildContext context) async {
-    final choice = await showModalBottomSheet<_ChatAttachmentChoice>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => _ChatBottomSheetSafeArea(
-        child: Column(
-          key: const Key('chat-attach-sheet'),
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text(
-                'Share a file',
-                style: TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              subtitle: Text('Choose what you want to share.'),
-            ),
-            ListTile(
-              key: const Key('chat-document'),
-              leading: const Icon(Icons.insert_drive_file_outlined),
-              title: const Text('Document'),
-              onTap: () => Navigator.of(
-                sheetContext,
-              ).pop(_ChatAttachmentChoice.document),
-            ),
-            ListTile(
-              key: const Key('chat-gallery'),
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Photos'),
-              onTap: () =>
-                  Navigator.of(sheetContext).pop(_ChatAttachmentChoice.gallery),
-            ),
-            ListTile(
-              key: const Key('chat-camera'),
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Camera'),
-              onTap: () =>
-                  Navigator.of(sheetContext).pop(_ChatAttachmentChoice.camera),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !context.mounted) return;
+  @override
+  State<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<_Composer> {
+  bool _attachmentsOpen = false;
+  String? _attachmentNotice;
+
+  ChatSession get session => widget.session;
+  String get threadId => widget.threadId;
+  TextEditingController get controller => widget.controller;
+  Future<void> Function() get onSend => widget.onSend;
+  Future<void> Function() get onSendPhoto => widget.onSendPhoto;
+
+  void _toggleAttachments() {
+    setState(() {
+      _attachmentsOpen = !_attachmentsOpen;
+      _attachmentNotice = null;
+    });
+  }
+
+  Future<void> _chooseAttachment(
+    BuildContext context,
+    _ChatAttachmentChoice choice,
+  ) async {
     switch (choice) {
       case _ChatAttachmentChoice.document:
-        await _showUnavailableCapability(
-          context,
-          keyName: 'chat-document-recovery',
-          title: 'Document sharing unavailable',
-          message:
-              'Document sharing is not available right now. You can share a photo or continue with a message.',
-        );
+        setState(() {
+          _attachmentNotice =
+              'Document sharing is not available right now. You can share a photo or continue with a message.';
+        });
         return;
       case _ChatAttachmentChoice.gallery:
         await _selectPhoto(context, ChatPhotoSource.gallery);
@@ -982,16 +1011,20 @@ class _Composer extends StatelessWidget {
     ChatPhotoSource source,
   ) async {
     if (!session.photoSharingAvailable) {
-      await _showUnavailableCapability(
-        context,
-        keyName: 'chat-photo-recovery',
-        title: 'Photo sharing unavailable',
-        message:
-            'Photo sharing is not available right now. You can continue with a message.',
-      );
+      if (!mounted) return;
+      setState(() {
+        _attachmentsOpen = true;
+        _attachmentNotice =
+            'Photo sharing is not available right now. You can continue with a message.';
+      });
       return;
     }
     await session.selectPhoto(threadId, source);
+    if (!mounted) return;
+    setState(() {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+    });
   }
 
   @override
@@ -1014,6 +1047,94 @@ class _Composer extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_attachmentsOpen) ...[
+                Container(
+                  key: const Key('chat-attachment-tray'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(MoolSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(MoolRadii.card),
+                    border: Border.all(
+                      color: MoolColors.navy.withValues(alpha: .10),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ChatAttachmentAction(
+                              keyName: 'chat-document',
+                              icon: Icons.insert_drive_file_outlined,
+                              label: 'Document',
+                              onPressed: () => unawaited(
+                                _chooseAttachment(
+                                  context,
+                                  _ChatAttachmentChoice.document,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: _ChatAttachmentAction(
+                              keyName: 'chat-gallery',
+                              icon: Icons.photo_library_outlined,
+                              label: 'Photos',
+                              onPressed: () => unawaited(
+                                _chooseAttachment(
+                                  context,
+                                  _ChatAttachmentChoice.gallery,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: _ChatAttachmentAction(
+                              keyName: 'chat-camera',
+                              icon: Icons.photo_camera_outlined,
+                              label: 'Camera',
+                              onPressed: () => unawaited(
+                                _chooseAttachment(
+                                  context,
+                                  _ChatAttachmentChoice.camera,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_attachmentNotice != null) ...[
+                        const SizedBox(height: MoolSpacing.xs),
+                        Container(
+                          key: const Key('chat-attachment-notice'),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: MoolSpacing.sm,
+                            vertical: MoolSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F1F5),
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.control,
+                            ),
+                          ),
+                          child: Text(
+                            _attachmentNotice!,
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
               if (photo != null) ...[
                 Container(
                   key: const Key('chat-selected-photo'),
@@ -1172,10 +1293,10 @@ class _Composer extends StatelessWidget {
                           ),
                           IconButton(
                             key: const Key('chat-attach'),
-                            tooltip: 'Attach a file',
-                            onPressed: session.busy
-                                ? null
-                                : () => unawaited(_chooseAttachment(context)),
+                            tooltip: _attachmentsOpen
+                                ? 'Close attachments'
+                                : 'Attach a file',
+                            onPressed: session.busy ? null : _toggleAttachments,
                             icon: const Icon(Icons.attach_file_rounded),
                           ),
                           IconButton(
