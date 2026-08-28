@@ -124,9 +124,14 @@ Assert-CursorUiReviewControl (
 
 Assert-CursorUiReviewControl (
   $builder.Contains("'com.moolsocial.app.runtime'") -and
+  $builder.Contains("'RuntimeUiReview'") -and
+  $builder.Contains('Runtime UI Review permits debug APK builds only.') -and
+  $builder.Contains('AndroidDebugPackage=runtime;Promotable=false') -and
   $builder.Contains("if (`$BuildMode -cne 'debug') {") -and
   $apkGate.Contains("'uaw_runtime_debug_review'") -and
+  $apkGate.Contains("'uaw_runtime_ui_review_debug'") -and
   $apkGate.Contains('runtime device review permits debug APK builds only.') -and
+  $apkGate.Contains('runtime UI review permits debug APK builds only.') -and
   $apkGate.Contains('runtime debug review must remain non-promotable.')
 ) 'runtime debug review is not package-isolated, debug-only and non-promotable.'
 
