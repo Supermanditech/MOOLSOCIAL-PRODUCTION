@@ -3599,3 +3599,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3819 rejects grouped RuntimeUiReview build-control searches across scripts
   and config. Read the exact wrapper and foundation checker independently, then
   follow only their returned machine-state contract.
+- REG3820 rejects manually completing a short commit into a candidate HEAD.
+  Project `git rev-parse HEAD` immediately before state creation, copy the exact
+  scalar and compare parsed state before any build gate.

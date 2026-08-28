@@ -43463,6 +43463,16 @@
       "prevention": "Runtime UI build recovery reads one exact wrapper or checker owner per command, then inspects only the returned state-path contract; no combined scripts-plus-config search is used.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3820-R61-34-CANDIDATE-STATE-TRANSCRIBED-WRONG-FULL-HEAD",
+      "status": "registered_direct_head_scalar_binding_required",
+      "appliesTo": ["primary", "mobile", "build", "git", "testing"],
+      "mistake": "The first r61.34 candidate state expanded the short commit output into an incorrect full HEAD instead of copying the exact git rev-parse scalar.",
+      "rootCause": "Candidate JSON was authored before the full 40-character HEAD was independently projected and copied.",
+      "prevention": "Project git rev-parse HEAD immediately before candidate-state creation, copy that exact scalar without manual completion, then parse and compare state HEAD before any machine gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "work/runtime-ui-review-r61-34-20260829/apk-gate-state.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }
