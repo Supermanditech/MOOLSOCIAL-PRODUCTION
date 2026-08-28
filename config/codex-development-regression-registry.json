@@ -43223,6 +43223,16 @@
       "prevention": "Before retrying an Android review build, preserve any failed raw or partial APK as unpromotable evidence and require at least four GiB of free local space immediately before the wrapper; only the wrapper-copied artifact may be installed.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1"]
+    },
+    {
+      "id": "REG-20260828-3796-GLOBAL-SECURITY-SIGN-IN-TAP-DID-NOT-START-AUTH-JOURNEY",
+      "status": "registered_exact_security_auth_return_continuity_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "authentication", "testing"],
+      "mistake": "The signed-out Security page exposed a Sign in action that navigated directly to /sign-in without starting JourneySession authentication, so the production router could immediately return the ready user elsewhere instead of fulfilling the tap.",
+      "rootCause": "The isolated Security widget test asserted only a route string and did not exercise the real router stage machine, return location, cancellation or restored-route continuity.",
+      "prevention": "Security Sign in must call beginSignIn with its complete current URI as both return and cancel location before navigation; real-router tests must prove sign-in remains open, cancellation returns to Security, and the nested originating main-section return is retained.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_security_v2.dart", "apps/mobile/lib/features/journey01/journey_session.dart", "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart"]
     }
   ]
 }

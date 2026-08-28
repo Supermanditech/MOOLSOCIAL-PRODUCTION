@@ -134,7 +134,7 @@ class GlobalSecurityV2 extends StatelessWidget {
                             detail:
                                 'Manage account recovery and access methods',
                             palette: palette,
-                            onTap: () => context.go('/sign-in'),
+                            onTap: () => _beginSignIn(context),
                           ),
                       ],
                     ),
@@ -184,6 +184,15 @@ class GlobalSecurityV2 extends StatelessWidget {
         const SnackBar(content: Text('Device settings could not be opened.')),
       );
     }
+  }
+
+  void _beginSignIn(BuildContext context) {
+    final securityLocation = GoRouterState.of(context).uri.toString();
+    session.beginSignIn(
+      returnLocation: securityLocation,
+      cancelLocation: securityLocation,
+    );
+    context.go('/sign-in');
   }
 
   Future<void> _confirmSignOut(
