@@ -297,7 +297,15 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
       animation: Listenable.merge(listeners),
       builder: (context, _) {
         final entryContext = _entryContext;
-        final threads = widget.session.visibleThreads(_searchController.text);
+        final visibleThreads = widget.session.visibleThreads(
+          _searchController.text,
+        );
+        final allowedThreadIds = entryContext.allowedThreadIds;
+        final threads = allowedThreadIds == null
+            ? visibleThreads
+            : visibleThreads
+                  .where((thread) => allowedThreadIds.contains(thread.id))
+                  .toList(growable: false);
         final people = _visiblePeople();
         final sectionMotion = MoolMotion.accessible(
           context,

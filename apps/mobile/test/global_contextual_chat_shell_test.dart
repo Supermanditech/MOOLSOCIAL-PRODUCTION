@@ -87,6 +87,10 @@ void main() {
       expect(resolved.title, entry.$3, reason: entry.$1);
       expect(resolved.defaultFilter, entry.$4, reason: entry.$1);
     }
+    expect(
+      ChatEntryContext.resolve('/app/ride/book?type=cab').allowedThreadIds,
+      {'ride-support'},
+    );
   });
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
@@ -174,6 +178,16 @@ void main() {
         final filterRect = tester.getRect(activeFilter);
         expect(filterRect.left, greaterThanOrEqualTo(0));
         expect(filterRect.right, lessThanOrEqualTo(320));
+      }
+      if (entry.$2 == 'Travel Chat') {
+        expect(
+          find.byKey(const Key('chat-open-thread-ride-support')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('chat-open-thread-order-support')),
+          findsNothing,
+        );
       }
       expect(tester.takeException(), isNull);
 

@@ -62,6 +62,16 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'ride-support': [
+        const ChatMessage(
+          id: 'm9',
+          sender: 'Trip Support',
+          text:
+              'Your Bike Saver trip from Sardarpura pickup gate to Railway Station is ready for coordination.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
       'clinic-care': [
         const ChatMessage(
           id: 'm7',
@@ -139,6 +149,16 @@ class ChatSession extends ChangeNotifier {
       preview: 'Your lunch order is being prepared.',
       timeLabel: '10:21',
       type: ChatThreadType.order,
+      unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'ride-support',
+      title: 'Trip Support',
+      subtitle: 'Bike Saver · Sardarpura to Railway Station',
+      preview: 'Your trip is ready for coordination.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
       unreadCount: 1,
       verified: true,
     ),

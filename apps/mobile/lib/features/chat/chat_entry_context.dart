@@ -25,6 +25,7 @@ class ChatEntryContext {
     required this.accent,
     this.defaultFilter,
     this.showThreadFilters = true,
+    this.allowedThreadIds,
   });
 
   final ChatEntryContextId id;
@@ -35,6 +36,7 @@ class ChatEntryContext {
   final Color accent;
   final ChatThreadType? defaultFilter;
   final bool showThreadFilters;
+  final Set<String>? allowedThreadIds;
 
   static ChatEntryContext resolve(String returnRoute) {
     final path = Uri.tryParse(returnRoute)?.path.toLowerCase() ?? '';
@@ -97,6 +99,7 @@ class ChatEntryContext {
     icon: Icons.route_outlined,
     accent: Color(0xFF4C4C8A),
     defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'ride-support'},
   );
 
   static const care = ChatEntryContext(
