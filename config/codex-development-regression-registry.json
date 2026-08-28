@@ -44013,6 +44013,16 @@
       "prevention": "Do not create Child 6; bind Build Child 7 directly to product integration head ca54d3d3 and apply the complete registry, policy, state, ticket and placeholder bootstrap delta in that full worktree.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3883-SHOP-R61-6-BUILD-NEW-ARTIFACT-ROOT-OUTSIDE-INTEGRATION-ALLOWLIST",
+      "status": "registered_unique_files_inside_approved_artifact_root_required",
+      "appliesTo": ["primary", "coordination", "build", "evidence", "integration_repair"],
+      "mistake": "Build Child 7 bootstrap passed source preservation but the lane gate rejected the new shop-location-address artifact root because integration_repair permits only the approved Shop build artifact root.",
+      "rootCause": "A new evidence directory was chosen even though unique r61.6 filenames can coexist safely under the already-approved non-overwriting artifact root.",
+      "prevention": "Bind Build Child 8 to product-bearing Child 7, claim and track unique r61.6 text placeholders inside artifacts/quality/shop-v2-r61-5-cursor-review-20260828, overwrite no existing file, and use that root for the wrapper output.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD8-20260828.md"]
     }
   ]
 }
