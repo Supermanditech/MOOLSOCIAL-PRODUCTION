@@ -43183,6 +43183,16 @@
       "prevention": "Forward image results with an explicit for-of loop or a one-argument arrow callback, pass no second argument, and verify both expected images render before making a visual design decision.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3800-SHOP-LANDING-V2-BROAD-BUY-TEST-PROFILE-SEARCH-TIMED-OUT",
+      "status": "registered_exact_claimed_test_reads_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "tooling", "buy"],
+      "mistake": "A multi-pattern search for Buy profile/account assertions targeted the complete apps/mobile/test/ui_v2/buy directory and timed out before returning any usable match inventory.",
+      "rootCause": "The audit searched a large evidence-heavy test tree even though the ticket already claimed exact focused Shop and screen test owners.",
+      "prevention": "Read only the literal claimed test files, locate matches independently in each file, bound every returned range and never repeat a recursive Buy test-directory content search for this ticket.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md"]
     }
   ]
 }
