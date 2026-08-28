@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
-  "baselineTag": "moolsocial-reconciled-debug-baseline-v7.4-20260828",
+  "baselineTag": "moolsocial-reconciled-debug-baseline-v7.4.1-gate-ready-20260828",
   "uiFounderReview": {
     "state": "pending",
     "acceptedScopes": [],

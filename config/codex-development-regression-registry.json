@@ -43163,6 +43163,16 @@
       "prevention": "Use the exact verified 40-character parent commit directly for worktree creation and future cat-file checks; when a peel expression is genuinely required, pass it as one quoted literal argument and validate the immediate native exit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3798-SHOP-LANDING-V2-BOOTSTRAP-ALL-CLAIM-EXISTENCE-SUMMARY-TIMED-OUT",
+      "status": "registered_ticket_bounded_owner_validation_required",
+      "appliesTo": ["primary", "coordination", "implementation", "tooling", "buy"],
+      "mistake": "The Shop Landing V2 bootstrap preflight iterated every active claim and filesystem owner, then timed out before returning any JSON, missing-owner or bootstrap-set result.",
+      "rootCause": "The preflight repeated global owner validation already enforced by the coordination checker instead of bounding the readback to the new ticket claim and exact five bootstrap owners.",
+      "prevention": "Validate only the selected Shop claim, selected continuation binding and exact bootstrap owners before the machine gate; let the authoritative coordination checker validate global claims once, and treat timeout output as zero evidence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md"]
     }
   ]
 }
