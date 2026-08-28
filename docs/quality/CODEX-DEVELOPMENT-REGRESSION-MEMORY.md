@@ -3602,3 +3602,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3820 rejects manually completing a short commit into a candidate HEAD.
   Project `git rev-parse HEAD` immediately before state creation, copy the exact
   scalar and compare parsed state before any build gate.
+- REG3821 rejects reusing absent candidate-specific premium-motion evidence.
+  Keep the canonical policy and coverage, but bind the candidate contract and
+  disposition to exact existing current-ticket owners before the APK gate.

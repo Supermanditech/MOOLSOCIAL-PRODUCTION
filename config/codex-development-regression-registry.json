@@ -43472,7 +43472,17 @@
       "rootCause": "Candidate JSON was authored before the full 40-character HEAD was independently projected and copied.",
       "prevention": "Project git rev-parse HEAD immediately before candidate-state creation, copy that exact scalar without manual completion, then parse and compare state HEAD before any machine gate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-apk-regression-gate-state.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "work/runtime-ui-review-r61-34-20260829/apk-gate-state.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/apk-gate-state.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3821-R61-34-REUSED-MISSING-PREMIUM-MOTION-EVIDENCE-PATHS",
+      "status": "registered_current_ticket_motion_evidence_required",
+      "appliesTo": ["primary", "mobile", "build", "ui_ux", "testing"],
+      "mistake": "The first r61.34 APK gate reused premium-motion evidence paths from an old Buy candidate that are absent from this isolated Chat worktree, so prebuild failed closed.",
+      "rootCause": "The canonical policy fields were copied together with candidate-specific historical evidence paths instead of binding the current Chat contract and disposition owners.",
+      "prevention": "Keep the canonical motion policy and coverage authority, but bind candidateContract and disposition to current existing Chat ticket owners before the first APK gate; verify every path independently.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-buy-premium-motion-policy-state.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/apk-gate-state.json", "apps/mobile/test/global_contextual_chat_shell_test.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }
