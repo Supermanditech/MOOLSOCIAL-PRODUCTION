@@ -184,7 +184,7 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
             MoolSpacing.md,
             MoolSpacing.xs,
             MoolSpacing.md,
-            media.viewPadding.bottom + MoolSpacing.sm,
+            media.viewPadding.bottom + MoolSpacing.lg,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -440,7 +440,7 @@ class _PreferencesHero extends StatelessWidget {
               ),
               SizedBox(height: 3),
               Text(
-                'Language and service area apply across every main action.',
+                'Choose your language and service area for a more relevant experience.',
                 style: TextStyle(
                   color: Color(0xFFDADAF3),
                   fontSize: 10,

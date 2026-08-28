@@ -87,6 +87,13 @@ void main() {
     expect(find.byKey(const Key('global-privacy-preferences-v2')), findsOne);
     expect(find.text('English'), findsOne);
     expect(find.text('Sardarpura'), findsOne);
+    expect(
+      find.text(
+        'Choose your language and service area for a more relevant experience.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('main action'), findsNothing);
 
     await tester.tap(find.byKey(const Key('global-preferences-language')));
     await tester.pumpAndSettle();
@@ -236,6 +243,7 @@ void main() {
       const cases = <({Size size, double scale, double bottomInset})>[
         (size: Size(320, 568), scale: 1.4, bottomInset: 34),
         (size: Size(360, 640), scale: 1.4, bottomInset: 48),
+        (size: Size(360, 720), scale: 1, bottomInset: 0),
         (size: Size(430, 932), scale: 1, bottomInset: 34),
       ];
 
@@ -263,7 +271,11 @@ void main() {
         expect(tester.getTopLeft(english).dy, greaterThanOrEqualTo(0));
         expect(
           tester.getBottomRight(hindi).dy,
-          lessThanOrEqualTo(testCase.size.height - testCase.bottomInset),
+          lessThanOrEqualTo(testCase.size.height - testCase.bottomInset - 16),
+        );
+        expect(
+          tester.getSize(hindi).height,
+          closeTo(tester.getSize(english).height, .1),
         );
         expect(tester.takeException(), isNull);
 

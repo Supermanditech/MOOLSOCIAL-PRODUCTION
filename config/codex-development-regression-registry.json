@@ -43033,6 +43033,26 @@
       "prevention": "After refreshed memory, project only those allowlisted scalar facts from policy and fixture source, update the single stale expectation, then rerun the focused graph fixture before any commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/test-codex-integration-repair-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260828-3777-GLOBAL-PROFILE-LANGUAGE-SHEET-ZERO-INSET-BOTTOM-CLIP",
+      "status": "registered_full_option_height_and_bottom-clearance_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "testing", "android"],
+      "mistake": "The first Language-sheet correction passed simulated bottom-inset cases, but OPPO review showed the Hindi option clipped to 38 physical pixels at the bottom of a zero-inset application viewport.",
+      "rootCause": "The sheet used the reported view padding plus only the smallest spacing token; Android can already subtract system navigation from the application viewport and report zero bottom view padding, leaving no guaranteed internal clearance for the final option.",
+      "prevention": "Every compact sheet must retain an unconditional bottom clearance in addition to reported safe padding, assert equal full-height actions with and without reported insets, and verify the final action bounds on the acceptance device before founder handoff.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3778-GLOBAL-PROFILE-INTERNAL-MAIN-ACTION-COPY-ESCAPE",
+      "status": "registered_customer_language_required_before_next_candidate",
+      "appliesTo": ["primary", "mobile", "ui_ux", "customer_copy", "testing"],
+      "mistake": "The global Privacy and preferences hero exposed the internal phrase 'Language and service area apply across every main action.' to customers.",
+      "rootCause": "The accepted profile sweep retained a cross-module implementation explanation instead of describing the customer benefit in ordinary account language, and the copy gate did not classify 'main action' as internal terminology.",
+      "prevention": "Describe shared preferences by their user benefit without module, route, screen, workflow or main-action terminology; mount the hero in customer-copy tests and review all newly visible profile copy before the next UI-review APK.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
     }
   ]
 }
