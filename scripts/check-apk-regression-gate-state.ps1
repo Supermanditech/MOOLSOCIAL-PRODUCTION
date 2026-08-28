@@ -165,7 +165,7 @@ Assert-Gate -Condition (
 $mvpScopeState = Join-Path `
   $repositoryRoot `
   'config/mvp-scope-gate-state.json'
-if (-not $runtimeDebugReview) {
+if (-not $isolatedDebugReview) {
   & $mvpScopeGate `
     -StatePath $mvpScopeState `
     -CandidateId $CandidateId `
@@ -174,7 +174,7 @@ if (-not $runtimeDebugReview) {
 } else {
   Assert-Gate -Condition (
     [string]$state.promotion.state -ceq 'forbidden_non_promotable'
-  ) -Message 'runtime debug review must remain non-promotable.'
+  ) -Message 'isolated debug review must remain non-promotable.'
 }
 
 $motionPolicyGate = Join-Path `
