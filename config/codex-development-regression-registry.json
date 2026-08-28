@@ -44063,6 +44063,16 @@
       "prevention": "Initialize statusText to an empty string, assign joined status output only when records exist, and report zero bytes and zero records without hashing null.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
+    },
+    {
+      "id": "REG-20260829-3888-SHOP-R61-6-GENERIC-HANDOFF-EXPECTED-MERGE-ONLY-TOPOLOGY",
+      "status": "registered_ticket_specific_redmi_closure_disposition_required",
+      "appliesTo": ["primary", "coordination", "closure", "integration_repair"],
+      "mistake": "The generic handoff phase rejected the clean approved r61.6 build branch because it enforces the predecessor merge-only integration-repair count, while this founder-authorized successor used direct bounded coordination, evidence and build commits.",
+      "rootCause": "A generic merge-topology handoff was invoked for a ticket-specific Redmi build branch whose closure scope explicitly excludes OPPO and next-destination integration.",
+      "prevention": "Keep the approved branch clean, push its exact evidence head, verify remote equality, record the Redmi-only closure disposition, and do not invoke OPPO-only ticket_close or start a successor ticket.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-founder-approval.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-install-result.json"]
     }
   ]
 }
