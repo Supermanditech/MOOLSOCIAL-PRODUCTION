@@ -5111,19 +5111,6 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: BuyV2Colors.softOrange,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_outlined,
-                      color: BuyV2Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7314,7 +7301,7 @@ class _BuyV2AddressChoice extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   '${address.line}, ${address.shortLine} · ${address.landmark}',
-                                  maxLines: 3,
+                                  maxLines: 4,
                                   overflow: TextOverflow.ellipsis,
                                   style: context.buyMeta,
                                 ),
@@ -7505,6 +7492,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                 decoration: const InputDecoration(
                   labelText: 'Recipient name (optional)',
                   helperText: 'Helps you confirm who the request is for.',
+                  helperMaxLines: 2,
                 ),
               ),
               const SizedBox(height: 12),
