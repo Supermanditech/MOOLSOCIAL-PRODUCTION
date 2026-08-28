@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3795,
-    "sha256": "9A856ECC4812F887993C7060DDDA016DCF5BF02853233F588518860EEA7E5662"
+    "entryCount": 3798,
+    "sha256": "14B1CEE16B75EED3D8649015508F31D4EC2027695392A9D7D3C700ACC45DFD36"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -36,14 +36,12 @@
       "owners": [
         ".gitattributes",
         "AGENTS.md",
-        "config/apk-regression-gate-state.json",
         "config/cross-agent-incremental-ticket-gate.json",
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
-        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
         "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
         "scripts/check-brand-integrity.ps1",
         "scripts/check-buy-protected-baseline.ps1",
@@ -51,12 +49,11 @@
         "scripts/check-cross-agent-incremental-ticket-gate.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
         "scripts/check-social-protected-baseline.ps1",
-        "scripts/new-shop-v2-r61-5-source-manifest.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },
     {
-      "task": "/root/repair_shop_v2_r61_5_buy_regression_fix_20260828",
+      "task": "/root/repair_shop_v2_r61_5_cursor_review_build_20260828",
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
@@ -104,7 +101,11 @@
         "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "config/apk-regression-gate-state.json",
+        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+        "scripts/new-shop-v2-r61-5-source-manifest.ps1"
       ]
     },
     {
@@ -717,6 +718,28 @@
         "bootstrapOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_shop_v2_r61_5_cursor_review_build_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_shop_v2_r61_5_cursor_review_build_20260828",
+        "workId": "shop-v2-r61-5-cursor-review-build-20260828",
+        "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828",
+        "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+        "baselineHead": "2ff8062dee1027e25ca128c2df968d16896e434e",
+        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-cursor-review-build-20260828): bind exact Redmi review build",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

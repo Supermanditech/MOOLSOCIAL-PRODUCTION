@@ -561,7 +561,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 19) `
+Assert-Coordination ($continuationBindings.Count -eq 20) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1575,8 +1575,10 @@ if ($ProductionLane -ceq 'baseline') {
             "$baseCommit..$head")
         $isShopBuyRegressionRepair = (
           $hasContinuationBinding -and
-          [string]$selectedContinuationBinding.id -ceq
-            'integration_repair_shop_v2_r61_5_buy_regression_fix_20260828'
+          [string]$selectedContinuationBinding.id -cin @(
+            'integration_repair_shop_v2_r61_5_buy_regression_fix_20260828',
+            'integration_repair_shop_v2_r61_5_cursor_review_build_20260828'
+          )
         )
         if ($isShopBuyRegressionRepair) {
           $shopRepairOwnerKeys = @($effectiveOwners | ForEach-Object {
@@ -1587,6 +1589,9 @@ if ($ProductionLane -ceq 'baseline') {
             'config/codex-subagent-coordination-policy.json',
             'docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md',
             'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md',
+            'config/apk-regression-gate-state.json',
+            'docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
+            'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
             'scripts/check-codex-subagent-coordination-policy.ps1'
           ) | ForEach-Object { $_.ToLowerInvariant() }
           $shopRepairExistingSubjects = @(& git -C $root log --format=%s `
@@ -1596,8 +1601,10 @@ if ($ProductionLane -ceq 'baseline') {
             (
               $existingCoordinationCommits.Count -eq 1 -and
               $shopRepairExistingSubjects.Count -eq 1 -and
-              [string]$shopRepairExistingSubjects[0] -ceq
-                'repair(shop-v2-r61-5-buy-regression-fix-20260828): restore complete c24f Buy regression'
+              [string]$shopRepairExistingSubjects[0] -cin @(
+                'repair(shop-v2-r61-5-buy-regression-fix-20260828): restore complete c24f Buy regression',
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): authorize one Redmi review build'
+              )
             )
           )
           $shopRepairAllowedStagedOwnerKeys = if (

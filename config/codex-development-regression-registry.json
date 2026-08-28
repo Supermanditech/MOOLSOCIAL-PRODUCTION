@@ -43513,6 +43513,36 @@
       "prevention": "For each non-hidden testDone event, count skipped true first; otherwise count result success as pass and every other result as failure, then require the final done.success boolean and native exit zero.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle1-final.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle2-final.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3833-WORKSPACE-BUILD-CACHE-INVENTORY-HID-GIB-COLUMN",
+      "status": "registered-path-and-size-list-output-required",
+      "appliesTo": ["primary", "coordination", "tooling", "environment"],
+      "mistake": "The read-only 55-build-directory inventory reported 21.28 GiB total but Format-Table hid the per-directory GiB column because long worktree paths consumed the output width.",
+      "rootCause": "A wide path and size projection used tabular formatting instead of one bounded object per candidate.",
+      "prevention": "Project only the largest candidates and emit each BuildPath, GiB and registry-reference count with Format-List before selecting any literal cleanup target.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3834-VERIFIED-SIX-APP-CACHE-DELETION-TOOL-POLICY-BLOCKED",
+      "status": "registered_founder_literal_cleanup_required",
+      "appliesTo": ["primary", "coordination", "tooling", "environment"],
+      "mistake": "The attempt to delete six verified literal build/app caches was blocked by execution policy before removing any file, despite zero registry references, zero scoped processes and no reparse points.",
+      "rootCause": "Recursive deletion remained disallowed through the agent shell when orchestrated across multiple targets; technical authorization did not make the execution form admissible.",
+      "prevention": "Provide the founder a literal PowerShell cleanup block for only the six preflighted paths, retain before/after free-space evidence, and do not retry the blocked agent deletion form.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3835-CACHE-BLOCK-REGISTRY-APPEND-USED-NORMALIZED-STATUS-SPELLING",
+      "status": "registered_exact-tail-readback-required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The first REG3834 append expected an underscore-normalized status token for REG3833, while the registry stores the exact hyphenated token, so apply_patch rejected the hunk without changing the file.",
+      "rootCause": "The preceding registry tail was reconstructed from memory instead of read back literally before anchoring the append.",
+      "prevention": "Read the exact final registry object after every failed append and anchor the next patch to its literal bytes; never normalize an existing status string.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
     }
   ]
 }
