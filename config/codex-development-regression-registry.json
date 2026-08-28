@@ -43283,6 +43283,176 @@
       "prevention": "Global profile context titles must allow two proportional lines while preserving the CTA and detail, with a compact Work panel test and OPPO visual readback rejecting title truncation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3802-SOURCE-THREAD-READ-EXCEEDED-LIVE-TURN-LIMIT",
+      "status": "registered_live_tool_parameter_contract_required",
+      "appliesTo": ["primary", "coordination", "tooling", "continuation"],
+      "mistake": "A delegated-checkpoint read requested 24 turns even though the live thread reader accepts at most 10, so the read was rejected before returning any checkpoint content.",
+      "rootCause": "The continuation request used a remembered broad history size instead of the live tool's enforced parameter range.",
+      "prevention": "Every continuation read must use the callable tool's current bounded parameter contract, request at most 10 turns, and page only when the returned cursor proves older history is required.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3803-GROUPED-TICKET-IDENTITY-SEARCH-RETURNED-NO-PROJECTION",
+      "status": "registered_separate_bounded_ticket_identity_search_required",
+      "appliesTo": ["primary", "coordination", "tooling", "ticket_selection"],
+      "mistake": "A grouped exact-ticket search across config and quality roots completed without a usable projection, so it established no ticket identity or owner evidence.",
+      "rootCause": "Two independent searches, exit classifications and a structured projection were combined across a large quality root instead of preserving one bounded result at a time.",
+      "prevention": "Ticket identity recovery must search config and quality roots in separate calls, normalize exit 1 independently and accept only explicit bounded counts plus exact returned matches.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3804-COORDINATION-BINDING-PATCH-USED-PENDING-HASH-PLACEHOLDER",
+      "status": "registered_exact_registry_digest_before_binding_patch_required",
+      "appliesTo": ["primary", "coordination", "governance", "regression"],
+      "mistake": "The first minimal coordination-binding patch inserted a pending hash placeholder instead of the exact current registry SHA-256, temporarily leaving the policy unparsable by its machine gate.",
+      "rootCause": "The binding edit was issued before recomputing the registry digest after the immediately preceding incident registrations.",
+      "prevention": "After every registry append, parse the registry, emit its exact count and SHA-256, then copy those scalars directly into one bounded binding patch with no placeholder state.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3805-SOURCE-THREAD-READ-EXCEEDED-LIVE-OUTPUT-LIMIT",
+      "status": "registered_live_thread_output_bound_required",
+      "appliesTo": ["primary", "coordination", "tooling", "continuation"],
+      "mistake": "The corrected 10-turn source-thread read still requested 30000 characters per item even though the live reader accepts at most 20000, so no history was returned.",
+      "rootCause": "Only the previously rejected turn-limit field was corrected; the second live bounded parameter was not validated before retry.",
+      "prevention": "Before every thread-history call, validate both turnLimit at no more than 10 and maxOutputCharsPerItem at no more than 20000, then reuse those exact bounds on every cursor page.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3806-CODEX-UI-HISTORY-GATE-HID-PARENT-REJECTION-CAUSE",
+      "status": "registered_parent_exit_and_shape_projection_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The first codex_ui coordination replay rejected the established ticket history as not beginning with one non-merge commit without exposing whether native exit or parsed parent shape caused the rejection.",
+      "rootCause": "The new compatibility assertion combined native process status and parsed parent cardinality after additional PowerShell evaluation, making the failing subcondition opaque.",
+      "prevention": "Capture the git parent command exit immediately, normalize its one returned row separately, assert the exact two-token non-merge shape and retain a focused negative merge fixture in the checker path.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3807-CODEX-UI-PARENT-COMPOUND-ASSERTION-REJECTED-VALID-HISTORY",
+      "status": "registered_independent_parent_exit_row_and_token_assertions_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The codex_ui gate repeated its non-merge rejection after immediate exit capture even though an independent projection proved exit 0, one parent row and two exact commit tokens.",
+      "rootCause": "The parent command, row normalization and token cardinality remained coupled inside one compound compatibility block, so the gate still produced a false rejection for valid linear history.",
+      "prevention": "Validate native exit, row count and token count as three independent assertions, then assign the parent only after all three pass; keep the exact valid current-history projection as the positive fixture.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3808-CODEX-UI-PARENT-SPLIT-CARDINALITY-FALSE-REJECTION",
+      "status": "registered_exact_parent_row_pattern_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The separated parent check proved native exit and one row but still rejected the split token count although the same literal history projected one child and one parent.",
+      "rootCause": "PowerShell collection cardinality inside the checker remained an unreliable oracle for the native one-line commit-parent contract.",
+      "prevention": "Validate the one parent row against the exact child-space-parent SHA pattern, then extract the parent from that already-qualified row without using array count as the history oracle.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3809-CODEX-UI-PARENT-ROW-REGEX-FALSE-REJECTION",
+      "status": "registered_native_parent_and_merge_probe_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The exact parent-row regex also rejected the established linear first ticket commit despite independent Git evidence of its single parent.",
+      "rootCause": "Formatted native parent-row text remained an unnecessary parsing boundary for a fact Git can expose directly.",
+      "prevention": "Resolve the first parent with git rev-parse commit-caret, require one SHA, and independently require the commit to be absent from a min-parents-two probe; do not parse formatted parent rows.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3810-CODEX-UI-MERGE-PROBE-SCANNED-ANCESTOR-HISTORY",
+      "status": "registered_exact_commit_parent_projection_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The replacement merge probe used rev-list on the first ticket commit and found an older merge ancestor, falsely classifying the first ticket commit itself as a merge.",
+      "rootCause": "The probe traversed reachable history instead of projecting only the selected commit's direct parent list.",
+      "prevention": "Use git show format-percent-P on the exact first ticket commit, require one parent SHA and compare it with rev-parse commit-caret; never use an ancestor-walking query for commit-local merge classification.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3811-CODEX-UI-DIRECT-PARENT-REPRESENTATION-FALSE-REJECTION",
+      "status": "registered_ticket_range_merge_inventory_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The direct percent-P versus rev-parse parent comparison also rejected the same valid linear ticket history, leaving formatted parent representation as a false-failure source.",
+      "rootCause": "Two native parent representations were compared textually even though the real invariant is zero merge commits inside the exact ticket range.",
+      "prevention": "Resolve the base with rev-parse commit-caret, then query merges only in base-dot-dot-HEAD and require zero; this scopes the oracle to the ticket and removes parent-format comparison.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3812-CODEX-UI-TICKET-RANGE-MERGE-INVENTORY-UNEXPECTED",
+      "status": "registered_exact_ticket_merge_identity_projection_required",
+      "appliesTo": ["primary", "coordination", "ui_ux", "git", "testing"],
+      "mistake": "The range-scoped merge check rejected the existing Chat ticket although its visible commit sequence appeared linear, so the compatibility gate still lacked an exact merge identity projection.",
+      "rootCause": "The checker reported only aggregate presence and did not prove which exact commit and parent count produced the result before blocking the established ticket.",
+      "prevention": "After registration, project only merge commit IDs and parent counts in the exact ticket range; preserve existing history and admit it only through a literal compatibility rule if the founder-approved sequence requires one retained merge.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3813-CONVERSATION-INFO-GUESSED-MOOLCOLORS-OUTLINE-TOKEN",
+      "status": "registered_declared_design_token_inventory_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "design", "analysis"],
+      "mistake": "The first focused Conversation Info analysis failed because the new identity card referenced a nonexistent MoolColors.outline token.",
+      "rootCause": "A conventional design-token name was inferred instead of copied from the exact current MoolColors declaration.",
+      "prevention": "Before adding a shared design token reference, inspect the declaring design owner and use only an exact existing member; focused analysis must pass before widget execution.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_design_system.dart", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3814-CONVERSATION-INFO-SOURCE-FIX-PRECEDED-GATE-REFRESH",
+      "status": "registered_immediate_post_registry_gate_replay_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "coordination", "regression"],
+      "mistake": "The MoolColors token correction was applied after REG3813 moved the registry generation but before replaying the regression and incremental UI implementation gates.",
+      "rootCause": "The correction followed the exact design-token inspection directly and skipped the mandatory generation refresh boundary created by incident registration.",
+      "prevention": "After every registry append and binding update, the next mutation must be preceded by the implementation regression gate and the existing codex_ui incremental gate; no source correction may intervene.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3815-CHAT-PAUSED-ROW-INHERITED-INFINITE-WIDTH-BUTTON",
+      "status": "registered_finite_row_button_constraints_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "testing"],
+      "mistake": "The first Conversation Info widget cycle failed when the paused composer placed a themed OutlinedButton inside a Row and inherited the app-wide infinite-width minimum.",
+      "rootCause": "The global full-width button theme was reused in a horizontal action slot without a finite local width and minimum-size override.",
+      "prevention": "Every button inside a Row must own finite width and a local finite minimum size of at least 44 logical pixels; compact tests must render the paused state before qualification.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3816-CONVERSATION-INFO-LAZY-SAFETY-TILE-ENSUREVISIBLE-FALSE-SETUP",
+      "status": "registered_bounded_lazy_list_scroll_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "testing"],
+      "mistake": "The compact Conversation Info test called ensureVisible for the off-screen blocking tile before the lazy ListView had constructed it, producing a no-element failure.",
+      "rootCause": "The test treated an unbuilt lazy child as an existing off-screen render object instead of scrolling its persistent list owner until construction.",
+      "prevention": "Compact tests must use bounded dragUntilVisible on the keyed Conversation Info list before measuring a later lazy child; ensureVisible runs only after one element exists.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3817-REPLAYED-RETIRED-C10D-STATIC-CHAT-DOCK-SHAPE",
+      "status": "registered_current_chat_shell_contract_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "The post-Conversation Info gate set invoked the historical C10D static checker, which still requires the retired MoolGlobalNavigationV2 Chat dock spelling and rejected the already-approved shared contextual Chat architecture.",
+      "rootCause": "A predecessor gate was selected by filename without auditing its active source-shape assumptions against the current global contextual Chat ticket.",
+      "prevention": "Successor Chat qualification uses the current contextual shell test, exact-return C10D widget journey and incremental lane gate; the historical static checker is not replayed without an explicit successor mode.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_chat_global_dock_exact_return_c10d_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-personal-mool-chat-global-dock-c10d.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3818-APPLY-PATCH-REJECTED-STANDARD-REVERSE-DIFF-HUNK",
+      "status": "registered_apply_patch_native_hunk_shape_required",
+      "appliesTo": ["primary", "mobile", "tooling", "windows", "cleanup"],
+      "mistake": "The first cleanup of Flutter-generated tracked metadata was rejected because a standard git reverse-diff hunk with line ranges was passed into the repository apply_patch format.",
+      "rootCause": "Git unified-diff syntax was assumed to be directly interchangeable with the custom apply_patch update format.",
+      "prevention": "For exact generated-text restoration, construct one apply_patch whole-file replacement from independently read current and HEAD content, or use formatter-owned regeneration; never pass raw git diff range headers.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/.dart_tool/package_config.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }

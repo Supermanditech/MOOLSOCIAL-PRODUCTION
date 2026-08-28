@@ -3545,3 +3545,54 @@ change. It strengthens the gates of otherwise authorized work.
   only the retained failed assertion after gates, fix once and use a new cycle.
 - REG3378 rejects using `$error` as a task variable because it collides with
   PowerShell's read-only `$Error`. Use task-specific failure-event names.
+- REG3802 rejects delegated checkpoint reads that exceed the live thread
+  reader's bounded turn limit. Use the callable parameter contract, request at
+  most 10 turns and page only when a returned cursor proves it is necessary.
+- REG3803 rejects grouped ticket-identity searches that return no usable
+  projection. Search config and quality roots independently, normalize no-match
+  exits separately and accept only explicit bounded counts and exact matches.
+- REG3804 rejects a coordination binding patched with a pending digest
+  placeholder. Recompute the exact registry count and SHA-256 after every
+  append, then copy those scalars directly into one bounded binding update.
+- REG3805 rejects thread-history reads whose per-item output request exceeds
+  the live 20000-character limit. Validate both the 10-turn and 20000-character
+  bounds before the call and reuse them unchanged on every cursor page.
+- REG3806 rejects a ticket-history assertion that hides whether native exit or
+  parent cardinality failed. Capture the git exit immediately, normalize the
+  one parent row separately and assert its exact two-token non-merge shape.
+- REG3807 rejects coupling those parent checks after a valid current-history
+  projection still fails. Assert native exit, row count and token count
+  independently, then assign the parent only after all three pass.
+- REG3808 rejects split-array cardinality as the final parent-history oracle.
+  Match the one native row against the exact child-space-parent SHA pattern,
+  then extract the parent only from that qualified row.
+- REG3809 rejects formatted parent-row regex parsing after valid Git evidence
+  still fails. Resolve the parent with `rev-parse commit^` and independently
+  require an empty `--min-parents=2` probe for the first ticket commit.
+- REG3810 rejects `rev-list --min-parents=2` for commit-local classification
+  because it scans merge ancestors. Project `%P` from the exact commit, require
+  one parent SHA and compare it with `rev-parse commit^`.
+- REG3811 rejects comparing two formatted direct-parent representations when
+  ticket history is the invariant. Resolve the base with `commit^`, then require
+  zero merges only inside the exact `base..HEAD` ticket range.
+- REG3812 rejects an aggregate ticket-range merge result without exact identity.
+  Project only merge commit IDs and parent counts, preserve existing history and
+  use a literal compatibility rule only for a founder-approved retained merge.
+- REG3813 rejects guessed design tokens such as `MoolColors.outline`. Inspect
+  the exact declaring owner, use only a current member and pass focused analysis
+  before running widget behavior.
+- REG3814 rejects any source correction after registry movement and before gate
+  refresh. Replay the implementation regression and existing codex_ui
+  incremental gates immediately after every append and binding update.
+- REG3815 rejects a themed full-width OutlinedButton placed directly inside a
+  Row. Give horizontal action buttons finite local width and a finite minimum
+  height of at least 44 pixels, then render the paused state at compact width.
+- REG3816 rejects `ensureVisible` for an unbuilt lazy Conversation Info child.
+  Use bounded `dragUntilVisible` on the keyed list, then measure the constructed
+  later tile.
+- REG3817 rejects replaying the retired C10D static dock-shape checker against
+  the approved contextual Chat shell. Use the current shell suite, exact-return
+  widget journey and incremental lane gate unless that checker gains a successor mode.
+- REG3818 rejects passing raw Git reverse-diff range hunks into `apply_patch`.
+  Restore generated text from independently read current and HEAD content using
+  the patch tool’s native whole-file update shape.
