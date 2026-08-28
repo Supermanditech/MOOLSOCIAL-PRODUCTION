@@ -43033,6 +43033,16 @@
       "prevention": "After refreshed memory, project only those allowlisted scalar facts from policy and fixture source, update the single stale expectation, then rerun the focused graph fixture before any commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/test-codex-integration-repair-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260828-3785-SHOP-LANDING-BOOTSTRAP-GUESSED-MISSING-BUY-MODELS-OWNER",
+      "status": "registered_coordination_bootstrap_owner_corrected_before_retry",
+      "appliesTo": ["primary", "coordination", "implementation", "tooling", "buy"],
+      "mistake": "The Shop landing coordination bootstrap gate rejected before implementation because the new Cursor claim guessed apps/mobile/lib/ui_v2/buy/buy_v2_models.dart, which does not exist in the exact v7.4 baseline.",
+      "rootCause": "The initial owner claim expanded from remembered Buy naming instead of accepting only paths returned by the bounded baseline filename inventory.",
+      "prevention": "Remove only the nonexistent owner, retain every existing claimed Shop/UI/test owner, verify all recorded owners resolve as repository leaves, refresh the registry count/SHA binding and replay regression memory before one coordination-bootstrap retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-20260828.md"]
     }
   ]
 }
