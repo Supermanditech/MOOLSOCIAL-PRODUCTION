@@ -43883,6 +43883,16 @@
       "prevention": "In Child 12, declare revealInForm before enterCompleteAddress, keep the route-scoped title finder, format and analyze both test files, then rerun both focused files completely.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD12-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3870-SHOP-ADDRESS-VISUAL-AUDIT-UNRELATED-HEADER-ICON-AND-COMPACT-CLIPPING",
+      "status": "registered_exact_owner_visual_fix_and_recapture_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy", "ui"],
+      "mistake": "Fresh r61.6 captures proved the generic header-icon hunk inserted a 48-pixel location icon into the unrelated order-delivery context sheet, while the Request helper and saved-address detail clipped at 320 by 700 with 140 percent text.",
+      "rootCause": "The initial source hunk was anchored to a generic Row rather than showBuyV2AddressSheet, and compact text limits were retained from the shorter legacy composition.",
+      "prevention": "In Child 13, remove only the unintended icon block from the exact order-delivery sheet, allow two helper lines, allow four saved-address detail lines, rerun focused tests, regenerate all r61.6 captures and inspect compact plus 390-pixel renders before device work.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD13-20260828.md"]
     }
   ]
 }

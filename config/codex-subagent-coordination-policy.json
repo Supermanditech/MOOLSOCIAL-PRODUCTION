@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3832,
-    "sha256": "3164EEA601EC3AACA8C3BF67296DF2D8CDBA4C687F77424BCD6D7680AD819152"
+    "entryCount": 3833,
+    "sha256": "807DA3AFEF8EC327E734AA13BAACA430DFF0D448075AA81A3A1AB688AA9E4590"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -162,7 +162,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_location_address_v1_child12_20260828",
+      "task": "/root/cursor_shop_location_address_v1_child13_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -289,7 +289,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD9-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD10-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD11-20260828.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD12-20260828.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD12-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD13-20260828.md"
       ]
     },
     {
@@ -1053,6 +1054,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD12-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_location_address_v1_child13_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_location_address_v1_child13_20260828",
+        "workId": "shop-location-address-v1-child13-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD13-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-location-address-v1-child13-20260828",
+        "branch": "work/cursor-ui/shop-location-address-v1-child13-20260828",
+        "baselineHead": "d03e3d16912f196f2b3b08b87b82157702eb2137",
+        "bootstrapCommitSubject": "coordination(shop-location-address-child13-20260828): bind compact visual repair",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD13-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
