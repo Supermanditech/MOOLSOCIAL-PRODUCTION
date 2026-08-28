@@ -44073,6 +44073,16 @@
       "prevention": "Keep the approved branch clean, push its exact evidence head, verify remote equality, record the Redmi-only closure disposition, and do not invoke OPPO-only ticket_close or start a successor ticket.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-founder-approval.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-install-result.json"]
+    },
+    {
+      "id": "REG-20260829-3889-SHOP-CHAT-AUDIT-FOREACH-DIRECT-PIPE-PARSER-ERROR",
+      "status": "registered_collected_rows_before_pipeline_required",
+      "appliesTo": ["primary", "coordination", "audit", "tooling", "buy", "chat"],
+      "mistake": "The first Shop Chat source inventory piped directly after foreach, and Windows PowerShell rejected the command with an empty-pipe parser error before emitting inventory.",
+      "rootCause": "The new audit repeated the known foreach-to-pipeline construction error instead of collecting rows first.",
+      "prevention": "Bind the Shop Chat ticket before retry, store every inventory row in an explicit list, format only after the loop, and use exact indexed symbol reads for the audit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-20260829.md"]
     }
   ]
 }
