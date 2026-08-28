@@ -43093,6 +43093,46 @@
       "prevention": "Every test file must explicitly import the library that owns new public types, and a focused compile run must pass before interpreting any widget-fitment result.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3783-NEXT-PROFILE-WORKTREE-FULL-CHECKOUT-DISK-EXHAUSTION",
+      "status": "registered_sparse_checkout_recovery_required",
+      "appliesTo": ["primary", "git_discipline", "tooling", "windows"],
+      "mistake": "The first origin-return ticket worktree attempted a full checkout of retained historical artifacts and exhausted the Windows volume at roughly 40 percent, leaving no target directory and an unoccupied branch ref.",
+      "rootCause": "The repository contains large immutable APK and device-evidence owners that are unnecessary for profile source work, while free-space qualification was not performed before a full worktree checkout.",
+      "prevention": "Before creating another large-repository worktree, qualify free bytes and use a no-checkout sparse worktree that excludes historical artifacts while including exact mandatory evidence files; preserve all retained evidence and never delete it to force checkout success.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260828-3784-FLUTTER-CLEAN-GUARD-PARENT-DIRECTORY-RESTORE-FAILURE",
+      "status": "registered_exact_tracked_support_recovery_required",
+      "appliesTo": ["primary", "mobile", "tooling", "windows"],
+      "mistake": "Cache cleanup removed the tracked .dart_tool directory and the clean-support guard then failed to restore package_config.json and package_graph.json because their parent directory no longer existed.",
+      "rootCause": "The restoration helper writes saved bytes directly but does not recreate deleted parent directories before WriteAllBytes; flutter clean deletes the complete generated directory.",
+      "prevention": "Do not run flutter clean through this guard until its parent-directory behavior is corrected; if this exact failure occurs, recreate only .dart_tool and restore the four tracked generated owners with checkout-index, then prove both closed worktrees remain clean.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/invoke-flutter-with-clean-support.ps1"]
+    },
+    {
+      "id": "REG-20260828-3785-GLOBAL-PREFERENCES-DIRECT-RESTORE-FALLS-BACK-TO-WORK",
+      "status": "registered_exact_safe_origin_return_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "When Privacy and preferences was restored without a Navigator history but carried a valid Food return location, Back ignored that origin and navigated to Work home.",
+      "rootCause": "The destination used a hard-coded Work fallback whenever context.canPop was false, even though global profile is shared by every main action and restored routes can retain an exact return query.",
+      "prevention": "Global profile destinations must prefer a validated in-app return location when history is unavailable, reject circular or external returns, and use the neutral Mool hub rather than a module-specific fallback; tests must cover direct restore and ordinary stack pop separately.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3786-SPARSE-PROFILE-WORKTREE-BROAD-TEST-BEFORE-DEPENDENCY-HYDRATION",
+      "status": "registered_same_operation_locked_hydration_required",
+      "appliesTo": ["primary", "mobile", "testing", "dependencies", "tooling"],
+      "mistake": "The first cross-module profile/navigation run used --no-pub in a fresh sparse worktree whose tracked package configuration did not contain share_plus, so seven wider tests failed during compilation before executing behavior.",
+      "rootCause": "Focused profile tests did not compile the Social share owner, and the broad suite was started without first hydrating the locked dependency graph inside the same clean-support operation.",
+      "prevention": "In every fresh or sparse worktree, run flutter pub get --enforce-lockfile and the affected broad Flutter suite in one clean-support invocation; do not interpret missing-package compilation as a product regression.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/pubspec.lock", "scripts/invoke-flutter-with-clean-support.ps1"]
     }
   ]
 }

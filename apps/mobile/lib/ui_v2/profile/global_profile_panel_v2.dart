@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_theme.dart';
@@ -8,6 +9,7 @@ import '../../core/design/mool_theme.dart';
 const _profileNavy = Color(0xFF000080);
 const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
+const _globalPreferencesRoute = '/app/account/workspaces/preferences';
 
 enum GlobalProfileSurfaceTone { light, socialDark }
 
@@ -65,6 +67,7 @@ Future<void> showGlobalProfilePanelV2(
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   GlobalProfileContextAction? contextAction,
 }) async {
+  final returnLocation = GoRouterState.of(context).uri.toString();
   final result = await showGeneralDialog<_GlobalProfilePanelResult>(
     context: context,
     barrierDismissible: true,
@@ -108,11 +111,20 @@ Future<void> showGlobalProfilePanelV2(
   );
   if (!context.mounted || result == null) return;
   if (result.route case final route?) {
-    onOpenRoute(route);
+    onOpenRoute(
+      route == _globalPreferencesRoute
+          ? globalPreferencesLocationForReturn(returnLocation)
+          : route,
+    );
   } else if (result.contextActionSelected) {
     contextAction?.onPressed();
   }
 }
+
+String globalPreferencesLocationForReturn(String returnLocation) => Uri(
+  path: _globalPreferencesRoute,
+  queryParameters: {'return': returnLocation},
+).toString();
 
 /// The one account launcher used by every top-level MoolSocial destination.
 ///
