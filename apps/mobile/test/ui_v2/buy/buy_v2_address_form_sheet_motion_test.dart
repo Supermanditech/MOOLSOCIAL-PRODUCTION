@@ -68,7 +68,17 @@ void main() {
       disableAnimations: disableAnimations,
       textScale: textScale,
     );
-    await tester.tap(find.byKey(const ValueKey('buy-address-request')));
+    final request = find.byKey(const ValueKey('buy-address-request'));
+    await tester.scrollUntilVisible(
+      request,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-address-sheet-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(request);
     await tester.pumpAndSettle();
   }
 
@@ -84,7 +94,17 @@ void main() {
       disableAnimations: disableAnimations,
       textScale: textScale,
     );
-    await tester.tap(find.byKey(const ValueKey('buy-address-add')));
+    final add = find.byKey(const ValueKey('buy-address-add'));
+    await tester.scrollUntilVisible(
+      add,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-address-sheet-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(add);
     await tester.pumpAndSettle();
   }
 
