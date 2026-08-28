@@ -43173,6 +43173,16 @@
       "prevention": "Validate only the selected Shop claim, selected continuation binding and exact bootstrap owners before the machine gate; let the authoritative coordination checker validate global claims once, and treat timeout output as zero evidence.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3799-SHOP-LANDING-V2-IMAGE-AUDIT-FOREACH-PASSED-NUMERIC-DETAIL",
+      "status": "registered_explicit_image_loop_required",
+      "appliesTo": ["primary", "coordination", "implementation", "tooling", "buy"],
+      "mistake": "The first approved-reference/current-capture image audit called Array.forEach(image), causing the array index to be passed as the image helper's detail argument and rejecting both displays before inspection.",
+      "rootCause": "The JavaScript callback signature was treated as a one-argument forwarder even though forEach always supplies element, index and array while the image helper interprets its second argument as the optional detail string.",
+      "prevention": "Forward image results with an explicit for-of loop or a one-argument arrow callback, pass no second argument, and verify both expected images render before making a visual design decision.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md"]
     }
   ]
 }

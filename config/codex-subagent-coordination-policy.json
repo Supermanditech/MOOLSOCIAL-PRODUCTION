@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3761,
-    "sha256": "CAB7058EC39C5A03D53C9D38CF9934A219EF9FA4FD204939B076268BE29427AF"
+    "entryCount": 3762,
+    "sha256": "9336EA8135975516939A1772CB20ABA3DEA60F2DD3E17E2AF1D548CBDEEA375C"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_landing_v2_20260828",
+      "task": "/root/cursor_shop_landing_v2_child1_tooling_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
@@ -162,7 +162,8 @@
         "docs/quality/UAW-CURSOR-SHOP-CHAT-UI-20260824.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX1-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md"
       ]
     },
     {
@@ -449,6 +450,27 @@
           "config/codex-subagent-coordination-policy.json",
           "config/cross-agent-incremental-ticket-gate.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_landing_v2_child1_tooling_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_landing_v2_child1_tooling_20260828",
+        "workId": "shop-landing-v2-child1-tooling-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-SHOP-LANDING-V2-CHILD1-TOOLING-20260828",
+        "branch": "work/cursor-ui/shop-landing-v2-child1-tooling-20260828",
+        "baselineHead": "5c92134bfb407357ce53cb294c660fdac709c05a",
+        "bootstrapCommitSubject": "coordination(shop-landing-v2-child1-tooling-20260828): bind image-audit recovery",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
