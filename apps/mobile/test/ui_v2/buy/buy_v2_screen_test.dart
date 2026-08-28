@@ -3597,12 +3597,18 @@ void main() {
     await tester.tap(wholesale);
     await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.wholesale);
-    expect(tester.widget<InkWell>(wholesale).onTap, isNull);
+    expect(tester.widget<InkWell>(wholesale).onTap, isNotNull);
+    await tester.tap(wholesale);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.wholesale);
 
     await tester.tap(orders);
     await tester.pumpAndSettle();
     expect(session.destination, BuyV2Destination.orders);
-    expect(tester.widget<InkWell>(orders).onTap, isNull);
+    expect(tester.widget<InkWell>(orders).onTap, isNotNull);
+    await tester.tap(orders);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.orders);
 
     await tester.tap(offers);
     await tester.pumpAndSettle();
@@ -3610,7 +3616,13 @@ void main() {
       find.byKey(const ValueKey('buy-offers-publisher-summary')),
       findsOneWidget,
     );
-    expect(tester.widget<InkWell>(offers).onTap, isNull);
+    expect(tester.widget<InkWell>(offers).onTap, isNotNull);
+    await tester.tap(offers);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

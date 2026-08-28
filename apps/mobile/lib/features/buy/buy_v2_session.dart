@@ -1935,6 +1935,21 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool updateAddress(BuyV2Address address) {
+    final index = _addresses.indexWhere(
+      (candidate) => candidate.id == address.id,
+    );
+    if (index < 0) {
+      notice = 'This saved address is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    _addresses[index] = address;
+    notice = '${address.label} address updated';
+    notifyListeners();
+    return true;
+  }
+
   bool choosePayment(String value) {
     if (!paymentMethods.contains(value)) {
       notice = 'This payment method is not available.';

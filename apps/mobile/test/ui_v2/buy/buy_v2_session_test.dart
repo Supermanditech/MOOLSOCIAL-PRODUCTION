@@ -1003,6 +1003,65 @@ void main() {
       expect(session.selectedPayment, 'Bank transfer');
     });
 
+    test('saved address update preserves identity count and selection', () {
+      final before = session.addresses.length;
+      final home = session.addresses.firstWhere(
+        (address) => address.id == 'home',
+      );
+      session.chooseAddress('work');
+
+      expect(
+        session.updateAddress(
+          BuyV2Address(
+            id: home.id,
+            kind: home.kind,
+            label: home.label,
+            recipient: 'Asha Verma',
+            phone: home.phone,
+            line: home.line,
+            area: home.area,
+            pinCode: home.pinCode,
+            landmark: home.landmark,
+          ),
+        ),
+        isTrue,
+      );
+
+      expect(session.addresses.length, before);
+      expect(session.selectedAddressId, 'work');
+      expect(
+        session.addresses
+            .firstWhere((address) => address.id == 'home')
+            .recipient,
+        'Asha Verma',
+      );
+      expect(session.notice, 'Home address updated');
+    });
+
+    test('stale saved address update fails without mutation', () {
+      final beforeIds = session.addresses.map((address) => address.id).toList();
+
+      expect(
+        session.updateAddress(
+          const BuyV2Address(
+            id: 'missing-address',
+            kind: BuyV2AddressKind.other,
+            label: 'Other place',
+            recipient: 'Meera Sharma',
+            phone: '9876543210',
+            line: '12 Market Road',
+            area: 'Jodhpur',
+            pinCode: '342001',
+            landmark: 'No nearby landmark',
+          ),
+        ),
+        isFalse,
+      );
+
+      expect(session.addresses.map((address) => address.id), beforeIds);
+      expect(session.notice, 'This saved address is no longer available.');
+    });
+
     test('unsupported payment identifiers fail closed', () {
       session.chooseAddress('work');
       expect(session.choosePayment('Purchase order'), isTrue);

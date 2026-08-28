@@ -266,12 +266,26 @@ void main() {
     expect(selected.flagsCollection.isSelected, Tristate.isTrue);
     expect(selected.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     expect(
+      find.byKey(const ValueKey('buy-address-selected-home')),
+      findsOneWidget,
+    );
+    final edit = tester.getSemantics(
+      find.byKey(const ValueKey('buy-address-edit-semantics-home')),
+    );
+    expect(edit.label, 'Edit Home address');
+    expect(edit.flagsCollection.isButton, isTrue);
+    expect(edit.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(
       tester.getSize(find.byKey(const ValueKey('buy-address-home'))).height,
       greaterThanOrEqualTo(76),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-address-close'))).height,
       greaterThanOrEqualTo(44),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('buy-address-edit-home'))),
+      const Size(48, 48),
     );
     semantics.dispose();
   });
@@ -300,7 +314,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-address-request')));
     await tester.pumpAndSettle();
-    expect(find.text('Request their address'), findsOne);
+    expect(find.text('Request an address'), findsOne);
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
     expect(session.selectedAddressId, 'home');
   });
@@ -398,7 +412,7 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile(
-          'candidate_captures/buy-v2-r56-9-address-${capture.$4}.png',
+          'candidate_captures/buy-v2-r61-6-shop-address-${capture.$4}.png',
         ),
       );
       session.dispose();

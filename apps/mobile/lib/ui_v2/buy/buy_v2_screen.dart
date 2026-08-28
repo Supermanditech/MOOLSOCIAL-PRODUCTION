@@ -507,25 +507,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           id: BuyV2Destination.wholesale.name,
           label: 'Wholesale',
           icon: Icons.inventory_2_outlined,
-          onPressed: !_offersActive && active == BuyV2Destination.wholesale
-              ? null
-              : () => _openBuyDestination(BuyV2Destination.wholesale),
+          onPressed: () => _openBuyDestination(BuyV2Destination.wholesale),
         ),
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-orders',
           id: BuyV2Destination.orders.name,
           label: 'Orders',
           icon: Icons.receipt_long_outlined,
-          onPressed: !_offersActive && active == BuyV2Destination.orders
-              ? null
-              : () => _openBuyDestination(BuyV2Destination.orders),
+          onPressed: () => _openBuyDestination(BuyV2Destination.orders),
         ),
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-offers',
           id: 'offers',
           label: 'Offers',
           icon: Icons.local_offer_outlined,
-          onPressed: _offersActive ? null : _openOffers,
+          onPressed: _openOffers,
         ),
       ],
     );

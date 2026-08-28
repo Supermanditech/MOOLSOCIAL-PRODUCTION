@@ -5111,6 +5111,19 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: BuyV2Colors.softOrange,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_outlined,
+                      color: BuyV2Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7071,13 +7084,13 @@ Future<void> showBuyV2AddressSheet(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Delivery address',
+                          'Choose delivery address',
                           key: const ValueKey('buy-address-sheet-title'),
                           style: sheetContext.buyTitle,
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Choose a saved address, request one, or add it yourself.',
+                          'Select a saved address or add another place.',
                           style: sheetContext.buyMeta,
                         ),
                       ],
@@ -7137,6 +7150,11 @@ Future<void> showBuyV2AddressSheet(
                       address: address,
                       selected: selectedAddressId == address.id,
                       onTap: () => chooseAfterReverse(sheetContext, address.id),
+                      onEdit: () => _showAddAddressSheet(
+                        sheetContext,
+                        session,
+                        existingAddress: address,
+                      ),
                     ),
                   ),
               const SizedBox(height: 4),
@@ -7148,7 +7166,7 @@ Future<void> showBuyV2AddressSheet(
                   onPressed: () =>
                       _showAddressRequestSheet(sheetContext, session),
                   icon: const Icon(Icons.ios_share_outlined, size: 18),
-                  label: const Text('Request address'),
+                  label: const Text('Request an address'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -7159,7 +7177,7 @@ Future<void> showBuyV2AddressSheet(
                   key: const ValueKey('buy-address-add'),
                   onPressed: () => _showAddAddressSheet(sheetContext, session),
                   icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                  label: const Text('Add address'),
+                  label: const Text('Add new address'),
                 ),
               ),
             ],
@@ -7175,11 +7193,13 @@ class _BuyV2AddressChoice extends StatelessWidget {
     required this.address,
     required this.selected,
     required this.onTap,
+    required this.onEdit,
   });
 
   final BuyV2Address address;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -7195,93 +7215,155 @@ class _BuyV2AddressChoice extends StatelessWidget {
       BuyV2AddressKind.thirdParty => Icons.group_outlined,
       BuyV2AddressKind.other => Icons.location_on_outlined,
     };
-    return Semantics(
-      key: ValueKey('buy-address-semantics-${address.id}'),
-      container: true,
-      button: true,
-      selected: selected,
-      label: semanticsLabel,
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: Material(
-          color: selected ? BuyV2Colors.softBlue : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: ValueKey('buy-address-${address.id}'),
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 76),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? BuyV2Colors.navy
-                            : BuyV2Colors.softBlue,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        icon,
-                        color: selected ? Colors.white : BuyV2Colors.navy,
-                        size: 21,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: selected ? BuyV2Colors.softBlue : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+          width: selected ? 1.4 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 82),
+        child: Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                key: ValueKey('buy-address-semantics-${address.id}'),
+                container: true,
+                button: true,
+                selected: selected,
+                label: semanticsLabel,
+                onTap: onTap,
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    key: ValueKey('buy-address-${address.id}'),
+                    onTap: onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(13, 10, 8, 10),
+                      child: Row(
                         children: [
-                          Text(
-                            address.label,
-                            style: const TextStyle(
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? BuyV2Colors.navy
+                                  : BuyV2Colors.softBlue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: selected ? Colors.white : BuyV2Colors.navy,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        address.label,
+                                        style: const TextStyle(
+                                          color: BuyV2Colors.navy,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    if (selected)
+                                      Container(
+                                        key: ValueKey(
+                                          'buy-address-selected-${address.id}',
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: BuyV2Colors.green,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Selected',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${address.recipient} · ${address.phone}',
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${address.line}, ${address.shortLine} · ${address.landmark}',
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!selected) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
                               color: BuyV2Colors.navy,
-                              fontWeight: FontWeight.w900,
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${address.recipient} · ${address.phone}',
-                            style: context.buyMeta.copyWith(
-                              color: BuyV2Colors.ink,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${address.line}, ${address.shortLine} · ${address.landmark}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.buyMeta,
-                          ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      selected
-                          ? Icons.check_circle_rounded
-                          : Icons.chevron_right_rounded,
-                      color: selected ? BuyV2Colors.green : BuyV2Colors.navy,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(
+              height: 54,
+              child: VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: BuyV2Colors.line,
+              ),
+            ),
+            Semantics(
+              key: ValueKey('buy-address-edit-semantics-${address.id}'),
+              button: true,
+              label: 'Edit ${address.label} address',
+              onTap: onEdit,
+              child: ExcludeSemantics(
+                child: IconButton(
+                  key: ValueKey('buy-address-edit-${address.id}'),
+                  tooltip: 'Edit ${address.label} address',
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 19),
+                  color: BuyV2Colors.navy,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 48,
+                    height: 48,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -7311,19 +7393,27 @@ Future<void> _showAddressRequestSheet(
   );
 }
 
-Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
+Future<void> _showAddAddressSheet(
+  BuildContext context,
+  BuyV2Session session, {
+  BuyV2Address? existingAddress,
+}) {
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
 
-  bool addToExistingOwner(BuyV2Address address) {
+  bool saveToExistingOwner(BuyV2Address address) {
     if (session.destination != destination ||
         session.view != view ||
         session.selectedAddressId != selectedAddressId) {
       return false;
     }
-    session.addAddress(address);
-    return true;
+    if (existingAddress == null) {
+      session.addAddress(address);
+      return true;
+    }
+    if (existingAddress.id != address.id) return false;
+    return session.updateAddress(address);
   }
 
   return showModalBottomSheet<void>(
@@ -7341,8 +7431,10 @@ Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
     clipBehavior: Clip.antiAlias,
     sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
     routeSettings: const RouteSettings(name: 'buy-address-add-form'),
-    builder: (sheetContext) =>
-        _BuyV2AddAddressForm(onSubmit: addToExistingOwner),
+    builder: (sheetContext) => _BuyV2AddAddressForm(
+      existingAddress: existingAddress,
+      onSubmit: saveToExistingOwner,
+    ),
   );
 }
 
@@ -7385,7 +7477,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
       scopesRoute: true,
       namesRoute: true,
       explicitChildNodes: true,
-      label: 'Request their address',
+      label: 'Request an address',
       child: RepaintBoundary(
         key: const ValueKey('buy-address-request-form-repaint-boundary'),
         child: ConstrainedBox(
@@ -7400,9 +7492,9 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
             padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             children: [
               _AddressFormHeader(
-                title: 'Request their address',
+                title: 'Request an address',
                 body:
-                    'Copy the MoolSocial request link, then send it with your chosen app.',
+                    'Copy a secure request link and send it to the person receiving the order.',
                 closeKey: const ValueKey('buy-address-request-form-close'),
               ),
               const SizedBox(height: 12),
@@ -7411,8 +7503,8 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                 controller: recipientController,
                 textInputAction: TextInputAction.done,
                 decoration: const InputDecoration(
-                  labelText: 'Recipient name or phone (optional)',
-                  helperText: 'Kept on this sheet; not added to the link.',
+                  labelText: 'Recipient name (optional)',
+                  helperText: 'Helps you confirm who the request is for.',
                 ),
               ),
               const SizedBox(height: 12),
@@ -7420,23 +7512,23 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                 children: [
                   _ShareChoice(
                     key: const ValueKey('buy-address-request-whatsapp'),
-                    label: 'WhatsApp',
+                    label: 'For WhatsApp',
                     icon: Icons.call_outlined,
                     onTap: () => copyRequest('WhatsApp'),
                   ),
                   const SizedBox(width: 7),
                   _ShareChoice(
                     key: const ValueKey('buy-address-request-moolsocial'),
-                    label: 'MoolSocial',
+                    label: 'For MoolSocial',
                     icon: Icons.chat_outlined,
                     onTap: () => copyRequest('MoolSocial'),
                   ),
                   const SizedBox(width: 7),
                   _ShareChoice(
                     key: const ValueKey('buy-address-request-device-share'),
-                    label: 'Device share',
+                    label: 'Copy link',
                     icon: Icons.ios_share_outlined,
-                    onTap: () => copyRequest('Device share'),
+                    onTap: () => copyRequest('link'),
                   ),
                 ],
               ),
@@ -7448,7 +7540,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                   key: const ValueKey('buy-address-request-enter-manually'),
                   onPressed: () =>
                       _showAddAddressSheet(context, widget.session),
-                  child: const Text('Enter address yourself'),
+                  child: const Text('Add it myself'),
                 ),
               ),
             ],
@@ -7460,26 +7552,38 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
 }
 
 class _BuyV2AddAddressForm extends StatefulWidget {
-  const _BuyV2AddAddressForm({required this.onSubmit});
+  const _BuyV2AddAddressForm({required this.onSubmit, this.existingAddress});
 
   final bool Function(BuyV2Address address) onSubmit;
+  final BuyV2Address? existingAddress;
 
   @override
   State<_BuyV2AddAddressForm> createState() => _BuyV2AddAddressFormState();
 }
 
 class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
-  final recipientController = TextEditingController();
-  final phoneController = TextEditingController();
-  final lineController = TextEditingController();
-  final pinController = TextEditingController();
-  final areaController = TextEditingController();
-  final landmarkController = TextEditingController();
+  late final TextEditingController recipientController;
+  late final TextEditingController phoneController;
+  late final TextEditingController lineController;
+  late final TextEditingController pinController;
+  late final TextEditingController areaController;
+  late final TextEditingController landmarkController;
 
-  BuyV2AddressKind kind = BuyV2AddressKind.home;
-  String? locationChoice;
-  String? locationNotice;
+  late BuyV2AddressKind kind;
   String? validationMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final address = widget.existingAddress;
+    recipientController = TextEditingController(text: address?.recipient);
+    phoneController = TextEditingController(text: address?.phone);
+    lineController = TextEditingController(text: address?.line);
+    pinController = TextEditingController(text: address?.pinCode);
+    areaController = TextEditingController(text: address?.area);
+    landmarkController = TextEditingController(text: address?.landmark);
+    kind = address?.kind ?? BuyV2AddressKind.home;
+  }
 
   @override
   void dispose() {
@@ -7492,21 +7596,6 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     super.dispose();
   }
 
-  void chooseLocationIntent(String choice) {
-    FocusScope.of(context).unfocus();
-    setState(() {
-      locationChoice = choice;
-      locationNotice = switch (choice) {
-        'Current' =>
-          'Current-location lookup is not connected in this session. Enter the delivery details manually.',
-        'Map pin' =>
-          'Map-pin lookup is not connected in this session. Enter the delivery details manually.',
-        _ =>
-          'Google address lookup is not connected in this session. Enter the delivery details manually.',
-      };
-    });
-  }
-
   void submit() {
     FocusScope.of(context).unfocus();
     final recipient = recipientController.text.trim();
@@ -7515,13 +7604,18 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     final pin = pinController.text.trim();
     final area = areaController.text.trim();
     final landmark = landmarkController.text.trim();
-    if (recipient.isEmpty ||
-        phone.isEmpty ||
-        line.isEmpty ||
-        pin.length != 6 ||
-        area.isEmpty ||
-        landmark.isEmpty) {
-      setState(() => validationMessage = 'Complete every delivery detail');
+    if (recipient.isEmpty || line.isEmpty || area.isEmpty) {
+      setState(() {
+        validationMessage = 'Add the recipient, street address and locality.';
+      });
+      return;
+    }
+    if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+      setState(() => validationMessage = 'Enter a 10-digit phone number.');
+      return;
+    }
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      setState(() => validationMessage = 'Enter a valid 6-digit PIN code.');
       return;
     }
     final label = switch (kind) {
@@ -7530,9 +7624,12 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       BuyV2AddressKind.thirdParty => 'Third party',
       BuyV2AddressKind.other => 'Other place',
     };
+    final existingAddress = widget.existingAddress;
     final added = widget.onSubmit(
       BuyV2Address(
-        id: 'saved-${DateTime.now().microsecondsSinceEpoch}',
+        id:
+            existingAddress?.id ??
+            'saved-${DateTime.now().microsecondsSinceEpoch}',
         kind: kind,
         label: label,
         recipient: recipient,
@@ -7540,7 +7637,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
         line: line,
         area: area,
         pinCode: pin,
-        landmark: landmark,
+        landmark: landmark.isEmpty ? 'No nearby landmark' : landmark,
       ),
     );
     if (!added) {
@@ -7555,6 +7652,10 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
 
   @override
   Widget build(BuildContext context) {
+    final editingAddress = widget.existingAddress;
+    final title = editingAddress == null
+        ? 'Add delivery address'
+        : 'Edit ${editingAddress.label} address';
     final bottomPadding =
         18 +
         BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
@@ -7565,7 +7666,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       scopesRoute: true,
       namesRoute: true,
       explicitChildNodes: true,
-      label: 'Add address',
+      label: title,
       child: RepaintBoundary(
         key: const ValueKey('buy-address-add-form-repaint-boundary'),
         child: ConstrainedBox(
@@ -7579,12 +7680,15 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
             padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             children: [
               _AddressFormHeader(
-                title: 'Add address',
-                body:
-                    'Enter the delivery details. Availability is confirmed only by the real order flow.',
+                title: title,
+                body: editingAddress == null
+                    ? 'Save where this order should arrive.'
+                    : 'Update the delivery details for this saved place.',
                 closeKey: const ValueKey('buy-address-add-form-close'),
               ),
               const SizedBox(height: 12),
+              Text('Address type', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -7604,47 +7708,33 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-current'),
-                    label: 'Current',
-                    icon: Icons.my_location_rounded,
-                    selected: locationChoice == 'Current',
-                    onTap: () => chooseLocationIntent('Current'),
-                  ),
-                  const SizedBox(width: 6),
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-map-pin'),
-                    label: 'Map pin',
-                    icon: Icons.map_outlined,
-                    selected: locationChoice == 'Map pin',
-                    onTap: () => chooseLocationIntent('Map pin'),
-                  ),
-                  const SizedBox(width: 6),
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-google'),
-                    label: 'Google',
-                    icon: Icons.place_outlined,
-                    selected: locationChoice == 'Google',
-                    onTap: () => chooseLocationIntent('Google'),
-                  ),
-                ],
-              ),
-              if (locationNotice != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  key: const ValueKey('buy-address-location-notice'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: buyV2CardDecoration(
-                    color: BuyV2Colors.softOrange,
-                    border: BuyV2Colors.orange,
-                    radius: 14,
-                  ),
-                  child: Text(locationNotice!, style: context.buyMeta),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: buyV2CardDecoration(
+                  color: BuyV2Colors.softBlue,
+                  radius: 14,
                 ),
-              ],
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.pin_drop_outlined,
+                      color: BuyV2Colors.navy,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        'Enter the complete address below. You can review it before placing the order.',
+                        style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 12),
+              Text('Delivery contact', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               TextField(
                 key: const ValueKey('buy-address-add-recipient'),
                 controller: recipientController,
@@ -7657,9 +7747,13 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Recipient phone'),
+                decoration: const InputDecoration(
+                  labelText: '10-digit phone number',
+                ),
               ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 14),
+              Text('Address details', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               TextField(
                 key: const ValueKey('buy-address-add-line'),
                 controller: lineController,
@@ -7667,16 +7761,8 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 maxLines: 3,
                 textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
-                  labelText: 'House, street and full address',
+                  labelText: 'House, building and street',
                 ),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-pin'),
-                controller: pinController,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'PIN code'),
               ),
               const SizedBox(height: 9),
               TextField(
@@ -7689,10 +7775,22 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
               ),
               const SizedBox(height: 9),
               TextField(
+                key: const ValueKey('buy-address-add-pin'),
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: '6-digit PIN code',
+                ),
+              ),
+              const SizedBox(height: 9),
+              TextField(
                 key: const ValueKey('buy-address-add-landmark'),
                 controller: landmarkController,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(labelText: 'Landmark'),
+                decoration: const InputDecoration(
+                  labelText: 'Nearby landmark (optional)',
+                ),
               ),
               if (validationMessage != null) ...[
                 const SizedBox(height: 10),
@@ -7714,7 +7812,11 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 child: FilledButton(
                   key: const ValueKey('buy-address-add-submit'),
                   onPressed: submit,
-                  child: const Text('Save and deliver here'),
+                  child: Text(
+                    editingAddress == null
+                        ? 'Save and deliver here'
+                        : 'Save changes',
+                  ),
                 ),
               ),
             ],
@@ -11248,7 +11350,7 @@ class _AddPrescriptionChoice extends StatelessWidget {
   }
 }
 
-class _ShareChoice extends StatelessWidget {
+class _ShareChoice extends StatefulWidget {
   const _ShareChoice({
     super.key,
     required this.label,
@@ -11261,39 +11363,61 @@ class _ShareChoice extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_ShareChoice> createState() => _ShareChoiceState();
+}
+
+class _ShareChoiceState extends State<_ShareChoice> {
+  bool pressed = false;
+
+  void handleTap() {
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Semantics(
         container: true,
         button: true,
-        label: label,
-        onTap: onTap,
+        label: widget.label,
+        onTap: handleTap,
         child: ExcludeSemantics(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 66),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              alignment: Alignment.center,
-              decoration: buyV2CardDecoration(radius: 14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: BuyV2Colors.navy),
-                  const SizedBox(height: 3),
-                  Text(
-                    label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: BuyV2Colors.navy,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
+          child: AnimatedScale(
+            scale: pressed ? BuyV2Motion.pressScale : 1,
+            duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
+            child: InkWell(
+              onTap: handleTap,
+              onHighlightChanged: (value) {
+                if (mounted) setState(() => pressed = value);
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 66),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: buyV2CardDecoration(
+                  radius: 14,
+                  color: pressed ? BuyV2Colors.softBlue : Colors.white,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(widget.icon, color: BuyV2Colors.navy),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: BuyV2Colors.navy,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -11315,67 +11439,9 @@ Future<void> _copyAddressRequest(
   final navigator = Navigator.of(context);
   final messenger = ScaffoldMessenger.of(context);
   final recipientCopy = recipient.isEmpty ? '' : ' for $recipient';
+  final message = channel == 'link'
+      ? 'Request link copied$recipientCopy. Ready to share.'
+      : 'Request link copied$recipientCopy. Open $channel to share it.';
   navigator.pop();
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text('Address request link copied$recipientCopy via $channel'),
-    ),
-  );
-}
-
-class _LocationChoice extends StatelessWidget {
-  const _LocationChoice({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        container: true,
-        button: true,
-        selected: selected,
-        label: label,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              height: 54,
-              alignment: Alignment.center,
-              decoration: buyV2CardDecoration(
-                radius: 14,
-                color: selected ? BuyV2Colors.softOrange : Colors.white,
-                border: selected ? BuyV2Colors.orange : BuyV2Colors.line,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: BuyV2Colors.navy, size: 19),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: BuyV2Colors.navy,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  messenger.showSnackBar(SnackBar(content: Text(message)));
 }
