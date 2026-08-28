@@ -43983,6 +43983,36 @@
       "prevention": "Shorten only the unadmitted Child 2 continuation ID, bind Build Child 4 with prevalidated ID/work ID/branch/subject lengths, and pass the gate before creating candidate state.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD4-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3880-SHOP-R61-6-BUILD-CLAIMED-FUTURE-EVIDENCE-BEFORE-CREATION",
+      "status": "registered_existing_placeholder_owners_only_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "build", "evidence", "git_discipline"],
+      "mistake": "Build Child 4 passed continuation validation but the owner gate stopped on the new machine-state path because the build claim included state, APK and Redmi evidence before those files existed.",
+      "rootCause": "Planned build outputs were added to the active claim in advance instead of bootstrapping only real text/state placeholders and claiming binary outputs after creation.",
+      "prevention": "Bind Build Child 5 with existing state/source/prebuild placeholders in its exact bootstrap owner set, omit all future APK/device binary owners, pass the gate, then replace placeholders through authorized build preparation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "config/apk-regression-gate-state-shop-location-r61-6.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD5-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3881-SHOP-R61-6-BUILD-SPARSE-BOOTSTRAP-OMITTED-ARTIFACT-PLACEHOLDERS",
+      "status": "registered_full_worktree_placeholder_bootstrap_required",
+      "appliesTo": ["primary", "coordination", "build", "evidence", "git_discipline"],
+      "mistake": "The Build Child 5 coordination commit recorded only five changed files because Git refused to stage three artifact placeholders outside the sparse coordination worktree cone.",
+      "rootCause": "The bootstrap used ordinary git add from a sparse coordination worktree and did not stop on the pathspec warning before commit.",
+      "prevention": "Bind Build Child 6 from the preserved commit, create and track the three placeholders in its full worktree, declare only its exact seven changed bootstrap owners, and pass the gate before prebuild preparation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-manifest.txt", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD6-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3882-SHOP-R61-6-BUILD-CHILD6-COORDINATION-BASELINE-OMITTED-PRODUCT-SOURCE",
+      "status": "registered_direct_product_integration_baseline_required",
+      "appliesTo": ["primary", "coordination", "build", "git_discipline", "source_identity"],
+      "mistake": "Before creation, readback proved Build Child 6 was bound to the sparse coordination branch commit 064c6a0 rather than the product-bearing integration head, which would omit the completed Shop UI source.",
+      "rootCause": "The recovery binding followed the latest governance commit instead of the latest integration commit containing the authoritative feature history.",
+      "prevention": "Do not create Child 6; bind Build Child 7 directly to product integration head ca54d3d3 and apply the complete registry, policy, state, ticket and placeholder bootstrap delta in that full worktree.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828.md"]
     }
   ]
 }

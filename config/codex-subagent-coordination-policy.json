@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3842,
-    "sha256": "33A5F5CBA63A31F38FA1D0CFD3532579389FEA39161458E284025D39C7CFE47F"
+    "entryCount": 3845,
+    "sha256": "009E60C2E54E4CF8F46DEC50D6172B2B657C4549D3304A8BE3F6FA04E78D65F1"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/repair_shop_address_r61_6_build_c4_20260828",
+      "task": "/root/repair_shop_address_r61_6_build_c7_20260828",
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
@@ -164,23 +164,12 @@
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD2-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD3-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD4-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD5-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD6-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828.md",
         "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-manifest.txt",
         "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-identity.json",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/prebuild-validation.md",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-device-review-debug.apk",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-build-provenance.txt",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-install-result.json",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-installed-base.apk",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-shop-location.png",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-shop-location-ui.xml",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-request-address.png",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-request-address-ui.xml",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-add-address.png",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-add-address-ui.xml",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-edit-home.png",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-edit-home-ui.xml",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-back-recovery.png",
-        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-back-recovery-ui.xml"
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/prebuild-validation.md"
       ]
     },
     {
@@ -1292,6 +1281,33 @@
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD4-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_shop_address_r61_6_build_c7_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_shop_address_r61_6_build_c7_20260828",
+        "workId": "shop-address-r61-6-build-c7-20260828",
+        "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-address-r61-6-build-c7-20260828",
+        "branch": "work/integration-repair/shop-address-r61-6-build-c7-20260828",
+        "baselineHead": "ca54d3d3386f9695fe4bec601a8d1bdfee5067d3",
+        "bootstrapCommitSubject": "coordination(shop-address-r61-6-build-c7-20260828): bind product prebuild state",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "config/apk-regression-gate-state-shop-location-r61-6.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD5-20260828.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD6-20260828.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-manifest.txt",
+          "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-identity.json",
+          "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/prebuild-validation.md"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

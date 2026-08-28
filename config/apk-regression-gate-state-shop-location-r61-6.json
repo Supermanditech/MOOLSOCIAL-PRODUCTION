@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_pending",
+  "buildAuthorization": "not_consumed",
+  "candidate": {
+    "id": "UAW-SHOP-LOCATION-ADDRESS-R61.6-CURSOR-UI-REVIEW-20260828",
+    "versionName": "1.0.0-r61.6",
+    "versionCode": "2026082808",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug"
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-SHOP-LOCATION-ADDRESS-R61.6-CURSOR-UI-REVIEW-20260828"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  }
+}
