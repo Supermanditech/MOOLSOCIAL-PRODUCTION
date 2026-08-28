@@ -43803,6 +43803,16 @@
       "prevention": "Patch the registry binding, active task, owner list and exact Child 4 tail as separately anchored hunks read directly from current policy.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD5-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3862-SHOP-LOCATION-CHILD5-WORKTREE-CREATION-TIMEOUT-AMENDED",
+      "status": "registered_read_only_recovery_and_longer_timeout_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "Child 5 worktree creation returned terminal timeout even though read-only recovery proved Git registered the complete worktree at exact bootstrap e2ed0b31.",
+      "rootCause": "The thirty-second tool timeout was shorter than Windows checkout completion for this repository.",
+      "prevention": "Never retry an ambiguous worktree creation; inspect target, Git registration, branch and HEAD read-only, then use a sixty-second allowance for the next clean child creation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD6-20260828.md"]
     }
   ]
 }
