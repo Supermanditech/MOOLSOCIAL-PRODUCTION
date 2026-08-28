@@ -184,6 +184,7 @@ void main() {
       route: '/app/chat/inbox?return=/app/work/my-work',
       journey: journey,
       chat: chat,
+      size: const Size(360, 800),
     );
 
     await tapVisible(tester, const Key('chat-new'));
@@ -202,6 +203,16 @@ void main() {
     expect(find.text('Public Feed unavailable'), findsOneWidget);
     expect(find.byKey(const Key('chat-feed-retry')), findsOneWidget);
     expect(find.byKey(const Key('chat-feed-back-to-chats')), findsOneWidget);
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-feed-retry'))).dy,
+      lessThanOrEqualTo(728),
+    );
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('chat-feed-back-to-chats')))
+          .dy,
+      lessThanOrEqualTo(728),
+    );
     expect(find.byKey(const Key('chat-new')), findsNothing);
     expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
     await tapVisible(tester, const Key('chat-feed-back-to-chats'));

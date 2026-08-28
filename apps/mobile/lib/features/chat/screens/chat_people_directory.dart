@@ -487,17 +487,23 @@ class _PeopleEmpty extends StatelessWidget {
           ),
           const SizedBox(height: MoolSpacing.md),
           if (publicFeedOpened) ...[
-            FilledButton.icon(
-              key: const Key('chat-feed-retry'),
-              onPressed: onOpenFeed,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try again'),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            TextButton(
-              key: const Key('chat-feed-back-to-chats'),
-              onPressed: onBackToChats,
-              child: const Text('Back to Chats'),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: MoolSpacing.xs,
+              runSpacing: MoolSpacing.xs,
+              children: [
+                OutlinedButton(
+                  key: const Key('chat-feed-back-to-chats'),
+                  onPressed: onBackToChats,
+                  child: const Text('Back to Chats'),
+                ),
+                FilledButton.icon(
+                  key: const Key('chat-feed-retry'),
+                  onPressed: onOpenFeed,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              ],
             ),
           ] else
             FilledButton.icon(
