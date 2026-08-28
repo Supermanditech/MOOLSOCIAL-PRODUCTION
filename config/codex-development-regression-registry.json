@@ -43963,6 +43963,16 @@
       "prevention": "Restore the parent build binding field to true, bind clean Build Child 2 with the field true, pass the integration_repair implementation gate, and only then create candidate state or run preflight.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD2-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3878-SHOP-R61-6-BUILD-WORK-ID-EXCEEDED-48-CHARACTERS",
+      "status": "registered_short_literal_work_ids_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "build", "git_discipline"],
+      "mistake": "After restoring the integration requirement, Build Child 2 still failed the continuation assertion because the parent and child work IDs exceeded the validator's 48-character maximum.",
+      "rootCause": "Ticket detail was copied into workId even though workId is a short machine identifier with a strict length bound.",
+      "prevention": "Correct the two unadmitted build bindings to short work IDs, bind Build Child 3 as shop-address-r61-6-build-c3-20260828, verify branch equality and length before commit, then pass the gate before build state work.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD3-20260828.md"]
     }
   ]
 }
