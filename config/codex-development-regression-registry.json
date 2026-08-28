@@ -43283,6 +43283,66 @@
       "prevention": "Use the proven expanded loop form with explicit whitespace and statements; never compress PowerShell control-flow syntax for registry allocation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3810-SHOP-BUY-REGRESSION-FIX-POST-BOOTSTRAP-TASK-IDENTITY-MISMATCH",
+      "status": "registered_exact_continuation_task_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy"],
+      "mistake": "After the Buy regression-fix bootstrap commit, the implementation-phase coordination gate was invoked with the generic primary task /root and correctly rejected the run before any diagnostic test started.",
+      "rootCause": "The bootstrap invocation permits the canonical primary coordinator identity, but post-bootstrap continuation phases require the exact task recorded in the ticket continuation binding.",
+      "prevention": "For every post-bootstrap Shop Buy regression-fix gate, use AgentTask /root/codex_auth_shop_v2_r61_5_buy_regression_fix_20260828 with the recorded codex_auth lane, work ID and ticket ID; never reuse the bootstrap-only generic task identity.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3811-SHOP-BUY-REGRESSION-FIX-CONTINUATION-TASK-MISSING-ACTIVE-CLAIM",
+      "status": "registered_pretest_claim_binding_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy"],
+      "mistake": "The corrected exact continuation task was used for the implementation-phase coordination gate, but the policy had no active owner claim for that task, so the gate correctly stopped before testing.",
+      "rootCause": "The regression-fix bootstrap added its continuation binding and bootstrap owners but left the diagnostic execution owner claim attached to generic /root; continuation identity and active claim were not atomically bound.",
+      "prevention": "Before the diagnostic run, bind one non-overlapping active owner claim to the exact continuation task and include only the required diagnostic evidence/test owners; validate claim uniqueness and phase compatibility before retrying the gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3812-SHOP-BUY-REGRESSION-FIX-CLAIM-BOOTSTRAP-FULL-SHA-GUESSED",
+      "status": "registered_git_resolved_full_sha_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "The claim-only continuation baseline was initially written with a manually guessed expansion of short commit 14fcd6b; an immediate git rev-parse check proved the full SHA differed before any gate or commit used it.",
+      "rootCause": "A short commit identity from prior output was expanded by pattern completion instead of reading the repository scalar authority.",
+      "prevention": "Resolve every abbreviated commit with an independent git rev-parse command and copy the exact 40-character scalar result before writing any coordination baseline, manifest or gate state.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3813-REGRESSION-MEMORY-INVALID-COORDINATION-PHASE",
+      "status": "registered_general_phase_for_coordination_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The claim-only coordination checkpoint invoked regression memory with unsupported Phase coordination, and PowerShell parameter validation rejected it before the script ran.",
+      "rootCause": "The coordination gate phase vocabulary was reused for the separate regression-memory script without reading its narrower ValidateSet.",
+      "prevention": "Use Phase general for coordination-only regression-memory checks; reserve implementation, build and device for their matching execution stages and never pass coordination to this script.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3814-SHOP-DIAGNOSTIC-SECOND-CODEX-AUTH-ACTIVE-TICKET-REJECTED",
+      "status": "registered_primary_read_only_diagnosis_then_cursor_child_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy", "git_discipline"],
+      "mistake": "Adding an active codex_auth claim for the Shop regression diagnostic caused the coordination gate to reject two simultaneous open production tickets in the authentication lane.",
+      "rootCause": "The Shop review regression diagnosis was modeled as an auth-lane mutation ticket even though Codex Desktop already holds that lane and this step only needs read-only failure inventory before a Cursor-owned defect child.",
+      "prevention": "Do not activate a second codex_auth claim. Keep exact failure inventory under the primary coordination owner with no source mutation, then transfer only demonstrated UI/test owners into one Cursor child after diagnosis; preserve Codex Desktop lane independence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3815-SHOP-FEATURE-WORKTREE-GENERIC-NO-LANE-GATE-REJECTED",
+      "status": "registered_integration_repair_lane_required",
+      "appliesTo": ["primary", "coordination", "testing", "buy", "git_discipline"],
+      "mistake": "A generic primary coordination check without ProductionLane was attempted in the Shop feature worktree and correctly rejected it as not being the production checkout root and branch.",
+      "rootCause": "The no-lane checker mode is a production-checkout coordination path, not a substitute for declaring a valid feature-worktree lane.",
+      "prevention": "Run the Buy regression diagnosis in a fresh integration_repair worktree and continuation binding, whose lane allows Buy test/repair ownership without consuming the open codex_auth or cursor_ui ticket queues.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"]
     }
   ]
 }

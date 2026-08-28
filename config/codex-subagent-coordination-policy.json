@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3772,
-    "sha256": "EA06BD6938C71E4C96E2D602E97610A05A965B4F8A1B6296DC5E4AB717BD529D"
+    "entryCount": 3778,
+    "sha256": "B77C1E83A2DC2524A8E119166378A10B3B0224829C0FD9AB225B98BB4A61D977"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -38,14 +38,12 @@
         "AGENTS.md",
         "config/apk-regression-gate-state.json",
         "config/cross-agent-incremental-ticket-gate.json",
-        "config/codex-development-regression-registry.json",
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
-        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
         "scripts/check-brand-integrity.ps1",
         "scripts/check-buy-protected-baseline.ps1",
@@ -55,6 +53,15 @@
         "scripts/check-social-protected-baseline.ps1",
         "scripts/new-shop-v2-r61-5-source-manifest.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ]
+    },
+    {
+      "task": "/root/repair_shop_v2_r61_5_buy_regression_fix_20260828",
+      "role": "primary",
+      "owners": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md"
       ]
     },
     {
@@ -651,6 +658,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_shop_v2_r61_5_buy_regression_fix_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_shop_v2_r61_5_buy_regression_fix_20260828",
+        "workId": "shop-v2-r61-5-buy-regression-fix-20260828",
+        "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-buy-regression-fix-20260828",
+        "branch": "work/integration-repair/shop-v2-r61-5-buy-regression-fix-20260828",
+        "baselineHead": "14fcd6b2be25cd9ebee0ca803606069f49dd74c3",
+        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-buy-regression-fix-20260828): bind independent Buy diagnosis",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
