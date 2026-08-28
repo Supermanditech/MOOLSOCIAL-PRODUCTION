@@ -9,6 +9,7 @@ import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
+import '../profile/global_profile_panel_v2.dart';
 import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_catalogue.dart';
@@ -223,6 +224,97 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     }
   }
 
+  GlobalProfileContextAction _shopProfileContext(BuyV2Session session) {
+    void openShopOrders() {
+      setState(() {
+        _offersActive = false;
+        _shopChatActive = false;
+        _searchOpen = false;
+      });
+      session.openOrders();
+    }
+
+    void openShopCart() {
+      setState(() {
+        _offersActive = false;
+        _shopChatActive = false;
+        _searchOpen = false;
+      });
+      session.openCart(scope: BuyV2CartScope.shop);
+    }
+
+    void openShopCatalogue() {
+      setState(() {
+        _offersActive = false;
+        _shopChatActive = false;
+        _searchOpen = false;
+      });
+      session.openDestination(BuyV2Destination.shop);
+    }
+
+    final activeOrders = session.activeOrderCount;
+    if (activeOrders > 0) {
+      return GlobalProfileContextAction(
+        id: 'shop-active-orders',
+        title: activeOrders == 1
+            ? 'Your active Shop order'
+            : 'Your Shop orders',
+        detail: activeOrders == 1
+            ? 'One order is ready to track from purchase to delivery.'
+            : '$activeOrders active orders are ready to track.',
+        actionLabel: 'Open orders',
+        icon: Icons.local_shipping_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: openShopOrders,
+      );
+    }
+
+    final shopItemCount = session.countForDestination(BuyV2Destination.shop);
+    if (shopItemCount > 0) {
+      return GlobalProfileContextAction(
+        id: 'shop-cart',
+        title: 'Your Shop cart',
+        detail:
+            '$shopItemCount ${shopItemCount == 1 ? 'item' : 'items'} · '
+            '${buyV2Money(session.totalForDestination(BuyV2Destination.shop))}',
+        actionLabel: 'Open cart',
+        icon: Icons.shopping_bag_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: openShopCart,
+      );
+    }
+
+    final savedCount = session.savedCountFor(BuyV2Destination.shop);
+    return GlobalProfileContextAction(
+      id: 'shop-discovery',
+      title: savedCount > 0 ? 'Continue shopping' : 'Shop everyday needs',
+      detail: savedCount > 0
+          ? '$savedCount saved ${savedCount == 1 ? 'product is' : 'products are'} ready when you return.'
+          : 'Browse retail packs, trusted sellers and delivery promises.',
+      actionLabel: 'Browse Shop',
+      icon: Icons.storefront_outlined,
+      accentColor: BuyV2Colors.orange,
+      gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+      onPressed: openShopCatalogue,
+    );
+  }
+
+  void _openShopProfile() {
+    HapticFeedback.selectionClick();
+    setState(() => _searchOpen = false);
+    unawaited(
+      showGlobalProfilePanelV2(
+        context,
+        contextAction: _shopProfileContext(widget.session),
+        onOpenRoute: (route) {
+          context.push(route);
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _noticeTimer?.cancel();
@@ -304,9 +396,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               onLocation: () =>
                                   showBuyV2AddressSheet(context, session),
                               onAccount: () {
-                                HapticFeedback.selectionClick();
-                                setState(() => _searchOpen = false);
-                                session.openAccount();
+                                if (session.destination ==
+                                    BuyV2Destination.shop) {
+                                  _openShopProfile();
+                                } else {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _searchOpen = false);
+                                  session.openAccount();
+                                }
                               },
                               accountLabel:
                                   widget.accountIdentity?.primaryLabel ??
@@ -1177,7 +1274,16 @@ class _BuySearchBand extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            _BuyAccountButton(onPressed: onAccount, accountLabel: accountLabel),
+            if (session.destination == BuyV2Destination.shop)
+              MoolGlobalProfileShortcutV2(
+                keyName: 'buy-open-account',
+                onPressed: onAccount,
+              )
+            else
+              _BuyAccountButton(
+                onPressed: onAccount,
+                accountLabel: accountLabel,
+              ),
           ],
         ],
       ),

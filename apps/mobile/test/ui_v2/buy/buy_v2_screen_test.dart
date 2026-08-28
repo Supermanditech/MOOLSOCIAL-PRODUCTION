@@ -967,17 +967,31 @@ void main() {
 
         await tester.tap(accountAction);
         await tester.pumpAndSettle();
-        expect(session.view, BuyV2View.account, reason: destination.name);
-        expect(
-          find.byKey(const ValueKey('buy-account-hub')),
-          findsOneWidget,
-          reason: destination.name,
-        );
-        expect(
-          find.byKey(const ValueKey('buy-search-band')),
-          findsNothing,
-          reason: '${destination.name} Account is a full-page content surface',
-        );
+        if (destination == BuyV2Destination.shop) {
+          expect(session.view, BuyV2View.catalogue);
+          expect(
+            find.byKey(const Key('global-profile-panel-v2')),
+            findsOneWidget,
+          );
+          expect(
+            find.bySemanticsLabel('Open your MoolSocial profile'),
+            findsOneWidget,
+          );
+          expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
+        } else {
+          expect(session.view, BuyV2View.account, reason: destination.name);
+          expect(
+            find.byKey(const ValueKey('buy-account-hub')),
+            findsOneWidget,
+            reason: destination.name,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-search-band')),
+            findsNothing,
+            reason:
+                '${destination.name} Account is a full-page content surface',
+          );
+        }
 
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -990,7 +1004,7 @@ void main() {
     },
   );
 
-  testWidgets('top-right avatar opens full-page Account and returns to Shop', (
+  testWidgets('Shop uses the shared global profile and exact Back recovery', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
@@ -999,15 +1013,27 @@ void main() {
     await tester.pumpWidget(app(session, disableAnimations: true));
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('Open profile and account'), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-profile-avatar')), findsOneWidget);
+    final profileAction = find.byKey(const ValueKey('buy-open-account'));
+    expect(
+      find.bySemanticsLabel('Open your MoolSocial profile'),
+      findsOneWidget,
+    );
+    expect(profileAction, findsOneWidget);
+    expect(tester.getSize(profileAction), const Size(44, 44));
+    expect(find.byKey(const ValueKey('buy-profile-avatar')), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('buy-open-account')));
+    await tester.tap(profileAction);
     await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.account);
-    expect(find.byKey(const ValueKey('buy-account-hub')), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-search-band')), findsNothing);
+    expect(session.view, BuyV2View.catalogue);
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(find.text('Your MoolSocial profile'), findsOneWidget);
+    expect(
+      find.byKey(const Key('global-profile-context-shop-active-orders')),
+      findsOneWidget,
+    );
+    expect(find.text('Open orders'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
 
     await tester.binding.handlePopRoute();
@@ -1015,40 +1041,38 @@ void main() {
 
     expect(session.destination, BuyV2Destination.shop);
     expect(session.view, BuyV2View.catalogue);
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsNothing);
     expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
     expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
     semantics.dispose();
   });
 
-  testWidgets('Shop Account projects the global authenticated identity', (
+  testWidgets('Shop profile context opens the current order destination', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
-    const identity = AuthenticatedAccountIdentity(
-      displayName: 'Runtime Member',
-      emailAddress: 'member@example.com',
-      signInMethods: ['Google'],
-    );
-
-    await tester.pumpWidget(
-      app(
-        session,
-        disableAnimations: true,
-        accountIdentity: identity,
-        accountAuthenticated: true,
-      ),
-    );
+    await tester.pumpWidget(app(session, disableAnimations: true));
     await tester.pumpAndSettle();
 
-    expect(find.text('RM'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('buy-open-account')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Runtime Member'), findsOneWidget);
-    expect(find.text('member@example.com'), findsOneWidget);
-    expect(find.text('Sign out or switch account'), findsOneWidget);
-    expect(find.text('Account security and provider access'), findsOneWidget);
-    expect(find.text('Dharmendra Choudhary'), findsNothing);
+    expect(
+      find.byKey(const Key('global-profile-context-action-shop-active-orders')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('global-profile-context-action-shop-active-orders')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsNothing);
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+    expect(
+      find.byKey(const PageStorageKey<String>('buy-orders')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('inactive sponsored placement consumes no catalogue height', (

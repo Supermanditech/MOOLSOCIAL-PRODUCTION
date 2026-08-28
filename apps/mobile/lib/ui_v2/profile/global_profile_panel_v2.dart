@@ -139,26 +139,31 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
       container: true,
       button: true,
       label: 'Open your MoolSocial profile',
-      child: IconButton(
-        tooltip: 'Your MoolSocial profile',
-        onPressed: onPressed,
-        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-        style: IconButton.styleFrom(
-          foregroundColor: dark ? Colors.white : _profileNavy,
-          backgroundColor: dark
-              ? Colors.white.withValues(alpha: .10)
-              : Colors.white.withValues(alpha: .72),
-          side: BorderSide(
-            color: dark
-                ? Colors.white.withValues(alpha: .24)
-                : _profileNavy.withValues(alpha: .14),
+      child: SizedBox.square(
+        dimension: 44,
+        child: IconButton(
+          tooltip: 'Your MoolSocial profile',
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            foregroundColor: dark ? Colors.white : _profileNavy,
+            backgroundColor: dark
+                ? Colors.white.withValues(alpha: .10)
+                : Colors.white.withValues(alpha: .72),
+            side: BorderSide(
+              color: dark
+                  ? Colors.white.withValues(alpha: .24)
+                  : _profileNavy.withValues(alpha: .14),
+            ),
+            overlayColor: dark
+                ? Colors.white.withValues(alpha: .10)
+                : _profileNavy.withValues(alpha: .08),
+            shape: const CircleBorder(),
           ),
-          overlayColor: dark
-              ? Colors.white.withValues(alpha: .10)
-              : _profileNavy.withValues(alpha: .08),
-          shape: const CircleBorder(),
+          icon: const Icon(Icons.account_circle_outlined, size: 22),
         ),
-        icon: const Icon(Icons.account_circle_outlined, size: 22),
       ),
     );
   }
