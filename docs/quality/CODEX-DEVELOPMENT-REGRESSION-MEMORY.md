@@ -3629,3 +3629,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3829 rejects changing a shared Chat sheet constructor before updating all
   consumers. Inventory every call site and pass caller-owned clearance through
   every sheet launch before focused analysis.
+- REG3830 rejects combining regression-memory and incremental pre-build gates
+  in one shell. Run each authoritative gate separately with its own exit before
+  APK state validation and wrapper preflight.

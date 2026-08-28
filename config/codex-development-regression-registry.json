@@ -43563,6 +43563,16 @@
       "prevention": "Inventory every _ChatBottomSheetSafeArea constructor first, compute caller-owned clearance for each sheet launch and update all consumers in the same source wave before focused analysis.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3830-R61-37-BUILD-AND-INCREMENTAL-GATES-COMBINED-IN-ONE-SHELL",
+      "status": "registered_one_authoritative_gate_per_shell_required",
+      "appliesTo": ["primary", "mobile", "build", "coordination", "testing"],
+      "mistake": "The first r61.37 build refresh invoked the regression-memory build gate and incremental pre-build gate in one shell call, contrary to their independent evidence ownership.",
+      "rootCause": "Two already-known passing commands were compressed for latency instead of preserving one authoritative gate and exit per process.",
+      "prevention": "Run regression memory, incremental pre-build and APK state validation as three separate shell calls with their own exit metadata before the wrapper preflight.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }
