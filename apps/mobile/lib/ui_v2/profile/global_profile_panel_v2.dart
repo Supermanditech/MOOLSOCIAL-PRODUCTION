@@ -265,19 +265,10 @@ class GlobalProfileBackButtonV2 extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    key: ValueKey(keyName),
-    tooltip: 'Back',
+  Widget build(BuildContext context) => MoolNativeBackButton(
+    keyName: keyName,
     onPressed: onPressed,
-    constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-    padding: EdgeInsets.zero,
-    style: IconButton.styleFrom(
-      foregroundColor: palette.ink,
-      backgroundColor: Colors.transparent,
-      overlayColor: palette.ink.withValues(alpha: .08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    icon: const BackButtonIcon(),
+    foregroundColor: palette.ink,
   );
 }
 

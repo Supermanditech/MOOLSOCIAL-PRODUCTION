@@ -43253,6 +43253,16 @@
       "prevention": "For pushed profile destinations, assert the active URI through GoRouterState.of on a stable mounted destination key; reserve routeInformationProvider assertions for go/replace roots whose ownership is independently proven.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3799-GLOBAL-VERTICAL-SCAFFOLDS-DUPLICATED-OUTLINED-BACK-CONTROLS",
+      "status": "registered_one_platform_adaptive_native_back_control_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "design", "navigation", "accessibility", "testing"],
+      "mistake": "Food, Travel, Care, Work, Pay and provider/workspace scaffolds each rendered a separate outlined circular Back control with a hard-coded iOS chevron, diverging from the approved sleek native profile control.",
+      "rootCause": "Ten vertical scaffolds copied IconButton.outlined and Icons.arrow_back_ios_new_rounded instead of consuming one app-wide platform-adaptive navigation control.",
+      "prevention": "All shared vertical scaffolds must use one 44-point transparent MoolNativeBackButton with BackButtonIcon, restrained local highlight, stable semantics and no duplicated outlined circle or platform-specific arrow source.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/universal/mool_native_back_control_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_design_system.dart", "apps/mobile/test/ui_v2/universal/mool_native_back_control_test.dart"]
     }
   ]
 }

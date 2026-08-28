@@ -177,14 +177,9 @@ class RidePageScaffold extends StatelessWidget {
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
-                    key: const Key('ride-back'),
-                    tooltip: 'Go back',
+                  child: MoolNativeBackButton(
+                    keyName: 'ride-back',
                     onPressed: leaveContentDepth,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
                   ),
                 )
               : null,

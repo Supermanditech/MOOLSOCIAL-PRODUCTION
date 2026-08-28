@@ -236,8 +236,12 @@ void main() {
     final shared = File(
       'lib/ui_v2/profile/global_profile_panel_v2.dart',
     ).readAsStringSync();
+    final design = File(
+      'lib/core/design/mool_design_system.dart',
+    ).readAsStringSync();
     expect(shared, contains('class GlobalProfileBackButtonV2'));
-    expect(shared, contains('const BackButtonIcon()'));
+    expect(shared, contains('MoolNativeBackButton('));
+    expect(design, contains('icon: const BackButtonIcon()'));
   });
 
   testWidgets('compact preferences stay proportional without overflow', (
