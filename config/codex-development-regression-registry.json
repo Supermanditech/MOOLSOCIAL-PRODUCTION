@@ -43223,6 +43223,46 @@
       "prevention": "Read the claimed Orders view declaration, copy its exact key, assert session destination/view plus that visible owner and rerun the focused CTA test before broader suites.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3804-SHOP-DIRECT-FLUTTER-RUN-MODIFIED-TRACKED-GENERATED-SUPPORT-OWNERS",
+      "status": "registered_clean_support_wrapper_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "environment", "buy"],
+      "mistake": "After all Shop and profile tests passed, git diff check showed direct Flutter dependency resolution had modified tracked apps/mobile/.dart_tool metadata and GeneratedPluginRegistrant.java alongside the three intended owners.",
+      "rootCause": "Flutter was invoked directly in a fresh worktree instead of through the repository clean-support wrapper that restores and verifies generated support ownership.",
+      "prevention": "Replay the proven source/test/profile changes in a clean child, invoke analysis and tests only through scripts/invoke-flutter-with-clean-support.ps1, require zero generated-owner drift and stage only the exact three implementation owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/invoke-flutter-with-clean-support.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3805-WORKSPACE-CACHE-CLEANUP-DENSE-DISCOVER-DELETE-COMMAND-POLICY-BLOCKED",
+      "status": "registered_literal_founder_cleanup_completed",
+      "appliesTo": ["primary", "coordination", "tooling", "environment"],
+      "mistake": "A dense PowerShell command that discovered, validated and recursively deleted many cache directories was blocked by execution policy before removing anything.",
+      "rootCause": "Destructive target discovery and deletion were combined in one computed loop instead of using independently verified literal targets and founder-controlled deletion.",
+      "prevention": "Inventory cache sizes read-only, present exact literal targets, obtain action-time founder authorization and use one literal deletion per verified directory; never retry the blocked dense command.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3806-SHOP-CLEAN-FLUTTER-CHILD-CHECKOUT-FAILED-DISK-FULL",
+      "status": "registered_founder_cleanup_recovered_fresh_child_required",
+      "appliesTo": ["primary", "coordination", "implementation", "environment", "git_discipline", "buy"],
+      "mistake": "The first clean-Flutter successor worktree checkout stopped with No space left on device and left no registered usable worktree record.",
+      "rootCause": "Ninety-plus worktrees retained more than 36 GB of reproducible build and dependency caches while only about 5 GB remained free.",
+      "prevention": "Preserve the failed partial path, reclaim only exact generated caches, verify free space before retry and create a fresh uniquely named child from the last clean coordination commit. The founder removed four build caches, reclaiming 16.14 GiB and leaving 23.37 GiB free.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3807-CACHE-CLEANUP-DELETED-REGISTRY-REFERENCED-GRADLE-PROBLEMS-REPORT",
+      "status": "registered_registry_aware_cache_cleanup_required",
+      "appliesTo": ["primary", "coordination", "implementation", "environment", "tooling"],
+      "mistake": "The founder-authorized cache cleanup removed build directories without excluding apps/mobile/build/reports/problems/problems-report.html, an existing repository-relative evidence path required by REG1065, so regression memory rejected the fresh child.",
+      "rootCause": "The cleanup classified directories by generated location and size only; it did not first build the registry evidence-path set and preserve generated files that durable memory still references.",
+      "prevention": "Every future cache cleanup must parse all registry evidence paths first, exclude every referenced file and its required ancestor directory, and delete only unreferenced generated content. Restore the exact problems report from a preserved worktree before replaying memory.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"]
     }
   ]
 }
