@@ -36,6 +36,7 @@
       "owners": [
         ".gitattributes",
         "AGENTS.md",
+        "config/apk-regression-gate-state.json",
         "config/cross-agent-incremental-ticket-gate.json",
         "config/codex-development-regression-registry.json",
         "docs/quality/ACTIVE-CODEX-HANDOFF.md",
@@ -43,6 +44,7 @@
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
+        "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
         "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
         "scripts/check-brand-integrity.ps1",
         "scripts/check-buy-protected-baseline.ps1",
@@ -50,6 +52,7 @@
         "scripts/check-cross-agent-incremental-ticket-gate.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
         "scripts/check-social-protected-baseline.ps1",
+        "scripts/new-shop-v2-r61-5-source-manifest.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },
@@ -606,6 +609,27 @@
           "scripts/check-brand-integrity.ps1",
           "scripts/check-buy-protected-baseline.ps1",
           "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_shop_v2_r61_5_cursor_review_build_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "codex_auth",
+        "role": "primary",
+        "task": "/root/codex_auth_shop_v2_r61_5_cursor_review_build_20260828",
+        "workId": "shop-v2-r61-5-cursor-review-build-20260828",
+        "ticketId": "UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-shop-v2-r61-5-cursor-review-build-20260828",
+        "branch": "work/codex-auth/shop-v2-r61-5-cursor-review-build-20260828",
+        "baselineHead": "05d0a8c7cf1bd62bcadffb48aa66c4f0a357e6ed",
+        "bootstrapCommitSubject": "coordination(shop-v2-r61-5-cursor-review-build-20260828): bind unique Cursor review build",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/new-shop-v2-r61-5-source-manifest.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
