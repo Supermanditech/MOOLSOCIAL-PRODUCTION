@@ -44093,6 +44093,16 @@
       "prevention": "Bind clean Chat Child 2, inspect only exact methods/classes in pages below 250 lines, retain complete output, and run existing focused tests before deciding on any source edit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3891-SHOP-CHAT-FULL-BUY-CONSOLE-OUTPUT-TRUNCATED",
+      "status": "registered_machine_file_reporter_as_authoritative_evidence",
+      "appliesTo": ["primary", "coordination", "testing", "tooling", "buy", "chat"],
+      "mistake": "The complete Buy test directory passed with 468 tests and 28 intentional skips, but its compact console progress exceeded the mailbox output budget and was truncated.",
+      "rootCause": "The full 63-file suite emits repeated compact progress frames even when a JSON file reporter is also enabled.",
+      "prevention": "Treat the complete JSON file reporter as the authoritative result, verify its done event reports success and bind its SHA-256 in the audit evidence; do not rerun the already-passed suite for console completeness.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-v1-full-buy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"]
     }
   ]
 }
