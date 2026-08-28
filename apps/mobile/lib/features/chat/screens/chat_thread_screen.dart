@@ -653,6 +653,28 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
+class _ChatBottomSheetSafeArea extends StatelessWidget {
+  const _ChatBottomSheetSafeArea({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final deviceInset = MediaQuery.viewPaddingOf(context).bottom;
+    final bottomPadding = deviceInset > MoolSpacing.md
+        ? deviceInset
+        : MoolSpacing.md;
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: child,
+      ),
+    );
+  }
+}
+
 Future<void> _showUnavailableCapability(
   BuildContext context, {
   required String keyName,
@@ -662,7 +684,9 @@ Future<void> _showUnavailableCapability(
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _ChatBottomSheetSafeArea(
       child: Padding(
         key: Key(keyName),
         padding: const EdgeInsets.fromLTRB(
@@ -714,7 +738,9 @@ Future<void> _showMessageActions(
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _ChatBottomSheetSafeArea(
       child: Column(
         key: const Key('chat-message-actions'),
         mainAxisSize: MainAxisSize.min,
@@ -789,7 +815,9 @@ Future<void> _chooseForwardTarget(
   final target = await showModalBottomSheet<ChatThread>(
     context: context,
     showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _ChatBottomSheetSafeArea(
       child: Column(
         key: const Key('chat-forward-picker'),
         mainAxisSize: MainAxisSize.min,
@@ -885,7 +913,9 @@ class _Composer extends StatelessWidget {
     final choice = await showModalBottomSheet<_ChatAttachmentChoice>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => _ChatBottomSheetSafeArea(
         child: Column(
           key: const Key('chat-attach-sheet'),
           mainAxisSize: MainAxisSize.min,

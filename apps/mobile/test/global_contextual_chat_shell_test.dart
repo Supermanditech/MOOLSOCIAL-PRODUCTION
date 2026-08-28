@@ -262,6 +262,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('attachment list stays above an OPPO bottom system inset', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/work/earn',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-attach')));
+    await tester.pumpAndSettle();
+
+    final camera = find.byKey(const Key('chat-camera'));
+    expect(camera, findsOneWidget);
+    final rect = tester.getRect(camera);
+    expect(rect.height, greaterThanOrEqualTo(44));
+    expect(rect.bottom, lessThanOrEqualTo(756));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('an explicit Chat intent overrides the origin default filter', (
     tester,
   ) async {
