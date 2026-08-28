@@ -162,7 +162,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_v2_child7_clean_flutter_20260828",
+      "task": "/root/cursor_shop_location_address_v1_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
@@ -276,7 +276,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD5-ORDERS-OWNER-20260828.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD7-CLEAN-FLUTTER-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"
       ]
     },
     {
@@ -789,6 +790,26 @@
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
           "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_location_address_v1_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_location_address_v1_20260828",
+        "workId": "shop-location-address-v1-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-location-address-v1-20260828",
+        "branch": "work/cursor-ui/shop-location-address-v1-20260828",
+        "baselineHead": "9d5b31765e65f72d501945b8f32cc37a407b67f5",
+        "bootstrapCommitSubject": "coordination(shop-location-address-v1-20260828): bind complete Shop address journey",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
