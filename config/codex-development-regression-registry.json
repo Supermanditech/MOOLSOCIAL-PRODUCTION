@@ -43503,6 +43503,16 @@
       "prevention": "Add a fail-closed Shop continuation exception that accepts only this binding's exact active claim and staged changed owners while leaving every existing Social conflict assertion unchanged; self-test both paths before pre-commit retry.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/test-codex-integration-repair-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3832-FULL-BUY-JSON-COUNT-PARSER-IGNORED-SKIPPED-BOOLEAN",
+      "status": "registered_skipped_flag_counting_required",
+      "appliesTo": ["primary", "coordination", "testing", "evidence", "buy"],
+      "mistake": "The first final-cycle parser counted non-hidden testDone results by result value and reported 491 passes, zero skips, even though Flutter encodes intentional skips as result success plus skipped true.",
+      "rootCause": "The JSON protocol's independent skipped boolean was not applied before result classification.",
+      "prevention": "For each non-hidden testDone event, count skipped true first; otherwise count result success as pass and every other result as failure, then require the final done.success boolean and native exit zero.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle1-final.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle2-final.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     }
   ]
 }

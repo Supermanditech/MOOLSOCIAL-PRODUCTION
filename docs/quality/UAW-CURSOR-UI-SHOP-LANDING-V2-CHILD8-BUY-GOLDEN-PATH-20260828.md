@@ -1,6 +1,6 @@
 # UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828
 
-State: `focused_verification_passed_full_buy_cycles_pending`
+State: `full_buy_cycles_passed_repair_closure_pending`
 
 Customer outcome: the full Buy regression suite can verify the existing
 checkout/cart responsive references before the Shop V2 Redmi review build.
@@ -43,3 +43,12 @@ Verification completed:
 
 The final authority for Shop landing fitment remains the separately required
 Redmi review of the uniquely versioned CursorUiReview APK.
+
+Full Buy regression after the sealed repair commit:
+
+- cycle 1: `463` passed, `28` intentional skips, `0` failures, final JSON
+  success `true`, stderr `0` bytes; JSON SHA-256
+  `2DE0F3BECC78A96955C2D81001E936EF97EB24875A3C75B9782E965403AF16C3`;
+- cycle 2: `463` passed, `28` intentional skips, `0` failures, final JSON
+  success `true`, stderr `0` bytes; JSON SHA-256
+  `5FCDA3495DFF934B73C3DECEB9414F46E75AA8C85768AD977D655309E256D0DE`.

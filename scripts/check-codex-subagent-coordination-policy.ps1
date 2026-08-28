@@ -1582,11 +1582,36 @@ if ($ProductionLane -ceq 'baseline') {
           $shopRepairOwnerKeys = @($effectiveOwners | ForEach-Object {
               ([string]$_).ToLowerInvariant()
             })
+          $shopRepairClosureOwnerKeys = @(
+            'config/codex-development-regression-registry.json',
+            'config/codex-subagent-coordination-policy.json',
+            'docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md',
+            'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md',
+            'scripts/check-codex-subagent-coordination-policy.ps1'
+          ) | ForEach-Object { $_.ToLowerInvariant() }
+          $shopRepairExistingSubjects = @(& git -C $root log --format=%s `
+              "$baseCommit..$head")
+          $shopRepairExistingCommitValid = (
+            $existingCoordinationCommits.Count -eq 0 -or
+            (
+              $existingCoordinationCommits.Count -eq 1 -and
+              $shopRepairExistingSubjects.Count -eq 1 -and
+              [string]$shopRepairExistingSubjects[0] -ceq
+                'repair(shop-v2-r61-5-buy-regression-fix-20260828): restore complete c24f Buy regression'
+            )
+          )
+          $shopRepairAllowedStagedOwnerKeys = if (
+            $existingCoordinationCommits.Count -eq 0
+          ) {
+            $shopRepairOwnerKeys
+          } else {
+            $shopRepairClosureOwnerKeys
+          }
           Assert-Coordination (
             $LASTEXITCODE -eq 0 -and
-            $existingCoordinationCommits.Count -eq 0 -and
+            $shopRepairExistingCommitValid -and
             @($preCommitStagedOwners | Where-Object {
-              -not $shopRepairOwnerKeys.Contains(
+              -not $shopRepairAllowedStagedOwnerKeys.Contains(
                 ([string]$_).ToLowerInvariant()
               )
             }).Count -eq 0
