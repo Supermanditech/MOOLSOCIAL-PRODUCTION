@@ -219,7 +219,31 @@ function Test-SealedBuyOverlay {
     -OverlayCommit $v74Commit `
     -ContextAllowed $v74ContextAllowed
 
-  return $legacyOverlayAccepted -or $v74OverlayAccepted
+  $shopV2Commit = 'e383eb8558492c947aa1dabbbd7341ab6ce32e38'
+  $shopV2Type = @(& git -C $root cat-file -t $shopV2Commit 2>$null)
+  $shopV2TypeExit = $LASTEXITCODE
+  $shopV2ContextAllowed = $false
+  if (
+    $shopV2TypeExit -eq 0 -and
+    $shopV2Type.Count -eq 1 -and
+    [string]$shopV2Type[0] -ceq 'commit' -and
+    $headCommitExit -eq 0 -and
+    $headCommit.Count -eq 1
+  ) {
+    & git -C $root merge-base --is-ancestor $shopV2Commit `
+      ([string]$headCommit[0])
+    $shopV2ContextAllowed = $LASTEXITCODE -eq 0
+  }
+  $shopV2OverlayAccepted = Test-SealedBuyOverlayCandidate `
+    -CurrentOwners $CurrentOwners `
+    -OverlayCommit $shopV2Commit `
+    -ContextAllowed $shopV2ContextAllowed
+
+  return (
+    $legacyOverlayAccepted -or
+    $v74OverlayAccepted -or
+    $shopV2OverlayAccepted
+  )
 }
 
 $sealedOverlayAccepted = Test-SealedBuyOverlay $relativeFiles

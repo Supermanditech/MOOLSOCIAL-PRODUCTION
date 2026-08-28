@@ -498,7 +498,22 @@ function Test-SealedBuyThemeIntegration {
       -Owners @($owner) `
       -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
     $structureExact
-  return $legacyProjection -or $v74Projection
+  $shopV2Commit = 'e383eb8558492c947aa1dabbbd7341ab6ce32e38'
+  $shopV2Head = @(& git -C $root rev-parse HEAD 2>$null)
+  $shopV2HeadExit = $LASTEXITCODE
+  $shopV2ContextAllowed = $false
+  if ($shopV2HeadExit -eq 0 -and $shopV2Head.Count -eq 1) {
+    & git -C $root merge-base --is-ancestor $shopV2Commit `
+      ([string]$shopV2Head[0])
+    $shopV2ContextAllowed = $LASTEXITCODE -eq 0
+  }
+  $shopV2Projection = Test-BuyThemeIntegrationFacts `
+    $shopV2ContextAllowed `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit $shopV2Commit) `
+    $structureExact
+  return $legacyProjection -or $v74Projection -or $shopV2Projection
 }
 
 $buyThemeIntegrationSource = Get-Content -LiteralPath $buyThemeIntegrationPath -Raw
