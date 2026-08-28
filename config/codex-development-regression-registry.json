@@ -43783,6 +43783,26 @@
       "prevention": "Every remaining loop stores rows in an explicit System.Collections.Generic.List object and formats the list only in a later independent statement.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD4-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3860-SHOP-LOCATION-CHILD4-BASELINE-SHA-GUESSED",
+      "status": "registered_git_resolved_full_sha_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "buy"],
+      "mistake": "The Child 4 continuation used a guessed expansion of short commit c74df54, so the coordination gate rejected the nonexistent baseline before implementation.",
+      "rootCause": "The full baseline SHA was typed from the short prefix instead of captured from git rev-parse output.",
+      "prevention": "Resolve every baseline with git rev-parse, copy the exact forty-character output, read the binding back, and run the coordination gate before any product edit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD5-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3861-SHOP-LOCATION-CHILD5-POLICY-PATCH-ANCHOR-ORDER-MISMATCH",
+      "status": "registered_literal_continuation_tail_anchor_required",
+      "appliesTo": ["primary", "coordination", "tooling", "git_discipline"],
+      "mistake": "The first Child 5 policy patch expected the Child 4 continuation header after its body and apply_patch rejected the atomic patch without changing policy.",
+      "rootCause": "The multi-hunk patch used a reconstructed continuation anchor instead of the literal current tail order.",
+      "prevention": "Patch the registry binding, active task, owner list and exact Child 4 tail as separately anchored hunks read directly from current policy.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD5-20260828.md"]
     }
   ]
 }
