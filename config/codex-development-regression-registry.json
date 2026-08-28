@@ -43823,6 +43823,16 @@
       "prevention": "In clean Child 7, anchor updateAddress after the exact baseline addAddress body and read back the complete adjacent methods before editing the next owner.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/buy/buy_v2_session.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD7-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3864-SHOP-LOCATION-CHILD7-WORKTREE-CREATION-TIMEOUT-AMENDED",
+      "status": "registered_recovered_head_and_extended_terminal_allowance_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "Child 7 worktree creation exceeded the sixty-second terminal allowance, while read-only recovery proved a clean registered worktree at exact bootstrap d6bc74c5.",
+      "rootCause": "Windows checkout duration for the 8,817-file repository exceeded both prior terminal budgets.",
+      "prevention": "Preserve the recovered worktree without retry, bind the next child to its exact Git-resolved head, and allow one hundred twenty seconds while yielding progress in intervals under sixty seconds.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD8-20260828.md"]
     }
   ]
 }
