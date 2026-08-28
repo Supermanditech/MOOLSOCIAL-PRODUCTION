@@ -113,7 +113,7 @@ Assert-CursorUiReviewControl (
   $apkGate.Contains("'package-isolation'") -and
   $apkGate.Contains("'MOOLSOCIAL_UI_REVIEW_ONLY'") -and
   $apkGate.Contains('if (-not $isolatedDebugReview)') -and
-  $apkGate.Contains('$fullSocialRequested = if ($cursorUiReview)')
+  $apkGate.Contains('$fullSocialRequested = if ($isolatedDebugReview)')
 ) 'generic APK gate does not recognize the Cursor UI Review profile.'
 
 Assert-CursorUiReviewControl (

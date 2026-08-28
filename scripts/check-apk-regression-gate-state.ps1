@@ -119,7 +119,7 @@ $fullSocialCohortNames = @(
   'MOOLSOCIAL_FACEBOOK_REVOCATION_QUALIFIED',
   'MOOLSOCIAL_FACEBOOK_DATA_DELETION_QUALIFIED'
 )
-$fullSocialRequested = if ($cursorUiReview) {
+$fullSocialRequested = if ($isolatedDebugReview) {
   $false
 } else {
   @(
