@@ -12,6 +12,52 @@ import '../profile/global_profile_panel_v2.dart';
 const _workNavy = Color(0xFF000080);
 const _workViolet = Color(0xFF4D46A8);
 
+GlobalProfileContextAction _workProfileContext(
+  WorkSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final workspace = session.activeWorkspace;
+  if (session.reviewStage == WorkReviewStage.live && workspace != null) {
+    return GlobalProfileContextAction(
+      id: 'work-workspace-active',
+      title: workspace.name,
+      detail: '${workspace.profileLabel} · ${workspace.area}',
+      actionLabel: 'Open workspace',
+      icon: Icons.dashboard_customize_outlined,
+      accentColor: _workViolet,
+      gradientColors: const [_workNavy, _workViolet],
+      onPressed: () => onOpenRoute('/app/work/my-work'),
+    );
+  }
+
+  if (session.reviewCaseId != null &&
+      session.reviewStage != WorkReviewStage.live) {
+    return GlobalProfileContextAction(
+      id: 'work-workspace-application',
+      title: 'Workspace application',
+      detail:
+          'Review status and provide additional information when requested.',
+      actionLabel: 'View application',
+      icon: Icons.fact_check_outlined,
+      accentColor: _workViolet,
+      gradientColors: const [_workNavy, _workViolet],
+      onPressed: () => onOpenRoute('/app/work/my-work'),
+    );
+  }
+
+  return GlobalProfileContextAction(
+    id: 'work-workspace-create',
+    title: 'Create a provider workspace',
+    detail:
+        'Choose how you work and submit the required information for review.',
+    actionLabel: 'Start workspace setup',
+    icon: Icons.add_business_outlined,
+    accentColor: _workViolet,
+    gradientColors: const [_workNavy, _workViolet],
+    onPressed: () => onOpenRoute('/app/work/workspace/choose'),
+  );
+}
+
 class WorkMainV2 extends StatelessWidget {
   const WorkMainV2({required this.session, super.key});
 
@@ -19,6 +65,13 @@ class WorkMainV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void openProfileRoute(String route) {
+      if (route.startsWith('/app/work/workspace/choose')) {
+        session.startAnotherWork();
+      }
+      context.push(route);
+    }
+
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) => WorkPageScaffold(
@@ -33,24 +86,8 @@ class WorkMainV2 extends StatelessWidget {
           keyName: 'work-main-global-profile',
           onPressed: () => showGlobalProfilePanelV2(
             context,
-            activeWorkspace:
-                session.reviewStage == WorkReviewStage.live &&
-                    session.activeWorkspace != null
-                ? GlobalProfileWorkspaceContext(
-                    name: session.activeWorkspace!.name,
-                    roleLabel: session.activeWorkspace!.profileLabel,
-                    area: session.activeWorkspace!.area,
-                  )
-                : null,
-            applicationInProgress:
-                session.reviewCaseId != null &&
-                session.reviewStage != WorkReviewStage.live,
-            onOpenRoute: (route) {
-              if (route.startsWith('/app/work/workspace/choose')) {
-                session.startAnotherWork();
-              }
-              context.push(route);
-            },
+            contextAction: _workProfileContext(session, openProfileRoute),
+            onOpenRoute: openProfileRoute,
           ),
         ),
         body: ListView(

@@ -83,6 +83,63 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Food profile context resumes the basket without losing state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final eat = EatSession()..addMenuItem('veg-thali');
+    addTearDown(journey.dispose);
+    addTearDown(eat.dispose);
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+
+    await tapVisible(tester, const Key('eat-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-food-basket')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-food-table-discovery')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-food-basket'),
+    );
+    expect(find.byKey(const Key('eat-basket-screen')), findsOneWidget);
+    expect(eat.itemCount, 1);
+  });
+
+  testWidgets('active Food order takes priority over the retained basket', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final eat = EatSession(
+      gateway: ReviewEatOrderGateway(latency: Duration.zero),
+    )..addMenuItem('veg-thali');
+    expect(await eat.placeFoodOrder(), isTrue);
+    addTearDown(journey.dispose);
+    addTearDown(eat.dispose);
+    await mount(tester, route: '/app/eat/home', journey: journey, eat: eat);
+
+    await tapVisible(tester, const Key('eat-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-food-order')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-food-basket')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-food-order'),
+    );
+    expect(find.byKey(const Key('eat-tracking-screen')), findsOneWidget);
+    expect(eat.orderReceipt, isNotNull);
+  });
+
   testWidgets(
     'food order completes add, duplicate merge, payment, tracking and rating',
     (tester) async {

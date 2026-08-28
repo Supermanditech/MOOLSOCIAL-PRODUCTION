@@ -19,7 +19,9 @@ class GlobalProfileContextAction {
     required this.actionLabel,
     required this.icon,
     required this.onPressed,
-  });
+    this.accentColor = const Color(0xFFFF3355),
+    this.gradientColors = const [Color(0xFF8F001F), Color(0xFFFF0033)],
+  }) : assert(gradientColors.length >= 2);
 
   final String id;
   final String title;
@@ -27,6 +29,8 @@ class GlobalProfileContextAction {
   final String actionLabel;
   final IconData icon;
   final VoidCallback onPressed;
+  final Color accentColor;
+  final List<Color> gradientColors;
 }
 
 class GlobalProfileWorkspaceContext {
@@ -41,6 +45,18 @@ class GlobalProfileWorkspaceContext {
   final String area;
 }
 
+class _GlobalProfilePanelResult {
+  const _GlobalProfilePanelResult.route(this.route)
+    : contextActionSelected = false;
+
+  const _GlobalProfilePanelResult.contextAction()
+    : route = null,
+      contextActionSelected = true;
+
+  final String? route;
+  final bool contextActionSelected;
+}
+
 Future<void> showGlobalProfilePanelV2(
   BuildContext context, {
   required ValueChanged<String> onOpenRoute,
@@ -49,12 +65,12 @@ Future<void> showGlobalProfilePanelV2(
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   GlobalProfileContextAction? contextAction,
 }) async {
-  await showGeneralDialog<void>(
+  final result = await showGeneralDialog<_GlobalProfilePanelResult>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close global profile',
     barrierColor: Colors.black.withValues(alpha: .38),
-    transitionDuration: MoolMotion.standard,
+    transitionDuration: MoolMotion.quick,
     pageBuilder: (dialogContext, _, _) => Align(
       alignment: Alignment.centerRight,
       child: GlobalProfilePanelV2(
@@ -63,10 +79,16 @@ Future<void> showGlobalProfilePanelV2(
         surfaceTone: surfaceTone,
         contextAction: contextAction,
         onClose: () => Navigator.pop(dialogContext),
-        onOpenRoute: (route) {
-          Navigator.pop(dialogContext);
-          onOpenRoute(route);
-        },
+        onOpenRoute: (route) => Navigator.pop(
+          dialogContext,
+          _GlobalProfilePanelResult.route(route),
+        ),
+        onContextAction: contextAction == null
+            ? null
+            : () => Navigator.pop(
+                dialogContext,
+                const _GlobalProfilePanelResult.contextAction(),
+              ),
       ),
     ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -84,6 +106,12 @@ Future<void> showGlobalProfilePanelV2(
       );
     },
   );
+  if (!context.mounted || result == null) return;
+  if (result.route case final route?) {
+    onOpenRoute(route);
+  } else if (result.contextActionSelected) {
+    contextAction?.onPressed();
+  }
 }
 
 /// The one account launcher used by every top-level MoolSocial destination.
@@ -125,6 +153,9 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
                 ? Colors.white.withValues(alpha: .24)
                 : _profileNavy.withValues(alpha: .14),
           ),
+          overlayColor: dark
+              ? Colors.white.withValues(alpha: .10)
+              : _profileNavy.withValues(alpha: .08),
           shape: const CircleBorder(),
         ),
         icon: const Icon(Icons.account_circle_outlined, size: 22),
@@ -141,6 +172,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     this.applicationInProgress = false,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     this.contextAction,
+    this.onContextAction,
     super.key,
   });
 
@@ -150,6 +182,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   final bool applicationInProgress;
   final GlobalProfileSurfaceTone surfaceTone;
   final GlobalProfileContextAction? contextAction;
+  final VoidCallback? onContextAction;
 
   @override
   Widget build(BuildContext context) {
@@ -231,10 +264,12 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                                 else if (contextAction case final action?)
                                   _GlobalProfileContextCard(
                                     action: action,
-                                    onPressed: () {
-                                      onClose();
-                                      action.onPressed();
-                                    },
+                                    onPressed:
+                                        onContextAction ??
+                                        () {
+                                          onClose();
+                                          action.onPressed();
+                                        },
                                   )
                                 else
                                   _ProfileAccessCard(
@@ -267,6 +302,8 @@ class GlobalProfileSurfacePalette {
     required this.ink,
     required this.muted,
     required this.control,
+    required this.accent,
+    required this.accentSecondary,
   });
 
   final Color canvas;
@@ -275,6 +312,8 @@ class GlobalProfileSurfacePalette {
   final Color ink;
   final Color muted;
   final Color control;
+  final Color accent;
+  final Color accentSecondary;
 
   static GlobalProfileSurfacePalette forTone(GlobalProfileSurfaceTone tone) =>
       switch (tone) {
@@ -285,6 +324,8 @@ class GlobalProfileSurfacePalette {
           ink: MoolColors.ink,
           muted: MoolColors.muted,
           control: Color(0xFFF4F5FA),
+          accent: _profileNavy,
+          accentSecondary: Color(0xFF4D46A8),
         ),
         GlobalProfileSurfaceTone.socialDark =>
           const GlobalProfileSurfacePalette(
@@ -294,6 +335,8 @@ class GlobalProfileSurfacePalette {
             ink: Colors.white,
             muted: Color(0xFFB8B8B8),
             control: Color(0xFF242424),
+            accent: Color(0xFFFF3355),
+            accentSecondary: Color(0xFF8F001F),
           ),
       };
 }
@@ -346,11 +389,11 @@ class _ProfileHeader extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [_profileNavy, Color(0xFF4D46A8)],
+                    colors: [palette.accent, palette.accentSecondary],
                   ),
                   shape: BoxShape.circle,
                 ),
@@ -623,14 +666,10 @@ class _GlobalProfileContextCard extends StatelessWidget {
                   height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF0033).withValues(alpha: .14),
+                    color: action.accentColor.withValues(alpha: .14),
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(
-                    action.icon,
-                    color: const Color(0xFFFF3355),
-                    size: 20,
-                  ),
+                  child: Icon(action.icon, color: action.accentColor, size: 20),
                 ),
                 const SizedBox(width: MoolSpacing.sm),
                 Expanded(
@@ -667,10 +706,10 @@ class _GlobalProfileContextCard extends StatelessWidget {
             const SizedBox(height: MoolSpacing.sm),
             DecoratedBox(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xFF8F001F), Color(0xFFFF0033)],
+                  colors: action.gradientColors,
                 ),
                 borderRadius: BorderRadius.circular(MoolRadii.control),
               ),
@@ -1078,7 +1117,7 @@ class _ProfileDestinationTile extends StatelessWidget {
           color: palette.control,
           borderRadius: BorderRadius.circular(MoolRadii.control),
         ),
-        child: Icon(item.icon, color: _profileNavy, size: 18),
+        child: Icon(item.icon, color: palette.accent, size: 18),
       ),
       title: Text(
         item.title,
@@ -1097,11 +1136,13 @@ class _ProfileDestinationTile extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right_rounded,
-        color: _profileNavy,
+        color: palette.accent,
         size: 19,
       ),
+      splashColor: palette.accent.withValues(alpha: .08),
+      hoverColor: palette.accent.withValues(alpha: .04),
       onTap: onTap,
     );
   }

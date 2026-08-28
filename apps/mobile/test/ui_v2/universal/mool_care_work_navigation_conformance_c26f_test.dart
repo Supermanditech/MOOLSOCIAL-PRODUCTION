@@ -48,8 +48,17 @@ void main() {
     await tester.tap(find.byKey(const Key('care-global-profile')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('global-profile-close')));
+    expect(
+      find.byKey(const Key('global-profile-context-care-salon-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-care-salon-discovery'),
+      ),
+    );
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('salon-discovery-home')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('care-local-medicine')));
     await tester.pumpAndSettle();

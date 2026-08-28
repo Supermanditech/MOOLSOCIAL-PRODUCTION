@@ -73,6 +73,40 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Travel profile resumes the active ride over discovery', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final ride = RideSession(
+      gateway: ReviewRideGateway(latency: Duration.zero),
+    );
+    expect(await ride.bookRide(), isTrue);
+    addTearDown(journey.dispose);
+    addTearDown(ride.dispose);
+    await mount(
+      tester,
+      route: '/app/ride/book?type=auto',
+      journey: journey,
+      ride: ride,
+    );
+
+    await tapVisible(tester, const Key('ride-global-profile'));
+    expect(
+      find.byKey(const Key('global-profile-context-travel-active-ride')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('global-profile-context-travel-bus-discovery')),
+      findsNothing,
+    );
+    await tapVisible(
+      tester,
+      const Key('global-profile-context-action-travel-active-ride'),
+    );
+    expect(find.byKey(const Key('ride-arriving-screen')), findsOneWidget);
+  });
+
   testWidgets(
     'ride completes booking, arrival, live stop, payment, receipt and rating',
     (tester) async {
