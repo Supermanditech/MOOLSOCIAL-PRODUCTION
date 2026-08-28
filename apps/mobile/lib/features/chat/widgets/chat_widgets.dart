@@ -36,6 +36,7 @@ class ChatPageScaffold extends StatelessWidget {
     this.prominentTitle = false,
     this.titleIcon,
     this.titleAccent,
+    this.onTitleTap,
     this.backgroundColor = MoolColors.canvas,
     this.messageThreadId,
     this.trailing,
@@ -55,6 +56,7 @@ class ChatPageScaffold extends StatelessWidget {
   final bool prominentTitle;
   final IconData? titleIcon;
   final Color? titleAccent;
+  final VoidCallback? onTitleTap;
   final Color backgroundColor;
   final String? messageThreadId;
   final Widget? trailing;
@@ -94,61 +96,77 @@ class ChatPageScaffold extends StatelessWidget {
             titleSpacing: showContentBack ? 0 : MoolSpacing.md,
             title: Semantics(
               header: true,
-              child: Row(
-                children: [
-                  if (titleIcon != null) ...[
-                    Container(
-                      key: const Key('chat-context-icon'),
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: (titleAccent ?? MoolColors.navy).withValues(
-                          alpha: .10,
-                        ),
-                        borderRadius: BorderRadius.circular(MoolRadii.control),
-                      ),
-                      child: Icon(
-                        titleIcon,
-                        size: 20,
-                        color: titleAccent ?? MoolColors.navy,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: MoolColors.ink,
-                            fontSize: prominentTitle ? 25 : 19,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: prominentTitle ? -.55 : -.25,
-                          ),
-                        ),
-                        if (subtitle.trim().isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+              button: onTitleTap != null,
+              label: onTitleTap == null ? null : '$title. Conversation info',
+              child: InkWell(
+                key: onTitleTap == null
+                    ? null
+                    : const Key('chat-conversation-info'),
+                onTap: onTitleTap,
+                borderRadius: BorderRadius.circular(MoolRadii.control),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: MoolMetrics.minimumTapTarget,
+                  ),
+                  child: Row(
+                    children: [
+                      if (titleIcon != null) ...[
+                        Container(
+                          key: const Key('chat-context-icon'),
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: (titleAccent ?? MoolColors.navy).withValues(
+                              alpha: .10,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.control,
                             ),
                           ),
-                        ],
+                          child: Icon(
+                            titleIcon,
+                            size: 20,
+                            color: titleAccent ?? MoolColors.navy,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                       ],
-                    ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: MoolColors.ink,
+                                fontSize: prominentTitle ? 25 : 19,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: prominentTitle ? -.55 : -.25,
+                              ),
+                            ),
+                            if (subtitle.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoolColors.muted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             actions: [

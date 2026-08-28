@@ -453,7 +453,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('chat-conversation-info')));
+    final conversationInfo = find.byKey(const Key('chat-conversation-info'));
+    expect(tester.getSize(conversationInfo).height, greaterThanOrEqualTo(44));
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-thread-video'))).dx,
+      lessThanOrEqualTo(320),
+    );
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-thread-call'))).dx,
+      lessThanOrEqualTo(320),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(conversationInfo);
     await tester.pumpAndSettle();
 
     final blockUser = find.byKey(const Key('chat-info-block-user'));

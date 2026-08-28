@@ -202,6 +202,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           showContentBack: true,
           titleIcon: _threadIconFor(thread.type),
           titleAccent: entryContext.accent,
+          onTitleTap: () =>
+              unawaited(_openConversationInfo(thread, entryContext)),
           backgroundColor: const Color(0xFFF1F2F6),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -247,13 +249,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   ),
                 ),
                 icon: const Icon(Icons.call_outlined),
-              ),
-              IconButton(
-                key: const Key('chat-conversation-info'),
-                tooltip: 'Conversation info',
-                onPressed: () =>
-                    unawaited(_openConversationInfo(thread, entryContext)),
-                icon: const Icon(Icons.info_outline_rounded),
               ),
             ],
           ),
