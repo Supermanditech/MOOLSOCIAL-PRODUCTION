@@ -43873,6 +43873,16 @@
       "prevention": "Preserve the analyzed implementation as an intermediate commit, bind Child 11 to that exact commit, scope the title assertion to the request route, reveal each field before entering text, and rerun both focused files completely.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD11-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3869-SHOP-ADDRESS-TEST-LOCAL-FUNCTION-REFERENCED-BEFORE-DECLARATION",
+      "status": "registered_helper_declaration_order_required",
+      "appliesTo": ["primary", "coordination", "testing", "buy", "dart"],
+      "mistake": "Child 11 test analysis rejected enterCompleteAddress because it referenced the local revealInForm function before that function's declaration.",
+      "rootCause": "The harness repair assumed Dart local function declarations were callable earlier in the enclosing function body.",
+      "prevention": "In Child 12, declare revealInForm before enterCompleteAddress, keep the route-scoped title finder, format and analyze both test files, then rerun both focused files completely.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD12-20260828.md"]
     }
   ]
 }
