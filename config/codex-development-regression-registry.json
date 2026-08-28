@@ -43143,6 +43143,16 @@
       "prevention": "Classify the retained returned hierarchy before retry, assert Food using stable semantic/action identities such as the Food global profile and search surface, and report each missing fact independently without changing the installed candidate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3788-GLOBAL-PROFILE-DESTINATIONS-OUTLINED-CIRCULAR-BACK-CONTROLS",
+      "status": "registered_one_sleek_platform_adaptive_back_control_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "design", "testing"],
+      "mistake": "Personal profile, Privacy and preferences, Security, and Help each rendered a large outlined circular Back control that competed with the page title and looked unlike a restrained native navigation affordance.",
+      "rootCause": "The four destination AppBars duplicated IconButton.outlined styling and an iOS-specific chevron instead of sharing one transparent platform-adaptive profile Back owner.",
+      "prevention": "All global-profile destination AppBars must use one shared 44-point transparent Back control with BackButtonIcon platform adaptation, no border or filled circle, and source tests that reject duplicated outlined or hard-coded chevron implementations.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/lib/ui_v2/profile/global_security_v2.dart", "apps/mobile/lib/ui_v2/profile/global_help_support_v2.dart"]
     }
   ]
 }

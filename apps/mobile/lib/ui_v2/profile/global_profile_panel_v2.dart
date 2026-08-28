@@ -176,6 +176,35 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
   }
 }
 
+class GlobalProfileBackButtonV2 extends StatelessWidget {
+  const GlobalProfileBackButtonV2({
+    required this.keyName,
+    required this.palette,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String keyName;
+  final GlobalProfileSurfacePalette palette;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: ValueKey(keyName),
+    tooltip: 'Back',
+    onPressed: onPressed,
+    constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+    padding: EdgeInsets.zero,
+    style: IconButton.styleFrom(
+      foregroundColor: palette.ink,
+      backgroundColor: Colors.transparent,
+      overlayColor: palette.ink.withValues(alpha: .08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    icon: const BackButtonIcon(),
+  );
+}
+
 class GlobalProfilePanelV2 extends StatelessWidget {
   const GlobalProfilePanelV2({
     required this.onClose,

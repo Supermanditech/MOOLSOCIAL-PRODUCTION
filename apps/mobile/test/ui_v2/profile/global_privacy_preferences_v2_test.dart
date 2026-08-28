@@ -216,6 +216,30 @@ void main() {
     expect(source, contains('previousRouter.dispose()'));
   });
 
+  test('global profile destinations share one sleek native Back control', () {
+    for (final path in const [
+      'lib/ui_v2/profile/global_personal_profile_v2.dart',
+      'lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+      'lib/ui_v2/profile/global_security_v2.dart',
+      'lib/ui_v2/profile/global_help_support_v2.dart',
+    ]) {
+      final source = File(path).readAsStringSync();
+      expect(source, contains('GlobalProfileBackButtonV2('), reason: path);
+      expect(source, isNot(contains('IconButton.outlined')), reason: path);
+      expect(
+        source,
+        isNot(contains('Icons.arrow_back_ios_new_rounded')),
+        reason: path,
+      );
+    }
+
+    final shared = File(
+      'lib/ui_v2/profile/global_profile_panel_v2.dart',
+    ).readAsStringSync();
+    expect(shared, contains('class GlobalProfileBackButtonV2'));
+    expect(shared, contains('const BackButtonIcon()'));
+  });
+
   testWidgets('compact preferences stay proportional without overflow', (
     tester,
   ) async {

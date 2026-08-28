@@ -41,19 +41,13 @@ class GlobalSecurityV2 extends StatelessWidget {
             backgroundColor: palette.canvas,
             surfaceTintColor: Colors.transparent,
             toolbarHeight: 64,
-            leadingWidth: 60,
+            leadingWidth: 56,
             leading: Padding(
-              padding: const EdgeInsets.only(left: MoolSpacing.sm),
-              child: IconButton.outlined(
-                key: const Key('global-security-back'),
-                tooltip: 'Back',
+              padding: const EdgeInsets.only(left: MoolSpacing.xs),
+              child: GlobalProfileBackButtonV2(
+                keyName: 'global-security-back',
+                palette: palette,
                 onPressed: () => _leave(context),
-                style: IconButton.styleFrom(
-                  foregroundColor: palette.ink,
-                  backgroundColor: palette.card,
-                  side: BorderSide(color: palette.border),
-                ),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               ),
             ),
             titleSpacing: MoolSpacing.xs,
