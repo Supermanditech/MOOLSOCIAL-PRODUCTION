@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3813,
-    "sha256": "30B0CCDE8FA6FD027EC37FEBD2CD1BCFB4F77A759DEFC2AE81DC18B3D8A539A7"
+    "entryCount": 3815,
+    "sha256": "C1C188A4F908A0E2A0849A8DC7EBD532E6C9D5B96F9611063BF6F7CA9B943383"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -165,6 +165,7 @@
       "task": "/root/cursor_shop_location_address_v1_20260828",
       "role": "subagent",
       "owners": [
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
@@ -805,11 +806,12 @@
         "ticketId": "UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828",
         "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-location-address-v1-20260828",
         "branch": "work/cursor-ui/shop-location-address-v1-20260828",
-        "baselineHead": "20393f91e7b015c7ead26f4001c949eb0cb15d00",
-        "bootstrapCommitSubject": "coordination(shop-location-address-audit-20260828): bind exact audit recovery",
+        "baselineHead": "60a65a83d9ff519013dd225b47b06bd218402218",
+        "bootstrapCommitSubject": "coordination(shop-location-address-child1-20260828): bind existing address update owner",
         "bootstrapOwners": [
           "config/codex-development-regression-registry.json",
-          "config/codex-subagent-coordination-policy.json"
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

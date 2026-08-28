@@ -35,3 +35,9 @@ CursorUiReview build isolation.
 The founder accepts every baseline surface except this location/address and
 navigation-feedback successor. Stop after the full journey is shown on Redmi;
 do not start another Shop destination.
+
+Audit outcome: the saved-address chooser, request form and add form already
+exist and are retained. The required delta is customer-facing redesign,
+truthful request-link completion, visible Shop selected/pressed feedback and
+one thin in-memory `updateAddress` operation so Home/Work edits complete
+without adding a service, API or persistence owner.

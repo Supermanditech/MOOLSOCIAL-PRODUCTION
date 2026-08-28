@@ -43693,6 +43693,26 @@
       "prevention": "Use exact symbol references with explicit exit-zero-or-one normalization and inspect the imported owner resolved from the source before any navigation edit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3851-SHOP-ADDRESS-SESSION-OWNER-RG-NO-MATCH-NOT-NORMALIZED",
+      "status": "registered_parsed_policy_owner_inventory_required",
+      "appliesTo": ["primary", "coordination", "tooling", "implementation", "buy"],
+      "mistake": "The first active-claim search for buy_v2_session.dart returned the expected no-match exit one and again surfaced it as a failed command.",
+      "rootCause": "The ticket reused raw rg for an optional policy-membership check after REG3850.",
+      "prevention": "Use parsed JSON activeClaims for every future owner inventory, record the absence as a boolean, and never use raw rg to decide ownership.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3852-SHOP-ADDRESS-REG3851-APPEND-NORMALIZED-STATUS-SPELLING",
+      "status": "registered_literal_registry_tail_anchor_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The first REG3851 append expected an underscore-normalized REG3850 status token, while the registry stores hyphens, so apply_patch rejected the hunk without changing the file.",
+      "rootCause": "The existing tail object was reconstructed instead of read back literally.",
+      "prevention": "Anchor every subsequent registry append to the exact current tail bytes and preserve existing status spelling unchanged.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828.md"]
     }
   ]
 }
