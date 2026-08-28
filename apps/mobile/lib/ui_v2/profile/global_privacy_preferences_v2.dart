@@ -167,59 +167,75 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
+      isScrollControlled: true,
       backgroundColor: palette.card,
       showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.md,
-          MoolSpacing.xs,
-          MoolSpacing.md,
-          MoolSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Choose language',
-              style: TextStyle(
-                color: palette.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            for (final choice in const [
-              (code: 'en', label: 'English'),
-              (code: 'hi', label: 'हिन्दी'),
-            ])
-              ListTile(
-                key: Key('global-preferences-language-${choice.code}'),
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  session.languageCode == choice.code
-                      ? Icons.check_circle_rounded
-                      : Icons.circle_outlined,
-                  color: palette.accent,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return SingleChildScrollView(
+          key: const Key('global-preferences-language-sheet'),
+          padding: EdgeInsets.fromLTRB(
+            MoolSpacing.md,
+            MoolSpacing.xs,
+            MoolSpacing.md,
+            media.viewPadding.bottom + MoolSpacing.sm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Choose language',
+                style: TextStyle(
+                  color: palette.ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
                 ),
-                title: Text(
-                  choice.label,
-                  style: TextStyle(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w800,
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              for (final choice in const [
+                (code: 'en', label: 'English'),
+                (code: 'hi', label: 'हिन्दी'),
+              ])
+                Semantics(
+                  selected: session.languageCode == choice.code,
+                  button: true,
+                  child: ListTile(
+                    key: Key('global-preferences-language-${choice.code}'),
+                    contentPadding: EdgeInsets.zero,
+                    minTileHeight: 48,
+                    leading: Icon(
+                      session.languageCode == choice.code
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      color: palette.accent,
+                    ),
+                    title: Text(
+                      choice.label,
+                      style: TextStyle(
+                        color: palette.ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    onTap: () async {
+                      final saved = await session.updateLanguage(choice.code);
+                      if (saved && sheetContext.mounted) {
+                        Navigator.pop(sheetContext);
+                      }
+                    },
                   ),
                 ),
-                onTap: () async {
-                  final saved = await session.updateLanguage(choice.code);
-                  if (saved && sheetContext.mounted) {
-                    Navigator.pop(sheetContext);
-                  }
-                },
-              ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 

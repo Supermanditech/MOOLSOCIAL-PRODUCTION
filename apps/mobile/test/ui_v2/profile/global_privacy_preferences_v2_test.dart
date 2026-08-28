@@ -18,6 +18,7 @@ void main() {
     required Future<bool> Function() openPrivacy,
     Size size = const Size(390, 844),
     double textScale = 1,
+    double bottomInset = 0,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -49,9 +50,11 @@ void main() {
       MaterialApp.router(
         routerConfig: router,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+            padding: EdgeInsets.only(bottom: bottomInset),
+            viewPadding: EdgeInsets.only(bottom: bottomInset),
+          ),
           child: child!,
         ),
       ),
@@ -226,4 +229,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Language choices remain fully visible above compact phone insets',
+    (tester) async {
+      const cases = <({Size size, double scale, double bottomInset})>[
+        (size: Size(320, 568), scale: 1.4, bottomInset: 34),
+        (size: Size(360, 640), scale: 1.4, bottomInset: 48),
+        (size: Size(430, 932), scale: 1, bottomInset: 34),
+      ];
+
+      for (final testCase in cases) {
+        final journey = JourneySession(store: MemoryJourneyStore());
+        final work = WorkSession();
+        await pumpFromWork(
+          tester,
+          journey: journey,
+          work: work,
+          openNotifications: () async => true,
+          openPrivacy: () async => true,
+          size: testCase.size,
+          textScale: testCase.scale,
+          bottomInset: testCase.bottomInset,
+        );
+
+        await tester.tap(find.byKey(const Key('global-preferences-language')));
+        await tester.pumpAndSettle();
+
+        final english = find.byKey(const Key('global-preferences-language-en'));
+        final hindi = find.byKey(const Key('global-preferences-language-hi'));
+        expect(english, findsOneWidget);
+        expect(hindi, findsOneWidget);
+        expect(tester.getTopLeft(english).dy, greaterThanOrEqualTo(0));
+        expect(
+          tester.getBottomRight(hindi).dy,
+          lessThanOrEqualTo(testCase.size.height - testCase.bottomInset),
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('global-privacy-preferences-v2')),
+          findsOneWidget,
+        );
+        journey.dispose();
+        work.dispose();
+      }
+    },
+  );
 }
