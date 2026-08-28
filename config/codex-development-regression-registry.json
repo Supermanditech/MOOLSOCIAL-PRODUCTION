@@ -43933,6 +43933,16 @@
       "prevention": "Bind evidence-only Child 17 to exact committed head 73a68c81, change no product or test source, and rerun the same five files with at least twelve thousand output tokens retained.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD17-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3875-SHOP-ADDRESS-CHILD17-GATE-INVALID-TESTING-PHASE",
+      "status": "registered_validate_set_phase_literal_required",
+      "appliesTo": ["primary", "coordination", "testing", "tooling"],
+      "mistake": "The Child 17 evidence gate did not start because ProductionPhase testing is outside the script's exact ValidateSet.",
+      "rootCause": "The evidence-only rerun guessed a descriptive phase token instead of reusing the admitted implementation phase.",
+      "prevention": "Bind Child 18 to unchanged Child 17 head, use ProductionPhase implementation exactly, pass the gate, then run the same five files with complete output retention.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD18-20260828.md"]
     }
   ]
 }
