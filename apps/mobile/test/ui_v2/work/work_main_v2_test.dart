@@ -163,6 +163,12 @@ void main() {
     expect(find.byKey(const Key('global-profile-ask')), findsNothing);
     expect(find.text('Help and support'), findsNothing);
     expect(find.text('Create a provider workspace'), findsWidgets);
+    final contextTitle = find.descendant(
+      of: find.byKey(const Key('global-profile-context-work-workspace-create')),
+      matching: find.text('Create a provider workspace'),
+    );
+    expect(contextTitle, findsOneWidget);
+    expect(tester.widget<Text>(contextTitle).maxLines, 2);
     expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
     expect(
       find.byKey(const Key('global-profile-active-workspace')),

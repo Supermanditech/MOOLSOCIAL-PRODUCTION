@@ -43273,6 +43273,16 @@
       "prevention": "The global profile must not expose Help or support Chat; every main section must invoke one shared Chat screen with exact context and return continuity, and Shop must consume that owner through integration rather than clone it.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3801-GLOBAL-PROFILE-CONTEXT-TITLE-TRUNCATED-ON-OPPO",
+      "status": "registered_two_line_context_title_fit_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "android", "testing"],
+      "mistake": "The r61.18 OPPO panel showed 'Create a provider worksp…' because the global contextual card forced every title into one line inside the narrow profile panel.",
+      "rootCause": "The shared context title used maxLines 1 with ellipsis even though professional action titles such as Create a provider workspace need two lines at the approved panel width.",
+      "prevention": "Global profile context titles must allow two proportional lines while preserving the CTA and detail, with a compact Work panel test and OPPO visual readback rejecting title truncation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/work/work_main_v2_test.dart"]
     }
   ]
 }
