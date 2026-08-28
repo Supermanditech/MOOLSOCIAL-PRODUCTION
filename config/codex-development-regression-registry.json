@@ -43203,6 +43203,16 @@
       "prevention": "The shared profile launcher must compose return and contextual surface query parameters into one destination URI before handing it to any module; Social tests must prove the dark profile surface and exact Back return together.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_account_state_journey_c30j_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_account_state_journey_c30j_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3794-UI-REVIEW-SPARSE-BUILD-OMITTED-WRAPPER-BACKEND-READ-OWNER",
+      "status": "registered_complete_build_gate_read_set_required",
+      "appliesTo": ["primary", "mobile", "build", "tooling", "windows"],
+      "mistake": "The first r61.12 RuntimeUiReview wrapper attempt stopped before APK generation because the sparse UI worktree omitted backend/functions/src/index.ts, which the mandatory public-auth build-control self-test reads.",
+      "rootCause": "The sparse checkout included mobile source and the build scripts but not every read-only source owner transitively inspected by the authorized wrapper's self-tests.",
+      "prevention": "Before any sparse-worktree Android build, materialize the complete read set of the authorized wrapper and its self-tests, including backend/functions source and local mobile packages, then run the wrapper preflight before artifact generation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "backend/functions/src/index.ts", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/build-buy-device-review.ps1"]
     }
   ]
 }
