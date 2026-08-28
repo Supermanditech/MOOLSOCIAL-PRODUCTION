@@ -43153,6 +43153,16 @@
       "prevention": "Keep the successful Social gate repair isolated, do not weaken or modify Brand under this authorization, create no gate-ready tag while Brand or Buy protection is red, and require a separately authorized exact-v7.4 protected-gate bundle for Buy baseline and branch-limited brand-oracle reconciliation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-brand-integrity.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-brand-integrity.ps1", "scripts/check-social-protected-baseline.ps1", "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3797-V74-BUY-BRAND-GATE-WORKTREE-PREFLIGHT-UNQUOTED-COMMIT-SUFFIX",
+      "status": "registered_literal_commit_reuse_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "The gate-bundle worktree preflight passed an unquoted commit^{commit} expression to git cat-file under PowerShell, which parsed the suffix incorrectly and emitted a false base_commit_exists=false result.",
+      "rootCause": "The command mixed a rev-parse peel suffix with a git cat-file existence call without shell-literal quoting, despite the exact parent commit already being verified.",
+      "prevention": "Use the exact verified 40-character parent commit directly for worktree creation and future cat-file checks; when a peel expression is genuinely required, pass it as one quoted literal argument and validate the immediate native exit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md"]
     }
   ]
 }

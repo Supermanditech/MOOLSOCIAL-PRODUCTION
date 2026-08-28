@@ -149,18 +149,13 @@ function Get-SealedBuyOverlayInventory {
   return @($selected | Sort-Object -Unique)
 }
 
-function Test-SealedBuyOverlay {
-  param([Parameter(Mandatory = $true)][string[]]$CurrentOwners)
-  $branch = (& git -C $root branch --show-current).Trim()
-  if ($LASTEXITCODE -ne 0) { return $false }
-  $branchAllowed = $branch -cin @(
-    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
-    'integration/moolsocial/social-runtime-chat-v2-20260825',
-    'integration/moolsocial/social-runtime-chat-v3-20260826',
-    'integration/moolsocial/social-runtime-chat-v4-20260826'
+function Test-SealedBuyOverlayCandidate {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$CurrentOwners,
+    [Parameter(Mandatory = $true)][string]$OverlayCommit,
+    [Parameter(Mandatory = $true)][bool]$ContextAllowed
   )
-  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
-  $overlayOwners = @(Get-SealedBuyOverlayInventory $overlayCommit)
+  $overlayOwners = @(Get-SealedBuyOverlayInventory $OverlayCommit)
   $inventoryEqual = (
     (@($CurrentOwners | Sort-Object) -join '|') -ceq
       (@($overlayOwners | Sort-Object) -join '|')
@@ -177,7 +172,54 @@ function Test-SealedBuyOverlay {
   } else {
     $ownerBytesEqual = $false
   }
-  return Test-BuyOverlayFacts $branchAllowed $inventoryEqual $ownerBytesEqual
+  return Test-BuyOverlayFacts `
+    $ContextAllowed $inventoryEqual $ownerBytesEqual
+}
+
+function Test-SealedBuyOverlay {
+  param([Parameter(Mandatory = $true)][string[]]$CurrentOwners)
+  $branch = (& git -C $root branch --show-current).Trim()
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $legacyBranchAllowed = $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826'
+  )
+  $legacyOverlayAccepted = Test-SealedBuyOverlayCandidate `
+    -CurrentOwners $CurrentOwners `
+    -OverlayCommit 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4' `
+    -ContextAllowed $legacyBranchAllowed
+
+  $v74Tag = 'moolsocial-reconciled-debug-baseline-v7.4-20260828'
+  $v74Commit = '369bb45599366de8a8d95a9f0824c8cb961d0692'
+  $v74ContextAllowed = $false
+  $tagType = @(& git -C $root cat-file -t $v74Tag 2>$null)
+  $tagTypeExit = $LASTEXITCODE
+  $tagCommit = @(& git -C $root rev-parse "$v74Tag^{commit}" 2>$null)
+  $tagCommitExit = $LASTEXITCODE
+  $headCommit = @(& git -C $root rev-parse HEAD 2>$null)
+  $headCommitExit = $LASTEXITCODE
+  if (
+    $tagTypeExit -eq 0 -and
+    $tagType.Count -eq 1 -and
+    [string]$tagType[0] -ceq 'tag' -and
+    $tagCommitExit -eq 0 -and
+    $tagCommit.Count -eq 1 -and
+    [string]$tagCommit[0] -ceq $v74Commit -and
+    $headCommitExit -eq 0 -and
+    $headCommit.Count -eq 1
+  ) {
+    & git -C $root merge-base --is-ancestor $v74Commit `
+      ([string]$headCommit[0])
+    $v74ContextAllowed = $LASTEXITCODE -eq 0
+  }
+  $v74OverlayAccepted = Test-SealedBuyOverlayCandidate `
+    -CurrentOwners $CurrentOwners `
+    -OverlayCommit $v74Commit `
+    -ContextAllowed $v74ContextAllowed
+
+  return $legacyOverlayAccepted -or $v74OverlayAccepted
 }
 
 $sealedOverlayAccepted = Test-SealedBuyOverlay $relativeFiles

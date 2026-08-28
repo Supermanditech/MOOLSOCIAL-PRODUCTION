@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3759,
-    "sha256": "61582508EB58EE548B9493FB65FE4D37146193E4BBFC1D1812C33504D7A72939"
+    "entryCount": 3760,
+    "sha256": "273D1F359F0B11C808E3433F307EBE0FF9B6C33E9C230F2D9424F4449F0EED77"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -42,6 +42,9 @@
         "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
         "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
+        "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
+        "scripts/check-brand-integrity.ps1",
+        "scripts/check-buy-protected-baseline.ps1",
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/check-cross-agent-incremental-ticket-gate.ps1",
         "scripts/check-mvp-delivery-discipline-lock.ps1",
@@ -401,6 +404,29 @@
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "scripts/check-cross-agent-incremental-ticket-gate.ps1",
           "scripts/check-social-protected-baseline.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_v74_buy_protection_brand_gate_fix_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "codex_auth",
+        "role": "primary",
+        "task": "/root/codex_auth_v74_buy_protection_brand_gate_fix_20260828",
+        "workId": "v74-buy-protection-brand-gate-fix-20260828",
+        "ticketId": "UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-v74-buy-protection-brand-gate-fix-20260828",
+        "branch": "work/codex-auth/v74-buy-protection-brand-gate-fix-20260828",
+        "baselineHead": "17af6df85a6a6987a5995f4ee01eedb0c11dacbe",
+        "bootstrapCommitSubject": "coordination(v74-buy-protection-brand-gate-fix-20260828): bind exact Buy and Brand protection",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
+          "scripts/check-brand-integrity.ps1",
+          "scripts/check-buy-protected-baseline.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

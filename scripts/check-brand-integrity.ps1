@@ -432,6 +432,44 @@ if (
   throw 'Brand integrity sealed Buy theme fixture failed.'
 }
 
+function Test-BrandOwnerBytesEqualAtCommit {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$Owners,
+    [Parameter(Mandatory = $true)][string]$Commit
+  )
+  foreach ($owner in $Owners) {
+    & git -C $root diff --quiet $Commit -- $owner
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+  return $true
+}
+
+function Test-V74BrandContextAllowed {
+  $v74Tag = 'moolsocial-reconciled-debug-baseline-v7.4-20260828'
+  $v74Commit = '369bb45599366de8a8d95a9f0824c8cb961d0692'
+  $tagType = @(& git -C $root cat-file -t $v74Tag 2>$null)
+  $tagTypeExit = $LASTEXITCODE
+  $tagCommit = @(& git -C $root rev-parse "$v74Tag^{commit}" 2>$null)
+  $tagCommitExit = $LASTEXITCODE
+  $headCommit = @(& git -C $root rev-parse HEAD 2>$null)
+  $headCommitExit = $LASTEXITCODE
+  if (
+    $tagTypeExit -ne 0 -or
+    $tagType.Count -ne 1 -or
+    [string]$tagType[0] -cne 'tag' -or
+    $tagCommitExit -ne 0 -or
+    $tagCommit.Count -ne 1 -or
+    [string]$tagCommit[0] -cne $v74Commit -or
+    $headCommitExit -ne 0 -or
+    $headCommit.Count -ne 1
+  ) {
+    return $false
+  }
+  & git -C $root merge-base --is-ancestor $v74Commit `
+    ([string]$headCommit[0])
+  return $LASTEXITCODE -eq 0
+}
+
 function Test-SealedBuyThemeIntegration {
   param([Parameter(Mandatory = $true)][string]$Source)
   $branch = (& git -C $root branch --show-current).Trim()
@@ -443,8 +481,8 @@ function Test-SealedBuyThemeIntegration {
   )
   $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
   $owner = 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'
-  & git -C $root diff --quiet $overlayCommit -- $owner
-  $ownerBytesEqual = $LASTEXITCODE -eq 0
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners @($owner) -Commit $overlayCommit
   $structureExact = (
     ([regex]::Matches($Source, 'MoolFiniteGradientTransition')).Count -eq 1 -and
     $Source.Contains("key: const ValueKey('buy-theme-canvas')") -and
@@ -452,8 +490,15 @@ function Test-SealedBuyThemeIntegration {
     $Source.Contains("key: const ValueKey('buy-navigation-surface-owner')") -and
     $Source.Contains('duration: BuyV2Motion.routeChange')
   )
-  return Test-BuyThemeIntegrationFacts `
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
     $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  return $legacyProjection -or $v74Projection
 }
 
 $buyThemeIntegrationSource = Get-Content -LiteralPath $buyThemeIntegrationPath -Raw
@@ -679,16 +724,23 @@ function Test-SealedChatBrandProjection {
   )
   $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
   $owner = 'apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart'
-  & git -C $root diff --quiet $overlayCommit -- $owner
-  $ownerBytesEqual = $LASTEXITCODE -eq 0
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners @($owner) -Commit $overlayCommit
   $structureExact = (
     $Source.Contains('return ChatPageScaffold(') -and
     $Source.Contains("title: 'MoolSocial Chat'") -and
     $Source.Contains('returnRoute: widget.returnRoute') -and
     $Source.Contains("tooltip: 'Add MoolSocial people'")
   )
-  return Test-BuyThemeIntegrationFacts `
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
     $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  return $legacyProjection -or $v74Projection
 }
 
 if (Test-SealedChatBrandProjection $chatSource) {
@@ -712,14 +764,12 @@ function Test-SealedSocialBrandEntries {
     'integration/moolsocial/social-runtime-chat-v4-20260826'
   )
   $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
-  $ownerBytesEqual = $true
-  foreach ($owner in @(
-      'apps/mobile/lib/ui_v2/social/screen04_universal_components.dart',
-      'apps/mobile/lib/ui_v2/social/social_v2_creator.dart'
-    )) {
-    & git -C $root diff --quiet $overlayCommit -- $owner
-    if ($LASTEXITCODE -ne 0) { $ownerBytesEqual = $false; break }
-  }
+  $owners = @(
+    'apps/mobile/lib/ui_v2/social/screen04_universal_components.dart',
+    'apps/mobile/lib/ui_v2/social/social_v2_creator.dart'
+  )
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners $owners -Commit $overlayCommit
   $structureExact = (
     $SocialSource.Contains('child: MoolLocalNavigationRail(') -and
     $SocialSource.Contains("familyId: 'social'") -and
@@ -727,8 +777,15 @@ function Test-SealedSocialBrandEntries {
     $CreatorSource -match
       "(?s)label:\s*'Mool'.{0,160}icon:\s*Icons\.grid_view_rounded"
   )
-  return Test-BuyThemeIntegrationFacts `
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
     $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners $owners `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  return $legacyProjection -or $v74Projection
 }
 
 $socialRailSource = Get-Content -LiteralPath $socialRailPath -Raw
