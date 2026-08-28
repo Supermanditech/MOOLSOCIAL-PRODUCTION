@@ -295,6 +295,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'composer rises above the keyboard and restores after dismissal',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+      addTearDown(tester.view.reset);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/chat/thread/home-basket?return=/app/work/earn',
+        ),
+      );
+      await tester.pumpAndSettle();
+      final composer = find.byKey(const Key('chat-composer-surface'));
+      final field = find.byKey(const Key('chat-message-field'));
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+
+      expect(tester.getBottomRight(composer).dy, lessThanOrEqualTo(500));
+      expect(
+        tester.getBottomRight(find.byKey(const Key('chat-voice-message'))).dy,
+        lessThanOrEqualTo(500),
+      );
+
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(tester.getBottomRight(composer).dy, greaterThan(500));
+      expect(tester.getBottomRight(composer).dy, lessThanOrEqualTo(756));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('an explicit Chat intent overrides the origin default filter', (
     tester,
   ) async {

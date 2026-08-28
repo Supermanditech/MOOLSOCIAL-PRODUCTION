@@ -64,9 +64,11 @@ class ChatPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final bottomSystemInset = MediaQuery.viewInsetsOf(context).bottom > 0
-        ? 0.0
-        : MediaQuery.viewPaddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomSystemInset = MediaQuery.viewPaddingOf(context).bottom;
+    final bottomContentInset = keyboardInset > 0
+        ? keyboardInset
+        : bottomSystemInset;
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -75,6 +77,7 @@ class ChatPageScaffold extends StatelessWidget {
       child: RepaintBoundary(
         key: const Key('chat-page-surface'),
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           backgroundColor: backgroundColor,
           appBar: AppBar(
             automaticallyImplyLeading: false,
@@ -188,8 +191,11 @@ class ChatPageScaffold extends StatelessWidget {
           ),
           bottomNavigationBar: bottom == null
               ? null
-              : Padding(
-                  padding: EdgeInsets.only(bottom: bottomSystemInset),
+              : AnimatedPadding(
+                  key: const Key('chat-keyboard-safe-bottom'),
+                  duration: MoolMotion.accessible(context, MoolMotion.quick),
+                  curve: MoolMotion.enter,
+                  padding: EdgeInsets.only(bottom: bottomContentInset),
                   child: bottom,
                 ),
           floatingActionButton: floatingActionButton,
