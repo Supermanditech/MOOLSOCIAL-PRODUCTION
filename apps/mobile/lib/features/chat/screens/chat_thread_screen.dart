@@ -1149,10 +1149,12 @@ class _MessageBubble extends StatelessWidget {
 class _ChatBottomSheetSafeArea extends StatelessWidget {
   const _ChatBottomSheetSafeArea({
     required this.bottomInset,
+    required this.exportedSemanticsClearance,
     required this.child,
   });
 
   final double bottomInset;
+  final double exportedSemanticsClearance;
   final Widget child;
 
   @override
@@ -1160,10 +1162,6 @@ class _ChatBottomSheetSafeArea extends StatelessWidget {
     final baseBottomPadding = bottomInset > MoolSpacing.md
         ? bottomInset
         : MoolSpacing.md;
-    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-      viewPadding: MediaQuery.viewPaddingOf(context),
-      platform: Theme.of(context).platform,
-    );
     final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
     return SafeArea(
       top: false,
@@ -1182,7 +1180,12 @@ Future<void> _showUnavailableCapability(
   required String title,
   required String message,
 }) {
-  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -1190,6 +1193,7 @@ Future<void> _showUnavailableCapability(
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
       child: Padding(
         key: Key(keyName),
         padding: const EdgeInsets.fromLTRB(
@@ -1238,7 +1242,12 @@ Future<void> _showMessageActions(
   final canForward =
       forwardableContent &&
       session.availableForwardTargets(threadId).isNotEmpty;
-  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -1246,6 +1255,7 @@ Future<void> _showMessageActions(
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(
         key: const Key('chat-message-actions'),
         mainAxisSize: MainAxisSize.min,
@@ -1317,7 +1327,12 @@ Future<void> _chooseForwardTarget(
 ) async {
   final targets = session.availableForwardTargets(sourceThreadId);
   if (targets.isEmpty) return;
-  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
   final target = await showModalBottomSheet<ChatThread>(
     context: context,
     showDragHandle: true,
@@ -1325,6 +1340,7 @@ Future<void> _chooseForwardTarget(
     isScrollControlled: true,
     builder: (sheetContext) => _ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(
         key: const Key('chat-forward-picker'),
         mainAxisSize: MainAxisSize.min,
