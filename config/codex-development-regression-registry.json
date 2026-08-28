@@ -43733,6 +43733,46 @@
       "prevention": "Restore the parent binding exactly, append a separate Child 2 binding and task, increment the binding fixture, and bootstrap the clean child from ddfc9a3 without weakening parent history.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD2-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3855-SHOP-ADDRESS-OBSOLETE-LOCATION-CHOICE-PATCH-CONTEXT-MISMATCH",
+      "status": "registered_exact_class_block_deletion_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy"],
+      "mistake": "The first attempt to remove the obsolete _LocationChoice widget used stale surrounding context and apply_patch rejected the hunk without changing source.",
+      "rootCause": "The deletion was composed from the pre-format source rather than the literal current class block.",
+      "prevention": "In clean Child 3, delete only the complete current _LocationChoice class using its exact class declaration and closing boundary after the Add/Edit form no longer references it.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD3-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3856-SHOP-ADDRESS-EDIT-VARIABLES-INSERTED-IN-REQUEST-FORM",
+      "status": "registered_clean_child_exact_state_class_replay_required",
+      "appliesTo": ["primary", "coordination", "implementation", "analysis", "buy"],
+      "mistake": "Child 2 analysis failed because editingAddress and title were inserted in _BuyV2AddressRequestFormState while the Add/Edit form referenced those undefined variables; the obsolete _LocationChoice also remained.",
+      "rootCause": "A generic build-method patch anchored to the first nearby Widget build method instead of _BuyV2AddAddressFormState.",
+      "prevention": "Replay in clean Child 3, place edit-mode variables only inside _BuyV2AddAddressFormState.build, read back both complete form-state class headers, remove the obsolete class, then run focused analysis before test edits.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD3-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3857-SHOP-ADDRESS-REGISTRY-INVENTORY-FOREACH-PIPE-PARSER-ERROR",
+      "status": "registered_collected_rows_then_pipeline_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "The first cross-worktree registry inventory piped directly after a foreach statement and PowerShell rejected the command with an empty-pipe parser error.",
+      "rootCause": "The command repeated the known Windows PowerShell foreach-to-pipeline construction error.",
+      "prevention": "Collect foreach output into an explicit typed list or variable, then pipe that completed value in a separate statement.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD3-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3858-SHOP-ADDRESS-OPTIONAL-REGISTRY-RG-NO-MATCH-NOT-NORMALIZED",
+      "status": "registered_json_registry_inventory_only_required",
+      "appliesTo": ["primary", "coordination", "tooling"],
+      "mistake": "A fallback cross-worktree rg search for REG385 entries found no matching path under the supplied glob and exposed exit one as a failed command.",
+      "rootCause": "The inventory reused raw optional text search after the ticket already required parsed JSON registry inspection.",
+      "prevention": "Enumerate workspace repositories, parse each exact regression registry JSON, and calculate count and maximum numeric ID without optional rg calls.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD3-20260828.md"]
     }
   ]
 }
