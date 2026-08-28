@@ -44043,6 +44043,16 @@
       "prevention": "Parse all registry evidence paths under apps/mobile/build, restore every missing byte from the preserved qualified r61.5 worktree with hash verification, refresh candidate HEAD, and rerun preflight only once.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"]
+    },
+    {
+      "id": "REG-20260829-3886-SHOP-R61-6-CLOSURE-STATUS-DIGEST-INLINE-IF-ERROR",
+      "status": "registered_precomputed_digest_value_required",
+      "appliesTo": ["primary", "coordination", "closure", "tooling"],
+      "mistake": "The first r61.6 closure inventory embedded an if statement as a hashtable value, which Windows PowerShell treated as a command and emitted a non-terminating error after the targeted status inventory completed.",
+      "rootCause": "The status SHA value was not computed in a separate scalar variable before object construction.",
+      "prevention": "Compute empty/non-empty status hash in an independent statement, then construct the digest object; do not rerun the malformed projection.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
     }
   ]
 }
