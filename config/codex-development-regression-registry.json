@@ -44023,6 +44023,16 @@
       "prevention": "Bind Build Child 8 to product-bearing Child 7, claim and track unique r61.6 text placeholders inside artifacts/quality/shop-v2-r61-5-cursor-review-20260828, overwrite no existing file, and use that root for the wrapper output.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD8-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3884-SHOP-R61-6-BUILD-CLAIM-INHERITED-ANDROID-OWNER",
+      "status": "registered_remove_single_outside_allowlist_owner_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "build", "integration_repair", "android_boundary"],
+      "mistake": "The complete allowlist projection proved the only remaining outside-lane owner in Build Child 8 was the inherited apps/mobile/android/app/build.gradle.kts path.",
+      "rootCause": "The prior r61.5 ticket-specific Android exception remained in the reused active claim although r61.6 changes no Android owner and has no such exception.",
+      "prevention": "Remove exactly that Android owner, bind Build Child 9, retain every other allowed owner, pass the gate, and make no Android source change.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md"]
     }
   ]
 }

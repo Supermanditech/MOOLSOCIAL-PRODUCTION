@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3846,
-    "sha256": "BE787EF40398711154DAF9044750E8E3444F03351AA24DF6A61935EF773BEA9B"
+    "entryCount": 3847,
+    "sha256": "AF340553E776C9D26EC714624A5846619DE566A797D66CB5A9303DC1293DF423"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/repair_shop_address_r61_6_build_c8_20260828",
+      "task": "/root/repair_shop_address_r61_6_build_c9_20260828",
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
@@ -111,7 +111,6 @@
         "scripts/test-cursor-ui-review-build-profile.ps1",
         "scripts/check-apk-production-plugin-integrity.ps1",
         "scripts/test-release-production-plugin-integrity.ps1",
-        "apps/mobile/android/app/build.gradle.kts",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-failure.log",
@@ -168,6 +167,7 @@
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD6-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD7-20260828.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD8-20260828.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-identity.json",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"
@@ -1333,6 +1333,27 @@
           "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt",
           "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-identity.json",
           "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_shop_address_r61_6_build_c9_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_shop_address_r61_6_build_c9_20260828",
+        "workId": "shop-address-r61-6-build-c9-20260828",
+        "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-address-r61-6-build-c9-20260828",
+        "branch": "work/integration-repair/shop-address-r61-6-build-c9-20260828",
+        "baselineHead": "15c9bd7c1e438b10f82476b59bdc551fc99d3472",
+        "bootstrapCommitSubject": "coordination(shop-address-r61-6-build-c9-20260828): bind no-Android review build",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
