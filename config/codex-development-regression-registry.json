@@ -43193,6 +43193,16 @@
       "prevention": "Read only the literal claimed test files, locate matches independently in each file, bound every returned range and never repeat a recursive Buy test-directory content search for this ticket.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3801-SHOP-LANDING-V2-PROFILE-CTA-TEST-INVENTED-ORDERS-VIEW-ENUM",
+      "status": "registered_existing_session_view_oracle_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "buy"],
+      "mistake": "Focused analysis rejected the first Shop profile-context test because it asserted nonexistent enum constant BuyV2View.orders after tapping the Open orders CTA.",
+      "rootCause": "The new test inferred an Orders-specific enum name from the customer destination instead of reading the existing openOrders session/view contract.",
+      "prevention": "Inspect and assert the existing session view selected by openOrders plus the visible Orders owner; never invent an enum constant from destination wording, then rerun focused analysis before tests.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md"]
     }
   ]
 }

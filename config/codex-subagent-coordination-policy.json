@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3763,
-    "sha256": "576F6CA2A708867358B5B0881AC7EAF20BECB4F4EFF525C46481410093E9B20D"
+    "entryCount": 3764,
+    "sha256": "E7915487DBCB7C0F910BB9665D1A2C08AF00D2B2B65646D0BBA70BC8B5D06960"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_landing_v2_child2_test_inventory_20260828",
+      "task": "/root/cursor_shop_landing_v2_child3_order_oracle_20260828",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
@@ -164,7 +164,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V1-FIX2-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD1-TOOLING-20260828.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md"
       ]
     },
     {
@@ -493,6 +494,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD2-TEST-INVENTORY-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_landing_v2_child3_order_oracle_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_landing_v2_child3_order_oracle_20260828",
+        "workId": "shop-landing-v2-child3-order-oracle-20260828",
+        "ticketId": "UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828",
+        "branch": "work/cursor-ui/shop-landing-v2-child3-order-oracle-20260828",
+        "baselineHead": "8d74dc56d01fba6050b0c04ed75851fdc6191abc",
+        "bootstrapCommitSubject": "coordination(shop-landing-v2-child3-order-oracle-20260828): bind Orders oracle correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
