@@ -43233,6 +43233,26 @@
       "prevention": "Security Sign in must call beginSignIn with its complete current URI as both return and cancel location before navigation; real-router tests must prove sign-in remains open, cancellation returns to Security, and the nested originating main-section return is retained.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_security_v2.dart", "apps/mobile/lib/features/journey01/journey_session.dart", "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3797-GLOBAL-HELP-TOPIC-RESTORE-LOST-HELP-AND-MAIN-ORIGIN",
+      "status": "registered_nested_help_topic_return_chain_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "restoration", "testing"],
+      "mistake": "Help opened Security and Preferences with plain routes, so ordinary Back worked only while the Navigator stack survived; restored child routes rejected /app/ask as a safe return and lost both Help and its originating main section.",
+      "rootCause": "The tests covered immediate push/pop but not a reconstructed child route containing a nested Help return URI, and the shared safe-return allow-list omitted the Help destination.",
+      "prevention": "Help topic taps must compose the complete current Help URI and contextual surface into the child route, /app/ask must be accepted as a safe nested profile return, and tests must destroy stack history then prove child Back to Help and Help Back to the exact main origin.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart", "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_help_support_v2.dart", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3798-PUSHED-HELP-TOPIC-TEST-READ-ROOT-ROUTER-URI",
+      "status": "registered_mounted_destination_uri_oracle_required",
+      "appliesTo": ["primary", "mobile", "testing", "navigation", "tooling"],
+      "mistake": "The first Help-topic continuity assertion read router.routeInformationProvider while a pushed child page was active; the provider still exposed the root Work location, producing a false missing-return failure.",
+      "rootCause": "The test used a root router information oracle for nested Navigator state instead of reading GoRouterState from the mounted Help, Security or Preferences destination element.",
+      "prevention": "For pushed profile destinations, assert the active URI through GoRouterState.of on a stable mounted destination key; reserve routeInformationProvider assertions for go/replace roots whose ownership is independently proven.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart"]
     }
   ]
 }

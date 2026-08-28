@@ -21,6 +21,7 @@ const _safeGlobalProfileReturnRoots = <String>[
   '/app/book',
   '/app/work',
   '/app/mool',
+  '/app/ask',
 ];
 
 enum GlobalProfileSurfaceTone { light, socialDark }
@@ -130,6 +131,7 @@ Future<void> showGlobalProfilePanelV2(
       ),
       _globalPreferencesRoute => globalPreferencesLocationForReturn(
         returnLocation,
+        surfaceTone: surfaceTone,
       ),
       _globalSecurityRoute => globalSecurityLocationForReturn(
         returnLocation,
@@ -157,9 +159,15 @@ String globalPersonalProfileLocationForReturn(
   },
 ).toString();
 
-String globalPreferencesLocationForReturn(String returnLocation) => Uri(
+String globalPreferencesLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
   path: _globalPreferencesRoute,
-  queryParameters: {'return': returnLocation},
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
 ).toString();
 
 String globalSecurityLocationForReturn(

@@ -6,6 +6,8 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
@@ -119,12 +121,19 @@ void main() {
   ) async {
     final router = await pumpFromWork(tester);
     expect(find.byKey(const Key('global-help-support-v2')), findsOne);
+    final helpLocation = GoRouterState.of(
+      tester.element(find.byKey(const Key('global-help-support-v2'))),
+    ).uri.toString();
 
     await tester.ensureVisible(find.byKey(const Key('global-help-security')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('global-help-security')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('security-destination')), findsOne);
+    final securityUri = GoRouterState.of(
+      tester.element(find.byKey(const Key('security-destination'))),
+    ).uri;
+    expect(securityUri.queryParameters['return'], helpLocation);
 
     router.pop();
     await tester.pumpAndSettle();
@@ -135,6 +144,10 @@ void main() {
     await tester.tap(find.byKey(const Key('global-help-preferences')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('preferences-destination')), findsOne);
+    final preferencesUri = GoRouterState.of(
+      tester.element(find.byKey(const Key('preferences-destination'))),
+    ).uri;
+    expect(preferencesUri.queryParameters['return'], helpLocation);
   });
 
   testWidgets('support CTA opens filtered Chat with Help return continuity', (
@@ -219,10 +232,95 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'restored Help topics return through Help to the exact main origin',
+    (tester) async {
+      final journey = JourneySession(store: MemoryJourneyStore());
+      addTearDown(journey.dispose);
+      const workOrigin = '/app/work/home';
+      final helpLocation = globalHelpLocationForReturn(workOrigin);
+      final securityLocation = globalSecurityLocationForReturn(helpLocation);
+      final preferencesLocation = globalPreferencesLocationForReturn(
+        helpLocation,
+      );
+      final router = GoRouter(
+        initialLocation: securityLocation,
+        routes: [
+          GoRoute(
+            path: '/app/account/security',
+            builder: (context, state) => GlobalSecurityV2(
+              session: journey,
+              onSignOut: () async => true,
+              openDeviceSettings: () async => true,
+            ),
+          ),
+          GoRoute(
+            path: '/app/account/workspaces/preferences',
+            builder: (context, state) => GlobalPrivacyPreferencesV2(
+              session: journey,
+              openNotificationSettings: () async => true,
+              openPrivacyPolicy: () async => true,
+            ),
+          ),
+          GoRoute(
+            path: '/app/ask',
+            builder: (context, state) => GlobalHelpSupportV2(session: journey),
+          ),
+          GoRoute(
+            path: workOrigin,
+            builder: (context, state) =>
+                const Scaffold(key: Key('work-origin-return')),
+          ),
+          GoRoute(
+            path: '/app/mool',
+            builder: (context, state) =>
+                const Scaffold(key: Key('global-safe-return')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-security-v2')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('global-security-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-help-support-v2')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('global-help-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-origin-return')), findsOneWidget);
+
+      router.go(preferencesLocation);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('global-privacy-preferences-v2')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('global-preferences-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-help-support-v2')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('global-help-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-origin-return')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('Social Help keeps its surface and exact return together', () {
-    final uri = Uri.parse(
-      globalHelpLocationForReturn(
-        '/app/social?sub=videos',
+    final help = globalHelpLocationForReturn(
+      '/app/social?sub=videos',
+      surfaceTone: GlobalProfileSurfaceTone.socialDark,
+    );
+    final uri = Uri.parse(help);
+    final security = Uri.parse(
+      globalSecurityLocationForReturn(
+        help,
+        surfaceTone: GlobalProfileSurfaceTone.socialDark,
+      ),
+    );
+    final preferences = Uri.parse(
+      globalPreferencesLocationForReturn(
+        help,
         surfaceTone: GlobalProfileSurfaceTone.socialDark,
       ),
     );
@@ -230,6 +328,10 @@ void main() {
     expect(uri.path, '/app/ask');
     expect(uri.queryParameters['return'], '/app/social?sub=videos');
     expect(uri.queryParameters['surface'], 'social');
+    expect(security.queryParameters['return'], help);
+    expect(security.queryParameters['surface'], 'social');
+    expect(preferences.queryParameters['return'], help);
+    expect(preferences.queryParameters['surface'], 'social');
   });
 
   testWidgets('unsafe Help return uses the neutral Mool destination', (

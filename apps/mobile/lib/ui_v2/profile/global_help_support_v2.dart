@@ -87,7 +87,12 @@ class GlobalHelpSupportV2 extends StatelessWidget {
                       title: 'Account access & security',
                       detail: 'Sign-in methods, recovery and app permissions',
                       palette: palette,
-                      onTap: () => context.push('/app/account/security'),
+                      onTap: () => context.push(
+                        globalSecurityLocationForReturn(
+                          GoRouterState.of(context).uri.toString(),
+                          surfaceTone: surfaceTone,
+                        ),
+                      ),
                     ),
                     _HelpAction(
                       keyName: 'global-help-preferences',
@@ -96,8 +101,12 @@ class GlobalHelpSupportV2 extends StatelessWidget {
                       detail:
                           'Language, service area, notifications and privacy',
                       palette: palette,
-                      onTap: () =>
-                          context.push('/app/account/workspaces/preferences'),
+                      onTap: () => context.push(
+                        globalPreferencesLocationForReturn(
+                          GoRouterState.of(context).uri.toString(),
+                          surfaceTone: surfaceTone,
+                        ),
+                      ),
                     ),
                   ],
                 ),
