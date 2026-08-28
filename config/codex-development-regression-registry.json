@@ -43053,6 +43053,26 @@
       "prevention": "Describe shared preferences by their user benefit without module, route, screen, workflow or main-action terminology; mount the hero in customer-copy tests and review all newly visible profile copy before the next UI-review APK.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-user-facing-copy.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3779-GLOBAL-PROFILE-FIX1-ADB-LONG-PATH-STAT-RECURRENCE",
+      "status": "registered_checksum_verified_short_transport_required",
+      "appliesTo": ["primary", "android", "device", "tooling", "installation"],
+      "mistake": "The first FIX1 OPPO install command passed the deeply nested retained-evidence APK path directly to ADB, which failed its local stat before transmitting any bytes to the device.",
+      "rootCause": "The candidate path exceeded the reliable Windows path boundary for the ADB client even though the file existed and had already passed artifact identity checks; the retained C17G prevention was not applied to this new UI-review candidate.",
+      "prevention": "For every Android install from a long evidence path, create one short-path transport copy, prove its SHA-256 equals the gated artifact, install only that copy, and preserve the original artifact and failed no-mutation attempt.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3780-GLOBAL-PROFILE-LANGUAGE-SHEET-WHITESPACE-OVER-CORRECTION",
+      "status": "registered_compact_equal_tap_rows_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "testing", "android"],
+      "mistake": "The bottom-clearance correction protected the final Language choice by adding excessive blank sheet padding, producing a visually oversized popup around only two short choices.",
+      "rootCause": "Clearance was treated as empty-space padding instead of designing a compact intrinsic sheet with explicit full-height actions and removing the separate drag-handle band.",
+      "prevention": "Two-choice profile sheets must use compact intrinsic height, no redundant drag-handle band, minimal safe bottom spacing, and equal actions of at least 56 logical pixels so available space serves readable wording and touch comfort rather than blank area.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
     }
   ]
 }

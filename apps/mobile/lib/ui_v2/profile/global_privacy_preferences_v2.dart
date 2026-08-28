@@ -171,7 +171,7 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: palette.card,
-      showDragHandle: true,
+      showDragHandle: false,
       clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -182,9 +182,9 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
           key: const Key('global-preferences-language-sheet'),
           padding: EdgeInsets.fromLTRB(
             MoolSpacing.md,
-            MoolSpacing.xs,
+            MoolSpacing.sm,
             MoolSpacing.md,
-            media.viewPadding.bottom + MoolSpacing.lg,
+            media.viewPadding.bottom + MoolSpacing.md,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -203,33 +203,45 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
                 (code: 'en', label: 'English'),
                 (code: 'hi', label: 'हिन्दी'),
               ])
-                Semantics(
-                  selected: session.languageCode == choice.code,
-                  button: true,
-                  child: ListTile(
-                    key: Key('global-preferences-language-${choice.code}'),
-                    contentPadding: EdgeInsets.zero,
-                    minTileHeight: 48,
-                    leading: Icon(
-                      session.languageCode == choice.code
-                          ? Icons.check_circle_rounded
-                          : Icons.circle_outlined,
-                      color: palette.accent,
-                    ),
-                    title: Text(
-                      choice.label,
-                      style: TextStyle(
-                        color: palette.ink,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
+                  ),
+                  child: Semantics(
+                    selected: session.languageCode == choice.code,
+                    button: true,
+                    child: ListTile(
+                      key: Key('global-preferences-language-${choice.code}'),
+                      tileColor: palette.control,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                        side: BorderSide(color: palette.border),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: MoolSpacing.sm,
+                      ),
+                      minTileHeight: 56,
+                      leading: Icon(
+                        session.languageCode == choice.code
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        color: palette.accent,
+                      ),
+                      title: Text(
+                        choice.label,
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      onTap: () async {
+                        final saved = await session.updateLanguage(choice.code);
+                        if (saved && sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
                     ),
-                    onTap: () async {
-                      final saved = await session.updateLanguage(choice.code);
-                      if (saved && sheetContext.mounted) {
-                        Navigator.pop(sheetContext);
-                      }
-                    },
                   ),
                 ),
             ],

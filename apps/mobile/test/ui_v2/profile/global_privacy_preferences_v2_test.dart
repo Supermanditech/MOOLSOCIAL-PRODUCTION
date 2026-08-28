@@ -273,6 +273,8 @@ void main() {
           tester.getBottomRight(hindi).dy,
           lessThanOrEqualTo(testCase.size.height - testCase.bottomInset - 16),
         );
+        expect(tester.getSize(english).height, greaterThanOrEqualTo(56));
+        expect(tester.getSize(hindi).height, greaterThanOrEqualTo(56));
         expect(
           tester.getSize(hindi).height,
           closeTo(tester.getSize(english).height, .1),
