@@ -43943,6 +43943,16 @@
       "prevention": "Bind Child 18 to unchanged Child 17 head, use ProductionPhase implementation exactly, pass the gate, then run the same five files with complete output retention.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD18-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3876-SHOP-R61-6-BUILD-CONTROL-SEARCH-OUTPUT-TRUNCATED",
+      "status": "registered_bounded_script_page_read_required",
+      "appliesTo": ["primary", "coordination", "build", "tooling", "evidence"],
+      "mistake": "The first r61.6 build-control inspection emitted a broad Select-String context projection from test-public-auth-sideload-build-controls.ps1 and the tool truncated the result.",
+      "rootCause": "A large build-control script was searched with many generic patterns instead of reading only the candidate-validation page needed for the new debug machine state.",
+      "prevention": "Transition to the bounded integration build ticket, inspect only literal pages or parsed JSON projections, create a new non-overwriting candidate state, and run wrapper preflight before consuming a build authorization.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-20260828.md"]
     }
   ]
 }

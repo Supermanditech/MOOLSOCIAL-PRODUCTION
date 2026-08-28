@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3838,
-    "sha256": "798BD5A180AC0231A7EE144C61583B76F3C3EEDC8C285BFB8A3F2144F432AAB6"
+    "entryCount": 3839,
+    "sha256": "600CA8C123FF193AEF46616484516AEAB75FAD5BD9B796EA66681B51068884EB"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "task": "/root/repair_shop_v2_r61_5_cursor_review_build_20260828",
+      "task": "/root/repair_shop_location_address_r61_6_cursor_review_build_20260828",
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
@@ -158,7 +158,26 @@
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-shop-back-recovery.png",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-installed-base.apk",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/redmi-install-result.json",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/founder-approval-with-successor.md",
+        "config/apk-regression-gate-state-shop-location-r61-6.json",
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-20260828.md",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-manifest.txt",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/source-identity.json",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/prebuild-validation.md",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-device-review-debug.apk",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-build-provenance.txt",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-install-result.json",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-installed-base.apk",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-shop-location.png",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-shop-location-ui.xml",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-request-address.png",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-request-address-ui.xml",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-add-address.png",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-add-address-ui.xml",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-edit-home.png",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-edit-home-ui.xml",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-back-recovery.png",
+        "artifacts/quality/shop-location-address-r61-6-cursor-review-20260828/redmi-back-recovery-ui.xml"
       ]
     },
     {
@@ -1189,6 +1208,27 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_shop_location_address_r61_6_cursor_review_build_20260828",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_shop_location_address_r61_6_cursor_review_build_20260828",
+        "workId": "shop-location-address-r61-6-cursor-review-build-20260828",
+        "ticketId": "UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-20260828",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-location-address-r61-6-cursor-review-build-20260828",
+        "branch": "work/integration-repair/shop-location-address-r61-6-cursor-review-build-20260828",
+        "baselineHead": "db049222f7d25ac2e3b9d16559488ec77392f43b",
+        "bootstrapCommitSubject": "coordination(shop-location-address-r61-6-cursor-review-build-20260828): bind Redmi review build",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-20260828.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": false
       }
     ],
     "workspaceIsolation": {
