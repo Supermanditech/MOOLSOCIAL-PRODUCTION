@@ -212,6 +212,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     }
   }
 
+  Future<void> _openPublicFeedDiscovery() async {
+    _selectSection(ChatHomeSection.discover);
+    await _ensurePeopleDirectory(refresh: true);
+  }
+
   List<ChatPersonEntry> _visiblePeople() {
     final social = widget.socialSession;
     if (social == null) return const [];
@@ -282,7 +287,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         }
         return;
       case 'feed':
-        if (mounted) context.go('/app/social?sub=feed');
+        if (mounted) await _openPublicFeedDiscovery();
         return;
     }
   }
@@ -352,10 +357,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           floatingActionButton: FloatingActionButton(
             key: const Key('chat-new'),
             tooltip: 'Start a conversation',
-            onPressed: () => _showNewChat(
-              context,
-              onDiscover: () => _selectSection(ChatHomeSection.discover),
-            ),
+            onPressed: () => _selectSection(ChatHomeSection.discover),
             backgroundColor: MoolColors.navy,
             foregroundColor: Colors.white,
             child: const Icon(Icons.person_add_alt_1_rounded),
@@ -421,7 +423,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 onConnect: (person) => unawaited(_toggleConnection(person)),
                 onChat: (person) => unawaited(_startPersonChat(person)),
                 onDiscover: () => _selectSection(ChatHomeSection.discover),
-                onOpenFeed: () => context.go('/app/social?sub=feed'),
+                onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
               ),
             },
           ),
@@ -513,7 +515,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 setState(() {});
               },
               onDiscover: () => _selectSection(ChatHomeSection.discover),
-              onOpenFeed: () => context.go('/app/social?sub=feed'),
+              onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
             ),
           )
         else
@@ -832,69 +834,6 @@ void _openThread(
       '/app/chat/thread/$threadId',
       returnRoute: returnRoute,
       draft: draft,
-    ),
-  );
-}
-
-Future<void> _showNewChat(
-  BuildContext context, {
-  required VoidCallback onDiscover,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Start a conversation',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            const Text(
-              'Discover a public MoolSocial profile, connect, then continue '
-              'privately in Chat. Phone contacts are never uploaded.',
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            FilledButton.icon(
-              key: const Key('chat-new-discover-people'),
-              onPressed: () {
-                Navigator.of(sheetContext).pop();
-                onDiscover();
-              },
-              icon: const Icon(Icons.person_search_outlined),
-              label: const Text('Discover MoolSocial people'),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            OutlinedButton.icon(
-              key: const Key('chat-new-open-feed'),
-              onPressed: () {
-                Navigator.of(sheetContext).pop();
-                context.go('/app/social?sub=feed');
-              },
-              icon: const Icon(Icons.dynamic_feed_outlined),
-              label: const Text('Open public Feed'),
-            ),
-            TextButton(
-              key: const Key('chat-new-cancel'),
-              onPressed: () => Navigator.of(sheetContext).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
-      ),
     ),
   );
 }

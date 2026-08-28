@@ -135,14 +135,13 @@ void main() {
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-new'));
-      expect(find.byKey(const Key('chat-new-open-feed')), findsOneWidget);
-      expect(find.byKey(const Key('chat-new-discover-people')), findsOneWidget);
       expect(
-        find.textContaining('Phone contacts are never uploaded'),
+        find.byKey(const ValueKey('chat-section-body-discover')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('chat-new-business')), findsNothing);
-      await tapVisible(tester, const Key('chat-new-cancel'));
+      expect(find.byKey(const Key('chat-new-open-feed')), findsNothing);
+      expect(find.byKey(const Key('chat-new-discover-people')), findsNothing);
+      await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
       await tapVisible(tester, const Key('chat-voice-search'));
@@ -169,6 +168,40 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Start conversation opens public Feed discovery inside Chat', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+    );
+
+    await tapVisible(tester, const Key('chat-new'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tapVisible(tester, const Key('chat-discover-open-feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(find.text('Discover from the public Feed'), findsOneWidget);
+    expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Discover connects MoolSocial people and starts a real direct Chat',
