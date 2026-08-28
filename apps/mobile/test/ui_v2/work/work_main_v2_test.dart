@@ -157,8 +157,11 @@ void main() {
       findsOne,
     );
     expect(find.text('Personal account'), findsOne);
-    expect(find.text('Your account'), findsOne);
+    expect(find.text('Account settings'), findsOne);
+    expect(find.text('Your account'), findsNothing);
     expect(find.text('Privacy and preferences'), findsOne);
+    expect(find.byKey(const Key('global-profile-ask')), findsNothing);
+    expect(find.text('Help and support'), findsNothing);
     expect(find.text('Create a provider workspace'), findsWidgets);
     expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
     expect(
@@ -229,7 +232,9 @@ void main() {
       ),
       findsOne,
     );
-    expect(find.text('Your account'), findsOne);
+    expect(find.text('Personal account'), findsOne);
+    expect(find.text('Account settings'), findsOne);
+    expect(find.text('Your account'), findsNothing);
     expect(find.text('Personal profile'), findsOne);
     expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
     expect(find.byKey(const Key('global-profile-access-card')), findsNothing);

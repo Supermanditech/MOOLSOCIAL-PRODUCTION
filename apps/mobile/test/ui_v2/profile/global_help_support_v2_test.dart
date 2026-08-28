@@ -93,9 +93,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('global-profile-ask')));
+    router.go(globalHelpLocationForReturn('/app/work/home'));
     await tester.pumpAndSettle();
     return router;
   }

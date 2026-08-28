@@ -43263,6 +43263,16 @@
       "prevention": "All shared vertical scaffolds must use one 44-point transparent MoolNativeBackButton with BackButtonIcon, restrained local highlight, stable semantics and no duplicated outlined circle or platform-specific arrow source.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/universal/mool_native_back_control_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_design_system.dart", "apps/mobile/test/ui_v2/universal/mool_native_back_control_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3800-GLOBAL-PROFILE-DUPLICATED-HELP-AND-CONTEXTUAL-CHAT-ENTRY",
+      "status": "registered_one_shared_contextual_chat_entry_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "testing"],
+      "mistake": "The global profile exposed Help & support and an Open support Chat CTA even though every main section already owns a Chat entry, creating a duplicate path that opened the generic global inbox without profile-specific intent fulfilment.",
+      "rootCause": "Account destinations and contextual communication were mixed in one profile panel instead of keeping profile for identity/preferences/security and routing support through the single shared context-aware Chat owner.",
+      "prevention": "The global profile must not expose Help or support Chat; every main section must invoke one shared Chat screen with exact context and return continuity, and Shop must consume that owner through integration rather than clone it.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart"]
     }
   ]
 }

@@ -1,0 +1,59 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
+
+void main() {
+  testWidgets('global profile exposes account destinations without Help', (
+    tester,
+  ) async {
+    final routes = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.centerRight,
+            child: GlobalProfilePanelV2(
+              onClose: () {},
+              onOpenRoute: routes.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personal account'), findsOneWidget);
+    expect(find.text('Account settings'), findsOneWidget);
+    expect(find.byKey(const Key('global-profile-identity')), findsOneWidget);
+    expect(find.byKey(const Key('global-profile-preferences')), findsOneWidget);
+    expect(find.byKey(const Key('global-profile-security')), findsOneWidget);
+    expect(find.byKey(const Key('global-profile-ask')), findsNothing);
+    expect(find.text('Help and support'), findsNothing);
+
+    for (final entry in const <(Key, String)>[
+      (Key('global-profile-identity'), '/app/account/identity'),
+      (
+        Key('global-profile-preferences'),
+        '/app/account/workspaces/preferences',
+      ),
+      (Key('global-profile-security'), '/app/account/security'),
+    ]) {
+      final target = find.byKey(entry.$1);
+      await tester.ensureVisible(target);
+      await tester.tap(target);
+      await tester.pump();
+      expect(routes.last, entry.$2);
+    }
+  });
+
+  test('profile source cannot reintroduce a public Help destination', () {
+    final source = File(
+      'lib/ui_v2/profile/global_profile_panel_v2.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains("id: 'ask'")));
+    expect(source, isNot(contains("title: 'Help and support'")));
+  });
+}

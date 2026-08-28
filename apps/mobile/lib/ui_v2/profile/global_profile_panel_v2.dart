@@ -345,7 +345,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                                 ],
                               ),
                               null => _PersonalAccountSection(
-                                includeSupport: true,
                                 onOpenRoute: onOpenRoute,
                               ),
                             },
@@ -366,7 +365,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                               children: [
                                 if (activeWorkspace != null)
                                   _PersonalAccountSection(
-                                    includeSupport: false,
                                     onOpenRoute: onOpenRoute,
                                   )
                                 else if (contextAction case final action?)
@@ -611,17 +609,13 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _PersonalAccountSection extends StatelessWidget {
-  const _PersonalAccountSection({
-    required this.includeSupport,
-    required this.onOpenRoute,
-  });
+  const _PersonalAccountSection({required this.onOpenRoute});
 
-  final bool includeSupport;
   final ValueChanged<String> onOpenRoute;
 
   @override
   Widget build(BuildContext context) => _ProfileSection(
-    title: includeSupport ? 'Your account' : 'Personal account',
+    title: 'Account settings',
     items: [
       const _ProfileDestination(
         id: 'identity',
@@ -644,14 +638,6 @@ class _PersonalAccountSection extends StatelessWidget {
         icon: Icons.shield_outlined,
         route: '/app/account/security',
       ),
-      if (includeSupport)
-        const _ProfileDestination(
-          id: 'ask',
-          title: 'Help and support',
-          detail: 'Account assistance',
-          icon: Icons.support_agent_outlined,
-          route: '/app/ask',
-        ),
     ],
     onOpenRoute: onOpenRoute,
   );
