@@ -43483,6 +43483,36 @@
       "prevention": "Keep the canonical motion policy and coverage authority, but bind candidateContract and disposition to current existing Chat ticket owners before the first APK gate; verify every path independently.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-buy-premium-motion-policy-state.ps1", "scripts/check-apk-regression-gate-state.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/apk-gate-state.json", "apps/mobile/test/global_contextual_chat_shell_test.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3822-OPPO-CHAT-NODE-PARSER-USED-HYPHENATED-PROPERTY-DOT-SYNTAX",
+      "status": "registered_xml_getattribute_required",
+      "appliesTo": ["primary", "mobile", "device", "android", "tooling"],
+      "mistake": "The first r61.34 OPPO Chat-node parser failed before output because it accessed the hyphenated content-desc XML attribute through PowerShell dot syntax.",
+      "rootCause": "Android UIAutomator attribute names were treated as ordinary PowerShell object properties despite the hyphen token.",
+      "prevention": "Device hierarchy parsers read hyphenated attributes through GetAttribute with exact literal names, emit only bounded text/clickable/enabled/bounds fields and never repeat the completed capture.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/oppo-r61.34-start.xml", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3823-R61-34-OPPO-THREE-ACTION-CONVERSATION-HEADER-OVERFLOW",
+      "status": "registered_identity_tap_conversation_info_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "android", "testing"],
+      "mistake": "The installed r61.34 OPPO conversation showed a visible RIGHT OVERFLOWED BY 16 stripe because Video, Voice and a new Info icon competed with the conversation identity in the compact AppBar.",
+      "rootCause": "Widget coverage opened the new destination but did not reject the final three-action AppBar geometry at the OPPO width before building.",
+      "prevention": "Retain the approved Voice and Video actions, open Conversation Info by tapping the familiar conversation identity/title, and require compact large-text header fit plus OPPO screenshot evidence before acceptance.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/review-runtime/r61-34-conversation-info-20260829/oppo-r61.34-chat-thread.png", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3824-R61-35-THREAD-HEADER-PATCH-USED-STALE-FORMATTED-CONTEXT",
+      "status": "registered_immediate_formatted_source_reread_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "tooling", "testing"],
+      "mistake": "The first r61.35 header correction patch was atomically rejected because it used the pre-format Info IconButton layout rather than the exact current formatted source.",
+      "rootCause": "The source hunk was composed from earlier chat context after formatting had changed the onPressed layout.",
+      "prevention": "Read the exact current title and trailing ranges immediately before each bounded patch, change the scaffold callback and removed icon in separate verified hunks, then format again.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
     }
   ]
 }

@@ -3605,3 +3605,12 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3821 rejects reusing absent candidate-specific premium-motion evidence.
   Keep the canonical policy and coverage, but bind the candidate contract and
   disposition to exact existing current-ticket owners before the APK gate.
+- REG3822 rejects PowerShell dot access for UIAutomator attributes such as
+  `content-desc`. Use `GetAttribute` with exact literal names and resume from
+  the retained capture without repeating the device action.
+- REG3823 rejects a third compact conversation-header action after r61.34
+  overflowed by 16 pixels on OPPO. Keep Voice and Video visible, open shared
+  Conversation Info from the identity/title and test final header geometry.
+- REG3824 rejects header corrections based on pre-format source context. Read
+  exact current title and trailing ranges, patch them independently and format
+  only after both bounded changes are verified.
