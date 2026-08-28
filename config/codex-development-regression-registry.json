@@ -43893,6 +43893,26 @@
       "prevention": "In Child 13, remove only the unintended icon block from the exact order-delivery sheet, allow two helper lines, allow four saved-address detail lines, rerun focused tests, regenerate all r61.6 captures and inspect compact plus 390-pixel renders before device work.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD13-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3871-SHOP-ADDRESS-COMPACT-REQUEST-HELPER-TAPPED-BELOW-FOLD",
+      "status": "registered_scroll_until_visible_before_tap_required",
+      "appliesTo": ["primary", "coordination", "testing", "buy", "ui"],
+      "mistake": "After address detail expanded for readability, the compact 320 by 700 test helper tapped Request at y=716 without scrolling, so the request sheet never opened and its next reveal failed.",
+      "rootCause": "openRequest and openAdd assumed chooser actions were always initially visible instead of using the chooser ListView's established scroll recovery.",
+      "prevention": "Preserve the analyzed compact visual fix, bind Child 14, scroll each chooser action into view before tapping, rerun the full chooser/form and order-delivery files, then regenerate and inspect all captures.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD14-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3872-SHOP-ADDRESS-CHILD14-WORKTREE-COMPLETION-OUTPUT-TRUNCATED",
+      "status": "registered_full_completion_output_budget_required",
+      "appliesTo": ["primary", "coordination", "git_discipline", "tooling"],
+      "mistake": "Child 14 checkout completed at the intended product commit with exit zero, but the wait response was capped at one thousand tokens and emitted a truncation warning over Git progress output.",
+      "rootCause": "The worktree creation wait used an output budget smaller than the Windows checkout progress stream.",
+      "prevention": "Preserve Child 14 read-only, bind Child 15 to the same exact product commit, and retain at least three thousand output tokens for the complete checkout result before bootstrap or test action.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD15-20260828.md"]
     }
   ]
 }
