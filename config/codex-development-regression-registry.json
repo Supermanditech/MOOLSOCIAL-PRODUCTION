@@ -43973,6 +43973,16 @@
       "prevention": "Correct the two unadmitted build bindings to short work IDs, bind Build Child 3 as shop-address-r61-6-build-c3-20260828, verify branch equality and length before commit, then pass the gate before build state work.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD3-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3879-SHOP-R61-6-BUILD-CHILD2-BINDING-ID-EXCEEDED-80-CHARACTERS",
+      "status": "registered_short_binding_id_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "build", "git_discipline"],
+      "mistake": "The field-by-field validator proved the only remaining Build Child 3 gate failure was the predecessor Child 2 binding ID at 82 characters, above the 80-character maximum.",
+      "rootCause": "Work IDs were shortened but the corresponding continuation ID was not normalized in the same bounded correction.",
+      "prevention": "Shorten only the unadmitted Child 2 continuation ID, bind Build Child 4 with prevalidated ID/work ID/branch/subject lengths, and pass the gate before creating candidate state.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD4-20260828.md"]
     }
   ]
 }
