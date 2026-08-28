@@ -1604,6 +1604,8 @@ if ($ProductionLane -ceq 'baseline') {
             'docs/quality/UAW-PRIMARY-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
             'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md',
             'scripts/test-cursor-ui-review-build-profile.ps1',
+            'scripts/check-apk-production-plugin-integrity.ps1',
+            'scripts/test-release-production-plugin-integrity.ps1',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/branch.txt',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head.txt',
@@ -1613,6 +1615,16 @@ if ($ProductionLane -ceq 'baseline') {
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/protected-boundary-disposition.md',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/rejected-candidate-preserved.md',
             'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/startup-config-regression-registered.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-package-identity-rejected-debug.apk',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt2.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head-attempt2.txt',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation-attempt2.log',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt2.md',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2-final.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2.json',
+            'artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt',
             'scripts/check-codex-subagent-coordination-policy.ps1'
           ) | ForEach-Object { $_.ToLowerInvariant() }
           $shopRepairExistingSubjects = @(& git -C $root log --format=%s `
@@ -1626,6 +1638,14 @@ if ($ProductionLane -ceq 'baseline') {
                 'repair(shop-v2-r61-5-buy-regression-fix-20260828): restore complete c24f Buy regression',
                 'repair(shop-v2-r61-5-cursor-review-build-20260828): authorize one Redmi review build'
               )
+            ) -or
+            (
+              $existingCoordinationCommits.Count -eq 2 -and
+              $shopRepairExistingSubjects.Count -eq 2 -and
+              [string]$shopRepairExistingSubjects[0] -ceq
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): seal Cursor-only Google Services exclusion' -and
+              [string]$shopRepairExistingSubjects[1] -ceq
+                'repair(shop-v2-r61-5-cursor-review-build-20260828): authorize one Redmi review build'
             )
           )
           $shopRepairAllowedStagedOwnerKeys = if (

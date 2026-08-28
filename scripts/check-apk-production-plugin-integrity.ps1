@@ -137,7 +137,16 @@ $applicationIdExit = $LASTEXITCODE
 if ($applicationIdExit -ne 0) {
   throw 'APK integrity gate rejected: manifest identity inspection failed.'
 }
-$applicationId = ($applicationIdOutput -join '').Trim()
+$applicationIdCandidates = @(
+  $applicationIdOutput | ForEach-Object { ([string]$_).Trim() } |
+    Where-Object {
+      $_ -cmatch '^[A-Za-z][A-Za-z0-9_]*(?:[.][A-Za-z0-9_]+)+$'
+    } | Select-Object -Unique
+)
+if ($applicationIdCandidates.Count -ne 1) {
+  throw 'APK integrity gate rejected: manifest identity output is ambiguous.'
+}
+$applicationId = [string]$applicationIdCandidates[0]
 if ($applicationId -cne $ExpectedApplicationId) {
   throw 'APK integrity gate rejected: package identity changed.'
 }

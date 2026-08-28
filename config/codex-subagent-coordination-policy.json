@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3807,
-    "sha256": "BD683EEAC2237ED6E8619DC269A05EFB6944351E6827EE6183976C2407DA11D2"
+    "entryCount": 3811,
+    "sha256": "BA65C61813D0F33892934ADE7FD541433E56CBFA309A0A28E6E1F8FC2ACC5054"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -109,6 +109,8 @@
         "scripts/check-buy-backend-contract-boundary.ps1",
         "scripts/check-buy-data-egress-boundary.ps1",
         "scripts/test-cursor-ui-review-build-profile.ps1",
+        "scripts/check-apk-production-plugin-integrity.ps1",
+        "scripts/test-release-production-plugin-integrity.ps1",
         "apps/mobile/android/app/build.gradle.kts",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
@@ -131,7 +133,17 @@
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/protected-boundary-disposition.md",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/rejected-candidate-preserved.md",
         "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/startup-config-regression-registered.md",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation-attempt2.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/head-attempt2.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2-final.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt2.json",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt2.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-package-identity-rejected-debug.apk",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt"
       ]
     },
     {
@@ -282,7 +294,6 @@
         "scripts/check-android-plugin-manifest-namespace-readiness.ps1",
         "scripts/check-android-release-kotlin-plugin-readiness.ps1",
         "scripts/check-android-release-resource-integrity.ps1",
-        "scripts/check-apk-production-plugin-integrity.ps1",
         "scripts/check-pre-apk-readiness-r60-92.ps1",
         "scripts/check-social-runtime-deployment-map-r60-92.ps1",
         "scripts/check-social-runtime-deployment-execution-r60-92.ps1",
@@ -290,7 +301,6 @@
         "scripts/invoke-social-runtime-deployment-r60-92.ps1",
         "scripts/test-pre-apk-readiness-r60-92.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
-        "scripts/test-release-production-plugin-integrity.ps1",
         "scripts/test-social-runtime-deployment-map-r60-92.ps1",
         "scripts/test-social-runtime-deployment-execution-r60-92.ps1"
       ]

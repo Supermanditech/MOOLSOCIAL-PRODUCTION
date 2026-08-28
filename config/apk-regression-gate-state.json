@@ -5,8 +5,8 @@
   "buildAuthorization": "consumed_failed",
   "preBuildValidation": {
     "state": "passed",
-    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation.md",
-    "negativeSelfTest": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log"
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/prebuild-validation-attempt2.md",
+    "negativeSelfTest": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md"
   },
   "candidate": {
     "id": "UAW-SHOP-V2-R61.5-CURSOR-UI-REVIEW-20260828",
@@ -15,11 +15,11 @@
     "buildMode": "debug",
     "gateProfile": "uaw_cursor_ui_review_debug",
     "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
-    "head": "a582ea950e056ff49c69ac0553984f2a2903cc18"
+    "head": "9a05a49a5979671e4d7a21f4fb572b57dfb0b847"
   },
   "source": {
-    "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-final.txt",
-    "manifestSha256": "8512355AD08E1CC45731B7D8B97772AE9CE45360811D1FF68D9F496E28CF64E8",
+    "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
+    "manifestSha256": "6F339A05D63B13F09C3B09F29795FC61E4713FC9A784F536D3C16183680D5E52",
     "fileCount": 636
   },
   "requiredRuntimeDefines": {
@@ -44,8 +44,8 @@
       "id": "source-manifest",
       "state": "passed",
       "evidence": [
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-final.txt",
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity.json"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2-final.json"
       ]
     },
     {
@@ -114,7 +114,7 @@
       "id": "clean-state-regression",
       "state": "passed",
       "evidence": [
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state.json"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/clean-state-attempt2.json"
       ]
     },
     {
@@ -128,7 +128,7 @@
       "id": "package-isolation",
       "state": "passed",
       "evidence": [
-        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation.log"
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation-attempt2.log"
       ]
     }
   ],
@@ -163,14 +163,32 @@
     "runtimePackageForbidden": true
   },
   "qualificationResult": {
-    "state": "build_failed_no_apk"
+    "state": "attempt2_false_integrity_gate_rejection"
   },
   "buildResult": {
-    "state": "failed_no_apk",
-    "failedTask": ":app:processDebugGoogleServices",
-    "reason": "google-services.json is intentionally absent for CursorUiReview",
-    "apkCreated": false,
-    "authorizationConsumed": true
+    "state": "failed_attempt2_false_integrity_gate",
+    "failedAttempts": [
+      {
+        "attempt": 1,
+        "state": "failed_no_apk",
+        "failedTask": ":app:processDebugGoogleServices",
+        "reason": "google-services.json is intentionally absent for CursorUiReview",
+        "apkCreated": false,
+        "authorizationConsumed": true,
+        "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt1-google-services-failure.md"
+      },
+      {
+        "attempt": 2,
+        "state": "failed_wrapper_rejected_valid_apk_preserved",
+        "failedGate": "check-apk-production-plugin-integrity.ps1",
+        "reason": "Windows apkanalyzer batch echo caused ambiguous concatenated identity output",
+        "apkCreated": true,
+        "authorizationConsumed": true,
+        "actualPackage": "com.moolsocial.app.cursorreview",
+        "apkSha256": "A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4",
+        "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md"
+      }
+    ]
   },
   "installResult": {
     "state": "pending_redmi_only"

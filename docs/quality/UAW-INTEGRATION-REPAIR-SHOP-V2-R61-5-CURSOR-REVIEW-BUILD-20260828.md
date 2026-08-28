@@ -48,3 +48,10 @@ repair: disable `processDebugGoogleServices` only when
 `MOOLSOCIAL_ANDROID_DEBUG_PACKAGE=cursorreview`. Runtime, release, OPPO and
 `com.moolsocial.app.runtime` behavior remain unchanged. A fresh authorization
 is required after the repaired profile is tested and resealed.
+
+Attempt 2 assembled successfully after that repair. The wrapper then falsely
+rejected package identity because Windows `apkanalyzer.bat` echoed batch
+commands and the integrity gate concatenated all lines. The preserved APK is
+`com.moolsocial.app.cursorreview` and passes the corrected, fixture-tested
+integrity gate, but remains rejected because its wrapper transaction did not
+complete. Attempt 3 requires a new source manifest and fresh authorization.

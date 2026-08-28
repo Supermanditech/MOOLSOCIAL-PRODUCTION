@@ -43633,6 +43633,46 @@
       "prevention": "Transfer only build.gradle.kts from the Social auth claim to the Shop build claim, leave every other Codex Desktop owner unchanged, and require the overlap gate to pass before any test or retry.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/android/app/build.gradle.kts", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3845-ATTEMPT2-SOURCE-IDENTITY-USED-BARE-TRUE",
+      "status": "registered_preserve_invalid_create_separate_final_identity_required",
+      "appliesTo": ["primary", "coordination", "tooling", "build", "evidence"],
+      "mistake": "The attempt-2 evidence writer used bare true rather than PowerShell $true for two JSON fields, emitted a command error and still created an invalid source-identity-attempt2.json file.",
+      "rootCause": "JSON boolean syntax was inserted directly into a PowerShell ordered hashtable.",
+      "prevention": "Preserve the invalid file, create source-identity-attempt2-final.json with explicit $true values under ErrorAction Stop, parse and read back exact fields, and bind only the final file in machine state.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-identity-attempt2.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3846-CURSORREVIEW-ATTEMPT2-APK-PACKAGE-IDENTITY-REJECTED",
+      "status": "registered_rejected_apk_preservation_and_exact_badging_required",
+      "appliesTo": ["primary", "coordination", "build", "android", "package_isolation"],
+      "mistake": "Attempt 2 completed assembleDebug after the Cursor-only Google Services exclusion, but check-apk-production-plugin-integrity.ps1 rejected the generated APK because package identity differed from com.moolsocial.app.cursorreview; the wrapper did not copy a review artifact.",
+      "rootCause": "The existing debug applicationId suffix contract and wrapper expectation are not producing or observing the same exact package identity for the Cursor review variant.",
+      "prevention": "Mark attempt 2 consumed_failed, preserve the generated APK under a unique rejected path, read its aapt badging and manifest package, compare the Gradle suffix contract, and repair only the exact cursorreview package isolation before any fresh build authorization.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-production-plugin-integrity.ps1", "scripts/test-cursor-ui-review-build-profile.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/apk-regression-gate-state.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3847-ATTEMPT2-PACKAGE-EVIDENCE-CLAIMED-BEFORE-CREATION",
+      "status": "registered_evidence_placeholder_then_diagnosis_required",
+      "appliesTo": ["primary", "coordination", "build", "evidence", "package_isolation"],
+      "mistake": "The first attempt-2 package diagnosis gate failed because build-attempt2-package-identity-failure.md and the manifest application-id evidence were added to the active claim before both files existed.",
+      "rootCause": "Planned evidence ownership was updated ahead of the required create-and-readback transition.",
+      "prevention": "Create truthful pending-diagnosis evidence paths first, pass owner validation, then replace only the manifest evidence with the exact apkanalyzer result and read it back before any repair.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3848-APK-INTEGRITY-WINDOWS-APKANALYZER-ECHO-FALSE-PACKAGE-REJECTION",
+      "status": "registered_exact_manifest_value_line_parser_required",
+      "appliesTo": ["primary", "coordination", "build", "tooling", "package_isolation"],
+      "mistake": "Read-only inspection proved attempt 2 contains applicationId com.moolsocial.app.cursorreview, but apkanalyzer.bat echoes Windows batch commands and the integrity checker concatenated every output line, causing a false package-identity rejection.",
+      "rootCause": "check-apk-production-plugin-integrity.ps1 assumes manifest application-id emits only one clean line on Windows.",
+      "prevention": "Select exactly one trimmed output line matching an Android application-id pattern, reject zero or multiple candidates, add an echoed-batch fixture, and rerun integrity against the preserved APK before any fresh build authorization.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-apk-production-plugin-integrity.ps1", "scripts/test-release-production-plugin-integrity.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-package-identity-rejected-debug.apk", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/attempt2-manifest-application-id.txt", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-CURSOR-REVIEW-BUILD-20260828.md"]
     }
   ]
 }
