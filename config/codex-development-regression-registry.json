@@ -43203,6 +43203,16 @@
       "prevention": "Inspect and assert the existing session view selected by openOrders plus the visible Orders owner; never invent an enum constant from destination wording, then rerun focused analysis before tests.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD3-ORDER-ORACLE-20260828.md"]
+    },
+    {
+      "id": "REG-20260828-3802-SHOP-SHARED-GLOBAL-PROFILE-SHORTCUT-RENDERED-48X45-INSTEAD-OF-44X44",
+      "status": "registered_shared_shortcut_geometry_fix_required",
+      "appliesTo": ["primary", "coordination", "implementation", "testing", "accessibility", "buy"],
+      "mistake": "The first Shop shared-profile behavior test measured the common launcher at 48 by 45 logical pixels even though its component contract and cross-destination standard require exactly 44 by 44.",
+      "rootCause": "IconButton theme padding and minimum interactive sizing escaped the shortcut's declared constraints because the outer semantic owner had no hard 44-by-44 box and zero-padding shrink-wrap contract.",
+      "prevention": "Constrain the shared shortcut's outer child with SizedBox.square(44), zero IconButton padding, shrink-wrap tap target and exact constraints; retain at least 44-by-44 semantics and replay Shop plus existing shared-profile destination tests.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD4-PROFILE-GEOMETRY-20260828.md"]
     }
   ]
 }
