@@ -9,7 +9,17 @@ import '../../core/design/mool_theme.dart';
 const _profileNavy = Color(0xFF000080);
 const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
+const _globalPersonalProfileRoute = '/app/account/identity';
 const _globalPreferencesRoute = '/app/account/workspaces/preferences';
+const _safeGlobalProfileReturnRoots = <String>[
+  '/app/social',
+  '/app/buy',
+  '/app/eat',
+  '/app/ride',
+  '/app/book',
+  '/app/work',
+  '/app/mool',
+];
 
 enum GlobalProfileSurfaceTone { light, socialDark }
 
@@ -111,20 +121,46 @@ Future<void> showGlobalProfilePanelV2(
   );
   if (!context.mounted || result == null) return;
   if (result.route case final route?) {
-    onOpenRoute(
-      route == _globalPreferencesRoute
-          ? globalPreferencesLocationForReturn(returnLocation)
-          : route,
-    );
+    onOpenRoute(switch (route) {
+      _globalPersonalProfileRoute => globalPersonalProfileLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
+      _globalPreferencesRoute => globalPreferencesLocationForReturn(
+        returnLocation,
+      ),
+      _ => route,
+    });
   } else if (result.contextActionSelected) {
     contextAction?.onPressed();
   }
 }
 
+String globalPersonalProfileLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalPersonalProfileRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
 String globalPreferencesLocationForReturn(String returnLocation) => Uri(
   path: _globalPreferencesRoute,
   queryParameters: {'return': returnLocation},
 ).toString();
+
+String? globalProfileSafeReturnLocation(String? raw) {
+  if (raw == null || !raw.startsWith('/')) return null;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+  final safe = _safeGlobalProfileReturnRoots.any(
+    (root) => uri.path == root || uri.path.startsWith('$root/'),
+  );
+  return safe ? uri.toString() : null;
+}
 
 /// The one account launcher used by every top-level MoolSocial destination.
 ///

@@ -8,15 +8,6 @@ import '../../features/journey01/journey_session.dart';
 import 'global_profile_panel_v2.dart';
 
 final _privacyPolicyUri = Uri.parse('https://moolsocial.com/privacy/');
-const _safeProfileReturnRoots = <String>[
-  '/app/social',
-  '/app/buy',
-  '/app/eat',
-  '/app/ride',
-  '/app/book',
-  '/app/work',
-  '/app/mool',
-];
 
 class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   const GlobalPrivacyPreferencesV2({
@@ -166,13 +157,7 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
 
   String? _safeReturnLocation(BuildContext context) {
     final raw = GoRouterState.of(context).uri.queryParameters['return'];
-    if (raw == null || !raw.startsWith('/')) return null;
-    final uri = Uri.tryParse(raw);
-    if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
-    final safe = _safeProfileReturnRoots.any(
-      (root) => uri.path == root || uri.path.startsWith('$root/'),
-    );
-    return safe ? uri.toString() : null;
+    return globalProfileSafeReturnLocation(raw);
   }
 
   Future<void> _showLanguage(

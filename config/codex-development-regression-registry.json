@@ -43193,6 +43193,16 @@
       "prevention": "For this ticket run the exact tap-acknowledgement test, design-system test and active Buy screen suite; preserve historical golden failures without updating or using them as acceptance authority.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/design_system_test.dart", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/motion/mool_buy_tap_acknowledgement_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3793-GLOBAL-PROFILE-RETURN-QUERY-DROPPED-SOCIAL-SURFACE",
+      "status": "registered_return_and_surface_query_composition_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "The first Personal-profile origin-return change appended a return query before Social's exact route comparison, so the destination no longer received surface=social and rendered the light profile theme inside Social.",
+      "rootCause": "Origin continuity and contextual surface were composed in separate route layers, while the Social caller detected the Personal destination through exact full-string equality rather than an already-complete destination URI.",
+      "prevention": "The shared profile launcher must compose return and contextual surface query parameters into one destination URI before handing it to any module; Social tests must prove the dark profile surface and exact Back return together.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_account_state_journey_c30j_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart", "apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_account_state_journey_c30j_test.dart"]
     }
   ]
 }

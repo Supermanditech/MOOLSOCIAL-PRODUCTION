@@ -191,7 +191,12 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/social');
+      final returnLocation = GoRouterState.of(
+        context,
+      ).uri.queryParameters['return'];
+      context.go(
+        globalProfileSafeReturnLocation(returnLocation) ?? '/app/mool',
+      );
     }
   }
 }

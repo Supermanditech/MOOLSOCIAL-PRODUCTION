@@ -130,4 +130,113 @@ void main() {
     expect(find.text('Email'), findsOne);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'direct Personal profile restore returns to its exact safe origin',
+    (tester) async {
+      final session = JourneySession(store: MemoryJourneyStore());
+      addTearDown(session.dispose);
+      final router = GoRouter(
+        initialLocation: Uri(
+          path: '/app/account/identity',
+          queryParameters: const {'return': '/app/ride?sub=cab'},
+        ).toString(),
+        routes: [
+          GoRoute(
+            path: '/app/account/identity',
+            builder: (context, state) =>
+                GlobalPersonalProfileV2(session: session),
+          ),
+          GoRoute(
+            path: '/app/ride',
+            builder: (context, state) =>
+                const Scaffold(key: Key('ride-origin-return')),
+          ),
+          GoRoute(
+            path: '/app/mool',
+            builder: (context, state) =>
+                const Scaffold(key: Key('global-safe-return')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('global-personal-profile-back')));
+      await tester.pumpAndSettle();
+
+      expect(
+        router.routeInformationProvider.value.uri.toString(),
+        '/app/ride?sub=cab',
+      );
+      expect(find.byKey(const Key('ride-origin-return')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'profile panel binds Personal profile to the exact originating location',
+    () {
+      expect(
+        globalPersonalProfileLocationForReturn('/app/social?sub=feed'),
+        Uri(
+          path: '/app/account/identity',
+          queryParameters: const {'return': '/app/social?sub=feed'},
+        ).toString(),
+      );
+    },
+  );
+
+  test(
+    'Social Personal profile keeps its surface and exact return together',
+    () {
+      final uri = Uri.parse(
+        globalPersonalProfileLocationForReturn(
+          '/app/social?sub=videos',
+          surfaceTone: GlobalProfileSurfaceTone.socialDark,
+        ),
+      );
+
+      expect(uri.path, '/app/account/identity');
+      expect(uri.queryParameters['return'], '/app/social?sub=videos');
+      expect(uri.queryParameters['surface'], 'social');
+    },
+  );
+
+  testWidgets(
+    'unsafe Personal profile return uses the neutral Mool destination',
+    (tester) async {
+      final session = JourneySession(store: MemoryJourneyStore());
+      addTearDown(session.dispose);
+      final router = GoRouter(
+        initialLocation: Uri(
+          path: '/app/account/identity',
+          queryParameters: const {'return': 'https://example.com/account'},
+        ).toString(),
+        routes: [
+          GoRoute(
+            path: '/app/account/identity',
+            builder: (context, state) =>
+                GlobalPersonalProfileV2(session: session),
+          ),
+          GoRoute(
+            path: '/app/mool',
+            builder: (context, state) =>
+                const Scaffold(key: Key('global-safe-return')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('global-personal-profile-back')));
+      await tester.pumpAndSettle();
+
+      expect(router.routeInformationProvider.value.uri.path, '/app/mool');
+      expect(find.byKey(const Key('global-safe-return')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
