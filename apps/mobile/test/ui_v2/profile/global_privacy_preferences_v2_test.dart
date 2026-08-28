@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +20,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     double bottomInset = 0,
+    ValueListenable<double>? keyboardInset,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -49,14 +51,24 @@ void main() {
     await tester.pumpWidget(
       MaterialApp.router(
         routerConfig: router,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(textScale),
-            padding: EdgeInsets.only(bottom: bottomInset),
-            viewPadding: EdgeInsets.only(bottom: bottomInset),
-          ),
-          child: child!,
-        ),
+        builder: (context, child) {
+          Widget withKeyboardInset(double inset) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(textScale),
+              padding: EdgeInsets.only(bottom: bottomInset),
+              viewPadding: EdgeInsets.only(bottom: bottomInset),
+              viewInsets: EdgeInsets.only(bottom: inset),
+            ),
+            child: child!,
+          );
+
+          final insetListenable = keyboardInset;
+          if (insetListenable == null) return withKeyboardInset(0);
+          return ValueListenableBuilder<double>(
+            valueListenable: insetListenable,
+            builder: (context, inset, _) => withKeyboardInset(inset),
+          );
+        },
       ),
     );
     await tester.pumpAndSettle();
@@ -289,6 +301,95 @@ void main() {
         );
         journey.dispose();
         work.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'Service area actions fit the phone and remain reachable with a keyboard',
+    (tester) async {
+      const cases =
+          <
+            ({
+              Size size,
+              double scale,
+              double bottomInset,
+              double keyboardInset,
+            })
+          >[
+            (size: Size(360, 720), scale: 1, bottomInset: 0, keyboardInset: 0),
+            (
+              size: Size(320, 568),
+              scale: 1.4,
+              bottomInset: 34,
+              keyboardInset: 0,
+            ),
+            (
+              size: Size(360, 640),
+              scale: 1.2,
+              bottomInset: 48,
+              keyboardInset: 220,
+            ),
+          ];
+
+      for (final testCase in cases) {
+        final journey = JourneySession(store: MemoryJourneyStore())
+          ..selectArea(AreaChoice.manual, label: 'Jodhpur, Rajasthan');
+        final work = WorkSession();
+        final keyboardInset = ValueNotifier<double>(0);
+        await pumpFromWork(
+          tester,
+          journey: journey,
+          work: work,
+          openNotifications: () async => true,
+          openPrivacy: () async => true,
+          size: testCase.size,
+          textScale: testCase.scale,
+          bottomInset: testCase.bottomInset,
+          keyboardInset: keyboardInset,
+        );
+
+        await tester.tap(find.byKey(const Key('global-preferences-area')));
+        await tester.pumpAndSettle();
+        keyboardInset.value = testCase.keyboardInset;
+        await tester.pumpAndSettle();
+
+        final save = find.byKey(const Key('global-preferences-area-save'));
+        final current = find.byKey(
+          const Key('global-preferences-area-current'),
+        );
+        final remove = find.byKey(const Key('global-preferences-area-remove'));
+        expect(save, findsOneWidget);
+        expect(current, findsOneWidget);
+        expect(remove, findsOneWidget);
+        expect(tester.getSize(save).height, greaterThanOrEqualTo(44));
+        expect(tester.getSize(current).height, greaterThanOrEqualTo(44));
+        expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
+
+        if (testCase.keyboardInset == 0) {
+          expect(
+            tester.getBottomRight(remove).dy,
+            lessThanOrEqualTo(testCase.size.height - testCase.bottomInset - 16),
+          );
+        } else {
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getBottomRight(remove).dy,
+            lessThanOrEqualTo(testCase.size.height - testCase.keyboardInset),
+          );
+        }
+        expect(tester.takeException(), isNull);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('global-privacy-preferences-v2')),
+          findsOneWidget,
+        );
+        journey.dispose();
+        work.dispose();
+        keyboardInset.dispose();
       }
     },
   );

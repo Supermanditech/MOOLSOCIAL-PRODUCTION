@@ -257,10 +257,15 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: palette.card,
-      showDragHandle: true,
+      showDragHandle: false,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (sheetContext) =>
           _ServiceAreaSheet(session: session, palette: palette),
     );
@@ -325,12 +330,13 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final palette = widget.palette;
+    final media = MediaQuery.of(context);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         MoolSpacing.md,
-        MoolSpacing.xs,
+        MoolSpacing.sm,
         MoolSpacing.md,
-        MediaQuery.viewInsetsOf(context).bottom + MoolSpacing.lg,
+        media.viewInsets.bottom + media.viewPadding.bottom + MoolSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -363,46 +369,77 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
             ),
           ],
           const SizedBox(height: MoolSpacing.sm),
-          FilledButton(
-            key: const Key('global-preferences-area-save'),
-            onPressed: () async {
-              final saved = await session.updateArea(
-                AreaChoice.manual,
-                label: _controller.text,
-              );
-              if (saved && context.mounted) {
-                Navigator.pop(context);
-              } else if (context.mounted) {
-                setState(() {});
-              }
-            },
-            child: const Text('Save service area'),
-          ),
-          OutlinedButton.icon(
-            key: const Key('global-preferences-area-current'),
-            onPressed: session.resolvingCurrentArea
-                ? null
-                : () async {
-                    final resolved = await session.resolveCurrentArea();
-                    if (resolved) {
-                      await session.updateArea(AreaChoice.current);
-                    }
-                    if (resolved && context.mounted) {
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  key: const Key('global-preferences-area-save'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MoolSpacing.xs,
+                    ),
+                  ),
+                  onPressed: () async {
+                    final saved = await session.updateArea(
+                      AreaChoice.manual,
+                      label: _controller.text,
+                    );
+                    if (saved && context.mounted) {
                       Navigator.pop(context);
                     } else if (context.mounted) {
                       setState(() {});
                     }
                   },
-            icon: const Icon(Icons.my_location_rounded),
-            label: const Text('Use current location'),
+                  child: const Text('Save area'),
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('global-preferences-area-current'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MoolSpacing.xs,
+                    ),
+                  ),
+                  onPressed: session.resolvingCurrentArea
+                      ? null
+                      : () async {
+                          final resolved = await session.resolveCurrentArea();
+                          if (resolved) {
+                            await session.updateArea(AreaChoice.current);
+                          }
+                          if (resolved && context.mounted) {
+                            Navigator.pop(context);
+                          } else if (context.mounted) {
+                            setState(() {});
+                          }
+                        },
+                  icon: const Icon(Icons.my_location_rounded, size: 18),
+                  label: const Text(
+                    'Use my location',
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
+          const SizedBox(height: MoolSpacing.xs),
+          TextButton.icon(
             key: const Key('global-preferences-area-remove'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+              minimumSize: const Size.fromHeight(48),
+            ),
             onPressed: () async {
               final saved = await session.updateArea(AreaChoice.skipped);
               if (saved && context.mounted) Navigator.pop(context);
             },
-            child: const Text('Remove service area'),
+            icon: const Icon(Icons.location_off_outlined, size: 18),
+            label: const Text('Remove service area'),
           ),
         ],
       ),

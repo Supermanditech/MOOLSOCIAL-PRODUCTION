@@ -43073,6 +43073,26 @@
       "prevention": "Two-choice profile sheets must use compact intrinsic height, no redundant drag-handle band, minimal safe bottom spacing, and equal actions of at least 56 logical pixels so available space serves readable wording and touch comfort rather than blank area.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3781-GLOBAL-PROFILE-SERVICE-AREA-REMOVE-ACTION-BELOW-PHONE",
+      "status": "registered_all_service_area_actions_visible_and_keyboard_safe_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "testing", "android"],
+      "mistake": "The Service area sheet opened with Save and Use current location visible while Remove service area rendered below the usable OPPO viewport with zero accessibility bounds.",
+      "rootCause": "The intrinsic bottom sheet stacked a field and three actions without a compact action layout or guaranteed safe bottom clearance; its final recovery action was allowed to extend behind the Android navigation region.",
+      "prevention": "Service area must use a compact phone-fitted sheet where Save, current location and Remove remain fully visible with equal minimum tap targets; keyboard appearance must preserve scroll or repositioning, and OPPO evidence must prove nonzero bounds for the final recovery action.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
+    },
+    {
+      "id": "REG-20260828-3782-SERVICE-AREA-KEYBOARD-HARNESS-MISSING-FOUNDATION-IMPORT",
+      "status": "registered_explicit_listenable_import_required",
+      "appliesTo": ["primary", "mobile", "testing", "tooling"],
+      "mistake": "The first dynamic keyboard-inset test harness referenced ValueListenable and ValueNotifier without importing Flutter foundation, so the focused test failed at compilation before exercising the UI.",
+      "rootCause": "The harness assumed material.dart re-exported the foundation listenable type contract instead of declaring the direct dependency used by the test signature.",
+      "prevention": "Every test file must explicitly import the library that owns new public types, and a focused compile run must pass before interpreting any widget-fitment result.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart"]
     }
   ]
 }
