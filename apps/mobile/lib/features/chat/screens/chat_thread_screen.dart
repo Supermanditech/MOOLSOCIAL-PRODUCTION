@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_services.dart';
@@ -1156,9 +1157,14 @@ class _ChatBottomSheetSafeArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = bottomInset > MoolSpacing.md
+    final baseBottomPadding = bottomInset > MoolSpacing.md
         ? bottomInset
         : MoolSpacing.md;
+    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+      viewPadding: MediaQuery.viewPaddingOf(context),
+      platform: Theme.of(context).platform,
+    );
+    final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
     return SafeArea(
       top: false,
       bottom: false,

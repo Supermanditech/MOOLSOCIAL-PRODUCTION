@@ -8,6 +8,7 @@ import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -475,6 +476,49 @@ void main() {
     );
     expect(blockUser, findsOneWidget);
     expect(tester.getBottomRight(blockUser).dx, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('privacy recovery clears OPPO exported semantics clipping', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 38);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/task-helper?return=/app/work/earn',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-conversation-info')));
+    await tester.pumpAndSettle();
+    final lastSeen = find.byKey(const Key('chat-info-last-seen'));
+    await tester.ensureVisible(lastSeen);
+    await tester.tap(lastSeen);
+    await tester.pumpAndSettle();
+
+    final continueButton = find.byKey(const Key('chat-capability-continue'));
+    final clearance = moolAndroidExportedSemanticsClearance(
+      viewPadding: const EdgeInsets.only(top: 41, bottom: 38),
+      platform: TargetPlatform.android,
+    );
+    final exportedClipBottom = 800 - 38 - clearance;
+    expect(tester.getSize(continueButton).height, greaterThanOrEqualTo(44));
+    expect(
+      tester.getBottomRight(continueButton).dy,
+      lessThanOrEqualTo(exportedClipBottom),
+    );
     expect(tester.takeException(), isNull);
   });
 
