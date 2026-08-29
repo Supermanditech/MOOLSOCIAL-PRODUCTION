@@ -235,8 +235,22 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         );
                       },
                     ),
+                    const Divider(height: 1),
+                    _AccountSettingTile(
+                      keyName: 'chat-settings-notifications',
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Notifications and quiet hours',
+                      subtitle:
+                          'Device and account settings · current choices stay unchanged.',
+                      onTap: () => _showAccountRecovery(
+                        keyName: 'chat-notifications-recovery',
+                        title: 'Notification settings unavailable',
+                        message:
+                            'Notifications and quiet hours cannot be opened right now. Your device and account choices stay unchanged. You can still quiet one conversation from the Chat list.',
+                      ),
+                    ),
                     const _ChatSettingsScopeNote(
-                      'These are local display and send controls. They do not filter messages on MoolSocial servers.',
+                      'Local display and send controls apply only in this app session. Device or account notification choices never change without a confirmed result.',
                     ),
                   ],
                 ),
