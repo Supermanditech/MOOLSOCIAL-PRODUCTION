@@ -150,7 +150,7 @@ class ChatSession extends ChangeNotifier {
     ChatThread(
       id: 'shop-assist',
       title: 'MoolSocial Assist',
-      subtitle: 'Shop orders and purchase help',
+      subtitle: 'Shop order help',
       preview: 'Choose an order question to continue.',
       timeLabel: 'Now',
       type: ChatThreadType.support,
