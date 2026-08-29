@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3907,
-    "sha256": "4A5A254414028E04A8FBAD2C51565664676DB985F3F3EDF19572B6FE38033F4A"
+    "entryCount": 3911,
+    "sha256": "AD5D376FC55DA99F3B73BD0A4A144CD09449983E371FC19B76572E000135C084"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -108,6 +108,25 @@
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
         "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "task": "/root/cursor_shop_chat_phase1_gap_v1_20260829",
+      "role": "subagent",
+      "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
+        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829.md"
       ]
     }
   ],
@@ -1336,6 +1355,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_chat_phase1_gap_v1_20260829",
+        "state": "founder_authorized_2026_08_29",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_chat_phase1_gap_v1_20260829",
+        "workId": "shop-chat-phase1-gap-v1-20260829",
+        "ticketId": "UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-chat-phase1-gap-v1-20260829",
+        "branch": "work/cursor-ui/shop-chat-phase1-gap-v1-20260829",
+        "baselineHead": "03ccd371f0f182b885c35c9a26c69c5348c766ca",
+        "bootstrapCommitSubject": "coordination(shop-chat-phase1-gap-v1-20260829): bind approved Chat gap audit",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,

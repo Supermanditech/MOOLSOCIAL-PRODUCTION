@@ -44633,6 +44633,46 @@
       "prevention": "Select the qualified binding by lane plus exact current task /root/repair_shop_chat_shared_v1_20260829, require one match, and rerun the full handoff gate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3945-BUY-CHAT-BROAD-RG-AUDIT-RETURNED-NO-MATCH",
+      "status": "registered_bounded_exact_owner_queries_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "audit", "buy", "chat", "tooling"],
+      "mistake": "The first broad Buy/Shop Chat source-route-test ripgrep command returned exit 1 with no retained inventory before the founder narrowed approval to audit-only exceptions.",
+      "rootCause": "Several heterogeneous path/pattern searches were grouped without normalizing an expected no-match result or retaining each bounded owner result independently.",
+      "prevention": "Bind the Phase 1 gap ticket, inspect exact Buy owners and route families independently, normalize optional no-match inventories, and preserve all founder-approved behavior unless one deterministic gap is proved.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3946-PHASE1-BOOTSTRAP-CHECKER-COUNT-ANCHOR-MISMATCH",
+      "status": "registered_discover_then_patch_checker_values_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "tooling"],
+      "mistake": "The first Phase 1 bootstrap checker patch combined the new 2026-08-29 authorization state with a remembered continuation-count anchor that did not match, so no checker hunk applied.",
+      "rootCause": "The count was inferred from an earlier branch state rather than rediscovered from the exact bootstrap baseline checker.",
+      "prevention": "Read the exact current continuation count and state allowlist lines, patch them independently, parse the checker and require policy count/readback before bootstrap commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3947-PHASE1-SPARSE-WORKTREE-OMITTED-RETAINED-BUILD-EVIDENCE",
+      "status": "registered_exact_evidence_sparse_roots_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "audit", "git", "evidence"],
+      "mistake": "The first Phase 1 bootstrap memory gate stopped at retained r61.5 format-analysis evidence because the new sparse Cursor worktree omitted the established Shop review artifact directories.",
+      "rootCause": "The audit sparse set included source, config, docs and scripts but not permanent artifact evidence referenced by the current registry generation.",
+      "prevention": "Sparse-add only artifacts/quality/shop-v2-r61-5-cursor-review-20260828 and artifacts/quality/shop-location-address-r61-6-cursor-review-20260828, then rerun memory and coordination bootstrap without changing product source.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/format-analysis.log"]
+    },
+    {
+      "id": "REG-20260829-3948-PHASE1-REGISTRY-FINGERPRINT-USED-NONEXISTENT-MARKDOWN-PATH",
+      "status": "registered_json_registry_object_count_and_hash_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "tooling"],
+      "mistake": "The first Phase 1 registry fingerprint command targeted a nonexistent docs/quality/failure-attempt-registry.md path and therefore produced neither a valid count nor SHA-256.",
+      "rootCause": "A summarized generic registry label was treated as a literal path instead of using the repository's authoritative config/codex-development-regression-registry.json owner.",
+      "prevention": "Parse the authoritative JSON registry, count its entries array, hash that exact file, update the policy binding, and do not treat the failed zero output as evidence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }
