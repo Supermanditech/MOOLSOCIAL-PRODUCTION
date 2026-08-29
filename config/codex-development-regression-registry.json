@@ -44253,6 +44253,16 @@
       "prevention": "Inventory recorded-claim owners whose literal paths are absent, sparse-add only their required repository roots, verify every recorded owner exists, and rerun task_start without editing any excluded owner.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "backend/functions/src/youtube/adapters.ts"]
+    },
+    {
+      "id": "REG-20260829-3907-CHILD3-POST-BOOTSTRAP-COORDINATION-COMMITS-OUTSIDE-CLAIM",
+      "status": "registered_clean_single_bootstrap_child_required",
+      "appliesTo": ["primary", "coordination", "implementation", "git", "tooling"],
+      "mistake": "Child 3 task_start rejected registry and policy changes outside the feature claim because several coordination repair commits followed its one machine-declared bootstrap commit.",
+      "rootCause": "The failed worktree, storage and stale-evidence repairs were committed after Child 3 bootstrap, while the lane gate exempts only the declared bootstrap topology from feature-owner enforcement.",
+      "prevention": "Bind one clean Child 4 continuation of the same Shop Chat ticket from the repaired Child 3 HEAD, place the refreshed registry, policy, checker count and Child 4 evidence in its single declared bootstrap commit, use sparse checkout from the outset, and run task_start before any later commit or source edit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD4-20260829.md"]
     }
   ]
 }
