@@ -44133,6 +44133,16 @@
       "prevention": "For every later edit, patch exactly one literal owner, read it back independently, and register any failed or over-broad operation before proceeding. Validate the already-applied bootstrap owners independently before commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3895-SHOP-CHAT-CHILD3-FULL-WORKTREE-DISK-EXHAUSTION",
+      "status": "registered_sparse_worktree_required",
+      "appliesTo": ["primary", "coordination", "git", "storage", "chat"],
+      "mistake": "Creating the Chat Child 3 worktree as a full checkout attempted to materialize large tracked historical APK and evidence files, exhausted the C drive, and stopped at 43 percent.",
+      "rootCause": "The checkout did not use the repository's established sparse-worktree pattern even though the task needs only source, tests, scripts, config and ticket evidence.",
+      "prevention": "Verify the exact incomplete worktree registration and path, remove only that incomplete worktree, recreate the same Child 3 branch with --no-checkout, enable cone-mode sparse checkout for required repository owners, then checkout the bound bootstrap commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart"]
     }
   ]
 }
