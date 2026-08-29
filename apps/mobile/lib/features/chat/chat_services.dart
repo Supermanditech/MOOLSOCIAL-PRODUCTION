@@ -172,6 +172,28 @@ abstract interface class ChatPhotoGateway {
   });
 }
 
+abstract interface class ChatPrivacyGateway {
+  Future<ChatPrivacySettings> getPrivacySettings();
+
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  );
+
+  Future<List<ChatBlockedAccount>> listBlockedAccounts();
+
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  });
+
+  Future<List<ChatMessageRequest>> listMessageRequests();
+
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  });
+}
+
 abstract interface class ChatPhotoUploadTransport {
   Future<void> put({
     required Uri url,
@@ -268,7 +290,7 @@ ChatGateway buildChatGateway() {
   );
 }
 
-class UnavailableChatGateway implements ChatGateway {
+class UnavailableChatGateway implements ChatGateway, ChatPrivacyGateway {
   const UnavailableChatGateway();
 
   ChatServiceException get _error => const ChatServiceException(
@@ -315,9 +337,36 @@ class UnavailableChatGateway implements ChatGateway {
 
   @override
   Future<void> markThreadRead({required String threadId}) async => throw _error;
+
+  @override
+  Future<ChatPrivacySettings> getPrivacySettings() async => throw _error;
+
+  @override
+  Future<List<ChatBlockedAccount>> listBlockedAccounts() async => throw _error;
+
+  @override
+  Future<List<ChatMessageRequest>> listMessageRequests() async => throw _error;
+
+  @override
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  }) async => throw _error;
+
+  @override
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  }) async => throw _error;
+
+  @override
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  ) async => throw _error;
 }
 
-class AuthenticatedChatGateway implements ChatGateway, ChatPhotoGateway {
+class AuthenticatedChatGateway
+    implements ChatGateway, ChatPhotoGateway, ChatPrivacyGateway {
   AuthenticatedChatGateway({
     required Uri endpoint,
     required this.credentials,
@@ -521,6 +570,65 @@ class AuthenticatedChatGateway implements ChatGateway, ChatPhotoGateway {
     );
   }
 
+  @override
+  Future<ChatPrivacySettings> getPrivacySettings() async =>
+      _decodePrivacySettings(
+        _map(await _invoke('getPrivacySettings', body: const {})),
+      );
+
+  @override
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  ) async => _decodePrivacySettings(
+    _map(
+      await _invoke(
+        'updatePrivacySettings',
+        limitedUseAppCheck: true,
+        body: _encodePrivacySettings(settings),
+      ),
+    ),
+  );
+
+  @override
+  Future<List<ChatBlockedAccount>> listBlockedAccounts() async => _list(
+    await _invoke('listBlockedAccounts', body: const {}),
+  ).map((item) => _decodeBlockedAccount(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  }) async {
+    final result = _map(
+      await _invoke(
+        'setBlockedAccount',
+        limitedUseAppCheck: true,
+        body: {'targetUserId': targetUserId, 'blocked': blocked},
+      ),
+    );
+    return result['blocked'] == true;
+  }
+
+  @override
+  Future<List<ChatMessageRequest>> listMessageRequests() async => _list(
+    await _invoke('listMessageRequests', body: const {}),
+  ).map((item) => _decodeMessageRequest(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  }) async {
+    final result = _map(
+      await _invoke(
+        'resolveMessageRequest',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'accepted': accepted},
+      ),
+    );
+    return result['accepted'] == true;
+  }
+
   Future<Object?> _invoke(
     String operation, {
     required Map<String, Object?> body,
@@ -629,8 +737,45 @@ ChatThread _decodeThread(Map<String, Object?> data) {
     },
     unreadCount: _integer(data['unreadCount']),
     verified: data['verified'] == true,
+    targetUserId: _optionalString(data['targetUserId']),
+    messageRequestPending: data['requestStatus'] == 'pending',
   );
 }
+
+ChatPrivacySettings _decodePrivacySettings(Map<String, Object?> data) =>
+    ChatPrivacySettings(
+      whoCanMessage: switch (_requiredString(data['whoCanMessage'])) {
+        'connections' => ChatMessagePermission.connections,
+        'nobody' => ChatMessagePermission.nobody,
+        _ => ChatMessagePermission.everyone,
+      },
+      messageRequestsEnabled: data['messageRequestsEnabled'] == true,
+      shareLastSeen: data['shareLastSeen'] == true,
+      readReceipts: data['readReceipts'] == true,
+      updatedAt: _optionalDateTime(data['updatedAt']),
+    );
+
+Map<String, Object?> _encodePrivacySettings(ChatPrivacySettings settings) => {
+  'whoCanMessage': settings.whoCanMessage.name,
+  'messageRequestsEnabled': settings.messageRequestsEnabled,
+  'shareLastSeen': settings.shareLastSeen,
+  'readReceipts': settings.readReceipts,
+};
+
+ChatBlockedAccount _decodeBlockedAccount(Map<String, Object?> data) =>
+    ChatBlockedAccount(
+      userId: _requiredString(data['userId']),
+      name: _requiredString(data['name']),
+      handle: _requiredString(data['handle']),
+      blockedAt: _requiredDateTime(data['blockedAt']),
+    );
+
+ChatMessageRequest _decodeMessageRequest(Map<String, Object?> data) =>
+    ChatMessageRequest(
+      thread: _decodeThread(_map(data['thread'])),
+      requestedByUserId: _requiredString(data['requestedByUserId']),
+      requestedAt: _requiredDateTime(data['requestedAt']),
+    );
 
 ChatMessage _decodeMessage(Map<String, Object?> data) {
   final mine = data['mine'] == true;
@@ -778,6 +923,26 @@ String _requiredString(Object? value) {
   }
   return value.trim();
 }
+
+String? _optionalString(Object? value) {
+  if (value == null) return null;
+  return _requiredString(value);
+}
+
+DateTime _requiredDateTime(Object? value) {
+  final parsed = DateTime.tryParse(_requiredString(value));
+  if (parsed == null) {
+    throw const ChatServiceException(
+      'Chat returned an invalid response. Try again.',
+      code: 'invalid_response',
+      retryable: true,
+    );
+  }
+  return parsed;
+}
+
+DateTime? _optionalDateTime(Object? value) =>
+    value == null ? null : _requiredDateTime(value);
 
 int _integer(Object? value) => value is int ? value : 0;
 

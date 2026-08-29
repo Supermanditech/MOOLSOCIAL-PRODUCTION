@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../chat_entry_context.dart';
+import '../chat_models.dart';
 import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
+import 'chat_privacy_screens.dart';
 
 class ChatSettingsScreen extends StatefulWidget {
   const ChatSettingsScreen({
@@ -25,6 +27,14 @@ class ChatSettingsScreen extends StatefulWidget {
 
 class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
   String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(widget.session.loadPrivacySettings());
+    });
+  }
 
   void _confirmSessionChange(String message) {
     setState(() => _statusMessage = message);
@@ -52,6 +62,76 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
         title: title,
         message: message,
       ),
+    );
+  }
+
+  Future<void> _savePrivacy(
+    ChatPrivacySettings requested,
+    String successMessage,
+  ) async {
+    final saved = await widget.session.updatePrivacySettings(requested);
+    if (!mounted) return;
+    if (saved) {
+      _confirmSessionChange(successMessage);
+      return;
+    }
+    await showChatUnavailableCapability(
+      context,
+      keyName: 'chat-privacy-update-recovery',
+      title: 'Privacy setting unchanged',
+      message:
+          widget.session.privacyError ??
+          'This setting could not update. Your current choice stays unchanged.',
+    );
+  }
+
+  Future<void> _chooseMessagePermission() async {
+    final selected = await showModalBottomSheet<ChatMessagePermission>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      sheetAnimationStyle: ChatMotion.sheetStyle(context),
+      builder: (sheetContext) => SingleChildScrollView(
+        child: Padding(
+          key: const Key('chat-message-permission-picker'),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Who can message you',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final permission in ChatMessagePermission.values)
+                ListTile(
+                  key: Key('chat-message-permission-${permission.name}'),
+                  title: Text(_permissionLabel(permission)),
+                  subtitle: Text(_permissionDescription(permission)),
+                  trailing:
+                      widget.session.privacySettings.whoCanMessage == permission
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: MoolColors.success,
+                        )
+                      : const Icon(Icons.circle_outlined),
+                  onTap: () => Navigator.of(sheetContext).pop(permission),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    await _savePrivacy(
+      widget.session.privacySettings.copyWith(whoCanMessage: selected),
+      'Message permission saved.',
     );
   }
 
@@ -264,27 +344,49 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       keyName: 'chat-settings-who-can-message',
                       icon: Icons.person_search_outlined,
                       title: 'Who can message you',
-                      subtitle:
-                          'Account setting · current choice stays unchanged.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-message-permission-recovery',
-                        title: 'Message permission unchanged',
-                        message:
-                            'Who can message you cannot be updated right now. Nothing changed. You can pause Chat in this app session or try again later.',
+                      subtitle: _permissionLabel(
+                        session.privacySettings.whoCanMessage,
                       ),
+                      onTap: () => unawaited(_chooseMessagePermission()),
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-settings-message-requests'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      secondary: const Icon(Icons.mark_email_unread_outlined),
+                      title: const Text('Allow message requests'),
+                      subtitle: const Text(
+                        'People outside your allowed audience can request one conversation.',
+                      ),
+                      value: session.privacySettings.messageRequestsEnabled,
+                      onChanged: session.privacyLoading
+                          ? null
+                          : (enabled) => unawaited(
+                              _savePrivacy(
+                                session.privacySettings.copyWith(
+                                  messageRequestsEnabled: enabled,
+                                ),
+                                enabled
+                                    ? 'Message requests turned on.'
+                                    : 'Message requests turned off.',
+                              ),
+                            ),
                     ),
                     const Divider(height: 1),
                     _AccountSettingTile(
-                      keyName: 'chat-settings-message-requests',
-                      icon: Icons.mark_email_unread_outlined,
-                      title: 'Message requests',
-                      subtitle:
-                          'Account setting · request filters are unavailable.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-message-requests-recovery',
-                        title: 'Message requests unavailable',
-                        message:
-                            'Message request filters cannot be opened right now. Nothing was accepted or rejected. Try again later.',
+                      keyName: 'chat-settings-review-message-requests',
+                      icon: Icons.inbox_outlined,
+                      title: 'Review message requests',
+                      subtitle: 'Accept or decline pending conversations.',
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatMessageRequestsScreen(
+                            session: session,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
                       ),
                     ),
                     const Divider(height: 1),
@@ -292,42 +394,65 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       keyName: 'chat-settings-blocked-accounts',
                       icon: Icons.block_outlined,
                       title: 'Blocked accounts',
-                      subtitle:
-                          'Account setting · blocked accounts stay unchanged.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-blocked-accounts-recovery',
-                        title: 'Blocked accounts unavailable',
-                        message:
-                            'Blocked accounts cannot be loaded or changed right now. Nothing changed. Try again later.',
+                      subtitle: 'Review or unblock accounts safely.',
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatBlockedAccountsScreen(
+                            session: session,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
                       ),
                     ),
                     const Divider(height: 1),
-                    _AccountSettingTile(
-                      keyName: 'chat-settings-last-seen',
-                      icon: Icons.schedule_outlined,
-                      title: 'Share last seen',
-                      subtitle:
-                          'Account setting · current choice stays unchanged.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-settings-last-seen-recovery',
-                        title: 'Last seen setting unchanged',
-                        message:
-                            'Last seen cannot be updated right now. Your current account choice stays unchanged. Try again later.',
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-settings-last-seen'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
                       ),
+                      secondary: const Icon(Icons.schedule_outlined),
+                      title: const Text('Share last seen'),
+                      subtitle: const Text(
+                        'Let eligible people see when you last used Chat.',
+                      ),
+                      value: session.privacySettings.shareLastSeen,
+                      onChanged: session.privacyLoading
+                          ? null
+                          : (enabled) => unawaited(
+                              _savePrivacy(
+                                session.privacySettings.copyWith(
+                                  shareLastSeen: enabled,
+                                ),
+                                enabled
+                                    ? 'Last seen sharing turned on.'
+                                    : 'Last seen sharing turned off.',
+                              ),
+                            ),
                     ),
                     const Divider(height: 1),
-                    _AccountSettingTile(
-                      keyName: 'chat-settings-read-receipts',
-                      icon: Icons.done_all_rounded,
-                      title: 'Read receipts',
-                      subtitle:
-                          'Account setting · current choice stays unchanged.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-settings-read-receipts-recovery',
-                        title: 'Read receipt setting unchanged',
-                        message:
-                            'Read receipts cannot be updated right now. Your current account choice stays unchanged. Try again later.',
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-settings-read-receipts'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
                       ),
+                      secondary: const Icon(Icons.done_all_rounded),
+                      title: const Text('Read receipts'),
+                      subtitle: const Text(
+                        'Share and receive read status where permitted.',
+                      ),
+                      value: session.privacySettings.readReceipts,
+                      onChanged: session.privacyLoading
+                          ? null
+                          : (enabled) => unawaited(
+                              _savePrivacy(
+                                session.privacySettings.copyWith(
+                                  readReceipts: enabled,
+                                ),
+                                enabled
+                                    ? 'Read receipts turned on.'
+                                    : 'Read receipts turned off.',
+                              ),
+                            ),
                     ),
                     const _ChatSettingsScopeNote(
                       'Account-backed privacy and spam controls never change without a confirmed service response.',
@@ -342,6 +467,23 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
     );
   }
 }
+
+String _permissionLabel(ChatMessagePermission permission) =>
+    switch (permission) {
+      ChatMessagePermission.everyone => 'Everyone',
+      ChatMessagePermission.connections => 'Connections only',
+      ChatMessagePermission.nobody => 'No new conversations',
+    };
+
+String _permissionDescription(ChatMessagePermission permission) =>
+    switch (permission) {
+      ChatMessagePermission.everyone =>
+        'Anyone eligible on MoolSocial can start a conversation.',
+      ChatMessagePermission.connections =>
+        'Only people you mutually follow can start directly.',
+      ChatMessagePermission.nobody =>
+        'Existing conversations stay available; no one new can start.',
+    };
 
 class _ChatSettingsSummary extends StatelessWidget {
   const _ChatSettingsSummary({required this.session});

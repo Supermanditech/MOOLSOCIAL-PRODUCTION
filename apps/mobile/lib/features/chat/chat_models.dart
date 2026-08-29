@@ -4,6 +4,72 @@ enum ChatSafetyTarget { person, business, conversation }
 
 enum ChatDeliveryState { sending, delivered, read, failed }
 
+enum ChatMessagePermission { everyone, connections, nobody }
+
+class ChatPrivacySettings {
+  const ChatPrivacySettings({
+    required this.whoCanMessage,
+    required this.messageRequestsEnabled,
+    required this.shareLastSeen,
+    required this.readReceipts,
+    this.updatedAt,
+  });
+
+  static const defaults = ChatPrivacySettings(
+    whoCanMessage: ChatMessagePermission.everyone,
+    messageRequestsEnabled: true,
+    shareLastSeen: true,
+    readReceipts: true,
+  );
+
+  final ChatMessagePermission whoCanMessage;
+  final bool messageRequestsEnabled;
+  final bool shareLastSeen;
+  final bool readReceipts;
+  final DateTime? updatedAt;
+
+  ChatPrivacySettings copyWith({
+    ChatMessagePermission? whoCanMessage,
+    bool? messageRequestsEnabled,
+    bool? shareLastSeen,
+    bool? readReceipts,
+    DateTime? updatedAt,
+  }) => ChatPrivacySettings(
+    whoCanMessage: whoCanMessage ?? this.whoCanMessage,
+    messageRequestsEnabled:
+        messageRequestsEnabled ?? this.messageRequestsEnabled,
+    shareLastSeen: shareLastSeen ?? this.shareLastSeen,
+    readReceipts: readReceipts ?? this.readReceipts,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+class ChatBlockedAccount {
+  const ChatBlockedAccount({
+    required this.userId,
+    required this.name,
+    required this.handle,
+    required this.blockedAt,
+  });
+
+  final String userId;
+  final String name;
+  final String handle;
+  final DateTime blockedAt;
+}
+
+class ChatMessageRequest {
+  const ChatMessageRequest({
+    required this.thread,
+    required this.requestedByUserId,
+    required this.requestedAt,
+  });
+
+  final ChatThread thread;
+  final String requestedByUserId;
+  final DateTime requestedAt;
+}
+
 class ChatPhotoAttachment {
   const ChatPhotoAttachment({
     required this.id,
@@ -64,6 +130,8 @@ class ChatThread {
     this.suggestedPrompts = const [],
     this.participants = const [],
     this.groupDescription,
+    this.targetUserId,
+    this.messageRequestPending = false,
   });
 
   final String id;
@@ -78,6 +146,8 @@ class ChatThread {
   final List<String> suggestedPrompts;
   final List<ChatParticipant> participants;
   final String? groupDescription;
+  final String? targetUserId;
+  final bool messageRequestPending;
 
   bool get isGroup => participants.isNotEmpty;
 

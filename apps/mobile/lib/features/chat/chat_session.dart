@@ -239,6 +239,12 @@ class ChatSession extends ChangeNotifier {
   bool _globalReviewBeforeSendingForSession = false;
   bool _hideMessagePreviewsForSession = false;
   bool _showSuggestedPromptsForSession = true;
+  ChatPrivacySettings _privacySettings = ChatPrivacySettings.defaults;
+  final List<ChatBlockedAccount> _blockedAccounts = [];
+  final List<ChatMessageRequest> _messageRequests = [];
+  bool privacyLoading = false;
+  bool privacyLoaded = false;
+  String? privacyError;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -666,6 +672,209 @@ class ChatSession extends ChangeNotifier {
   bool get hideMessagePreviewsForSession => _hideMessagePreviewsForSession;
 
   bool get showSuggestedPromptsForSession => _showSuggestedPromptsForSession;
+
+  ChatPrivacySettings get privacySettings => _privacySettings;
+
+  List<ChatBlockedAccount> get blockedAccounts =>
+      List.unmodifiable(_blockedAccounts);
+
+  List<ChatMessageRequest> get messageRequests =>
+      List.unmodifiable(_messageRequests);
+
+  ChatPrivacyGateway? get _privacyGateway =>
+      _gateway is ChatPrivacyGateway ? _gateway as ChatPrivacyGateway : null;
+
+  Future<bool> loadPrivacySettings({bool refresh = false}) async {
+    if (privacyLoading || (privacyLoaded && !refresh)) return privacyLoaded;
+    final gateway = _privacyGateway;
+    if (gateway == null) {
+      privacyLoaded = _gateway == null;
+      if (!privacyLoaded) {
+        privacyError = 'Privacy settings are unavailable right now.';
+        notifyListeners();
+      }
+      return privacyLoaded;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _privacySettings = await gateway.getPrivacySettings();
+      privacyLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Privacy settings could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updatePrivacySettings(ChatPrivacySettings requested) async {
+    if (privacyLoading) return false;
+    final previous = _privacySettings;
+    final gateway = _privacyGateway;
+    if (gateway == null && _gateway == null) {
+      _privacySettings = requested;
+      privacyLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) {
+      privacyError = 'Privacy settings are unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _privacySettings = await gateway.updatePrivacySettings(requested);
+      privacyLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _privacySettings = previous;
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      _privacySettings = previous;
+      privacyError = 'Privacy settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadBlockedAccounts() async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _blockedAccounts
+        ..clear()
+        ..addAll(await gateway.listBlockedAccounts());
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Blocked accounts could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> setBlockedAccount(
+    String targetUserId, {
+    required bool blocked,
+  }) async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) {
+      privacyError = 'Blocking is unavailable right now. Nothing changed.';
+      notifyListeners();
+      return false;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.setBlockedAccount(
+        targetUserId: targetUserId,
+        blocked: blocked,
+      );
+      if (saved != blocked) {
+        throw const ChatServiceException(
+          'Blocking returned an invalid result. Nothing changed.',
+        );
+      }
+      if (!blocked) {
+        _blockedAccounts.removeWhere((item) => item.userId == targetUserId);
+      }
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Blocking could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadMessageRequests() async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _messageRequests
+        ..clear()
+        ..addAll(await gateway.listMessageRequests());
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Message requests could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> resolveMessageRequest(
+    String threadId, {
+    required bool accepted,
+  }) async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.resolveMessageRequest(
+        threadId: threadId,
+        accepted: accepted,
+      );
+      if (saved != accepted) {
+        throw const ChatServiceException(
+          'Message request returned an invalid result. Nothing changed.',
+        );
+      }
+      final index = _messageRequests.indexWhere(
+        (request) => request.thread.id == threadId,
+      );
+      if (index >= 0) {
+        final request = _messageRequests.removeAt(index);
+        if (accepted && !_threads.any((thread) => thread.id == threadId)) {
+          _threads.insert(0, request.thread);
+        }
+      }
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Message request could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
 
   bool chatAvailableForConversationInSession(String threadId) =>
       _chatAvailableForSession[threadId] ?? true;
@@ -1367,6 +1576,12 @@ class ChatSession extends ChangeNotifier {
     _globalReviewBeforeSendingForSession = false;
     _hideMessagePreviewsForSession = false;
     _showSuggestedPromptsForSession = true;
+    _privacySettings = ChatPrivacySettings.defaults;
+    _blockedAccounts.clear();
+    _messageRequests.clear();
+    privacyLoading = false;
+    privacyLoaded = false;
+    privacyError = null;
     selectedFilter = null;
     unreadOnly = false;
     noticeMessage = null;

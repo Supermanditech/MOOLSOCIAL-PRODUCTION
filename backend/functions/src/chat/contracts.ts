@@ -27,6 +27,32 @@ export interface ChatThreadRecord {
   type: ChatThreadType;
   unreadCount: number;
   verified: boolean;
+  targetUserId?: string;
+  requestStatus?: ChatMessageRequestStatus;
+}
+
+export type ChatMessagePermission = "everyone" | "connections" | "nobody";
+export type ChatMessageRequestStatus = "pending" | "accepted";
+
+export interface ChatPrivacySettings {
+  whoCanMessage: ChatMessagePermission;
+  messageRequestsEnabled: boolean;
+  shareLastSeen: boolean;
+  readReceipts: boolean;
+  updatedAt: string;
+}
+
+export interface ChatBlockedAccount {
+  userId: string;
+  name: string;
+  handle: string;
+  blockedAt: string;
+}
+
+export interface ChatMessageRequestRecord {
+  thread: ChatThreadRecord;
+  requestedByUserId: string;
+  requestedAt: string;
 }
 
 export interface ChatMessageRecord {
@@ -153,6 +179,23 @@ export interface ChatRepository {
     requestDigest: string,
   ): Promise<ChatMessageRecord>;
   markThreadRead(userId: string, threadId: string): Promise<ChatReadResult>;
+  getPrivacySettings?(userId: string): Promise<ChatPrivacySettings>;
+  updatePrivacySettings?(
+    userId: string,
+    settings: Omit<ChatPrivacySettings, "updatedAt">,
+  ): Promise<ChatPrivacySettings>;
+  listBlockedAccounts?(userId: string): Promise<ChatBlockedAccount[]>;
+  setBlockedAccount?(
+    actor: ChatProfile,
+    target: ChatProfile,
+    blocked: boolean,
+  ): Promise<{ blocked: boolean }>;
+  listMessageRequests?(userId: string): Promise<ChatMessageRequestRecord[]>;
+  resolveMessageRequest?(
+    userId: string,
+    threadId: string,
+    accepted: boolean,
+  ): Promise<{ threadId: string; accepted: boolean }>;
 }
 
 export type ChatProfileResolver = (userId: string) => Promise<ChatProfile>;

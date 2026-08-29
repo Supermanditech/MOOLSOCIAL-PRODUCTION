@@ -1,14 +1,21 @@
 import { createHash } from "node:crypto";
 
-import type { DocumentData, Firestore } from "firebase-admin/firestore";
+import type {
+  DocumentData,
+  Firestore,
+  Transaction,
+} from "firebase-admin/firestore";
 
 import {
   ChatError,
   type ChatMessageRecord,
+  type ChatMessagePermission,
+  type ChatMessageRequestRecord,
   type ChatPhotoAttachmentStore,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
+  type ChatPrivacySettings,
   type ChatRepository,
   type ChatThreadRecord,
 } from "./contracts.js";
@@ -26,8 +33,14 @@ export class FirestoreChatRepository implements ChatRepository {
       .where("participantIds", "array-contains", userId)
       .limit(limit)
       .get();
-    return snapshot.docs
-      .map((document) => threadFromDocument(document.id, document.data(), userId))
+    const visible = await Promise.all(snapshot.docs.map(async (document) => {
+      const data = document.data();
+      if (!requestVisibleInInbox(data, userId)) return undefined;
+      if (await this.blockedForDirectThread(userId, data)) return undefined;
+      return threadFromDocument(document.id, data, userId);
+    }));
+    return visible
+      .filter((thread): thread is ChatThreadRecord => thread !== undefined)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
@@ -60,8 +73,51 @@ export class FirestoreChatRepository implements ChatRepository {
     const threadId = `direct-${digest(participantIds.join(":"))}`;
     const ref = this.firestore.collection("chatThreads").doc(threadId);
     await this.firestore.runTransaction(async (transaction) => {
-      const existing = await transaction.get(ref);
-      if (existing.exists) return;
+      const targetPreferencesRef = this.privacyRef(target.userId);
+      const actorBlocksTarget = this.blockRef(actor.userId, target.userId);
+      const targetBlocksActor = this.blockRef(target.userId, actor.userId);
+      const actorFollowsTarget = this.followRef(actor.userId, target.userId);
+      const targetFollowsActor = this.followRef(target.userId, actor.userId);
+      const [existing, targetPreferences, actorBlock, targetBlock, actorFollow, targetFollow] =
+        await Promise.all([
+          transaction.get(ref),
+          transaction.get(targetPreferencesRef),
+          transaction.get(actorBlocksTarget),
+          transaction.get(targetBlocksActor),
+          transaction.get(actorFollowsTarget),
+          transaction.get(targetFollowsActor),
+        ]);
+      if (actorBlock.exists || targetBlock.exists) {
+        throw new ChatError(
+          "permission_denied",
+          "This conversation is unavailable.",
+          403,
+        );
+      }
+      if (existing.exists) {
+        if (existing.get("requestStatus") === "rejected") {
+          throw new ChatError(
+            "permission_denied",
+            "This conversation request was not accepted.",
+            403,
+          );
+        }
+        return;
+      }
+      const preferences = privacyFromData(targetPreferences.data());
+      const mutuallyConnected = actorFollow.get("followed") === true &&
+        targetFollow.get("followed") === true;
+      const accepted = preferences.whoCanMessage === "everyone" ||
+        (preferences.whoCanMessage === "connections" && mutuallyConnected);
+      if (!accepted &&
+          (preferences.whoCanMessage === "nobody" ||
+            !preferences.messageRequestsEnabled)) {
+        throw new ChatError(
+          "permission_denied",
+          "This member is not accepting new conversations.",
+          403,
+        );
+      }
       const updatedAt = this.now().toISOString();
       transaction.create(ref, {
         schemaVersion: 1,
@@ -82,6 +138,11 @@ export class FirestoreChatRepository implements ChatRepository {
           [actor.userId]: updatedAt,
           [target.userId]: updatedAt,
         },
+        requestStatus: accepted ? "accepted" : "pending",
+        requestedByUserId: actor.userId,
+        requestRecipientId: target.userId,
+        requestedAt: updatedAt,
+        requestMessageSent: false,
       });
     });
     const saved = await ref.get();
@@ -110,6 +171,8 @@ export class FirestoreChatRepository implements ChatRepository {
       const existing = await transaction.get(messageRef);
       const repliedMessage = replyRef ? await transaction.get(replyRef) : undefined;
       assertParticipant(thread.data(), actor.userId);
+      await this.assertTransactionNotBlocked(transaction, actor.userId, thread.data());
+      assertRequestCanSend(thread.data(), actor.userId);
       if (existing.exists) {
         if (existing.get("requestDigest") !== requestDigest) {
           throw new ChatError(
@@ -177,6 +240,9 @@ export class FirestoreChatRepository implements ChatRepository {
         updatedAt: createdAt,
         unreadCounts,
         lastReadAtBy,
+        ...(threadData.requestStatus === "pending"
+          ? { requestMessageSent: true }
+          : {}),
       });
     });
     return this.publicMessage(
@@ -513,11 +579,158 @@ export class FirestoreChatRepository implements ChatRepository {
     return { threadId, unreadCount: 0 };
   }
 
+  async getPrivacySettings(userId: string): Promise<ChatPrivacySettings> {
+    const snapshot = await this.privacyRef(userId).get();
+    return privacyFromData(snapshot.data());
+  }
+
+  async updatePrivacySettings(
+    userId: string,
+    settings: Omit<ChatPrivacySettings, "updatedAt">,
+  ): Promise<ChatPrivacySettings> {
+    const updatedAt = this.now().toISOString();
+    await this.privacyRef(userId).set({
+      schemaVersion: 1,
+      ...settings,
+      updatedAt,
+    }, { merge: true });
+    return { ...settings, updatedAt };
+  }
+
+  async listBlockedAccounts(userId: string) {
+    const snapshot = await this.firestore
+      .collection("chatBlocks")
+      .where("blockerUserId", "==", userId)
+      .get();
+    return snapshot.docs.map((document) => ({
+      userId: String(document.get("blockedUserId")),
+      name: String(document.get("blockedName") ?? "MoolSocial member"),
+      handle: String(document.get("blockedHandle") ?? ""),
+      blockedAt: String(document.get("blockedAt") ?? ""),
+    })).sort((left, right) => right.blockedAt.localeCompare(left.blockedAt));
+  }
+
+  async setBlockedAccount(
+    actor: ChatProfile,
+    target: ChatProfile,
+    blocked: boolean,
+  ) {
+    const ref = this.blockRef(actor.userId, target.userId);
+    if (blocked) {
+      await ref.set({
+        schemaVersion: 1,
+        blockerUserId: actor.userId,
+        blockedUserId: target.userId,
+        blockedName: target.name,
+        blockedHandle: target.handle,
+        blockedAt: this.now().toISOString(),
+      });
+    } else {
+      await ref.delete();
+    }
+    return { blocked };
+  }
+
+  async listMessageRequests(userId: string): Promise<ChatMessageRequestRecord[]> {
+    const snapshot = await this.firestore
+      .collection("chatThreads")
+      .where("participantIds", "array-contains", userId)
+      .limit(50)
+      .get();
+    const requests = await Promise.all(snapshot.docs.map(async (document) => {
+      const data = document.data();
+      if (data.requestStatus !== "pending" || data.requestRecipientId !== userId) {
+        return undefined;
+      }
+      if (await this.blockedForDirectThread(userId, data)) return undefined;
+      return {
+        thread: threadFromDocument(document.id, data, userId),
+        requestedByUserId: String(data.requestedByUserId),
+        requestedAt: String(data.requestedAt ?? data.updatedAt ?? ""),
+      };
+    }));
+    return requests
+      .filter((request): request is ChatMessageRequestRecord => request !== undefined)
+      .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt));
+  }
+
+  async resolveMessageRequest(
+    userId: string,
+    threadId: string,
+    accepted: boolean,
+  ) {
+    const ref = this.firestore.collection("chatThreads").doc(threadId);
+    await this.firestore.runTransaction(async (transaction) => {
+      const thread = await transaction.get(ref);
+      const data = thread.data();
+      assertParticipant(data, userId);
+      if (data?.requestStatus !== "pending" || data.requestRecipientId !== userId) {
+        throw new ChatError("not_found", "That message request is no longer available.", 404);
+      }
+      transaction.update(ref, {
+        requestStatus: accepted ? "accepted" : "rejected",
+        requestResolvedAt: this.now().toISOString(),
+      });
+    });
+    return { threadId, accepted };
+  }
+
   private async threadForParticipant(userId: string, threadId: string) {
     const ref = this.firestore.collection("chatThreads").doc(threadId);
     const snapshot = await ref.get();
-    assertParticipant(snapshot.data(), userId);
+    const data = snapshot.data();
+    assertParticipant(data, userId);
+    if (snapshot.get("requestStatus") === "rejected") {
+      throw new ChatError("permission_denied", "This conversation is unavailable.", 403);
+    }
+    if (await this.blockedForDirectThread(userId, data!)) {
+      throw new ChatError("permission_denied", "This conversation is unavailable.", 403);
+    }
     return { ref, snapshot };
+  }
+
+  private privacyRef(userId: string) {
+    return this.firestore.collection("chatPrivacySettings").doc(userId);
+  }
+
+  private blockRef(blockerUserId: string, blockedUserId: string) {
+    return this.firestore.collection("chatBlocks")
+      .doc(digest(`${blockerUserId}:${blockedUserId}`));
+  }
+
+  private followRef(viewerUserId: string, authorId: string) {
+    return this.firestore.collection("socialFollowRelationships")
+      .doc(digest(`${viewerUserId}:${authorId}`));
+  }
+
+  private async blockedForDirectThread(userId: string, data: DocumentData) {
+    const participants = participantIdsFrom(data);
+    if (participants.length !== 2) return false;
+    const other = participants.find((participant) => participant !== userId);
+    if (!other) return false;
+    const [outgoing, incoming] = await Promise.all([
+      this.blockRef(userId, other).get(),
+      this.blockRef(other, userId).get(),
+    ]);
+    return outgoing?.exists === true || incoming?.exists === true;
+  }
+
+  private async assertTransactionNotBlocked(
+    transaction: Transaction,
+    userId: string,
+    data: DocumentData | undefined,
+  ) {
+    const participants = participantIdsFrom(data);
+    if (participants.length !== 2) return;
+    const other = participants.find((participant) => participant !== userId);
+    if (!other) return;
+    const [outgoing, incoming] = await Promise.all([
+      transaction.get(this.blockRef(userId, other)),
+      transaction.get(this.blockRef(other, userId)),
+    ]);
+    if (outgoing.exists || incoming.exists) {
+      throw new ChatError("permission_denied", "This conversation is unavailable.", 403);
+    }
   }
 
   private requirePhotoStore(): ChatPhotoAttachmentStore {
@@ -538,7 +751,14 @@ export class FirestoreChatRepository implements ChatRepository {
     userId: string,
     threadData?: DocumentData,
   ): Promise<ChatMessageRecord> {
-    const message = messageFromDocument(id, data, userId, threadData);
+    const hiddenReceiptUsers = await this.hiddenReceiptUsers(data, threadData);
+    const message = messageFromDocument(
+      id,
+      data,
+      userId,
+      threadData,
+      hiddenReceiptUsers,
+    );
     const photo = photoFromDocument(data);
     if (!photo) return message;
     const signed = await this.requirePhotoStore().readUrl({
@@ -556,6 +776,24 @@ export class FirestoreChatRepository implements ChatRepository {
         readUrlExpiresAt: signed.expiresAt,
       },
     };
+  }
+
+  private async hiddenReceiptUsers(
+    messageData: DocumentData,
+    threadData?: DocumentData,
+  ): Promise<ReadonlySet<string>> {
+    const senderId = String(messageData.senderId ?? "");
+    const recipients = participantIdsFrom(threadData)
+      .filter((participantId) => participantId !== senderId);
+    if (recipients.length === 0) return new Set();
+    const snapshots = await Promise.all(
+      recipients.map((participantId) => this.privacyRef(participantId).get()),
+    );
+    return new Set(
+      snapshots.flatMap((snapshot, index) =>
+        snapshot?.get("readReceipts") === false ? [recipients[index]!] : []
+      ),
+    );
   }
 }
 
@@ -599,6 +837,38 @@ function threadFromDocument(
       : "people",
     unreadCount: unreadCounts[userId] ?? 0,
     verified: data.verified === true,
+    ...(otherUserId !== userId ? { targetUserId: otherUserId } : {}),
+    ...(data.requestStatus === "pending" ? { requestStatus: "pending" as const } : {}),
+  };
+}
+
+function requestVisibleInInbox(data: DocumentData, userId: string): boolean {
+  if (data.requestStatus === "rejected") return false;
+  return data.requestStatus !== "pending" || data.requestedByUserId === userId;
+}
+
+function assertRequestCanSend(data: DocumentData | undefined, userId: string): void {
+  if (data?.requestStatus !== "pending") return;
+  if (data.requestedByUserId !== userId || data.requestMessageSent === true) {
+    throw new ChatError(
+      "permission_denied",
+      "Wait for this member to accept your message request.",
+      403,
+    );
+  }
+}
+
+function privacyFromData(data: DocumentData | undefined): ChatPrivacySettings {
+  const permission: ChatMessagePermission = data?.whoCanMessage === "connections" ||
+      data?.whoCanMessage === "nobody"
+    ? data.whoCanMessage
+    : "everyone";
+  return {
+    whoCanMessage: permission,
+    messageRequestsEnabled: data?.messageRequestsEnabled !== false,
+    shareLastSeen: data?.shareLastSeen !== false,
+    readReceipts: data?.readReceipts !== false,
+    updatedAt: String(data?.updatedAt ?? ""),
   };
 }
 
@@ -607,6 +877,7 @@ function messageFromDocument(
   data: DocumentData,
   userId: string,
   threadData?: DocumentData,
+  hiddenReceiptUsers: ReadonlySet<string> = new Set(),
 ): ChatMessageRecord {
   const reactions = data.reactions && typeof data.reactions === "object"
     ? data.reactions as Record<string, unknown>
@@ -624,6 +895,7 @@ function messageFromDocument(
   const readCount = createdAt
     ? participantIds.filter((participantId) =>
       participantId !== senderId &&
+      !hiddenReceiptUsers.has(participantId) &&
       String(lastReadAtBy[participantId] ?? "").localeCompare(createdAt) >= 0
     ).length
     : 0;

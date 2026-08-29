@@ -3,11 +3,13 @@ import { createHash } from "node:crypto";
 import {
   ChatError,
   type ChatMessageRecord,
+  type ChatMessagePermission,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfileResolver,
   type ChatRepository,
   type ChatThreadRecord,
+  type ChatPrivacySettings,
 } from "./contracts.js";
 
 export class ChatService {
@@ -219,6 +221,93 @@ export class ChatService {
       requiredIdentifier(body, "threadId"),
     );
   }
+
+  getPrivacySettings(userId: string, raw: unknown): Promise<ChatPrivacySettings> {
+    object(raw);
+    return this.requireCapability("getPrivacySettings")(userId);
+  }
+
+  updatePrivacySettings(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatPrivacySettings> {
+    const body = object(raw);
+    const whoCanMessage = requiredMessagePermission(body.whoCanMessage);
+    return this.requireCapability("updatePrivacySettings")(userId, {
+      whoCanMessage,
+      messageRequestsEnabled: requiredBoolean(body, "messageRequestsEnabled"),
+      shareLastSeen: requiredBoolean(body, "shareLastSeen"),
+      readReceipts: requiredBoolean(body, "readReceipts"),
+    });
+  }
+
+  listBlockedAccounts(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listBlockedAccounts")(userId);
+  }
+
+  async setBlockedAccount(userId: string, raw: unknown) {
+    const body = object(raw);
+    const targetUserId = requiredIdentifier(body, "targetUserId");
+    if (targetUserId === userId) {
+      throw new ChatError("bad_request", "You cannot block yourself.", 400);
+    }
+    const [actor, target] = await Promise.all([
+      this.resolveProfile(userId),
+      this.resolveProfile(targetUserId),
+    ]);
+    return this.requireCapability("setBlockedAccount")(
+      actor,
+      target,
+      requiredBoolean(body, "blocked"),
+    );
+  }
+
+  listMessageRequests(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listMessageRequests")(userId);
+  }
+
+  resolveMessageRequest(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("resolveMessageRequest")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredBoolean(body, "accepted"),
+    );
+  }
+
+  private requireCapability<K extends keyof ChatRepository>(
+    name: K,
+  ): NonNullable<ChatRepository[K]> {
+    const capability = this.repository[name];
+    if (typeof capability !== "function") {
+      throw new ChatError(
+        "service_unavailable",
+        "Chat privacy controls are unavailable right now. Try again later.",
+        503,
+        true,
+      );
+    }
+    return capability.bind(this.repository) as NonNullable<ChatRepository[K]>;
+  }
+}
+
+function requiredMessagePermission(value: unknown): ChatMessagePermission {
+  if (value === "everyone" || value === "connections" || value === "nobody") {
+    return value;
+  }
+  throw new ChatError("bad_request", "Choose who can message you.", 400);
+}
+
+function requiredBoolean(
+  body: Record<string, unknown>,
+  name: string,
+): boolean {
+  if (typeof body[name] !== "boolean") {
+    throw new ChatError("bad_request", `${name} must be confirmed.`, 400);
+  }
+  return body[name] as boolean;
 }
 
 function requiredPhotoFileName(body: Record<string, unknown>): string {

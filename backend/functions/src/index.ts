@@ -2654,7 +2654,10 @@ export const moolSocialChat = onRequest(
         operation === "sendPhotoMessage" ||
         operation === "setReaction" ||
         operation === "forwardMessage" ||
-        operation === "markThreadRead";
+        operation === "markThreadRead" ||
+        operation === "updatePrivacySettings" ||
+        operation === "setBlockedAccount" ||
+        operation === "resolveMessageRequest";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2689,6 +2692,18 @@ export const moolSocialChat = onRequest(
                   ? await chatService().forwardMessage(ownerUserId, body)
                 : operation === "markThreadRead"
                   ? await chatService().markThreadRead(ownerUserId, body)
+                : operation === "getPrivacySettings"
+                  ? await chatService().getPrivacySettings(ownerUserId, body)
+                : operation === "updatePrivacySettings"
+                  ? await chatService().updatePrivacySettings(ownerUserId, body)
+                : operation === "listBlockedAccounts"
+                  ? await chatService().listBlockedAccounts(ownerUserId, body)
+                : operation === "setBlockedAccount"
+                  ? await chatService().setBlockedAccount(ownerUserId, body)
+                : operation === "listMessageRequests"
+                  ? await chatService().listMessageRequests(ownerUserId, body)
+                : operation === "resolveMessageRequest"
+                  ? await chatService().resolveMessageRequest(ownerUserId, body)
               : (() => {
                   throw new ChatError(
                     "bad_request",

@@ -598,6 +598,14 @@ class _ConversationInfoScreen extends StatefulWidget {
 class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
   String? _statusMessage;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(widget.session.loadPrivacySettings());
+    });
+  }
+
   void _confirmLocalChange(String message) {
     setState(() => _statusMessage = message);
     final messenger = ScaffoldMessenger.of(context);
@@ -612,21 +620,6 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
       );
   }
 
-  void _showAccountSettingRecovery({
-    required String keyName,
-    required String title,
-  }) {
-    unawaited(
-      showChatUnavailableCapability(
-        context,
-        keyName: keyName,
-        title: title,
-        message:
-            'This account setting cannot be updated right now. Your current choice stays unchanged. Try again later.',
-      ),
-    );
-  }
-
   void _showSafetyRecovery(ChatThread thread) {
     final copy = _conversationSafetyCopy(thread);
     unawaited(
@@ -637,6 +630,68 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         message: copy.recoveryMessage,
       ),
     );
+  }
+
+  Future<void> _savePrivacyChoice(
+    ChatPrivacySettings requested,
+    String success,
+  ) async {
+    final saved = await widget.session.updatePrivacySettings(requested);
+    if (!mounted) return;
+    if (saved) {
+      _confirmLocalChange(success);
+      return;
+    }
+    await showChatUnavailableCapability(
+      context,
+      keyName: 'chat-info-privacy-recovery',
+      title: 'Privacy setting unchanged',
+      message:
+          widget.session.privacyError ??
+          'This account setting could not update. Nothing changed.',
+    );
+  }
+
+  Future<void> _blockConversation(ChatThread thread) async {
+    final targetUserId = thread.targetUserId;
+    if (targetUserId == null) {
+      _showSafetyRecovery(thread);
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('chat-block-confirmation'),
+        title: Text('Block ${thread.title}?'),
+        content: const Text(
+          'They will not be able to start or continue a direct conversation with you. You can unblock them later in Chat settings.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('chat-block-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('chat-block-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final blocked = await widget.session.setBlockedAccount(
+      targetUserId,
+      blocked: true,
+    );
+    if (!mounted) return;
+    if (!blocked) {
+      _showSafetyRecovery(thread);
+      return;
+    }
+    widget.session.setChatAvailableForSession(thread.id, available: false);
+    _confirmLocalChange('${thread.title} is blocked.');
   }
 
   @override
@@ -930,13 +985,21 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Share last seen'),
                       subtitle: const Text(
-                        'Account setting · current choice stays unchanged.',
+                        'Let eligible people see when you last used Chat.',
                       ),
-                      value: true,
-                      onChanged: (_) => _showAccountSettingRecovery(
-                        keyName: 'chat-last-seen-recovery',
-                        title: 'Last seen setting unchanged',
-                      ),
+                      value: session.privacySettings.shareLastSeen,
+                      onChanged: session.privacyLoading
+                          ? null
+                          : (enabled) => unawaited(
+                              _savePrivacyChoice(
+                                session.privacySettings.copyWith(
+                                  shareLastSeen: enabled,
+                                ),
+                                enabled
+                                    ? 'Last seen sharing turned on.'
+                                    : 'Last seen sharing turned off.',
+                              ),
+                            ),
                     ),
                     const Divider(height: 1),
                     SwitchListTile.adaptive(
@@ -946,13 +1009,21 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Read receipts'),
                       subtitle: const Text(
-                        'Account setting · current choice stays unchanged.',
+                        'Share and receive read status where permitted.',
                       ),
-                      value: true,
-                      onChanged: (_) => _showAccountSettingRecovery(
-                        keyName: 'chat-read-receipts-recovery',
-                        title: 'Read receipt setting unchanged',
-                      ),
+                      value: session.privacySettings.readReceipts,
+                      onChanged: session.privacyLoading
+                          ? null
+                          : (enabled) => unawaited(
+                              _savePrivacyChoice(
+                                session.privacySettings.copyWith(
+                                  readReceipts: enabled,
+                                ),
+                                enabled
+                                    ? 'Read receipts turned on.'
+                                    : 'Read receipts turned off.',
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -967,7 +1038,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   title: Text(safety.label),
                   subtitle: Text(safety.description),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showSafetyRecovery(thread),
+                  onTap: () => unawaited(_blockConversation(thread)),
                 ),
               ),
             ],
