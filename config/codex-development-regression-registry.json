@@ -44673,6 +44673,56 @@
       "prevention": "Keep both governance owners in the repair primary claim, record the failure there, and restore the Cursor branch to its sealed bootstrap generation before product testing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3953-PHASE1-GENERATED-BUILD-CACHE-REMOVAL-BLOCKED",
+      "status": "registered_zero_files_removed_sparse_checkout_reclaim_used",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "storage", "tooling"],
+      "mistake": "The exact validated PowerShell removal of two generated apps/mobile/build caches was blocked by execution policy before removing either directory.",
+      "rootCause": "Recursive deletion is disallowed in this execution environment even for literal verified generated-cache targets authorized by the founder.",
+      "prevention": "Record zero deletion, do not bypass policy, de-materialize retained artifact roots through sparse checkout for the focused test, and request the founder's existing parser-checked cleanup script only if build capacity remains insufficient.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3954-ORDER-ASSIST-BACK-TEST-AMBIGUOUS-TEXT-CONTAINING",
+      "status": "registered_exact_assist_status_sentence_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "testing", "buy", "chat"],
+      "mistake": "The first focused order Assist Chat run passed the route and Back journey but failed its final finder because textContaining matched both the selected-intent card and retained notice.",
+      "rootCause": "The assertion used a shared phrase even though two intentionally visible customer surfaces retain that phrase after exact Back recovery.",
+      "prevention": "Assert the exact selected-intent card sentence, keep both valid notices unchanged, and rerun only the same two focused tests before expanding coverage.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3955-ORDER-ASSIST-TEST-FIX-PATCH-USED-PREFORMAT-LINE",
+      "status": "registered_exact_formatted_test_context_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "testing", "tooling"],
+      "mistake": "The first test-fix patch expected the ambiguous finder on one line, but dart format had split it across four lines, so the multi-file patch applied nothing.",
+      "rootCause": "The remembered pre-format assertion layout was used instead of reading the exact current test context before patching.",
+      "prevention": "Read the exact formatted lines, patch the test independently from the registry owner, and require one exact replacement before rerunning.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3956-CONNECTED-CHAT-SUITE-NO-PUB-USED-STALE-SUPPORT-SNAPSHOT",
+      "status": "registered_wrapper_pub_resolution_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "testing", "flutter", "chat"],
+      "mistake": "The first connected Chat suite used --no-pub after the clean-support wrapper restored the tracked package snapshot, so four app-level tests could not resolve share_plus while the independent order tests continued.",
+      "rootCause": "The focused passing run resolved dependencies inside the guarded invocation, but the expanded command incorrectly assumed that generated package resolution persisted after the wrapper restored tracked support owners.",
+      "prevention": "Rerun the same connected files without --no-pub inside the wrapper, require dependency resolution before compilation, and retain the independent passing order-Assist evidence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/pubspec.yaml", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3957-PRIMARY-REGISTRY-EVIDENCE-POINTED-TO-CURSOR-ONLY-TICKET",
+      "status": "registered_branch_local_existing_evidence_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "evidence", "tooling"],
+      "mistake": "The first primary repair memory gate for the post-bootstrap failures stopped because REG3953 referenced the Cursor ticket document, which is not materialized on the repair branch.",
+      "rootCause": "The failure was correctly moved to the primary repair lane, but its evidence owner was not changed from the branch-local Cursor ticket to the existing repair ticket.",
+      "prevention": "Reference the existing repair ticket for the storage failure, require every evidence path to exist in the recording branch, and rerun memory before staging.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     }
   ]
 }
