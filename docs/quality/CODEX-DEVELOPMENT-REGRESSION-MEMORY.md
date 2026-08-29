@@ -3644,3 +3644,18 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3834 rejects an empty action that still overlaps the rendered NavigationBar.
   Project all three rects, then move the keyed action group by the smallest
   explicit layout offset that preserves 44-pixel targets and proves zero overlap.
+- REG3835 rejects assuming the empty-inbox Open Feed key for the full journey.
+  Seed one real thread, enter Discover through `chat-new`, then open Feed and
+  return to the loaded people list for connect-to-direct-Chat completion.
+- REG3836 rejects a Discover empty action after people have loaded. Use the
+  persistent Social `chat-more` → `Open public Feed` entry for the complete
+  populated Feed-to-Discover-to-direct-Chat journey.
+- REG3837 rejects an unencoded nested `/app/social?sub=feed` return query. Encode
+  the complete Social URI as one Chat return value before asserting the Social
+  title and persistent Feed menu action.
+- REG3838 rejects restricting the persistent public Feed menu to Social-origin
+  Chat. Expose one shared Feed entry in every context and preserve the exact
+  originating Chat route on native Back.
+- REG3839 rejects assuming Android Back pops a Social root directly to Chat.
+  Preserve Social shell Back ownership, continue through its global Chat action
+  and verify Chat Back returns to Feed within the approved navigation contract.

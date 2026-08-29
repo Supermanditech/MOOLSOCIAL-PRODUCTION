@@ -43613,6 +43613,56 @@
       "prevention": "Project feed, start and navigation rect scalars in the focused test, then shift the keyed action group by the smallest explicit layout offset that proves zero overlap and stable 44-pixel targets.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3835-OPEN-FEED-JOURNEY-TEST-ASSUMED-EMPTY-ACTION-ENTRY",
+      "status": "registered_proven_nonempty_discover_entry_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "The first complete Open Feed journey test assumed the empty-inbox Open Feed action existed at its mounted Work route, but the rendered state exposed no such key.",
+      "rootCause": "The test coupled feed-route acceptance to an unproven initial emptiness state instead of entering Discover through the established nonempty Person+ journey.",
+      "prevention": "Seed one truthful existing thread, enter Discover through chat-new, then open Feed, return to the loaded people list and complete the connect-to-direct-Chat intent.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3836-OPEN-FEED-JOURNEY-TEST-USED-DISCOVER-EMPTY-ACTION-AFTER-LOAD",
+      "status": "registered_persistent_social_feed_menu_entry_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "The corrected Open Feed journey entered Discover first, which loaded people and legitimately removed the empty-state chat-discover-open-feed control before the next tap.",
+      "rootCause": "The test still selected a transient empty-state action rather than the persistent Social Chat menu action available with populated discovery.",
+      "prevention": "Mount Social-context Chat, open the persistent chat-more menu, choose Open public Feed, then verify Social Feed, Back to loaded Discover and direct Chat completion.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3837-OPEN-FEED-TEST-USED-UNENCODED-NESTED-SOCIAL-RETURN",
+      "status": "registered_encoded_nested_return_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "testing"],
+      "mistake": "The Social-context Feed test supplied /app/social?sub=feed as an unencoded nested return query, so Chat did not classify the entry as Social and omitted Open public Feed from its menu.",
+      "rootCause": "A nested route containing its own query was embedded directly instead of using the production chatRoute encoding contract.",
+      "prevention": "Encode the complete Social return URI as one query value, prove the Social Chat title/menu, then select the persistent Feed action.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3838-OPEN-PUBLIC-FEED-MENU-RESTRICTED-TO-SOCIAL-CONTEXT",
+      "status": "registered_shared_all_context_feed_entry_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "testing"],
+      "mistake": "The persistent Open public Feed menu action remained absent because production exposed it only when Chat originated from Social.",
+      "rootCause": "Feed discovery was context-gated even though the shared communication contract requires the same public discovery intent from Work, Travel, Care, Food, Workspaces and other Chat entries.",
+      "prevention": "Expose one shared Open public Feed menu action in every Chat context, route to the existing Social Feed owner and preserve the exact originating Chat route on Back.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3839-SOCIAL-FEED-SYSTEM-BACK-DID-NOT-POP-TO-ORIGIN-CHAT",
+      "status": "registered_existing_social_chat_forward_contract_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "social", "testing"],
+      "mistake": "After Chat opened the shared Social Feed, Android Back followed the approved Social shell contract instead of popping directly to the originating Chat route.",
+      "rootCause": "The test assumed generic Navigator pop semantics across a Social root that intentionally owns Back through the global shell.",
+      "prevention": "Preserve Social Back ownership, use the visible Social global Chat action as the forward continuation into messaging, then verify Chat Back returns to the Feed and the intent remains escapable through approved global navigation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }
