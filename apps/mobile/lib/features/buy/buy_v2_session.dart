@@ -131,6 +131,23 @@ final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
   );
 
   @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: false,
+        enabled: false,
+        customerMessage: 'Order alerts are unavailable right now.',
+      );
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({
+    required bool enabled,
+  }) async => const BuyV2OrderAlertsResult(
+    available: false,
+    enabled: false,
+    customerMessage: 'Order alerts are unavailable right now.',
+  );
+
+  @override
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,
     required int rating,
@@ -203,6 +220,25 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   );
 
   @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: true,
+        customerMessage: 'Order alerts are on.',
+      );
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({
+    required bool enabled,
+  }) async => BuyV2OrderAlertsResult(
+    available: true,
+    enabled: enabled,
+    customerMessage: enabled
+        ? 'Order alerts are on.'
+        : 'Order alerts are paused.',
+  );
+
+  @override
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,
     required int rating,
@@ -269,6 +305,8 @@ class BuyV2Session extends ChangeNotifier {
       _orders.clear();
       _selectedAddressId = null;
       businessVerified = false;
+      trackingAlertsEnabled = false;
+      trackingAlertsAvailable = false;
       availablePaymentMethods = const {};
       commerceLoadState = BuyV2CommerceLoadState.loading;
     }
@@ -359,6 +397,8 @@ class BuyV2Session extends ChangeNotifier {
 
   bool prescriptionAttached = false;
   bool trackingAlertsEnabled = true;
+  bool trackingAlertsAvailable = true;
+  bool trackingAlertsBusy = false;
   String selectedPayment = 'UPI';
 
   int _navigationMotionSequence = 0;
@@ -1972,11 +2012,60 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void toggleTrackingAlerts() {
+    if (!reviewDataEnabled) {
+      notice = 'Order alerts are unavailable right now.';
+      notifyListeners();
+      return;
+    }
     trackingAlertsEnabled = !trackingAlertsEnabled;
     notice = trackingAlertsEnabled
         ? 'Live order alerts are on.'
         : 'Live order alerts are paused.';
     notifyListeners();
+  }
+
+  Future<void> restoreOrderAlerts() async {
+    if (reviewDataEnabled || trackingAlertsBusy) return;
+    trackingAlertsBusy = true;
+    notifyListeners();
+    try {
+      final result = await commerceAdapter.loadOrderAlerts();
+      trackingAlertsAvailable = result.available;
+      trackingAlertsEnabled = result.available && result.enabled;
+      notice = result.available ? null : result.customerMessage;
+    } on Object {
+      trackingAlertsAvailable = false;
+      trackingAlertsEnabled = false;
+      notice = 'Order alerts could not load. Try again.';
+    } finally {
+      trackingAlertsBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> setTrackingAlerts(bool enabled) async {
+    if (trackingAlertsBusy || !trackingAlertsAvailable) return false;
+    if (reviewDataEnabled) {
+      trackingAlertsEnabled = enabled;
+      notice = enabled ? 'Order alerts are on.' : 'Order alerts are paused.';
+      notifyListeners();
+      return true;
+    }
+    trackingAlertsBusy = true;
+    notifyListeners();
+    try {
+      final result = await commerceAdapter.setOrderAlerts(enabled: enabled);
+      trackingAlertsAvailable = result.available;
+      trackingAlertsEnabled = result.available && result.enabled;
+      notice = result.customerMessage;
+      return result.available && result.enabled == enabled;
+    } on Object {
+      notice = 'Order alert preference could not be saved. Try again.';
+      return false;
+    } finally {
+      trackingAlertsBusy = false;
+      notifyListeners();
+    }
   }
 
   void openAssist() {

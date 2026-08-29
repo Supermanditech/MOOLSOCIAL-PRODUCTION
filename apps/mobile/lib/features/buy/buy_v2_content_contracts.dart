@@ -179,6 +179,19 @@ class BuyV2OrderRefreshResult {
 }
 
 @immutable
+class BuyV2OrderAlertsResult {
+  const BuyV2OrderAlertsResult({
+    required this.available,
+    required this.enabled,
+    required this.customerMessage,
+  });
+
+  final bool available;
+  final bool enabled;
+  final String customerMessage;
+}
+
+@immutable
 class BuyV2MutationResult {
   const BuyV2MutationResult({
     required this.accepted,
@@ -219,6 +232,10 @@ abstract interface class BuyV2CommerceAdapter {
   });
 
   Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId});
+
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts();
+
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({required bool enabled});
 
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,

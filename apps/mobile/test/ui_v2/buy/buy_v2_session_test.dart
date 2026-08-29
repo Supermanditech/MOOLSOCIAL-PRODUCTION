@@ -60,6 +60,11 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
     state: BuyV2CommerceLoadState.unavailable,
     customerMessage: 'Order updates are unavailable right now.',
   );
+  BuyV2OrderAlertsResult alertsResult = const BuyV2OrderAlertsResult(
+    available: true,
+    enabled: false,
+    customerMessage: 'Order alerts are paused.',
+  );
 
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
@@ -88,6 +93,21 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   }) async {
     orderRefreshCalls += 1;
     return orderRefreshResult;
+  }
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async => alertsResult;
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({required bool enabled}) async {
+    alertsResult = BuyV2OrderAlertsResult(
+      available: true,
+      enabled: enabled,
+      customerMessage: enabled
+          ? 'Order alerts are on.'
+          : 'Order alerts are paused.',
+    );
+    return alertsResult;
   }
 
   @override
@@ -1822,6 +1842,32 @@ void main() {
           fixture.session.orderRefreshMessage(fixture.order.id),
           'Order identity could not be verified.',
         );
+      },
+    );
+
+    test(
+      'order alerts change only after authoritative acknowledgement',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+        );
+        addTearDown(fixture.session.dispose);
+
+        await fixture.session.restoreOrderAlerts();
+        expect(fixture.session.trackingAlertsAvailable, isTrue);
+        expect(fixture.session.trackingAlertsEnabled, isFalse);
+
+        expect(await fixture.session.setTrackingAlerts(true), isTrue);
+        expect(fixture.session.trackingAlertsEnabled, isTrue);
+
+        fixture.adapter.alertsResult = const BuyV2OrderAlertsResult(
+          available: false,
+          enabled: false,
+          customerMessage: 'Order alerts are unavailable right now.',
+        );
+        await fixture.session.restoreOrderAlerts();
+        expect(fixture.session.trackingAlertsAvailable, isFalse);
+        expect(fixture.session.trackingAlertsEnabled, isFalse);
       },
     );
   });

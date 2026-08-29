@@ -6096,7 +6096,11 @@ class BuyV2TrackingView extends StatelessWidget {
                   children: [
                     Text('Order updates', style: context.buyBody),
                     Text(
-                      session.trackingAlertsEnabled
+                      session.trackingAlertsBusy
+                          ? 'Saving alert preference…'
+                          : !session.trackingAlertsAvailable
+                          ? 'Order alerts are unavailable'
+                          : session.trackingAlertsEnabled
                           ? 'Order alerts are on'
                           : 'Order alerts are paused',
                       style: context.buyMeta.copyWith(fontSize: 8),
@@ -6104,13 +6108,25 @@ class BuyV2TrackingView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (!session.trackingAlertsAvailable &&
+                  !session.trackingAlertsBusy)
+                IconButton(
+                  key: const ValueKey('buy-tracking-alerts-retry'),
+                  tooltip: 'Retry order alerts',
+                  onPressed: session.restoreOrderAlerts,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
               Switch.adaptive(
                 key: const ValueKey('buy-tracking-alerts-toggle'),
                 value: session.trackingAlertsEnabled,
-                onChanged: (_) {
-                  HapticFeedback.selectionClick();
-                  session.toggleTrackingAlerts();
-                },
+                onChanged:
+                    session.trackingAlertsBusy ||
+                        !session.trackingAlertsAvailable
+                    ? null
+                    : (enabled) {
+                        HapticFeedback.selectionClick();
+                        session.setTrackingAlerts(enabled);
+                      },
                 activeTrackColor: BuyV2Colors.green,
               ),
             ],
