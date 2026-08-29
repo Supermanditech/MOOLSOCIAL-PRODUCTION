@@ -392,6 +392,29 @@ abstract interface class ChatCallGateway {
   Future<List<ChatCall>> listIncomingCalls();
 }
 
+abstract interface class ChatGroupGateway {
+  Future<ChatGroupInfo> getGroupInfo({required String threadId});
+
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  });
+
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  });
+
+  Future<bool> leaveGroup({required String threadId});
+
+  Future<List<ChatGroupInvite>> listGroupInvites();
+
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  });
+}
+
 abstract interface class ChatPhotoUploadTransport {
   Future<void> put({
     required Uri url,
@@ -517,7 +540,11 @@ ChatGateway buildChatGateway() {
 }
 
 class UnavailableChatGateway
-    implements ChatGateway, ChatPrivacyGateway, ChatCallGateway {
+    implements
+        ChatGateway,
+        ChatPrivacyGateway,
+        ChatCallGateway,
+        ChatGroupGateway {
   const UnavailableChatGateway();
 
   ChatServiceException get _error => const ChatServiceException(
@@ -626,6 +653,34 @@ class UnavailableChatGateway
 
   @override
   Future<List<ChatCall>> listIncomingCalls() async => throw _error;
+
+  @override
+  Future<ChatGroupInfo> getGroupInfo({required String threadId}) async =>
+      throw _error;
+
+  @override
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  }) async => throw _error;
+
+  @override
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  }) async => throw _error;
+
+  @override
+  Future<bool> leaveGroup({required String threadId}) async => throw _error;
+
+  @override
+  Future<List<ChatGroupInvite>> listGroupInvites() async => throw _error;
+
+  @override
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  }) async => throw _error;
 }
 
 class AuthenticatedChatGateway
@@ -634,7 +689,8 @@ class AuthenticatedChatGateway
         ChatPhotoGateway,
         ChatAttachmentGateway,
         ChatPrivacyGateway,
-        ChatCallGateway {
+        ChatCallGateway,
+        ChatGroupGateway {
   AuthenticatedChatGateway({
     required Uri endpoint,
     required this.credentials,
@@ -1062,6 +1118,72 @@ class AuthenticatedChatGateway
     await _invoke('listIncomingCalls', body: const {}),
   ).map((item) => _decodeCall(_map(item))).toList(growable: false);
 
+  @override
+  Future<ChatGroupInfo> getGroupInfo({required String threadId}) async =>
+      _decodeGroupInfo(
+        _map(await _invoke('getGroupInfo', body: {'threadId': threadId})),
+      );
+
+  @override
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  }) async => _decodeGroupInvite(
+    _map(
+      await _invoke(
+        'inviteGroupMember',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'targetUserId': targetUserId},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  }) async => _decodeGroupInfo(
+    _map(
+      await _invoke(
+        'updateGroupPermissions',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'invitePermission': invitePermission.name},
+      ),
+    ),
+  );
+
+  @override
+  Future<bool> leaveGroup({required String threadId}) async {
+    final value = _map(
+      await _invoke(
+        'leaveGroup',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId},
+      ),
+    );
+    return value['left'] == true;
+  }
+
+  @override
+  Future<List<ChatGroupInvite>> listGroupInvites() async => _list(
+    await _invoke('listGroupInvites', body: const {}),
+  ).map((item) => _decodeGroupInvite(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  }) async {
+    final value = _map(
+      await _invoke(
+        'respondToGroupInvite',
+        limitedUseAppCheck: true,
+        body: {'inviteId': inviteId, 'accepted': accepted},
+      ),
+    );
+    return value['accepted'] == true;
+  }
+
   Future<Object?> _invoke(
     String operation, {
     required Map<String, Object?> body,
@@ -1172,8 +1294,49 @@ ChatThread _decodeThread(Map<String, Object?> data) {
     verified: data['verified'] == true,
     targetUserId: _optionalString(data['targetUserId']),
     messageRequestPending: data['requestStatus'] == 'pending',
+    participants: _decodeParticipants(data['participants']),
+    groupDescription: _optionalString(data['groupDescription']),
   );
 }
+
+List<ChatParticipant> _decodeParticipants(Object? value) {
+  if (value == null) return const [];
+  return _list(value)
+      .map((item) {
+        final data = _map(item);
+        return ChatParticipant(
+          id: _requiredString(data['userId']),
+          name: _requiredString(data['name']),
+          subtitle: _optionalString(data['handle']) ?? 'Group member',
+          isMe: data['isMe'] == true,
+          isAdmin: data['isAdmin'] == true,
+        );
+      })
+      .toList(growable: false);
+}
+
+ChatGroupInfo _decodeGroupInfo(Map<String, Object?> data) => ChatGroupInfo(
+  threadId: _requiredString(data['threadId']),
+  title: _requiredString(data['title']),
+  description: _requiredString(data['description']),
+  members: _decodeParticipants(data['members']),
+  invitePermission: _requiredString(data['invitePermission']) == 'members'
+      ? ChatGroupInvitePermission.members
+      : ChatGroupInvitePermission.admins,
+  canInvite: data['canInvite'] == true,
+  canManage: data['canManage'] == true,
+  canLeave: data['canLeave'] == true,
+);
+
+ChatGroupInvite _decodeGroupInvite(Map<String, Object?> data) =>
+    ChatGroupInvite(
+      id: _requiredString(data['id']),
+      threadId: _requiredString(data['threadId']),
+      groupTitle: _requiredString(data['groupTitle']),
+      invitedByUserId: _requiredString(data['invitedByUserId']),
+      invitedByName: _requiredString(data['invitedByName']),
+      invitedAt: _requiredDateTime(data['invitedAt']),
+    );
 
 ChatPrivacySettings _decodePrivacySettings(Map<String, Object?> data) =>
     ChatPrivacySettings(

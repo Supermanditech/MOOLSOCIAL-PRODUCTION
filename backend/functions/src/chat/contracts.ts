@@ -29,6 +29,38 @@ export interface ChatThreadRecord {
   verified: boolean;
   targetUserId?: string;
   requestStatus?: ChatMessageRequestStatus;
+  participants?: ChatGroupMemberRecord[];
+  groupDescription?: string;
+}
+
+export interface ChatGroupMemberRecord {
+  userId: string;
+  name: string;
+  handle: string;
+  isAdmin: boolean;
+  isMe: boolean;
+}
+
+export type ChatGroupInvitePermission = "admins" | "members";
+
+export interface ChatGroupInfoRecord {
+  threadId: string;
+  title: string;
+  description: string;
+  members: ChatGroupMemberRecord[];
+  invitePermission: ChatGroupInvitePermission;
+  canInvite: boolean;
+  canManage: boolean;
+  canLeave: boolean;
+}
+
+export interface ChatGroupInviteRecord {
+  id: string;
+  threadId: string;
+  groupTitle: string;
+  invitedByUserId: string;
+  invitedByName: string;
+  invitedAt: string;
 }
 
 export type ChatMessagePermission = "everyone" | "connections" | "nobody";
@@ -270,6 +302,27 @@ export interface ChatRepository {
     requestDigest: string,
     replyToMessageId?: string,
   ): Promise<ChatMessageRecord>;
+  getGroupInfo?(userId: string, threadId: string): Promise<ChatGroupInfoRecord>;
+  inviteGroupMember?(
+    actor: ChatProfile,
+    threadId: string,
+    target: ChatProfile,
+  ): Promise<ChatGroupInviteRecord>;
+  updateGroupPermissions?(
+    userId: string,
+    threadId: string,
+    invitePermission: ChatGroupInvitePermission,
+  ): Promise<ChatGroupInfoRecord>;
+  leaveGroup?(
+    userId: string,
+    threadId: string,
+  ): Promise<{ threadId: string; left: boolean }>;
+  listGroupInvites?(userId: string): Promise<ChatGroupInviteRecord[]>;
+  respondToGroupInvite?(
+    userId: string,
+    inviteId: string,
+    accepted: boolean,
+  ): Promise<{ inviteId: string; accepted: boolean; threadId: string }>;
   setReaction(
     actor: ChatProfile,
     threadId: string,

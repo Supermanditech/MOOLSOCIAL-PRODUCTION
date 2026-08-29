@@ -270,6 +270,10 @@ class ChatSession extends ChangeNotifier {
   bool callLoading = false;
   bool callPreferencesLoaded = false;
   String? callError;
+  final Map<String, ChatGroupInfo> _groupInfoByThread = {};
+  final List<ChatGroupInvite> _groupInvites = [];
+  bool groupLoading = false;
+  String? groupError;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -1304,6 +1308,192 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  ChatGroupGateway? get _groupGateway =>
+      _gateway is ChatGroupGateway ? _gateway as ChatGroupGateway : null;
+
+  ChatGroupInfo? groupInfo(String threadId) => _groupInfoByThread[threadId];
+
+  List<ChatGroupInvite> get groupInvites => List.unmodifiable(_groupInvites);
+
+  Future<bool> loadGroupInfo(String threadId, {bool refresh = false}) async {
+    if (groupLoading ||
+        (!refresh && _groupInfoByThread.containsKey(threadId))) {
+      return _groupInfoByThread.containsKey(threadId);
+    }
+    final gateway = _groupGateway;
+    if (gateway == null) {
+      final selected = thread(threadId);
+      if (!selected.isGroup) return false;
+      _groupInfoByThread[threadId] = ChatGroupInfo(
+        threadId: threadId,
+        title: selected.title,
+        description:
+            selected.groupDescription ?? 'Coordinate together in Chat.',
+        members: selected.participants,
+        invitePermission: ChatGroupInvitePermission.admins,
+        canInvite: false,
+        canManage: false,
+        canLeave: false,
+      );
+      notifyListeners();
+      return true;
+    }
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInfoByThread[threadId] = await gateway.getGroupInfo(
+        threadId: threadId,
+      );
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group info could not load. Try again.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> inviteGroupMember(String threadId, String targetUserId) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      final invite = await gateway.inviteGroupMember(
+        threadId: threadId,
+        targetUserId: targetUserId,
+      );
+      _groupInvites.removeWhere((item) => item.id == invite.id);
+      _groupInvites.add(invite);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'This member could not be invited. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateGroupPermissions(
+    String threadId,
+    ChatGroupInvitePermission permission,
+  ) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInfoByThread[threadId] = await gateway.updateGroupPermissions(
+        threadId: threadId,
+        invitePermission: permission,
+      );
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group permissions could not update. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> leaveGroup(String threadId) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      if (!await gateway.leaveGroup(threadId: threadId)) {
+        throw const ChatServiceException('Leaving returned an invalid result.');
+      }
+      _threads.removeWhere((thread) => thread.id == threadId);
+      _messages.remove(threadId);
+      _groupInfoByThread.remove(threadId);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'You could not leave this group. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadGroupInvites() async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInvites
+        ..clear()
+        ..addAll(await gateway.listGroupInvites());
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group invitations could not load. Try again.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> respondToGroupInvite(
+    String inviteId, {
+    required bool accepted,
+  }) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.respondToGroupInvite(
+        inviteId: inviteId,
+        accepted: accepted,
+      );
+      if (saved != accepted) {
+        throw const ChatServiceException(
+          'Invitation returned an invalid result.',
+        );
+      }
+      _groupInvites.removeWhere((item) => item.id == inviteId);
+      if (accepted) await loadThreads(refresh: true);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group invitation could not update. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
   bool chatAvailableForConversationInSession(String threadId) =>
       _chatAvailableForSession[threadId] ?? true;
 
@@ -2019,6 +2209,10 @@ class ChatSession extends ChangeNotifier {
     callLoading = false;
     callPreferencesLoaded = false;
     callError = null;
+    _groupInfoByThread.clear();
+    _groupInvites.clear();
+    groupLoading = false;
+    groupError = null;
     selectedFilter = null;
     unreadOnly = false;
     noticeMessage = null;

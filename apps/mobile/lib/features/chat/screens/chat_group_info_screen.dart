@@ -11,7 +11,7 @@ import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_shared_content_screen.dart';
 
-class ChatGroupInfoScreen extends StatelessWidget {
+class ChatGroupInfoScreen extends StatefulWidget {
   const ChatGroupInfoScreen({
     required this.session,
     required this.threadId,
@@ -24,12 +24,42 @@ class ChatGroupInfoScreen extends StatelessWidget {
   final String originReturnRoute;
 
   @override
+  State<ChatGroupInfoScreen> createState() => _ChatGroupInfoScreenState();
+}
+
+class _ChatGroupInfoScreenState extends State<ChatGroupInfoScreen> {
+  ChatSession get session => widget.session;
+  String get threadId => widget.threadId;
+  String get originReturnRoute => widget.originReturnRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(session.loadGroupInfo(threadId));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final entryContext = ChatEntryContext.resolve(originReturnRoute);
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
         final thread = session.thread(threadId);
+        final info =
+            session.groupInfo(threadId) ??
+            ChatGroupInfo(
+              threadId: thread.id,
+              title: thread.title,
+              description:
+                  thread.groupDescription ?? 'Coordinate together in Chat.',
+              members: thread.participants,
+              invitePermission: ChatGroupInvitePermission.admins,
+              canInvite: false,
+              canManage: false,
+              canLeave: false,
+            );
         return ChatPageScaffold(
           key: const Key('chat-group-info-screen'),
           session: session,
@@ -51,7 +81,7 @@ class ChatGroupInfoScreen extends StatelessWidget {
             children: [
               ChatFiniteIncomingMotion(
                 stateKey: 'group-identity-${thread.id}',
-                child: _GroupIdentityCard(thread: thread),
+                child: _GroupIdentityCard(info: info),
               ),
               const SizedBox(height: 16),
               _GroupSection(
@@ -60,16 +90,16 @@ class ChatGroupInfoScreen extends StatelessWidget {
                   children: [
                     for (
                       var index = 0;
-                      index < thread.participants.length;
+                      index < info.members.length;
                       index++
                     ) ...[
                       _ParticipantTile(
-                        participant: thread.participants[index],
+                        participant: info.members[index],
                         onTap: () => unawaited(
-                          _showParticipant(context, thread.participants[index]),
+                          _showParticipant(context, info.members[index]),
                         ),
                       ),
-                      if (index < thread.participants.length - 1)
+                      if (index < info.members.length - 1)
                         const Divider(height: 1),
                     ],
                   ],
@@ -102,27 +132,19 @@ class ChatGroupInfoScreen extends StatelessWidget {
                       icon: Icons.person_add_alt_1_outlined,
                       title: 'Invite people',
                       subtitle: 'Add someone with their permission.',
-                      onTap: () => _showUnchanged(
-                        context,
-                        keyName: 'chat-group-invite-recovery',
-                        title: 'Invites unavailable',
-                        message:
-                            'People cannot be invited right now. The group and its members stay unchanged.',
-                      ),
+                      onTap: () => unawaited(_inviteMember(context, info)),
                     ),
                     const Divider(height: 1),
                     _GroupActionTile(
                       keyName: 'chat-group-permissions',
                       icon: Icons.admin_panel_settings_outlined,
                       title: 'Group permissions',
-                      subtitle: 'Review who can manage this group.',
-                      onTap: () => _showUnchanged(
-                        context,
-                        keyName: 'chat-group-permissions-recovery',
-                        title: 'Permissions unavailable',
-                        message:
-                            'Group permissions cannot be loaded right now. No permission changed.',
-                      ),
+                      subtitle:
+                          info.invitePermission ==
+                              ChatGroupInvitePermission.members
+                          ? 'All members can invite people.'
+                          : 'Only admins can invite people.',
+                      onTap: () => unawaited(_changePermissions(context, info)),
                     ),
                     const Divider(height: 1),
                     _GroupActionTile(
@@ -132,13 +154,7 @@ class ChatGroupInfoScreen extends StatelessWidget {
                       subtitle:
                           'Your membership stays active until leaving succeeds.',
                       destructive: true,
-                      onTap: () => _showUnchanged(
-                        context,
-                        keyName: 'chat-group-leave-recovery',
-                        title: 'Could not leave group',
-                        message:
-                            'Leaving is unavailable right now. You are still a member and can continue in Chat.',
-                      ),
+                      onTap: () => unawaited(_leaveGroup(context, info)),
                     ),
                   ],
                 ),
@@ -156,12 +172,195 @@ class ChatGroupInfoScreen extends StatelessWidget {
       },
     );
   }
+
+  Future<void> _inviteMember(BuildContext context, ChatGroupInfo info) async {
+    if (!info.canInvite) {
+      _showUnchanged(
+        context,
+        keyName: 'chat-group-invite-recovery',
+        title: 'Invites unavailable',
+        message:
+            'You do not currently have permission to invite people. The group stays unchanged.',
+      );
+      return;
+    }
+    final memberIds = info.members.map((member) => member.id).toSet();
+    final candidates = session
+        .availableForwardTargets(info.threadId)
+        .where(
+          (thread) =>
+              thread.targetUserId != null &&
+              !memberIds.contains(thread.targetUserId),
+        )
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      _showUnchanged(
+        context,
+        keyName: 'chat-group-invite-recovery',
+        title: 'No eligible people to invite',
+        message:
+            'Connect with someone in MoolSocial first, then invite them from Group info.',
+      );
+      return;
+    }
+    final selected = await showModalBottomSheet<ChatThread>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      sheetAnimationStyle: ChatMotion.sheetStyle(context),
+      builder: (sheetContext) => ListView(
+        key: const Key('chat-group-invite-picker'),
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+        children: [
+          const Text(
+            'Invite a connected person',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final candidate in candidates)
+            ListTile(
+              key: Key('chat-group-invite-person-${candidate.targetUserId}'),
+              title: Text(candidate.title),
+              subtitle: Text(candidate.subtitle),
+              trailing: const Icon(Icons.person_add_alt_1_rounded),
+              onTap: () => Navigator.of(sheetContext).pop(candidate),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    final saved = await session.inviteGroupMember(
+      info.threadId,
+      selected.targetUserId!,
+    );
+    if (!context.mounted) return;
+    if (saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('chat-group-invite-feedback'),
+          content: Text('Invitation sent to ${selected.title}.'),
+        ),
+      );
+    } else {
+      _showUnchanged(
+        context,
+        keyName: 'chat-group-invite-recovery',
+        title: 'Invitation not sent',
+        message: session.groupError ?? 'The group stays unchanged.',
+      );
+    }
+  }
+
+  Future<void> _changePermissions(
+    BuildContext context,
+    ChatGroupInfo info,
+  ) async {
+    if (!info.canManage) {
+      _showUnchanged(
+        context,
+        keyName: 'chat-group-permissions-recovery',
+        title: 'Permissions unchanged',
+        message: 'Only a group admin can change invitation permissions.',
+      );
+      return;
+    }
+    final selected = await showModalBottomSheet<ChatGroupInvitePermission>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        key: const Key('chat-group-permissions-picker'),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('chat-group-permission-admins'),
+              title: const Text('Admins only'),
+              onTap: () => Navigator.of(
+                sheetContext,
+              ).pop(ChatGroupInvitePermission.admins),
+            ),
+            ListTile(
+              key: const Key('chat-group-permission-members'),
+              title: const Text('All members'),
+              onTap: () => Navigator.of(
+                sheetContext,
+              ).pop(ChatGroupInvitePermission.members),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    final saved = await session.updateGroupPermissions(info.threadId, selected);
+    if (!context.mounted || saved) return;
+    _showUnchanged(
+      context,
+      keyName: 'chat-group-permissions-recovery',
+      title: 'Permissions unchanged',
+      message: session.groupError ?? 'No permission changed.',
+    );
+  }
+
+  Future<void> _leaveGroup(BuildContext context, ChatGroupInfo info) async {
+    if (!info.canLeave) {
+      _showUnchanged(
+        context,
+        keyName: 'chat-group-leave-recovery',
+        title: 'Could not leave group',
+        message:
+            'Leaving is unavailable right now. You are still a member and can continue in Chat.',
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('chat-group-leave-confirmation'),
+        title: Text('Leave ${info.title}?'),
+        content: const Text(
+          'You will stop receiving new group messages. Your earlier messages remain in the conversation.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('chat-group-leave-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            key: const Key('chat-group-leave-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Leave group'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final left = await session.leaveGroup(info.threadId);
+    if (!context.mounted) return;
+    if (left) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+    _showUnchanged(
+      context,
+      keyName: 'chat-group-leave-recovery',
+      title: 'Could not leave group',
+      message: session.groupError ?? 'You are still a member.',
+    );
+  }
 }
 
 class _GroupIdentityCard extends StatelessWidget {
-  const _GroupIdentityCard({required this.thread});
+  const _GroupIdentityCard({required this.info});
 
-  final ChatThread thread;
+  final ChatGroupInfo info;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +385,7 @@ class _GroupIdentityCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  thread.title,
+                  info.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -197,19 +396,17 @@ class _GroupIdentityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${thread.participants.length} members',
+                  '${info.members.length} members',
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (thread.groupDescription case final description?) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: const TextStyle(color: MoolColors.muted),
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  info.description,
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
               ],
             ),
           ),
@@ -299,8 +496,8 @@ class _ParticipantTile extends StatelessWidget {
       ),
       subtitle: Text(
         participant.isMe
-            ? 'You · ${participant.subtitle}'
-            : participant.subtitle,
+            ? 'You${participant.isAdmin ? ' · Admin' : ''} · ${participant.subtitle}'
+            : '${participant.isAdmin ? 'Admin · ' : ''}${participant.subtitle}',
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
@@ -351,12 +548,10 @@ Future<void> _showParticipant(
   return showChatUnavailableCapability(
     context,
     keyName: 'chat-group-member-recovery-${participant.id}',
-    title: participant.isMe
-        ? 'This is you'
-        : '${participant.name} profile unavailable',
+    title: participant.isMe ? 'This is you' : participant.name,
     message: participant.isMe
-        ? 'Your group membership is active. Continue in Chat to coordinate with everyone.'
-        : 'This member profile cannot be opened right now. You remain in Group info and nothing changed.',
+        ? 'Your group membership is active${participant.isAdmin ? ' and you are an admin' : ''}. Continue in Chat to coordinate with everyone.'
+        : '${participant.subtitle}${participant.isAdmin ? ' · Group admin' : ' · Group member'}. Continue in Group info or return to Chat.',
   );
 }
 

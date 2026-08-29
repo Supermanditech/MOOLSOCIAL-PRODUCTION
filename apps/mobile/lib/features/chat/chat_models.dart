@@ -208,6 +208,7 @@ class ChatParticipant {
     required this.subtitle,
     this.isMe = false,
     this.verified = false,
+    this.isAdmin = false,
   });
 
   final String id;
@@ -215,6 +216,49 @@ class ChatParticipant {
   final String subtitle;
   final bool isMe;
   final bool verified;
+  final bool isAdmin;
+}
+
+enum ChatGroupInvitePermission { admins, members }
+
+class ChatGroupInfo {
+  const ChatGroupInfo({
+    required this.threadId,
+    required this.title,
+    required this.description,
+    required this.members,
+    required this.invitePermission,
+    required this.canInvite,
+    required this.canManage,
+    required this.canLeave,
+  });
+
+  final String threadId;
+  final String title;
+  final String description;
+  final List<ChatParticipant> members;
+  final ChatGroupInvitePermission invitePermission;
+  final bool canInvite;
+  final bool canManage;
+  final bool canLeave;
+}
+
+class ChatGroupInvite {
+  const ChatGroupInvite({
+    required this.id,
+    required this.threadId,
+    required this.groupTitle,
+    required this.invitedByUserId,
+    required this.invitedByName,
+    required this.invitedAt,
+  });
+
+  final String id;
+  final String threadId;
+  final String groupTitle;
+  final String invitedByUserId;
+  final String invitedByName;
+  final DateTime invitedAt;
 }
 
 class ChatThread {

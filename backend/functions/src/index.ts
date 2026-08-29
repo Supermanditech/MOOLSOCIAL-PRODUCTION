@@ -2667,6 +2667,10 @@ export const moolSocialChat = onRequest(
         operation === "endCall";
       const attachmentMutation = operation === "prepareAttachmentUpload" ||
         operation === "sendAttachmentMessage";
+      const groupMutation = operation === "inviteGroupMember" ||
+        operation === "updateGroupPermissions" ||
+        operation === "leaveGroup" ||
+        operation === "respondToGroupInvite";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2677,7 +2681,7 @@ export const moolSocialChat = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation || callMutation || attachmentMutation,
+        mutation || callMutation || attachmentMutation || groupMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2699,6 +2703,18 @@ export const moolSocialChat = onRequest(
                 ? await chatService().sendPhotoMessage(ownerUserId, body)
               : operation === "sendAttachmentMessage"
                 ? await chatService().sendAttachmentMessage(ownerUserId, body)
+              : operation === "getGroupInfo"
+                ? await chatService().getGroupInfo(ownerUserId, body)
+              : operation === "inviteGroupMember"
+                ? await chatService().inviteGroupMember(ownerUserId, body)
+              : operation === "updateGroupPermissions"
+                ? await chatService().updateGroupPermissions(ownerUserId, body)
+              : operation === "leaveGroup"
+                ? await chatService().leaveGroup(ownerUserId, body)
+              : operation === "listGroupInvites"
+                ? await chatService().listGroupInvites(ownerUserId, body)
+              : operation === "respondToGroupInvite"
+                ? await chatService().respondToGroupInvite(ownerUserId, body)
               : operation === "setReaction"
                 ? await chatService().setReaction(ownerUserId, body)
                 : operation === "forwardMessage"

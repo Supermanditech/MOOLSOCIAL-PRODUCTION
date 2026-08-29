@@ -7,6 +7,7 @@ import {
   type ChatCallKind,
   type ChatAttachmentKind,
   type ChatAttachmentUploadGrant,
+  type ChatGroupInvitePermission,
   type ChatCallPreferences,
   type ChatPresenceState,
   type ChatPhotoContentType,
@@ -246,6 +247,62 @@ export class ChatService {
       idempotencyKey,
       requestDigest,
       replyToMessageId,
+    );
+  }
+
+  getGroupInfo(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("getGroupInfo")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+    );
+  }
+
+  async inviteGroupMember(userId: string, raw: unknown) {
+    const body = object(raw);
+    const targetUserId = requiredIdentifier(body, "targetUserId");
+    if (targetUserId === userId) {
+      throw new ChatError("bad_request", "You are already in this group.", 400);
+    }
+    const [actor, target] = await Promise.all([
+      this.resolveProfile(userId),
+      this.resolveProfile(targetUserId),
+    ]);
+    return this.requireCapability("inviteGroupMember")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      target,
+    );
+  }
+
+  updateGroupPermissions(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("updateGroupPermissions")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredGroupInvitePermission(body.invitePermission),
+    );
+  }
+
+  leaveGroup(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("leaveGroup")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+    );
+  }
+
+  listGroupInvites(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listGroupInvites")(userId);
+  }
+
+  respondToGroupInvite(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("respondToGroupInvite")(
+      userId,
+      requiredIdentifier(body, "inviteId"),
+      requiredBoolean(body, "accepted"),
     );
   }
 
@@ -504,6 +561,13 @@ function requiredAttachmentKind(value: unknown): ChatAttachmentKind {
     return value;
   }
   throw new ChatError("bad_request", "Choose a supported attachment.", 400);
+}
+
+function requiredGroupInvitePermission(
+  value: unknown,
+): ChatGroupInvitePermission {
+  if (value === "admins" || value === "members") return value;
+  throw new ChatError("bad_request", "Choose who can invite members.", 400);
 }
 
 function requiredPhotoContentType(

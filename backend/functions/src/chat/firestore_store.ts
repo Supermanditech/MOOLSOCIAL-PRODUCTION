@@ -19,6 +19,9 @@ import {
   type ChatAttachmentKind,
   type ChatAttachmentStore,
   type ChatAttachmentUploadGrant,
+  type ChatGroupInfoRecord,
+  type ChatGroupInvitePermission,
+  type ChatGroupInviteRecord,
   type ChatPhotoAttachmentStore,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
@@ -1066,6 +1069,187 @@ export class FirestoreChatRepository implements ChatRepository {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
+  async getGroupInfo(
+    userId: string,
+    threadId: string,
+  ): Promise<ChatGroupInfoRecord> {
+    const thread = await this.threadForParticipant(userId, threadId);
+    return groupInfoFromDocument(threadId, thread.snapshot.data()!, userId);
+  }
+
+  async inviteGroupMember(
+    actor: ChatProfile,
+    threadId: string,
+    target: ChatProfile,
+  ): Promise<ChatGroupInviteRecord> {
+    const threadRef = this.firestore.collection("chatThreads").doc(threadId);
+    const inviteId = digest(`${threadId}:${target.userId}`);
+    const inviteRef = this.firestore.collection("chatGroupInvites").doc(inviteId);
+    let result: ChatGroupInviteRecord | undefined;
+    await this.firestore.runTransaction(async (transaction) => {
+      const [thread, existing, actorBlock, targetBlock] = await Promise.all([
+        transaction.get(threadRef),
+        transaction.get(inviteRef),
+        transaction.get(this.blockRef(actor.userId, target.userId)),
+        transaction.get(this.blockRef(target.userId, actor.userId)),
+      ]);
+      const data = thread.data();
+      assertParticipant(data, actor.userId);
+      const group = groupInfoFromDocument(threadId, data!, actor.userId);
+      if (!group.canInvite) {
+        throw new ChatError(
+          "permission_denied",
+          "Only group admins can invite members.",
+          403,
+        );
+      }
+      if (participantIdsFrom(data).includes(target.userId)) {
+        throw new ChatError("conflict", "This member is already in the group.", 409);
+      }
+      if (actorBlock.exists || targetBlock.exists) {
+        throw new ChatError("permission_denied", "This member cannot be invited.", 403);
+      }
+      if (existing.exists && existing.get("status") === "pending") {
+        result = groupInviteFromDocument(existing.id, existing.data()!);
+        return;
+      }
+      const invitedAt = this.now().toISOString();
+      const inviteData = {
+        schemaVersion: 1,
+        threadId,
+        groupTitle: group.title,
+        invitedByUserId: actor.userId,
+        invitedByName: actor.name,
+        targetUserId: target.userId,
+        targetProfile: profileData(target),
+        status: "pending",
+        invitedAt,
+      };
+      if (existing.exists) transaction.update(inviteRef, inviteData);
+      else transaction.create(inviteRef, inviteData);
+      result = groupInviteFromDocument(inviteId, inviteData);
+    });
+    return result!;
+  }
+
+  async updateGroupPermissions(
+    userId: string,
+    threadId: string,
+    invitePermission: ChatGroupInvitePermission,
+  ): Promise<ChatGroupInfoRecord> {
+    const ref = this.firestore.collection("chatThreads").doc(threadId);
+    await this.firestore.runTransaction(async (transaction) => {
+      const thread = await transaction.get(ref);
+      const data = thread.data();
+      assertParticipant(data, userId);
+      const admins = stringArray(data?.adminIds);
+      if (!admins.includes(userId)) {
+        throw new ChatError(
+          "permission_denied",
+          "Only a group admin can change permissions.",
+          403,
+        );
+      }
+      assertGroup(data);
+      transaction.update(ref, { invitePermission });
+    });
+    const saved = await ref.get();
+    return groupInfoFromDocument(threadId, saved.data()!, userId);
+  }
+
+  async leaveGroup(userId: string, threadId: string) {
+    const ref = this.firestore.collection("chatThreads").doc(threadId);
+    await this.firestore.runTransaction(async (transaction) => {
+      const thread = await transaction.get(ref);
+      const data = thread.data();
+      assertParticipant(data, userId);
+      assertGroup(data);
+      const groupData = data!;
+      const participants = participantIdsFrom(groupData);
+      if (participants.length <= 2) {
+        throw new ChatError(
+          "conflict",
+          "You cannot leave until another member joins this group.",
+          409,
+        );
+      }
+      const remaining = participants.filter((item) => item !== userId);
+      const profiles = { ...objectMap(groupData.profiles) };
+      const unreadCounts = numericMap(groupData.unreadCounts);
+      const lastReadAtBy = stringMap(groupData.lastReadAtBy);
+      delete profiles[userId];
+      delete unreadCounts[userId];
+      delete lastReadAtBy[userId];
+      const admins = stringArray(groupData.adminIds)
+        .filter((item) => item !== userId);
+      if (admins.length === 0) admins.push(remaining[0]!);
+      transaction.update(ref, {
+        participantIds: remaining,
+        profiles,
+        unreadCounts,
+        lastReadAtBy,
+        adminIds: admins,
+        updatedAt: this.now().toISOString(),
+      });
+    });
+    return { threadId, left: true };
+  }
+
+  async listGroupInvites(userId: string): Promise<ChatGroupInviteRecord[]> {
+    const snapshot = await this.firestore.collection("chatGroupInvites")
+      .where("targetUserId", "==", userId)
+      .where("status", "==", "pending")
+      .limit(30)
+      .get();
+    return snapshot.docs
+      .map((document) => groupInviteFromDocument(document.id, document.data()))
+      .sort((left, right) => right.invitedAt.localeCompare(left.invitedAt));
+  }
+
+  async respondToGroupInvite(
+    userId: string,
+    inviteId: string,
+    accepted: boolean,
+  ) {
+    const inviteRef = this.firestore.collection("chatGroupInvites").doc(inviteId);
+    let threadId = "";
+    await this.firestore.runTransaction(async (transaction) => {
+      const invite = await transaction.get(inviteRef);
+      if (!invite.exists || invite.get("targetUserId") !== userId ||
+          invite.get("status") !== "pending") {
+        throw new ChatError("not_found", "That group invitation is unavailable.", 404);
+      }
+      threadId = String(invite.get("threadId"));
+      const threadRef = this.firestore.collection("chatThreads").doc(threadId);
+      const thread = await transaction.get(threadRef);
+      const data = thread.data();
+      assertGroup(data);
+      const groupData = data!;
+      if (accepted) {
+        const participants = participantIdsFrom(groupData);
+        if (!participants.includes(userId)) participants.push(userId);
+        const profiles = { ...objectMap(groupData.profiles) };
+        profiles[userId] = objectMap({ value: invite.get("targetProfile") }).value ?? {};
+        const unreadCounts = numericMap(groupData.unreadCounts);
+        const lastReadAtBy = stringMap(groupData.lastReadAtBy);
+        unreadCounts[userId] = 0;
+        lastReadAtBy[userId] = this.now().toISOString();
+        transaction.update(threadRef, {
+          participantIds: participants,
+          profiles,
+          unreadCounts,
+          lastReadAtBy,
+          updatedAt: this.now().toISOString(),
+        });
+      }
+      transaction.update(inviteRef, {
+        status: accepted ? "accepted" : "declined",
+        resolvedAt: this.now().toISOString(),
+      });
+    });
+    return { inviteId, accepted, threadId };
+  }
+
   private async threadForParticipant(userId: string, threadId: string) {
     const ref = this.firestore.collection("chatThreads").doc(threadId);
     const snapshot = await ref.get();
@@ -1255,6 +1439,21 @@ function threadFromDocument(
     : {};
   const profile = profiles[otherUserId] ?? {};
   const unreadCounts = numericMap(data.unreadCounts);
+  if (participantIds.length > 2 || data.group === true) {
+    const group = groupInfoFromDocument(id, data, userId);
+    return {
+      id,
+      title: group.title,
+      subtitle: `${group.members.length} members`,
+      preview: String(data.preview ?? "No messages yet"),
+      updatedAt: String(data.updatedAt ?? ""),
+      type: "people",
+      unreadCount: unreadCounts[userId] ?? 0,
+      verified: false,
+      participants: group.members,
+      groupDescription: group.description,
+    };
+  }
   return {
     id,
     title: String(profile.name ?? "MoolSocial member"),
@@ -1327,6 +1526,66 @@ function callFromDocument(id: string, data: DocumentData): ChatCallRecord {
     createdAt: String(data.createdAt),
     updatedAt: String(data.updatedAt),
   };
+}
+
+function groupInfoFromDocument(
+  threadId: string,
+  data: DocumentData,
+  userId: string,
+): ChatGroupInfoRecord {
+  assertGroup(data);
+  const participants = participantIdsFrom(data);
+  const profiles = objectMap(data.profiles);
+  const admins = stringArray(data.adminIds);
+  const invitePermission: ChatGroupInvitePermission =
+    data.invitePermission === "members" ? "members" : "admins";
+  const isAdmin = admins.includes(userId);
+  return {
+    threadId,
+    title: String(data.title ?? "MoolSocial group"),
+    description: String(data.groupDescription ?? "Coordinate together in Chat."),
+    members: participants.map((participantId) => ({
+      userId: participantId,
+      name: String(profiles[participantId]?.name ?? "MoolSocial member"),
+      handle: String(profiles[participantId]?.handle ?? ""),
+      isAdmin: admins.includes(participantId),
+      isMe: participantId === userId,
+    })),
+    invitePermission,
+    canInvite: isAdmin || invitePermission === "members",
+    canManage: isAdmin,
+    canLeave: participants.length > 2,
+  };
+}
+
+function groupInviteFromDocument(
+  id: string,
+  data: DocumentData,
+): ChatGroupInviteRecord {
+  return {
+    id,
+    threadId: String(data.threadId),
+    groupTitle: String(data.groupTitle ?? "MoolSocial group"),
+    invitedByUserId: String(data.invitedByUserId),
+    invitedByName: String(data.invitedByName ?? "MoolSocial member"),
+    invitedAt: String(data.invitedAt),
+  };
+}
+
+function assertGroup(data: DocumentData | undefined): void {
+  if (!data || (participantIdsFrom(data).length < 3 && data.group !== true)) {
+    throw new ChatError("bad_request", "That conversation is not a group.", 400);
+  }
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+function objectMap(value: unknown): Record<string, DocumentData> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, DocumentData>
+    : {};
 }
 
 function messageFromDocument(

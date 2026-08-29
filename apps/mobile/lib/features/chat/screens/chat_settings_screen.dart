@@ -10,6 +10,7 @@ import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_privacy_screens.dart';
+import 'chat_group_invites_screen.dart';
 
 class ChatSettingsScreen extends StatefulWidget {
   const ChatSettingsScreen({
@@ -409,6 +410,21 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       onTap: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
                           builder: (_) => ChatMessageRequestsScreen(
+                            session: session,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    _AccountSettingTile(
+                      keyName: 'chat-settings-group-invites',
+                      icon: Icons.group_add_outlined,
+                      title: 'Group invitations',
+                      subtitle: 'Review invitations before joining a group.',
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatGroupInvitesScreen(
                             session: session,
                             originReturnRoute: widget.originReturnRoute,
                           ),
