@@ -3659,3 +3659,40 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3839 rejects assuming Android Back pops a Social root directly to Chat.
   Preserve Social shell Back ownership, continue through its global Chat action
   and verify Chat Back returns to Feed within the approved navigation contract.
+- REG3840 rejects letting the shared Chat exact-return fallback override an
+  attachment tray that consumed Android Back. Close the tray and its notice
+  first, keep the conversation mounted and use the route fallback only on the
+  next Back action.
+- REG3841 rejects skipping the shared inbox when returning from a Feed author
+  conversation. Verify thread → inbox → originating Feed, then continue the
+  successful journey through Discover and a second direct Chat.
+- REG3842 rejects confirming a scrolled Conversation Info change only in an
+  offscreen summary card. Keep that summary and also show immediate floating
+  feedback for every session-local Chat or call availability change.
+- REG3843 rejects retaining the clinic-only Care allowlist oracle after task
+  and support destinations are added. Synchronize the audited set and prove
+  each deep thread returns under its actual contextual filter.
+- REG3844 rejects calling `ensureVisible` before a lazy Conversation Info tile
+  exists. Scroll the real keyed list until Safety is rendered, then assert and
+  tap the context-specific destination.
+- REG3845 rejects using a People thread under the Work business filter for a
+  shared Back test. Choose an unfiltered origin or a context-compatible thread
+  before exercising transient surfaces.
+- REG3846 rejects using audit shorthand as an APK candidate family. Keep Chat
+  RuntimeUiReview candidates under `UAW-CODEX-*`, bind the same id in state and
+  runtime defines, and run the direct gate before the wrapper.
+- REG3847 rejects a Chat sheet action clipped behind OPPO navigation. Reuse the
+  shared bottom-sheet clearance owner, retain keyboard scrolling and require
+  the final 44-pixel action to stay above the exported safe bottom.
+- REG3848 rejects deriving safety identity only from the operational filter.
+  Model person/business/conversation separately so an individual helper never
+  receives business-blocking wording.
+- REG3849 rejects asserting a base motion duration for an indexed staggered
+  row. Calculate the bounded final duration and still require zero under
+  reduced motion.
+- REG3850 rejects finding motion only by nested tween type when a row contains
+  reaction motion. Key every incoming tween by its real state owner and assert
+  that exact identity.
+- REG3851 rejects casting a stable motion owner as its inner switcher or using
+  a generic switcher descendant. Key both the owner and each independently
+  asserted visual animation explicitly.

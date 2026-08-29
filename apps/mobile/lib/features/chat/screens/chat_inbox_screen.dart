@@ -5,10 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../shared/shared_session.dart';
 import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_session.dart';
+import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_people_directory.dart';
 
@@ -36,6 +38,7 @@ class ChatInboxScreen extends StatefulWidget {
 
 class _ChatInboxScreenState extends State<ChatInboxScreen> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   final _peopleSearchController = TextEditingController();
   int _routeRequest = 0;
   int _peopleRequest = 0;
@@ -54,9 +57,20 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.addListener(_handleSearchFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _queueRouteApplication();
     });
+  }
+
+  void _handleSearchFocusChange() {
+    if (mounted) setState(() {});
+  }
+
+  void _clearConversationSearch() {
+    if (_searchController.text.isEmpty) return;
+    _searchController.clear();
+    setState(() {});
   }
 
   @override
@@ -148,6 +162,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   void dispose() {
     _routeRequest += 1;
     _peopleRequest += 1;
+    _searchFocusNode
+      ..removeListener(_handleSearchFocusChange)
+      ..dispose();
     _searchController.dispose();
     _peopleSearchController.dispose();
     super.dispose();
@@ -317,20 +334,17 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         final visibleThreads = widget.session.visibleThreads(
           _searchController.text,
         );
-        final allowedThreadIds = entryContext.allowedThreadIds;
-        final threads = allowedThreadIds == null
-            ? visibleThreads
-            : visibleThreads
-                  .where((thread) => allowedThreadIds.contains(thread.id))
-                  .toList(growable: false);
+        final threads = visibleThreads
+            .where((thread) => entryContext.allowsThread(thread.id))
+            .toList(growable: false);
         final people = _visiblePeople();
-        final sectionMotion = MoolMotion.accessible(
+        final sectionMotion = ChatMotion.resolve(
           context,
-          MoolMotion.standard,
+          ChatMotion.stateChange,
         );
-        final reverseSectionMotion = MoolMotion.accessible(
+        final reverseSectionMotion = ChatMotion.resolve(
           context,
-          MoolMotion.quick,
+          ChatMotion.recovery,
         );
         return ChatPageScaffold(
           key: const Key('chat-inbox-screen'),
@@ -397,6 +411,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ],
           ),
           body: AnimatedSwitcher(
+            key: const Key('chat-section-motion'),
             duration: sectionMotion,
             reverseDuration: reverseSectionMotion,
             switchInCurve: Curves.easeOutCubic,
@@ -451,14 +466,21 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
 
   Widget _buildChats(List<ChatThread> threads) {
     if (widget.session.loadingThreads && !widget.session.threadsLoaded) {
-      return const _ChatLoadingState();
-    }
-    if (widget.session.errorMessage != null && threads.isEmpty) {
-      return _ChatErrorState(
-        message: widget.session.errorMessage!,
-        onRetry: () => widget.session.loadThreads(refresh: true),
+      return const ChatFiniteIncomingMotion(
+        stateKey: 'chat-inbox-loading',
+        child: _ChatLoadingState(),
       );
     }
+    if (widget.session.errorMessage != null && threads.isEmpty) {
+      return ChatFiniteIncomingMotion(
+        stateKey: 'chat-inbox-error',
+        child: _ChatErrorState(
+          message: widget.session.errorMessage!,
+          onRetry: () => widget.session.loadThreads(refresh: true),
+        ),
+      );
+    }
+    final hasSearchQuery = _searchController.text.trim().isNotEmpty;
     return CustomScrollView(
       key: const PageStorageKey('chat-inbox-scroll'),
       slivers: [
@@ -471,36 +493,52 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           ),
           sliver: SliverList.list(
             children: [
-              TextField(
-                key: const Key('chat-search-field'),
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Search conversations',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  filled: true,
-                  fillColor: const Color(0xFFF0F1F5),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                    borderSide: const BorderSide(
-                      color: MoolColors.navy,
-                      width: 1.5,
+              ChatSearchFocusMotion(
+                focused: _searchFocusNode.hasFocus,
+                child: TextField(
+                  key: const Key('chat-search-field'),
+                  focusNode: _searchFocusNode,
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search conversations',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    suffixIcon: IconButton(
+                      key: Key(
+                        hasSearchQuery
+                            ? 'chat-clear-search'
+                            : 'chat-search-assistance',
+                      ),
+                      tooltip: hasSearchQuery
+                          ? 'Clear conversation search'
+                          : 'Search assistance',
+                      onPressed: hasSearchQuery
+                          ? _clearConversationSearch
+                          : () async {
+                              final query = await _showSearchAssistance(
+                                context,
+                              );
+                              if (query == null || !mounted) return;
+                              _searchController.value = TextEditingValue(
+                                text: query,
+                                selection: TextSelection.collapsed(
+                                  offset: query.length,
+                                ),
+                              );
+                              setState(() {});
+                            },
+                      icon: ChatActionIconMotion(
+                        key: const Key('chat-search-action-icon-motion'),
+                        stateKey: hasSearchQuery ? 'clear' : 'assist',
+                        icon: hasSearchQuery
+                            ? Icons.close_rounded
+                            : Icons.manage_search_rounded,
+                      ),
                     ),
-                  ),
-                  suffixIcon: IconButton(
-                    key: const Key('chat-voice-search'),
-                    tooltip: 'Voice search',
-                    onPressed: () async {
-                      final query = await _showVoiceSearch(context);
-                      if (query == null || !mounted) return;
-                      _searchController.text = query;
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.mic_none_rounded),
                   ),
                 ),
               ),
@@ -515,26 +553,31 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         if (threads.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: _EmptyInbox(
-              hasQuery:
-                  _searchController.text.trim().isNotEmpty ||
-                  (_entryContext.showThreadFilters &&
-                      widget.session.selectedFilter != null) ||
-                  widget.session.unreadOnly,
-              socialOnly: _entryContext.id == ChatEntryContextId.social,
-              onReset: () {
-                _searchController.clear();
-                if (_entryContext.defaultFilter case final filter?) {
-                  widget.session.chooseFilter(filter);
-                } else {
-                  widget.session.chooseAll();
-                }
-                setState(() {});
-              },
-              onDiscover: () => _selectSection(ChatHomeSection.discover),
-              onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
-              onStartConversation: () =>
-                  _selectSection(ChatHomeSection.discover),
+            child: ChatFiniteIncomingMotion(
+              stateKey: hasSearchQuery
+                  ? 'chat-inbox-no-search-results'
+                  : 'chat-inbox-empty-${widget.session.selectedFilter?.name ?? 'all'}-${widget.session.unreadOnly}',
+              child: _EmptyInbox(
+                hasQuery:
+                    hasSearchQuery ||
+                    (_entryContext.showThreadFilters &&
+                        widget.session.selectedFilter != null) ||
+                    widget.session.unreadOnly,
+                socialOnly: _entryContext.id == ChatEntryContextId.social,
+                onReset: () {
+                  _searchController.clear();
+                  if (_entryContext.defaultFilter case final filter?) {
+                    widget.session.chooseFilter(filter);
+                  } else {
+                    widget.session.chooseAll();
+                  }
+                  setState(() {});
+                },
+                onDiscover: () => _selectSection(ChatHomeSection.discover),
+                onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
+                onStartConversation: () =>
+                    _selectSection(ChatHomeSection.discover),
+              ),
             ),
           )
         else
@@ -549,14 +592,19 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
               itemCount: threads.length,
               separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 61, color: MoolColors.line),
-              itemBuilder: (context, index) => _ThreadCard(
-                thread: threads[index],
-                unread: widget.session.unreadFor(threads[index]),
-                onTap: () => _openThread(
-                  context,
-                  threads[index].id,
-                  widget.returnRoute,
-                  draft: widget.initialMessageDraft,
+              itemBuilder: (context, index) => ChatListEntryMotion(
+                key: ValueKey('chat-thread-entry-motion-${threads[index].id}'),
+                stateKey: threads[index].id,
+                index: index,
+                child: _ThreadCard(
+                  thread: threads[index],
+                  unread: widget.session.unreadFor(threads[index]),
+                  onTap: () => _openThread(
+                    context,
+                    threads[index].id,
+                    widget.returnRoute,
+                    draft: widget.initialMessageDraft,
+                  ),
                 ),
               ),
             ),
@@ -634,21 +682,24 @@ class _FilterStripState extends State<_FilterStrip> {
         separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
         itemBuilder: (context, index) => KeyedSubtree(
           key: _anchors[index],
-          child: ChoiceChip(
-            key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
-            label: Text(values[index].$1),
+          child: ChatSelectionMotion(
             selected: values[index].$2,
-            showCheckmark: true,
-            checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
-            selectedColor: MoolColors.navy,
-            backgroundColor: const Color(0xFFF0F1F5),
-            side: BorderSide.none,
-            shape: const StadiumBorder(),
-            labelStyle: TextStyle(
-              color: values[index].$2 ? Colors.white : MoolColors.ink,
-              fontWeight: FontWeight.w700,
+            child: ChoiceChip(
+              key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
+              label: Text(values[index].$1),
+              selected: values[index].$2,
+              showCheckmark: true,
+              checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
+              selectedColor: MoolColors.navy,
+              backgroundColor: const Color(0xFFF0F1F5),
+              side: BorderSide.none,
+              shape: const StadiumBorder(),
+              labelStyle: TextStyle(
+                color: values[index].$2 ? Colors.white : MoolColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+              onSelected: (_) => values[index].$3(),
             ),
-            onSelected: (_) => values[index].$3(),
           ),
         ),
       ),
@@ -868,58 +919,78 @@ void _openThread(
   );
 }
 
-Future<String?> _showVoiceSearch(BuildContext context) {
+Future<String?> _showSearchAssistance(BuildContext context) {
   final formKey = GlobalKey<FormState>();
   var query = '';
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
   return showModalBottomSheet<String>(
     context: context,
+    showDragHandle: true,
+    useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Find a conversation',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text('Speak or type a person, business, order or case.'),
-          const SizedBox(height: MoolSpacing.md),
-          Form(
-            key: formKey,
-            child: TextFormField(
-              key: const Key('chat-voice-search-field'),
-              onChanged: (value) => query = value,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a conversation name.'
-                  : null,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.mic_none_rounded),
-                labelText: 'Conversation name',
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          MoolSpacing.xs,
+          MoolSpacing.lg,
+          MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Search conversations',
+              style: TextStyle(
+                color: MoolColors.ink,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton(
-            key: const Key('chat-use-voice-search'),
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              Navigator.of(sheetContext).pop(query.trim());
-            },
-            child: const Text('Search conversations'),
-          ),
-        ],
+            const SizedBox(height: MoolSpacing.xs),
+            const Text('Type a person, business, order or case.'),
+            const SizedBox(height: MoolSpacing.md),
+            Form(
+              key: formKey,
+              child: ChatFocusMotion(
+                motionKeyName: 'chat-search-assistance-focus-motion',
+                child: TextFormField(
+                  key: const Key('chat-search-assistance-field'),
+                  onChanged: (value) => query = value,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a conversation name.'
+                      : null,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    labelText: 'Conversation name',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.md),
+            FilledButton(
+              key: const Key('chat-use-search-assistance'),
+              onPressed: () {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                Navigator.of(sheetContext).pop(query.trim());
+              },
+              child: const Text('Search conversations'),
+            ),
+          ],
+        ),
       ),
     ),
   );

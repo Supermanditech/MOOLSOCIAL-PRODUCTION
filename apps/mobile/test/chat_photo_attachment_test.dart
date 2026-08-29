@@ -1,17 +1,68 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/screens/chat_thread_screen.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/social_media_picker.dart';
 
 void main() {
+  test(
+    'native picker maps camera and photo permission failures truthfully',
+    () async {
+      const cases = <(ChatPhotoSource, String, String, String)>[
+        (
+          ChatPhotoSource.camera,
+          'camera_access_denied',
+          'camera_permission_denied',
+          'Camera access was denied.',
+        ),
+        (
+          ChatPhotoSource.camera,
+          'camera_access_restricted',
+          'camera_permission_restricted',
+          'Camera access is restricted',
+        ),
+        (
+          ChatPhotoSource.gallery,
+          'photo_access_denied',
+          'photo_permission_denied',
+          'Photo access was denied.',
+        ),
+        (
+          ChatPhotoSource.gallery,
+          'photo_access_restricted',
+          'photo_permission_restricted',
+          'Photo access is restricted',
+        ),
+      ];
+
+      for (final entry in cases) {
+        final picker = NativeChatPhotoPicker(
+          picker: _PermissionFailureMediaPicker(entry.$2),
+        );
+        await expectLater(
+          picker.pick(entry.$1),
+          throwsA(
+            isA<ChatServiceException>()
+                .having((error) => error.code, 'code', entry.$3)
+                .having(
+                  (error) => error.userMessage,
+                  'message',
+                  contains(entry.$4),
+                ),
+          ),
+        );
+      }
+    },
+  );
+
   test(
     'authenticated photo send prepares, uploads and finalizes once',
     () async {
@@ -340,6 +391,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('camera permission denial stays in Chat with recovery guidance', (
+    tester,
+  ) async {
+    final session = ChatSession.production(
+      gateway: _PhotoChatGateway(),
+      photoPicker: NativeChatPhotoPicker(
+        picker: _PermissionFailureMediaPicker('camera_access_denied'),
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatThreadScreen(
+          session: session,
+          threadId: 'thread-1',
+          returnRoute: '/app/chat/inbox',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chat-composer-camera')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(
+      find.text(
+        'Camera access was denied. Allow camera access in device settings, then try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('late photo completion stays with its originating thread', (
     tester,
   ) async {
@@ -586,6 +672,28 @@ class _PhotoRequest {
   final String caption;
   final String idempotencyKey;
   final String? replyToMessageId;
+}
+
+class _PermissionFailureMediaPicker implements SocialMediaPicker {
+  const _PermissionFailureMediaPicker(this.code);
+
+  final String code;
+
+  @override
+  Future<SocialPickedMedia?> pickImage(SocialMediaSource source) =>
+      Future.error(PlatformException(code: code));
+
+  @override
+  Future<List<SocialPickedMedia>> pickCarousel({int limit = 10}) =>
+      Future.error(UnsupportedError('Carousel is outside this Chat test.'));
+
+  @override
+  Future<SocialPickedMedia?> pickReel(SocialMediaSource source) =>
+      Future.error(UnsupportedError('Video is outside this Chat test.'));
+
+  @override
+  Future<List<SocialPickedMedia>> recoverInterruptedSelection() async =>
+      const [];
 }
 
 class _PhotoChatGateway implements ChatGateway, ChatPhotoGateway {

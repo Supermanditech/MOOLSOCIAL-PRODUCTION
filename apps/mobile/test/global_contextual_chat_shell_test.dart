@@ -81,6 +81,30 @@ void main() {
         ChatThreadType.support,
       ),
       (
+        '/app/manufacturer/orders/review',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/captain/trips/ride-1',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/creator/audience',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/operations/home',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
         '/app/pay/home',
         ChatEntryContextId.pay,
         'Pay Chat',
@@ -105,10 +129,34 @@ void main() {
     });
     expect(ChatEntryContext.resolve('/app/book/doctor').allowedThreadIds, {
       'clinic-care',
+      'task-helper',
+      'order-support',
     });
     expect(ChatEntryContext.resolve('/app/work/my-work').allowedThreadIds, {
       'workspace-support',
     });
+    expect(
+      ChatEntryContext.resolve('/app/ride/trip/ride-1').allowsThread('ride-1'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/book/task/task-1',
+      ).allowsThread('task-helper'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/retailer/orders',
+      ).allowsThread('order-support'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/captain/trips/ride-1',
+      ).allowsThread('ride-support'),
+      isTrue,
+    );
   });
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
@@ -143,6 +191,12 @@ void main() {
       '/app/work/my-work',
       'Workspace Chat',
       'Setup and review support',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/pay/home',
+      'Pay Chat',
+      'Payments and support',
       ChatThreadType.support,
     ),
   ]) {
@@ -258,6 +312,96 @@ void main() {
     });
   }
 
+  for (final destination in const <(String, String, String, ChatThreadType)>[
+    ('/app/pay/home', 'order-support', 'Pay Chat', ChatThreadType.support),
+    (
+      '/app/retailer/orders/issues',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/manufacturer/orders/review',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/captain/trips/ride-1',
+      'ride-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/creator/audience',
+      'workspace-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/operations/home',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/book/task/task-1',
+      'task-helper',
+      'Care Chat',
+      ChatThreadType.business,
+    ),
+    (
+      '/app/book/task/task-1/support',
+      'order-support',
+      'Care Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/ride/trip/ride-1/support',
+      'ride-support',
+      'Travel Chat',
+      ChatThreadType.support,
+    ),
+  ]) {
+    testWidgets(
+      '${destination.$3} ${destination.$1} deep thread returns to its visible contextual inbox',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+
+        await tester.pumpWidget(
+          MoolSocialApp(
+            session: journey,
+            chatSession: chat,
+            initialLocation: Uri(
+              path: '/app/chat/thread/${destination.$2}',
+              queryParameters: {'return': destination.$1},
+            ).toString(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chat-back')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+        expect(find.text(destination.$3), findsOneWidget);
+        expect(chat.selectedFilter, destination.$4);
+        expect(
+          find.byKey(Key('chat-open-thread-${destination.$2}')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('conversation keeps familiar MoolSocial header and composer', (
     tester,
   ) async {
@@ -327,6 +471,12 @@ void main() {
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(find.textContaining('Video sharing'), findsOneWidget);
 
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+    expect(find.byKey(const Key('chat-attachment-notice')), findsNothing);
+
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
@@ -390,13 +540,30 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const Key('chat-info-voice-availability')));
+      final voiceAvailability = find.byKey(
+        const Key('chat-info-voice-availability'),
+      );
+      await tester.ensureVisible(voiceAvailability);
+      await tester.tap(voiceAvailability);
       await tester.pump();
       expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
-      expect(find.byKey(const Key('chat-info-local-status')), findsOneWidget);
+      expect(find.byKey(const Key('chat-info-local-feedback')), findsOneWidget);
+      expect(
+        find.text('Voice calls paused for this app session.'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('chat-info-video-availability')));
       await tester.pump();
       expect(chat.videoCallsAvailableForSession('home-basket'), isFalse);
+
+      final voiceChat = find.byKey(const Key('chat-info-voice-chat'));
+      await tester.ensureVisible(voiceChat);
+      await tester.tap(voiceChat);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-voice-chat-recovery')), findsOneWidget);
+      expect(find.text('Voice chat unavailable'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
 
       final lastSeen = find.byKey(const Key('chat-info-last-seen'));
       await tester.ensureVisible(lastSeen);
@@ -459,6 +626,82 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final safety in const <(String, String, String, String)>[
+    (
+      'task-helper',
+      'Block this person',
+      'chat-block-user-recovery',
+      'Blocking unavailable',
+    ),
+    (
+      'mahadev',
+      'Block this business',
+      'chat-block-business-recovery',
+      'Business blocking unavailable',
+    ),
+    (
+      'rasoi',
+      'Conversation safety',
+      'chat-conversation-safety-recovery',
+      'Conversation safety unavailable',
+    ),
+    (
+      'order-support',
+      'Conversation safety',
+      'chat-conversation-safety-recovery',
+      'Conversation safety unavailable',
+    ),
+  ]) {
+    testWidgets(
+      '${safety.$1} uses context-correct Conversation Info safety wording',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+
+        await tester.pumpWidget(
+          MoolSocialApp(
+            session: journey,
+            chatSession: chat,
+            initialLocation:
+                '/app/chat/thread/${safety.$1}?return=/app/work/earn',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('chat-conversation-info')));
+        await tester.pumpAndSettle();
+        final safetyAction = find.byKey(const Key('chat-info-block-user'));
+        await tester.scrollUntilVisible(
+          safetyAction,
+          180,
+          scrollable: find.descendant(
+            of: find.byKey(const Key('chat-conversation-info-list')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(find.text(safety.$2), findsOneWidget);
+        await tester.tap(safetyAction);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(Key(safety.$3)), findsOneWidget);
+        expect(find.text(safety.$4), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chat-capability-continue')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('chat-conversation-info-screen')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('conversation info remains reachable on compact large text', (
     tester,
@@ -546,6 +789,42 @@ void main() {
     expect(
       tester.getBottomRight(continueButton).dy,
       lessThanOrEqualTo(exportedClipBottom),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('search assistance clears the OPPO bottom system inset', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/inbox?return=/app/mool',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-search-assistance')));
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const Key('chat-use-search-assistance'));
+    final safeBottom = 800 - tester.view.viewPadding.bottom;
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+    expect(tester.getBottomRight(action).dy, lessThanOrEqualTo(safeBottom));
+    expect(
+      find.byKey(const Key('chat-search-assistance-field')),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });

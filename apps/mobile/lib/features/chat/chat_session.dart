@@ -220,6 +220,7 @@ class ChatSession extends ChangeNotifier {
       timeLabel: 'Now',
       type: ChatThreadType.business,
       verified: true,
+      safetyTarget: ChatSafetyTarget.person,
     ),
     ChatThread(
       id: 'workspace-support',

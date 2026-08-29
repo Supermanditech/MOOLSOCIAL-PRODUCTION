@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../shared/shared_models.dart';
+import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 
 enum ChatHomeSection { chats, people, discover }
@@ -100,27 +101,37 @@ class ChatPeopleDirectory extends StatelessWidget {
             ),
             sliver: SliverList.list(
               children: [
-                TextField(
-                  key: const Key('chat-people-search'),
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: connectedOnly
-                        ? 'Search connected people'
-                        : 'Search MoolSocial people',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            key: const Key('chat-people-search-clear'),
-                            tooltip: 'Clear people search',
-                            onPressed: () {
-                              searchController.clear();
-                              onSearchChanged('');
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
+                ChatFocusMotion(
+                  motionKeyName: 'chat-people-search-focus-motion',
+                  child: TextField(
+                    key: const Key('chat-people-search'),
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: connectedOnly
+                          ? 'Search connected people'
+                          : 'Search MoolSocial people',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      suffixIcon: searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('chat-people-search-clear'),
+                              tooltip: 'Clear people search',
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged('');
+                              },
+                              icon: const ChatActionIconMotion(
+                                stateKey: 'clear-people-search',
+                                icon: Icons.close_rounded,
+                              ),
+                            ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),
@@ -175,7 +186,10 @@ class ChatPeopleDirectory extends StatelessWidget {
                 ),
                 if (error case final message?) ...[
                   const SizedBox(height: MoolSpacing.sm),
-                  _PeopleNotice(message: message, onRetry: onRefresh),
+                  ChatFiniteIncomingMotion(
+                    stateKey: 'chat-people-error-$message',
+                    child: _PeopleNotice(message: message, onRetry: onRefresh),
+                  ),
                 ],
                 const SizedBox(height: MoolSpacing.md),
                 Row(
@@ -208,22 +222,29 @@ class ChatPeopleDirectory extends StatelessWidget {
           if (loading && people.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: CircularProgressIndicator(
-                  key: Key('chat-people-loading'),
+              child: ChatFiniteIncomingMotion(
+                stateKey: 'chat-people-loading-state',
+                child: Center(
+                  child: CircularProgressIndicator(
+                    key: Key('chat-people-loading'),
+                  ),
                 ),
               ),
             )
           else if (people.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _PeopleEmpty(
-                connectedOnly: connectedOnly,
-                hasQuery: searchController.text.trim().isNotEmpty,
-                onDiscover: onDiscover,
-                onOpenFeed: onOpenFeed,
-                publicFeedOpened: publicFeedOpened,
-                onBackToChats: onBackToChats,
+              child: ChatFiniteIncomingMotion(
+                stateKey:
+                    'chat-people-empty-${section.name}-${searchController.text.trim().isNotEmpty}-$publicFeedOpened',
+                child: _PeopleEmpty(
+                  connectedOnly: connectedOnly,
+                  hasQuery: searchController.text.trim().isNotEmpty,
+                  onDiscover: onDiscover,
+                  onOpenFeed: onOpenFeed,
+                  publicFeedOpened: publicFeedOpened,
+                  onBackToChats: onBackToChats,
+                ),
               ),
             )
           else
@@ -238,10 +259,17 @@ class ChatPeopleDirectory extends StatelessWidget {
                 itemCount: people.length,
                 separatorBuilder: (_, _) =>
                     const SizedBox(height: MoolSpacing.xs),
-                itemBuilder: (context, index) => _PersonCard(
-                  person: people[index],
-                  onConnect: () => onConnect(people[index]),
-                  onChat: () => onChat(people[index]),
+                itemBuilder: (context, index) => ChatListEntryMotion(
+                  key: ValueKey(
+                    'chat-person-entry-motion-${people[index].authorId}',
+                  ),
+                  stateKey: people[index].authorId,
+                  index: index,
+                  child: _PersonCard(
+                    person: people[index],
+                    onConnect: () => onConnect(people[index]),
+                    onChat: () => onChat(people[index]),
+                  ),
                 ),
               ),
             ),
@@ -264,7 +292,7 @@ class _PersonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final motionDuration = MoolMotion.accessible(context, MoolMotion.quick);
+    final motionDuration = ChatMotion.resolve(context, ChatMotion.focus);
     final initials = person.name
         .trim()
         .split(RegExp(r'\s+'))

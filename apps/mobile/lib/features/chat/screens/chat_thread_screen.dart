@@ -9,6 +9,7 @@ import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_services.dart';
 import '../chat_session.dart';
+import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 
 class ChatThreadScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class ChatThreadScreen extends StatefulWidget {
 
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _messageController = TextEditingController();
+  final _composerKey = GlobalKey<_ComposerState>();
   final Map<String, String> _draftTextByThread = {};
   int _threadLoadRequest = 0;
 
@@ -192,7 +194,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             returnUri?.pathSegments[2] == 'thread';
         final backRoute = returnsToChatThread
             ? widget.returnRoute
-            : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
+            : chatRoute(
+                '/app/chat/inbox',
+                returnRoute: widget.returnRoute,
+                filter: thread.type.name,
+              );
         final entryContext = ChatEntryContext.resolve(widget.returnRoute);
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
@@ -206,6 +212,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           onTitleTap: () =>
               unawaited(_openConversationInfo(thread, entryContext)),
           backgroundColor: const Color(0xFFF1F2F6),
+          onBlockedPop: () =>
+              _composerKey.currentState?.closeAttachmentsForBack() ?? false,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -257,29 +265,41 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           body:
               widget.session.loadingMessageThreads.contains(thread.id) &&
                   widget.session.messages(thread.id).isEmpty
-              ? const _ThreadLoadingState()
+              ? const ChatFiniteIncomingMotion(
+                  stateKey: 'chat-thread-loading-state',
+                  child: _ThreadLoadingState(),
+                )
               : widget.session.messageLoadError(thread.id) != null &&
                     widget.session.messages(thread.id).isEmpty
-              ? _ThreadErrorState(
-                  message: widget.session.messageLoadError(thread.id)!,
-                  onRetry: () =>
-                      widget.session.loadMessages(thread.id, refresh: true),
+              ? ChatFiniteIncomingMotion(
+                  stateKey: 'chat-thread-error-state',
+                  child: _ThreadErrorState(
+                    message: widget.session.messageLoadError(thread.id)!,
+                    onRetry: () =>
+                        widget.session.loadMessages(thread.id, refresh: true),
+                  ),
                 )
               : _ThreadBody(session: widget.session, thread: thread),
-          bottom: widget.session.chatAvailableForSession(thread.id)
-              ? _Composer(
-                  session: widget.session,
-                  threadId: thread.id,
-                  controller: _messageController,
-                  onSend: _sendCurrentMessage,
-                  onSendPhoto: _sendCurrentPhoto,
-                )
-              : _ChatPausedBar(
-                  onResume: () => widget.session.setChatAvailableForSession(
-                    thread.id,
-                    available: true,
+          bottom: ChatFiniteIncomingMotion(
+            stateKey: widget.session.chatAvailableForSession(thread.id)
+                ? 'chat-composer-active'
+                : 'chat-composer-paused',
+            child: widget.session.chatAvailableForSession(thread.id)
+                ? _Composer(
+                    key: _composerKey,
+                    session: widget.session,
+                    threadId: thread.id,
+                    controller: _messageController,
+                    onSend: _sendCurrentMessage,
+                    onSendPhoto: _sendCurrentPhoto,
+                  )
+                : _ChatPausedBar(
+                    onResume: () => widget.session.setChatAvailableForSession(
+                      thread.id,
+                      available: true,
+                    ),
                   ),
-                ),
+          ),
         );
       },
     );
@@ -307,6 +327,16 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
 
   void _confirmLocalChange(String message) {
     setState(() => _statusMessage = message);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('chat-info-local-feedback'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   void _showAccountSettingRecovery({
@@ -324,6 +354,18 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     );
   }
 
+  void _showSafetyRecovery(ChatThread thread) {
+    final copy = _conversationSafetyCopy(thread);
+    unawaited(
+      _showUnavailableCapability(
+        context,
+        keyName: copy.recoveryKey,
+        title: copy.recoveryTitle,
+        message: copy.recoveryMessage,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -332,6 +374,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         final thread = widget.thread;
         final session = widget.session;
         final chatAvailable = session.chatAvailableForSession(thread.id);
+        final safety = _conversationSafetyCopy(thread);
         return ChatPageScaffold(
           key: const Key('chat-conversation-info-screen'),
           session: session,
@@ -355,7 +398,10 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
               ),
               if (_statusMessage != null) ...[
                 const SizedBox(height: 12),
-                _ConversationStatusNotice(message: _statusMessage!),
+                ChatFiniteIncomingMotion(
+                  stateKey: _statusMessage!,
+                  child: _ConversationStatusNotice(message: _statusMessage!),
+                ),
               ],
               const SizedBox(height: 16),
               _ConversationSettingsSection(
@@ -438,6 +484,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
               ),
               const SizedBox(height: 16),
               _ConversationSettingsSection(
+                title: 'Conversation',
+                child: ListTile(
+                  key: const Key('chat-info-voice-chat'),
+                  minLeadingWidth: 28,
+                  leading: const Icon(Icons.graphic_eq_rounded),
+                  title: const Text('Start a voice chat'),
+                  subtitle: const Text(
+                    'Talk live with this conversation when voice chat is available.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => unawaited(
+                    _showUnavailableCapability(
+                      context,
+                      keyName: 'chat-voice-chat-recovery',
+                      title: 'Voice chat unavailable',
+                      message:
+                          'Voice chat is not available right now. You can continue with messages or try a voice call.',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
                 title: 'Privacy',
                 child: Column(
                   children: [
@@ -482,13 +551,10 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   key: const Key('chat-info-block-user'),
                   minLeadingWidth: 28,
                   leading: const Icon(Icons.block_outlined),
-                  title: const Text('Block this person'),
-                  subtitle: const Text('Nothing changes without confirmation.'),
+                  title: Text(safety.label),
+                  subtitle: Text(safety.description),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showAccountSettingRecovery(
-                    keyName: 'chat-block-user-recovery',
-                    title: 'Blocking unavailable',
-                  ),
+                  onTap: () => _showSafetyRecovery(thread),
                 ),
               ),
             ],
@@ -498,6 +564,42 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     );
   }
 }
+
+({
+  String label,
+  String description,
+  String recoveryKey,
+  String recoveryTitle,
+  String recoveryMessage,
+})
+_conversationSafetyCopy(
+  ChatThread thread,
+) => switch (thread.effectiveSafetyTarget) {
+  ChatSafetyTarget.person => (
+    label: 'Block this person',
+    description: 'Nothing changes without confirmation.',
+    recoveryKey: 'chat-block-user-recovery',
+    recoveryTitle: 'Blocking unavailable',
+    recoveryMessage:
+        'Blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+  ChatSafetyTarget.business => (
+    label: 'Block this business',
+    description: 'Nothing changes without confirmation.',
+    recoveryKey: 'chat-block-business-recovery',
+    recoveryTitle: 'Business blocking unavailable',
+    recoveryMessage:
+        'Business blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+  ChatSafetyTarget.conversation => (
+    label: 'Conversation safety',
+    description: 'Report this conversation or ask MoolSocial for help.',
+    recoveryKey: 'chat-conversation-safety-recovery',
+    recoveryTitle: 'Conversation safety unavailable',
+    recoveryMessage:
+        'Safety and reporting controls are not available right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+};
 
 class _ConversationIdentityCard extends StatelessWidget {
   const _ConversationIdentityCard({
@@ -808,10 +910,15 @@ class _ThreadBody extends StatelessWidget {
         MoolSpacing.lg,
       ),
       itemCount: messages.length,
-      itemBuilder: (context, index) => _MessageBubble(
-        message: messages[index],
-        threadId: thread.id,
-        session: session,
+      itemBuilder: (context, index) => ChatListEntryMotion(
+        key: ValueKey('chat-message-entry-motion-${messages[index].id}'),
+        stateKey: messages[index].id,
+        index: index,
+        child: _MessageBubble(
+          message: messages[index],
+          threadId: thread.id,
+          session: session,
+        ),
       ),
     );
   }
@@ -1077,8 +1184,10 @@ class _MessageBubble extends StatelessWidget {
                     const SizedBox(width: 4),
                     Tooltip(
                       message: _deliveryLabel(message.deliveryState),
-                      child: Icon(
-                        _deliveryIcon(message.deliveryState),
+                      child: ChatActionIconMotion(
+                        key: Key('chat-delivery-icon-motion-${message.id}'),
+                        stateKey: message.deliveryState,
+                        icon: _deliveryIcon(message.deliveryState),
                         color: failed
                             ? const Color(0xFFFFB4AB)
                             : message.deliveryState == ChatDeliveryState.read
@@ -1103,72 +1212,49 @@ class _MessageBubble extends StatelessWidget {
                   child: const Text('Retry'),
                 ),
               if (message.reactionCount > 0)
-                Container(
-                  key: Key('chat-reaction-count-${message.id}'),
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: message.mine
-                        ? Colors.white.withValues(alpha: .14)
-                        : const Color(0xFFF0F1F5),
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        message.reactedByMe
-                            ? Icons.thumb_up_rounded
-                            : Icons.thumb_up_outlined,
-                        size: 13,
-                        color: message.mine ? Colors.white : MoolColors.navy,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${message.reactionCount}',
-                        style: TextStyle(
-                          color: message.mine ? Colors.white : MoolColors.ink,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                ChatFiniteIncomingMotion(
+                  stateKey:
+                      'reaction-${message.id}-${message.reactionCount}-${message.reactedByMe}',
+                  duration: ChatMotion.focus,
+                  child: Container(
+                    key: Key('chat-reaction-count-${message.id}'),
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: message.mine
+                          ? Colors.white.withValues(alpha: .14)
+                          : const Color(0xFFF0F1F5),
+                      borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          message.reactedByMe
+                              ? Icons.thumb_up_rounded
+                              : Icons.thumb_up_outlined,
+                          size: 13,
+                          color: message.mine ? Colors.white : MoolColors.navy,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 3),
+                        Text(
+                          '${message.reactionCount}',
+                          style: TextStyle(
+                            color: message.mine ? Colors.white : MoolColors.ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ChatBottomSheetSafeArea extends StatelessWidget {
-  const _ChatBottomSheetSafeArea({
-    required this.bottomInset,
-    required this.exportedSemanticsClearance,
-    required this.child,
-  });
-
-  final double bottomInset;
-  final double exportedSemanticsClearance;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseBottomPadding = bottomInset > MoolSpacing.md
-        ? bottomInset
-        : MoolSpacing.md;
-    final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
-    return SafeArea(
-      top: false,
-      bottom: false,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: child,
       ),
     );
   }
@@ -1191,7 +1277,8 @@ Future<void> _showUnavailableCapability(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Padding(
@@ -1253,7 +1340,8 @@ Future<void> _showMessageActions(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(
@@ -1338,7 +1426,8 @@ Future<void> _chooseForwardTarget(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(
@@ -1471,6 +1560,7 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.onSend,
     required this.onSendPhoto,
+    super.key,
   });
 
   final ChatSession session;
@@ -1498,6 +1588,15 @@ class _ComposerState extends State<_Composer> {
       _attachmentsOpen = !_attachmentsOpen;
       _attachmentNotice = null;
     });
+  }
+
+  bool closeAttachmentsForBack() {
+    if (!_attachmentsOpen) return false;
+    setState(() {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+    });
+    return true;
   }
 
   Future<void> _chooseAttachment(
@@ -1567,225 +1666,274 @@ class _ComposerState extends State<_Composer> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_attachmentsOpen) ...[
-                Container(
-                  key: const Key('chat-attachment-tray'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(MoolSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(MoolRadii.card),
-                    border: Border.all(
-                      color: MoolColors.navy.withValues(alpha: .10),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
+              PopScope<void>(
+                canPop: !_attachmentsOpen,
+                child: const SizedBox.shrink(),
+              ),
+              ChatExpandableMotion(
+                key: const Key('chat-attachment-expand-motion'),
+                child: _attachmentsOpen
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: _ChatAttachmentAction(
-                              keyName: 'chat-document',
-                              icon: Icons.insert_drive_file_outlined,
-                              label: 'Document',
-                              onPressed: () => unawaited(
-                                _chooseAttachment(
-                                  context,
-                                  _ChatAttachmentChoice.document,
-                                ),
+                          Container(
+                            key: const Key('chat-attachment-tray'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(MoolSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.card,
+                              ),
+                              border: Border.all(
+                                color: MoolColors.navy.withValues(alpha: .10),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: _ChatAttachmentAction(
-                              keyName: 'chat-gallery',
-                              icon: Icons.photo_library_outlined,
-                              label: 'Photos',
-                              onPressed: () => unawaited(
-                                _chooseAttachment(
-                                  context,
-                                  _ChatAttachmentChoice.gallery,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _ChatAttachmentAction(
+                                        keyName: 'chat-document',
+                                        icon: Icons.insert_drive_file_outlined,
+                                        label: 'Document',
+                                        onPressed: () => unawaited(
+                                          _chooseAttachment(
+                                            context,
+                                            _ChatAttachmentChoice.document,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _ChatAttachmentAction(
+                                        keyName: 'chat-gallery',
+                                        icon: Icons.photo_library_outlined,
+                                        label: 'Photos',
+                                        onPressed: () => unawaited(
+                                          _chooseAttachment(
+                                            context,
+                                            _ChatAttachmentChoice.gallery,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _ChatAttachmentAction(
+                                        keyName: 'chat-camera',
+                                        icon: Icons.photo_camera_outlined,
+                                        label: 'Camera',
+                                        onPressed: () => unawaited(
+                                          _chooseAttachment(
+                                            context,
+                                            _ChatAttachmentChoice.camera,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _ChatAttachmentAction(
+                                        keyName: 'chat-video',
+                                        icon: Icons.video_library_outlined,
+                                        label: 'Video',
+                                        onPressed: () => unawaited(
+                                          _chooseAttachment(
+                                            context,
+                                            _ChatAttachmentChoice.video,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
+                                if (_attachmentNotice != null) ...[
+                                  const SizedBox(height: MoolSpacing.xs),
+                                  Container(
+                                    key: const Key('chat-attachment-notice'),
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: MoolSpacing.sm,
+                                      vertical: MoolSpacing.xs,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF0F1F5),
+                                      borderRadius: BorderRadius.circular(
+                                        MoolRadii.control,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _attachmentNotice!,
+                                      style: const TextStyle(
+                                        color: MoolColors.muted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          Expanded(
-                            child: _ChatAttachmentAction(
-                              keyName: 'chat-camera',
-                              icon: Icons.photo_camera_outlined,
-                              label: 'Camera',
-                              onPressed: () => unawaited(
-                                _chooseAttachment(
-                                  context,
-                                  _ChatAttachmentChoice.camera,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: _ChatAttachmentAction(
-                              keyName: 'chat-video',
-                              icon: Icons.video_library_outlined,
-                              label: 'Video',
-                              onPressed: () => unawaited(
-                                _chooseAttachment(
-                                  context,
-                                  _ChatAttachmentChoice.video,
-                                ),
-                              ),
-                            ),
-                          ),
+                          const SizedBox(height: MoolSpacing.xs),
                         ],
-                      ),
-                      if (_attachmentNotice != null) ...[
-                        const SizedBox(height: MoolSpacing.xs),
-                        Container(
-                          key: const Key('chat-attachment-notice'),
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: MoolSpacing.sm,
-                            vertical: MoolSpacing.xs,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              ChatExpandableMotion(
+                key: const Key('chat-selected-photo-expand-motion'),
+                child: photo != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            key: const Key('chat-selected-photo'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(MoolSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F1F8),
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.control,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    MoolRadii.control,
+                                  ),
+                                  child: Image.memory(
+                                    photo.bytes,
+                                    key: const Key('chat-selected-photo-image'),
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const SizedBox(
+                                              width: 72,
+                                              height: 72,
+                                              child: Icon(
+                                                Icons.broken_image_outlined,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                                const SizedBox(width: MoolSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Photo ready to send',
+                                        style: TextStyle(
+                                          color: MoolColors.navy,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        photo.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  key: const Key('chat-remove-photo'),
+                                  tooltip: 'Remove photo',
+                                  onPressed: session.busy
+                                      ? null
+                                      : () => session.cancelSelectedPhoto(
+                                          threadId,
+                                        ),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F1F5),
-                            borderRadius: BorderRadius.circular(
-                              MoolRadii.control,
+                          const SizedBox(height: MoolSpacing.xs),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              ChatExpandableMotion(
+                key: const Key('chat-reply-expand-motion'),
+                child: reply != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            key: const Key('chat-composer-reply-context'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolSpacing.sm,
+                              MoolSpacing.xs,
+                              MoolSpacing.xs,
+                              MoolSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F1F8),
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.control,
+                              ),
+                              border: const Border(
+                                left: BorderSide(
+                                  color: MoolColors.orange,
+                                  width: 3,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Replying to ${reply.sender}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: MoolColors.navy,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        reply.text,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  key: const Key('chat-cancel-reply'),
+                                  tooltip: 'Cancel reply',
+                                  onPressed: () =>
+                                      session.cancelReply(threadId),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Text(
-                            _attachmentNotice!,
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-              ],
-              if (photo != null) ...[
-                Container(
-                  key: const Key('chat-selected-photo'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(MoolSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F1F8),
-                    borderRadius: BorderRadius.circular(MoolRadii.control),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(MoolRadii.control),
-                        child: Image.memory(
-                          photo.bytes,
-                          key: const Key('chat-selected-photo-image'),
-                          width: 72,
-                          height: 72,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const SizedBox(
-                                width: 72,
-                                height: 72,
-                                child: Icon(Icons.broken_image_outlined),
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: MoolSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Photo ready to send',
-                              style: TextStyle(
-                                color: MoolColors.navy,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              photo.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: MoolColors.muted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        key: const Key('chat-remove-photo'),
-                        tooltip: 'Remove photo',
-                        onPressed: session.busy
-                            ? null
-                            : () => session.cancelSelectedPhoto(threadId),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-              ],
-              if (reply != null) ...[
-                Container(
-                  key: const Key('chat-composer-reply-context'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(
-                    MoolSpacing.sm,
-                    MoolSpacing.xs,
-                    MoolSpacing.xs,
-                    MoolSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F1F8),
-                    borderRadius: BorderRadius.circular(MoolRadii.control),
-                    border: const Border(
-                      left: BorderSide(color: MoolColors.orange, width: 3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Replying to ${reply.sender}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: MoolColors.navy,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              reply.text,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: MoolColors.muted,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        key: const Key('chat-cancel-reply'),
-                        tooltip: 'Cancel reply',
-                        onPressed: () => session.cancelReply(threadId),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-              ],
+                          const SizedBox(height: MoolSpacing.xs),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1898,8 +2046,16 @@ class _ComposerState extends State<_Composer> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Icon(
-                                  sendsContent
+                              : ChatActionIconMotion(
+                                  key: const Key(
+                                    'chat-composer-action-icon-motion',
+                                  ),
+                                  stateKey: photo != null
+                                      ? 'photo'
+                                      : hasMessage
+                                      ? 'send'
+                                      : 'voice',
+                                  icon: sendsContent
                                       ? Icons.send_rounded
                                       : Icons.mic_rounded,
                                 ),
