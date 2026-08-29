@@ -17,14 +17,16 @@ import 'retailer_wholesale_services.dart';
 
 class RetailerSession extends ChangeNotifier {
   RetailerSession({
-    ReviewRetailerGateway? gateway,
+    RetailerGateway? gateway,
     ReviewRetailerPosGateway? posGateway,
     ReviewRetailerWholesaleGateway? wholesaleGateway,
     ReviewRetailerBooksGateway? booksGateway,
     ReviewRetailerBusinessServicesGateway? businessServicesGateway,
     ReviewRetailerCampaignGateway? campaignGateway,
     ReviewRetailerControlGateway? controlGateway,
+    this.productionState = false,
   }) : gateway = gateway ?? ReviewRetailerGateway(),
+       ordersOnline = !productionState,
        posGateway = posGateway ?? ReviewRetailerPosGateway(),
        wholesaleGateway = wholesaleGateway ?? ReviewRetailerWholesaleGateway(),
        booksGateway = booksGateway ?? ReviewRetailerBooksGateway(),
@@ -32,7 +34,10 @@ class RetailerSession extends ChangeNotifier {
            businessServicesGateway ?? ReviewRetailerBusinessServicesGateway(),
        campaignGateway = campaignGateway ?? ReviewRetailerCampaignGateway(),
        controlGateway = controlGateway ?? ReviewRetailerControlGateway(),
-       orders = buildReviewRetailerOrders(),
+       orders = productionState ? [] : buildReviewRetailerOrders(),
+       catalogueProducts = productionState
+           ? []
+           : List<RetailerPosProduct>.of(reviewPosProducts),
        counters = buildReviewCounters(),
        sales = buildReviewSales(),
        purchases = buildReviewPurchaseRecords(),
@@ -42,7 +47,14 @@ class RetailerSession extends ChangeNotifier {
        staff = buildReviewStaff(),
        customerIssues = buildReviewCustomerIssues();
 
-  final ReviewRetailerGateway gateway;
+  factory RetailerSession.production({RetailerGateway? gateway}) =>
+      RetailerSession(
+        gateway: gateway ?? buildRetailerGateway(),
+        productionState: true,
+      );
+
+  final RetailerGateway gateway;
+  final bool productionState;
   final ReviewRetailerPosGateway posGateway;
   final ReviewRetailerWholesaleGateway wholesaleGateway;
   final ReviewRetailerBooksGateway booksGateway;
@@ -50,6 +62,7 @@ class RetailerSession extends ChangeNotifier {
   final ReviewRetailerCampaignGateway campaignGateway;
   final ReviewRetailerControlGateway controlGateway;
   final List<RetailerOrder> orders;
+  final List<RetailerPosProduct> catalogueProducts;
   final List<RetailerCounter> counters;
   final List<RetailerSaleRecord> sales;
   final List<RetailerPurchaseRecord> purchases;
@@ -60,7 +73,11 @@ class RetailerSession extends ChangeNotifier {
   final List<RetailerCustomerIssue> customerIssues;
 
   RetailerHomeView view = RetailerHomeView.home;
-  bool ordersOnline = true;
+  bool ordersOnline;
+  bool initialStoreLoaded = false;
+  String? workspaceId;
+  String shopName = 'Shop';
+  String shopArea = '';
   bool busy = false;
   String searchQuery = '';
   String? errorMessage;
@@ -246,16 +263,14 @@ class RetailerSession extends ChangeNotifier {
     orElse: () => counters.first,
   );
 
-  List<RetailerPosProduct> get posProducts => reviewPosProducts;
+  List<RetailerPosProduct> get posProducts => catalogueProducts;
 
   int posQuantity(String productId) => posCart[productId] ?? 0;
 
-  int get posItemCount => reviewPosProducts.fold(
-    0,
-    (sum, product) => sum + posQuantity(product.id),
-  );
+  int get posItemCount =>
+      posProducts.fold(0, (sum, product) => sum + posQuantity(product.id));
 
-  int get posSubtotal => reviewPosProducts.fold(
+  int get posSubtotal => posProducts.fold(
     0,
     (sum, product) => sum + (posQuantity(product.id) * product.price),
   );
@@ -500,6 +515,22 @@ class RetailerSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadInitialStore() async {
+    if (!productionState) return;
+    if (initialStoreLoaded || busy) return;
+    RetailerStoreSnapshot? snapshot;
+    await _run(
+      () async {
+        snapshot = await gateway.loadStore();
+      },
+      success: 'Shop availability and catalogue are current.',
+      afterSuccess: () {
+        _applyStore(snapshot!);
+        initialStoreLoaded = true;
+      },
+    );
+  }
+
   Future<void> refreshOrders() => _run(
     gateway.refreshOrders,
     success: 'Orders are current. No duplicate order was created.',
@@ -507,14 +538,56 @@ class RetailerSession extends ChangeNotifier {
 
   Future<void> setOrdersOnline(bool value) async {
     final previous = ordersOnline;
+    RetailerStoreSnapshot? snapshot;
     await _run(
-      () => gateway.setAvailability(value),
+      () async {
+        snapshot = await gateway.setAvailability(value);
+      },
       success: value
           ? 'New customer orders are on.'
           : 'New customer orders are paused. Accepted orders remain active.',
-      afterSuccess: () => ordersOnline = value,
+      afterSuccess: () => _applyStore(snapshot!),
       afterFailure: () => ordersOnline = previous,
     );
+  }
+
+  Future<bool> saveCatalogueProduct({
+    required String productId,
+    required int stock,
+    required int buyPrice,
+    required int sellPrice,
+  }) async {
+    if (stock < 0) {
+      _showError('Available stock cannot be negative.');
+      return false;
+    }
+    if (buyPrice <= 0 || sellPrice <= buyPrice) {
+      _showError('Selling price must be above the current purchase price.');
+      return false;
+    }
+    RetailerStoreSnapshot? snapshot;
+    return _runBool(
+      () async {
+        snapshot = await gateway.saveProduct(
+          productId: productId,
+          stock: stock,
+          buyPrice: buyPrice,
+          sellPrice: sellPrice,
+        );
+      },
+      success: 'Stock and customer price were saved.',
+      afterSuccess: () => _applyStore(snapshot!),
+    );
+  }
+
+  void _applyStore(RetailerStoreSnapshot snapshot) {
+    workspaceId = snapshot.workspaceId;
+    shopName = snapshot.name;
+    shopArea = snapshot.area;
+    ordersOnline = snapshot.ordersEnabled;
+    catalogueProducts
+      ..clear()
+      ..addAll(snapshot.products);
   }
 
   RetailerOrder openOrder(String id) {
@@ -879,9 +952,7 @@ class RetailerSession extends ChangeNotifier {
       _showError('Choose Edit order before changing reserved products.');
       return;
     }
-    final product = reviewPosProducts.firstWhere(
-      (item) => item.id == productId,
-    );
+    final product = posProducts.firstWhere((item) => item.id == productId);
     final current = posQuantity(productId);
     final next = (current + change).clamp(0, product.stock).toInt();
     clearMessages();
@@ -896,7 +967,7 @@ class RetailerSession extends ChangeNotifier {
 
   void clearPosCart() {
     if (posOrderId != null) return;
-    for (final product in reviewPosProducts) {
+    for (final product in posProducts) {
       posCart[product.id] = 0;
     }
     clearMessages();
@@ -997,7 +1068,7 @@ class RetailerSession extends ChangeNotifier {
               amount: posTotal,
               stage: RetailerOrderStage.accepted,
               lines: [
-                for (final product in reviewPosProducts.where(
+                for (final product in posProducts.where(
                   (item) => posQuantity(item.id) > 0,
                 ))
                   RetailerOrderLine(
@@ -1029,7 +1100,7 @@ class RetailerSession extends ChangeNotifier {
     lastSharedChannel = null;
     cashConfirmed = false;
     customerMobile = '';
-    for (final product in reviewPosProducts) {
+    for (final product in posProducts) {
       posCart[product.id] = 0;
     }
     selectPosSource(source ?? RetailerOrderSource.counter);

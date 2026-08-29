@@ -2871,7 +2871,9 @@ export const moolSocialWorkspace = onRequest(
         operation === "confirmProofUpload" ||
         operation === "submitProfile" ||
         operation === "submitGst" ||
-        operation === "finishRetailerSetup";
+        operation === "finishRetailerSetup" ||
+        operation === "setRetailerAvailability" ||
+        operation === "saveRetailerProduct";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2901,6 +2903,12 @@ export const moolSocialWorkspace = onRequest(
             ? await service.confirmProofUpload(ownerUserId, body)
             : operation === "submitProfile"
               ? await service.submitProfile(ownerUserId, body)
+            : operation === "retailerStoreState"
+              ? await service.retailerStoreState(ownerUserId)
+              : operation === "setRetailerAvailability"
+                ? await service.setRetailerAvailability(ownerUserId, body)
+                : operation === "saveRetailerProduct"
+                  ? await service.saveRetailerProduct(ownerUserId, body)
           : operation === "reviewStatus"
             ? await service.reviewStatus(ownerUserId, body)
             : operation === "submitGst"

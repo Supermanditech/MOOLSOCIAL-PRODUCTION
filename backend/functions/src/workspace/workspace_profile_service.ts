@@ -43,6 +43,14 @@ export interface WorkspaceProfileRecord {
   workspaceId?: string;
   reason?: string;
   gstin?: string;
+  shopEnabled?: boolean;
+  setup?: {
+    quantity: number;
+    buyPrice: number;
+    sellPrice: number;
+    homeDelivery: boolean;
+    storeCollection: boolean;
+  };
 }
 
 export interface WorkspaceProfileRepository {
@@ -234,10 +242,72 @@ export class WorkspaceProfileService {
     }
     await this.repository.update(record.caseId, record.ownerUserId, {
       status: "live",
+      shopEnabled: true,
       setup: { quantity, buyPrice, sellPrice, homeDelivery, storeCollection },
       updatedAt: this.now().toISOString(),
     });
     return { workspaceId, status: "live", plan: record.plan };
+  }
+
+  async retailerStoreState(ownerUserId: string): Promise<object> {
+    return retailerStore(await this.ownerRetailer(ownerUserId));
+  }
+
+  async setRetailerAvailability(
+    ownerUserId: string,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<object> {
+    if (typeof body.enabled !== "boolean") throw invalid("enabled is required.");
+    const record = await this.ownerRetailer(ownerUserId);
+    if (record.status !== "live" || !record.setup) {
+      throw new WorkspaceProfileError(
+        "invalid_state",
+        "Finish retailer setup before changing customer availability.",
+        409,
+      );
+    }
+    if (body.enabled && record.setup.quantity < 1) {
+      throw new WorkspaceProfileError(
+        "invalid_state",
+        "Add available stock before turning customer orders on.",
+        409,
+      );
+    }
+    const updated = await this.repository.update(record.caseId, record.ownerUserId, {
+      shopEnabled: body.enabled,
+      updatedAt: this.now().toISOString(),
+    });
+    return retailerStore(updated);
+  }
+
+  async saveRetailerProduct(
+    ownerUserId: string,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<object> {
+    const record = await this.ownerRetailer(ownerUserId);
+    if (record.status !== "live" || !record.setup) {
+      throw new WorkspaceProfileError(
+        "invalid_state",
+        "Finish retailer setup before editing live products.",
+        409,
+      );
+    }
+    if (stringField(body, "productId", 2, 80) !== "atta") {
+      throw invalid("That product is not in this Workspace catalogue.");
+    }
+    const stock = integerField(body, "stock", 0, 1_000_000);
+    const buyPrice = integerField(body, "buyPrice", 1, 100_000_000);
+    const sellPrice = integerField(body, "sellPrice", buyPrice + 1, 100_000_000);
+    const updated = await this.repository.update(record.caseId, record.ownerUserId, {
+      setup: {
+        ...record.setup,
+        quantity: stock,
+        buyPrice,
+        sellPrice,
+      },
+      updatedAt: this.now().toISOString(),
+    });
+    return retailerStore(updated);
   }
 
   private async ownerRecord(ownerUserId: string, caseId: string): Promise<WorkspaceProfileRecord> {
@@ -256,6 +326,20 @@ export class WorkspaceProfileService {
       );
     }
     return this.proofStore;
+  }
+
+  private async ownerRetailer(ownerUserId: string): Promise<WorkspaceProfileRecord> {
+    const owner = identifier(ownerUserId, "owner");
+    const records = await this.repository.list(owner);
+    const record = records
+      .filter((item) => item.profileId.startsWith("retailer-"))
+      .sort((left, right) => {
+        const leftLive = left.status === "live" ? 1 : 0;
+        const rightLive = right.status === "live" ? 1 : 0;
+        return rightLive - leftLive || right.updatedAt.localeCompare(left.updatedAt);
+      })[0];
+    if (!record) throw notFound();
+    return record;
   }
 }
 
@@ -346,6 +430,26 @@ function publicReview(record: WorkspaceProfileRecord): object {
     primaryActivity: record.primaryActivity,
     ...(record.workspaceId ? { workspaceId: record.workspaceId } : {}),
     ...(record.reason ? { reason: record.reason } : {}),
+  };
+}
+
+function retailerStore(record: WorkspaceProfileRecord): object {
+  const setup = record.setup;
+  return {
+    workspaceId: record.workspaceId ?? record.caseId,
+    name: record.name,
+    area: record.area,
+    ordersEnabled: record.status === "live" && record.shopEnabled === true,
+    products: setup
+      ? [{
+          id: "atta",
+          name: "Aashirvaad Whole Wheat Atta",
+          pack: "1 kg",
+          sku: "AAT-1K",
+          price: setup.sellPrice,
+          stock: setup.quantity,
+        }]
+      : [],
   };
 }
 
