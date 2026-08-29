@@ -1673,7 +1673,6 @@ BuyV2View _buyV2View(String? value) => switch (value) {
   'confirmation' || 'confirmed' => BuyV2View.confirmation,
   'tracking' => BuyV2View.tracking,
   'items' || 'order-items' => BuyV2View.orderItems,
-  'account' => BuyV2View.account,
   'assist' || 'chat' => BuyV2View.catalogue,
   'recovery' => BuyV2View.recovery,
   _ => BuyV2View.catalogue,

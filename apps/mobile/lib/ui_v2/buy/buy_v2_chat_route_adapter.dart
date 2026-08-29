@@ -121,7 +121,6 @@ class BuyV2ChatRouteAdapter {
         }
         break;
       case BuyV2View.account:
-        query['view'] = 'account';
         break;
       case BuyV2View.recovery:
         if (recoveryKind case final value?) {

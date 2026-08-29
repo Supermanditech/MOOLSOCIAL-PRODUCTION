@@ -136,10 +136,7 @@ void main() {
         view: BuyV2View.assist,
         expected: '/app/buy?sub=orders&view=tracking&order=PO-240783',
       ),
-      (
-        view: BuyV2View.account,
-        expected: '/app/buy?sub=wholesale&view=account',
-      ),
+      (view: BuyV2View.account, expected: '/app/buy?sub=wholesale'),
       (
         view: BuyV2View.recovery,
         expected:
@@ -386,6 +383,36 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('retired Buy Account route resolves to global Profile entry', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final chat = ChatSession();
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/buy?sub=wholesale&view=account',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('buy-account-hub')), findsNothing);
+    expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Open your MoolSocial profile'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
