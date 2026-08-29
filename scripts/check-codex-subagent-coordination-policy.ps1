@@ -910,9 +910,9 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 2 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 3 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
+    'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart|config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq

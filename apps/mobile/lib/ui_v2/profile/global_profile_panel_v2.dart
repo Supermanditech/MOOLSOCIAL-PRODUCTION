@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_theme.dart';
@@ -8,6 +9,20 @@ import '../../core/design/mool_theme.dart';
 const _profileNavy = Color(0xFF000080);
 const _profileSaffron = Color(0xFFFF9933);
 const _profileGreen = Color(0xFF138808);
+const _globalPersonalProfileRoute = '/app/account/identity';
+const _globalPreferencesRoute = '/app/account/workspaces/preferences';
+const _globalSecurityRoute = '/app/account/security';
+const _globalHelpRoute = '/app/ask';
+const _safeGlobalProfileReturnRoots = <String>[
+  '/app/social',
+  '/app/buy',
+  '/app/eat',
+  '/app/ride',
+  '/app/book',
+  '/app/work',
+  '/app/mool',
+  '/app/ask',
+];
 
 enum GlobalProfileSurfaceTone { light, socialDark }
 
@@ -65,6 +80,9 @@ Future<void> showGlobalProfilePanelV2(
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   GlobalProfileContextAction? contextAction,
 }) async {
+  final router = GoRouter.maybeOf(context);
+  final returnLocation =
+      router?.routeInformationProvider.value.uri.toString() ?? '/app/mool';
   final result = await showGeneralDialog<_GlobalProfilePanelResult>(
     context: context,
     barrierDismissible: true,
@@ -108,10 +126,82 @@ Future<void> showGlobalProfilePanelV2(
   );
   if (!context.mounted || result == null) return;
   if (result.route case final route?) {
-    onOpenRoute(route);
+    onOpenRoute(switch (route) {
+      _globalPersonalProfileRoute => globalPersonalProfileLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
+      _globalPreferencesRoute => globalPreferencesLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
+      _globalSecurityRoute => globalSecurityLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
+      _globalHelpRoute => globalHelpLocationForReturn(
+        returnLocation,
+        surfaceTone: surfaceTone,
+      ),
+      _ => route,
+    });
   } else if (result.contextActionSelected) {
     contextAction?.onPressed();
   }
+}
+
+String globalPersonalProfileLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalPersonalProfileRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
+String globalPreferencesLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalPreferencesRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
+String globalSecurityLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalSecurityRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
+String globalHelpLocationForReturn(
+  String returnLocation, {
+  GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
+}) => Uri(
+  path: _globalHelpRoute,
+  queryParameters: {
+    'return': returnLocation,
+    if (surfaceTone == GlobalProfileSurfaceTone.socialDark) 'surface': 'social',
+  },
+).toString();
+
+String? globalProfileSafeReturnLocation(String? raw) {
+  if (raw == null || !raw.startsWith('/')) return null;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+  final safe = _safeGlobalProfileReturnRoots.any(
+    (root) => uri.path == root || uri.path.startsWith('$root/'),
+  );
+  return safe ? uri.toString() : null;
 }
 
 /// The one account launcher used by every top-level MoolSocial destination.
@@ -167,6 +257,26 @@ class MoolGlobalProfileShortcutV2 extends StatelessWidget {
       ),
     );
   }
+}
+
+class GlobalProfileBackButtonV2 extends StatelessWidget {
+  const GlobalProfileBackButtonV2({
+    required this.keyName,
+    required this.palette,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String keyName;
+  final GlobalProfileSurfacePalette palette;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => MoolNativeBackButton(
+    keyName: keyName,
+    onPressed: onPressed,
+    foregroundColor: palette.ink,
+  );
 }
 
 class GlobalProfilePanelV2 extends StatelessWidget {
@@ -242,7 +352,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                                 ],
                               ),
                               null => _PersonalAccountSection(
-                                includeSupport: true,
                                 onOpenRoute: onOpenRoute,
                               ),
                             },
@@ -263,7 +372,6 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                               children: [
                                 if (activeWorkspace != null)
                                   _PersonalAccountSection(
-                                    includeSupport: false,
                                     onOpenRoute: onOpenRoute,
                                   )
                                 else if (contextAction case final action?)
@@ -508,17 +616,13 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _PersonalAccountSection extends StatelessWidget {
-  const _PersonalAccountSection({
-    required this.includeSupport,
-    required this.onOpenRoute,
-  });
+  const _PersonalAccountSection({required this.onOpenRoute});
 
-  final bool includeSupport;
   final ValueChanged<String> onOpenRoute;
 
   @override
   Widget build(BuildContext context) => _ProfileSection(
-    title: includeSupport ? 'Your account' : 'Personal account',
+    title: 'Account settings',
     items: [
       const _ProfileDestination(
         id: 'identity',
@@ -541,14 +645,6 @@ class _PersonalAccountSection extends StatelessWidget {
         icon: Icons.shield_outlined,
         route: '/app/account/security',
       ),
-      if (includeSupport)
-        const _ProfileDestination(
-          id: 'ask',
-          title: 'Help and support',
-          detail: 'Account assistance',
-          icon: Icons.support_agent_outlined,
-          route: '/app/ask',
-        ),
     ],
     onOpenRoute: onOpenRoute,
   );
@@ -683,7 +779,7 @@ class _GlobalProfileContextCard extends StatelessWidget {
                     children: [
                       Text(
                         action.title,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: palette.ink,

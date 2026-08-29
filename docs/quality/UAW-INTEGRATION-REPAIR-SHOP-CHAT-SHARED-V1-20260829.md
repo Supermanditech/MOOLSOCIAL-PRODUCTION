@@ -1,6 +1,6 @@
 # UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829
 
-State: `repair_merge_complete_supporting_ancestry_audit_required`
+State: `combined_regression_passed_candidate_gate_pending`
 
 - First parent: tested Buy adapter and cumulative Shop evidence
   `e5720cb86bd2119afc3d84a83d3116018f17f9a3`.
@@ -52,6 +52,31 @@ Combined-test result:
 - no APK, install or device action was attempted;
 - no speculative source or dependency fix is authorized before exact local
   supporting-commit ancestry is identified.
+
+Supporting-ancestry audit:
+
+- `share_plus: 13.3.0` and its lock entries already exist on both parents; the
+  failed run incorrectly used `--no-pub` after guarded support restoration;
+- profile Back/return helpers originate from existing approved commits
+  `941cf41d1af080ca75b19fea85f4c82a64f9fa61` and
+  `d27306378df51d6523c2608ad47a86e2bfa24b43`;
+- the exact Git auto-merged cumulative profile blob
+  `335a0d7af0a23650f9fba687070b049d2c7a0cb8` is restored, combining the Buy
+  profile with those shared helpers without a new design implementation;
+- the next test run must hydrate dependencies and compile in the same guarded
+  invocation.
+
+Final verification:
+
+- focused shared Chat, Buy and profile analysis: clean;
+- authoritative shared Chat suites: `55` passed, `0` failed;
+- complete Buy Shop Chat suite: `38` passed, `0` failed;
+- complete Buy screen regression: `78` passed, `0` failed;
+- complete Buy directory: `469` passed, `28` intentional skips, `0` failed;
+- full Buy JSON `done.success`: `true`;
+- full Buy JSON SHA-256:
+  `9EDB1DDA12F1A1681D902BF2E6B473B06AC7F150D85EB099700DEB09F081A0EC`;
+- OPPO, runtime package, backend, Firebase and Android configuration: untouched.
 
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

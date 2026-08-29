@@ -44473,6 +44473,56 @@
       "prevention": "Before any source or dependency patch, audit exact local refs and commits for the cumulative profile helper stack and Social share runtime, prove which supporting commits are missing from the repair tip, and integrate only authoritative existing owners with complete shared Chat and Buy regression.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart", "apps/mobile/pubspec.yaml", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3929-SHARED-CHAT-TEST-NO-PUB-RESTORED-STALE-PACKAGE-CONFIG",
+      "status": "registered_same_invocation_dependency_hydration_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "dependency", "flutter"],
+      "mistake": "The combined shared Chat tests used --no-pub after the guarded analysis invocation restored the tracked pre-hydration package_config, so the compiler could not resolve share_plus even though both parents and the merged pubspec declare it.",
+      "rootCause": "Dependency hydration and test compilation were split across guarded invocations whose required support-owner restoration intentionally discards generated package-config changes between commands.",
+      "prevention": "Run the combined Flutter tests without --no-pub so dependency resolution and compilation occur inside the same guarded invocation, then verify the wrapper restores tracked support bytes afterward.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock", "scripts/invoke-flutter-with-clean-support.ps1"]
+    },
+    {
+      "id": "REG-20260829-3930-SHARED-CHAT-INTEGRATED-FULL-BUY-THREE-FAILURES",
+      "status": "registered_retained_json_failure_inventory_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "buy", "chat", "profile"],
+      "mistake": "The first full Buy regression on the cumulative shared Chat/profile repair completed with 466 passes, 28 intentional skips and 3 failures.",
+      "rootCause": "The exact failing tests and assertions are retained in the machine JSON reporter and must be classified before any corrective source action or rerun.",
+      "prevention": "Parse only build/shop-chat-shared-full-buy.json, join testStart/error/testDone events for the three failed IDs, prove whether each failure belongs to cumulative profile compatibility or Shop Chat routing, then implement the smallest owned correction before one rerun.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-shared-full-buy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3931-FULL-BUY-FAILURE-PRINT-PARSER-FOREACH-DIRECT-PIPE",
+      "status": "registered_collect_rows_before_serialization_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "tooling"],
+      "mistake": "The first retained JSON print-event parser piped directly after foreach and PowerShell rejected the command with an empty-pipe parser error before output.",
+      "rootCause": "The known foreach-to-pipeline parser rule was not applied to the compact diagnostic command.",
+      "prevention": "Collect one result row per failing test in an explicit list, then pass the completed list to ConvertTo-Json; do not rerun the full suite for diagnostics.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-shared-full-buy.json"]
+    },
+    {
+      "id": "REG-20260829-3932-GLOBAL-PROFILE-REQUIRED-GOROUTER-IN-PLAIN-BUY-HOST",
+      "status": "registered_optional_router_origin_resolution_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "profile", "buy", "navigation", "testing"],
+      "mistake": "All three integrated Buy failures came from showGlobalProfilePanelV2 calling GoRouterState.of(context) under the existing plain MaterialApp Buy test host, throwing before the panel could open.",
+      "rootCause": "The cumulative exact-return helper made GoRouter presence mandatory even though the shared profile API historically supports non-router hosts through its explicit route callback.",
+      "prevention": "Resolve the live URI through GoRouter.maybeOf when available, retain a safe customer-origin fallback when absent, change no profile layout or copy, and rerun the three failed tests before the full Buy suite once.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "apps/mobile/build/shop-chat-shared-full-buy.json"]
+    },
+    {
+      "id": "REG-20260829-3933-FLUTTER-PLAIN-NAME-ANCHORED-ALTERNATION-NO-TESTS",
+      "status": "registered_complete_focused_file_rerun_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "tooling"],
+      "mistake": "The first three-test rerun passed an anchored alternation to --plain-name; Flutter matched it literally and exited 79 with no tests run.",
+      "rootCause": "The test selector's plain substring semantics were mistaken for a regular-expression selector.",
+      "prevention": "Run the complete buy_v2_screen_test.dart file once with expanded reporting; do not retry a composed plain-name filter.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"]
     }
   ]
 }
