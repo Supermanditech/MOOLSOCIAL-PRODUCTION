@@ -519,22 +519,41 @@ class RetailerSession extends ChangeNotifier {
     if (!productionState) return;
     if (initialStoreLoaded || busy) return;
     RetailerStoreSnapshot? snapshot;
+    List<RetailerOrder>? loadedOrders;
     await _run(
       () async {
         snapshot = await gateway.loadStore();
+        loadedOrders = await gateway.refreshOrders();
       },
       success: 'Shop availability and catalogue are current.',
       afterSuccess: () {
         _applyStore(snapshot!);
+        _replaceOrders(loadedOrders!);
         initialStoreLoaded = true;
       },
     );
   }
 
-  Future<void> refreshOrders() => _run(
-    gateway.refreshOrders,
-    success: 'Orders are current. No duplicate order was created.',
-  );
+  Future<void> refreshOrders() async {
+    List<RetailerOrder>? loaded;
+    await _run(
+      () async {
+        loaded = await gateway.refreshOrders();
+      },
+      success: 'Orders are current. No duplicate order was created.',
+      afterSuccess: () => _replaceOrders(loaded!),
+    );
+  }
+
+  void _replaceOrders(List<RetailerOrder> loaded) {
+    final selected = selectedOrderId;
+    orders
+      ..clear()
+      ..addAll(loaded);
+    if (selected != null && !orders.any((order) => order.id == selected)) {
+      selectedOrderId = null;
+    }
+  }
 
   Future<void> setOrdersOnline(bool value) async {
     final previous = ordersOnline;
@@ -705,10 +724,14 @@ class RetailerSession extends ChangeNotifier {
       },
       success: 'Delivery assigned. Keep the parcel until captain handover.',
       afterSuccess: () {
-        order
-          ..stage = RetailerOrderStage.captainAssigned
-          ..captainName = 'Rakesh Kumar'
-          ..captainVehicle = 'RJ 19 SX 4821';
+        if (productionState) {
+          order.stage = RetailerOrderStage.deliveryRequested;
+        } else {
+          order
+            ..stage = RetailerOrderStage.captainAssigned
+            ..captainName = 'Rakesh Kumar'
+            ..captainVehicle = 'RJ 19 SX 4821';
+        }
       },
       afterFailure: () => order.stage = RetailerOrderStage.packed,
     );
@@ -744,6 +767,12 @@ class RetailerSession extends ChangeNotifier {
   bool verifyHandoverOtp(String value) {
     final order = selectedOrder;
     if (order == null) return false;
+    if (productionState) {
+      _showError(
+        'Secure captain OTP verification is unavailable right now. Keep the parcel at the shop.',
+      );
+      return false;
+    }
     if (value.trim() != '2841') {
       _showError('Enter the 4-digit handover OTP shown to the captain.');
       return false;
@@ -778,7 +807,7 @@ class RetailerSession extends ChangeNotifier {
 
   void ensureTrackingOpen() {
     final order = selectedOrder;
-    if (order?.stage == RetailerOrderStage.handedOver) {
+    if (!productionState && order?.stage == RetailerOrderStage.handedOver) {
       order!.stage = RetailerOrderStage.outForDelivery;
     }
     clearMessages();
@@ -793,16 +822,26 @@ class RetailerSession extends ChangeNotifier {
       );
       return true;
     }
+    List<RetailerOrder>? loaded;
     return _runBool(
-      () => gateway.refreshTracking(order.id),
-      success: switch (order.stage) {
-        RetailerOrderStage.outForDelivery =>
-          'Captain is near the customer. Delivery proof is still required.',
-        RetailerOrderStage.nearby =>
-          'Customer received the order. Payment and proof are recorded.',
-        _ => 'Live delivery status is current.',
+      () async {
+        await gateway.refreshTracking(order.id);
+        if (productionState) loaded = await gateway.refreshOrders();
       },
+      success: productionState
+          ? 'Live delivery status is current.'
+          : switch (order.stage) {
+              RetailerOrderStage.outForDelivery =>
+                'Captain is near the customer. Delivery proof is still required.',
+              RetailerOrderStage.nearby =>
+                'Customer received the order. Payment and proof are recorded.',
+              _ => 'Live delivery status is current.',
+            },
       afterSuccess: () {
+        if (productionState) {
+          _replaceOrders(loaded!);
+          return;
+        }
         if (order.stage == RetailerOrderStage.outForDelivery) {
           order.stage = RetailerOrderStage.nearby;
         } else if (order.stage == RetailerOrderStage.nearby) {

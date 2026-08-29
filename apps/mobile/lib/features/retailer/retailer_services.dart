@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../shared/social_content_gateway.dart';
+import 'retailer_models.dart';
 import 'retailer_pos_models.dart';
 
 const moolSocialRetailerUrl = String.fromEnvironment(
@@ -40,7 +41,7 @@ abstract interface class RetailerGateway {
     required int buyPrice,
     required int sellPrice,
   });
-  Future<void> refreshOrders();
+  Future<List<RetailerOrder>> refreshOrders();
   Future<void> acceptOrder(String orderId);
   Future<void> savePackedOrder(String orderId);
   Future<String> requestDelivery(String orderId);
@@ -86,7 +87,7 @@ class UnavailableRetailerGateway implements RetailerGateway {
   @override
   Future<RetailerStoreSnapshot> loadStore() async => throw _error;
   @override
-  Future<void> refreshOrders() async => throw _error;
+  Future<List<RetailerOrder>> refreshOrders() async => throw _error;
   @override
   Future<void> refreshTracking(String orderId) async => throw _error;
   @override
@@ -146,7 +147,18 @@ class AuthenticatedRetailerGateway implements RetailerGateway {
     ),
   );
   @override
-  Future<void> refreshOrders() => _invoke('listRetailerOrders', const {});
+  Future<List<RetailerOrder>> refreshOrders() async {
+    final data = _map(await _invoke('listRetailerOrders', const {}));
+    final values = data['orders'];
+    if (values is! List) {
+      throw const RetailerGatewayException(
+        'Orders returned an invalid response. Try again.',
+        retryable: true,
+      );
+    }
+    return values.map((value) => _decodeOrder(_map(value))).toList();
+  }
+
   @override
   Future<void> acceptOrder(String orderId) =>
       _order('acceptRetailerOrder', orderId);
@@ -264,7 +276,7 @@ class ReviewRetailerGateway implements RetailerGateway {
   }
 
   @override
-  Future<void> refreshOrders() async {
+  Future<List<RetailerOrder>> refreshOrders() async {
     await _wait();
     if (failRefresh) {
       failRefresh = false;
@@ -272,6 +284,7 @@ class ReviewRetailerGateway implements RetailerGateway {
         'Orders could not be refreshed. Current orders remain available.',
       );
     }
+    return buildReviewRetailerOrders();
   }
 
   @override
@@ -474,3 +487,65 @@ int _requiredInt(Object? value, {bool allowZero = false}) {
   }
   return value;
 }
+
+RetailerOrder _decodeOrder(Map<String, Object?> data) {
+  final rawLines = data['lines'];
+  if (rawLines is! List) {
+    throw const RetailerGatewayException(
+      'Orders returned an invalid response. Try again.',
+      retryable: true,
+    );
+  }
+  final order = RetailerOrder(
+    id: _requiredString(data['id']),
+    customer: _requiredString(data['customer']),
+    area: _requiredString(data['area']),
+    payment: _requiredString(data['payment']),
+    fulfilment: _requiredString(data['fulfilment']),
+    deliveryPromise: _requiredString(data['deliveryPromise']),
+    amount: _requiredInt(data['amount']),
+    stage: _decodeOrderStage(_requiredString(data['stage'])),
+    lines: rawLines.map((value) {
+      final line = _map(value);
+      return RetailerOrderLine(
+        id: _requiredString(line['id']),
+        name: _requiredString(line['name']),
+        detail: _requiredString(line['detail']),
+        quantity: _requiredInt(line['quantity']),
+        amount: _requiredInt(line['amount'], allowZero: true),
+        packed: line['packed'] == true,
+      );
+    }).toList(),
+  );
+  order
+    ..cannotFulfilReason = _optionalString(data['cannotFulfilReason'])
+    ..deliveryReference = _optionalString(data['deliveryReference'])
+    ..captainName = _optionalString(data['captainName'])
+    ..captainVehicle = _optionalString(data['captainVehicle'])
+    ..handoverReference = _optionalString(data['handoverReference'])
+    ..deliveryProof = _optionalString(data['deliveryProof'])
+    ..issueReference = _optionalString(data['issueReference']);
+  return order;
+}
+
+RetailerOrderStage _decodeOrderStage(String value) => switch (value) {
+  'accepted' => RetailerOrderStage.accepted,
+  'packing' => RetailerOrderStage.packing,
+  'packed' => RetailerOrderStage.packed,
+  'delivery_requested' => RetailerOrderStage.deliveryRequested,
+  'captain_assigned' => RetailerOrderStage.captainAssigned,
+  'parcel_ready' => RetailerOrderStage.parcelReady,
+  'captain_arrived' => RetailerOrderStage.captainArrived,
+  'handover_verified' => RetailerOrderStage.handoverVerified,
+  'handed_over' => RetailerOrderStage.handedOver,
+  'out_for_delivery' => RetailerOrderStage.outForDelivery,
+  'nearby' => RetailerOrderStage.nearby,
+  'delivered' => RetailerOrderStage.delivered,
+  'cancelled' => RetailerOrderStage.cancelled,
+  'returned' => RetailerOrderStage.returned,
+  'cannot_fulfil' => RetailerOrderStage.cannotFulfil,
+  _ => RetailerOrderStage.newOrder,
+};
+
+String? _optionalString(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;

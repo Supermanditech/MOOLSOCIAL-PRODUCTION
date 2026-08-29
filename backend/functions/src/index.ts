@@ -128,6 +128,10 @@ import {
   WorkspaceProfileService,
 } from "./workspace/workspace_profile_service.js";
 import { GoogleCloudStorageWorkspaceProofStore } from "./workspace/workspace_proof_store.js";
+import {
+  FirestoreRetailerOrderRepository,
+  RetailerOrderService,
+} from "./workspace/retailer_order_service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -164,6 +168,7 @@ let providerStores: FirestoreYouTubeStores | undefined;
 let socialContentService: SocialContentService | undefined;
 let chatRuntimeService: ChatService | undefined;
 let workspaceProfileRuntimeService: WorkspaceProfileService | undefined;
+let retailerOrderRuntimeService: RetailerOrderService | undefined;
 let xAuthRuntimeService: XPublicAuthBroker | undefined;
 let instagramAuthRuntimeService: InstagramPublicAuthBroker | undefined;
 let instagramMetaCallbackRuntimeService:
@@ -411,6 +416,14 @@ function workspaceProfileService(): WorkspaceProfileService {
     ),
   );
   return workspaceProfileRuntimeService;
+}
+
+function retailerOrderService(): RetailerOrderService {
+  if (retailerOrderRuntimeService) return retailerOrderRuntimeService;
+  retailerOrderRuntimeService = new RetailerOrderService(
+    new FirestoreRetailerOrderRepository(getFirestore()),
+  );
+  return retailerOrderRuntimeService;
 }
 
 function requiredEnvironment(name: string): string {
@@ -2874,6 +2887,12 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct";
+      const orderMutation = operation === "acceptRetailerOrder" ||
+        operation === "packRetailerOrder" ||
+        operation === "requestRetailerDelivery" ||
+        operation === "confirmRetailerHandover" ||
+        operation === "createRetailerIssue" ||
+        operation === "declineRetailerOrder";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2884,7 +2903,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation,
+        mutation || orderMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2895,6 +2914,7 @@ export const moolSocialWorkspace = onRequest(
         );
       }
       const service = workspaceProfileService();
+      const orders = retailerOrderService();
       const result = operation === "listWorkspaces"
         ? await service.listWorkspaces(ownerUserId)
         : operation === "prepareProofUpload"
@@ -2909,6 +2929,22 @@ export const moolSocialWorkspace = onRequest(
                 ? await service.setRetailerAvailability(ownerUserId, body)
                 : operation === "saveRetailerProduct"
                   ? await service.saveRetailerProduct(ownerUserId, body)
+            : operation === "listRetailerOrders"
+              ? await orders.list(ownerUserId)
+              : operation === "acceptRetailerOrder"
+                ? await orders.accept(ownerUserId, body)
+                : operation === "packRetailerOrder"
+                  ? await orders.pack(ownerUserId, body)
+                  : operation === "requestRetailerDelivery"
+                    ? await orders.requestDelivery(ownerUserId, body)
+                    : operation === "confirmRetailerHandover"
+                      ? await orders.confirmHandover(ownerUserId, body)
+                      : operation === "retailerDeliveryStatus"
+                        ? await orders.tracking(ownerUserId, body)
+                        : operation === "createRetailerIssue"
+                          ? await orders.issue(ownerUserId, body)
+                          : operation === "declineRetailerOrder"
+                            ? await orders.decline(ownerUserId, body)
           : operation === "reviewStatus"
             ? await service.reviewStatus(ownerUserId, body)
             : operation === "submitGst"

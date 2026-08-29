@@ -341,6 +341,8 @@ class _RetailerOrderScreenState extends State<RetailerOrderScreen> {
             context.go('/app/retailer/orders/${order.id}/tracking'),
         icon: Icons.receipt_long_rounded,
       ),
+      RetailerOrderStage.cancelled ||
+      RetailerOrderStage.returned ||
       RetailerOrderStage.cannotFulfil => RetailerPrimaryButton(
         keyName: 'retailer-return-orders',
         label: 'Return to orders',
