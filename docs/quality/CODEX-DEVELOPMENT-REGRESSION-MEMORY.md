@@ -3669,3 +3669,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3842 rejects confirming a scrolled Conversation Info change only in an
   offscreen summary card. Keep that summary and also show immediate floating
   feedback for every session-local Chat or call availability change.
+- REG3843 rejects retaining the clinic-only Care allowlist oracle after task
+  and support destinations are added. Synchronize the audited set and prove
+  each deep thread returns under its actual contextual filter.

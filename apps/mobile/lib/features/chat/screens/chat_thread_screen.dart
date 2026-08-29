@@ -193,7 +193,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             returnUri?.pathSegments[2] == 'thread';
         final backRoute = returnsToChatThread
             ? widget.returnRoute
-            : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
+            : chatRoute(
+                '/app/chat/inbox',
+                returnRoute: widget.returnRoute,
+                filter: thread.type.name,
+              );
         final entryContext = ChatEntryContext.resolve(widget.returnRoute);
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),

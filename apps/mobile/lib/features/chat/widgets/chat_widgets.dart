@@ -13,12 +13,18 @@ void chatGoBack(BuildContext context, String returnRoute) {
   context.go(returnRoute.startsWith('/app/') ? returnRoute : '/app/social');
 }
 
-String chatRoute(String path, {required String returnRoute, String? draft}) {
+String chatRoute(
+  String path, {
+  required String returnRoute,
+  String? draft,
+  String? filter,
+}) {
   return Uri(
     path: path,
     queryParameters: {
       'return': returnRoute,
       if (draft != null && draft.trim().isNotEmpty) 'draft': draft,
+      if (filter != null && filter.trim().isNotEmpty) 'type': filter,
     },
   ).toString();
 }

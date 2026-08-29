@@ -43693,6 +43693,16 @@
       "prevention": "Keep the durable summary card and also show one floating in-context confirmation for every Chat, voice-call or video-call availability change; prove it at compact size after scrolling.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3843-CARE-ALLOWLIST-ORACLE-STAYED-CLINIC-ONLY",
+      "status": "registered_audited_care_destination_set_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "testing"],
+      "mistake": "The expanded global destination test retained the old assertion that Care Chat allowed only the clinic thread after task-helper and order-support deep routes were deliberately added.",
+      "rootCause": "The implementation and deep-return cases were updated before the earlier clinic-isolation oracle was synchronized to the audited Care destination set.",
+      "prevention": "Update the resolver allowlist assertion in the same bounded change as new Care destinations and require every allowed deep thread to return visibly under its actual thread-type filter.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/chat_entry_context.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
     }
   ]
 }

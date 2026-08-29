@@ -26,6 +26,7 @@ class ChatEntryContext {
     this.defaultFilter,
     this.showThreadFilters = true,
     this.allowedThreadIds,
+    this.allowedThreadPrefixes,
   });
 
   final ChatEntryContextId id;
@@ -37,6 +38,15 @@ class ChatEntryContext {
   final ChatThreadType? defaultFilter;
   final bool showThreadFilters;
   final Set<String>? allowedThreadIds;
+  final Set<String>? allowedThreadPrefixes;
+
+  bool allowsThread(String threadId) {
+    final ids = allowedThreadIds;
+    final prefixes = allowedThreadPrefixes;
+    if (ids == null && prefixes == null) return true;
+    return (ids?.contains(threadId) ?? false) ||
+        (prefixes?.any(threadId.startsWith) ?? false);
+  }
 
   static ChatEntryContext resolve(String returnRoute) {
     final uri = Uri.tryParse(returnRoute);
@@ -46,6 +56,11 @@ class ChatEntryContext {
     if (path.startsWith('/app/eat')) return food;
     if (path.startsWith('/app/ride')) return travel;
     if (path.startsWith('/app/book')) return care;
+    if (path.startsWith('/app/retailer')) return _retailerWorkspace;
+    if (path.startsWith('/app/manufacturer')) return _manufacturerWorkspace;
+    if (path.startsWith('/app/captain')) return _captainWorkspace;
+    if (path.startsWith('/app/operations')) return _operationsWorkspace;
+    if (path.startsWith('/app/creator')) return _creatorWorkspace;
     if (_workspaceWorkPrefixes.any(path.startsWith) ||
         (path == '/app/work' &&
             uri?.queryParameters['sub']?.toLowerCase() == 'workspace')) {
@@ -106,6 +121,7 @@ class ChatEntryContext {
     accent: Color(0xFF4C4C8A),
     defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'ride-support'},
+    allowedThreadPrefixes: {'ride-'},
   );
 
   static const care = ChatEntryContext(
@@ -116,7 +132,7 @@ class ChatEntryContext {
     icon: Icons.health_and_safety_outlined,
     accent: Color(0xFF00757B),
     defaultFilter: ChatThreadType.business,
-    allowedThreadIds: {'clinic-care'},
+    allowedThreadIds: {'clinic-care', 'task-helper', 'order-support'},
   );
 
   static const work = ChatEntryContext(
@@ -130,6 +146,67 @@ class ChatEntryContext {
   );
 
   static const workspace = ChatEntryContext(
+    id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
+    title: 'Workspace Chat',
+    subtitle: 'Setup and review support',
+    icon: Icons.storefront_outlined,
+    accent: Color(0xFF5B3F8C),
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'workspace-support'},
+  );
+
+  static const _retailerWorkspace = ChatEntryContext(
+    id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
+    title: 'Workspace Chat',
+    subtitle: 'Setup and review support',
+    icon: Icons.storefront_outlined,
+    accent: Color(0xFF5B3F8C),
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {
+      'workspace-support',
+      'order-support',
+      'ride-support',
+      'mahadev-business',
+    },
+  );
+
+  static const _manufacturerWorkspace = ChatEntryContext(
+    id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
+    title: 'Workspace Chat',
+    subtitle: 'Setup and review support',
+    icon: Icons.storefront_outlined,
+    accent: Color(0xFF5B3F8C),
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'workspace-support', 'order-support'},
+  );
+
+  static const _captainWorkspace = ChatEntryContext(
+    id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
+    title: 'Workspace Chat',
+    subtitle: 'Setup and review support',
+    icon: Icons.storefront_outlined,
+    accent: Color(0xFF5B3F8C),
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'workspace-support', 'order-support', 'ride-support'},
+    allowedThreadPrefixes: {'ride-'},
+  );
+
+  static const _operationsWorkspace = ChatEntryContext(
+    id: ChatEntryContextId.workspace,
+    originLabel: 'Workspace',
+    title: 'Workspace Chat',
+    subtitle: 'Setup and review support',
+    icon: Icons.storefront_outlined,
+    accent: Color(0xFF5B3F8C),
+    defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'workspace-support', 'order-support'},
+  );
+
+  static const _creatorWorkspace = ChatEntryContext(
     id: ChatEntryContextId.workspace,
     originLabel: 'Workspace',
     title: 'Workspace Chat',

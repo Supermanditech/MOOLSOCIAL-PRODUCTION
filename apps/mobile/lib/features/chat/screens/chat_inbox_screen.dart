@@ -317,12 +317,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         final visibleThreads = widget.session.visibleThreads(
           _searchController.text,
         );
-        final allowedThreadIds = entryContext.allowedThreadIds;
-        final threads = allowedThreadIds == null
-            ? visibleThreads
-            : visibleThreads
-                  .where((thread) => allowedThreadIds.contains(thread.id))
-                  .toList(growable: false);
+        final threads = visibleThreads
+            .where((thread) => entryContext.allowsThread(thread.id))
+            .toList(growable: false);
         final people = _visiblePeople();
         final sectionMotion = MoolMotion.accessible(
           context,

@@ -81,6 +81,30 @@ void main() {
         ChatThreadType.support,
       ),
       (
+        '/app/manufacturer/orders/review',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/captain/trips/ride-1',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/creator/audience',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
+        '/app/operations/home',
+        ChatEntryContextId.workspace,
+        'Workspace Chat',
+        ChatThreadType.support,
+      ),
+      (
         '/app/pay/home',
         ChatEntryContextId.pay,
         'Pay Chat',
@@ -100,10 +124,34 @@ void main() {
     );
     expect(ChatEntryContext.resolve('/app/book/doctor').allowedThreadIds, {
       'clinic-care',
+      'task-helper',
+      'order-support',
     });
     expect(ChatEntryContext.resolve('/app/work/my-work').allowedThreadIds, {
       'workspace-support',
     });
+    expect(
+      ChatEntryContext.resolve('/app/ride/trip/ride-1').allowsThread('ride-1'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/book/task/task-1',
+      ).allowsThread('task-helper'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/retailer/orders',
+      ).allowsThread('order-support'),
+      isTrue,
+    );
+    expect(
+      ChatEntryContext.resolve(
+        '/app/captain/trips/ride-1',
+      ).allowsThread('ride-support'),
+      isTrue,
+    );
   });
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
@@ -138,6 +186,12 @@ void main() {
       '/app/work/my-work',
       'Workspace Chat',
       'Setup and review support',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/pay/home',
+      'Pay Chat',
+      'Payments and support',
       ChatThreadType.support,
     ),
   ]) {
@@ -243,6 +297,96 @@ void main() {
       expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final destination in const <(String, String, String, ChatThreadType)>[
+    ('/app/pay/home', 'order-support', 'Pay Chat', ChatThreadType.support),
+    (
+      '/app/retailer/orders/issues',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/manufacturer/orders/review',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/captain/trips/ride-1',
+      'ride-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/creator/audience',
+      'workspace-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/operations/home',
+      'order-support',
+      'Workspace Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/book/task/task-1',
+      'task-helper',
+      'Care Chat',
+      ChatThreadType.business,
+    ),
+    (
+      '/app/book/task/task-1/support',
+      'order-support',
+      'Care Chat',
+      ChatThreadType.support,
+    ),
+    (
+      '/app/ride/trip/ride-1/support',
+      'ride-support',
+      'Travel Chat',
+      ChatThreadType.support,
+    ),
+  ]) {
+    testWidgets(
+      '${destination.$3} ${destination.$1} deep thread returns to its visible contextual inbox',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+
+        await tester.pumpWidget(
+          MoolSocialApp(
+            session: journey,
+            chatSession: chat,
+            initialLocation: Uri(
+              path: '/app/chat/thread/${destination.$2}',
+              queryParameters: {'return': destination.$1},
+            ).toString(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chat-back')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+        expect(find.text(destination.$3), findsOneWidget);
+        expect(chat.selectedFilter, destination.$4);
+        expect(
+          find.byKey(Key('chat-open-thread-${destination.$2}')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('conversation keeps familiar MoolSocial header and composer', (
