@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3871,
-    "sha256": "808ED376DD2D88F24A4A880F51BD55D453AD620D8EED6CD10BF65CC9C16B3B23"
+    "entryCount": 3872,
+    "sha256": "4F5BAC318ABE8E868E5788192D51143162B05A15563B68D99BE61ADB092B91B4"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -182,7 +182,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_chat_v1_child5_20260829",
+      "task": "/root/cursor_shop_chat_v1_child6_20260829",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -251,6 +251,7 @@
         "apps/mobile/test/ui_v2/buy/uaw_personal_mvp_buy_local_tabs_global_dock_c10c_test.dart",
         "apps/mobile/test/ui_v2/buy/uaw_personal_mvp_buy_subaction_professional_conformance_c16c_test.dart",
         "docs/quality/UAW-CURSOR-BUY-SCREEN-SUBACTIONS-UI-20260823.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat_motion.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/buy-v2-shop-chat-native-390x844.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/shop-chat-reference-current-moolsocial-oppo.png",
@@ -320,7 +321,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD4-20260829.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD5-20260829.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD5-20260829.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD6-20260829.md"
       ]
     },
     {
@@ -1471,6 +1473,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD5-20260829.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_chat_v1_child6_20260829",
+        "state": "founder_authorized_2026_08_28",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_chat_v1_child6_20260829",
+        "workId": "shop-chat-v1-child6-20260829",
+        "ticketId": "UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD6-20260829",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-chat-v1-child6-20260829",
+        "branch": "work/cursor-ui/shop-chat-v1-child6-20260829",
+        "baselineHead": "908b357a6c210d0513853f20258a106daef1b635",
+        "bootstrapCommitSubject": "coordination(shop-chat-v1-child6-20260829): bind exact Buy adapter owners",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD6-20260829.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,

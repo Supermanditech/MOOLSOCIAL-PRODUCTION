@@ -44273,6 +44273,16 @@
       "prevention": "Bind clean Child 5, discover exact test owners with git ls-tree at 30f46145, treat no-match searches explicitly as a successful empty inventory when expected, and continue with bounded exact files only.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD5-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3909-SHOP-CHAT-ROUTE-ADAPTER-OWNER-OMITTED-FROM-CLAIM",
+      "status": "registered_exact_buy_owner_claim_extension_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy", "chat", "git"],
+      "mistake": "The Child 5 implementation gate rejected apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart after the thin adapter was patched because that exact source owner was absent from the recorded claim.",
+      "rootCause": "The inherited broad Buy claim included buy_v2_screen.dart, the Shop Chat test and motion owner, but the owner inventory was not checked for the primary Shop Chat implementation file before mutation.",
+      "prevention": "Bind clean Child 6 from the Child 5 bootstrap HEAD, add exactly buy_v2_shop_chat.dart to the recorded claim, pass task_start before applying the three retained Buy changes, and require implementation gate success before testing or committing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD6-20260829.md"]
     }
   ]
 }
