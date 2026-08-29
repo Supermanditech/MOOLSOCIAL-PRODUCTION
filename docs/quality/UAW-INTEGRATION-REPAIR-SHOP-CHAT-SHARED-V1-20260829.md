@@ -116,9 +116,9 @@ Remote implementation binding:
 - the original Codex shared Chat branch advanced with later closure evidence;
 - immutable shared implementation commit `30f46145` is therefore bound to
   remote branch
-  `work/codex-ui/chat-shell-impl-v1-20260829`;
-- the advanced Codex branch and the first overlong alias remain preserved
-  without force-push or rewrite.
+  `work/cursor-ui/chat-shell-impl-v1-20260829`;
+- the advanced Codex branch and both earlier aliases remain preserved without
+  force-push or rewrite.
 
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.
