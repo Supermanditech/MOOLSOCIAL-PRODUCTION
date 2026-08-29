@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3854,
-    "sha256": "7BE7FA62F75525EC43C7B937B574F41154B7D9EA19AB1184689DA5DB63486E56"
+    "entryCount": 3857,
+    "sha256": "1B3A7E4F2569D40C72A886C8436EB1BB10181F44013B9DC002139245DD6BA0A1"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -182,7 +182,7 @@
       ]
     },
     {
-      "task": "/root/cursor_shop_chat_v1_child2_20260829",
+      "task": "/root/cursor_shop_chat_v1_child3_20260829",
       "role": "subagent",
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
@@ -317,7 +317,8 @@
         "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD17-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-CHILD18-20260828.md",
         "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-20260829.md",
-        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"
+        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md",
+        "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"
       ]
     },
     {
@@ -1405,6 +1406,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_shop_chat_v1_child3_20260829",
+        "state": "founder_authorized_2026_08_29",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_chat_v1_child3_20260829",
+        "workId": "shop-chat-v1-child3-20260829",
+        "ticketId": "UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-chat-v1-child3-20260829",
+        "branch": "work/cursor-ui/shop-chat-v1-child3-20260829",
+        "baselineHead": "3245b6cd21da9dfa69ffc863b261391bde7dcd1c",
+        "bootstrapCommitSubject": "coordination(shop-chat-v1-child3-20260829): bind safe shared audit",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,

@@ -44103,6 +44103,36 @@
       "prevention": "Treat the complete JSON file reporter as the authoritative result, verify its done event reports success and bind its SHA-256 in the audit evidence; do not rerun the already-passed suite for console completeness.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-v1-full-buy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3892-SHARED-CHAT-SCREEN-INVENTORY-REGEX-QUOTE-PARSER-ERROR",
+      "status": "registered_single_quoted_regex_and_clean_child_required",
+      "appliesTo": ["primary", "coordination", "audit", "tooling", "chat"],
+      "mistake": "The first shared screen key/route inventory embedded an escaped double quote inside a double-quoted PowerShell regex and the parser rejected the command before output.",
+      "rootCause": "PowerShell quote rules were mixed with regex quote matching in one inline expression.",
+      "prevention": "Bind clean Chat Child 3, use single-quoted regex literals or omit route extraction, and continue only with complete bounded output.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3893-COORDINATION-REGISTRY-DOCUMENTATION-PATH-NOT-FOUND",
+      "status": "registered_machine_owner_path_required",
+      "appliesTo": ["primary", "coordination", "audit", "tooling"],
+      "mistake": "A coordination inspection used obsolete docs/quality regression registry and policy paths, so PowerShell could not find either file after the mandatory AGENTS read.",
+      "rootCause": "The command relied on a remembered documentation filename instead of the current machine-owner paths declared by repository policy.",
+      "prevention": "Use config/codex-development-regression-registry.json and config/codex-subagent-coordination-policy.json as the current machine owners, verify each literal path before reading, and keep mandatory-owner reads independent.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3894-COORDINATION-BOOTSTRAP-MULTI-OWNER-PATCH",
+      "status": "registered_independent_owner_patch_required",
+      "appliesTo": ["primary", "coordination", "tooling", "git"],
+      "mistake": "The Child 3 bootstrap updated the coordination policy, checker count and ticket evidence in one apply_patch operation instead of one owner per bounded operation.",
+      "rootCause": "The related bootstrap edits were treated as one logical change even though the coordination policy explicitly requires independent owner patches and readback.",
+      "prevention": "For every later edit, patch exactly one literal owner, read it back independently, and register any failed or over-broad operation before proceeding. Validate the already-applied bootstrap owners independently before commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
     }
   ]
 }
