@@ -44153,6 +44153,16 @@
       "prevention": "Measure candidate build directories read-only, select only the largest inactive generated caches, and remove each exact verified literal path in a separate bounded command or provide the founder an explicit PowerShell script when local policy blocks deletion.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3897-EXACT-BUILD-CACHE-REMOVAL-POLICY-REJECTION",
+      "status": "registered_repository_clean_wrapper_or_founder_cleanup_required",
+      "appliesTo": ["primary", "coordination", "storage", "tooling"],
+      "mistake": "The execution environment also rejected deletion of one exact, resolved, workspace-contained, non-reparse apps/mobile/build directory before the command ran.",
+      "rootCause": "Direct recursive Remove-Item is prohibited by the active command policy even when the target is explicit and validated.",
+      "prevention": "Do not retry direct recursive deletion. Use the repository Flutter clean wrapper for exact inactive mobile worktrees, or provide the founder a validated literal-path PowerShell cleanup block if the wrapper cannot reclaim enough space.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md", "scripts/invoke-flutter-with-clean-support.ps1"]
     }
   ]
 }
