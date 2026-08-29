@@ -51,8 +51,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   ChatEntryContext get _entryContext =>
       ChatEntryContext.resolve(widget.returnRoute);
 
-  ChatThreadType? get _effectiveInitialFilter =>
-      widget.initialFilter ?? _entryContext.defaultFilter;
+  ChatThreadType? get _effectiveInitialFilter => widget.initialFilter;
 
   @override
   void initState() {
@@ -566,11 +565,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 socialOnly: _entryContext.id == ChatEntryContextId.social,
                 onReset: () {
                   _searchController.clear();
-                  if (_entryContext.defaultFilter case final filter?) {
-                    widget.session.chooseFilter(filter);
-                  } else {
-                    widget.session.chooseAll();
-                  }
+                  widget.session.chooseAll();
                   setState(() {});
                 },
                 onDiscover: () => _selectSection(ChatHomeSection.discover),

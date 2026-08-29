@@ -101,6 +101,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final session = widget.session;
     final threadId = widget.threadId;
     final draft = _messageController.text;
+    if (!await _confirmSendReview(draft: draft, includesPhoto: false)) {
+      return;
+    }
     final sent = await session.send(threadId, draft);
     if (!sent || !identical(session, widget.session)) return;
     if (_draftTextByThread[threadId] == draft) {
@@ -119,6 +122,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final draft = _messageController.text;
     final selected = session.selectedPhoto(threadId);
     if (selected == null) return;
+    if (!await _confirmSendReview(draft: draft, includesPhoto: true)) {
+      return;
+    }
     final sent = await session.sendSelectedPhoto(threadId, draft);
     if (!sent || !identical(session, widget.session)) return;
     if (_draftTextByThread[threadId] == draft) {
@@ -129,6 +135,98 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         _messageController.text == draft) {
       _messageController.clear();
     }
+  }
+
+  Future<bool> _confirmSendReview({
+    required String draft,
+    required bool includesPhoto,
+  }) async {
+    final session = widget.session;
+    final threadId = widget.threadId;
+    if (!session.reviewBeforeSendingForSession(threadId)) return true;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    final thread = session.thread(threadId);
+    final reply = session.replyTarget(threadId);
+    final trimmedDraft = draft.trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('chat-send-review-dialog'),
+        title: const Text('Review before sending'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'To ${thread.title}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (reply != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Replying to ${reply.sender}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Container(
+                key: const Key('chat-send-review-content'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F2F6),
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                ),
+                child: Text(
+                  switch ((includesPhoto, trimmedDraft.isEmpty)) {
+                    (true, true) => 'Photo',
+                    (true, false) => 'Photo\n$trimmedDraft',
+                    (false, _) => trimmedDraft,
+                  },
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Nothing is sent until you choose Send now.',
+                style: TextStyle(color: MoolColors.muted, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('chat-send-review-edit'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            key: const Key('chat-send-review-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Send now'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true &&
+        mounted &&
+        identical(session, widget.session) &&
+        threadId == widget.threadId;
   }
 
   void _applySuggestedPrompt(String prompt) {
@@ -211,11 +309,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             ? widget.returnRoute
             : returnsToChatThread
             ? widget.returnRoute
-            : chatRoute(
-                '/app/chat/inbox',
-                returnRoute: widget.returnRoute,
-                filter: thread.type.name,
-              );
+            : chatRoute('/app/chat/inbox', returnRoute: widget.returnRoute);
         final entryContext = ChatEntryContext.resolve(widget.returnRoute);
         return ChatPageScaffold(
           key: const Key('chat-thread-screen'),
@@ -565,6 +659,39 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                           'Voice chat is not available right now. You can continue with messages or try a voice call.',
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Wellbeing',
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: const Key('chat-info-review-before-send'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      title: const Text('Review before sending'),
+                      subtitle: const Text(
+                        'Confirm messages and photos before they are sent.',
+                      ),
+                      value: session.reviewBeforeSendingForSession(thread.id),
+                      onChanged: (enabled) {
+                        session.setReviewBeforeSendingForSession(
+                          thread.id,
+                          enabled: enabled,
+                        );
+                        _confirmLocalChange(
+                          enabled
+                              ? 'Send review turned on for this app session.'
+                              : 'Send review turned off for this app session.',
+                        );
+                      },
+                    ),
+                    const _ConversationScopeNote(
+                      'This preference applies to this conversation until you close MoolSocial. It does not change another person’s settings.',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

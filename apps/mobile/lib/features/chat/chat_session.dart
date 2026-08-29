@@ -226,6 +226,7 @@ class ChatSession extends ChangeNotifier {
   final Map<String, bool> _chatAvailableForSession = {};
   final Map<String, bool> _voiceCallsAvailableForSession = {};
   final Map<String, bool> _videoCallsAvailableForSession = {};
+  final Map<String, bool> _reviewBeforeSendingForSession = {};
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -512,6 +513,9 @@ class ChatSession extends ChangeNotifier {
   bool videoCallsAvailableForSession(String threadId) =>
       _videoCallsAvailableForSession[threadId] ?? true;
 
+  bool reviewBeforeSendingForSession(String threadId) =>
+      _reviewBeforeSendingForSession[threadId] ?? false;
+
   void setChatAvailableForSession(String threadId, {required bool available}) {
     if (chatAvailableForSession(threadId) == available) return;
     _chatAvailableForSession[threadId] = available;
@@ -533,6 +537,15 @@ class ChatSession extends ChangeNotifier {
   }) {
     if (videoCallsAvailableForSession(threadId) == available) return;
     _videoCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setReviewBeforeSendingForSession(
+    String threadId, {
+    required bool enabled,
+  }) {
+    if (reviewBeforeSendingForSession(threadId) == enabled) return;
+    _reviewBeforeSendingForSession[threadId] = enabled;
     notifyListeners();
   }
 
