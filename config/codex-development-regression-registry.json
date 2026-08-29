@@ -44633,6 +44633,46 @@
       "prevention": "Select the qualified binding by lane plus exact current task /root/repair_shop_chat_shared_v1_20260829, require one match, and rerun the full handoff gate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3949-CHAT-TEST-NAME-INVENTORY-REGEX-QUOTE-PARSER-FAILURE",
+      "status": "registered_single_quote_parser_safe_pattern_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "audit", "tooling"],
+      "mistake": "The first structured Chat test-name inventory embedded a double-quote character inside a double-quoted PowerShell regex and failed to parse before reading any test.",
+      "rootCause": "The nested JavaScript, PowerShell and regular-expression quoting layers were not reduced to a parser-safe literal.",
+      "prevention": "Use a single-quoted PowerShell regex limited to the repository's single-quoted Dart test names, retain each exact file inventory independently, and do not treat the failed attempt as audit evidence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3950-PHASE1-IMPLEMENTATION-GATE-INCLUDED-DIRTY-PRIMARY-REGISTRY-OWNER",
+      "status": "registered_separate_primary_governance_commit_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "git", "tooling"],
+      "mistake": "The first Phase 1 implementation gate ran while the primary-owned regression registry and registry binding were still dirty, so the Cursor subagent claim correctly rejected the unclaimed governance owner.",
+      "rootCause": "The permanent failure record was added after the ticket bootstrap but was not sealed in a separate primary governance commit before checking the product-owner diff.",
+      "prevention": "Record post-bootstrap failures in the existing primary repair lane, keep the Cursor feature branch on its sealed registry generation, and rerun the subagent implementation gate against only its declared Buy owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3951-PHASE1-REUSED-COORDINATION-BOOTSTRAP-AFTER-SEAL",
+      "status": "registered_post_bootstrap_governance_owner_path_required",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "git", "tooling"],
+      "mistake": "The attempt to seal post-bootstrap registry updates reused coordination_bootstrap after the ticket bootstrap commit already existed, and the gate correctly rejected the phase ordering.",
+      "rootCause": "The bootstrap phase was treated as a reusable governance-owner allowance instead of a one-time pre-bootstrap transition.",
+      "prevention": "Keep the product WIP isolated, record the failure through the existing primary repair owner, and never weaken or reuse the one-time bootstrap rule.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3952-PHASE1-TRANSFERRED-PRIMARY-REGISTRY-TO-SUBAGENT-CLAIM",
+      "status": "registered_primary_only_governance_ownership_must_remain_primary",
+      "appliesTo": ["primary", "coordination", "cursor_ui", "git", "tooling"],
+      "mistake": "The attempted post-bootstrap owner transfer placed the regression registry and coordination policy in the Cursor subagent claim, and the gate correctly rejected both as primary-only owners.",
+      "rootCause": "Owner uniqueness was considered without first applying the immutable primary-only governance-owner rule.",
+      "prevention": "Keep both governance owners in the repair primary claim, record the failure there, and restore the Cursor branch to its sealed bootstrap generation before product testing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }
