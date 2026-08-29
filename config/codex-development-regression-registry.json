@@ -44583,6 +44583,26 @@
       "prevention": "Mark r61.8 consumed failed, preserve its logs/state, reclaim only generated build caches and duplicate sparse checkout artifacts until at least 6 GiB is free, then create a new monotonic r61.9 one-build state; never reuse r61.8 authorization.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/apk-regression-gate-state-shop-chat-r61-8.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/prebuild-validation.md"]
+    },
+    {
+      "id": "REG-20260829-3940-SHARED-CHAT-REMOTE-BRANCH-ADVANCED-BEYOND-IMPLEMENTATION",
+      "status": "registered_stable_implementation_remote_branch_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "remote", "chat"],
+      "mistake": "Final remote readback found work/codex-ui/global-contextual-chat-shell-v1-20260828 at d52dbd57 rather than the authoritative implementation commit 30f46145 because Codex Desktop added later closure commits.",
+      "rootCause": "The repair binding used a mutable feature branch name for an immutable implementation-commit requirement.",
+      "prevention": "Preserve the advanced Codex branch, create and push a separate stable implementation branch fixed at 30f46145, update only the repair remote binding and checker, then require exact remote readback before handoff.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3941-REMOTE-BINDING-COMBINED-POLICY-ANCHOR-MISMATCH",
+      "status": "registered_independent_exact_binding_patches_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "remote", "tooling"],
+      "mistake": "The combined max-closure and required shared-branch policy patch failed because the remembered requiredCursorBranch literal did not match the current on-disk policy; no hunk applied.",
+      "rootCause": "Two distant policy updates were coupled to one stale branch anchor instead of using independent fixed-string discovery.",
+      "prevention": "Discover the exact current requiredCursorBranch line, patch it independently, patch maximumPostMergeClosureCommits independently, parse policy and rerun remote readback before handoff.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }
