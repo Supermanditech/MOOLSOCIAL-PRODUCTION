@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -4319,6 +4321,10 @@ class BuyV2CheckoutView extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                   ],
+                  if (session.checkoutBenefitReviewRequired) ...[
+                    _CartBenefitEligibilityState(session: session),
+                    const SizedBox(height: 9),
+                  ],
                   if (session.checkoutPriceReviewRequired) ...[
                     _CheckoutPriceChangeReview(session: session),
                     const SizedBox(height: 9),
@@ -4397,9 +4403,14 @@ class BuyV2CheckoutView extends StatelessWidget {
                           '${benefit.destination.label} '
                           '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
                       detail:
-                          '${benefit.title}\nEligibility and any saving will be '
-                          'confirmed before payment. No amount has been deducted '
-                          'from this review total.',
+                          benefit.kind == BuyV2CartBenefitKind.coupon &&
+                              benefit.savingAmount > 0
+                          ? '${benefit.title}\n${buyV2Money(benefit.savingAmount)} '
+                                'saving from ${benefit.sponsorName} is included '
+                                'in this review total.'
+                          : '${benefit.title}\n${_cartBenefitSponsorLabel(benefit)}. '
+                                'Final eligibility is checked before payment. '
+                                'No amount has been deducted from this review total.',
                       action: 'Review',
                       onTap: () => _openCartBenefitsPage(
                         context,
@@ -4460,6 +4471,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       onPressed:
                           session.checkoutBusy ||
                               session.checkoutRequiresResolution ||
+                              session.checkoutBenefitReviewRequired ||
                               session.checkoutPriceReviewRequired ||
                               session.checkoutPromiseReviewRequired
                           ? null
@@ -9669,6 +9681,16 @@ class _CartBenefitPanel extends StatelessWidget {
     final selectedPaymentOffers = selectedBenefits
         .where((benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer)
         .length;
+    final liveDetail = session.liveCartBenefitsEnabled
+        ? switch (session.cartBenefitsLoadState) {
+            BuyV2CartBenefitsLoadState.idle => 'Check current eligibility',
+            BuyV2CartBenefitsLoadState.loading => 'Checking eligibility…',
+            BuyV2CartBenefitsLoadState.ready => null,
+            BuyV2CartBenefitsLoadState.offline => 'Offline · Retry available',
+            BuyV2CartBenefitsLoadState.unavailable =>
+              'Eligibility unavailable · Retry',
+          }
+        : null;
     return Container(
       key: const ValueKey('buy-cart-benefits'),
       padding: const EdgeInsets.all(9),
@@ -9693,13 +9715,15 @@ class _CartBenefitPanel extends StatelessWidget {
                   key: const ValueKey('buy-cart-coupons'),
                   icon: Icons.local_offer_outlined,
                   title: 'Coupons',
-                  detail: selectedCoupons > 0
-                      ? '$selectedCoupons selected for review'
-                      : coupons.isEmpty
-                      ? destination == null
-                            ? 'Open by Cart segment'
-                            : 'No eligible ${destination.label} coupon'
-                      : '${coupons.length} available',
+                  detail:
+                      liveDetail ??
+                      (selectedCoupons > 0
+                          ? '$selectedCoupons selected for review'
+                          : coupons.isEmpty
+                          ? destination == null
+                                ? 'Open by Cart segment'
+                                : 'No eligible ${destination.label} coupon'
+                          : '${coupons.length} available'),
                   onTap: () => _openCartBenefitsPage(
                     context,
                     session: session,
@@ -9711,13 +9735,15 @@ class _CartBenefitPanel extends StatelessWidget {
                   key: const ValueKey('buy-cart-payment-offers'),
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'Payment offers',
-                  detail: selectedPaymentOffers > 0
-                      ? '$selectedPaymentOffers selected for review'
-                      : paymentOffers.isEmpty
-                      ? destination == null
-                            ? 'Open by Cart segment'
-                            : 'No ${destination.label} payment offer'
-                      : '${paymentOffers.length} available',
+                  detail:
+                      liveDetail ??
+                      (selectedPaymentOffers > 0
+                          ? '$selectedPaymentOffers selected for review'
+                          : paymentOffers.isEmpty
+                          ? destination == null
+                                ? 'Open by Cart segment'
+                                : 'No ${destination.label} payment offer'
+                          : '${paymentOffers.length} available'),
                   onTap: () => _openCartBenefitsPage(
                     context,
                     session: session,
@@ -9856,6 +9882,27 @@ String _cartBenefitContextLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Orders',
     };
 
+String _cartBenefitStrategyLabel(BuyV2CartBenefitStrategy strategy) =>
+    switch (strategy) {
+      BuyV2CartBenefitStrategy.timedSale => 'Time-bound sale',
+      BuyV2CartBenefitStrategy.publishedOffer => 'Published offer',
+      BuyV2CartBenefitStrategy.minimumOrder => 'MOQ reward',
+      BuyV2CartBenefitStrategy.loadBased => 'Order-load reward',
+      BuyV2CartBenefitStrategy.financialProduct => 'Financial partner offer',
+      BuyV2CartBenefitStrategy.partnerCampaign => 'Partner campaign',
+      BuyV2CartBenefitStrategy.freeDelivery => 'Free delivery',
+    };
+
+String _cartBenefitSponsorLabel(BuyV2CartBenefit benefit) =>
+    '${switch (benefit.sponsor) {
+      BuyV2CartBenefitSponsor.retailer => 'Retailer',
+      BuyV2CartBenefitSponsor.wholesaler => 'Wholesaler',
+      BuyV2CartBenefitSponsor.manufacturer => 'Manufacturer',
+      BuyV2CartBenefitSponsor.bank => 'Bank',
+      BuyV2CartBenefitSponsor.financialPartner => 'Financial partner',
+      BuyV2CartBenefitSponsor.moolSocial => 'MoolSocial',
+    }} · ${benefit.sponsorName}';
+
 String _cartBenefitEmptyTitle(
   BuyV2Destination destination,
   BuyV2CartBenefitKind kind,
@@ -9901,6 +9948,29 @@ class _CartBenefitsPage extends StatefulWidget {
 class _CartBenefitsPageState extends State<_CartBenefitsPage> {
   late BuyV2Destination _destination = widget.initialDestination;
   late BuyV2CartBenefitKind _kind = widget.initialKind;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.addListener(_sessionChanged);
+    if (widget.session.liveCartBenefitsEnabled &&
+        widget.session.cartBenefitsLoadState !=
+            BuyV2CartBenefitsLoadState.ready) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(widget.session.refreshCartBenefits());
+      });
+    }
+  }
+
+  void _sessionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.session.removeListener(_sessionChanged);
+    super.dispose();
+  }
 
   void _completeToCart() {
     HapticFeedback.selectionClick();
@@ -10000,7 +10070,11 @@ class _CartBenefitsPageState extends State<_CartBenefitsPage> {
                           onChanged: _selectKind,
                         ),
                         const SizedBox(height: 9),
-                        if (benefits.isEmpty)
+                        if (widget.session.liveCartBenefitsEnabled &&
+                            widget.session.cartBenefitsLoadState !=
+                                BuyV2CartBenefitsLoadState.ready)
+                          _CartBenefitEligibilityState(session: widget.session)
+                        else if (benefits.isEmpty)
                           BuyV2FiniteIncomingTransition(
                             key: const ValueKey(
                               'buy-cart-benefit-empty-motion',
@@ -10326,6 +10400,67 @@ class _CartBenefitKindButton extends StatelessWidget {
   }
 }
 
+class _CartBenefitEligibilityState extends StatelessWidget {
+  const _CartBenefitEligibilityState({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading =
+        session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.idle ||
+        session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
+    return Container(
+      key: ValueKey('buy-cart-benefits-${session.cartBenefitsLoadState.name}'),
+      padding: const EdgeInsets.all(12),
+      decoration: buyV2CardDecoration(radius: 14),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 38,
+            child: loading
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_off_outlined, color: BuyV2Colors.navy),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  loading
+                      ? 'Checking current eligibility'
+                      : 'Coupons and offers need a refresh',
+                  style: context.buyTitle.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  loading
+                      ? 'Matching this Cart with live campaigns.'
+                      : session.cartBenefitsMessage ??
+                            'Reconnect and try again. Your Cart is unchanged.',
+                  style: context.buyMeta.copyWith(fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+          if (!loading) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              key: const ValueKey('buy-cart-benefits-retry'),
+              onPressed: session.refreshCartBenefits,
+              child: const Text('Retry'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _CartBenefitEmptyState extends StatelessWidget {
   const _CartBenefitEmptyState({required this.destination, required this.kind});
 
@@ -10399,6 +10534,18 @@ class _CartBenefitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spec = BuyV2ThemeScope.of(context);
+    final hasCampaignDetails =
+        benefit.strategy != BuyV2CartBenefitStrategy.partnerCampaign ||
+        benefit.sponsor != BuyV2CartBenefitSponsor.moolSocial ||
+        benefit.sponsorName != 'MoolSocial' ||
+        benefit.savingAmount > 0 ||
+        benefit.freeDelivery ||
+        benefit.validFrom != null ||
+        benefit.validUntil != null ||
+        benefit.offerId != null ||
+        benefit.minimumSpend != null ||
+        benefit.minimumQuantity != null ||
+        benefit.eligiblePaymentMethods.isNotEmpty;
     void activate() => selected ? onRemove() : onSelect();
 
     return AnimatedContainer(
@@ -10455,6 +10602,46 @@ class _CartBenefitCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: context.buyMeta.copyWith(fontSize: 8.5),
                     ),
+                    if (hasCampaignDetails) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_cartBenefitStrategyLabel(benefit.strategy)} · '
+                        '${_cartBenefitSponsorLabel(benefit)}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    if (benefit.savingAmount > 0 ||
+                        benefit.freeDelivery ||
+                        benefit.minimumSpend != null ||
+                        benefit.minimumQuantity != null ||
+                        benefit.validUntil != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (benefit.savingAmount > 0)
+                            'Save ${buyV2Money(benefit.savingAmount)} now',
+                          if (benefit.freeDelivery) 'Free delivery',
+                          if (benefit.minimumSpend case final minimumSpend?)
+                            'Minimum order ${buyV2Money(minimumSpend)}',
+                          if (benefit.minimumQuantity
+                              case final minimumQuantity?)
+                            'Minimum quantity $minimumQuantity',
+                          if (benefit.validUntil case final validUntil?)
+                            'Ends ${MaterialLocalizations.of(context).formatMediumDate(validUntil)}',
+                        ].join(' · '),
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.green,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -10542,7 +10729,10 @@ class _CartBenefitCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  'Selected for Checkout review',
+                                  benefit.kind == BuyV2CartBenefitKind.coupon &&
+                                          benefit.savingAmount > 0
+                                      ? 'Applied to Cart total'
+                                      : 'Selected for Checkout review',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: context.buyMeta.copyWith(
@@ -10560,7 +10750,11 @@ class _CartBenefitCard extends StatelessWidget {
               );
               if (!selected) return ExcludeSemantics(child: visual);
               return Semantics(
-                label: 'Selected for Checkout review',
+                label:
+                    benefit.kind == BuyV2CartBenefitKind.coupon &&
+                        benefit.savingAmount > 0
+                    ? 'Applied to Cart total'
+                    : 'Selected for Checkout review',
                 excludeSemantics: true,
                 child: visual,
               );
@@ -11092,6 +11286,12 @@ class _CartBillSummary extends StatelessWidget {
             _CartAmountRow(
               label: 'Product savings',
               value: '−${buyV2Money(session.scopedCartSavings)}',
+              valueColor: BuyV2Colors.green,
+            ),
+          if (session.scopedCouponSaving > 0)
+            _CartAmountRow(
+              label: 'Coupon saving',
+              value: '−${buyV2Money(session.scopedCouponSaving)}',
               valueColor: BuyV2Colors.green,
             ),
           if (session.scopedTipTotal > 0)

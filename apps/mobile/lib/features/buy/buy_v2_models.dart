@@ -269,6 +269,7 @@ class BuyV2Order {
     this.addressLine,
     this.deliveryInstruction,
     this.tip = 0,
+    this.discount = 0,
     this.invoiceAvailable = true,
     this.receiptReference,
   });
@@ -294,6 +295,7 @@ class BuyV2Order {
   final String? addressLine;
   final String? deliveryInstruction;
   final int tip;
+  final int discount;
   final bool invoiceAvailable;
   final String? receiptReference;
 }

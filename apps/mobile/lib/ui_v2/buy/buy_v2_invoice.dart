@@ -245,6 +245,12 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     ),
                   if (order.tip > 0)
                     _InvoiceAmountRow(label: 'Delivery tip', amount: order.tip),
+                  if (order.discount > 0)
+                    _InvoiceAmountRow(
+                      label: 'Coupon saving',
+                      amount: order.discount,
+                      deduction: true,
+                    ),
                   _InvoiceAmountRow(
                     label: 'Order total',
                     amount: order.total,
@@ -460,11 +466,13 @@ class _InvoiceAmountRow extends StatelessWidget {
     required this.label,
     required this.amount,
     this.prominent = false,
+    this.deduction = false,
   });
 
   final String label;
   final int amount;
   final bool prominent;
+  final bool deduction;
 
   @override
   Widget build(BuildContext context) {
@@ -481,7 +489,7 @@ class _InvoiceAmountRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text(buyV2Money(amount), style: style),
+          Text('${deduction ? '−' : ''}${buyV2Money(amount)}', style: style),
         ],
       ),
     );

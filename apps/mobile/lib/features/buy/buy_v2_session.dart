@@ -298,6 +298,9 @@ class BuyV2Session extends ChangeNotifier {
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const _BuyV2DeviceReviewCommerceAdapter()
                : const _BuyV2UnavailableCommerceAdapter()) {
+    if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
+      cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
+    }
     _catalogueProducts.addAll(BuyV2Catalogue.products);
     if (this.reviewDataEnabled) {
       _businessVerificationState = BuyV2BusinessVerificationState.verified;
@@ -376,6 +379,11 @@ class BuyV2Session extends ChangeNotifier {
           BuyV2CheckoutSubmissionState.paymentActionRequired ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.paymentPending ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.paymentUnknown;
+
+  bool get checkoutBenefitReviewRequired =>
+      liveCartBenefitsEnabled &&
+      _hasSelectedCartBenefitReference &&
+      cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready;
 
   BuyV2Destination destination = BuyV2Destination.shop;
   BuyV2View view = BuyV2View.catalogue;
@@ -532,6 +540,11 @@ class BuyV2Session extends ChangeNotifier {
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
       {};
+  List<BuyV2CartBenefit> _liveCartBenefits = [];
+  int _cartBenefitsRequestSequence = 0;
+  BuyV2CartBenefitsLoadState cartBenefitsLoadState =
+      BuyV2CartBenefitsLoadState.ready;
+  String? cartBenefitsMessage;
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
   String? _savedProductsOwnerScope;
@@ -1278,9 +1291,39 @@ class BuyV2Session extends ChangeNotifier {
     (total, group) => total + tipForGroup(group),
   );
 
-  int get scopedPayableTotal => scopedCartTotal + scopedTipTotal;
+  int couponSavingForDestination(BuyV2Destination destination) {
+    final coupon = selectedCartBenefit(
+      kind: BuyV2CartBenefitKind.coupon,
+      destination: destination,
+    );
+    if (coupon == null) return 0;
+    return coupon.savingAmount.clamp(0, totalForDestination(destination));
+  }
 
-  int get checkoutPayableTotal => checkoutTotal + checkoutTipTotal;
+  int get scopedCouponSaving => cartLines
+      .map((line) => line.product.destination)
+      .toSet()
+      .fold(
+        0,
+        (total, destination) => total + couponSavingForDestination(destination),
+      );
+
+  int get checkoutCouponSaving => checkoutDestinations.fold(
+    0,
+    (total, destination) => total + couponSavingForDestination(destination),
+  );
+
+  int get scopedPayableTotal =>
+      (scopedCartTotal + scopedTipTotal - scopedCouponSaving).clamp(
+        0,
+        scopedCartTotal + scopedTipTotal,
+      );
+
+  int get checkoutPayableTotal =>
+      (checkoutTotal + checkoutTipTotal - checkoutCouponSaving).clamp(
+        0,
+        checkoutTotal + checkoutTipTotal,
+      );
 
   List<BuyV2TipOption> tipOptionsFor(BuyV2Destination destination) =>
       List.unmodifiable(tipPolicy.optionsFor(destination));
@@ -1352,6 +1395,177 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  bool get liveCartBenefitsEnabled =>
+      cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter;
+
+  bool get cartBenefitsBusy =>
+      cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
+
+  String _cartBenefitsFingerprint() => _cart.values
+      .map(
+        (line) => '${line.product.id}:${line.quantity}:${line.product.price}',
+      )
+      .followedBy([selectedPayment])
+      .join('|');
+
+  Future<bool> refreshCartBenefits() async {
+    final adapter = cartBenefitsAdapter;
+    if (adapter is! BuyV2LiveCartBenefitsAdapter) return true;
+    if (_cart.isEmpty) {
+      _liveCartBenefits = [];
+      cartBenefitsLoadState = BuyV2CartBenefitsLoadState.ready;
+      cartBenefitsMessage = null;
+      notifyListeners();
+      return true;
+    }
+    final requestSequence = ++_cartBenefitsRequestSequence;
+    final fingerprint = _cartBenefitsFingerprint();
+    cartBenefitsLoadState = BuyV2CartBenefitsLoadState.loading;
+    cartBenefitsMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadEligibility(
+        BuyV2CartBenefitsRequest(
+          lines: List.unmodifiable(_cart.values),
+          selectedPaymentMethod: selectedPayment,
+        ),
+      );
+      if (requestSequence != _cartBenefitsRequestSequence ||
+          fingerprint != _cartBenefitsFingerprint()) {
+        return false;
+      }
+      cartBenefitsLoadState = snapshot.state;
+      cartBenefitsMessage = snapshot.customerMessage;
+      if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
+        _liveCartBenefits = [];
+        notifyListeners();
+        return !_hasSelectedCartBenefitReference;
+      }
+      _liveCartBenefits = _validatedLiveCartBenefits(snapshot);
+      final removedSelection = _removeIneligibleCartBenefitSelections();
+      if (removedSelection) {
+        cartBenefitsMessage =
+            'A selected coupon or offer is no longer eligible. Review the current options.';
+      }
+      notifyListeners();
+      return !removedSelection;
+    } on Object {
+      if (requestSequence != _cartBenefitsRequestSequence) return false;
+      _liveCartBenefits = [];
+      cartBenefitsLoadState = BuyV2CartBenefitsLoadState.unavailable;
+      cartBenefitsMessage =
+          'Coupons and offers could not be checked. Try again.';
+      notifyListeners();
+      return !_hasSelectedCartBenefitReference;
+    }
+  }
+
+  List<BuyV2CartBenefit> _validatedLiveCartBenefits(
+    BuyV2CartBenefitsSnapshot snapshot,
+  ) {
+    final destinations = cartDestinations;
+    final totals = {
+      for (final destination in destinations)
+        destination: totalForDestination(destination),
+    };
+    final quantities = {
+      for (final destination in destinations)
+        destination: countForDestination(destination),
+    };
+    final ids = <String>{};
+    return List.unmodifiable([
+      for (final benefit in snapshot.benefits)
+        if (destinations.contains(benefit.destination) &&
+            benefit.id.trim().isNotEmpty &&
+            benefit.title.trim().isNotEmpty &&
+            benefit.detail.trim().isNotEmpty &&
+            benefit.sourceId.trim().isNotEmpty &&
+            benefit.sponsorName.trim().isNotEmpty &&
+            benefit.savingAmount >= 0 &&
+            benefit.savingAmount <= (totals[benefit.destination] ?? 0) &&
+            (benefit.kind == BuyV2CartBenefitKind.coupon ||
+                benefit.savingAmount == 0) &&
+            _liveBenefitMatchesStrategy(
+              benefit,
+              evaluatedAt: snapshot.evaluatedAt,
+              destinationTotal: totals[benefit.destination] ?? 0,
+              destinationQuantity: quantities[benefit.destination] ?? 0,
+            ) &&
+            ids.add(
+              '${benefit.destination.name}|${benefit.kind.name}|${benefit.id}',
+            ))
+          benefit,
+    ]);
+  }
+
+  bool _liveBenefitMatchesStrategy(
+    BuyV2CartBenefit benefit, {
+    required DateTime evaluatedAt,
+    required int destinationTotal,
+    required int destinationQuantity,
+  }) {
+    if (benefit.validFrom case final validFrom?
+        when evaluatedAt.isBefore(validFrom)) {
+      return false;
+    }
+    if (benefit.validUntil case final validUntil?
+        when !evaluatedAt.isBefore(validUntil)) {
+      return false;
+    }
+    if (benefit.minimumSpend case final minimumSpend?
+        when minimumSpend <= 0 || destinationTotal < minimumSpend) {
+      return false;
+    }
+    if (benefit.minimumQuantity case final minimumQuantity?
+        when minimumQuantity <= 0 || destinationQuantity < minimumQuantity) {
+      return false;
+    }
+    return switch (benefit.strategy) {
+      BuyV2CartBenefitStrategy.timedSale => benefit.validUntil != null,
+      BuyV2CartBenefitStrategy.publishedOffer =>
+        benefit.offerId?.trim().isNotEmpty ?? false,
+      BuyV2CartBenefitStrategy.minimumOrder =>
+        benefit.minimumSpend != null || benefit.minimumQuantity != null,
+      BuyV2CartBenefitStrategy.loadBased => benefit.minimumQuantity != null,
+      BuyV2CartBenefitStrategy.financialProduct =>
+        (benefit.sponsor == BuyV2CartBenefitSponsor.bank ||
+                benefit.sponsor == BuyV2CartBenefitSponsor.financialPartner) &&
+            (benefit.eligiblePaymentMethods.isEmpty ||
+                benefit.eligiblePaymentMethods.contains(selectedPayment)),
+      BuyV2CartBenefitStrategy.partnerCampaign => true,
+      BuyV2CartBenefitStrategy.freeDelivery => benefit.freeDelivery,
+    };
+  }
+
+  bool get _hasSelectedCartBenefitReference =>
+      _selectedCartBenefitRefs.isNotEmpty;
+
+  bool _removeIneligibleCartBenefitSelections() {
+    var removed = false;
+    _selectedCartBenefitRefs.removeWhere((key, selection) {
+      final available = _liveCartBenefits.any(
+        (benefit) =>
+            key ==
+                _cartBenefitSelectionKey(benefit.destination, benefit.kind) &&
+            selection.benefitId == benefit.id &&
+            selection.sourceId == benefit.sourceId,
+      );
+      if (!available) removed = true;
+      return !available;
+    });
+    return removed;
+  }
+
+  void _invalidateLiveCartBenefits() {
+    if (!liveCartBenefitsEnabled) return;
+    _cartBenefitsRequestSequence += 1;
+    _liveCartBenefits = [];
+    cartBenefitsLoadState = _cart.isEmpty
+        ? BuyV2CartBenefitsLoadState.ready
+        : BuyV2CartBenefitsLoadState.idle;
+    cartBenefitsMessage = null;
+  }
+
   List<BuyV2CartBenefit> cartBenefits({
     required BuyV2CartBenefitKind kind,
     BuyV2Destination? destination,
@@ -1363,13 +1577,15 @@ class BuyV2Session extends ChangeNotifier {
         destinations.contains(BuyV2Destination.orders)) {
       return const [];
     }
-    final raw = cartBenefitsAdapter.benefitsFor(
-      kind: kind,
-      destinations: destinations,
-      itemTotal: destination == null
-          ? scopedCartTotal
-          : totalForDestination(destination),
-    );
+    final raw = liveCartBenefitsEnabled
+        ? _liveCartBenefits
+        : cartBenefitsAdapter.benefitsFor(
+            kind: kind,
+            destinations: destinations,
+            itemTotal: destination == null
+                ? scopedCartTotal
+                : totalForDestination(destination),
+          );
     final valid = <BuyV2CartBenefit>[];
     final ids = <String>{};
     for (final benefit in raw) {
@@ -1379,7 +1595,9 @@ class BuyV2Session extends ChangeNotifier {
           benefit.title.trim().isEmpty ||
           benefit.detail.trim().isEmpty ||
           benefit.sourceId.trim().isEmpty ||
-          !ids.add(benefit.id)) {
+          benefit.sponsorName.trim().isEmpty ||
+          benefit.savingAmount < 0 ||
+          !ids.add('${benefit.destination.name}|${benefit.id}')) {
         continue;
       }
       valid.add(benefit);
@@ -1426,6 +1644,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool chooseCartBenefit(BuyV2CartBenefit benefit) {
+    if (liveCartBenefitsEnabled &&
+        cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
+      notice = 'Coupon eligibility is still being checked.';
+      notifyListeners();
+      return false;
+    }
     final available = cartBenefits(
       kind: benefit.kind,
       destination: benefit.destination,
@@ -1449,7 +1673,10 @@ class BuyV2Session extends ChangeNotifier {
       benefitId: current.id,
       sourceId: current.sourceId,
     );
-    notice = '${current.title} selected for Checkout review.';
+    notice =
+        current.kind == BuyV2CartBenefitKind.coupon && current.savingAmount > 0
+        ? '${current.title} applied. Your total now includes the saving.'
+        : '${current.title} selected for Checkout review.';
     notifyListeners();
     return true;
   }
@@ -2465,6 +2692,7 @@ class BuyV2Session extends ChangeNotifier {
       product: item,
       quantity: (current?.quantity ?? 0) + item.minimumOrder,
     );
+    _pruneCartSelections();
     final unitLabel = itemCount == 1 ? 'item' : 'items';
     _acknowledgeCart('${item.title} added · $itemCount $unitLabel');
     _persistCustomerState();
@@ -2549,6 +2777,7 @@ class BuyV2Session extends ChangeNotifier {
       return;
     }
     _cart[id] = current.copyWith(quantity: current.quantity + 1);
+    _pruneCartSelections();
     _acknowledgeCart(
       '${current.product.title} · ${current.quantity + 1} in cart',
     );
@@ -2697,6 +2926,10 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     selectedPayment = value;
+    _invalidateLiveCartBenefits();
+    if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
+      unawaited(refreshCartBenefits());
+    }
     notice = '$value selected';
     _persistCustomerState();
     notifyListeners();
@@ -2782,16 +3015,32 @@ class BuyV2Session extends ChangeNotifier {
     final purchaseId =
         'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
     _confirmedPurchaseId = purchaseId;
-    _confirmedOrders = groups
-        .map((group) => _createOrderForGroup(group, address, purchaseId))
-        .toList(growable: false);
+    _confirmedOrders = _createOrdersForGroups(groups, address, purchaseId);
     _completeConfirmedOrder(previous: previous, lines: lines);
     return true;
   }
 
   Future<bool> submitOrder() {
-    if (reviewDataEnabled) return Future<bool>.value(confirmOrder());
+    if (reviewDataEnabled) {
+      if (liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) {
+        return _submitReviewOrderWithLiveBenefits();
+      }
+      return Future<bool>.value(confirmOrder());
+    }
     return _submitOrderAsync();
+  }
+
+  Future<bool> _submitReviewOrderWithLiveBenefits() async {
+    final eligible = await refreshCartBenefits();
+    if (!eligible ||
+        cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
+      notice =
+          cartBenefitsMessage ??
+          'Coupon eligibility could not be confirmed. Review the current options.';
+      notifyListeners();
+      return false;
+    }
+    return confirmOrder();
   }
 
   bool _refreshCheckoutFactsForProduction(List<BuyV2CartLine> lines) {
@@ -2876,6 +3125,17 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'Review and accept the updated delivery times to continue.';
       notifyListeners();
       return false;
+    }
+    if (liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) {
+      final eligible = await refreshCartBenefits();
+      if (!eligible ||
+          cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
+        notice =
+            cartBenefitsMessage ??
+            'Coupon eligibility could not be confirmed. Review the current options.';
+        notifyListeners();
+        return false;
+      }
     }
     if (!_refreshCheckoutFactsForProduction(lines)) return false;
     final groups = checkoutFulfilmentGroups;
@@ -2992,15 +3252,21 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (!reviewDataEnabled &&
+        placement.orders.fold<int>(0, (total, order) => total + order.total) !=
+            checkoutPayableTotal) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
+      notice = 'Order total could not be verified. Your Cart has not changed.';
+      notifyListeners();
+      return false;
+    }
     final purchaseId =
         placement.purchaseReference ??
         'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
     _confirmedPurchaseId = purchaseId;
     _confirmedOrders = placement.orders.isNotEmpty
         ? List.unmodifiable(placement.orders)
-        : groups
-              .map((group) => _createOrderForGroup(group, address, purchaseId))
-              .toList(growable: false);
+        : _createOrdersForGroups(groups, address, purchaseId);
     _completeConfirmedOrder(previous: previous, lines: lines);
     return true;
   }
@@ -3169,11 +3435,39 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  BuyV2Order _createOrderForGroup(
-    BuyV2FulfilmentGroup group,
+  List<BuyV2Order> _createOrdersForGroups(
+    List<BuyV2FulfilmentGroup> groups,
     BuyV2Address address,
     String purchaseId,
   ) {
+    final remainingDiscount = {
+      for (final destination
+          in groups.map((group) => group.destination).toSet())
+        destination: couponSavingForDestination(destination),
+    };
+    return List.unmodifiable([
+      for (final group in groups)
+        () {
+          final available = remainingDiscount[group.destination] ?? 0;
+          final groupPayable = group.total + tipForGroup(group);
+          final discount = available > groupPayable ? groupPayable : available;
+          remainingDiscount[group.destination] = available - discount;
+          return _createOrderForGroup(
+            group,
+            address,
+            purchaseId,
+            discount: discount,
+          );
+        }(),
+    ]);
+  }
+
+  BuyV2Order _createOrderForGroup(
+    BuyV2FulfilmentGroup group,
+    BuyV2Address address,
+    String purchaseId, {
+    int discount = 0,
+  }) {
     final sequence = _orderSequence++;
     final prefix = switch (group.destination) {
       BuyV2Destination.shop => 'MS',
@@ -3198,7 +3492,7 @@ class BuyV2Session extends ChangeNotifier {
       title: '${group.destination.label} order',
       itemSummary:
           '${group.itemCount} $itemName · ${address.label} · ${address.area}',
-      total: group.total + tipForGroup(group),
+      total: group.total + tipForGroup(group) - discount,
       partner: group.partner,
       partnerType: group.partnerType,
       promise: group.promise,
@@ -3216,6 +3510,7 @@ class BuyV2Session extends ChangeNotifier {
         group.destination,
       )?.label,
       tip: tipForGroup(group),
+      discount: discount,
     );
   }
 
@@ -3247,6 +3542,10 @@ class BuyV2Session extends ChangeNotifier {
       _cart.values.toList(growable: false),
     ).map((group) => group.key).toSet();
     _tipsByFulfilmentKey.removeWhere((key, _) => !groupKeys.contains(key));
+    _invalidateLiveCartBenefits();
+    if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
+      unawaited(refreshCartBenefits());
+    }
   }
 
   bool reorder(BuyV2Order order) {

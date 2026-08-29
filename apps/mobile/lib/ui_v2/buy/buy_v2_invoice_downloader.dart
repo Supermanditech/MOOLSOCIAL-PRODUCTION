@@ -70,6 +70,7 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     '',
     'Items subtotal: INR $subtotal',
     if (order.tip > 0) 'Delivery tip: INR ${order.tip}',
+    if (order.discount > 0) 'Coupon saving: -INR ${order.discount}',
     'Order total: INR ${order.total}',
   ];
   return <String, Object>{

@@ -132,6 +132,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     await widget.session.restoreCommerce();
     await widget.session.restoreCustomerState();
     await widget.session.restoreSavedProducts();
+    await widget.session.refreshCartBenefits();
     await _gstInvoiceController.restore();
   }
 
