@@ -491,10 +491,10 @@ class BuyV2ProductView extends StatelessWidget {
               _ProductReviewsPanel(
                 product: product,
                 review: review,
-                onReview: session.productFeedbackAvailable
+                onReview: session.canReviewProduct(product.id)
                     ? () => _showProductReviewSheet(context, session, product)
                     : null,
-                onReport: session.productFeedbackAvailable
+                onReport: session.canReportProduct(product.id)
                     ? () => _showProductReportSheet(context, session, product)
                     : null,
                 reported: session.hasReportedProduct(product.id),
@@ -2576,6 +2576,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final FocusNode _commentFocus;
   late int _rating;
   bool _submissionRejected = false;
+  bool _submitting = false;
 
   bool get _isValid =>
       _rating >= 1 && _rating <= 5 && _commentController.text.trim().isNotEmpty;
@@ -2594,17 +2595,25 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     if (mounted) setState(() {});
   }
 
-  void _submit() {
-    if (!_isValid) return;
-    final saved = widget.session.submitProductReview(
+  Future<void> _submit() async {
+    if (!_isValid || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _submissionRejected = false;
+    });
+    final saved = await widget.session.submitProductReviewOnline(
       productId: widget.product.id,
       rating: _rating,
       comment: _commentController.text,
     );
+    if (!mounted) return;
     if (saved) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _submissionRejected = true);
+      setState(() {
+        _submitting = false;
+        _submissionRejected = true;
+      });
     }
   }
 
@@ -2673,10 +2682,12 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                               'buy-review-rating-${widget.product.id}-$value',
                             ),
                             tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
-                            onPressed: () => setState(() {
-                              _rating = value;
-                              _submissionRejected = false;
-                            }),
+                            onPressed: _submitting
+                                ? null
+                                : () => setState(() {
+                                    _rating = value;
+                                    _submissionRejected = false;
+                                  }),
                             icon: Icon(
                               value <= _rating
                                   ? Icons.star_rounded
@@ -2731,6 +2742,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     onChanged: (_) => setState(() {
                       _submissionRejected = false;
                     }),
+                    enabled: !_submitting,
                     minLines: 3,
                     maxLines: 5,
                     maxLength: 500,
@@ -2768,6 +2780,8 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     key: ValueKey(
                       _submissionRejected
                           ? 'review-submit-rejected'
+                          : _submitting
+                          ? 'review-submitting'
                           : _isValid
                           ? 'review-ready'
                           : 'review-incomplete',
@@ -2777,6 +2791,8 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                       _submissionRejected
                           ? (widget.session.notice ??
                                 'This review could not be saved.')
+                          : _submitting
+                          ? 'Saving your review…'
                           : _isValid
                           ? 'Ready to save to this product.'
                           : 'Choose a rating and write a review to enable Save.',
@@ -2797,7 +2813,9 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     Expanded(
                       child: TextButton(
                         key: const ValueKey('buy-cancel-product-review'),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
                       ),
                     ),
@@ -2810,9 +2828,16 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                           key: ValueKey(
                             'buy-submit-review-${widget.product.id}',
                           ),
-                          onPressed: _isValid ? _submit : null,
-                          icon: const Icon(Icons.check_rounded, size: 18),
-                          label: const Text('Save review'),
+                          onPressed: _isValid && !_submitting ? _submit : null,
+                          icon: _submitting
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.check_rounded, size: 18),
+                          label: Text(_submitting ? 'Saving…' : 'Save review'),
                         ),
                       ),
                     ),
@@ -2845,18 +2870,27 @@ class _ProductReportSheet extends StatefulWidget {
 class _ProductReportSheetState extends State<_ProductReportSheet> {
   String? _selectedReason;
   bool _submissionRejected = false;
+  bool _submitting = false;
 
-  void _submit() {
+  Future<void> _submit() async {
     final reason = _selectedReason;
-    if (reason == null) return;
-    final reported = widget.session.reportProduct(
+    if (reason == null || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _submissionRejected = false;
+    });
+    final reported = await widget.session.reportProductOnline(
       productId: widget.product.id,
       reason: reason,
     );
+    if (!mounted) return;
     if (reported) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _submissionRejected = true);
+      setState(() {
+        _submitting = false;
+        _submissionRejected = true;
+      });
     }
   }
 
@@ -2913,10 +2947,12 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                         child: InkWell(
                           key: ValueKey('buy-report-reason-$index'),
                           borderRadius: BorderRadius.circular(14),
-                          onTap: () => setState(() {
-                            _selectedReason = widget.reasons[index];
-                            _submissionRejected = false;
-                          }),
+                          onTap: _submitting
+                              ? null
+                              : () => setState(() {
+                                  _selectedReason = widget.reasons[index];
+                                  _submissionRejected = false;
+                                }),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -2957,6 +2993,8 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                   key: ValueKey(
                     _submissionRejected
                         ? 'report-submit-rejected'
+                        : _submitting
+                        ? 'report-submitting'
                         : _selectedReason == null
                         ? 'report-incomplete'
                         : 'report-ready',
@@ -2966,6 +3004,8 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                     _submissionRejected
                         ? (widget.session.notice ??
                               'This report could not be sent.')
+                        : _submitting
+                        ? 'Sending your report…'
                         : _selectedReason == null
                         ? 'Choose one reason to enable Send.'
                         : 'Ready to send this listing issue.',
@@ -2986,7 +3026,9 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                   Expanded(
                     child: TextButton(
                       key: const ValueKey('buy-cancel-product-report'),
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -2997,9 +3039,18 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                       height: 48,
                       child: FilledButton.icon(
                         key: ValueKey('buy-submit-report-${widget.product.id}'),
-                        onPressed: _selectedReason == null ? null : _submit,
-                        icon: const Icon(Icons.send_outlined, size: 18),
-                        label: const Text('Send report'),
+                        onPressed: _selectedReason == null || _submitting
+                            ? null
+                            : _submit,
+                        icon: _submitting
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send_outlined, size: 18),
+                        label: Text(_submitting ? 'Sending…' : 'Send report'),
                       ),
                     ),
                   ),

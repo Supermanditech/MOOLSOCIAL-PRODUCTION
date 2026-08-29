@@ -160,6 +160,10 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
     products: BuyV2Catalogue.products,
     paymentMethods: BuyV2Session.paymentMethods,
     businessVerified: true,
+    productReportsAvailable: true,
+    reviewableProductIds: BuyV2Catalogue.products
+        .map((product) => product.id)
+        .toSet(),
   );
 
   @override
@@ -235,6 +239,12 @@ class BuyV2Session extends ChangeNotifier {
                ? const _BuyV2DeviceReviewCommerceAdapter()
                : const _BuyV2UnavailableCommerceAdapter()) {
     _catalogueProducts.addAll(BuyV2Catalogue.products);
+    if (this.reviewDataEnabled) {
+      _productReportsAvailable = true;
+      _reviewableProductIds.addAll(
+        BuyV2Catalogue.products.map((product) => product.id),
+      );
+    }
     if (!this.reviewDataEnabled) {
       _catalogueProducts.clear();
       _addresses.clear();
@@ -283,7 +293,14 @@ class BuyV2Session extends ChangeNotifier {
   bool get catalogueAvailable =>
       commerceLoadState == BuyV2CommerceLoadState.ready;
 
-  bool get productFeedbackAvailable => reviewDataEnabled;
+  bool canReviewProduct(String productId) =>
+      _reviewableProductIds.contains(productId);
+
+  bool canReportProduct(String productId) =>
+      findProduct(productId) != null && _productReportsAvailable;
+
+  bool productFeedbackBusy(String productId) =>
+      _productFeedbackBusyIds.contains(productId);
 
   bool get addressRequestsAvailable => reviewDataEnabled;
 
@@ -425,6 +442,9 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
   final Map<String, String> _reportedProductReasons = {};
+  final Set<String> _reviewableProductIds = {};
+  final Set<String> _productFeedbackBusyIds = {};
+  bool _productReportsAvailable = false;
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
@@ -595,6 +615,10 @@ class BuyV2Session extends ChangeNotifier {
         ..clear()
         ..addAll(snapshot.orders);
       businessVerified = snapshot.businessVerified;
+      _productReportsAvailable = snapshot.productReportsAvailable;
+      _reviewableProductIds
+        ..clear()
+        ..addAll(snapshot.reviewableProductIds);
       availablePaymentMethods = Set.unmodifiable(snapshot.paymentMethods);
       _selectedAddressId = snapshot.selectedAddressId;
       if (_selectedAddressId != null &&
@@ -2057,6 +2081,101 @@ class BuyV2Session extends ChangeNotifier {
     notice = 'Report received. We will review these product details.';
     notifyListeners();
     return true;
+  }
+
+  Future<bool> submitProductReviewOnline({
+    required String productId,
+    required int rating,
+    required String comment,
+  }) async {
+    if (reviewDataEnabled) {
+      return submitProductReview(
+        productId: productId,
+        rating: rating,
+        comment: comment,
+      );
+    }
+    final product = findProduct(productId);
+    final cleanComment = comment.trim();
+    if (product == null || rating < 1 || rating > 5 || cleanComment.isEmpty) {
+      notice = 'Add a rating and a short review to continue.';
+      notifyListeners();
+      return false;
+    }
+    if (!canReviewProduct(productId)) {
+      notice = 'You can review this product after a delivered purchase.';
+      notifyListeners();
+      return false;
+    }
+    if (!_productFeedbackBusyIds.add(productId)) return false;
+    notice = null;
+    notifyListeners();
+    try {
+      final result = await commerceAdapter.submitProductReview(
+        product: product,
+        rating: rating,
+        comment: cleanComment,
+      );
+      if (result.accepted) {
+        _customerReviews[product.canonicalId] = BuyV2CustomerReview(
+          productCanonicalId: product.canonicalId,
+          rating: rating,
+          comment: cleanComment,
+          updatedLabel: 'Added just now',
+        );
+      }
+      notice = result.customerMessage;
+      return result.accepted;
+    } on Object {
+      notice =
+          'Your review could not be sent. Check your connection and retry.';
+      return false;
+    } finally {
+      _productFeedbackBusyIds.remove(productId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> reportProductOnline({
+    required String productId,
+    required String reason,
+  }) async {
+    if (reviewDataEnabled) {
+      return reportProduct(productId: productId, reason: reason);
+    }
+    final product = findProduct(productId);
+    final cleanReason = reason.trim();
+    if (product == null || cleanReason.isEmpty) {
+      notice = 'Choose what needs attention.';
+      notifyListeners();
+      return false;
+    }
+    if (!canReportProduct(productId)) {
+      notice = 'Product reporting is unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    if (!_productFeedbackBusyIds.add(productId)) return false;
+    notice = null;
+    notifyListeners();
+    try {
+      final result = await commerceAdapter.reportProduct(
+        product: product,
+        reason: cleanReason,
+      );
+      if (result.accepted) {
+        _reportedProductReasons[product.canonicalId] = cleanReason;
+      }
+      notice = result.customerMessage;
+      return result.accepted;
+    } on Object {
+      notice =
+          'This report could not be sent. Check your connection and retry.';
+      return false;
+    } finally {
+      _productFeedbackBusyIds.remove(productId);
+      notifyListeners();
+    }
   }
 
   void chooseCategory(String id) {

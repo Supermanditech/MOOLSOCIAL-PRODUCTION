@@ -108,6 +108,8 @@ class BuyV2CommerceSnapshot {
     this.paymentMethods = const {},
     this.selectedAddressId,
     this.businessVerified = false,
+    this.productReportsAvailable = false,
+    this.reviewableProductIds = const {},
     this.customerMessage,
   });
 
@@ -118,6 +120,8 @@ class BuyV2CommerceSnapshot {
   final Set<String> paymentMethods;
   final String? selectedAddressId;
   final bool businessVerified;
+  final bool productReportsAvailable;
+  final Set<String> reviewableProductIds;
   final String? customerMessage;
 }
 

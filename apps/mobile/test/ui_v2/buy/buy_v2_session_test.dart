@@ -44,7 +44,17 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   BuyV2OrderPlacementResult? reconciliation;
   int placementCalls = 0;
   int reconciliationCalls = 0;
+  int reviewCalls = 0;
+  int reportCalls = 0;
   final requests = <BuyV2OrderPlacementRequest>[];
+  BuyV2MutationResult reviewResult = const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Review added.',
+  );
+  BuyV2MutationResult reportResult = const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Report received.',
+  );
 
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
@@ -78,20 +88,20 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   Future<BuyV2MutationResult> reportProduct({
     required BuyV2Product product,
     required String reason,
-  }) async => const BuyV2MutationResult(
-    accepted: true,
-    customerMessage: 'Report received.',
-  );
+  }) async {
+    reportCalls += 1;
+    return reportResult;
+  }
 
   @override
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,
     required int rating,
     required String comment,
-  }) async => const BuyV2MutationResult(
-    accepted: true,
-    customerMessage: 'Review added.',
-  );
+  }) async {
+    reviewCalls += 1;
+    return reviewResult;
+  }
 }
 
 final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
@@ -145,6 +155,8 @@ _openProductionCheckout({
   String? paymentReference,
   BuyV2ProductFactsAdapter? factsAdapter,
   BuyV2CustomerStateStore? customerStateStore,
+  bool productReportsAvailable = false,
+  bool productReviewAvailable = false,
 }) async {
   final product = BuyV2Catalogue.products.firstWhere(
     (candidate) => candidate.destination == BuyV2Destination.shop,
@@ -207,6 +219,8 @@ _openProductionCheckout({
       addresses: const [address],
       selectedAddressId: address.id,
       paymentMethods: const {'UPI'},
+      productReportsAvailable: productReportsAvailable,
+      reviewableProductIds: productReviewAvailable ? {product.id} : const {},
     ),
     placement: placement,
   );
@@ -1638,5 +1652,78 @@ void main() {
         'Check the current payment before changing your Cart or payment method.',
       );
     });
+
+    test(
+      'verified purchase review and product report require real acceptance',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true,
+          productReviewAvailable: true,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(
+          await fixture.session.submitProductReviewOnline(
+            productId: fixture.product.id,
+            rating: 5,
+            comment: 'Fresh and packed carefully.',
+          ),
+          isTrue,
+        );
+        expect(fixture.adapter.reviewCalls, 1);
+        expect(
+          fixture.session.customerReviewFor(fixture.product.id)?.rating,
+          5,
+        );
+        expect(
+          await fixture.session.reportProductOnline(
+            productId: fixture.product.id,
+            reason: 'Product information is incorrect',
+          ),
+          isTrue,
+        );
+        expect(fixture.adapter.reportCalls, 1);
+        expect(fixture.session.hasReportedProduct(fixture.product.id), isTrue);
+      },
+    );
+
+    test(
+      'ineligible or rejected feedback never records local success',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(
+          await fixture.session.submitProductReviewOnline(
+            productId: fixture.product.id,
+            rating: 4,
+            comment: 'Useful product.',
+          ),
+          isFalse,
+        );
+        expect(fixture.adapter.reviewCalls, 0);
+        fixture.adapter.reportResult = const BuyV2MutationResult(
+          accepted: false,
+          customerMessage: 'This report could not be sent. Try again.',
+        );
+        expect(
+          await fixture.session.reportProductOnline(
+            productId: fixture.product.id,
+            reason: 'Product image does not match',
+          ),
+          isFalse,
+        );
+        expect(fixture.adapter.reportCalls, 1);
+        expect(fixture.session.hasReportedProduct(fixture.product.id), isFalse);
+        expect(
+          fixture.session.notice,
+          'This report could not be sent. Try again.',
+        );
+      },
+    );
   });
 }
