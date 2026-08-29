@@ -6636,17 +6636,142 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   );
 }
 
+class _BalancePaymentCard extends StatelessWidget {
+  const _BalancePaymentCard({
+    required this.session,
+    required this.order,
+    this.paymentHandoff,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final BuyV2PaymentHandoff? paymentHandoff;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = session.balancePaymentFor(order.id);
+    final busy = session.balancePaymentBusy(order.id);
+    if (order.balanceDue <= 0 &&
+        result?.state != BuyV2BalancePaymentState.paid) {
+      return const SizedBox.shrink();
+    }
+    final state = result?.state ?? BuyV2BalancePaymentState.upcoming;
+    final amountDue = result?.amountDue ?? order.balanceDue;
+    final dueLabel = result?.dueLabel ?? order.balanceDueLabel ?? 'Due later';
+    final statusLabel = switch (state) {
+      BuyV2BalancePaymentState.upcoming => 'Upcoming balance',
+      BuyV2BalancePaymentState.due => 'Balance due',
+      BuyV2BalancePaymentState.overdue => 'Balance overdue',
+      BuyV2BalancePaymentState.paymentActionRequired => 'Ready for payment',
+      BuyV2BalancePaymentState.paymentPending => 'Payment pending',
+      BuyV2BalancePaymentState.paid => 'Balance paid',
+      BuyV2BalancePaymentState.unknown => 'Payment needs checking',
+      BuyV2BalancePaymentState.offline => 'Balance status offline',
+      BuyV2BalancePaymentState.unavailable => 'Balance payment unavailable',
+    };
+    VoidCallback? action;
+    String? actionLabel;
+    switch (state) {
+      case BuyV2BalancePaymentState.due || BuyV2BalancePaymentState.overdue:
+        action = () => session.startBalancePayment(order.id);
+        actionLabel = 'Pay balance';
+      case BuyV2BalancePaymentState.paymentActionRequired:
+        final handoff = paymentHandoff;
+        if (handoff != null) {
+          action = () => session.continueBalancePayment(order.id, handoff);
+          actionLabel = 'Continue payment';
+        }
+      case BuyV2BalancePaymentState.paymentPending ||
+          BuyV2BalancePaymentState.unknown:
+        action = () => session.reconcileBalancePayment(order.id);
+        actionLabel = 'Check payment';
+      case BuyV2BalancePaymentState.offline ||
+          BuyV2BalancePaymentState.unavailable:
+        action = () => session.restoreBalancePayment(order.id);
+        actionLabel = 'Retry';
+      case BuyV2BalancePaymentState.upcoming || BuyV2BalancePaymentState.paid:
+        break;
+    }
+    return Container(
+      key: const ValueKey('buy-tracking-balance-payment'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: state == BuyV2BalancePaymentState.paid
+            ? BuyV2Colors.softGreen
+            : BuyV2Colors.softBlue,
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: BuyV2Colors.navy,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusLabel,
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+              if (busy)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            state == BuyV2BalancePaymentState.paid
+                ? 'No balance remains.'
+                : '${buyV2Money(amountDue)} · $dueLabel',
+            key: const ValueKey('buy-tracking-balance-amount'),
+            style: context.buyBody,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            result?.customerMessage ??
+                'Payment becomes available when the supplier confirms it is due.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          if (action != null && actionLabel != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: ValueKey(
+                  'buy-tracking-balance-${actionLabel.toLowerCase().replaceAll(' ', '-')}',
+                ),
+                onPressed: busy ? null : action,
+                child: Text(actionLabel),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class BuyV2TrackingView extends StatelessWidget {
   const BuyV2TrackingView({
     super.key,
     required this.session,
     required this.onOpenOrderHelp,
     this.invoiceDownloader,
+    this.paymentHandoff,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -6961,6 +7086,16 @@ class BuyV2TrackingView extends StatelessWidget {
               ),
           ],
         ),
+        if (order.balanceDue > 0 ||
+            session.balancePaymentFor(order.id)?.state ==
+                BuyV2BalancePaymentState.paid) ...[
+          const SizedBox(height: 6),
+          _BalancePaymentCard(
+            session: session,
+            order: order,
+            paymentHandoff: paymentHandoff,
+          ),
+        ],
         const SizedBox(height: 6),
         _TrackingRoute(order: order),
         const SizedBox(height: 6),

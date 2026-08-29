@@ -796,6 +796,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
+        paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2AssistView(

@@ -231,6 +231,54 @@ class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
       );
 }
 
+class _BalancePaymentAdapter implements BuyV2BalancePaymentAdapter {
+  int startCalls = 0;
+  int reconcileCalls = 0;
+  int amountDue = 100;
+
+  @override
+  Future<BuyV2BalancePaymentResult> loadBalance({
+    required String orderId,
+  }) async => BuyV2BalancePaymentResult(
+    state: BuyV2BalancePaymentState.due,
+    amountDue: amountDue,
+    dueLabel: 'due today',
+    customerMessage: 'The supplier confirmed this balance is due.',
+  );
+
+  @override
+  Future<BuyV2BalancePaymentResult> startPayment({
+    required String orderId,
+    required int amountDue,
+    required String idempotencyKey,
+  }) async {
+    startCalls += 1;
+    return BuyV2BalancePaymentResult(
+      state: BuyV2BalancePaymentState.paymentActionRequired,
+      amountDue: amountDue,
+      dueLabel: 'due today',
+      customerMessage: 'Continue to the payment app.',
+      paymentReference: 'BALANCE-PAY-1',
+      paymentActionUri: Uri.parse('upi://pay?pa=supplier@example'),
+    );
+  }
+
+  @override
+  Future<BuyV2BalancePaymentResult> reconcilePayment({
+    required String orderId,
+    required String paymentReference,
+  }) async {
+    reconcileCalls += 1;
+    return const BuyV2BalancePaymentResult(
+      state: BuyV2BalancePaymentState.paid,
+      amountDue: 0,
+      dueLabel: 'Paid now',
+      customerMessage: 'Balance payment confirmed.',
+      paymentReference: 'BALANCE-PAY-1',
+    );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -241,6 +289,7 @@ void main() {
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    BuyV2PaymentHandoff? paymentHandoff,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -261,6 +310,7 @@ void main() {
         initialDestination: session.destination,
         initialView: session.view,
         initialCartScope: session.cartScope,
+        paymentHandoff: paymentHandoff,
       ),
     );
   }
@@ -677,6 +727,73 @@ void main() {
       expect(find.text('Rajasthan Freight Network'), findsOneWidget);
       expect(find.text('Business freight · tracked'), findsOneWidget);
       expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'later balance pays once and reconciles without duplicate payment',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final balanceAdapter = _BalancePaymentAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+        balancePaymentAdapter: balanceAdapter,
+      );
+      addTearDown(session.dispose);
+      final product = productFor(BuyV2Destination.wholesale);
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final booking = session
+          .commercialPaymentTermsFor(group.key)
+          .firstWhere(
+            (term) =>
+                term.kind ==
+                BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+          );
+      expect(session.chooseCommercialPaymentTerm(booking), isTrue);
+      expect(await session.submitOrder(), isTrue);
+      final order = session.confirmedOrders.single;
+      balanceAdapter.amountDue = order.balanceDue;
+      expect(session.openTracking(order.id), isTrue);
+
+      await tester.pumpWidget(app(session, paymentHandoff: (_) async => true));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-tracking-balance-payment')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-tracking-balance-payment')),
+          matching: find.text('Balance due'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-pay-balance')),
+      );
+      await tester.pumpAndSettle();
+      expect(balanceAdapter.startCalls, 1);
+      expect(await session.startBalancePayment(order.id), isFalse);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-continue-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Payment pending'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-check-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(balanceAdapter.reconcileCalls, 1);
+      expect(find.text('Balance paid'), findsOneWidget);
+      expect(find.text('No balance remains.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

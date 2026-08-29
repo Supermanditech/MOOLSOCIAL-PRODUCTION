@@ -386,6 +386,54 @@ abstract interface class BuyV2CheckoutQuoteAdapter {
   });
 }
 
+enum BuyV2BalancePaymentState {
+  upcoming,
+  due,
+  overdue,
+  paymentActionRequired,
+  paymentPending,
+  paid,
+  unknown,
+  offline,
+  unavailable,
+}
+
+@immutable
+class BuyV2BalancePaymentResult {
+  const BuyV2BalancePaymentResult({
+    required this.state,
+    required this.amountDue,
+    required this.dueLabel,
+    required this.customerMessage,
+    this.paymentReference,
+    this.paymentActionUri,
+  });
+
+  final BuyV2BalancePaymentState state;
+  final int amountDue;
+  final String dueLabel;
+  final String customerMessage;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
+}
+
+abstract interface class BuyV2BalancePaymentAdapter {
+  const BuyV2BalancePaymentAdapter();
+
+  Future<BuyV2BalancePaymentResult> loadBalance({required String orderId});
+
+  Future<BuyV2BalancePaymentResult> startPayment({
+    required String orderId,
+    required int amountDue,
+    required String idempotencyKey,
+  });
+
+  Future<BuyV2BalancePaymentResult> reconcilePayment({
+    required String orderId,
+    required String paymentReference,
+  });
+}
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
