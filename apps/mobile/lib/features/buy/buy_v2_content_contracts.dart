@@ -88,6 +88,8 @@ abstract interface class BuyV2ProductFactsAdapter {
 
 enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
 
+enum BuyV2BusinessVerificationState { verified, pending, rejected, unavailable }
+
 enum BuyV2OrderPlacementOutcome {
   paymentActionRequired,
   confirmed,
@@ -108,6 +110,7 @@ class BuyV2CommerceSnapshot {
     this.paymentMethods = const {},
     this.selectedAddressId,
     this.businessVerified = false,
+    this.businessVerificationState = BuyV2BusinessVerificationState.unavailable,
     this.productReportsAvailable = false,
     this.reviewableProductIds = const {},
     this.customerMessage,
@@ -120,6 +123,7 @@ class BuyV2CommerceSnapshot {
   final Set<String> paymentMethods;
   final String? selectedAddressId;
   final bool businessVerified;
+  final BuyV2BusinessVerificationState businessVerificationState;
   final bool productReportsAvailable;
   final Set<String> reviewableProductIds;
   final String? customerMessage;

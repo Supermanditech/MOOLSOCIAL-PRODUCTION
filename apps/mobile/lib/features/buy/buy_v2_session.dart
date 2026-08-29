@@ -160,6 +160,7 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
     products: BuyV2Catalogue.products,
     paymentMethods: BuyV2Session.paymentMethods,
     businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
     productReportsAvailable: true,
     reviewableProductIds: BuyV2Catalogue.products
         .map((product) => product.id)
@@ -240,6 +241,7 @@ class BuyV2Session extends ChangeNotifier {
                : const _BuyV2UnavailableCommerceAdapter()) {
     _catalogueProducts.addAll(BuyV2Catalogue.products);
     if (this.reviewDataEnabled) {
+      _businessVerificationState = BuyV2BusinessVerificationState.verified;
       _productReportsAvailable = true;
       _reviewableProductIds.addAll(
         BuyV2Catalogue.products.map((product) => product.id),
@@ -330,6 +332,15 @@ class BuyV2Session extends ChangeNotifier {
   String? cartAcknowledgement;
   String? selectedFilter;
   bool businessVerified = true;
+  BuyV2BusinessVerificationState _businessVerificationState =
+      BuyV2BusinessVerificationState.unavailable;
+  BuyV2BusinessVerificationState get businessVerificationState {
+    if (businessVerified) return BuyV2BusinessVerificationState.verified;
+    return _businessVerificationState == BuyV2BusinessVerificationState.verified
+        ? BuyV2BusinessVerificationState.unavailable
+        : _businessVerificationState;
+  }
+
   bool prescriptionAttached = false;
   bool trackingAlertsEnabled = true;
   String selectedPayment = 'UPI';
@@ -614,7 +625,11 @@ class BuyV2Session extends ChangeNotifier {
       _orders
         ..clear()
         ..addAll(snapshot.orders);
-      businessVerified = snapshot.businessVerified;
+      _businessVerificationState = snapshot.businessVerificationState;
+      businessVerified =
+          snapshot.businessVerificationState ==
+              BuyV2BusinessVerificationState.verified ||
+          snapshot.businessVerified;
       _productReportsAvailable = snapshot.productReportsAvailable;
       _reviewableProductIds
         ..clear()

@@ -339,13 +339,25 @@ class BuyV2ProductView extends StatelessWidget {
               ],
               const SizedBox(height: 8),
               if (wholesale)
-                _WholesaleTradeDecisionPanel(
-                  session: session,
-                  product: product,
-                  facts: facts,
-                  decision: offerDecision!,
-                  buyerPromise: buyerPromise,
-                  adapter: wholesaleTradeDecisionAdapter,
+                Column(
+                  children: [
+                    if (!session.businessVerified) ...[
+                      _WholesaleVerificationCard(
+                        state: session.businessVerificationState,
+                        onOpenWorkspace: () =>
+                            context.push('/app/work/workspace'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    _WholesaleTradeDecisionPanel(
+                      session: session,
+                      product: product,
+                      facts: facts,
+                      decision: offerDecision!,
+                      buyerPromise: buyerPromise,
+                      adapter: wholesaleTradeDecisionAdapter,
+                    ),
+                  ],
                 )
               else if (automaticFulfilment)
                 _ProductOfferDecisionPanel(
@@ -515,6 +527,8 @@ class BuyV2ProductView extends StatelessWidget {
             onDecrease: () => session.decrease(product.id),
             onIncrease: () => session.increase(product.id),
             onRetryOffer: () => session.refreshProductFacts(product.id),
+            businessVerified: session.businessVerified,
+            onOpenWorkspace: () => context.push('/app/work/workspace'),
           ),
       ],
     );
@@ -664,6 +678,68 @@ class _ProductDecisionGlance extends StatelessWidget {
   }
 }
 
+class _WholesaleVerificationCard extends StatelessWidget {
+  const _WholesaleVerificationCard({
+    required this.state,
+    required this.onOpenWorkspace,
+  });
+
+  final BuyV2BusinessVerificationState state;
+  final VoidCallback onOpenWorkspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (state) {
+      BuyV2BusinessVerificationState.pending =>
+        'Business verification is in progress',
+      BuyV2BusinessVerificationState.rejected =>
+        'Business details need attention',
+      BuyV2BusinessVerificationState.unavailable =>
+        'Verify your business to order wholesale',
+      BuyV2BusinessVerificationState.verified => 'Business verified',
+    };
+    final detail = switch (state) {
+      BuyV2BusinessVerificationState.pending =>
+        'You can browse trade packs now. Ordering opens after verification.',
+      BuyV2BusinessVerificationState.rejected =>
+        'Open Workspace to review the requested business details.',
+      BuyV2BusinessVerificationState.unavailable =>
+        'Use your verified Workspace for trade pricing, invoices and eligible payment methods.',
+      BuyV2BusinessVerificationState.verified =>
+        'Wholesale ordering is available for this Workspace.',
+    };
+    return Container(
+      key: ValueKey('buy-wholesale-verification-${state.name}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: BuyV2Colors.softOrange,
+        border: BuyV2Colors.orange,
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: context.buyBody),
+          const SizedBox(height: 3),
+          Text(detail, style: context.buyMeta),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: BuyV2Metrics.minimumTap,
+            child: FilledButton.icon(
+              key: const ValueKey('buy-wholesale-open-workspace'),
+              onPressed: onOpenWorkspace,
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('Open Workspace'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WholesaleTradeDecisionPanel extends StatefulWidget {
   const _WholesaleTradeDecisionPanel({
     required this.session,
@@ -752,6 +828,7 @@ class _WholesaleTradeDecisionPanelState
     final product = widget.product;
     final facts = widget.facts;
     final decision = widget.decision;
+    final supplierProducts = widget.session.supplierContinuationsFor(product);
     final statusColor = decision.canAdd
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
@@ -834,6 +911,29 @@ class _WholesaleTradeDecisionPanelState
                 label: 'Fulfilment',
                 value: buyV2AutomaticFulfilmentLabel(product.destination),
               ),
+              if (supplierProducts.isEmpty)
+                _DecisionRow(
+                  icon: Icons.storefront_outlined,
+                  label: product.partnerRole,
+                  value: facts.partner,
+                )
+              else
+                _DecisionActionRow(
+                  key: ValueKey('buy-wholesale-supplier-action-${product.id}'),
+                  icon: Icons.storefront_outlined,
+                  label: product.partnerRole,
+                  value: facts.partner,
+                  detail:
+                      '${supplierProducts.length} other current trade packs',
+                  semanticLabel:
+                      'View ${supplierProducts.length} more products from ${facts.partner} in the current Wholesale catalogue',
+                  onTap: () => _showPartnerProductsSheet(
+                    context,
+                    widget.session,
+                    product,
+                    supplierProducts,
+                  ),
+                ),
               _DecisionRow(
                 icon: Icons.local_shipping_outlined,
                 label: 'Freight',
@@ -1172,6 +1272,8 @@ class _WholesaleTradeActionDock extends StatelessWidget {
     required this.onDecrease,
     required this.onIncrease,
     required this.onRetryOffer,
+    required this.businessVerified,
+    required this.onOpenWorkspace,
   });
 
   final BuyV2Product product;
@@ -1182,6 +1284,8 @@ class _WholesaleTradeActionDock extends StatelessWidget {
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRetryOffer;
+  final bool businessVerified;
+  final VoidCallback onOpenWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -1218,7 +1322,14 @@ class _WholesaleTradeActionDock extends StatelessWidget {
     );
 
     Widget action;
-    if (!decision.canAdd) {
+    if (!businessVerified) {
+      action = FilledButton.icon(
+        key: ValueKey('buy-wholesale-verify-business-${product.id}'),
+        onPressed: onOpenWorkspace,
+        icon: const Icon(Icons.verified_user_outlined),
+        label: const Text('Verify business'),
+      );
+    } else if (!decision.canAdd) {
       action = FilledButton.icon(
         key: ValueKey('buy-wholesale-retry-offer-${product.id}'),
         onPressed: onRetryOffer,
@@ -1326,6 +1437,9 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
     final savings = mrp == null || mrp <= facts.price
         ? null
         : mrp - facts.price;
+    final partnerProducts = product.destination == BuyV2Destination.wholesale
+        ? session.supplierContinuationsFor(product)
+        : session.sellerContinuationsFor(product);
     return Semantics(
       key: ValueKey('buy-product-offer-decision-${product.id}'),
       container: true,
@@ -1390,6 +1504,33 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 label: 'Fulfilment',
                 value: buyV2AutomaticFulfilmentLabel(product.destination),
               ),
+              if (partnerProducts.isEmpty)
+                _DecisionRow(
+                  icon: Icons.storefront_outlined,
+                  label: product.partnerRole,
+                  value: facts.partner,
+                )
+              else
+                _DecisionActionRow(
+                  key: ValueKey(
+                    product.destination == BuyV2Destination.wholesale
+                        ? 'buy-wholesale-supplier-action-${product.id}'
+                        : 'buy-shop-seller-action-${product.id}',
+                  ),
+                  icon: Icons.storefront_outlined,
+                  label: product.partnerRole,
+                  value: facts.partner,
+                  detail:
+                      '${partnerProducts.length} other current ${product.destination == BuyV2Destination.wholesale ? 'packs' : 'products'}',
+                  semanticLabel:
+                      'View ${partnerProducts.length} more products from ${facts.partner} in the current ${product.destination.label} catalogue',
+                  onTap: () => _showPartnerProductsSheet(
+                    context,
+                    session,
+                    product,
+                    partnerProducts,
+                  ),
+                ),
               _DecisionRow(
                 icon: Icons.location_on_outlined,
                 label: 'Deliver to',

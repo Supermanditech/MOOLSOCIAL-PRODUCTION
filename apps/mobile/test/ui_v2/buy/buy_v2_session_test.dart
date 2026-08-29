@@ -157,6 +157,8 @@ _openProductionCheckout({
   BuyV2CustomerStateStore? customerStateStore,
   bool productReportsAvailable = false,
   bool productReviewAvailable = false,
+  BuyV2BusinessVerificationState businessVerificationState =
+      BuyV2BusinessVerificationState.unavailable,
 }) async {
   final product = BuyV2Catalogue.products.firstWhere(
     (candidate) => candidate.destination == BuyV2Destination.shop,
@@ -219,6 +221,7 @@ _openProductionCheckout({
       addresses: const [address],
       selectedAddressId: address.id,
       paymentMethods: const {'UPI'},
+      businessVerificationState: businessVerificationState,
       productReportsAvailable: productReportsAvailable,
       reviewableProductIds: productReviewAvailable ? {product.id} : const {},
     ),
@@ -1723,6 +1726,25 @@ void main() {
           fixture.session.notice,
           'This report could not be sent. Try again.',
         );
+      },
+    );
+
+    test(
+      'Workspace verification status remains authoritative for Wholesale',
+      () async {
+        for (final state in const [
+          BuyV2BusinessVerificationState.pending,
+          BuyV2BusinessVerificationState.rejected,
+          BuyV2BusinessVerificationState.unavailable,
+        ]) {
+          final fixture = await _openProductionCheckout(
+            outcome: BuyV2OrderPlacementOutcome.failed,
+            businessVerificationState: state,
+          );
+          addTearDown(fixture.session.dispose);
+          expect(fixture.session.businessVerified, isFalse);
+          expect(fixture.session.businessVerificationState, state);
+        }
       },
     );
   });
